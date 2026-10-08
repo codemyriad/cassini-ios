@@ -1,0 +1,12 @@
+"library.empty" = "Le tue parole, da ritrovare.";
+"library.empty.hint" = "Importa un documento Cassini da File. Registrazione e trascrizione arriveranno anche in questa versione.";
+"library.search" = "Cerca note e parole trascritte";
+"library.import" = "Importa";
+"library.error" = "Impossibile importare il file";
+"note.transcript" = "TRASCRIZIONE";
+"note.no_transcript" = "Questo file non ha ancora una trascrizione.";
+"note.state.ok" = "Documento portabile · audio verificato";
+"note.state.unverified" = "Documento portabile · audio non verificato";
+"note.state.stale" = "L'audio è cambiato dopo questa trascrizione";
+"note.state.plain" = "Solo audio · nessuna trascrizione";
+"note.state.invalid" = "La trascrizione in questo file è danneggiata o di una versione più recente";

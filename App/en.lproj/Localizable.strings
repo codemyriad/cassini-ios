@@ -1,0 +1,12 @@
+"library.empty" = "Your words, remembered.";
+"library.empty.hint" = "Import a Cassini document from Files. Recording and transcription are coming to this version.";
+"library.search" = "Search notes and what was said";
+"library.import" = "Import";
+"library.error" = "Could not import the file";
+"note.transcript" = "TRANSCRIPT";
+"note.no_transcript" = "This file has no transcript yet.";
+"note.state.ok" = "Portable document · audio verified";
+"note.state.unverified" = "Portable document · audio not verified";
+"note.state.stale" = "The audio has changed since this transcript was made";
+"note.state.plain" = "Audio only · no transcript";
+"note.state.invalid" = "The transcript in this file is damaged or from a newer version";

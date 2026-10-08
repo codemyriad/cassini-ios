@@ -6,3 +6,4 @@ xcuserdata/
 *.opus
 *.wav
 Models/
+build/
