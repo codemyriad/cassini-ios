@@ -19,7 +19,9 @@ targets:
     sources: [Cassini]
     dependencies:
       - package: Cassini
-        product: CassiniNotebook
+        product: CassiniInference
+      - package: Cassini
+        product: CassiniAudio
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.codemyriad.cassini
@@ -46,6 +48,10 @@ targets:
       - target: Cassini
       - package: Cassini
         product: CassiniNotebook
+      - package: Cassini
+        product: CassiniAudio
+      - package: Cassini
+        product: CassiniCore
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES

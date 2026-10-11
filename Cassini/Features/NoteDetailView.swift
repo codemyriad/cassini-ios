@@ -15,6 +15,9 @@ struct NoteDetailView: View {
     @State private var editing: TranscriptSegment?
     @State private var exportItem: ExportItem?
     @State private var consent = false
+    @State private var showingSpeakers = false
+    @State private var showingVersions = false
+    @State private var exportingDocument = false
     private var note: Note? { store.note(noteID) }
     private var activeSegment: UUID? {
         note?.transcript.last { $0.start <= store.player.position && $0.end > store.player.position }?.id
@@ -31,6 +34,7 @@ struct NoteDetailView: View {
                             }
                             if store.recorder.isActive { NoticeCard(title: "Finish recording to listen to this note.", symbol: "mic") }
                             if let failure = note.failureMessage { NoticeCard(title: failure, symbol: "exclamationmark.circle") }
+                            if let message = note.speakerAnalysisMessage { NoticeCard(title: message, symbol: "person.2") }
                             if let unavailable = note.playbackUnavailable { NoticeCard(title: unavailable, symbol: "waveform.slash") }
                             if note.status == .transcribing || note.status == .queued { processingCard(note) }
                             if showSearch {
@@ -62,6 +66,7 @@ struct NoteDetailView: View {
                                     Spacer()
                                     Button { followPlayback.toggle() } label: { Label(followPlayback ? "Following" : "Follow audio", systemImage: "text.line.first.and.arrowtriangle.forward") }.font(.caption).accessibilityValue(followPlayback ? "On" : "Off")
                                 }
+                                Button { showingSpeakers = true } label: { Label("Speakers · \(note.speakers?.count ?? 0)", systemImage: "person.2") }.accessibilityIdentifier("speakersButton")
                                 LazyVStack(alignment: .leading, spacing: 8) {
                                     ForEach(note.transcript.filter { query.isEmpty || $0.text.localizedStandardContains(query) || ($0.speaker?.localizedStandardContains(query) ?? false) }) { segment in
                                         transcriptRow(segment).id(segment.id)
@@ -108,7 +113,9 @@ struct NoteDetailView: View {
             Button("Allow & Transcribe") { store.downloadsAllowed = true; store.enqueue(noteID) }
             Button("Not now", role: .cancel) {}
         } message: { Text("Cassini uses Apple’s on-device speech model. If needed, iOS will download a language model, which may use several hundred MB. Your audio is never sent for transcription. You can change this in Settings.") }
-        .sheet(item: $editing) { segment in SegmentEditor(segment: segment) { revised in store.update(noteID) { note in if let index = note.transcript.firstIndex(where: { $0.id == revised.id }) { note.transcript[index] = revised } } } }
+        .sheet(item: $editing) { segment in SegmentEditor(segment: segment, speakers: note?.speakers ?? []) { revised in store.update(noteID) { note in if let index = note.transcript.firstIndex(where: { $0.id == revised.id }) { note.transcript[index] = revised } } } }
+        .sheet(isPresented: $showingSpeakers) { SpeakersView(noteID: noteID) }
+        .sheet(isPresented: $showingVersions) { TranscriptVersionsView(noteID: noteID) }
         .sheet(item: $exportItem) { item in ShareSheet(url: item.url) }
     }
     private func detailHeader(_ note: Note) -> some View {
@@ -215,11 +222,21 @@ struct NoteDetailView: View {
             Button("Find in transcript", systemImage: "magnifyingglass") { showSearch.toggle() }
             Menu {
                 Button(note.isFavorite ? "Remove star" : "Star recording", systemImage: note.isFavorite ? "star.slash" : "star") { store.update(noteID) { $0.isFavorite.toggle() } }
+                Button("Speakers", systemImage: "person.2") { showingSpeakers = true }
+                Button("Transcript versions", systemImage: "clock.arrow.circlepath") { showingVersions = true }
                 Button("Rename", systemImage: "pencil") { titleDraft = note.title; renaming = true }
                 Menu("Export transcript", systemImage: "square.and.arrow.up") {
                     ForEach(TranscriptFormat.allCases) { format in Button(format.title) { export(note, format: format) } }
                 }.disabled(note.transcript.isEmpty)
-                Button("Share audio", systemImage: "waveform") { if let url = store.audioURL(note) { exportItem = ExportItem(url: url) } }.disabled(store.finalizingID == noteID)
+                Button(exportingDocument ? "Preparing Cassini document…" : "Export Cassini document", systemImage: "doc.badge.arrow.up") {
+                    exportingDocument = true
+                    Task {
+                        do { exportItem = ExportItem(url: try await store.exportPortable(noteID)) }
+                        catch { store.errorMessage = error.localizedDescription }
+                        exportingDocument = false
+                    }
+                }.disabled(exportingDocument || note.transcript.isEmpty || note.status == .transcribing || store.finalizingID == noteID)
+                Button("Share original audio", systemImage: "waveform") { if let url = store.originalAudioURL(note) { exportItem = ExportItem(url: url) } }.disabled(store.finalizingID == noteID)
                 Button("Transcribe again", systemImage: "arrow.clockwise") { requestTranscription() }.disabled(note.status == .transcribing || note.status == .queued || store.finalizingID == noteID || note.playbackUnavailable != nil)
                 Divider()
                 Button("Move to Recently Deleted", systemImage: "trash", role: .destructive) { store.trash(noteID); dismiss() }
@@ -253,19 +270,20 @@ struct ShareSheet: UIViewControllerRepresentable {
 
 private struct SegmentEditor: View {
     let segment: TranscriptSegment
+    let speakers: [NoteSpeaker]
     let save: (TranscriptSegment) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var text: String
     @State private var speaker: String
-    init(segment: TranscriptSegment, save: @escaping (TranscriptSegment) -> Void) {
-        self.segment = segment; self.save = save
-        _text = State(initialValue: segment.text); _speaker = State(initialValue: segment.speaker ?? "")
+    init(segment: TranscriptSegment, speakers: [NoteSpeaker], save: @escaping (TranscriptSegment) -> Void) {
+        self.segment = segment; self.speakers = speakers; self.save = save
+        _text = State(initialValue: segment.text); _speaker = State(initialValue: segment.speakerID ?? "")
     }
     var body: some View {
         NavigationStack {
             Form {
                 Section("Passage at \(TimeText.clock(segment.start))") { TextEditor(text: $text).frame(minHeight: 180).accessibilityLabel("Passage text") }
-                Section { TextField("Speaker name (optional)", text: $speaker) } header: { Text("Speaker") } footer: { Text("Labels apply to this passage. Speakers are not identified automatically.") }
+                Section { Picker("Speaker", selection: $speaker) { Text("Unassigned").tag(""); ForEach(speakers) { Text($0.name).tag($0.id) } } } header: { Text("Speaker") } footer: { Text("Assign this passage to a speaker. Rename or merge people from Speakers.") }
             }.navigationTitle("Edit passage").navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
@@ -274,8 +292,8 @@ private struct SegmentEditor: View {
                             var revised = segment
                             revised.text = text.trimmingCharacters(in: .whitespacesAndNewlines)
                             if revised.text != segment.text { revised.words = [] }
-                            let name = speaker.trimmingCharacters(in: .whitespacesAndNewlines)
-                            revised.speaker = name.isEmpty ? nil : String(name.prefix(100))
+                            revised.speakerID = speaker.isEmpty ? nil : speaker
+                            revised.speaker = speakers.first { $0.id == speaker }?.name
                             save(revised); dismiss()
                         }.disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     }

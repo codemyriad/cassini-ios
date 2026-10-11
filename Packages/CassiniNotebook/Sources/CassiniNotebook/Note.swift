@@ -16,10 +16,11 @@ public struct TranscriptSegment: Codable, Identifiable, Hashable, Sendable {
     public var start: Double
     public var end: Double
     public var speaker: String?
+    public var speakerID: String?
     public var words: [TimedWord]
-    public init(id: UUID = UUID(), text: String, start: Double, end: Double, speaker: String? = nil, words: [TimedWord] = []) {
+    public init(id: UUID = UUID(), text: String, start: Double, end: Double, speaker: String? = nil, speakerID: String? = nil, words: [TimedWord] = []) {
         self.id = id; self.text = text; self.start = max(0, start); self.end = max(start, end)
-        self.speaker = speaker; self.words = words
+        self.speaker = speaker; self.speakerID = speakerID; self.words = words
     }
 }
 
@@ -63,6 +64,11 @@ public struct Note: Codable, Identifiable, Hashable, Sendable {
     public var language: String = Locale.current.identifier
     public var failureMessage: String?
     public var playbackUnavailable: String?
+    public var originalAudioFilename: String?
+    public var speakers: [NoteSpeaker]?
+    public var versions: [TranscriptVersion]?
+    public var selectedVersionID: UUID?
+    public var speakerAnalysisMessage: String?
     public init(id: UUID = UUID(), title: String, createdAt: Date = Date(), audioFilename: String = "audio.m4a") {
         self.id = id; self.title = title; self.createdAt = createdAt; self.audioFilename = audioFilename
     }

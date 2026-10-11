@@ -9,7 +9,13 @@ public enum TranscriptFormat: String, CaseIterable, Identifiable, Sendable {
     public func data(for note: Note) throws -> Data {
         if self == .json {
             let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted, .sortedKeys]; encoder.dateEncodingStrategy = .iso8601
-            return try encoder.encode(note)
+            var copy = note
+            func publicSpeakers(_ speakers: [NoteSpeaker]) -> [NoteSpeaker] {
+                speakers.map { value in var s = value; s.voiceID = nil; s.suggestedVoiceID = nil; s.excludedVoiceIDs = []; return s }
+            }
+            copy.speakers = publicSpeakers(copy.speakers ?? [])
+            copy.versions = copy.versions?.map { value in var version = value; version.speakers = publicSpeakers(version.speakers); return version }
+            return try encoder.encode(copy)
         }
         let content: String
         switch self {

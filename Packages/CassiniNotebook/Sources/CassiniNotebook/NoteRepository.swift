@@ -10,7 +10,8 @@ public struct NoteRepository: Sendable {
     public func directory(for id: UUID) -> URL { root.appendingPathComponent(id.uuidString, isDirectory: true) }
     public func audioURL(for note: Note) -> URL { directory(for: note.id).appendingPathComponent(note.audioFilename) }
     public func save(_ note: Note) throws {
-        guard note.schemaVersion == 1, !note.audioFilename.contains("/"), !note.audioFilename.contains("..") else {
+        guard note.schemaVersion == 1, !note.audioFilename.contains("/"), !note.audioFilename.contains(".."),
+              note.originalAudioFilename.map({ !$0.contains("/") && !$0.contains("..") }) ?? true else {
             throw RepositoryError.invalidDocument
         }
         let folder = directory(for: note.id)
@@ -26,6 +27,7 @@ public struct NoteRepository: Sendable {
                 let note = try JSONDecoder().decode(Note.self, from: Data(contentsOf: folder.appendingPathComponent("note.json")))
                 guard note.schemaVersion == 1, note.id.uuidString == folder.lastPathComponent,
                       !note.audioFilename.contains("/"), !note.audioFilename.contains(".."),
+                      note.originalAudioFilename.map({ !$0.contains("/") && !$0.contains("..") }) ?? true,
                       note.duration.isFinite, note.duration >= 0 else { throw RepositoryError.invalidDocument }
                 notes.append(note)
             } catch { unreadable += 1 }

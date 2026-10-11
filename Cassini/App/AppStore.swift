@@ -1,6 +1,8 @@
 import SwiftUI
 import AVFoundation
 import CassiniNotebook
+import CassiniInference
+import CassiniAudio
 
 @MainActor @Observable final class AppStore {
     private(set) var notes: [Note] = []
@@ -19,6 +21,11 @@ import CassiniNotebook
     let player = Player()
     let repository: NoteRepository?
     private let speech = SpeechService()
+    private let speakerAnalyzer = SpeakerAnalyzer()
+    var voiceLibrary: VoiceLibrary?
+    var savedVoices: [SavedVoice] = []
+    var voiceGeneration = 0
+    private var speakerOnlyJobs: Set<UUID> = []
     private var processingTask: Task<Void, Never>?
     private var queue: [UUID] = []
     private var backgroundTask: UIBackgroundTaskIdentifier = .invalid
@@ -30,6 +37,24 @@ import CassiniNotebook
         #endif
         return .standard
     }()
+
+    var speakerModelIdentity: String? {
+        get { preferences.string(forKey: "speakerModelIdentity") }
+        set { preferences.set(newValue, forKey: "speakerModelIdentity") }
+    }
+    var speakerModelsInstalled: Bool { SpeakerAnalyzer.modelsAvailable }
+    var speakerDownloadsAllowed: Bool {
+        get { preferences.bool(forKey: "speakerDownloadsAllowed") }
+        set { preferences.set(newValue, forKey: "speakerDownloadsAllowed") }
+    }
+    var automaticallyNameVoices: Bool {
+        get { preferences.bool(forKey: "automaticallyNameVoices") }
+        set { preferences.set(newValue, forKey: "automaticallyNameVoices") }
+    }
+    var identifySpeakers: Bool {
+        get { preferences.object(forKey: "identifySpeakers") as? Bool ?? true }
+        set { preferences.set(newValue, forKey: "identifySpeakers") }
+    }
 
     var language: String {
         get { preferences.string(forKey: "speechLanguage") ?? Locale.current.identifier }
@@ -68,6 +93,9 @@ import CassiniNotebook
             let loaded = try repo.load()
             repository = repo
             notes = loaded.notes
+            for index in notes.indices { notes[index].migrateSpeakers() }
+            do { voiceLibrary = try VoiceLibrary(root: folder); savedVoices = voiceLibrary?.voices ?? [] }
+            catch { notice = "Saved voices could not be read. Their files have been preserved. Recordings remain available." }
             if loaded.unreadableCount > 0 { notice = "\(loaded.unreadableCount) recording documents could not be read. Their files have been preserved." }
         } catch {
             repository = nil
@@ -93,6 +121,7 @@ import CassiniNotebook
         try repository.save(note); notes.insert(note, at: 0)
     }
     func recoverInterruptedWork() async {
+        purgeExpiredTrash()
         for note in notes where note.status == .recording || note.status == .transcribing || note.status == .queued {
             if note.status == .recording, let url = audioURL(note) {
                 do {
@@ -168,9 +197,20 @@ import CassiniNotebook
             if let portable {
                 note.title = portable.title; note.language = portable.language
                 note.duration = portable.duration; note.transcript = portable.segments; note.status = .ready
+                note.speakers = portable.speakers; note.versions = portable.versions; note.selectedVersionID = portable.selectedVersionID
+            }
+            if ["opus", "ogg"].contains(ext) {
+                let decoded = folder.appendingPathComponent("playback.caf")
+                do {
+                    try await Task.detached(priority: .userInitiated) { try OpusAudio.decode(destination, to: decoded) }.value
+                    note.originalAudioFilename = note.audioFilename; note.audioFilename = "playback.caf"
+                } catch {
+                    try? FileManager.default.removeItem(at: decoded)
+                    if portable == nil { throw error }
+                }
             }
             do {
-                let info = try await AudioInspection.inspect(destination)
+                let info = try await AudioInspection.inspect(repository.audioURL(for: note))
                 note.duration = info.duration; note.waveform = info.waveform
             } catch {
                 guard portable != nil else { throw error }
@@ -183,10 +223,11 @@ import CassiniNotebook
             errorMessage = "Could not import audio: \(error.localizedDescription)"
         }
     }
-    func enqueue(_ id: UUID) {
+    func enqueue(_ id: UUID, speakersOnly: Bool = false) {
         guard let note = note(id), note.trashedAt == nil, note.status != .recording, note.playbackUnavailable == nil,
               processingID != id, finalizingID != id, !queue.contains(id), audioURL(note) != nil else { return }
         guard update(id, { $0.status = .queued; $0.failureMessage = nil; $0.language = language }) else { return }
+        if speakersOnly { speakerOnlyJobs.insert(id) }
         queue.append(id); processNext()
     }
     private func processNext() {
@@ -196,17 +237,45 @@ import CassiniNotebook
         processingID = id; processingProgress = nil; processingMessage = "Preparing…"
         guard update(id, { $0.status = .transcribing }) else { processingID = nil; processNext(); return }
         let allowDownload = downloadsAllowed
+        let onlySpeakers = speakerOnlyJobs.remove(id) != nil
+        let analyzeSpeakers = onlySpeakers || (identifySpeakers && (speakerDownloadsAllowed || speakerModelsInstalled))
+        let allowSpeakerDownload = speakerDownloadsAllowed
+        let generation = voiceGeneration
         backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "Finish transcription") { [weak self] in
             Task { @MainActor in self?.suspendTranscriptions() }
         }
         processingTask = Task {
             do {
-                let transcript = try await speech.transcribe(url: url, locale: note.language, allowDownload: allowDownload) { [self] message, progress in
-                    guard processingID == id else { return }
-                    processingMessage = message; processingProgress = progress
+                if !onlySpeakers {
+                    let transcript = try await speech.transcribe(url: url, locale: note.language, allowDownload: allowDownload) { [self] message, progress in
+                        guard processingID == id else { return }
+                        processingMessage = message; processingProgress = progress
+                    }
+                    try Task.checkCancellation()
+                    guard update(id, {
+                        $0.saveCurrentVersion(name: "Previous transcript")
+                        $0.transcript = transcript; $0.speakers = []; $0.selectedVersionID = nil
+                        $0.saveCurrentVersion(name: "On-device transcription")
+                        $0.failureMessage = nil
+                    }) else { throw CocoaError(.fileWriteUnknown) }
+                }
+                if analyzeSpeakers {
+                    do {
+                        let analysis = try await speakerAnalyzer.analyze(url, allowDownload: allowSpeakerDownload) { [weak self] message, progress in
+                            Task { @MainActor in
+                                guard self?.processingID == id else { return }
+                                self?.processingMessage = message; self?.processingProgress = progress
+                            }
+                        }
+                        try Task.checkCancellation()
+                        try applySpeakerAnalysis(analysis, to: id, allowEvidence: generation == voiceGeneration)
+                    } catch is CancellationError { throw CancellationError() }
+                    catch {
+                        update(id) { $0.speakerAnalysisMessage = "Speaker analysis could not finish: \(error.localizedDescription). Your transcript is saved. You can retry from Speakers." }
+                    }
                 }
                 try Task.checkCancellation()
-                update(id) { $0.transcript = transcript; $0.status = .ready; $0.failureMessage = nil }
+                update(id) { $0.status = .ready; $0.failureMessage = nil }
             } catch is CancellationError {
                 // Cancellation state was saved when the user or OS requested it.
             } catch {
@@ -218,7 +287,7 @@ import CassiniNotebook
         }
     }
     func cancelTranscription(_ id: UUID, reason: String? = nil) {
-        queue.removeAll { $0 == id }
+        queue.removeAll { $0 == id }; speakerOnlyJobs.remove(id)
         if processingID == id { processingTask?.cancel() }
         update(id) { $0.status = $0.transcript.isEmpty ? .audioOnly : .ready; $0.failureMessage = reason }
     }
@@ -240,7 +309,12 @@ import CassiniNotebook
     func restore(_ id: UUID) { update(id) { $0.trashedAt = nil } }
     func deletePermanently(_ id: UUID) {
         guard note(id)?.trashedAt != nil, let repository else { return }
-        do { try repository.delete(id); notes.removeAll { $0.id == id } }
+        guard let voiceLibrary else { errorMessage = "Saved voice storage could not be read. Restore access before permanent deletion so voice samples can be removed safely."; return }
+        do {
+            try voiceLibrary.removeEvidence(noteID: id)
+            savedVoices = voiceLibrary.voices
+            try repository.delete(id); notes.removeAll { $0.id == id }
+        }
         catch { errorMessage = "Could not delete recording: \(error.localizedDescription)" }
     }
     func addBookmark(_ id: UUID, at time: Double) {

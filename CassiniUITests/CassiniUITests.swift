@@ -102,4 +102,34 @@ final class CassiniUITests: XCTestCase {
         app.buttons["playButton"].tap()
         XCTAssertTrue(app.buttons["Pause playback"].waitForExistence(timeout: 3))
     }
+    @MainActor func testSpeakerRenameAppliesToAllPassagesAndPersists() {
+        let app = launch(); openFixture(app)
+        app.buttons["speakersButton"].tap()
+        XCTAssertTrue(app.navigationBars["Speakers"].waitForExistence(timeout: 5))
+        let alex = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Alex")).firstMatch
+        XCTAssertTrue(alex.waitForExistence(timeout: 5)); alex.tap()
+        let field = app.textFields["speakerNameField"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        field.tap(); field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 30)); field.typeText("Alice")
+        app.buttons["Save"].tap()
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Alice")).firstMatch.waitForExistence(timeout: 5))
+        capture("Speakers")
+        app.buttons["Done"].tap()
+        XCTAssertTrue(app.staticTexts.matching(identifier: "Alice").firstMatch.exists)
+        app.terminate()
+        let reopened = launch(seed: false, reset: false); openFixture(reopened)
+        XCTAssertTrue(reopened.staticTexts.matching(identifier: "Alice").firstMatch.exists)
+    }
+    @MainActor func testEmptyTrashRequiresConfirmationAndRemovesRecording() {
+        let app = launch(); openFixture(app)
+        app.buttons["Recording actions"].tap(); app.buttons["Move to Recently Deleted"].tap()
+        XCTAssertTrue(app.buttons["Recently Deleted"].waitForExistence(timeout: 5)); app.buttons["Recently Deleted"].tap()
+        XCTAssertTrue(app.buttons["Empty"].waitForExistence(timeout: 5)); app.buttons["Empty"].tap()
+        XCTAssertTrue(app.alerts["Empty Recently Deleted?"].waitForExistence(timeout: 5))
+        app.alerts.buttons["Cancel"].tap()
+        XCTAssertTrue(app.buttons["Restore"].exists)
+        app.buttons["Empty"].tap(); app.alerts.buttons["Delete all forever"].tap()
+        XCTAssertTrue(app.staticTexts["Nothing here"].waitForExistence(timeout: 5))
+    }
+
 }
