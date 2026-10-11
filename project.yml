@@ -1,0 +1,60 @@
+name: Cassini
+options:
+  bundleIdPrefix: app.codemyriad
+  deploymentTarget:
+    iOS: '26.0'
+packages:
+  Cassini:
+    path: .
+settings:
+  base:
+    SWIFT_VERSION: '6.0'
+    TARGETED_DEVICE_FAMILY: '1,2'
+    CODE_SIGN_STYLE: Automatic
+    DEVELOPMENT_TEAM: ''
+targets:
+  Cassini:
+    type: application
+    platform: iOS
+    sources: [Cassini]
+    dependencies:
+      - package: Cassini
+        product: CassiniNotebook
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.codemyriad.cassini
+        INFOPLIST_FILE: Cassini/Resources/Info.plist
+        MARKETING_VERSION: '0.1.0'
+        CURRENT_PROJECT_VERSION: '1'
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        SWIFT_EMIT_LOC_STRINGS: YES
+  CassiniUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [CassiniUITests]
+    dependencies:
+      - target: Cassini
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+  CassiniTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [CassiniTests]
+    dependencies:
+      - target: Cassini
+      - package: Cassini
+        product: CassiniNotebook
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+schemes:
+  Cassini:
+    build:
+      targets:
+        Cassini: all
+        CassiniUITests: [test]
+        CassiniTests: [test]
+    test:
+      targets: [CassiniTests, CassiniUITests]

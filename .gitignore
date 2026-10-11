@@ -1,8 +1,14 @@
+.DS_Store
 .build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+.build-logs/
+
 .swiftpm/
 *.xcodeproj/
-DerivedData/
-xcuserdata/
 *.opus
 *.wav
+*.caf
+*.m4a
 Models/
