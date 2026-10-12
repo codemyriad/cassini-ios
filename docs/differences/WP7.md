@@ -80,3 +80,29 @@
   remove the `XCTExpectFailure` from `PlaybackStoreTests.testAFinalSaveThroughTheAppRefreshesTheLibraryPreview`. That
   test runs a final save through the real graph and asserts that the preview changes. It is marked as an expected
   failure until then, and the marker makes the test fail once the preview is wired, so the step cannot be skipped.
+- **WP8 (`wp8` branch) against this branch.** WP7 replaces `PlaybackStore`'s API, and `wp8` still calls the old one,
+  so whichever of the two merges second must port the other's call sites before it compiles. This branch also edits
+  files other packages own: `NameSpeakerSheet.swift` (WP8), `NoteDetailView.swift` (WP6) and `AppGraph.swift` (WP0),
+  all of which `wp8` rewrites too; expect conflicts there and resolve them as below.
+  - Removed or renamed `PlaybackStore` members:
+    - `init(playback:library:errors:clock:)` is now `init(playback:library:preview:)` (`AppGraph`).
+    - `load(_ note:)` is gone. A screen shows a note's player with `show(_:owner:)` and a `PlaybackOwner` it keeps
+      in `@State`, and gives it back with `leave(owner)` (the Note screen keys this on `NotePlayer.key`). Tests that
+      only need the note open call `show(note, owner: PlaybackOwner())`. `wp8` call sites:
+      `NoteDetailView.swift:78` (`.task { playback.load(note) }` and the `.onDisappear { pause() }` after it: keep
+      WP7's `show`/`leave` version), `AppGraphTests.swift:380`
+      (`testGoingToTheBackgroundHoldsATaskUntilThePositionIsSaved`) and `AudioPipelineTests.swift:130`.
+    - `playSample(_:from:duration:)` is now `playSample(_:from:to:) -> Bool` (an end time, not a length; false when
+      the note's player is not open). `wp8` call site: `NameSpeakerSheet.swift:186`, which becomes
+      `playback.playSample(note, from: window.start, to: window.start + window.duration)`.
+    - `cancelSample()` is now `stopSample()`, which ends a running sample (the position from before returns, paused)
+      and does nothing otherwise, so it never pauses ordinary playback.
+    - `play(_:from:)` only plays when the note owns the player. `wp8`'s `NoteDetailView` `play` fallback
+      (`playback.play(note, from: 0)` when it does not own the player) does nothing; keep WP7's
+      `if ownsPlayer { playback.play() }`.
+  - The name sheet's sampling state comes from `playback.state.sample != nil` (with `playback.owns(noteID)` to offer
+    the button), not from `playback.state.isPlaying` and a local `sampling` flag: a sample ends by itself at its end,
+    on a pause, an interruption or a lost output, and the state already says so. `wp8`'s `toggleSample`, `close()`
+    and `.onDisappear` stop a sample with `playback.stopSample()` instead of `playback.pause()`, and its
+    `.onChange(of: playback.state.isPlaying)` and `sampling` flag go.
+  - `wp8`'s `docs/differences/WP8.md` ("For WP7: … swap in `playRange` when it exists") is done by the step above.
