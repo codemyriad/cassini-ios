@@ -103,7 +103,7 @@ extension Note {
     /// The Library preview at the saved playback position, from the transcript shown. Only the words it can show are
     /// read: the transcript start, or the words from the one playing at the position.
     public var transcriptPreview: Preview? {
-        let positionMs = Int64((playbackPosition * 1000).rounded(.down))
+        let positionMs = Int64((playbackPosition * 1000).rounded())
         let segments = transcript.lazy.map(PreviewWord.of)
         guard let lastEnd = segments.last(where: { !$0.isEmpty })?.last?.endMs else { return nil }
         let fromStart = positionMs >= lastEnd
