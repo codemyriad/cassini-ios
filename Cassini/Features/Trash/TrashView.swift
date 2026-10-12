@@ -10,11 +10,11 @@ struct TrashView: View {
     @Environment(ErrorPresenter.self) private var errors
     @Environment(\.restoresSceneState) private var restoresSceneState
     @SceneStorage("trash.dialog") private var savedDialog: Data?
-    @State private var request: TrashDialogRequest?
+    @State private var dialogs = TrashDialogs()
 
     var body: some View {
         let items = trash.items
-        let dialog = request?.dialog(in: items)
+        let dialog = dialogs.dialog(in: items)
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.tight) {
                 if items.isEmpty {
@@ -23,7 +23,7 @@ struct TrashView: View {
                     Text(TrashCopy.intro).font(.subheadline).foregroundStyle(Color.muted)
                         .padding(.horizontal, 4).padding(.bottom, 6)
                     ForEach(items) { item in
-                        TrashCard(item: item, restore: { trash.restore(item.id) }, deleteNow: { request = .delete(item.id) })
+                        TrashCard(item: item, restore: { trash.restore(item.id) }, deleteNow: { dialogs.askDeleteNow(item.id) })
                     }
                 }
             }
@@ -35,26 +35,25 @@ struct TrashView: View {
         .toolbar {
             if !items.isEmpty {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button(TrashCopy.empty, role: .destructive) { request = .empty }.tint(.ember)
+                    Button(TrashCopy.empty, role: .destructive) { dialogs.askEmpty(items: items) }.tint(.ember)
                 }
             }
         }
         .task { _ = try? await trash.purgeExpired() }
-        .alert(dialog.map(Self.title) ?? "", isPresented: Binding(get: { dialog != nil }, set: { if !$0 { request = nil } }),
+        .alert(dialog.map(Self.title) ?? "", isPresented: Binding(get: { dialog != nil }, set: { if !$0 { dialogs.dismiss() } }),
                presenting: dialog) { dialog in
-            Button(TrashCopy.cancel, role: .cancel) { request = nil }
-            Button(TrashCopy.delete, role: .destructive) {
-                request = nil
-                confirm(dialog)
-            }
+            Button(TrashCopy.cancel, role: .cancel) { dialogs.dismiss() }
+            Button(TrashCopy.delete, role: .destructive) { confirm(dialog) }
         } message: { dialog in
             switch dialog {
             case .delete: Text(TrashCopy.deleteBody)
             case .emptyAll: Text(TrashCopy.deleteAllBody)
             }
         }
-        .onAppear { if restoresSceneState { request = savedDialog.flatMap { try? JSONDecoder().decode(TrashDialogRequest.self, from: $0) } } }
-        .onChange(of: request) { _, request in
+        .onAppear {
+            if restoresSceneState { dialogs.request = savedDialog.flatMap { try? JSONDecoder().decode(TrashDialogRequest.self, from: $0) } }
+        }
+        .onChange(of: dialogs.request) { _, request in
             if restoresSceneState { savedDialog = request.flatMap { try? JSONEncoder().encode($0) } }
         }
     }
@@ -69,13 +68,10 @@ struct TrashView: View {
     private func confirm(_ dialog: TrashDialog) {
         Task {
             do throws(TrashError) {
-                switch dialog {
-                case .delete(let id, _): try await trash.deleteNow(id)
-                case .emptyAll: try await trash.emptyTrash()
-                }
+                try await dialogs.confirm(dialog, with: trash)
             } catch {
                 switch error {
-                case .deleteFailed(let id): errors.present(TrashCopy.notDeleted(trash.items.first { $0.id == id }?.title ?? ""))
+                case .deleteFailed(let ids): errors.present(TrashCopy.notDeleted(ids, in: trash.items))
                 case .voicesUnavailable: errors.present(TrashCopy.voicesUnavailable)
                 }
             }

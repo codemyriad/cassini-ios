@@ -42,6 +42,47 @@
         }
       }
     },
+    "%lld notes could not be deleted. They stay in Recently Deleted.": {
+      "comment": "Empty failed for several notes; the others were deleted",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld note could not be deleted. It stays in Recently Deleted."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld notes could not be deleted. They stay in Recently Deleted."
+                }
+              }
+            }
+          }
+        },
+        "it": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Non è stato possibile eliminare %lld nota. Resta in Eliminati di recente."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Non è stato possibile eliminare %lld note. Restano in Eliminati di recente."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "Cancel": {
       "comment": "Confirmation button: keep everything",
       "localizations": {

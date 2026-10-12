@@ -33,7 +33,9 @@ import CassiniNotebook
         XCTAssertTrue(FileManager.default.fileExists(atPath: test.root.appendingPathComponent(note.id.uuidString).path))
         XCTAssertTrue(graph.trash.voicesUnavailable)
         XCTAssertNil(graph.errors.current, "no alert, however often the purge runs")
-        XCTAssertEqual(graph.notices.notices.count, 1, "the one notice of the unreadable voices")
+        // The one notice today is the load's own ("Saved voices could not be read"); the purge adds none. The lasting
+        // fact below is for WP9's NoticeCenter, which builds the banners from `contribute(to:)`.
+        XCTAssertEqual(graph.notices.notices.count, 1, "only the load's notice of the unreadable voices")
         var facts = NoticeFacts()
         graph.trash.contribute(to: &facts)
         XCTAssertTrue(facts.voicesUnavailable)

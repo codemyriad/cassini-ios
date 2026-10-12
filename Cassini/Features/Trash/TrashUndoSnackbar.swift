@@ -22,8 +22,8 @@ private struct TrashUndoSnackbar: ViewModifier {
                         .frame(maxWidth: ReadableWidth.library).frame(maxWidth: .infinity)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                         .task(id: snackbar.id) {
-                            // A task cancelled as the screen changes starts again; only a full wait ends the snackbar.
-                            guard (try? await Task.sleep(for: snackbar.duration)) != nil else { return }
+                            // A task cancelled as the screen changes starts again and waits only for the time left.
+                            guard (try? await Task.sleep(until: snackbar.deadline, clock: .continuous)) != nil else { return }
                             undo.timedOut(snackbar.id)
                         }
                         .accessibilityIdentifier("trashUndoSnackbar")

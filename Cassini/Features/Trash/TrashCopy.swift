@@ -40,9 +40,14 @@ enum TrashCopy {
                comment: "Library snackbar after a note was moved to Recently Deleted")
     }
 
-    static func notDeleted(_ title: String) -> String {
-        String(localized: "“\(title)” could not be deleted. It stays in Recently Deleted.", table: "Trash",
-               comment: "Delete now or Empty failed for one note")
+    /// Delete now or Empty left `ids`: the note by its title when one stayed, else how many.
+    static func notDeleted(_ ids: [UUID], in items: [TrashItem]) -> String {
+        if ids.count == 1, let title = items.first(where: { $0.id == ids[0] })?.title {
+            return String(localized: "“\(title)” could not be deleted. It stays in Recently Deleted.", table: "Trash",
+                          comment: "Delete now or Empty failed for one note")
+        }
+        return String(localized: "\(ids.count) notes could not be deleted. They stay in Recently Deleted.", table: "Trash",
+                      comment: "Empty failed for several notes; the others were deleted")
     }
 
     static func daysLeft(_ days: Int) -> String {
