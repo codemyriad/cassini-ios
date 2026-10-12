@@ -26,9 +26,14 @@ struct NoteMenu: View {
             Button("Speakers", systemImage: "person.2") { showingSpeakers = true }
             Button("Transcript versions", systemImage: "clock.arrow.circlepath") { showingVersions = true }
             Button("Rename", systemImage: "pencil") { renaming = true }
-            Menu("Export transcript", systemImage: "square.and.arrow.up") {
+            let unavailable = ExportCopy.reason(TranscriptExports.availability(of: note))
+            Menu {
                 ForEach(TranscriptFormat.allCases) { format in Button(ExportCopy.title(format)) { export(format) } }
-            }.disabled(TranscriptExports.availability(of: note) != .available)
+            } label: {
+                Text("Export transcript")
+                if let unavailable { Text(unavailable) }
+                Image(systemName: "square.and.arrow.up")
+            }.disabled(unavailable != nil)
             Button(exportingDocument ? "Preparing Cassini document…" : "Export Cassini document", systemImage: "doc.badge.arrow.up") { exportDocument() }
                 .disabled(exportingDocument || note.transcript.isEmpty || note.status == .transcribing || finishing)
             Button("Share original audio", systemImage: "waveform") {
@@ -50,10 +55,8 @@ struct NoteMenu: View {
         }
     }
 
-    /// Offers an export, removing it once the share sheet is done.
-    private func share(_ url: URL) {
-        shareItem = ShareItem(url: url) { [exports] in exports.discard(url) }
-    }
+    /// Offers an export, removing it once the share sheet is gone.
+    private func share(_ url: URL) { shareItem = exports.shareItem(url) }
 
     private func exportDocument() {
         exportingDocument = true

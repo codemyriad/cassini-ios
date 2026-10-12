@@ -42,7 +42,7 @@ import CassiniNotebook
                            clock: environment.clock, calendar: environment.calendar)
         exports = ExportStore(library: library, portable: PortableExportService(audio: environment.audio),
                               folder: environment.exports,
-                              locale: environment.locale, timeZone: environment.timeZone)
+                              locale: environment.locale, timeZone: environment.timeZone) { [startup] in _ = await startup.ready() }
         processing.modelDownload = ModelDownloadAdapter(
             settings: settings, processing: processing, transcriber: environment.transcriber,
             analyzer: environment.analyzer, storage: environment.storage, notifier: environment.notifier,

@@ -51,6 +51,59 @@ import CassiniEngine
         XCTAssertFalse(FileManager.default.fileExists(atPath: test.graph.environment.exports.path))
     }
 
+    func testAnExportMadeDuringLaunchWaitsForTheSweepAndSurvivesIt() async throws {
+        let test = TestGraph(); defer { test.tearDown() }
+        let note = transcribedNote()
+        try NoteRepository(root: test.root).save(note)
+        let export = Task { try await test.graph.exports.exportTranscript(note.id, format: .subtitles) }
+
+        await test.graph.start()
+        let url = try await export.value
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: url.path), "the launch sweep ran before the export")
+    }
+
+    func testTheShareSheetRemovesAnExportOnceItIsDismissedAndNotWhenAnActivityIsCancelled() async throws {
+        let test = TestGraph(); defer { test.tearDown() }
+        let note = transcribedNote()
+        try NoteRepository(root: test.root).save(note)
+        await test.graph.start()
+        let url = try await test.graph.exports.exportTranscript(note.id, format: .webVTT)
+        let item = test.graph.exports.shareItem(url)
+        var session = ShareSession()
+        session.present(item)
+
+        XCTAssertFalse(ShareSheet.closes(activity: .mail, completed: false), "backing out of Mail keeps the sheet")
+        XCTAssertTrue(ShareSheet.closes(activity: .airDrop, completed: true))
+        XCTAssertTrue(ShareSheet.closes(activity: nil, completed: false), "closing the sheet without an activity")
+        XCTAssertNil(session.dismiss(current: item), "the sheet still shows the item")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: url.path))
+
+        let dismissed = try XCTUnwrap(session.dismiss(current: nil))
+        dismissed.onComplete?()
+        dismissed.onComplete?()
+
+        XCTAssertEqual(dismissed.id, item.id)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
+        XCTAssertNil(session.dismiss(current: nil), "a dismissal ends one item once")
+    }
+
+    func testTheMenuGivesTheReasonATranscriptCannotBeExported() {
+        XCTAssertNil(ExportCopy.reason(.available))
+        XCTAssertEqual(ExportCopy.reason(.afterTranscription), "Available after transcription")
+        XCTAssertEqual(ExportCopy.reason(.notReadable), "Not available for this transcript")
+        var damaged = transcribedNote()
+        damaged.document = DocumentInfo(state: .invalidMetadata)
+        XCTAssertEqual(TranscriptExports.availability(of: damaged), .notReadable)
+    }
+
+    private func transcribedNote() -> Note {
+        var note = Note(title: "Riunione", audioFilename: "audio.caf")
+        note.duration = 5; note.status = .ready
+        note.transcript = [TranscriptSegment(text: "Ciao a tutti", start: 1, end: 2, speakerID: "S1")]
+        return note
+    }
+
     func testTheSubtitleLineCountsSpeakersFromTwo() {
         let at = Date(timeIntervalSince1970: 1_791_472_200)
         let locale = Locale(identifier: "en_US"), utc = TimeZone(identifier: "UTC")!

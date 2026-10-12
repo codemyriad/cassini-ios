@@ -40,12 +40,18 @@ enum ExportCopy {
         }
     }
 
+    /// Why a note's transcript cannot be exported now, shown under the disabled menu item; nil when it can.
+    static func reason(_ availability: TranscriptExportAvailability) -> String? {
+        switch availability {
+        case .available: nil
+        case .afterTranscription: String(localized: "Available after transcription", table: "Export")
+        case .notReadable: String(localized: "Not available for this transcript", table: "Export")
+        }
+    }
+
     /// Why an export was not made.
     static func message(_ error: ExportError) -> String {
-        switch error {
-        case .notAvailable(.afterTranscription): String(localized: "Available after transcription", table: "Export")
-        case .notAvailable(.notReadable): String(localized: "Not available for this transcript", table: "Export")
-        case .notAvailable(.available), .noNote, .cannotSave: String(localized: "Couldn’t save the file", table: "Export")
-        }
+        if case .notAvailable(let availability) = error, let reason = reason(availability) { return reason }
+        return String(localized: "Couldn’t save the file", table: "Export")
     }
 }
