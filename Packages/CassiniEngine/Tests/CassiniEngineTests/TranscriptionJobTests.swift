@@ -328,6 +328,23 @@ import CassiniNotebook
         #expect(events.contains { $0.stage == .speakers })
     }
 
+    @Test func aSpeakersOnlyJobEndsWithTheSpeakerModelDownloadFailure() async throws {
+        let failure = SpeakerAnalysisError.download(.notEnoughStorage, requiredFreeBytes: 54_000_000)
+        let h = try await Harness(analyzer: InstallFailingAnalyzer(failure: failure))
+        let (outcome, _) = await h.run(kind: .speakersOnly)
+        #expect(outcome == .downloadFailed(DownloadFailure(error: .notEnoughStorage, part: .speakers,
+                                                           requiredFreeBytes: 54_000_000)))
+        #expect(h.applied.isEmpty)
+    }
+
+    @Test func aTranscriptionWhoseSpeakerModelsFailToDownloadKeepsItsWordsInOneVoice() async throws {
+        let h = try await Harness(analyzer: InstallFailingAnalyzer(failure: .download(.noConnection, requiredFreeBytes: 0)))
+        let (outcome, events) = await h.run()
+        #expect(outcome == .done)
+        #expect(events.contains(.speakersUnavailable))
+        #expect(await h.note()?.speakerAnalysisFailure == .speakers)
+    }
+
     @Test func aStopInTheSpeakerStepKeepsTheWordsAndResumesWithTheSpeakers() async throws {
         let analyzer = FakeAnalyzer(suspends: true)
         let h = try await Harness(analyzer: analyzer)
@@ -675,6 +692,19 @@ private final class FakeHost: TranscriptionJobHost, @unchecked Sendable {
         _ = try await notes.mutate(noteID) { $0.transcript = SpeakerAttribution.assign($0.transcript, turns: analysis.turns) }
         lock.withLock { _applied.append((noteID, generation)) }
     }
+}
+
+/// An analyzer whose model install fails with `failure`.
+private struct InstallFailingAnalyzer: SpeakerAnalyzing {
+    let failure: SpeakerAnalysisError
+    func analyze(url: URL, allowDownload: Bool,
+                 progress: @escaping @Sendable (SpeakerAnalysisEvent) -> Void) async throws -> SpeakerAnalysis {
+        throw failure
+    }
+    var modelIdentity: String? { get async { nil } }
+    func modelStatus() async -> ModelPartStatus { .notDownloaded }
+    func refreshModelStatus() async -> ModelPartStatus { .notDownloaded }
+    func installModels(progress: @escaping @Sendable (Double?) -> Void) async throws { throw failure }
 }
 
 private struct FailingAnalyzer: SpeakerAnalyzing {
