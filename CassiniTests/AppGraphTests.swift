@@ -149,6 +149,48 @@ import CassiniEngineTesting
         XCTAssertNil(errors.current)
     }
 
+    func testAnEditToAValueMadeInAnEarlierQueuedEditIsWritten() async throws {
+        let test = TestGraph(); defer { test.tearDown() }
+        let note = try await seedPlainNote(in: test)
+        let library = test.graph.library
+        library.updateAll { $0.isFavorite = true }
+        library.update(note.id) { $0.addBookmark(at: 1) }
+        let bookmark = try XCTUnwrap(library.note(note.id)?.bookmarks.first)
+        library.update(note.id) { $0.bookmarks.removeAll { $0.id == bookmark.id } }
+        await library.settle()
+
+        XCTAssertEqual(library.note(note.id)?.bookmarks, [])
+        let stored = try NoteRepository(root: test.root).load().notes.first { $0.id == note.id }
+        XCTAssertEqual(stored?.bookmarks, [])
+        XCTAssertEqual(stored?.isFavorite, true)
+        XCTAssertNil(test.graph.errors.current)
+    }
+
+    func testTrashingANoteOpenInTheDetailColumnClosesIt() async throws {
+        let test = TestGraph(); defer { test.tearDown() }
+        let note = try await seedPlainNote(in: test)
+        let graph = test.graph
+        graph.router.isSplit = true
+        graph.router.show(.note(note.id))
+        XCTAssertTrue(graph.trash.moveToTrash(note.id))
+        XCTAssertEqual(graph.router.path, [])
+    }
+
+    func testGoingToTheBackgroundHoldsATaskUntilThePositionIsSaved() async throws {
+        let test = TestGraph(); defer { test.tearDown() }
+        let note = try await seedPlainNote(in: test)
+        let graph = test.graph
+        graph.playback.load(try XCTUnwrap(graph.library.note(note.id)))
+        graph.playback.seek(1.5)
+
+        graph.enterBackground()
+        XCTAssertEqual(test.background.activeCount, 1)
+        await waitUntil { test.background.activeCount == 0 }
+
+        let stored = try NoteRepository(root: test.root).load().notes.first { $0.id == note.id }
+        XCTAssertEqual(stored?.playbackPosition, 1.5)
+    }
+
     private func seedPlainNote(in test: TestGraph) async throws -> Note {
         var note = Note(title: "Plain", audioFilename: "audio.caf")
         note.duration = 2

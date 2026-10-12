@@ -14,6 +14,17 @@ import CassiniEngine
         XCTAssertEqual(router.path, [.note(b)])
     }
 
+    func testClosingANotePopsItAndTheScreensAboveIt() {
+        let router = Router()
+        let a = UUID(), b = UUID()
+        router.push(.note(a))
+        router.push(.savedVoices)
+        router.close(noteID: b)
+        XCTAssertEqual(router.path, [.note(a), .savedVoices])
+        router.close(noteID: a)
+        XCTAssertEqual(router.path, [])
+    }
+
     func testOpeningANoteThatIsOpenPopsToIt() {
         let router = Router()
         let a = UUID()
