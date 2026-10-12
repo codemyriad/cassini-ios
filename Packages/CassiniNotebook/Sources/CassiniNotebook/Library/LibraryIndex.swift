@@ -32,6 +32,8 @@ public struct LibraryIndex: Sendable {
 
     /// The notes outside Recently Deleted, newest first.
     public private(set) var entries: [Entry] = []
+    /// Changes whenever a note is added, changed, moved or removed, so a search knows its results are out of date.
+    public private(set) var revision = 0
     private var cache: [UUID: Entry] = [:]
 
     public init(_ notes: [Note] = []) { update(notes) }
@@ -40,13 +42,29 @@ public struct LibraryIndex: Sendable {
     public mutating func update(_ notes: [Note]) {
         var next: [UUID: Entry] = [:]
         next.reserveCapacity(notes.count)
-        entries = notes.compactMap { note in
+        var changed = false
+        let updated = notes.compactMap { note -> Entry? in
             guard note.trashedAt == nil else { return nil }
-            let entry = cache[note.id].flatMap { $0.note == note ? $0 : nil } ?? Entry(note)
+            let kept = cache[note.id].flatMap { $0.note == note ? $0 : nil }
+            if kept == nil { changed = true }
+            let entry = kept ?? Entry(note)
             next[note.id] = entry
             return entry
         }
+        if changed || updated.map(\.note.id) != entries.map(\.note.id) { revision += 1 }
+        entries = updated
         cache = next
+    }
+
+    /// Takes the tokens another copy of the index worked out (a search run elsewhere) for the notes that did not
+    /// change since.
+    public mutating func adoptTokens(from other: LibraryIndex) {
+        for index in entries.indices where entries[index].fields == nil {
+            guard let theirs = other.cache[entries[index].note.id], let fields = theirs.fields,
+                  theirs.note == entries[index].note else { continue }
+            entries[index].fields = fields
+            cache[entries[index].note.id] = entries[index]
+        }
     }
 
     public func entry(_ id: UUID) -> Entry? { cache[id] }

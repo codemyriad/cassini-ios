@@ -77,6 +77,16 @@ public final class LibraryScreenModel {
     @ObservationIgnored private let ports: Ports
     @ObservationIgnored private var index = LibraryIndex()
     @ObservationIgnored private var pendingSearch: Task<Void, Never>?
+    /// The last search's results: for `query` over the notes at `revision` of the index.
+    private var found: Found?
+    /// The search running off the main actor.
+    @ObservationIgnored private var running: (query: String, revision: Int, task: Task<Void, Never>)?
+
+    private struct Found {
+        let query: String
+        let revision: Int
+        let hits: [LibraryIndex.Hit]
+    }
 
     public init(ports: Ports) { self.ports = ports }
 
@@ -95,11 +105,15 @@ public final class LibraryScreenModel {
             return LibraryContent(loading: loading, sections: LibraryMapping.sections(live, context: context, now: now, calendar: calendar),
                                   emptyState: LibraryMapping.emptyState(facts, favoritesOnly: favoritesOnly))
         }
-        // Until the first search answers, the results are empty and say nothing.
-        guard !searched.isEmpty else { return LibraryContent(loading: loading, results: []) }
-        let hits = index.search(SearchQuery(searched)).filter { !favoritesOnly || $0.entry.note.isFavorite }
-        facts.query = searched
-        facts.results = hits.count
+        // Until the first search answers, the results are empty and say nothing. Afterwards a new query or a changed
+        // note shows the last results until the search over them answers.
+        if !searched.isEmpty, found?.query != searched || found?.revision != index.revision { search() }
+        guard let found else { return LibraryContent(loading: loading, results: []) }
+        let hits = found.hits.filter { !favoritesOnly || $0.entry.note.isFavorite }
+        if found.query == searched {
+            facts.query = searched
+            facts.results = hits.count
+        }
         return LibraryContent(loading: loading, results: LibraryMapping.results(hits, context: context, now: now, calendar: calendar),
                               emptyState: LibraryMapping.emptyState(facts, favoritesOnly: favoritesOnly))
     }
@@ -157,8 +171,31 @@ public final class LibraryScreenModel {
         }
     }
 
-    /// Waits for the search asked for last (tests).
-    public func settleSearch() async { await pendingSearch?.value }
+    /// Waits for the search asked for last and its results (tests).
+    public func settleSearch() async {
+        await pendingSearch?.value
+        await running?.task.value
+    }
+
+    /// Searches the notes for `searched` off the main actor, a thousand notes being more than a frame's work; the
+    /// tokens it works out are kept for the next search.
+    private func search() {
+        let query = searched, revision = index.revision
+        guard running?.query != query || running?.revision != revision else { return }
+        running?.task.cancel()
+        let snapshot = index
+        let task = Task { [weak self] in
+            let (hits, searched) = await Task.detached(priority: .userInitiated) {
+                var copy = snapshot
+                return (copy.search(SearchQuery(query)), copy)
+            }.value
+            guard let self, !Task.isCancelled else { return }
+            index.adoptTokens(from: searched)
+            found = Found(query: query, revision: revision, hits: hits)
+            running = nil
+        }
+        running = (query, revision, task)
+    }
 
     private func scheduleSearch() {
         pendingSearch?.cancel()
@@ -166,13 +203,18 @@ public final class LibraryScreenModel {
         guard text != searched else { pendingSearch = nil; return }
         guard !text.isEmpty else {
             searched = ""
+            found = nil
+            running?.task.cancel()
+            running = nil
             pendingSearch = nil
             return
         }
         pendingSearch = Task { [weak self, clock = ports.clock] in
             do { try await clock.sleep(for: Self.searchDebounce) } catch { return }
-            guard !Task.isCancelled else { return }
-            self?.searched = text
+            guard let self, !Task.isCancelled else { return }
+            searched = text
+            index.update(ports.notes())
+            search()
         }
     }
 }

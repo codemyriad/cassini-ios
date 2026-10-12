@@ -12,16 +12,16 @@ import Foundation
 public struct SearchQuery: Hashable, Sendable {
     /// The tokens of each phrase, in order, as typed.
     public let phrases: [[String]]
+    /// The phrases with case and accents folded, as the index compares them.
+    let folded: [[String]]
 
     /// Nil when nothing searchable is left.
     public init?(_ input: String) {
         let phrases = Self.terms(input).map(SearchTokens.split).filter { !$0.isEmpty }
         guard !phrases.isEmpty else { return nil }
         self.phrases = phrases
+        folded = phrases.map { $0.map(SearchTokens.fold) }
     }
-
-    /// The phrases with case and accents folded, as the index compares them.
-    var folded: [[String]] { phrases.map { $0.map(SearchTokens.fold) } }
 
     /// Splits on any Unicode whitespace (no-break and ideographic spaces included), dropping empty pieces.
     private static func terms(_ input: String) -> [String] {
