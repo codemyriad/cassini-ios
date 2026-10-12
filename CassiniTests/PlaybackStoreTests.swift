@@ -28,7 +28,8 @@ import CassiniEngineTesting
     func testANoteOpensAtItsSavedPositionAndTheSameScreenKeepsThePlayer() async throws {
         let test = TestGraph(); defer { test.tearDown() }
         var note = try await seedNote(in: test)
-        note = try XCTUnwrap(await test.graph.library.commit(note.id) { $0.playbackPosition = 1.5 })
+        let saved = await test.graph.library.commit(note.id) { $0.playbackPosition = 1.5 }
+        note = try XCTUnwrap(saved)
         let playback = test.graph.playback, owner = PlaybackOwner()
         playback.show(note, owner: owner)
         XCTAssertTrue(playback.owns(note.id))
@@ -52,8 +53,8 @@ import CassiniEngineTesting
 
         let compressed = test.root.appendingPathComponent(note.id.uuidString).appendingPathComponent("audio.m4a")
         try Data([1]).write(to: compressed)
-        let moved = try XCTUnwrap(await library.commit(note.id) { $0.audioFilename = "audio.m4a" })
-        playback.show(moved, owner: owner)
+        let moved = await library.commit(note.id) { $0.audioFilename = "audio.m4a" }
+        playback.show(try XCTUnwrap(moved), owner: owner)
 
         XCTAssertEqual(test.playback.loadedURL, compressed)
         XCTAssertEqual(test.playback.position, 1.25)
