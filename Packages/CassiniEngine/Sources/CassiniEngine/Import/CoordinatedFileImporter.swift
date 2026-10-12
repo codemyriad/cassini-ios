@@ -5,7 +5,8 @@ import Synchronization
 /// Copies a file another app offered (the picker, Files, a share) into the library, as Android's `ImportRepository.copy`.
 ///
 /// The read is coordinated (`NSFileCoordinator`), so a file provider downloads an iCloud placeholder first, and runs
-/// under the URL's security scope. It runs on its own queue, not the cooperative pool, because coordination can wait for
+/// under the URL's security scope. The size the provider reports (a placeholder reports its logical size) is checked
+/// against the cap and the free space before coordinating, so a file that cannot be imported is never downloaded. It runs on its own queue, not the cooperative pool, because coordination can wait for
 /// a download. The copy streams in 64 KiB blocks, hashing as it goes; it enforces the size cap even when the size is
 /// unknown, and re-checks the free space every 8 MiB. Cancelling the task stops the copy (and a pending download).
 public struct CoordinatedFileImporter: FileImporting {
@@ -22,7 +23,8 @@ public struct CoordinatedFileImporter: FileImporting {
     }
 
     public static func reportedSize(of url: URL) -> Int64? {
-        (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize).map(Int64.init)
+        let values = try? url.resourceValues(forKeys: [.fileSizeKey, .totalFileSizeKey])
+        return (values?.fileSize ?? values?.totalFileSize).map(Int64.init)
     }
 
     public func copy(from source: URL, to destination: URL, maxBytes: Int64, reserveBytes: Int64) async throws -> ImportedFile {
@@ -44,15 +46,21 @@ public struct CoordinatedFileImporter: FileImporting {
                                  cancel: Cancellation) throws -> ImportedFile {
         let scoped = source.startAccessingSecurityScopedResource()
         defer { if scoped { source.stopAccessingSecurityScopedResource() } }
+        let copy = Copy(storage: storage, folder: destination.deletingLastPathComponent(), maxBytes: maxBytes,
+                        reserveBytes: reserveBytes, cancel: cancel)
+        // Before any download: the cap and the space for the whole file. Once a placeholder has been downloaded, its
+        // bytes already take space on this volume, so the check in the accessor covers only a size not reported here.
+        let reported = sizeOf(source)
+        try copy.check(reported, space: true)
         let coordinator = NSFileCoordinator()
         guard cancel.watch(coordinator) else { throw CancellationError() }
         var coordinationError: NSError?
         var result: Result<ImportedFile, any Error> = .failure(FileImportError.cannotOpen)
         coordinator.coordinate(readingItemAt: source, options: [], error: &coordinationError) { readable in
             result = Result {
-                let copy = Copy(storage: storage, folder: destination.deletingLastPathComponent(), maxBytes: maxBytes,
-                                reserveBytes: reserveBytes, cancel: cancel)
-                return try copy.run(from: readable, size: sizeOf(readable), to: destination, name: source.lastPathComponent)
+                let size = sizeOf(readable) ?? reported
+                try copy.check(size, space: reported == nil)
+                return try copy.run(from: readable, size: size, to: destination, name: source.lastPathComponent)
             }
         }
         if coordinationError != nil { throw cancel.isCancelled ? CancellationError() : FileImportError.cannotOpen }
@@ -68,11 +76,17 @@ private struct Copy {
     let reserveBytes: Int64
     let cancel: Cancellation
 
-    func run(from source: URL, size: Int64?, to destination: URL, name: String) throws -> ImportedFile {
-        if let size, size > maxBytes { throw FileImportError.tooLarge }
-        if let size, storage.availableBytes(at: folder) < size + reserveBytes {
+    /// Rejects a known `size` over the cap and, with `space`, one the free space cannot hold with the reserve.
+    func check(_ size: Int64?, space: Bool) throws {
+        guard let size else { return }
+        if size > maxBytes { throw FileImportError.tooLarge }
+        if space, storage.availableBytes(at: folder) < size + reserveBytes {
             throw FileImportError.noSpace(bytesNeeded: size + reserveBytes)
         }
+    }
+
+    /// Streams `source` to `destination`; the limits are enforced as it goes.
+    func run(from source: URL, size: Int64?, to destination: URL, name: String) throws -> ImportedFile {
         do {
             let (sha256, bytes) = try stream(from: source, size: size, to: destination)
             return ImportedFile(displayName: name, byteCount: bytes, sha256: sha256)

@@ -12,6 +12,7 @@ public final class FakeAudioProcessing: AudioProcessing {
         var inspections = 0
         var error: (any Error)?
         var onInspect: (@Sendable () -> Void)?
+        var decodeError: (any Error)?
     }
 
     private let state = Mutex(State())
@@ -25,6 +26,9 @@ public final class FakeAudioProcessing: AudioProcessing {
     /// From now on every `inspect` throws `error` (an I/O error while the file is read), or works again with nil.
     public func failInspections(with error: (any Error)?) { state.withLock { $0.error = error } }
 
+    /// From now on every `decodeOpus` throws `error` (say an `OSStatus` of a full disk), or works again with nil.
+    public func failDecodes(with error: (any Error)?) { state.withLock { $0.decodeError = error } }
+
     /// Runs `action` at the start of every `inspect`, e.g. to cancel the import that asked.
     public func onInspect(_ action: @escaping @Sendable () -> Void) { state.withLock { $0.onInspect = action } }
 
@@ -34,6 +38,8 @@ public final class FakeAudioProcessing: AudioProcessing {
             return (state.error, state.onInspect)
         }
         action?()
+        // As AVFoundation's loading does, a cancelled task stops the read.
+        try Task.checkCancellation()
         if let error { throw error }
         let bytes = [UInt8](try Data(contentsOf: url))
         let text = String(decoding: bytes.prefix(4096), as: UTF8.self)
@@ -51,8 +57,10 @@ public final class FakeAudioProcessing: AudioProcessing {
         try FileManager.default.copyItem(at: source, to: destination)
     }
 
-    /// Writes a `caff` file when `source` is Ogg Opus whose pages scan; throws otherwise.
+    /// Writes a `caff` file when `source` is Ogg Opus whose pages scan; throws otherwise, or the error set with
+    /// `failDecodes(with:)`.
     public func decodeOpus(_ source: URL, to destination: URL) async throws {
+        if let error = state.withLock({ $0.decodeError }) { throw error }
         let info = try OggOpus.scan(source)
         guard info.validFraming, info.sampleCount > 0 else { throw CassiniError("Unsupported or damaged Opus stream") }
         try Data("caff".utf8).write(to: destination)

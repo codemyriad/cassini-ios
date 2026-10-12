@@ -2,7 +2,8 @@ import Foundation
 import CassiniNotebook
 
 /// Writes a note as a Cassini document: its audio as Ogg Opus with every transcript version made on this device added
-/// as a variant, the note's own transcript last and default.
+/// as a variant (and, for a source that is not verified, its imported variants too), the note's own transcript last
+/// and default.
 ///
 /// The audio is the imported Ogg Opus when the note has one (a verified document keeps its earlier variants), else the
 /// playable file encoded to Opus. Intermediate files go in `<folder>/work/`, which is removed afterwards, so no title
@@ -24,7 +25,7 @@ public struct PortableExportService: Sendable {
                 opus = work.appendingPathComponent("encoded.opus")
                 try await audio.encodeOpus(playable, to: opus)
             }
-            for (index, version) in Self.localVersions(of: note).enumerated() {
+            for (index, version) in Self.versionsToSeal(of: note).enumerated() {
                 try Task.checkCancellation()
                 var snapshot = note
                 snapshot.transcript = version.segments
@@ -42,9 +43,15 @@ public struct PortableExportService: Sendable {
         }
     }
 
-    /// The versions made on this device besides the current one, oldest first; imported variants are in the source.
-    static func localVersions(of note: Note) -> [TranscriptVersion] {
-        (note.versions ?? []).filter { $0.id != note.selectedVersionID && $0.portableID == nil && !$0.segments.isEmpty }
+    /// The versions besides the current one that the export adds as variants, oldest first. A verified source keeps
+    /// its own variants, so only the ones made on this device are added; any other source is sealed afresh, so its
+    /// readable imported variants are added too.
+    static func versionsToSeal(of note: Note) -> [TranscriptVersion] {
+        let sourceKeepsVariants = note.document?.state == .ok
+        return (note.versions ?? []).filter { version in
+            version.id != note.selectedVersionID && !version.segments.isEmpty
+                && (version.portableID == nil || !sourceKeepsVariants)
+        }
     }
 
     private static func seal(_ note: Note, _ opus: URL, _ target: URL) async throws {

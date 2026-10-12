@@ -7,7 +7,7 @@ import Foundation
 /// 1. copies the file into `<root>/<newId>/source.tmp` with its SHA-256, within the size cap and the free space
 ///    (`FileImporting`);
 /// 2. gives `existing` when a live note has the same bytes (one in Recently Deleted does not count);
-/// 3. classifies the copy by its first bytes, never by its name: Ogg Opus with Cassini metadata becomes
+/// 3. classifies the copy by its first bytes, never by its name: Ogg Opus that names a Cassini format becomes
 ///    `document.opus`, read and verified once now; other Ogg Opus `source.opus`; anything else `source.<ext>` when
 ///    AVFoundation reads it. Opus is decoded to `playback.caf`, which the note plays;
 /// 4. writes the note, unless a live note got the same bytes meanwhile.
@@ -69,7 +69,7 @@ public struct ImportService: Sendable {
         try Task.checkCancellation()
         let staged: Staged
         do {
-            staged = try await classify(staging, in: folder, displayName: copied.displayName)
+            staged = try await classify(staging, in: folder, displayName: copied.displayName, bytes: copied.byteCount)
         } catch let rejection as Rejection {
             return .rejected(rejection.kind)
         } catch is CancellationError {
@@ -100,61 +100,108 @@ public struct ImportService: Sendable {
     }
 
     /// Step 3: decides what the copy is, moves it to its name in the note directory and reads what the note shows.
-    private func classify(_ staging: URL, in folder: URL, displayName: String) async throws -> Staged {
-        switch try ImportClassifier.sniff(fileAt: staging) {
-        case .oggOpus:
-            let document = CassiniDocument.readChecked(staging)
-            if document.state == .plainAudio { return try await plainOpus(staging, in: folder) }
-            return try await cassiniDocument(document, staging, in: folder)
+    /// Ogg Opus is a document only when it names a Cassini format, as Android's `AudioFiles.isCassini`.
+    private func classify(_ staging: URL, in folder: URL, displayName: String, bytes: Int64) async throws -> Staged {
+        let kind = try await Self.blocking { () throws -> Classified in
+            switch try ImportClassifier.sniff(fileAt: staging) {
+            case .oggOpus:
+                switch try CassiniDocument.namesCassiniFormat(staging) {
+                case nil: throw Rejection(kind: .cannotOpen)
+                case false: return .plainOpus
+                case true: return .document
+                }
+            case .other(let content): return .other(fileExtension: content)
+            }
+        }
+        switch kind {
+        case .plainOpus:
+            return try await plainOpus(staging, in: folder, bytes: bytes)
+        case .document:
+            let document = try await Self.blocking { CassiniDocument.readChecked(staging) }
+            // The headers read a moment ago, so this is our own copy failing to read: a storage error.
+            if document.state == .unreadable { throw CocoaError(.fileReadUnknown) }
+            return try await cassiniDocument(document, staging, in: folder, bytes: bytes)
         case .other(let content):
             let name = "source." + ImportTitles.fileExtension(displayName: displayName, content: content)
             let source = try move(staging, to: name, in: folder)
             let summary: AudioSummary
             do { summary = try await audio.inspect(source) } catch {
-                throw Self.isStorageError(error) ? error : Rejection(kind: .cannotOpen)
+                throw audioFailure(error, bytes: bytes) ?? Rejection(kind: .cannotOpen)
             }
             return Staged(audio: ImportedAudio(filename: name, duration: summary.duration, waveform: summary.waveform))
         }
     }
 
-    private func plainOpus(_ staging: URL, in folder: URL) async throws -> Staged {
-        guard let info = try? OggOpus.scan(staging), info.sampleCount > 0 else { throw Rejection(kind: .cannotOpen) }
+    private enum Classified: Sendable {
+        case plainOpus, document
+        case other(fileExtension: String?)
+    }
+
+    private func plainOpus(_ staging: URL, in folder: URL, bytes: Int64) async throws -> Staged {
+        let info = try? await Self.blocking { try OggOpus.scan(staging) }
+        guard let info, info.sampleCount > 0 else { throw Rejection(kind: .cannotOpen) }
         let source = try move(staging, to: Self.plainOpusFilename, in: folder)
-        guard let waveform = try await decode(source, in: folder) else { throw Rejection(kind: .cannotOpen) }
+        guard let waveform = try await decode(source, in: folder, bytes: bytes) else { throw Rejection(kind: .cannotOpen) }
         return Staged(audio: ImportedAudio(filename: Self.playbackFilename, originalFilename: Self.plainOpusFilename,
                                            duration: Double(info.durationMs) / 1000, waveform: waveform))
     }
 
     /// A document stays one whatever its state; when its audio does not decode, the note keeps it unplayable.
-    private func cassiniDocument(_ document: CassiniDocument, _ staging: URL, in folder: URL) async throws -> Staged {
+    private func cassiniDocument(_ document: CassiniDocument, _ staging: URL, in folder: URL, bytes: Int64) async throws -> Staged {
         let source = try move(staging, to: Self.documentFilename, in: folder)
         guard let portable = PortableTranscript(document, vendor: PortableTranscript.vendor(of: source)) else {
             throw Rejection(kind: .cannotOpen)
         }
-        let pages = (try? OggOpus.scan(source)).map { Double($0.durationMs) / 1000 } ?? 0
-        let audio: ImportedAudio
-        if let waveform = try await decode(source, in: folder) {
-            audio = ImportedAudio(filename: Self.playbackFilename, originalFilename: Self.documentFilename,
-                                  duration: pages, waveform: waveform)
+        // A verified document's duration is the one verification measured; any other is scanned for it.
+        let duration: TimeInterval
+        if document.state == .ok, let verified = portable.duration {
+            duration = verified
         } else {
-            audio = ImportedAudio(filename: Self.documentFilename, duration: pages, state: .unplayable(.unsupportedFormat))
+            duration = ((try? await Self.blocking { try OggOpus.scan(source) }).map { Double($0.durationMs) / 1000 }) ?? 0
+        }
+        let audio: ImportedAudio
+        if let waveform = try await decode(source, in: folder, bytes: bytes) {
+            audio = ImportedAudio(filename: Self.playbackFilename, originalFilename: Self.documentFilename,
+                                  duration: duration, waveform: waveform)
+        } else {
+            audio = ImportedAudio(filename: Self.documentFilename, duration: duration, state: .unplayable(.unsupportedFormat))
         }
         return Staged(audio: audio, document: portable)
     }
 
     /// Decodes `opus` to the playback file and returns its waveform; nil when it does not decode.
-    private func decode(_ opus: URL, in folder: URL) async throws -> [Float]? {
+    private func decode(_ opus: URL, in folder: URL, bytes: Int64) async throws -> [Float]? {
         let playback = folder.appendingPathComponent(Self.playbackFilename)
         do {
             try await audio.decodeOpus(opus, to: playback)
-        } catch is CancellationError {
-            throw CancellationError()
         } catch {
             try? FileManager.default.removeItem(at: playback)
-            if Self.isStorageError(error) { throw error }
+            if let failure = audioFailure(error, bytes: bytes) { throw failure }
             return nil
         }
         return (try? await audio.inspect(playback))?.waveform ?? []
+    }
+
+    /// What an error of AVFoundation or libopus means for the import: the cancellation itself, a storage error, or
+    /// `noSpace` when the volume ran out (AVFoundation reports a full disk as its own status codes); nil when the audio
+    /// just does not read.
+    private func audioFailure(_ error: any Error, bytes: Int64) -> (any Error)? {
+        if error is CancellationError || Task.isCancelled { return CancellationError() }
+        if Self.isStorageError(error) { return error }
+        let space = storageFailure(bytes: bytes)
+        if case .noSpace = space { return Rejection(kind: space) }
+        return nil
+    }
+
+    /// Runs blocking file work (a sniff, a verification or a scan of up to 4 GiB) on its own queue rather than the
+    /// cooperative pool, checking for cancellation before and after it.
+    private static func blocking<T: Sendable>(_ work: @escaping @Sendable () throws -> T) async throws -> T {
+        try Task.checkCancellation()
+        let value = try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async { continuation.resume(with: Result(catching: work)) }
+        }
+        try Task.checkCancellation()
+        return value
     }
 
     private func move(_ staging: URL, to name: String, in folder: URL) throws -> URL {

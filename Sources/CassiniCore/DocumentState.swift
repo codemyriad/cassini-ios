@@ -25,3 +25,23 @@ extension CassiniDocument {
         read(verify: verify, reportsIOErrors: true) { try FileSource(url) }
     }
 }
+
+extension CassiniDocument {
+    /**
+     * Whether the Ogg Opus file at [url] names itself Cassini, with a `CASSINI_FORMAT` comment (Android
+     * `AudioFiles.isCassini`); nil when its headers or comments do not parse, the comment header too large included.
+     * Only the headers are read. Throws when the file cannot be opened or read.
+     */
+    public static func namesCassiniFormat(_ url: URL) throws -> Bool? {
+        let tags: [UInt8]
+        do {
+            tags = try OggOpus.headers(FileSource(url)).tags
+        } catch is OggOpus.HeaderTooLarge {
+            return nil
+        } catch is CassiniError {
+            return nil
+        }
+        guard let comments = try? rawComments(tags) else { return nil }
+        return comments.contains { sameBytes(tagName($0), "CASSINI_FORMAT") }
+    }
+}

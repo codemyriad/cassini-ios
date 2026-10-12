@@ -391,8 +391,14 @@ private func sha256(_ url: URL) throws -> String {
         let task = Mutex<Task<ImportOutcome, any Error>?>(nil)
         // The cancel arrives while the file is classified, so the import stops just after the move to source.mp3.
         h.audio.onInspect { task.withLock { $0?.cancel() } }
-        let running = Task { try await h.run(url, service) }
+        // The import waits until its handle is stored, so the cancel always finds it.
+        let (gate, open) = AsyncStream.makeStream(of: Void.self)
+        let running = Task {
+            for await _ in gate { break }
+            return try await h.run(url, service)
+        }
         task.withLock { $0 = running }
+        open.yield()
 
         await #expect(throws: CancellationError.self) { try await running.value }
         #expect(h.noteDirs().isEmpty)
@@ -405,5 +411,104 @@ private func sha256(_ url: URL) throws -> String {
         let h = try ImportHarness()
         let id = try h.created(try await h.run(try h.input(try ImportFixtures.opus(comments: ["TITLE=Altro titolo"]), "registrazione.opus")))
         try await h.assertPlain(id, file: ImportService.playbackFilename, duration: 15.84, title: "registrazione")
+    }
+
+    @Test func anOggOpusFileWhoseTagsDoNotParseIsRejectedAsOpen() async throws {
+        // No CASSINI_FORMAT can be found in comments that do not parse: Android's isCassini gives null, so OPEN.
+        let h = try ImportHarness()
+        let broken = Array("OpusTags".utf8) + [0xFF, 0xFF, 0xFF, 0x7F]
+        let head = Array("OpusHead".utf8) + [1, 1, 0, 0, 0x80, 0xBB, 0, 0, 0, 0, 0]
+        let stream = OggOpus.Stream(head: head, tags: broken, audio: Array(repeating: [0xF8, 0xFF, 0xFE], count: 100),
+                                    finalGranule: 96_000, validFraming: true)
+        let url = try h.input(try OggOpus.mux(stream, tags: broken), "rotto.opus")
+
+        #expect(try await h.run(url) == .rejected(.cannotOpen))
+        #expect(h.noteDirs().isEmpty)
+    }
+
+    @Test func aReportedSizeOverTheCapIsRejectedBeforeCoordinating() async throws {
+        // Only the size asked before coordination is over the cap: a placeholder would not be downloaded.
+        let h = try ImportHarness()
+        let asked = Atomic(0)
+        let service = h.importer(sizeOf: { _ in asked.add(1, ordering: .relaxed).oldValue == 0 ? Limits.maxImportBytes + 1 : nil })
+
+        let outcome = try await h.run(try h.input(ImportFixtures.m4a, "cloud.m4a"), service)
+
+        #expect(outcome == .rejected(.tooLarge))
+        #expect(asked.load(ordering: .relaxed) == 1)
+        #expect(h.noteDirs().isEmpty)
+    }
+
+    @Test func aReportedSizeWithoutTheSpaceIsRejectedBeforeCoordinating() async throws {
+        let h = try ImportHarness()
+        let asked = Atomic(0)
+        let size = Limits.maxImportBytes - 1
+        let service = h.importer(storage: ScriptedStorage(always: size), sizeOf: { _ in
+            asked.add(1, ordering: .relaxed).oldValue == 0 ? size : nil
+        })
+
+        let outcome = try await h.run(try h.input(ImportFixtures.m4a, "cloud.m4a"), service)
+
+        #expect(outcome == .rejected(.noSpace(bytesNeeded: size + Limits.minFreeImportBytes)))
+        #expect(asked.load(ordering: .relaxed) == 1)
+    }
+
+    @Test func aDecodeThatFailsOnAFullDiskIsNoSpaceNotAnUnplayableNote() async throws {
+        // AVFoundation reports a full disk as an OSStatus, not a POSIX or Cocoa error.
+        let h = try ImportHarness()
+        h.audio.failDecodes(with: NSError(domain: NSOSStatusErrorDomain, code: -34))
+        let storage = ScriptedStorage { $0 == 0 ? 64 << 30 : Limits.minFreeImportBytes - 1 }
+        let plain = try h.input(try ImportFixtures.opus(), "pieno.opus")
+        let document = try h.input(try ImportFixtures.document("disco pieno", title: "Pieno"), "documento.opus")
+
+        let plainOutcome = try await h.run(plain, h.importer(storage: storage))
+        let documentOutcome = try await h.run(document, h.importer(storage: ScriptedStorage { $0 == 0 ? 64 << 30 : 0 }))
+
+        #expect(plainOutcome.failure.map { if case .noSpace = $0 { true } else { false } } == true)
+        #expect(documentOutcome.failure.map { if case .noSpace = $0 { true } else { false } } == true)
+        #expect(h.noteDirs().isEmpty)
+    }
+
+    @Test func aCancelWhileAVFoundationReadsTheFileIsACancellationNotARejection() async throws {
+        let h = try ImportHarness()
+        let url = try h.input(ImportFixtures.m4a, "memo.m4a")
+        let service = h.importer()
+        let task = Mutex<Task<ImportOutcome, any Error>?>(nil)
+        h.audio.onInspect { task.withLock { $0?.cancel() } }
+        let (gate, open) = AsyncStream.makeStream(of: Void.self)
+        let running = Task {
+            for await _ in gate { break }
+            return try await h.run(url, service)
+        }
+        task.withLock { $0 = running }
+        open.yield()
+
+        await #expect(throws: CancellationError.self) { try await running.value }
+        #expect(h.noteDirs().isEmpty)
+    }
+
+    @Test func exportingAStaleDocumentKeepsItsOtherReadableVariants() async throws {
+        let h = try ImportHarness()
+        let first = try ImportFixtures.document("prima versione", title: "Due")
+        let words = [Word("S1", 0, 400, "seconda"), Word("S1", 500, 900, "versione")]
+        let two = try CassiniDocument.create(first, transcript: Transcript(words, language: "it"), title: "Due",
+                                             processing: JSONObject(), existing: CassiniDocument.read(first))
+        let stale = try OggOpus.mux(OggOpus.read(ImportFixtures.opus(packets: 100)), tags: OggOpus.read(two).tags)
+        let id = try h.created(try await h.run(try h.input(stale, "due.opus")))
+        let note = try await h.note(id)
+        #expect(note.document?.state == .staleAudio)
+        #expect(note.versions?.count == 2)
+        let folder = h.inputs.appendingPathComponent("export")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+
+        let output = try await PortableExportService(audio: h.audio)
+            .export(note, original: h.store.originalAudioURL(for: note), playable: h.store.audioURL(for: note),
+                    into: folder, filename: "Due")
+
+        let exported = CassiniDocument.read(output)
+        #expect(exported.state == .ok)
+        let texts = Set(exported.variants.compactMap { $0.transcript?.words.map(\.text).joined(separator: " ") })
+        #expect(texts == ["prima versione", "seconda versione"])
+        #expect(exported.selected()?.transcript?.words.map(\.text).joined(separator: " ") == note.text)
     }
 }
