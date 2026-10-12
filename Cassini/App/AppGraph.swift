@@ -21,7 +21,8 @@ import CassiniNotebook
 
     init(environment: AppEnvironment) {
         self.environment = environment
-        settings = SettingsStore(defaults: environment.defaults, clock: environment.clock)
+        settings = SettingsStore(defaults: environment.defaults, clock: environment.clock,
+                                 defaultLanguage: environment.locale.identifier(.bcp47))
         library = LibraryStore(root: environment.root, errors: errors)
         voices = VoicesStore(library: library, settings: settings, errors: errors)
         playback = PlaybackStore(playback: environment.playback, library: library, errors: errors, clock: environment.clock)
@@ -35,8 +36,8 @@ import CassiniNotebook
         imports = ImportStore(library: library, processing: processing, settings: settings, audio: environment.audio,
                               storage: environment.storage, router: router, errors: errors, clock: environment.clock)
         trash = TrashStore(library: library, voices: voices, processing: processing, playback: playback,
-                           recording: recording, settings: settings, errors: errors, clock: environment.clock,
-                           calendar: environment.calendar)
+                           recording: recording, settings: settings, router: router, errors: errors,
+                           clock: environment.clock, calendar: environment.calendar)
         exports = ExportStore(library: library)
         registerStartup()
     }
@@ -53,6 +54,16 @@ import CassiniNotebook
         }
         #endif
         return report
+    }
+
+    /// Saves the playback position and keeps the app awake until every pending write has landed.
+    func enterBackground() {
+        let token = environment.background.begin(title: "Saving your recordings", progress: Progress(), onExpire: {})
+        playback.savePosition()
+        Task { [library, background = environment.background] in
+            await library.settle()
+            background.end(token)
+        }
     }
 
     private func registerStartup() {

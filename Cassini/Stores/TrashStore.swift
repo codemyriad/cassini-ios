@@ -11,14 +11,16 @@ import CassiniNotebook
     @ObservationIgnored private let playback: PlaybackStore
     @ObservationIgnored private let recording: RecordingStore
     @ObservationIgnored private let settings: SettingsStore
+    @ObservationIgnored private let router: Router
     @ObservationIgnored private let errors: ErrorPresenter
     @ObservationIgnored private let clock: any AppClock
     @ObservationIgnored private let calendar: Calendar
 
     init(library: LibraryStore, voices: VoicesStore, processing: ProcessingStore, playback: PlaybackStore,
-         recording: RecordingStore, settings: SettingsStore, errors: ErrorPresenter, clock: any AppClock, calendar: Calendar) {
+         recording: RecordingStore, settings: SettingsStore, router: Router, errors: ErrorPresenter, clock: any AppClock,
+         calendar: Calendar) {
         self.library = library; self.voices = voices; self.processing = processing; self.playback = playback
-        self.recording = recording; self.settings = settings; self.errors = errors; self.clock = clock; self.calendar = calendar
+        self.recording = recording; self.settings = settings; self.router = router; self.errors = errors; self.clock = clock; self.calendar = calendar
     }
 
     /// Oldest deletion first.
@@ -30,13 +32,15 @@ import CassiniNotebook
         note.trashedAt.map { TrashPolicy.daysLeft(since: $0, now: clock.now, calendar: calendar) } ?? TrashPolicy.retentionDays
     }
 
-    /// False while the note is being recorded.
+    /// Closes the note wherever it is open. False while the note is being recorded.
     @discardableResult func moveToTrash(_ id: UUID) -> Bool {
         guard recording.state.noteID != id, let note = library.note(id) else { return false }
         if note.status == .queued || processing.state.isRunning(id) { processing.cancel(id) }
         if playback.state.noteID == id { playback.stop() }
         let now = clock.now
-        return library.update(id) { $0.trashedAt = now }
+        guard library.update(id, { $0.trashedAt = now }) else { return false }
+        router.close(noteID: id)
+        return true
     }
 
     func restore(_ id: UUID) { library.update(id) { $0.trashedAt = nil } }

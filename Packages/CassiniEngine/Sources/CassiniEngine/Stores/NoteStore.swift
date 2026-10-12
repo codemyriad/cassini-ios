@@ -11,6 +11,13 @@ public protocol NotePersisting: Sendable {
 
 extension NoteRepository: NotePersisting {}
 
+public enum NoteStoreError: LocalizedError, Equatable {
+    /// The stored note is no longer the one the change was made from; nothing was written.
+    case changedElsewhere
+
+    public var errorDescription: String? { "The recording was changed while this edit was being saved." }
+}
+
 public enum NoteChange: Hashable, Sendable {
     case saved(Note)
     case deleted(UUID)
@@ -61,6 +68,27 @@ public actor NoteStore {
         change(&copy)
         if copy != current { try save(copy) }
         return copy
+    }
+
+    /// Writes `updated` in place of `expected`, unless the stored note is no longer `expected`. Writes nothing when
+    /// the two are equal. Returns the stored note.
+    @discardableResult
+    public func replace(_ expected: Note, with updated: Note) throws -> Note {
+        precondition(expected.id == updated.id, "a replacement keeps the note's id")
+        guard notes[expected.id] == expected else { throw NoteStoreError.changedElsewhere }
+        if updated != expected { try save(updated) }
+        return updated
+    }
+
+    /// `replace(_:with:)` for several notes, in order; stops at the first that fails. Returns the notes it wrote.
+    @discardableResult
+    public func replaceAll(_ replacements: [(expected: Note, updated: Note)]) throws -> [Note] {
+        var written: [Note] = []
+        for (expected, updated) in replacements {
+            try replace(expected, with: updated)
+            if updated != expected { written.append(updated) }
+        }
+        return written
     }
 
     /// Applies `change` to every note and writes the ones it changed. Returns those.

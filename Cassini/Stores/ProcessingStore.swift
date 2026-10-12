@@ -97,8 +97,8 @@ import CassiniNotebook
     }
 
     private func transcribe(_ id: UUID, _ request: TranscriptionRequest) async throws {
-        let result = try await transcriber.transcribe(request) { [weak self] event in
-            Task { @MainActor in self?.report(event, for: id) }
+        let result = try await withOrderedEvents({ [weak self] in self?.report($0, for: id) }) { events in
+            try await transcriber.transcribe(request, events: events)
         }
         try Task.checkCancellation()
         let saved = await library.commit(id) { note in
@@ -119,8 +119,9 @@ import CassiniNotebook
 
     private func analyzeSpeakers(_ id: UUID, url: URL, generation: Int) async throws {
         do {
-            let analysis = try await analyzer.analyze(url: url, allowDownload: settings.speakerDownloadsAllowed) { [weak self] event in
-                Task { @MainActor in self?.report(event, for: id) }
+            let allowDownload = settings.speakerDownloadsAllowed
+            let analysis = try await withOrderedEvents({ [weak self] in self?.report($0, for: id) }) { events in
+                try await analyzer.analyze(url: url, allowDownload: allowDownload, progress: events)
             }
             try Task.checkCancellation()
             try await voices.applySpeakerAnalysis(analysis, to: id, generation: generation)
@@ -129,6 +130,23 @@ import CassiniNotebook
         } catch {
             library.update(id) { $0.speakerAnalysisFailure = .speakers }
         }
+    }
+
+    /// Runs `body` with a callback that may be called from any thread; `apply` gets the events here, in the order
+    /// they were sent, and has had every one of them when this returns.
+    private func withOrderedEvents<Event: Sendable, Value>(
+        _ apply: @escaping @MainActor (Event) -> Void,
+        _ body: (@escaping @Sendable (Event) -> Void) async throws -> Value
+    ) async throws -> Value {
+        let (stream, sink) = AsyncStream.makeStream(of: Event.self)
+        let consumer = Task { @MainActor in
+            for await event in stream { apply(event) }
+        }
+        let result: Result<Value, any Error>
+        do { result = .success(try await body { sink.yield($0) }) } catch { result = .failure(error) }
+        sink.finish()
+        await consumer.value
+        return try result.get()
     }
 
     private func report(_ event: TranscriptionEvent, for id: UUID) {

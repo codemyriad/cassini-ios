@@ -4,6 +4,7 @@ import CassiniEngine
 /// The Library and the stack above it: side by side on regular width, one stack on compact width. Recording covers
 /// everything; app-wide errors show here, one at a time.
 struct RootView: View {
+    /// Restores the stack and the screens' scene storage (the library search); off for UI tests.
     var restoresNavigation = true
     @Environment(Router.self) private var router
     @Environment(ErrorPresenter.self) private var errors
@@ -44,6 +45,7 @@ struct RootView: View {
         }
         .onChange(of: sizeClass) { _, size in router.isSplit = size == .regular }
         .onChange(of: router.path) { _, _ in if restoresNavigation { savedPath = router.encodedPath } }
+        .environment(\.restoresSceneState, restoresNavigation)
     }
 }
 

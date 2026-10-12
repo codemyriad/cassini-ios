@@ -13,7 +13,7 @@ import SwiftUI
                 .onOpenURL { url in Task { await graph.imports.importAudio(url) } }
                 .onChange(of: scenePhase) { _, phase in
                     if phase == .active, graph.startup.isReady { Task { await graph.trash.purgeExpired() } }
-                    if phase == .background { graph.playback.savePosition() }
+                    if phase == .background { graph.enterBackground() }
                 }
         }
     }

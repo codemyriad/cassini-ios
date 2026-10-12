@@ -13,7 +13,6 @@ struct NoteMenu: View {
     @Environment(TrashStore.self) private var trash
     @Environment(ExportStore.self) private var exports
     @Environment(RecordingStore.self) private var recording
-    @Environment(Router.self) private var router
     @Environment(ErrorPresenter.self) private var errors
     @State private var exportingDocument = false
 
@@ -38,7 +37,7 @@ struct NoteMenu: View {
                 .disabled(note.status == .transcribing || note.status == .queued || finishing || !note.audio.isPlayable)
             Divider()
             Button("Move to Recently Deleted", systemImage: "trash", role: .destructive) {
-                if trash.moveToTrash(note.id) { router.popToLibrary() }
+                trash.moveToTrash(note.id)
             }
         } label: { Image(systemName: "ellipsis").frame(minWidth: 32, minHeight: 32) }.accessibilityLabel("Recording actions")
     }

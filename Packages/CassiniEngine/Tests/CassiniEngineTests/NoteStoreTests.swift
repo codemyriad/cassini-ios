@@ -100,4 +100,21 @@ import CassiniNotebook
         #expect(object?["failure"] as? String == "INTERRUPTED")
         #expect(object?["failureMessage"] == nil)
     }
+
+    @Test func aReplacementIsWrittenOnlyOverTheNoteItWasMadeFrom() async throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        let (store, persistence) = try store()
+        let note = Note(title: "First")
+        try await store.save(note)
+        var renamed = note; renamed.title = "Second"
+        #expect(try await store.replace(note, with: renamed) == renamed)
+        #expect(persistence.saveCount == 2)
+        #expect(try await store.replace(renamed, with: renamed) == renamed)
+        #expect(persistence.saveCount == 2, "an unchanged replacement writes nothing")
+
+        var stale = note; stale.isFavorite = true
+        await #expect(throws: NoteStoreError.changedElsewhere) { try await store.replace(note, with: stale) }
+        #expect(await store.note(note.id) == renamed)
+        #expect(persistence.saveCount == 2)
+    }
 }

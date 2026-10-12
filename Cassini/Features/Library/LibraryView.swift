@@ -13,6 +13,9 @@ struct LibraryView: View {
     @Environment(\.dynamicTypeSize) private var dynamicType
     @Environment(\.calendar) private var calendar
     @Environment(\.clock) private var clock
+    @Environment(\.restoresSceneState) private var restoresSceneState
+    @SceneStorage("library.query") private var savedQuery = ""
+    @SceneStorage("library.favoritesOnly") private var savedFavoritesOnly = false
     @State private var query = ""
     @State private var favoritesOnly = false
     @State private var importing = false
@@ -72,6 +75,13 @@ struct LibraryView: View {
                 Button("Settings", systemImage: "slider.horizontal.3") { router.show(.settings) }
             }
         }
+        .onAppear {
+            guard restoresSceneState else { return }
+            query = savedQuery
+            favoritesOnly = savedFavoritesOnly
+        }
+        .onChange(of: query) { _, query in if restoresSceneState { savedQuery = query } }
+        .onChange(of: favoritesOnly) { _, favoritesOnly in if restoresSceneState { savedFavoritesOnly = favoritesOnly } }
         .fileImporter(isPresented: $importing, allowedContentTypes: [.audio], allowsMultipleSelection: false) { result in
             switch result {
             case .success(let urls): if let url = urls.first { Task { await imports.importAudio(url) } }

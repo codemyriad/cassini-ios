@@ -31,6 +31,12 @@ enum FullScreenRoute: String, Identifiable, Hashable {
 
     func popToLibrary() { path.removeAll() }
 
+    /// Pops the note's screen, and every screen above it, when it is open.
+    func close(noteID: UUID) {
+        guard let index = path.firstIndex(where: { $0.noteID == noteID }) else { return }
+        path.removeSubrange(index...)
+    }
+
     /// The screen under the topmost `route`, for its back label.
     func below(_ route: Route) -> Route? { BackStack.below(route, in: stack) }
 

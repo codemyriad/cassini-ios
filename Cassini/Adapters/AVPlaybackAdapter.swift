@@ -33,12 +33,16 @@ import CassiniEngine
             continuation.yield(.remoteSeek(event.positionTime)); return .success
         }
         let center = NotificationCenter.default
-        observers.append(center.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: .main) { _ in
-            continuation.yield(.interrupted)
+        // The player pauses here, before the observer returns; the store hears about it from `events` afterwards.
+        observers.append(center.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: .main) { [weak self] notification in
+            let type = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
+            guard type == AVAudioSession.InterruptionType.began.rawValue else { return }
+            MainActor.assumeIsolated { self?.pauseAndReport(.interrupted) }
         })
-        observers.append(center.addObserver(forName: AVAudioSession.routeChangeNotification, object: nil, queue: .main) { notification in
+        observers.append(center.addObserver(forName: AVAudioSession.routeChangeNotification, object: nil, queue: .main) { [weak self] notification in
             let reason = notification.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt
-            if reason == AVAudioSession.RouteChangeReason.oldDeviceUnavailable.rawValue { continuation.yield(.routeLost) }
+            guard reason == AVAudioSession.RouteChangeReason.oldDeviceUnavailable.rawValue else { return }
+            MainActor.assumeIsolated { self?.pauseAndReport(.routeLost) }
         })
     }
 
@@ -72,6 +76,12 @@ import CassiniEngine
     func seek(_ position: TimeInterval) {
         player?.currentTime = max(0, min(position, duration))
         updateNowPlaying()
+    }
+
+    private func pauseAndReport(_ event: PlaybackEvent) {
+        guard isPlaying else { return }
+        pause()
+        continuation.yield(event)
     }
 
     private func updateNowPlaying() {
