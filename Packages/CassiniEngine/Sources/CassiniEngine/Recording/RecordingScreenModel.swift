@@ -1,0 +1,220 @@
+import Foundation
+import Observation
+import CassiniNotebook
+
+/// Where the Recording screen's capture is.
+public enum RecordingPhase: Hashable, Sendable {
+    case needsPermission, starting, recording, paused, stopping
+}
+
+/// What the Recording screen asks the app to do.
+public enum RecordingEffect: Hashable, Sendable {
+    /// Back to the Library; the recording continues.
+    case close
+    /// Cassini's page in the Settings app (microphone access is off).
+    case openSettings
+    /// Replace the Recording screen with the note, and the model download on top when `modelDownload`.
+    case openNote(UUID, modelDownload: Bool)
+    /// Show the Recording screen: a recording stopped on its own and its banner says why.
+    case show
+}
+
+/// The Recording screen. The recording itself is `RecordingController`'s; this model starts it on entry once the
+/// microphone is allowed, shows its state, levels and banners, and leads away when it ends.
+///
+/// - Entry with microphone access starts the capture; without it the system is asked, and a denial shows "Microphone
+///   access is off". The capture then starts when the app comes back with access granted.
+/// - Entry while a recording is in progress shows it.
+/// - Finish: a saved recording opens its note, with the model download on top when consent was never asked and the
+///   speech model is missing. A storage stop, a microphone failure and a failed start stay with their banner.
+@MainActor @Observable
+public final class RecordingScreenModel {
+    public struct Ports {
+        public var permission: any MicrophonePermission
+        /// Whether a part of the speech model is missing, so finishing without consent opens the model download.
+        public var modelsMissing: @MainActor () async -> Bool
+        /// Asked once, at the first recording, for permission to tell about recordings that stopped on their own.
+        public var notifier: (any Notifier)?
+        public var settings: SettingsStore
+
+        public init(permission: any MicrophonePermission, modelsMissing: @escaping @MainActor () async -> Bool,
+                    notifier: (any Notifier)?, settings: SettingsStore) {
+            self.permission = permission; self.modelsMissing = modelsMissing; self.notifier = notifier; self.settings = settings
+        }
+    }
+
+    /// A recording that ended without being saved by the user; the screen keeps its banner.
+    public struct Ended: Hashable, Sendable {
+        public var outcome: RecordingOutcome
+        /// The note that keeps what was captured; nil when nothing was kept.
+        public var noteID: UUID?
+    }
+
+    public let controller: RecordingController
+    public private(set) var microphoneDenied = false
+    /// Waiting for microphone access to start.
+    public private(set) var pendingStart = false
+    public private(set) var ended: Ended?
+    /// The capture as last shown, for the title and time while it is being saved.
+    private var shown: ActiveRecording?
+
+    @ObservationIgnored public var onEffect: (@MainActor (RecordingEffect) -> Void)?
+    @ObservationIgnored private let ports: Ports
+    /// A capture began while this screen was in use: only then does its end lead away.
+    @ObservationIgnored private var sawCapture = false
+    @ObservationIgnored private var leaving = false
+    @ObservationIgnored private var prefilled: UUID?
+
+    public init(controller: RecordingController, ports: Ports) {
+        self.controller = controller
+        self.ports = ports
+        controller.observe { [weak self] state in self?.follow(state) }
+    }
+
+    // MARK: What the screen shows
+
+    public var phase: RecordingPhase {
+        let recorder = controller.state
+        let idle = !recorder.inProgress
+        if idle, microphoneDenied || pendingStart { return .needsPermission }
+        if idle, ended?.outcome == .couldNotStart { return .starting }
+        if idle, ended != nil { return .stopping }
+        switch recorder {
+        case .active(let active): return active.pause == nil ? .recording : .paused
+        case .finishing, .ended: return .stopping
+        case .idle, .starting: return .starting
+        }
+    }
+
+    public var title: String { controller.state.activeRecording?.title ?? (controller.state.inProgress ? shown?.title ?? "" : "") }
+
+    public var elapsed: TimeInterval {
+        if let active = controller.state.activeRecording { return active.elapsed }
+        return controller.state.inProgress || ended != nil ? shown?.elapsed ?? 0 : 0
+    }
+
+    public var format: CaptureFormat { controller.state.activeRecording?.format ?? shown?.format ?? .pcm48kMono }
+
+    /// The free space as recording time, for the hint; nil before the capture runs.
+    public var space: RecordingSpace? { controller.state.activeRecording?.space }
+
+    public var levels: [Float] { controller.bars.levels }
+
+    public var banner: RecordingBanner? {
+        RecordingBanner.banners(state: controller.state, microphoneOff: microphoneDenied && !controller.state.inProgress,
+                                ended: ended?.outcome).first
+    }
+
+    // MARK: Entry and permission
+
+    /// The screen is shown: starts a recording unless one is in progress, asking for the microphone first.
+    public func enter() async {
+        leaving = false
+        guard !controller.state.inProgress else { return }
+        if ports.permission.access == .granted {
+            startCapture()
+        } else {
+            pendingStart = true
+            permissionAnswered(granted: await ports.permission.request())
+        }
+        if !ports.settings.notificationsAsked, let notifier = ports.notifier {
+            ports.settings.markNotificationsAsked()
+            await notifier.requestOnce()
+        }
+    }
+
+    /// The answer to the system's microphone question.
+    public func permissionAnswered(granted: Bool) {
+        guard pendingStart else { return }
+        if granted { startCapture() } else { microphoneDenied = true }
+    }
+
+    /// The app is active again, maybe back from Settings with access granted.
+    public func appBecameActive() {
+        if ports.permission.access == .granted, pendingStart, !controller.state.inProgress { startCapture() }
+    }
+
+    private func startCapture() {
+        pendingStart = false
+        microphoneDenied = false
+        ended = nil
+        shown = nil
+        controller.dismissEnded()
+        controller.start()
+    }
+
+    // MARK: Events
+
+    public func setTitle(_ text: String) { controller.setTitle(text) }
+
+    public func pauseOrResume() {
+        guard let active = controller.state.activeRecording else { return }
+        if active.pause == nil { controller.pause() } else { controller.resume() }
+    }
+
+    public func finish() {
+        guard let active = controller.state.activeRecording else { return }
+        controller.finish(title: active.title)
+    }
+
+    /// Library, or the header's chevron: back to the Library while the recording continues.
+    public func minimise() { close() }
+
+    public func perform(_ action: RecordingBanner.Action) {
+        switch action {
+        case .resume: controller.resume()
+        case .openSettings: onEffect?(.openSettings)
+        case .tryAgain: startCapture()
+        case .openNote:
+            if let noteID = ended?.noteID { leave(.openNote(noteID, modelDownload: false)) } else { close() }
+        }
+    }
+
+    // MARK: The recorder
+
+    private func follow(_ state: RecordingState) {
+        switch state {
+        case .starting, .finishing:
+            sawCapture = true
+        case .active(let active):
+            sawCapture = true
+            shown = active
+            // The field starts with the default title; the user may clear it.
+            if active.title.isEmpty, prefilled != active.noteID {
+                prefilled = active.noteID
+                controller.setTitle(active.defaultTitle)
+            }
+        case .ended(let noteID, let outcome):
+            guard sawCapture else { return }
+            sawCapture = false
+            Task { await self.ended(noteID, outcome) }
+        case .idle:
+            break
+        }
+    }
+
+    private func ended(_ noteID: UUID?, _ outcome: RecordingOutcome) async {
+        if case .saved(let next) = outcome {
+            controller.dismissEnded()
+            guard let noteID else { return close() }
+            let download = next == .askConsent ? await ports.modelsMissing() : false
+            leave(.openNote(noteID, modelDownload: download))
+        } else {
+            ended = Ended(outcome: outcome, noteID: noteID)
+            controller.dismissEnded()
+            if outcome != .couldNotStart { onEffect?(.show) }
+        }
+    }
+
+    private func leave(_ effect: RecordingEffect) {
+        guard !leaving else { return }
+        leaving = true
+        onEffect?(effect)
+    }
+
+    private func close() {
+        guard !leaving else { return }
+        leaving = true
+        onEffect?(.close)
+    }
+}
