@@ -330,9 +330,9 @@ public final class RecordingController {
         parts.handoff.audioFinalizing(id)
         compressions[id] = Task { [weak self] in
             guard let self else { return }
+            defer { compressions[id] = nil } // Last, so `settle()` waits for the hand-off too.
             let readable = await finishAudio(id, capture)
             finalizing.remove(id)
-            compressions[id] = nil
             parts.handoff.audioReady(id)
             // Cancelled while compressing ("Waiting to transcribe" shows Cancel): the user's choice stands.
             guard transcribe, await parts.notes.note(id)?.status == .queued else { return }
