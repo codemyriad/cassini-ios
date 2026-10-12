@@ -124,10 +124,12 @@ import CassiniEngineTesting
         graph.trash.restore(note.id)
         XCTAssertTrue(graph.processing.hasSavedProgress(note.id))
         graph.processing.enqueue(note.id)
-        await waitUntil { graph.processing.progress.fraction(for: note.id) ?? 0 > 0 }
+        await waitUntil { draftText(graph.processing.progress.phase(for: note.id)) == ["Hello"] }
+        XCTAssertEqual(draftText(graph.processing.progress.phase(for: note.id)), ["Hello"],
+                       "the run resumed from the saved progress")
         graph.processing.stop(note.id)
         await waitUntil { graph.processing.state.running == nil }
-        XCTAssertEqual(try checkpoints.load(note.id)?.resumedFromMs, 1_000, "the run resumed from the saved progress")
+        XCTAssertEqual(try checkpoints.load(note.id)?.doneMs, 1_000)
     }
 
     func testARetryAfterAMismatchStartsOver() async throws {
@@ -462,6 +464,11 @@ import CassiniEngineTesting
                                              words: [.init(text: "Hello", start: 0, end: 0.8)])]
         paused.doneMs = 1_000
         return paused
+    }
+
+    private func draftText(_ phase: JobPhase?) -> [String]? {
+        guard case .transcribing(_, let draft) = phase else { return nil }
+        return draft.words.map(\.text)
     }
 
     private func waitUntil(timeout: Duration = .seconds(5), _ condition: @MainActor () -> Bool) async {
