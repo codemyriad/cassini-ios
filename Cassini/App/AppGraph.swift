@@ -33,12 +33,16 @@ import CassiniNotebook
                                    library: library, processing: processing, playback: playback, settings: settings,
                                    router: router, errors: errors, notices: notices, clock: environment.clock,
                                    locale: environment.locale, timeZone: environment.timeZone)
-        imports = ImportStore(library: library, processing: processing, settings: settings, audio: environment.audio,
-                              storage: environment.storage, router: router, errors: errors, clock: environment.clock)
+        let importService = library.noteStore.map {
+            ImportService(notes: $0, files: CoordinatedFileImporter(storage: environment.storage), audio: environment.audio,
+                          storage: environment.storage, clock: environment.clock)
+        }
+        imports = ImportStore(service: importService, library: library, processing: processing, settings: settings,
+                              router: router, clock: environment.clock)
         trash = TrashStore(library: library, voices: voices, processing: processing, playback: playback,
                            recording: recording, settings: settings, router: router, errors: errors,
                            clock: environment.clock, calendar: environment.calendar)
-        exports = ExportStore(library: library)
+        exports = ExportStore(library: library, portable: PortableExportService(audio: environment.audio))
         registerStartup()
     }
 

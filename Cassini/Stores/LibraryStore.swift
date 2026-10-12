@@ -106,6 +106,12 @@ import CassiniNotebook
         notes.removeAll { $0.id == id }
     }
 
+    /// Shows a note that another writer (an import) just saved to `NoteStore`, ahead of its change notification.
+    func adopt(_ note: Note) {
+        guard pendingWrites[note.id, default: 0] == 0 else { return }
+        place(note)
+    }
+
     /// Waits until every write asked for so far has finished.
     func settle() async { await tail?.value }
 

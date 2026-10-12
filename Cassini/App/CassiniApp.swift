@@ -10,7 +10,7 @@ import SwiftUI
                 .environment(graph)
                 .tint(.ember)
                 .task { await graph.start() }
-                .onOpenURL { url in Task { await graph.imports.importAudio(url) } }
+                .onOpenURL { url in graph.imports.open(url) }
                 .onChange(of: scenePhase) { _, phase in
                     if phase == .active, graph.startup.isReady { Task { await graph.trash.purgeExpired() } }
                     if phase == .background { graph.enterBackground() }

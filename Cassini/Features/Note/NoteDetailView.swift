@@ -95,6 +95,7 @@ struct NoteDetailView: View {
             HStack(spacing: 12) { ProgressView(); Text("Saving a compact copy. Your original audio is safe.").font(.subheadline).foregroundStyle(Color.muted) }
         }
         if recording.state.isActive { NoticeCard(title: "Finish recording to listen to this note.", symbol: "mic") }
+        if let document = note.document { DocumentTrustNotice(info: document) }
         if let failure = note.failure { NoticeCard(title: failure.transcriptionMessage, symbol: "exclamationmark.circle") }
         if let failure = note.speakerAnalysisFailure { NoticeCard(title: failure.speakerAnalysisMessage, symbol: "person.2") }
         if let problem = note.playbackProblem { NoticeCard(title: problem, symbol: "waveform.slash") }

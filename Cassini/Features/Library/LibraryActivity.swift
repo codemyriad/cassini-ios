@@ -23,7 +23,6 @@ struct ActiveRecordingCard: View {
 /// Import and Record, pinned to the bottom of the Library.
 struct CaptureBar: View {
     @Environment(RecordingStore.self) private var recording
-    @Environment(ImportStore.self) private var imports
     @Environment(\.dynamicTypeSize) private var dynamicType
     @Binding var importing: Bool
     var body: some View {
@@ -31,7 +30,6 @@ struct CaptureBar: View {
         let active = recording.state.isActive
         layout {
             Button { importing = true } label: { Label("Import", systemImage: "square.and.arrow.down").font(.subheadline.weight(.semibold)).frame(minWidth: 88, minHeight: 52) }
-                .disabled(imports.isImporting)
             Button { Task { await recording.start() } } label: {
                 Label(active ? "Return to recording" : "Record", systemImage: active ? "waveform" : "mic.fill")
             }.buttonStyle(PrimaryButtonStyle()).disabled(recording.isBusy).accessibilityIdentifier("recordButton")
