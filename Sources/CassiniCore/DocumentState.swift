@@ -4,7 +4,7 @@ import Foundation
  * What a reader concluded about a file. The raw value is the state name of SPEC.md "Trust and integrity";
  * [unreadable] is reported only by [CassiniDocument.readChecked], for a file that could not be opened or read.
  */
-public enum DocumentState: String, CaseIterable, Sendable {
+public enum DocumentState: String, Codable, CaseIterable, Hashable, Sendable {
     case plainAudio = "plain-audio"
     case unknownFormat = "unknown-cassini-format"
     case invalidMetadata = "invalid-cassini-metadata"

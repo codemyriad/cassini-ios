@@ -1,3 +1,4 @@
+import CassiniCore
 import Foundation
 
 /// What a job does. Persisted by raw value: never rename one.
@@ -54,7 +55,7 @@ public enum JobFailure: Hashable, Sendable {
     case unsupportedLanguage
     case reservationLimit
     case download(DownloadError)
-    case documentRefused(DocumentStateCode)
+    case documentRefused(DocumentState)
     case checkpointMismatch
 
     public static let downloadPrefix = "DOWNLOAD_"
@@ -68,7 +69,7 @@ public enum JobFailure: Hashable, Sendable {
 
     /// Every failure, one per stored code.
     public static var allCases: [JobFailure] {
-        plain + DownloadError.allCases.map(JobFailure.download) + DocumentStateCode.allCases.map(JobFailure.documentRefused)
+        plain + DownloadError.allCases.map(JobFailure.download) + DocumentState.allCases.map(JobFailure.documentRefused)
     }
 
     public var code: String {
@@ -106,7 +107,7 @@ public enum JobFailure: Hashable, Sendable {
     public init?(code: String) {
         if let error = Self.downloadError(code) { self = .download(error); return }
         if code.hasPrefix(Self.documentPrefix),
-           let state = DocumentStateCode.allCases.first(where: { Self.documentPrefix + $0.name == code }) {
+           let state = DocumentState.allCases.first(where: { Self.documentPrefix + $0.name == code }) {
             self = .documentRefused(state); return
         }
         guard let failure = Self.plain.first(where: { $0.code == code }) else { return nil }
