@@ -27,11 +27,38 @@ struct TranscriptExportsTests {
         #expect(export.title == "Consegna: giovedì?")
     }
 
-    @Test func anEditedPassageIsOneWordOverItsSpan() {
+    @Test func anEditedPassageSharesItsSpanAmongItsWords() {
         let segments = [TranscriptSegment(text: "Testo  corretto\na mano", start: 2, end: 9.5, speakerID: "S1")]
         let export = ExportTranscript(note: note(segments), unassignedLabel: "?")
-        #expect(export.words == [Word("S1", 2_000, 9_500, "Testo corretto a mano")])
-        #expect(SrtWriter.write(export) == "1\n00:00:02,000 --> 00:00:09,500\nTesto corretto a mano\n")
+        #expect(export.words == [Word("S1", 2_000, 4_083, "Testo"), Word("S1", 4_083, 7_416, "corretto"),
+                                 Word("S1", 7_416, 7_833, "a"), Word("S1", 7_833, 9_500, "mano")])
+        #expect(SrtWriter.write(export) == """
+            1
+            00:00:02,000 --> 00:00:07,833
+            Testo corretto a
+
+            2
+            00:00:07,833 --> 00:00:09,500
+            mano
+
+            """)
+    }
+
+    @Test func aLongEditedPassageIsCutIntoCuesLikeATimedOne() {
+        let text = (1...30).map { "parola\($0)" }.joined(separator: " ")
+        #expect(text.utf16.count > SubtitleCues.maxText)
+        let export = ExportTranscript(note: note([TranscriptSegment(text: text, start: 1, end: 21, speakerID: "S1")]),
+                                      unassignedLabel: "?")
+        #expect(export.words.count == 30)
+        #expect(zip(export.words, export.words.dropFirst()).allSatisfy { $0.endMs == $1.startMs && $0.startMs < $1.startMs })
+        let cues = SubtitleCues.build(export, labelPrefixForSrt: true)
+        #expect(cues.count > 1)
+        #expect(cues.map(\.text).joined(separator: " ") == text)
+        for cue in cues {
+            #expect(cue.endMs - cue.startMs <= SubtitleCues.maxSpanMs)
+            #expect(cue.text.utf16.count <= SubtitleCues.maxText)
+            #expect(cue.lines.allSatisfy { $0.utf16.count <= SubtitleCues.lineLength }, "\(cue.lines)")
+        }
     }
 
     @Test func passagesWithoutASpeakerAreLabelledAsUnknown() throws {
@@ -41,7 +68,7 @@ struct TranscriptExportsTests {
         ]
         let text = String(decoding: try TranscriptExports.data(note(segments, speakers: [.init(id: "S1", name: "Giulia")]),
                                                                 format: .text, texts: texts), as: UTF8.self)
-        #expect(text == "Consegna: giovedì?\nsub 12500 2\n\n[00:00] Giulia\nCiao\n\n[00:03] Unknown speaker\nChi parla?\n")
+        #expect(text == "Consegna: giovedì?\nsub 12500 1\n\n[00:00] Giulia\nCiao\n\n[00:03] Unknown speaker\nChi parla?\n")
     }
 
     @Test func aVersionExportsItsOwnWordsAndNames() throws {
@@ -72,7 +99,7 @@ struct TranscriptExportsTests {
         var kept = note([TranscriptSegment(text: "x", start: 0, end: 1)])
         kept.status = .transcribing
         #expect(TranscriptExports.availability(of: kept) == .available)
-        for state in [DocumentState.unreadable, .unknownFormat] {
+        for state in [DocumentState.unreadable, .invalidMetadata, .unknownFormat] {
             var document = note([TranscriptSegment(text: "x", start: 0, end: 1)])
             document.document = DocumentInfo(state: state)
             #expect(TranscriptExports.availability(of: document) == .notReadable)

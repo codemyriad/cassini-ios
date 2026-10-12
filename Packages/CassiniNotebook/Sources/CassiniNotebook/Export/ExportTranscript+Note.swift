@@ -9,8 +9,8 @@ extension ExportTranscript {
     /// as the note shows them; passages without a speaker are labelled `unassignedLabel`.
     ///
     /// A timed word whose text holds several words gives one word per part, each with the word's range. A passage
-    /// without word timing (one edited by hand) is one word with the passage's text and range, so its subtitle keeps
-    /// the passage's span instead of cues that share one start.
+    /// without word timing (one edited by hand) gives one word per part too, its span shared out among them
+    /// (`untimedWords`), so the cue rules cut it like a timed passage.
     public init(note: Note, version: TranscriptVersion? = nil, unassignedLabel: String) {
         let segments = version?.segments ?? note.transcript
         let speakers = version?.speakers ?? note.speakers ?? []
@@ -22,12 +22,27 @@ extension ExportTranscript {
     private static func words(of segment: TranscriptSegment) -> [Word] {
         let speaker = segment.speakerID ?? unassignedSpeaker
         if segment.words.isEmpty {
-            let text = parts(segment.text).joined(separator: " ")
-            return text.isEmpty ? [] : [Word(speaker, ms(segment.start), ms(segment.end), text)]
+            return untimedWords(parts(segment.text), speaker: speaker, startMs: ms(segment.start), endMs: ms(segment.end))
         }
         return segment.words.flatMap { word in
             parts(word.text).map { Word(speaker, ms(word.start), ms(word.end), $0) }
         }
+    }
+
+    /// `texts` over `startMs..<endMs`, each word's share of the span in proportion to its UTF-16 length. The ranges
+    /// follow each other without overlapping: a word ends where the next one starts.
+    static func untimedWords(_ texts: [String], speaker: String, startMs: Int64, endMs: Int64) -> [Word] {
+        let span = max(0, endMs - startMs)
+        let total = Int64(texts.reduce(0) { $0 + $1.utf16.count })
+        guard total > 0 else { return [] }
+        var words: [Word] = []
+        var before: Int64 = 0
+        for text in texts {
+            let after = before + Int64(text.utf16.count)
+            words.append(Word(speaker, startMs + span * before / total, startMs + span * after / total, text))
+            before = after
+        }
+        return words
     }
 
     private static func parts(_ text: String) -> [String] { text.split(whereSeparator: \.isWhitespace).map(String.init) }

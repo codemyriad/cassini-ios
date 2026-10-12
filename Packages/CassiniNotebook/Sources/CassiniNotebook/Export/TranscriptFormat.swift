@@ -33,11 +33,11 @@ public enum TranscriptExportAvailability: Hashable, Sendable {
 }
 
 public enum TranscriptExports {
-    /// Document states whose transcript cannot be exported (features.md section 6).
-    public static let notExportable: Set<DocumentState> = [.unreadable, .unknownFormat]
+    /// Document states whose transcript cannot be exported (features.md section 6, Android's `NOT_READABLE`).
+    public static let notExportable: Set<DocumentState> = [.unreadable, .invalidMetadata, .unknownFormat]
 
     /// A note exports its transcript once it has one: a finished transcription (even one without words) or a
-    /// transcript kept from before. A live capture and an unreadable or unknown-format document do not.
+    /// transcript kept from before. A live capture and a document Cassini cannot read (`notExportable`) do not.
     public static func availability(of note: Note) -> TranscriptExportAvailability {
         if let state = note.document?.state, notExportable.contains(state) { return .notReadable }
         if note.isRecording || (note.transcript.isEmpty && note.status != .ready) { return .afterTranscription }
@@ -54,9 +54,15 @@ public enum TranscriptExports {
         case .subtitles: text = SrtWriter.write(transcript)
         case .webVTT: text = VttWriter.write(transcript)
         case .text:
-            let subtitle = texts.subtitle(note.createdAt, transcript.durationMs, transcript.speakerCount)
+            let subtitle = texts.subtitle(note.createdAt, transcript.durationMs, speakerCount(note, version: version))
             text = TextExport.write(transcript, subtitle: subtitle, emptyText: texts.emptyText)
         }
         return Data(text.utf8)
+    }
+
+    /// The TXT subtitle line's number of speakers: the speakers of the exported transcript, as Android counts the
+    /// selected variant's, so passages without a speaker add none and a speaker without words still counts.
+    static func speakerCount(_ note: Note, version: TranscriptVersion?) -> Int {
+        Set((version?.speakers ?? note.speakers ?? []).map(\.id)).count
     }
 }
