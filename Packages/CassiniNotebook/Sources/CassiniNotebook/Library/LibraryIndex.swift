@@ -6,7 +6,9 @@ import Foundation
 public struct LibraryIndex: Sendable {
     public struct Entry: Sendable {
         public let note: Note
-        /// The row's preview without a query: the stored one, or the one at the saved position.
+        /// The row's preview without a query: the one at the saved position, from the transcript shown now. The
+        /// stored `previewText` is read only for a note without a transcript to compute one from (an older note), so
+        /// a new version, a picked version or an edit shows at once, as Android refreshes `preview` with the body.
         public let preview: Highlighted?
         public let speakerCount: Int
         public let hasWords: Bool
@@ -14,9 +16,9 @@ public struct LibraryIndex: Sendable {
 
         init(_ note: Note) {
             self.note = note
-            preview = LibraryMapping.storedPreview(note.previewText) ?? note.transcriptPreview.map {
+            preview = note.transcriptPreview.map {
                 Highlighted($0.text, leadingEllipsis: $0.leadingEllipsis, trailingEllipsis: $0.trailingEllipsis)
-            }
+            } ?? LibraryMapping.storedPreview(note.previewText)
             speakerCount = Set(note.transcript.compactMap { $0.speakerID ?? $0.speaker }).count
             hasWords = note.transcript.contains { $0.text.contains { !$0.isWhitespace } }
         }

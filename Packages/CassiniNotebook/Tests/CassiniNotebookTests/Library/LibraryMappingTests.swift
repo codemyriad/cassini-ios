@@ -135,13 +135,35 @@ struct LibraryMappingTests {
         #expect(cut.text.hasSuffix("parola"))
     }
 
-    /// Without a stored preview the row shows the one at the saved position.
-    @Test func aNoteWithoutAStoredPreviewShowsTheTranscriptStart() {
+    /// The row shows the preview at the saved position, from the transcript shown; a stored preview is read only
+    /// for a note without a transcript.
+    @Test func theRowPreviewComesFromTheTranscriptShown() {
         var note = transcribed("t", speakers: 1)
         note.transcript = [TranscriptSegment(text: "Good morning everyone.", start: 0, end: 2)]
         #expect(entry(note).preview == Highlighted("Good morning everyone."))
         note.previewText = "…stored…"
+        #expect(entry(note).preview == Highlighted("Good morning everyone."), "a stored preview never hides the transcript")
+        note.transcript = []
         #expect(entry(note).preview == Highlighted("stored", leadingEllipsis: true, trailingEllipsis: true))
+    }
+
+    /// Android `NoteDao.selectVariant` writes the preview with the body: a stored preview from the old version, or
+    /// from before Transcribe again, never stays on the row.
+    @Test func aStalePreviewFollowsTheSelectedVersion() throws {
+        var note = transcribed("t", speakers: 1)
+        note.transcript = [TranscriptSegment(text: "First take of the meeting.", start: 0, end: 2)]
+        note.saveCurrentVersion(name: "First")
+        let first = try #require(note.selectedVersionID)
+        note.transcript = [TranscriptSegment(text: "Second take, transcribed again.", start: 0, end: 2)]
+        note.saveCurrentVersion(name: "Second")
+        note.previewText = PreviewText.of(note.transcript.flatMap(PreviewWord.of), positionMs: 0)?.display
+        var index = LibraryIndex([note])
+        #expect(index.entries[0].preview?.text == "Second take, transcribed again.")
+
+        note.selectVersion(first)
+        index.update([note])
+        #expect(note.previewText?.contains("Second") == true, "the stored preview is from the other version")
+        #expect(index.entries[0].preview?.text == "First take of the meeting.")
     }
 
     // ports: LibraryMappingTest#transcriptionBannerInputs

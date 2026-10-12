@@ -154,13 +154,13 @@ public struct SearchFields: Sendable {
     public let title: SearchText
     /// The transcript shown (the selected version's).
     public let body: SearchText
-    /// Bookmark labels, an iOS extra.
-    public let bookmarks: SearchText
+    /// Bookmark labels, an iOS extra: one text each, so a phrase never runs from one label into the next.
+    public let bookmarks: [SearchText]
 
     public init(title: String, body: String, bookmarks: [String] = []) {
         self.title = SearchText(title)
         self.body = SearchText(body)
-        self.bookmarks = SearchText(bookmarks.joined(separator: "\n"))
+        self.bookmarks = bookmarks.map(SearchText.init)
     }
 
     public init(_ note: Note) {
@@ -170,7 +170,7 @@ public struct SearchFields: Sendable {
     /// Whether every phrase is in one of the fields (each phrase may be in another).
     public func matches(_ query: SearchQuery) -> Bool {
         query.folded.allSatisfy { phrase in
-            title.contains(phrase) || body.contains(phrase) || bookmarks.contains(phrase)
+            title.contains(phrase) || body.contains(phrase) || bookmarks.contains { $0.contains(phrase) }
         }
     }
 

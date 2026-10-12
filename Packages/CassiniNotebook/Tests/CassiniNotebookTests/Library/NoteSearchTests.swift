@@ -127,6 +127,16 @@ final class NoteSearchTests {
         #expect(ids("budget").count == 1)
     }
 
+    /// iOS extra: each bookmark label is its own text, so a phrase never runs from one label into the next.
+    @Test func aPhraseStaysInsideOneBookmarkLabel() {
+        _ = insert("", title: "Standup")
+        notes[0].bookmarks = [Bookmark(time: 3, label: "budget"), Bookmark(time: 9, label: "review")]
+        #expect(ids("budget-review").isEmpty)
+        #expect(ids("budget review").count == 1, "two phrases may match two labels")
+        notes[0].bookmarks.append(Bookmark(time: 12, label: "Budget review"))
+        #expect(ids("budget-review").count == 1)
+    }
+
     /// Android `NoteRepository.search`: a query with nothing searchable lists every note, without marks.
     @Test func aQueryWithNothingSearchableListsEveryNote() {
         let a = insert("uno", createdAt: 1), b = insert("due", createdAt: 2)
