@@ -172,7 +172,10 @@ final class CassiniUITests: XCTestCase {
         XCUIDevice.shared.orientation = .landscapeLeft
         let app = launch()
         openFixture(app)
-        XCTAssertTrue(app.textFields["librarySearch"].isHittable, "the library stays beside the note")
+        let search = app.textFields["librarySearch"], title = app.staticTexts["noteTitle"]
+        XCTAssertTrue(search.isHittable, "the library stays beside the note")
+        XCTAssertTrue(title.isHittable, "the note shows in the detail column")
+        XCTAssertLessThanOrEqual(search.frame.maxX, title.frame.minX, "the library sits to the left of the note")
         capture("iPad split")
     }
 }
