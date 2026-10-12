@@ -100,9 +100,11 @@ import CassiniNotebook
         speechInstall = DownloadFact(part: .speech, fraction: fraction, at: clock.now)
     }
 
+    /// The install ended; a failure keeps the free space the install needs, for "Free about N MB".
     private func finishInstall(_ failure: DownloadError?) {
         installing = nil
-        speechInstall = failure.map { DownloadFact(part: .speech, failure: $0, at: clock.now) }
+        let bytes = ModelPlan(missing: [.speech]).requiredFreeBytes
+        speechInstall = failure.map { DownloadFact(part: .speech, failure: $0, requiredFreeBytes: bytes, at: clock.now) }
     }
 
     /// The user closed the failure of the last install; the next install may fail again.

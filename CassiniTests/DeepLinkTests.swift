@@ -53,7 +53,39 @@ import CassiniNotebook
         #expect(router.path == [.note(first.id), .note(second.id)], "a note that is gone opens nothing")
     }
 
-    @Test func resumeFromTheNotificationTranscribesAgain() async throws {
+    @Test func resumeFromTheNotificationGoesOnFromTheSavedProgressWithTheJobsKind() async throws {
+        let test = TestGraph(transcriber: FakeTranscriber(.frozen(done: 1.5, total: 2)))
+        defer { test.tearDown() }
+        let note = try seed(test)
+        let graph = test.graph
+        graph.settings.downloadsAllowed = true
+        graph.settings.identifySpeakers = false
+        let language = graph.settings.speechLanguage
+        // iOS took the background time back from a Transcribe again after its first second.
+        let audio = test.root.appendingPathComponent(note.id.uuidString).appendingPathComponent("audio.caf")
+        let checkpoints = CheckpointFiles(noteDirectory: { [root = test.root] in root.appendingPathComponent($0.uuidString) })
+        try checkpoints.save(CheckpointState(source: "audio.caf", signature: CheckpointState.signature(of: audio), language: language,
+                                             segments: [TranscriptSegment(text: "Hello", start: 0, end: 0.8,
+                                                                          words: [.init(text: "Hello", start: 0, end: 0.8)])],
+                                             doneMs: 1_000, totalMs: 2_000, elapsedMs: 1_000), for: note.id)
+        try JobRepository(root: test.root).save([
+            Job(noteID: note.id, seq: 1, kind: .transcribeAgain, state: .paused, pauseReason: .system, doneMs: 1_000,
+                totalMs: 2_000, language: language, enqueuedAt: test.clock.now),
+        ])
+        await graph.start()
+        #expect(graph.processing.state.jobs[note.id]?.state == .paused)
+
+        await DeepLinkHandler(router: graph.router, library: graph.library, processing: graph.processing,
+                              recording: graph.recording, ready: {}).handle(.note(note.id, resume: true))
+        #expect(graph.router.path == [.note(note.id)])
+        await waitUntil { draft(graph.processing.progress.phase(for: note.id)) == ["Hello"] }
+        #expect(draft(graph.processing.progress.phase(for: note.id)) == ["Hello"], "it goes on from the saved words")
+        #expect(graph.processing.state.jobs[note.id]?.kind == .transcribeAgain, "Resume keeps the job's kind")
+        graph.processing.stopAll()
+        await graph.processing.coordinator?.awaitIdle()
+    }
+
+    @Test func resumeOfANoteWithoutAJobTranscribesIt() async throws {
         let test = TestGraph(transcriber: FakeTranscriber(.returns([TranscriptSegment(text: "Hello.", start: 0, end: 1)], total: 2)))
         defer { test.tearDown() }
         let note = try seed(test)
@@ -62,10 +94,18 @@ import CassiniNotebook
         await test.graph.start()
         await DeepLinkHandler(router: test.graph.router, library: test.graph.library, processing: test.graph.processing,
                               recording: test.graph.recording, ready: {}).handle(.note(note.id, resume: true))
-        #expect(test.graph.router.path == [.note(note.id)])
         await test.graph.processing.coordinator?.awaitIdle()
         await waitUntil { test.graph.library.note(note.id)?.transcript.isEmpty == false }
         #expect(test.graph.library.note(note.id)?.transcript.map(\.text) == ["Hello."])
+    }
+
+    @Test func theLiveActivityLinkOpensTheRecording() {
+        #expect(DeepLinks.parse(url: RecordingLink.url) == .recording)
+    }
+
+    private func draft(_ phase: JobPhase?) -> [String]? {
+        guard case .transcribing(_, let draft) = phase else { return nil }
+        return draft.words.map(\.text)
     }
 
     @Test func theFirstTranscribeFromTheScreenAsksToNotifyOnce() async throws {

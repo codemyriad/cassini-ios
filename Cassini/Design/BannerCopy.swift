@@ -118,7 +118,11 @@ enum BannerCopy {
             args.bySystem
                 ? String(localized: "iOS stopped the download. Try again to continue where it stopped.", table: "Notices")
                 : String(localized: "The connection dropped. Try again to continue where it stopped.", table: "Notices")
-        case .dlNoSpace: String(localized: "Free about \(megabytes(args.bytes)) and try again.", table: "Notices")
+        case .dlNoSpace:
+            // Without a figure the body names no size, never "0 MB".
+            args.bytes > 0
+                ? String(localized: "Free about \(megabytes(args.bytes)) and try again.", table: "Notices")
+                : String(localized: "Free some space and try again.", table: "Notices")
         case .dlFileCheck: String(localized: "The download was damaged and has been discarded.", table: "Notices")
         case .dlInstallFailed: String(localized: "Try again. Your recordings are safe.", table: "Notices")
         case .dlRecordNow: String(localized: "Transcription needs a one-time download. Audio is safe meanwhile.", table: "Notices")

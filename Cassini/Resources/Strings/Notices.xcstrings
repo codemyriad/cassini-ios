@@ -873,6 +873,23 @@
         }
       }
     },
+    "Free some space and try again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Free some space and try again."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Libera spazio e riprova."
+          }
+        }
+      }
+    },
     "Free some space to keep going. If it runs out, the recording saves automatically.": {
       "extractionState": "manual",
       "localizations": {

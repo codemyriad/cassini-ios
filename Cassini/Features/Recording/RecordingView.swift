@@ -20,9 +20,7 @@ struct RecordingView: View {
                     RecordingTitleField(title: Binding(get: { screen.title }, set: { screen.setTitle($0) }))
                         .padding(.top, 28)
                     if let banner = screen.banner {
-                        Banner(spec: Notices.spec(banner), style: .onDark, onAction: { action in
-                            if let action = RecordingBanner.Action(action) { screen.perform(action) }
-                        })
+                        Banner(spec: banner, style: .onDark, onAction: { screen.perform($0) })
                         .padding(.top, 8)
                     }
                     Spacer(minLength: 24)
@@ -195,18 +193,5 @@ private struct LabelledCircle<Circle: View>: View {
             }
         }
         .buttonStyle(.plain)
-    }
-}
-
-extension RecordingBanner.Action {
-    /// The Recording screen's part of a banner button.
-    init?(_ action: BannerAction) {
-        switch action {
-        case .resume: self = .resume
-        case .openNote: self = .openNote
-        case .tryAgain: self = .tryAgain
-        case .openSettings: self = .openSettings
-        default: return nil
-        }
     }
 }

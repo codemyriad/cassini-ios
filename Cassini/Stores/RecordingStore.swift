@@ -8,7 +8,8 @@ import CassiniNotebook
 @MainActor @Observable final class RecordingStore {
     let controller: RecordingController
     let screen: RecordingScreenModel
-    /// Recordings recovered at this launch, oldest first, for the "recording recovered" notice.
+    /// Recordings recovered at this launch, oldest first, for the "recording recovered" notice; `contribute(to:)`
+    /// leaves out the ones no longer in the library.
     private(set) var recovered: [RecoveredRecording] = []
     /// When a finished recording last stayed in its original quality because its compression failed; nil once the
     /// notice is closed.
@@ -108,16 +109,16 @@ import CassiniNotebook
         guard let store = library.noteStore else { return }
         let repaired = await recovery.recover(in: store, activeNoteID: state.noteID)
         await library.refresh() // The reconcile that follows reads the mirror.
-        let created = { [library] (recording: RecoveredRecording) in library.note(recording.noteID)?.createdAt ?? .distantPast }
-        recovered = (rebuilt + repaired).sorted { created($0) < created($1) }
+        recovered = (rebuilt + repaired).sorted { $0.createdAt < $1.createdAt }
         rebuilt = []
     }
 
     // MARK: Notices
 
-    /// Adds the recovered recordings and a failed compression to the facts the banners are built from.
+    /// Adds the recovered recordings still in the library (not deleted, not in Recently Deleted) and a failed
+    /// compression to the facts the banners are built from.
     func contribute(to facts: inout NoticeFacts) {
-        facts.recovered = recovered
+        facts.recovered = recovered.filter { library.note($0.noteID).map { $0.trashedAt == nil } ?? false }
         facts.compressionFailedAt = compressionFailedAt
     }
 

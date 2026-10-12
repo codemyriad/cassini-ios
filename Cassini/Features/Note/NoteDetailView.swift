@@ -119,36 +119,27 @@ struct NoteDetailView: View {
         }
         let job = processing.state.jobs[noteID]
         if job == nil, let failure = note.failure { NoticeCard(title: failure.transcriptionMessage, symbol: "exclamationmark.circle") }
-        BannerList(specs: jobBanners(note, job: job), onAction: { _, action in perform(action, job: job) },
-                   onDismiss: { dismiss($0, job: job) })
+        BannerList(specs: NoteBanners.banners(note, job: job, failureText: \.transcriptionMessage, dismissed: closedBanners),
+                   onAction: { _, action in perform(action, note: note, job: job) },
+                   onDismiss: { dismiss($0, note: note, job: job) })
         if let problem = note.playbackProblem { NoticeCard(title: problem, symbol: "waveform.slash") }
         if playback.failed(noteID) {
             NoticeCard(title: String(localized: "This audio can’t be played", table: "Playback"), symbol: "waveform.slash")
         }
     }
 
-    /// The note's transcription banners (paused, failed, one voice) less the ones closed here.
-    private func jobBanners(_ note: Note, job: Job?) -> [BannerSpec] {
-        let oneVoice = !note.transcript.isEmpty && note.speakerAnalysisFailure != nil
-        return Notices.job(job, oneVoice: oneVoice, failureText: job?.failure?.transcriptionMessage)
-            .filter { !closedBanners.contains($0.id) }
-    }
-
-    private func perform(_ action: BannerAction, job: Job?) {
-        switch action {
-        case .resume, .tryAgain, .retry, .downloadAgain: requestTranscription(kind: job?.kind ?? .transcribe)
-        case .transcribeAgain: requestTranscription(kind: .transcribeAgain)
-        case .startOver: confirmingStartOver = true
-        default: break
+    private func perform(_ action: BannerAction, note: Note, job: Job?) {
+        switch NoteBanners.command(for: action, note: note, job: job) {
+        case .transcribe(let kind): requestTranscription(kind: kind)
+        case .confirmStartOver: confirmingStartOver = true
+        case nil: break
         }
     }
 
-    /// A final failure goes with its job, so the note shows as it was; any other banner is closed on this screen.
-    private func dismiss(_ spec: BannerSpec, job: Job?) {
-        if spec.kind == .txFailed, let job, Notices.finalFailure(job, noNewVersion: false) {
-            processing.clearFailed(noteID)
-        } else {
-            closedBanners.insert(spec.id)
+    private func dismiss(_ spec: BannerSpec, note: Note, job: Job?) {
+        switch NoteBanners.dismissal(of: spec, note: note, job: job) {
+        case .clearJob: processing.clearFailed(noteID)
+        case .hide(let id): closedBanners.insert(id)
         }
     }
 

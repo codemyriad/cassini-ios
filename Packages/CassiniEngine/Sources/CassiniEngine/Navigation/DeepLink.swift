@@ -17,6 +17,10 @@ public enum DeepLinks {
     public static let noteIDKey = "noteID"
     /// The identifier of the Resume action of a paused or stopped transcription.
     public static let resumeAction = "resume"
+    /// The app's URL scheme, and the hosts of its links.
+    public static let scheme = "cassini"
+    public static let recordingHost = "recording"
+    public static let noteHost = "note"
 
     /// What a results notification of `noteID` carries.
     public static func userInfo(noteID: UUID) -> [String: String] {
@@ -33,10 +37,10 @@ public enum DeepLinks {
 
     /// `cassini://recording` (the Live Activity) and `cassini://note/<id>`; nil for any other URL.
     public static func parse(url: URL) -> DeepLink? {
-        guard url.scheme == "cassini" else { return nil }
+        guard url.scheme == scheme else { return nil }
         switch url.host() {
-        case "recording": return .recording
-        case "note": return url.pathComponents.dropFirst().first.flatMap(UUID.init(uuidString:)).map { .note($0) }
+        case recordingHost: return .recording
+        case noteHost: return url.pathComponents.dropFirst().first.flatMap(UUID.init(uuidString:)).map { .note($0) }
         default: return nil
         }
     }

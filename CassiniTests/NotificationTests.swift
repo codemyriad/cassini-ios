@@ -97,6 +97,13 @@ private final class RecordingCenter: UserNotificationCenter, @unchecked Sendable
         #expect(text(.failed(.documentRefused(.unverified))).body
                 == "This transcript can’t take a new version. Your recording is kept.")
         #expect(text(.failed(.empty)).body == JobFailure.empty.transcriptionMessage)
+        // ports: ProcessingNotificationsTest (failureText): each download error has its own failure's text.
+        #expect(text(.failed(.download(.notEnoughStorage))).body
+                == "Your device is running low on storage. Free up space, then try again.")
+        #expect(text(.failed(.download(.fileCheckFailed))).body == "Model verification failed. Please download it again.")
+        #expect(text(.failed(.download(.install))).body == "Could not save the model. Free some space and retry.")
+        #expect(text(.failed(.download(.interrupted))).body == "Model download failed. Check your connection and retry.")
+        #expect(text(.failed(.unknown)).body == "Something went wrong. Please try again.")
         #expect(NotificationCategory(.transcriptionStopped).offersResume)
         #expect(!NotificationCategory(.transcribed(speakers: 1, duration: 1)).offersResume)
     }

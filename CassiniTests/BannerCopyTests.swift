@@ -125,6 +125,7 @@ private func vary(_ args: BannerArgs, _ arg: BannerArg) -> BannerArgs {
         #expect(BannerCopy.body(.dlDownloading, BannerArgs(percent: 46)) == nil, "Apple's assets report no bytes")
         #expect(BannerCopy.title(.recStorageLow, BannerArgs(ms1: 10_000)) == "Storage almost full — about 1 min left")
         #expect(BannerCopy.title(.notesUnreadable, BannerArgs(count: 1)) == "1 note can’t be read")
+        #expect(BannerCopy.body(.dlNoSpace, BannerArgs()) == "Free some space and try again.", "never “Free about 0 MB”")
     }
 
     // ports: BannerKindTest#usesListsExactlyTheArgumentsTheCopyReads
@@ -167,5 +168,8 @@ private func vary(_ args: BannerArgs, _ arg: BannerArg) -> BannerArgs {
         #expect(lookup("Nothing matches “%@”") == "Nessun risultato per “%@”")
         #expect(BannerCopy.body(.importNoSpace, BannerArgs(bytes: 1_500_000_000), locale: Locale(identifier: "it_IT"))?
                     .contains("1,4 GB") == true)
+        let failures = { (key: String) in italian.localizedString(forKey: key, value: nil, table: "Failures") }
+        #expect(failures("Operation cancelled.") == "Operazione annullata.")
+        #expect(failures("Something went wrong. Please try again.") == "Qualcosa non ha funzionato. Riprova.")
     }
 }

@@ -54,9 +54,8 @@ struct FinishRecordingIntent: LiveActivityIntent {
     }
 }
 
-/// The link a tap on the Live Activity opens: back to the Recording screen.
+/// The link a tap on the Live Activity opens: back to the Recording screen. The app reads it with
+/// `DeepLinks.parse(url:)`; the widget extension does not link CassiniEngine, so a hosted test keeps the two together.
 enum RecordingLink {
     static let url = URL(string: "cassini://recording")!
-
-    static func matches(_ url: URL) -> Bool { url.scheme == Self.url.scheme && url.host() == Self.url.host() }
 }
