@@ -2,7 +2,6 @@ import Foundation
 import Observation
 import CassiniEngine
 
-
 /// Screens shown over everything else.
 enum FullScreenRoute: String, Identifiable, Hashable {
     case recording
@@ -22,7 +21,7 @@ struct NoteSession: Hashable {
 /// Where the user is. The Library is the root of the stack (or the sidebar on iPad); `path` holds the screens above it.
 @MainActor @Observable final class Router {
     var path: [Route] = [] {
-        didSet { sessions = sessions.filter { id, _ in path.contains { $0.noteID == id } } }
+        didSet { sessions = sessions.filter { id, _ in isOpen(id) } }
     }
     private(set) var sessions: [UUID: NoteSession] = [:]
     var fullScreen: FullScreenRoute?
@@ -54,6 +53,9 @@ struct NoteSession: Hashable {
     }
 
     func session(_ noteID: UUID) -> NoteSession { sessions[noteID] ?? NoteSession() }
+
+    /// Whether the note's screen is in the stack.
+    func isOpen(_ noteID: UUID) -> Bool { path.contains { $0.noteID == noteID } }
 
     /// The note's start action ran; a screen built again for it does not run it again.
     func markStarted(_ noteID: UUID) {

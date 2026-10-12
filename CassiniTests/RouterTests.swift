@@ -51,7 +51,8 @@ import CassiniEngine
         router.openNote(a)
         XCTAssertTrue(router.session(a).started, "popping back to the screen keeps it")
         router.popToLibrary()
-        XCTAssertEqual(router.session(a), NoteSession(), "the screen left the stack")
+        XCTAssertFalse(router.isOpen(a))
+        XCTAssertEqual(router.session(a), NoteSession(), "the screen left the stack, and a leaving screen runs nothing")
         router.show(.note(a, start: .documentInfo))
         XCTAssertFalse(router.session(a).started, "a fresh open runs it")
     }

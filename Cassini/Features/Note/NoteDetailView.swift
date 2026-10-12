@@ -200,10 +200,13 @@ struct NoteDetailView: View {
         if let turn = transcript.turn(match.turnID), let frame = geometry.frames[match.turnID], geometry.height > 0 {
             let fraction = turn.text.isEmpty ? 0 : Double(match.range.lowerBound) / Double(turn.text.count)
             let lineY = frame.minY - geometry.top + frame.height * fraction
-            if lineY >= 0, lineY + 24 <= geometry.height { return }
+            if lineY >= 0, lineY + Self.lineHeight <= geometry.height { return }
         }
         withAnimation(reduceMotion ? nil : .default) { proxy.scrollTo(match.turnID, anchor: .center) }
     }
+
+    /// About one line of the transcript's body text.
+    private static let lineHeight: CGFloat = 24
 
     private var bannerFacts: NoteBannerFacts {
         let state = processing.state
@@ -351,9 +354,9 @@ struct NoteDetailView: View {
     }
 
     /// Runs the Library's start action once for the screen: the router remembers that it ran, and a route restored
-    /// with the scene carries none.
+    /// with the scene carries none. A screen leaving the stack forgets it ran, and runs nothing.
     private func runStart() {
-        guard let start, !router.session(noteID).started else { return }
+        guard let start, router.isOpen(noteID), !router.session(noteID).started else { return }
         router.markStarted(noteID)
         switch start {
         case .export(let format): export(format)
