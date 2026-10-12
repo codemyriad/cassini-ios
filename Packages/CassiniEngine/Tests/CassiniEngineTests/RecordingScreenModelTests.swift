@@ -264,7 +264,6 @@ import CassiniNotebook
         #expect(s.effects == [.close, .show, .close])
     }
 
-    // ports: RecordingControllerTest#aTitleTypedWhileStartingIsKept
     @Test func aTitleTypedWhileStartingIsKept() async throws {
         let s = try Screen(); defer { s.h.tearDown() }
         s.h.isReady = false
@@ -275,6 +274,9 @@ import CassiniNotebook
         s.h.isReady = true
         try await s.h.waitFor("the capture") { s.model.phase == .recording }
         #expect(s.model.title == "Standup", "not replaced by the default")
+        s.model.setTitle("")
+        #expect(s.model.title == "", "the user may still clear the field")
+        s.model.setTitle("Standup")
         let id = try #require(s.h.controller.state.noteID)
         try await s.h.waitFor("the title write") { await s.h.note(id)?.title == "Standup" }
     }

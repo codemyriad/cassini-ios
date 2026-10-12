@@ -313,7 +313,6 @@ import CassiniNotebook
         #expect(h.handoff.handedOff == [active.noteID], "the original audio is transcribed")
     }
 
-    // ports: RecordingControllerTest#aRefusedHandOffIsAudioOnly
     @Test func aRefusedHandOffMakesTheNoteAudioOnly() async throws {
         let h = try RecordingHarness(); defer { h.tearDown() }
         h.handoff.accepts = false

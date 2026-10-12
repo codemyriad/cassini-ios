@@ -192,10 +192,10 @@ public final class RecordingScreenModel {
         case .active(let active):
             sawCapture = true
             shown = active
-            // The field starts with the default title; the user may clear it.
-            if active.title.isEmpty, prefilled != active.noteID {
+            // The field starts with the default title, unless one was typed while starting; the user may clear it.
+            if prefilled != active.noteID {
                 prefilled = active.noteID
-                controller.setTitle(active.defaultTitle)
+                if active.title.isEmpty { controller.setTitle(active.defaultTitle) }
             }
         case .ended(let noteID, let outcome):
             guard sawCapture else { return }
