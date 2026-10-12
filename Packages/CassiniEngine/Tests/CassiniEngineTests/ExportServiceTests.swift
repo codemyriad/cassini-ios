@@ -108,4 +108,39 @@ struct ExportServiceTests {
         #expect(!FileManager.default.fileExists(atPath: url.path))
         #expect(FileManager.default.fileExists(atPath: notes.directory(for: note.id).path))
     }
+
+    @Test func theSweepAfterLoadingRemovesAnOrphanFolderAndKeepsADamagedNote() async throws {
+        defer { try? FileManager.default.removeItem(at: base) }
+        let files = FileManager.default
+        let orphan = notes.root.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try files.createDirectory(at: orphan, withIntermediateDirectories: true)
+        try Data("partial".utf8).write(to: orphan.appendingPathComponent("source.tmp"))
+        let damaged = notes.root.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try files.createDirectory(at: damaged, withIntermediateDirectories: true)
+        try Data("{ not json".utf8).write(to: damaged.appendingPathComponent("note.json"))
+        try Data("partial".utf8).write(to: damaged.appendingPathComponent("note.json.tmp"))
+        let report = try await notes.load()
+        #expect(report.unreadable.count == 2, "both folders load as unreadable")
+
+        let swept = await service.sweep(now: Date().addingTimeInterval(2 * 60 * 60))
+
+        #expect(!files.fileExists(atPath: orphan.path), "a folder with nothing but stale temporary files goes")
+        #expect(files.fileExists(atPath: damaged.appendingPathComponent("note.json").path), "a damaged note stays")
+        #expect(!files.fileExists(atPath: damaged.appendingPathComponent("note.json.tmp").path))
+        #expect(swept.deleted.map(\.lastPathComponent).contains(orphan.lastPathComponent))
+    }
+
+    @Test func discardingAnExportKeepsAnotherExportsFolder() async throws {
+        defer { try? FileManager.default.removeItem(at: base) }
+        let note = transcribedNote()
+        try await notes.save(note)
+        let first = try await service.exportTranscript(note.id, format: .text, texts: texts)
+        let second = try service.newFolder()
+        service.discard(first)
+        service.discard(first)
+        #expect(!FileManager.default.fileExists(atPath: first.deletingLastPathComponent().path))
+        #expect(FileManager.default.fileExists(atPath: second.path), "an export still being made keeps its folder")
+        service.discardFolder(second)
+        #expect(!FileManager.default.fileExists(atPath: service.folder.path))
+    }
 }

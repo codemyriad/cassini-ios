@@ -23,8 +23,9 @@ public struct Sweep: Sendable {
 
     public init(notes: URL, exports: URL) { self.notes = notes; self.exports = exports }
 
-    /// Sweeps once. `known` are the ids of the notes that exist, readable or not; their directories are never
-    /// removed. Files that cannot be read or deleted are left as they are.
+    /// Sweeps once. `known` are the ids of the notes that exist; their directories are never removed. Any other
+    /// directory that holds more than stale `*.tmp` files (a `note.json` that could not be read, audio) is kept as
+    /// well. Files that cannot be read or deleted are left as they are.
     public func run(known: Set<UUID>, now: Date) -> Report {
         let files = FileManager.default
         var report = Report()

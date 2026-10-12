@@ -46,24 +46,26 @@ public struct ExportService: Sendable {
         return url
     }
 
-    /// Removes the folder of the export at `url`, then the exports folder once no other export is waiting in it.
-    /// Anything outside the exports folder, such as a note's own audio, is left alone.
-    public func discard(_ url: URL) {
-        let parent = url.deletingLastPathComponent().standardizedFileURL
-        guard parent.deletingLastPathComponent().path == folder.standardizedFileURL.path else { return }
-        let files = FileManager.default
-        try? files.removeItem(at: parent)
-        if (try? files.contentsOfDirectory(atPath: folder.path))?.isEmpty == true { try? files.removeItem(at: folder) }
+    /// Removes the export at `url` with its folder. Anything outside the exports folder, such as a note's own
+    /// audio, is left alone. Discarding an export twice does nothing.
+    public func discard(_ url: URL) { discardFolder(url.deletingLastPathComponent()) }
+
+    /// Removes one export's folder (from `newFolder`), then the exports folder once no other export is waiting in it.
+    public func discardFolder(_ exportFolder: URL) {
+        let exportFolder = exportFolder.standardizedFileURL
+        guard exportFolder.deletingLastPathComponent().path == folder.standardizedFileURL.path else { return }
+        try? FileManager.default.removeItem(at: exportFolder)
+        // rmdir removes only an empty folder, in one step: an export made meanwhile keeps the folder it is in.
+        _ = rmdir(folder.path)
     }
 
-    /// The launch sweep over the notes' directories and the exports folder (`Sweep`). The directories of every note,
-    /// readable or not, are kept.
+    /// The launch sweep over the notes' directories and the exports folder (`Sweep`), with the notes that were
+    /// loaded as the known ones. A directory whose `note.json` could not be read still holds that file, so the sweep
+    /// keeps it; one that holds nothing but stale temporary files is removed.
     @discardableResult
     public func sweep(now: Date) async -> Sweep.Report {
         let loaded = await notes.all().map(\.id)
-        let unreadable = await notes.loadReport.unreadable.compactMap { UUID(uuidString: $0.lastPathComponent) }
-        let sweep = Sweep(notes: notes.root, exports: folder)
-        return sweep.run(known: Set(loaded + unreadable), now: now)
+        return Sweep(notes: notes.root, exports: folder).run(known: Set(loaded), now: now)
     }
 
     private func write(_ data: Data, named name: String) throws(ExportError) -> URL {
@@ -72,7 +74,7 @@ public struct ExportService: Sendable {
         do {
             try data.write(to: url, options: .atomic)
         } catch {
-            discard(url)
+            discardFolder(target)
             throw .cannotSave
         }
         return url
