@@ -49,8 +49,11 @@ public struct DownloadFact: Hashable, Sendable {
 
 /// Everything the banners are built from. The coordinators publish facts; the notice rules order and word them.
 public struct NoticeFacts: Hashable, Sendable {
-    /// Recordings recovered after Cassini closed unexpectedly, oldest first.
+    /// Recordings recovered after Cassini closed unexpectedly and not yet seen, oldest first.
     public var recovered: [RecoveredRecording]
+    /// When a finished recording last stayed in its original quality because compression could not finish; nil once
+    /// that notice is closed. iOS only.
+    public var compressionFailedAt: Date?
     /// Note directories whose metadata could not be read; they are kept on disk.
     public var unreadableNotes: Int
     /// The library itself could not be opened.
@@ -71,11 +74,11 @@ public struct NoticeFacts: Hashable, Sendable {
     public var download: DownloadFact?
     public var notificationsOff: Bool
 
-    public init(recovered: [RecoveredRecording] = [], unreadableNotes: Int = 0, libraryUnavailable: Bool = false,
+    public init(recovered: [RecoveredRecording] = [], compressionFailedAt: Date? = nil, unreadableNotes: Int = 0, libraryUnavailable: Bool = false,
                 voicesUnavailable: Bool = false, queueHold: QueueHold? = nil, waitingJobs: Int = 0,
                 jobRunning: Bool = false, consented: Bool = true, failedJobs: [UUID: JobFailure] = [:],
                 importing: [String] = [], importFailure: ImportFailureFact? = nil, download: DownloadFact? = nil, notificationsOff: Bool = false) {
-        self.recovered = recovered; self.unreadableNotes = unreadableNotes; self.libraryUnavailable = libraryUnavailable
+        self.recovered = recovered; self.compressionFailedAt = compressionFailedAt; self.unreadableNotes = unreadableNotes; self.libraryUnavailable = libraryUnavailable
         self.voicesUnavailable = voicesUnavailable; self.queueHold = queueHold; self.waitingJobs = waitingJobs
         self.jobRunning = jobRunning; self.consented = consented
         self.failedJobs = failedJobs; self.importing = importing; self.importFailure = importFailure
