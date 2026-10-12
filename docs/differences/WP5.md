@@ -88,9 +88,16 @@
 - `ProgressText.timeLeftLine` is the banner's line 2 for **WP9** (Android's `ui_time_left_line_*`): "About 6–9 min
   left", "Under 1 min left", "Calculating time left…".
 
-## Interim queue (until WP4)
+## Interim queue (replaced by WP4)
 
-`ProcessingStore` now runs `TranscriptionJob`. Contract for **WP4**:
+WP4's `TranscriptionCoordinator` now runs `TranscriptionJob` and keeps `JobProgress`; `docs/differences/WP4.md` (The
+job) says how. Where the two differ, the queue follows Android: iOS taking the background time back holds the queue
+(`system`) and leaves the queued notes queued with their checkpoints, rather than taking them out of the queue; the
+processing card's Cancel is Stop and keep progress or Remove from queue, and only Start over drops `work/`; a
+`CHECKPOINT_MISMATCH` keeps its `work/` until Start over; a note queued when it was trashed is queued again on
+Restore; and "A speech model is needed" is the model download screen. The rest of this contract still holds.
+
+The contract WP5's interim `ProcessingStore` followed for **WP4**:
 
 - "Stop and keep progress" pauses the running job; transcribing the note again resumes from its checkpoint, in the
   language the checkpoint has (the Settings language applies only to a note without saved progress).

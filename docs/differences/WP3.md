@@ -43,6 +43,9 @@
   transcribe" with Cancel; a cancel then stands, since the hand-off happens only if the note is still `queued`. The Finish outcome (`saved(transcribe)`) is reported before
   the hand-off, so a refused hand-off is not reflected in it, where Android reports `AUDIO_ONLY`; on iOS both
   outcomes open the note the same way, and the note's status shows the result.
+- **Consent** is Android's `RecordingConsent.consented`: the recorded consent, or nothing to download (the speech model
+  is installed), through the queue's `ModelConsent` (`RecordingController.Parts.consent`). The hand-off
+  (`RecordingHandoff.handOff`, async) is a Transcribe from the app (`StartOrigin.automatic`), which clears no hold.
 - A recording longer than 36 h is saved with `failure = LONG` and never queued.
 - **Automatic transcription off** (an iOS setting Android does not have) makes every finish audio only.
 - **A seal that cannot be written** leaves the note live on disk. It is shown sealed (plain, audio only, its title and

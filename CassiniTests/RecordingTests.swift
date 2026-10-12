@@ -86,6 +86,40 @@ import CassiniEngineTesting
         await waitUntil { graph.processing.state.isQueued(id) || graph.processing.state.isRunning(id) || graph.library.note(id)?.status == .ready }
     }
 
+    /// Android's `RecordingController.next`: with the speech model installed nothing needs consent, so a finished
+    /// recording is queued even though no consent was ever recorded.
+    func testAFinishedRecordingIsQueuedWhenTheModelIsInstalledWithoutRecordedConsent() async throws {
+        let test = TestGraph(transcriber: FakeTranscriber(.frozen(done: 1, total: 2))); defer { test.tearDown() }
+        let graph = test.graph
+        await graph.start()
+        graph.settings.identifySpeakers = false
+        XCTAssertNil(graph.settings.modelsConsentAt)
+
+        await graph.recording.start()
+        await waitUntil { graph.recording.state.isActive }
+        let id = try XCTUnwrap(graph.recording.state.noteID)
+        graph.recording.screen.finish()
+        await waitUntil { graph.processing.state.isRunning(id) }
+        XCTAssertEqual(graph.router.path, [.note(id)], "nothing to ask")
+        graph.processing.stopAll()
+    }
+
+    func testAFinishedRecordingWithoutConsentOrInstalledModelOffersTheDownload() async throws {
+        let test = TestGraph(transcriber: FakeTranscriber(.returns([], total: 1), status: .notDownloaded))
+        defer { test.tearDown() }
+        let graph = test.graph
+        await graph.start()
+
+        await graph.recording.start()
+        await waitUntil { graph.recording.state.isActive }
+        let id = try XCTUnwrap(graph.recording.state.noteID)
+        graph.recording.screen.finish()
+        await waitUntil { graph.router.path == [.note(id), .modelDownload(noteID: id)] }
+        await graph.recording.controller.settle()
+        XCTAssertNil(graph.processing.state.jobs[id], "asking queues nothing")
+        XCTAssertEqual(graph.library.note(id)?.status, .audioOnly)
+    }
+
     func testTheLiveActivityButtonsControlTheRecording() async throws {
         let test = TestGraph(); defer { test.tearDown() }
         let graph = test.graph

@@ -2,29 +2,134 @@ import SwiftUI
 import CassiniEngine
 import CassiniNotebook
 
-/// Consent for downloading Apple's speech model, optionally for one note.
+/// "Transcribe on this device": consent for downloading the models a note, or a standalone download, needs.
 struct ModelDownloadView: View {
     let noteID: UUID?
-    @Environment(SettingsStore.self) private var settings
     @Environment(ProcessingStore.self) private var processing
+    @Environment(Router.self) private var router
     @Environment(\.dismiss) private var dismiss
+    @State private var model: ModelDownloadModel?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.section) {
-            Text("Transcribe on this device").font(.system(.title, design: .serif)).foregroundStyle(Color.ink)
-            Text("Cassini uses Apple’s on-device speech model. If needed, iOS will download a language model, which may use several hundred MB. Your audio is never sent for transcription. You can change this in Settings.")
-                .foregroundStyle(Color.muted)
-            Spacer()
-            Button(noteID == nil ? "Allow downloads" : "Download and transcribe") {
-                settings.recordConsent()
-                if let noteID { processing.enqueue(noteID) }
-                dismiss()
-            }.buttonStyle(PrimaryButtonStyle())
-            Button("Not now — keep the audio") { settings.recordDeclined(); dismiss() }
-                .frame(maxWidth: .infinity, minHeight: HitTarget.minimum)
+        Group {
+            if let model, let plan = model.plan {
+                ModelDownloadContent(model: model, plan: plan)
+            } else {
+                Color.paper.ignoresSafeArea()
+            }
         }
-        .padding(Spacing.gutter).frame(maxWidth: ReadableWidth.note).frame(maxWidth: .infinity)
         .background(Color.paper)
         .navigationBarTitleDisplayMode(.inline)
+        .task {
+            guard model == nil, let ports = processing.modelDownload else { return }
+            let model = ModelDownloadModel(noteID: noteID, ports: ports)
+            model.onEffect = { effect in
+                switch effect {
+                case .close: dismiss()
+                case .openLicenses: router.push(.licenses)
+                }
+            }
+            self.model = model
+            await model.load()
+        }
+    }
+}
+
+private struct ModelDownloadContent: View {
+    let model: ModelDownloadModel
+    let plan: ModelPlan
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    OrbitMark(size: 56)
+                    Text("Transcribe on this device", tableName: "Transcription")
+                        .font(.system(.largeTitle, design: .serif)).foregroundStyle(Color.ink)
+                        .accessibilityAddTraits(.isHeader)
+                    Text("Cassini needs a one-time download. After that, recognising words and telling voices apart happen on this device, even offline. Your audio stays here.", tableName: "Transcription")
+                        .font(.title3).foregroundStyle(Color.muted)
+                    VStack(spacing: 0) {
+                        ForEach(Array(plan.missing.enumerated()), id: \.element) { index, part in
+                            if index > 0 { Divider().padding(.leading, 16) }
+                            Text(part.label).font(.body).foregroundStyle(Color.ink)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 16).padding(.vertical, 14)
+                        }
+                    }.cardBackground(radius: Radius.control)
+                    Text("Needs about \(plan.requiredFreeBytes.formatted(.byteCount(style: .file))) free while installing. Each file is checked before it is used.", tableName: "Transcription")
+                        .font(.subheadline).foregroundStyle(Color.muted)
+                    Button(action: model.openSources) {
+                        Text("Where the models come from · Privacy", tableName: "Transcription")
+                    }
+                    .font(.subheadline.weight(.medium)).tint(.ember)
+                    .frame(minHeight: HitTarget.minimum)
+                }
+                .padding(.top, 8).padding(.bottom, 16)
+            }
+            .scrollBounceBehavior(.basedOnSize)
+            ModelDownloadActions(model: model)
+        }
+        .padding(.horizontal, 20).padding(.bottom, 24)
+        .frame(maxWidth: ReadableWidth.note).frame(maxWidth: .infinity)
+    }
+}
+
+private struct ModelDownloadActions: View {
+    let model: ModelDownloadModel
+
+    var body: some View {
+        VStack(spacing: 10) {
+            if let bytes = model.noSpaceBytes {
+                NoSpaceBanner(bytes: bytes) { Task { await model.download() } }.padding(.bottom, 6)
+            }
+            Button { Task { await model.download() } } label: {
+                ZStack {
+                    Text(model.withNote ? "Download and transcribe" : "Download", tableName: "Transcription")
+                        .opacity(model.busy ? 0 : 1)
+                    if model.busy { ProgressView().tint(.white) }
+                }
+            }
+            .buttonStyle(PrimaryButtonStyle())
+            .disabled(model.busy)
+            Button(action: model.notNow) { Text("Not now — keep the audio", tableName: "Transcription") }
+                .font(.body.weight(.medium)).tint(.ink)
+                .frame(maxWidth: .infinity, minHeight: HitTarget.minimum)
+                .disabled(model.busy)
+        }
+    }
+}
+
+private struct NoSpaceBanner: View {
+    let bytes: Int64
+    let retry: () -> Void
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Image(systemName: "externaldrive.badge.exclamationmark").foregroundStyle(Tone.warn.color)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Not enough storage", tableName: "Transcription").font(.subheadline.weight(.semibold))
+                Text("Free about \(bytes.formatted(.byteCount(style: .file))) and try again.", tableName: "Transcription")
+                    .font(.subheadline).foregroundStyle(Color.muted)
+            }
+            Spacer(minLength: 0)
+            Button(action: retry) { Text("Retry", tableName: "Transcription") }
+                .font(.subheadline.weight(.semibold)).tint(.ember).frame(minHeight: HitTarget.minimum)
+        }
+        .foregroundStyle(Color.ink)
+        .padding(16)
+        .background(Tone.warn.background, in: RoundedRectangle(cornerRadius: Radius.control))
+        .accessibilityElement(children: .contain)
+    }
+}
+
+extension ModelPart {
+    /// The part's name on the model download screen.
+    var label: String {
+        switch self {
+        case .speech: String(localized: "Speech recognition", table: "Transcription")
+        case .speakers: String(localized: "Telling speakers apart", table: "Transcription")
+        case .voices: String(localized: "Recognising saved voices", table: "Transcription")
+        }
     }
 }

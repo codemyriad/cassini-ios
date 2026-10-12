@@ -63,6 +63,15 @@ public actor AppleSpeechTranscriber: Transcribing {
         }
     }
 
+    /// Throws `TranscriptionError.failed(.download(_))` when the download or the install fails.
+    public func installAssets(locale requested: Locale, progress: @escaping @Sendable (Double) -> Void) async throws {
+        guard SpeechTranscriber.isAvailable,
+              let locale = await SpeechTranscriber.supportedLocale(equivalentTo: requested) else { return }
+        let module = SpeechTranscriber(locale: locale, transcriptionOptions: [], reportingOptions: [], attributeOptions: [])
+        guard await AssetInventory.status(forModules: [module]) != .installed else { return }
+        try await Self.install(module, locale: locale) { if let fraction = $0 { progress(fraction) } }
+    }
+
     public func assetStatus(locale: Locale) async -> ModelPartStatus {
         guard SpeechTranscriber.isAvailable,
               let supported = await SpeechTranscriber.supportedLocale(equivalentTo: locale) else { return .unsupported }
@@ -77,19 +86,25 @@ public actor AppleSpeechTranscriber: Transcribing {
 
     // MARK: - Assets
 
-    /// Downloads Apple's assets for `locale` when they are missing and downloading is allowed, reporting the download's
-    /// share done about twice a second.
+    /// Downloads Apple's assets for `locale` when they are missing and downloading is allowed.
     private func installAssets(for transcriber: SpeechTranscriber, locale: Locale, allowDownload: Bool,
                                events: @escaping @Sendable (TranscriptionEvent) -> Void) async throws {
         guard await AssetInventory.status(forModules: [transcriber]) != .installed else { return }
         guard allowDownload else { throw TranscriptionError.needsConsent }
         events(.preparingModel(nil))
+        try await Self.install(transcriber, locale: locale) { events(.preparingModel($0)) }
+    }
+
+    /// Reserves `locale` and installs the assets `module` needs, reporting the share done (nil while unknown) about
+    /// twice a second. A failure other than a cancel is `TranscriptionError.failed(.download(_))`.
+    private static func install(_ module: SpeechTranscriber, locale: Locale,
+                                report: @escaping @Sendable (Double?) -> Void) async throws {
         guard try await AssetInventory.reserve(locale: locale) else { throw TranscriptionError.failed(.reservationLimit) }
-        guard let installation = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) else { return }
+        guard let installation = try await AssetInventory.assetInstallationRequest(supporting: [module]) else { return }
         let progress = installation.progress
         let reporter = Task {
             while !Task.isCancelled {
-                events(.preparingModel(progress.totalUnitCount > 0 ? progress.fractionCompleted : nil))
+                report(progress.totalUnitCount > 0 ? progress.fractionCompleted : nil)
                 try? await Task.sleep(for: .milliseconds(500))
             }
         }

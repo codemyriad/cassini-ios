@@ -632,6 +632,8 @@ private final class ScriptedTranscriber: Transcribing, @unchecked Sendable {
     }
 
     func assetStatus(locale: Locale) async -> ModelPartStatus { status }
+
+    func installAssets(locale: Locale, progress: @escaping @Sendable (Double) -> Void) async throws { progress(1) }
 }
 
 /// The real files, recording each checkpoint saved.

@@ -15,13 +15,18 @@ struct LibraryRecordingNotes: RecordingNotes {
     func showUnsaved(_ id: UUID, _ change: @escaping @Sendable (inout Note) -> Void) async { await library.showUnsaved(id, change) }
 }
 
-/// A finished recording is queued like any other note.
-extension ProcessingStore: RecordingHandoff {
-    func audioFinalizing(_ noteID: UUID) { beginFinalizing(noteID) }
-    func audioReady(_ noteID: UUID) { endFinalizing(noteID) }
-    func handOff(_ noteID: UUID) -> Bool {
-        enqueue(noteID)
-        return state.isQueued(noteID) || state.isRunning(noteID)
+/// A finished recording is queued like any other note, as an automatic request that clears no hold.
+@MainActor final class ProcessingHandoff: RecordingHandoff {
+    private let processing: ProcessingStore
+
+    init(_ processing: ProcessingStore) { self.processing = processing }
+
+    func audioFinalizing(_ noteID: UUID) { processing.beginFinalizing(noteID) }
+    func audioReady(_ noteID: UUID) { processing.endFinalizing(noteID) }
+
+    func handOff(_ noteID: UUID) async -> Bool {
+        if case .queued = await processing.transcribe(noteID, origin: .automatic) { return true }
+        return false
     }
 }
 

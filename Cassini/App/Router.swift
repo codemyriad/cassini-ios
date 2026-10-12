@@ -31,6 +31,13 @@ enum FullScreenRoute: String, Identifiable, Hashable {
 
     func popToLibrary() { path.removeAll() }
 
+    /// The model download screen over the note, when the note is still the screen on top (as after a recording that
+    /// may not be transcribed without the download).
+    func offerModelDownload(for noteID: UUID) {
+        guard path.last == .note(noteID) else { return }
+        push(.modelDownload(noteID: noteID))
+    }
+
     /// Pops the note's screen, and every screen above it, when it is open.
     func close(noteID: UUID) {
         guard let index = path.firstIndex(where: { $0.noteID == noteID }) else { return }

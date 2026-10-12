@@ -1,0 +1,438 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "Cassini can’t play this audio, so there is nothing to transcribe.": {
+      "comment": "A Transcribe was refused: the audio cannot be decoded",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cassini can’t play this audio, so there is nothing to transcribe."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cassini non riesce a riprodurre questo audio, quindi non c’è niente da trascrivere."
+          }
+        }
+      }
+    },
+    "Cassini needs a one-time download. After that, recognising words and telling voices apart happen on this device, even offline. Your audio stays here.": {
+      "comment": "Model download screen body",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cassini needs a one-time download. After that, recognising words and telling voices apart happen on this device, even offline. Your audio stays here."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cassini ha bisogno di un unico download. Dopo, il riconoscimento delle parole e la distinzione delle voci avvengono su questo dispositivo, anche offline. Il tuo audio resta qui."
+          }
+        }
+      }
+    },
+    "Continue": {
+      "comment": "Held queue banner action: start the queue again",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continue"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continua"
+          }
+        }
+      }
+    },
+    "Continue when you’re ready.": {
+      "comment": "Held queue banner body",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continue when you’re ready."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continua quando vuoi."
+          }
+        }
+      }
+    },
+    "Download": {
+      "comment": "Model download button without a note",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scarica"
+          }
+        }
+      }
+    },
+    "Download and transcribe": {
+      "comment": "Model download button with a note waiting",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download and transcribe"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scarica e trascrivi"
+          }
+        }
+      }
+    },
+    "Free about %@ and try again.": {
+      "comment": "Banner body: the space to free",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Free about %@ and try again."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Libera circa %@ e riprova."
+          }
+        }
+      }
+    },
+    "Needs about %@ free while installing. Each file is checked before it is used.": {
+      "comment": "Model download footnote with the free space the install needs",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Needs about %@ free while installing. Each file is checked before it is used."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Servono circa %@ liberi durante l’installazione. Ogni file viene verificato prima dell’uso."
+          }
+        }
+      }
+    },
+    "Not enough storage": {
+      "comment": "Banner title: not enough free space for the models",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not enough storage"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Spazio insufficiente"
+          }
+        }
+      }
+    },
+    "Not now — keep the audio": {
+      "comment": "Model download refusal",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not now — keep the audio"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non ora — tieni l’audio"
+          }
+        }
+      }
+    },
+    "Recognising saved voices": {
+      "comment": "Model part",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recognising saved voices"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riconoscimento delle voci salvate"
+          }
+        }
+      }
+    },
+    "Restore this recording from Recently Deleted to transcribe it.": {
+      "comment": "A Transcribe was refused: the note is in Recently Deleted",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restore this recording from Recently Deleted to transcribe it."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ripristina questa registrazione da Eliminati di recente per trascriverla."
+          }
+        }
+      }
+    },
+    "Retry": {
+      "comment": "Banner action",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retry"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riprova"
+          }
+        }
+      }
+    },
+    "Speech recognition": {
+      "comment": "Model part",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Speech recognition"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riconoscimento vocale"
+          }
+        }
+      }
+    },
+    "Telling speakers apart": {
+      "comment": "Model part",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Telling speakers apart"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Distinzione delle voci"
+          }
+        }
+      }
+    },
+    "The transcription queue was saved by a newer version of Cassini, or can’t be read. Update Cassini to transcribe.": {
+      "comment": "A Transcribe was refused: the stored queue cannot be used",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The transcription queue was saved by a newer version of Cassini, or can’t be read. Update Cassini to transcribe."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La coda di trascrizione è stata salvata da una versione più recente di Cassini, o non si può leggere. Aggiorna Cassini per trascrivere."
+          }
+        }
+      }
+    },
+    "This recording is still being saved. Try again in a moment.": {
+      "comment": "A Transcribe was refused: the recording is still being written",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This recording is still being saved. Try again in a moment."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questa registrazione è ancora in salvataggio. Riprova tra un momento."
+          }
+        }
+      }
+    },
+    "This recording no longer exists.": {
+      "comment": "A Transcribe was refused: the note is gone",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This recording no longer exists."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questa registrazione non esiste più."
+          }
+        }
+      }
+    },
+    "This recording was saved by a newer version of Cassini. Update Cassini to transcribe it.": {
+      "comment": "A Transcribe was refused: the note's format is newer",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This recording was saved by a newer version of Cassini. Update Cassini to transcribe it."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questa registrazione è stata salvata da una versione più recente di Cassini. Aggiorna Cassini per trascriverla."
+          }
+        }
+      }
+    },
+    "Transcribe on this device": {
+      "comment": "Model download screen title",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcribe on this device"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascrivi su questo dispositivo"
+          }
+        }
+      }
+    },
+    "Transcribing “%@”": {
+      "comment": "The system's progress while a note is transcribed",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcribing “%@”"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascrizione di “%@”"
+          }
+        }
+      }
+    },
+    "Transcription paused · %lld waiting": {
+      "comment": "Held queue banner title with the notes waiting",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Transcription paused · %lld waiting"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Transcription paused · %lld waiting"
+                }
+              }
+            }
+          }
+        },
+        "it": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Trascrizione in pausa · %lld in attesa"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Trascrizione in pausa · %lld in attesa"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Where the models come from · Privacy": {
+      "comment": "Model download link to the licenses",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Where the models come from · Privacy"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Da dove vengono i modelli · Privacy"
+          }
+        }
+      }
+    },
+    "Your audio stays on this device": {
+      "comment": "Subtitle of the system's progress while a note is transcribed",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your audio stays on this device"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il tuo audio resta su questo dispositivo"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

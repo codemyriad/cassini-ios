@@ -43,4 +43,8 @@ public protocol Transcribing: Sendable {
     func transcribe(_ request: TranscriptionRequest,
                     events: @escaping @Sendable (TranscriptionEvent) -> Void) async throws -> TranscriptionResult
     func assetStatus(locale: Locale) async -> ModelPartStatus
+    /// Downloads and installs the speech model for `locale` now, as the model download screen's Download does,
+    /// reporting the fraction done. Does nothing when it is installed or not offered for `locale`; a failed download
+    /// or install throws `TranscriptionError.failed(.download(_))`.
+    func installAssets(locale: Locale, progress: @escaping @Sendable (Double) -> Void) async throws
 }

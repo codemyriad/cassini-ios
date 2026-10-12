@@ -37,7 +37,7 @@ struct SpeakersView: View {
                         }.disabled(note.transcript.isEmpty || busy || !note.audio.isPlayable)
                         if busy {
                             ProgressView(progress.processingPhase(for: noteID)?.message ?? "")
-                            Button("Cancel analysis", role: .cancel) { processing.cancel(noteID) }
+                            Button("Cancel analysis", role: .cancel) { processing.stop(noteID) }
                         }
                     } footer: {
                         Text("Speaker analysis runs on this device. It may take several minutes for a long recording. Keep Cassini open. Existing names remain available in transcript history when you analyze again.")
@@ -59,15 +59,15 @@ struct SpeakersView: View {
                     Button("Analyze again") { Task { await requestAnalysis() } }
                 } message: { Text("This creates a new transcript version. You can return to your current names and assignments from Transcript versions.") }
                 .alert("Download speaker models?", isPresented: $consent) {
-                    Button("Allow & Identify") { settings.speakerDownloadsAllowed = true; processing.enqueue(noteID, speakersOnly: true) }
+                    Button("Allow & Identify") { settings.speakerDownloadsAllowed = true; processing.request(noteID, kind: .speakersOnly, origin: .screen) }
                     Button("Not now", role: .cancel) {}
                 } message: { Text("Cassini downloads Core ML speaker models from Hugging Face through FluidAudio. This may use several hundred MB. Audio and voiceprints stay on your device. Model downloads can be disabled in Settings.") }
         }.tint(.ember)
     }
 
     private func requestAnalysis() async {
-        if settings.speakerDownloadsAllowed { processing.enqueue(noteID, speakersOnly: true); return }
-        if await processing.speakerModelsReady() { processing.enqueue(noteID, speakersOnly: true) } else { consent = true }
+        if settings.speakerDownloadsAllowed { processing.request(noteID, kind: .speakersOnly, origin: .screen); return }
+        if await processing.speakerModelsReady() { processing.request(noteID, kind: .speakersOnly, origin: .screen) } else { consent = true }
     }
 }
 

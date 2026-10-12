@@ -36,7 +36,8 @@ import CassiniNotebook
         library = parts.library; playback = parts.playback; router = parts.router; notices = parts.notices
         controller = RecordingController(parts: .init(
             ready: parts.ready, notes: LibraryRecordingNotes(library: parts.library), capture: environment.capture, storage: environment.storage,
-            audio: environment.audio, settings: parts.settings, handoff: parts.processing,
+            audio: environment.audio, settings: parts.settings, handoff: ProcessingHandoff(parts.processing),
+            consent: .recorded(settings: parts.settings, speech: environment.transcriber, speakers: environment.analyzer),
             liveActivity: environment.liveActivity, notifier: environment.notifier, clock: environment.clock,
             defaultTitle: { RecordingCopy.defaultTitle(RecordingTitles.dateTime($0, locale: locale, timeZone: timeZone)) }))
         let transcriber = environment.transcriber, settings = parts.settings

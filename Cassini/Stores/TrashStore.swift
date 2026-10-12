@@ -33,29 +33,36 @@ import CassiniNotebook
     }
 
     /// Closes the note wherever it is open. A queued or running transcription stops and keeps its progress, so a
-    /// restored note resumes; the note moves once its job has ended. False while the note is being recorded.
+    /// restored note resumes; the note moves once its job has ended, and remembers its job for Restore. False while
+    /// the note is being recorded.
     @discardableResult func moveToTrash(_ id: UUID) async -> Bool {
         guard recording.state.noteID != id, library.note(id) != nil else { return false }
         if playback.state.noteID == id { playback.stop() }
-        let moved = await processing.trash(id) {
+        let moved = await processing.trash(id) { job in
             guard recording.state.noteID != id else { return false }
             let now = clock.now
-            return library.update(id) { $0.trashedAt = now }
+            return library.update(id) { $0.trashedAt = now; $0.trashedJob = job }
         }
         guard moved else { return false }
         router.close(noteID: id)
         return true
     }
 
-    func restore(_ id: UUID) { library.update(id) { $0.trashedAt = nil } }
+    func restore(_ id: UUID) {
+        let job = library.note(id)?.trashedJob
+        guard library.update(id, { $0.trashedAt = nil; $0.trashedJob = nil }) else { return }
+        processing.restore(id, trashedJob: job)
+    }
 
-    /// Ends any job still running for the note, then removes its voice samples, then its files. Needs the saved voices to be readable.
+    /// Ends any job still running for the note, then removes its voice samples, then its files, then its job. Needs
+    /// the saved voices to be readable; when a step fails the note stays in Recently Deleted with its job.
     func deletePermanently(_ id: UUID) async {
         guard library.note(id)?.trashedAt != nil else { return }
-        await processing.end(id)
+        await processing.stopForDelete(id)
         do {
             try voices.removeEvidence(noteID: id)
             try await library.delete(id)
+            await processing.forget(id)
         } catch let error as VoicesStore.Unavailable {
             errors.present(error.message)
         } catch {

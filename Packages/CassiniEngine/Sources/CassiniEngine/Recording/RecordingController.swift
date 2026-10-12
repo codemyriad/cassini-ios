@@ -41,6 +41,8 @@ public final class RecordingController {
         public var audio: any AudioProcessing
         public var settings: SettingsStore
         public var handoff: any RecordingHandoff
+        /// Whether a saved recording may be transcribed without asking (Android's `RecordingConsent.consented`).
+        public var consent: ModelConsent
         public var liveActivity: (any LiveActivityPort)?
         public var notifier: (any Notifier)?
         public var clock: any AppClock
@@ -50,11 +52,14 @@ public final class RecordingController {
 
         public init(ready: @escaping @MainActor () async -> Void, notes: any RecordingNotes, capture: any AudioCapture,
                     storage: any StorageProbe, audio: any AudioProcessing, settings: SettingsStore,
-                    handoff: any RecordingHandoff, liveActivity: (any LiveActivityPort)? = nil,
+                    handoff: any RecordingHandoff, consent: ModelConsent? = nil, liveActivity: (any LiveActivityPort)? = nil,
                     notifier: (any Notifier)? = nil, clock: any AppClock,
                     defaultTitle: @escaping @Sendable (Date) -> String, timing: Timing = Timing()) {
             self.ready = ready; self.notes = notes; self.capture = capture; self.storage = storage; self.audio = audio
-            self.settings = settings; self.handoff = handoff; self.liveActivity = liveActivity; self.notifier = notifier
+            self.settings = settings; self.handoff = handoff
+            // Without a model check, only the recorded consent counts.
+            self.consent = consent ?? ModelConsent { _, _ in settings.modelsConsentAt != nil }
+            self.liveActivity = liveActivity; self.notifier = notifier
             self.clock = clock; self.defaultTitle = defaultTitle; self.timing = timing
         }
     }
@@ -289,7 +294,7 @@ public final class RecordingController {
         }
         let finalTitle = NoteTitles.clean(title ?? current.title) ?? current.defaultTitle
         let tooLong = duration > Limits.maxTranscribeDuration
-        let after = stop == .user ? next(tooLong: tooLong) : .audioOnly
+        let after = stop == .user ? await next(tooLong: tooLong) : .audioOnly
         // Marked queued at once: a kill before the hand-off leaves the note interrupted, not silently audio only.
         let status: NoteStatus = after == .transcribe ? .queued : .audioOnly
         let seal: @Sendable (inout Note) -> Void = { note in
@@ -315,12 +320,13 @@ public final class RecordingController {
         }
     }
 
-    /// After a saved recording: transcription with consent, else the consent question or audio only. A recording
-    /// longer than one transcription takes stays audio only, as does every one while automatic transcription is off.
-    private func next(tooLong: Bool) -> AfterFinish {
+    /// After a saved recording: transcription with consent (recorded, or nothing to download), else the consent
+    /// question or audio only. A recording longer than one transcription takes stays audio only, as does every one
+    /// while automatic transcription is off.
+    private func next(tooLong: Bool) async -> AfterFinish {
         let settings = parts.settings
         guard !tooLong, settings.autoTranscribe else { return .audioOnly }
-        if settings.modelsConsentAt != nil { return .transcribe }
+        if await parts.consent.allows(.transcribe, settings.speechLanguage) { return .transcribe }
         return settings.modelsDeclinedAt != nil ? .audioOnly : .askConsent
     }
 
@@ -336,7 +342,8 @@ public final class RecordingController {
             parts.handoff.audioReady(id)
             // Cancelled while compressing ("Waiting to transcribe" shows Cancel): the user's choice stands.
             guard transcribe, await parts.notes.note(id)?.status == .queued else { return }
-            if !readable || !parts.handoff.handOff(id) {
+            let queued = readable ? await parts.handoff.handOff(id) : false
+            if !queued {
                 _ = try? await parts.notes.update(id) { if $0.status == .queued { $0.status = .audioOnly } }
             }
         }

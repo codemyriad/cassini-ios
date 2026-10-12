@@ -41,6 +41,7 @@ struct LibraryView: View {
                             .accessibilityLabel("Dismiss notice")
                     }
                 }
+                QueueHeldBanner()
                 if recording.state.isActive { ActiveRecordingCard() }
                 ImportActivity()
                 if visible.isEmpty { LibraryEmptyState(query: query, favoritesOnly: favoritesOnly) }

@@ -13,8 +13,11 @@ import SwiftUI
                 .onOpenURL { url in
                     if RecordingLink.matches(url) { graph.recording.returnToRecording() } else { graph.imports.open(url) }
                 }
-                .onChange(of: scenePhase) { _, phase in
+                .onChange(of: scenePhase, initial: true) { _, phase in
                     graph.recording.appActivityChanged(isActive: phase == .active)
+                    // Inactive is still on the screen (Control Center, the app switcher, a system alert).
+                    if phase == .active { graph.processing.setVisible(true) }
+                    if phase == .background { graph.processing.setVisible(false) }
                     if phase == .active, graph.startup.isReady { Task { await graph.trash.purgeExpired() } }
                     if phase == .background { graph.enterBackground() }
                 }

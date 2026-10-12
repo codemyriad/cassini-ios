@@ -132,10 +132,105 @@ import CassiniNotebook
         #expect(try await store().load().isEmpty)
     }
 
-    @Test func aNewerQueueFileIsRefused() async throws {
+    @Test func aRequeuedJobKeepsTheNumbersOfItsSavedProgress() async throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        let jobs = store()
+        let id = UUID()
+        try await jobs.enqueue(id, kind: .transcribe, language: "it-IT", now: now)
+        try await jobs.transition(id, now: now) {
+            $0.state = .paused; $0.pauseReason = .user; $0.doneMs = 28_000; $0.totalMs = 60_000; $0.words = 40
+        }
+        let resumed = try await jobs.enqueue(id, kind: .transcribe, language: nil, now: now)
+        #expect(resumed.state == .queued)
+        #expect(resumed.doneMs == 28_000 && resumed.totalMs == 60_000 && resumed.words == 40)
+        #expect(resumed.language == "it-IT", "a nil language keeps the job's")
+    }
+
+    // ports: JobRepositoryTest#trashPortsRequeueAndCancel
+    @Test func restoreRequeuesAtTheBackAndRecreatesAMissingJobFromItsSavedProgress() async throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        let jobs = store()
+        let ids = ids(3)
+        try await jobs.enqueue(ids[0], kind: .transcribe, language: "", now: now)
+        try await jobs.enqueue(ids[1], kind: .transcribe, language: "", now: now)
+
+        // A queued job that still exists goes to the back.
+        #expect(try await jobs.requeueAtBack(ids[0], kind: .transcribe, language: "", checkpoint: .missing, now: now)?.seq == 3)
+        // Restore of a note whose job is missing creates it, with the numbers of its saved progress.
+        let created = try #require(try await jobs.requeueAtBack(
+            ids[2], kind: .transcribeAgain, language: "it-IT",
+            checkpoint: .saved(doneMs: 28_000, totalMs: 60_000, words: 3), now: now))
+        #expect(created.kind == .transcribeAgain && created.seq == 4)
+        #expect(created.doneMs == 28_000 && created.words == 3 && created.language == "it-IT")
+
+        // A running job is left alone.
+        #expect(try await jobs.claimNext(now: now)?.noteID == ids[1])
+        let running = try await jobs.requeueAtBack(ids[1], kind: .transcribe, language: "", checkpoint: .missing, now: now)
+        #expect(running?.state == .running && running?.seq == 2)
+    }
+
+    @Test func replaceWritesEveryChangeAtOnceAndIgnoresUnknownJobs() async throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        let jobs = store()
+        let ids = ids(2)
+        for id in ids { try await jobs.enqueue(id, kind: .transcribe, language: "", now: now) }
+        var first = try #require(await jobs.job(ids[0])); first.state = .failed; first.failure = .checkpointMismatch
+        let stranger = Job(noteID: UUID(), seq: 9, kind: .transcribe, enqueuedAt: now)
+        try await jobs.replace([first, stranger])
+        #expect(try await store().load() == [first, try #require(await jobs.job(ids[1]))])
+    }
+
+    @Test func aNewerQueueFileIsKeptAndTakesNoWrites() async throws {
         defer { try? FileManager.default.removeItem(at: root) }
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        try Data(#"{"version":2,"jobs":[]}"#.utf8).write(to: root.appendingPathComponent(JobRepository.filename))
-        await #expect(throws: JobRepository.Failure.unsupportedVersion(2)) { try await store().load() }
+        let file = root.appendingPathComponent(JobRepository.filename)
+        let newer = Data(#"{"version":2,"jobs":[{"from":"a newer Cassini"}]}"#.utf8)
+        try newer.write(to: file)
+        #expect(throws: JobRepository.Failure.unsupportedVersion(2)) { try JobRepository(root: root).load() }
+
+        let jobs = store()
+        await #expect(throws: JobStore.Failure.newerVersion(2)) { try await jobs.load(now: now) }
+        #expect(await jobs.isWritable == false)
+        await #expect(throws: JobStore.Failure.readOnly) {
+            try await jobs.enqueue(UUID(), kind: .transcribe, language: "", now: now)
+        }
+        #expect(try Data(contentsOf: file) == newer, "the newer file is never overwritten")
+    }
+
+    @Test func anUnreadableQueueFileIsMovedAsideAndTheQueueStartsEmpty() async throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let file = root.appendingPathComponent(JobRepository.filename)
+        let broken = Data("{\"version\":1,\"jobs\":[{".utf8)
+        try broken.write(to: file)
+
+        let jobs = store()
+        let failure = await #expect(throws: JobStore.Failure.self) { try await jobs.load(now: now) }
+        guard case .unreadable(let movedTo?) = failure else {
+            Issue.record("expected the file to be moved aside, got \(String(describing: failure))")
+            return
+        }
+        #expect(movedTo.lastPathComponent.hasPrefix("jobs.json.unreadable-"))
+        #expect(try Data(contentsOf: movedTo) == broken)
+        #expect(await jobs.isWritable)
+        let id = UUID()
+        try await jobs.enqueue(id, kind: .transcribe, language: "", now: now)
+        #expect(try JobRepository(root: root).load().map(\.noteID) == [id])
+        #expect(try Data(contentsOf: movedTo) == broken, "the new queue never touches the unreadable one")
+    }
+
+    @Test func aRepairThatCannotBeWrittenStillChangesTheQueueInMemory() async throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        let jobs = store()
+        let (a, b) = { let ids = ids(2); return (ids[0], ids[1]) }()
+        try await jobs.enqueue(a, kind: .transcribe, language: "", now: now)
+        try await jobs.enqueue(b, kind: .transcribe, language: "", now: now)
+        var running = try #require(try await jobs.claimNext(now: now))
+        running.state = .queued
+        await jobs.assume([running], removing: [b])
+        #expect(await jobs.all().map(\.noteID) == [a])
+        #expect(try JobRepository(root: root).load().map(\.state) == [.running, .queued], "nothing was written")
+        #expect(try await jobs.claimNext(now: now)?.noteID == a, "the queue goes on")
+        #expect(try JobRepository(root: root).load().map(\.noteID) == [a], "the next write saves the repair")
     }
 }

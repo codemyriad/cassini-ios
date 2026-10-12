@@ -40,6 +40,11 @@
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>
+		<string>processing</string>
+	</array>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>app.codemyriad.cassini.transcription.*</string>
 	</array>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>

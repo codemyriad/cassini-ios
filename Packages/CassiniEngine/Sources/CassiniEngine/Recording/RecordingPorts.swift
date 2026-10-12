@@ -35,7 +35,7 @@ extension NoteStore: RecordingNotes {
     func audioFinalizing(_ noteID: UUID)
     func audioReady(_ noteID: UUID)
     /// Queues the note's transcription; false when it could not be queued.
-    func handOff(_ noteID: UUID) -> Bool
+    func handOff(_ noteID: UUID) async -> Bool
 }
 
 public enum MicrophoneAccess: Hashable, Sendable {

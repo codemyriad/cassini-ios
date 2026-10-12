@@ -60,11 +60,13 @@ import CassiniNotebook
     private func finish(_ outcome: ImportOutcome, opensNote: Bool) async {
         if case .created(let id) = outcome, let note = await library.noteStore?.note(id) {
             library.adopt(note)
-            if ImportedNote.wantsTranscription(note) && settings.autoTranscribe && settings.downloadsAllowed {
-                processing.enqueue(id)
-            }
         }
         if opensNote, let id = outcome.noteID { router.openNote(id) }
+        // After the note opens, so the model download screen can ask over it.
+        if case .created(let id) = outcome, let note = library.note(id), ImportedNote.wantsTranscription(note),
+           settings.autoTranscribe, await processing.handOff(id) == .askConsent {
+            router.offerModelDownload(for: id)
+        }
     }
 
     private static func displayName(of url: URL) -> String {

@@ -3,7 +3,8 @@ import Foundation
 import CassiniEngine
 import CassiniNotebook
 
-/// A transcriber that either returns fixed segments or stops at a fixed point and waits until it is cancelled.
+/// A transcriber that either returns fixed segments or stops at a fixed point and waits until it is cancelled. Like
+/// Apple's, it asks for consent when its model is not downloaded and the request may not download it.
 public struct FakeTranscriber: Transcribing {
     public enum Script: Sendable {
         case returns([TranscriptSegment], total: TimeInterval)
@@ -19,6 +20,7 @@ public struct FakeTranscriber: Transcribing {
 
     public func transcribe(_ request: TranscriptionRequest,
                            events: @escaping @Sendable (TranscriptionEvent) -> Void) async throws -> TranscriptionResult {
+        if status == .notDownloaded, !request.allowDownload { throw TranscriptionError.needsConsent }
         switch script {
         case .returns(let segments, let total):
             for segment in segments {
@@ -36,5 +38,10 @@ public struct FakeTranscriber: Transcribing {
     }
 
     public func assetStatus(locale: Locale) async -> ModelPartStatus { status }
+
+    /// Reports the download as done at once; nothing is installed, so `assetStatus` stays as it was.
+    public func installAssets(locale: Locale, progress: @escaping @Sendable (Double) -> Void) async throws {
+        progress(1)
+    }
 }
 #endif

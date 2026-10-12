@@ -41,22 +41,36 @@ import CassiniNotebook
                            recording: recording, settings: settings, router: router, errors: errors,
                            clock: environment.clock, calendar: environment.calendar)
         exports = ExportStore(library: library, portable: PortableExportService(audio: environment.audio))
+        processing.modelDownload = ModelDownloadAdapter(
+            settings: settings, processing: processing, transcriber: environment.transcriber,
+            analyzer: environment.analyzer, storage: environment.storage, notifier: environment.notifier,
+            root: environment.root)
         registerStartup()
     }
 
-    /// The queue and the job it runs. Without a library there is nothing to transcribe, so the job finds no note.
+    /// The transcription queue and the job it runs, over the library's notes. Without a library there is no queue.
     private static func processing(environment: AppEnvironment, library: LibraryStore, voices: VoicesStore,
                                    settings: SettingsStore, notices: NoticesStore) -> ProcessingStore {
         let progress = JobProgress(battery: UIDeviceBattery(), onFinalization: { [settings] in settings.recordFinalization($0) })
         let checkpoints: any CheckpointStoring = library.noteStore.map { CheckpointFiles(notes: $0) } ?? NoLibraryWork()
-        let job: any TranscriptionJobRunning = library.noteStore.map {
-            TranscriptionJob(notes: $0, transcriber: environment.transcriber, analyzer: environment.analyzer,
-                             checkpoints: checkpoints, provenance: ProvenanceFiles(notes: $0),
-                             host: AppJobHost(settings: settings, voices: voices), clock: environment.clock)
-        } ?? NoLibraryJob()
-        return ProcessingStore(job: job, progress: progress, checkpoints: checkpoints, analyzer: environment.analyzer,
-                               background: environment.background, library: library, settings: settings,
-                               notices: notices, clock: environment.clock)
+        let coordinator = library.noteStore.map { notes in
+            let job = TranscriptionJob(notes: notes, transcriber: environment.transcriber, analyzer: environment.analyzer,
+                                       checkpoints: checkpoints, provenance: ProvenanceFiles(notes: notes),
+                                       host: AppJobHost(settings: settings, voices: voices), clock: environment.clock)
+            let parts = TranscriptionCoordinator.Parts(
+                jobs: JobStore(repository: JobRepository(root: environment.root)), notes: notes, runner: job,
+                checkpoints: NoteWorkFolders(notes: notes),
+                consent: .recorded(settings: settings, speech: environment.transcriber, speakers: environment.analyzer),
+                notifier: environment.notifier, background: environment.background, clock: environment.clock,
+                backgroundTitle: { String(localized: "Transcribing “\($0)”", table: "Transcription",
+                                          comment: "The system's progress while a note is transcribed") },
+                progress: progress)
+            return TranscriptionCoordinator(parts, settings: settings)
+        }
+        return ProcessingStore(coordinator: coordinator, progress: progress,
+                               checkpoints: checkpoints, transcriber: environment.transcriber,
+                               analyzer: environment.analyzer, library: library, notices: notices,
+                               clock: environment.clock)
     }
 
     /// Runs the launch steps once; the app is ready when it returns.
@@ -102,25 +116,19 @@ import CassiniNotebook
             }
         }
         startup.register(.recover) { [recording] in await recording.recoverInterrupted() }
-        startup.register(.reconcile) { [processing] in processing.reconcileOnStart() }
+        startup.register(.reconcile) { [processing, recording] in
+            try await processing.reconcileOnStart(activeNoteID: recording.state.noteID)
+        }
         startup.register(.purge) { [trash] in await trash.purgeExpired() }
     }
 }
 
-/// The work of the notes when the library could not be opened: there are none.
+/// The saved progress of the notes when the library could not be opened: there is none.
 private struct NoLibraryWork: CheckpointStoring {
     func load(_ noteID: UUID) throws -> CheckpointState? { nil }
     func save(_ state: CheckpointState, for noteID: UUID) throws { throw CocoaError(.fileWriteUnknown) }
     func discard(_ noteID: UUID) throws {}
     func exists(_ noteID: UUID) -> Bool { false }
-}
-
-/// The job when the library could not be opened: there is no note to transcribe.
-private struct NoLibraryJob: TranscriptionJobRunning {
-    func run(_ job: Job, stop: StopSignal, events: @escaping @Sendable (JobEvent) -> Void) async -> JobOutcome {
-        events(.ended(.failed(.open)))
-        return .failed(.open)
-    }
 }
 
 extension View {

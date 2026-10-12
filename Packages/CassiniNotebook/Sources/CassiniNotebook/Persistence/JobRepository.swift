@@ -10,6 +10,10 @@ public struct JobRepository: Sendable {
         case unsupportedVersion(Int)
     }
 
+    private struct Header: Decodable {
+        var version: Int
+    }
+
     private struct File: Codable {
         var version: Int
         var jobs: [Job]
@@ -24,9 +28,23 @@ public struct JobRepository: Sendable {
     /// The stored jobs in `seq` order; none when the file does not exist yet.
     public func load() throws -> [Job] {
         guard FileManager.default.fileExists(atPath: url.path) else { return [] }
-        let file = try JSONDecoder().decode(File.self, from: Data(contentsOf: url))
-        guard file.version <= Self.version else { throw Failure.unsupportedVersion(file.version) }
-        return file.jobs.sorted { $0.seq < $1.seq }
+        let data = try Data(contentsOf: url)
+        // The version first: a newer file may hold jobs this build cannot decode.
+        let header = try JSONDecoder().decode(Header.self, from: data)
+        guard header.version <= Self.version else { throw Failure.unsupportedVersion(header.version) }
+        return try JSONDecoder().decode(File.self, from: data).jobs.sorted { $0.seq < $1.seq }
+    }
+
+    /// Moves an unreadable `jobs.json` to `jobs.json.unreadable-<stamp>` beside it, so a new queue never overwrites
+    /// it. Returns where it went.
+    @discardableResult
+    public func moveAside(at stamp: Date) throws -> URL {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withYear, .withMonth, .withDay, .withTime]
+        let name = "\(Self.filename).unreadable-\(formatter.string(from: stamp))"
+        let target = url.deletingLastPathComponent().appendingPathComponent(name)
+        try FileManager.default.moveItem(at: url, to: target)
+        return target
     }
 
     public func save(_ jobs: [Job]) throws {

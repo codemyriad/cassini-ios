@@ -70,13 +70,13 @@ final class CassiniUITests: XCTestCase {
         goBack(app)
         XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "A quieter kind of productivity")).firstMatch.waitForExistence(timeout: 5))
     }
-    @MainActor func testTranscriptionConsentDoesNotStartWhenCancelled() {
+    @MainActor func testTranscribeWithTheModelInstalledStartsWithoutAskingAndWritesTheTranscript() {
         let app = launch()
         app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Thoughts from the morning walk")).firstMatch.tap()
         app.buttons["Transcribe"].tap()
-        XCTAssertTrue(app.alerts["Transcribe on this device"].waitForExistence(timeout: 5))
-        app.alerts.buttons["Not now"].tap()
-        XCTAssertTrue(app.buttons["Transcribe"].exists)
+        XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "What if being productive")).firstMatch
+            .waitForExistence(timeout: 15))
+        XCTAssertFalse(app.staticTexts["Transcribe on this device"].exists, "an installed model needs no download consent")
     }
     @MainActor func testRecordingOrUnavailableInputRecovery() {
         let app = launch(seed: false)

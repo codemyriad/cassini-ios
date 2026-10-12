@@ -85,7 +85,7 @@ import CassiniNotebook
     public init() {}
     public func audioFinalizing(_ noteID: UUID) { finalizing.insert(noteID) }
     public func audioReady(_ noteID: UUID) { finalizing.remove(noteID) }
-    public func handOff(_ noteID: UUID) -> Bool {
+    public func handOff(_ noteID: UUID) async -> Bool {
         guard accepts else { return false }
         handedOff.append(noteID)
         return true

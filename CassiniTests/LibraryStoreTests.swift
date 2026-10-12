@@ -126,7 +126,7 @@ import CassiniEngineTesting
     func testATranscriptionQueuedAfterAFailedSealShowsItsStatus() async throws {
         let id = try await recordingWithAFailedSeal()
         persistence.failSaves(true) // The disk is still full.
-        // As ProcessingStore.enqueue and processNext.
+        // As the queue writes a job's status.
         library.update(id) { $0.status = .queued; $0.failure = nil }
         XCTAssertEqual(library.note(id)?.status, .queued)
         library.update(id) { $0.status = .transcribing }

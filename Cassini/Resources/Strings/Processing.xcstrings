@@ -67,17 +67,6 @@
         }
       }
     },
-    "A speech model is needed. Allow model downloads in Settings, then try again. Audio stays on this device.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Serve un modello vocale. Consenti il download dei modelli nelle Impostazioni, poi riprova. L’audio resta su questo dispositivo."
-          }
-        }
-      }
-    },
     "About %@": {
       "extractionState": "manual",
       "localizations": {
