@@ -12,6 +12,8 @@ import CassiniEngineTesting
     let background = FakeBackgroundRunner()
     let playback = FakePlayback(fileDuration: 2)
     let capture = FakeCapture()
+    let microphone = FakeMicrophonePermission()
+    let liveActivity = FakeLiveActivity()
     let graph: AppGraph
 
     init(root: URL? = nil, suite: String? = nil, clock: FakeClock = FakeClock(),
@@ -22,7 +24,8 @@ import CassiniEngineTesting
         let environment = AppEnvironment(
             root: self.root, defaults: UserDefaults(suiteName: self.suite)!, clock: clock,
             locale: Locale(identifier: "en_US"), timeZone: TimeZone(identifier: "UTC")!,
-            transcriber: transcriber, analyzer: analyzer, capture: capture, playback: playback,
+            transcriber: transcriber, analyzer: analyzer, capture: capture, microphone: microphone,
+            liveActivity: liveActivity, playback: playback,
             audio: LocalAudioProcessing(), storage: FakeStorage(), background: background)
         graph = AppGraph(environment: environment)
     }

@@ -18,12 +18,4 @@ public enum NoteTitles {
             .trimmingCharacters(in: .whitespacesAndNewlines)
         return fitted.isEmpty ? nil : fitted
     }
-
-    /// The title a new recording starts with.
-    public static func recordingDefault(at date: Date, locale: Locale = .current, timeZone: TimeZone = .current) -> String {
-        var style = Date.FormatStyle(date: .abbreviated, time: .shortened)
-        style.locale = locale
-        style.timeZone = timeZone
-        return "Recording · \(date.formatted(style))"
-    }
 }

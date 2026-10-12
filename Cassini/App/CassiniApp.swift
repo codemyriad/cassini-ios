@@ -10,8 +10,11 @@ import SwiftUI
                 .environment(graph)
                 .tint(.ember)
                 .task { await graph.start() }
-                .onOpenURL { url in graph.imports.open(url) }
+                .onOpenURL { url in
+                    if RecordingLink.matches(url) { graph.recording.returnToRecording() } else { graph.imports.open(url) }
+                }
                 .onChange(of: scenePhase) { _, phase in
+                    graph.recording.appActivityChanged(isActive: phase == .active)
                     if phase == .active, graph.startup.isReady { Task { await graph.trash.purgeExpired() } }
                     if phase == .background { graph.enterBackground() }
                 }

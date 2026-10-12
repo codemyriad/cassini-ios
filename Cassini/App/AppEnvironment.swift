@@ -16,6 +16,10 @@ import CassiniEngineTesting
     var transcriber: any Transcribing
     var analyzer: any SpeakerAnalyzing
     var capture: any AudioCapture
+    var microphone: any MicrophonePermission
+    var liveActivity: (any LiveActivityPort)?
+    /// Result notifications; nil until an adapter posts them.
+    var notifier: (any Notifier)? = nil
     var playback: any AudioPlayback
     var audio: any AudioProcessing
     var storage: any StorageProbe
@@ -53,7 +57,7 @@ import CassiniEngineTesting
             root: URL.applicationSupportDirectory.appendingPathComponent("Cassini", isDirectory: true),
             defaults: .standard, clock: SystemClock(), locale: .autoupdatingCurrent, timeZone: .autoupdatingCurrent,
             transcriber: AppleSpeechTranscriber(), analyzer: SpeakerAnalyzer(), capture: AVCaptureAdapter(),
-            playback: AVPlaybackAdapter(), audio: LocalAudioProcessing(), storage: FileSystemStorageProbe(),
+            microphone: AVMicrophonePermission(), liveActivity: ActivityKitAdapter(), playback: AVPlaybackAdapter(), audio: LocalAudioProcessing(), storage: FileSystemStorageProbe(),
             background: UIKitBackgroundRunner())
     }
 
@@ -76,7 +80,7 @@ extension AppEnvironment {
     static let uiTestingNow = Date(timeIntervalSince1970: 1_791_452_460)
 
     /// A separate library and preferences, a fixed clock and en_US formatting. Transcription is faked; the
-    /// recording seed also fakes the microphone.
+    /// recording seed also fakes the microphone and its permission.
     static func uiTesting(reset: Bool, seed: Seed?, openFixture: OpenFixture? = nil) -> AppEnvironment {
         let root = URL.applicationSupportDirectory.appendingPathComponent("CassiniUITests", isDirectory: true)
         let defaults = UserDefaults(suiteName: uiTestingSuite) ?? .standard
@@ -92,7 +96,8 @@ extension AppEnvironment {
             locale: Locale(identifier: "en_US"), timeZone: TimeZone(identifier: "UTC") ?? .gmt,
             transcriber: transcriber, analyzer: FakeAnalyzer(modelIdentity: nil),
             capture: seed == .recording ? FakeCapture() : AVCaptureAdapter(),
-            playback: AVPlaybackAdapter(), audio: LocalAudioProcessing(), storage: FileSystemStorageProbe(),
+            microphone: seed == .recording ? FakeMicrophonePermission() : AVMicrophonePermission(),
+            liveActivity: ActivityKitAdapter(), playback: AVPlaybackAdapter(), audio: LocalAudioProcessing(), storage: FileSystemStorageProbe(),
             background: UIKitBackgroundRunner(),
             launch: LaunchOptions(seed: seed, openFixture: openFixture, restoresNavigation: false))
     }

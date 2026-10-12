@@ -1,9 +1,11 @@
 import AVFoundation
+import UIKit
 import CassiniAudio
 import CassiniEngine
 import CassiniNotebook
 
-/// The microphone through `AVAudioRecorder`, writing 48 kHz 16-bit mono PCM into CAF.
+/// The microphone through `AVAudioRecorder`, writing 48 kHz 16-bit mono PCM into CAF. The session does not mix with
+/// other apps, so a call interrupts (and pauses) the recording.
 @MainActor final class AVCaptureAdapter: NSObject, AudioCapture, AVAudioRecorderDelegate {
     let events: AsyncStream<CaptureEvent>
     private let continuation: AsyncStream<CaptureEvent>.Continuation
@@ -31,6 +33,10 @@ import CassiniNotebook
                 guard let self, self.recorder != nil else { return }
                 self.continuation.yield(.mediaReset)
             }
+        })
+        // The app is being closed: stopping writes the CAF header now, so recovery finds a clean file at next launch.
+        observers.append(center.addObserver(forName: UIApplication.willTerminateNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.stopForTermination() }
         })
     }
 
@@ -87,10 +93,18 @@ import CassiniNotebook
         return CaptureResult(duration: duration)
     }
 
+    /// Stops at once without reporting a failure: the delegate's finish callback is not for the recorder in use.
+    private func stopForTermination() {
+        guard let capture = recorder else { return }
+        recorder = nil
+        timer?.invalidate(); timer = nil
+        capture.stop()
+    }
+
     private func tick() {
         guard let recorder, !isPaused else { return }
         recorder.updateMeters()
-        continuation.yield(.level(max(0.04, min(1, pow(10, recorder.averagePower(forChannel: 0) / 35)))))
+        continuation.yield(.level(max(0, min(1, pow(10, recorder.averagePower(forChannel: 0) / 35)))))
     }
 
     private func pauseAndReport(_ event: CaptureEvent) {

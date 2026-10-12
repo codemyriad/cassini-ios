@@ -28,10 +28,9 @@ import CassiniNotebook
         playback = PlaybackStore(playback: environment.playback, library: library, errors: errors, clock: environment.clock)
         processing = Self.processing(environment: environment, library: library, voices: voices, settings: settings,
                                      notices: notices)
-        recording = RecordingStore(capture: environment.capture, audio: environment.audio, storage: environment.storage,
-                                   library: library, processing: processing, playback: playback, settings: settings,
-                                   router: router, errors: errors, notices: notices, clock: environment.clock,
-                                   locale: environment.locale, timeZone: environment.timeZone)
+        recording = RecordingStore(.init(environment: environment, library: library, processing: processing,
+                                         playback: playback, settings: settings, router: router, notices: notices,
+                                         ready: { [startup] in _ = await startup.ready() }))
         let importService = library.noteStore.map {
             ImportService(notes: $0, files: CoordinatedFileImporter(storage: environment.storage), audio: environment.audio,
                           storage: environment.storage, clock: environment.clock)
@@ -92,6 +91,7 @@ import CassiniNotebook
             }
         }
         #endif
+        startup.register(.load) { [recording] in await recording.rebuildBareDirectories() }
         startup.register(.load) { [library, voices, notices] in
             await library.load()
             if library.unreadableCount > 0 {
