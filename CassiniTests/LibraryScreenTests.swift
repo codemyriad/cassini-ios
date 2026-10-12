@@ -1,4 +1,5 @@
 import XCTest
+import Observation
 import UniformTypeIdentifiers
 import CassiniNotebook
 import CassiniEngine
@@ -30,6 +31,7 @@ import CassiniEngineTesting
         XCTAssertTrue(model.content.loading)
         XCTAssertNil(model.content.emptyState, "an unread library is not an empty one")
         await test.graph.start()
+        await model.settle()
         let row = try XCTUnwrap(model.content.sections.first?.rows.first)
         XCTAssertEqual(row.title, "Call with supplier")
         XCTAssertEqual(row.status, .transcribed(speakers: 0, hasWords: true))
@@ -44,34 +46,58 @@ import CassiniEngineTesting
         XCTAssertEqual(test.graph.libraryScreen.content.emptyState, .unavailable)
     }
 
-    /// The acceptance check: with a thousand notes, what a keystroke costs the main actor (building the rows from the
-    /// results) fits in a frame; the search itself runs off the main actor once its tokens are cached.
-    func testAThousandNotesFilterWithoutDroppingFrames() {
+    /// The acceptance check: with a thousand notes, what a keystroke costs the main actor fits in a frame. That is
+    /// indexing the notes after one of them changed (a new array, so nothing is compared by storage) and building the
+    /// Library's content: the flat results while searching, the day sections once the query is cleared. The search
+    /// itself runs off the main actor once its tokens are cached.
+    func testAThousandNotesFilterWithoutDroppingFrames() async {
         let words = ["consegna", "giovedì", "prezzo", "fornitore", "ordine", "magazzino", "riunione", "budget"]
-        let notes = (0..<1_000).map { index -> Note in
+        let notes = Notes((0..<1_000).map { index -> Note in
             var note = Note(title: "Note \(index) \(words[index % words.count])",
                             createdAt: Date(timeIntervalSince1970: 1_791_452_460 - Double(index) * 3_600))
-            let text = (0..<120).map { words[($0 * 7 + index) % words.count] + "\($0 % 13)" }.joined(separator: " ")
+            let text = (0..<120).map { words[($0 * 7 + index) % words.count] + "\(index % 13)" }.joined(separator: " ")
             note.transcript = [TranscriptSegment(text: text, start: 0, end: 60)]
+            note.status = .ready
             return note
-        }
-        var index = LibraryIndex(notes)
-        _ = index.search(SearchQuery("warm"))
+        })
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "UTC")!
-        let now = Date(timeIntervalSince1970: 1_791_452_460)
+        let model = LibraryScreenModel(ports: .init(
+            notes: { notes.all }, loading: { false }, unavailable: { false }, processing: { ProcessingState() },
+            phase: { _ in nil }, install: { nil }, recording: { .idle }, finishing: { nil },
+            transcribe: { _, _ in .queued(changed: true) }, startOver: { _ in .queued(changed: true) },
+            stop: { _ in }, dequeue: { _ in }, update: { _, _ in }, trash: { _ in }, speakerModelsReady: { false },
+            clock: FakeClock(now: Date(timeIntervalSince1970: 1_791_452_460)), calendar: calendar))
+        model.query = "warm"
+        await model.settle() // the tokens are worked out once
+
         let clock = ContinuousClock()
-        var slowestRows = Duration.zero, slowestSearch = Duration.zero
-        for query in ["c", "co", "cons", "consegna", "consegna gio", "zzz"] {
-            var hits: [LibraryIndex.Hit] = []
-            slowestSearch = max(slowestSearch, clock.measure { hits = index.search(SearchQuery(query)) })
-            slowestRows = max(slowestRows, clock.measure {
-                index.update(notes)
-                _ = LibraryMapping.results(hits, context: RowContext(), now: now, calendar: calendar)
-            })
+        var slowestIndex = Duration.zero, slowestContent = Duration.zero, slowestSearch = Duration.zero
+        var index = LibraryIndex(notes.all)
+        for (step, query) in ["c", "co", "cons", "consegna", "consegna gio", "zzz", ""].enumerated() {
+            // One note changes between keystrokes; the model indexes the new array on the main actor.
+            notes.all[step * 97].title += " edited"
+            let changed = notes.all
+            slowestIndex = max(slowestIndex, clock.measure { index.update(changed) })
+            model.query = query
+            let started = clock.now
+            await model.settle()
+            slowestSearch = max(slowestSearch, clock.now - started)
+            var content = LibraryContent()
+            slowestContent = max(slowestContent, clock.measure { content = model.content })
+            if query.isEmpty {
+                XCTAssertEqual(content.sections.flatMap(\.rows).count, 1_000, "the cleared query lists every note")
+            } else {
+                XCTAssertNotNil(content.results)
+            }
         }
-        XCTAssertLessThan(slowestRows, .milliseconds(16), "the main actor's part of the slowest keystroke")
-        XCTAssertLessThan(slowestSearch, .milliseconds(250), "the search off the main actor")
-        measure { _ = LibraryMapping.results(index.search(SearchQuery("consegna gio")), context: RowContext(), now: now, calendar: calendar) }
+        XCTAssertLessThan(slowestIndex + slowestContent, .milliseconds(16), "the main actor's part of the slowest keystroke")
+        XCTAssertLessThan(slowestSearch, .milliseconds(400), "the debounce and the search off the main actor")
     }
+}
+
+/// The notes of the thousand-note check, observed as `LibraryStore.notes` is.
+@MainActor @Observable private final class Notes {
+    var all: [Note]
+    init(_ all: [Note]) { self.all = all }
 }

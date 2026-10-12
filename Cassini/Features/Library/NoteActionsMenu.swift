@@ -25,7 +25,7 @@ struct NoteActionsMenu: View {
         }
     }
 
-    @ViewBuilder private func transcribeItems(_ menu: NoteMenu) -> some View {
+    @ViewBuilder private func transcribeItems(_ menu: LibraryRowMenu) -> some View {
         switch menu.transcribe {
         case .transcribe:
             Button(LibraryCopy.transcribe, systemImage: "text.badge.plus") { perform(.transcribe) }.disabled(menu.transcribeWaits)

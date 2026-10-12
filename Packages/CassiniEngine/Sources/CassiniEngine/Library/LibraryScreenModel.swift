@@ -30,7 +30,7 @@ public enum NoteAction: Hashable, Sendable {
 }
 
 /// What a note's actions menu offers (Android `NoteActionsUi`).
-public struct NoteMenu: Hashable, Sendable {
+public struct LibraryRowMenu: Hashable, Sendable {
     public var isFavorite: Bool
     /// The note is being recorded: only Star and Rename.
     public var recording: Bool
@@ -209,10 +209,10 @@ public final class LibraryScreenModel {
     }
 
     /// What the long press on a row offers; nil for a note no longer in the Library.
-    public func menu(_ id: UUID) -> NoteMenu? {
+    public func menu(_ id: UUID) -> LibraryRowMenu? {
         _ = revision
         guard let note = index.entry(id)?.note else { return nil }
-        return NoteMenu(isFavorite: note.isFavorite, recording: note.isRecording && ports.recording().noteID == id,
+        return LibraryRowMenu(isFavorite: note.isFavorite, recording: note.isRecording && ports.recording().noteID == id,
                         transcribe: LibraryMapping.transcribeAction(note, job: ports.processing().jobs[id],
                                                                     voiceModelReady: speakerModelsReady),
                         transcribeWaits: ports.finishing() == id, export: TranscriptExports.availability(of: note))

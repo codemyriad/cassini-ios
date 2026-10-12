@@ -198,6 +198,53 @@ final class LibraryUITests: XCTestCase {
         XCTAssertLessThanOrEqual(last.frame.maxY, record.frame.minY, "row \(last.frame) under the bar \(record.frame)")
     }
 
+    /// The long-press menu: Start over and a Transcribe again that replaces the versions ask first, and Export and
+    /// Document info open the note, which starts them.
+    // ports: LibraryBehaviourTest#theConfirmationsOfTheSheetRows
+    // ports: LibraryBehaviourTest#theSubtitleChooserExportsTheNote
+    // ports: LibraryBehaviourTest#documentInfoOpensAsADialog
+    @MainActor func testTheActionsMenuConfirmsAndOpensTheNoteForItsExports() {
+        let app = launch(["--seed", "statuses"])
+        let paused = scrolledRow(app, "Paused standup")
+        XCTAssertTrue(paused.waitForExistence(timeout: 10))
+        paused.press(forDuration: 1)
+        app.buttons["Start over"].tap()
+        let startOver = app.alerts["Start over?"]
+        XCTAssertTrue(startOver.waitForExistence(timeout: 5))
+        startOver.buttons["Cancel"].tap()
+        XCTAssertTrue(waitFor(paused, label: ", paused at 00:12"), "Cancel keeps the progress: \(paused.label)")
+        paused.press(forDuration: 1)
+        app.buttons["Start over"].tap()
+        XCTAssertTrue(startOver.waitForExistence(timeout: 5))
+        startOver.buttons["Start over"].tap()
+        XCTAssertTrue(waitFor(row(app, "Paused standup"), label: ", queued"), row(app, "Paused standup").label)
+
+        let damaged = scrolledRow(app, "Damaged document")
+        XCTAssertTrue(damaged.waitForExistence(timeout: 5))
+        damaged.press(forDuration: 1)
+        app.buttons["Transcribe again"].tap()
+        let fresh = app.alerts["Transcribe again?"]
+        XCTAssertTrue(fresh.waitForExistence(timeout: 5), "a document whose versions can't be kept asks first")
+        fresh.buttons["Cancel"].tap()
+        XCTAssertTrue(waitFor(row(app, "Damaged document"), label: ", can’t read transcript"))
+
+        for _ in 0..<8 { app.swipeDown() }
+        let note = scrolledRow(app, "A quieter kind of productivity")
+        XCTAssertTrue(note.waitForExistence(timeout: 5))
+        note.press(forDuration: 1)
+        app.buttons["Export"].tap()
+        app.buttons["Subtitles · .vtt"].tap()
+        XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts["noteTitle"].label, "A quieter kind of productivity")
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+
+        XCTAssertTrue(note.waitForExistence(timeout: 5))
+        note.press(forDuration: 1)
+        app.buttons["Document info"].tap()
+        XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts["noteTitle"].label, "A quieter kind of productivity")
+    }
+
     @MainActor private func openRename(_ app: XCUIApplication, _ title: String) -> XCUIElement {
         let note = row(app, title)
         XCTAssertTrue(note.waitForExistence(timeout: 5))
