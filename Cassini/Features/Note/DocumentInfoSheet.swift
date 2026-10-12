@@ -40,20 +40,23 @@ struct DocumentInfoSheet: View {
             .navigationTitle(NoteCopy.documentInfo).navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button(NoteCopy.close) { dismiss() } } }
         }
-        .task { facts = read() }
+        .task {
+            guard let note = library.note(noteID) else { return }
+            facts = await Self.read(note, provenance: library.noteStore.map { ProvenanceFiles(notes: $0) },
+                                    audio: library.originalAudioURL(note) ?? library.audioURL(note))
+        }
     }
 
     private func row(_ key: String, _ value: String) -> some View {
         LabeledContent(key) { Text(value).foregroundStyle(Color.ink).multilineTextAlignment(.trailing).textSelection(.enabled) }
     }
 
-    private func read() -> DocumentInfoFacts? {
-        guard let note = library.note(noteID) else { return nil }
-        let provenance = library.noteStore.flatMap { ProvenanceFiles(notes: $0).provenance(for: note) }
-        let bytes = (library.originalAudioURL(note) ?? library.audioURL(note)).flatMap { url in
+    /// Reads the run's record and the audio file's size off the main actor.
+    @concurrent private static func read(_ note: Note, provenance: ProvenanceFiles?, audio: URL?) async -> DocumentInfoFacts {
+        let bytes = audio.flatMap { url in
             (try? FileManager.default.attributesOfItem(atPath: url.path))?[.size] as? NSNumber
         }?.int64Value
-        return DocumentInfoFacts.of(note, provenance: provenance, fileBytes: bytes)
+        return DocumentInfoFacts.of(note, provenance: provenance?.provenance(for: note), fileBytes: bytes)
     }
 
     private func transcriptionLine(_ facts: DocumentInfoFacts) -> String? {

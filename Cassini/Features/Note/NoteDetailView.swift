@@ -26,10 +26,8 @@ struct NoteDetailView: View {
     @Environment(TrashService.self) private var trash
     @Environment(\.clock) private var clock
     @Environment(\.calendar) private var calendar
-    @Environment(\.restoresSceneState) private var restoresSceneState
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var screen: NoteScreenState
-    /// The search kept with the scene, so it comes back after Cassini was closed.
-    @SceneStorage private var savedQuery: String
     @State private var sheet: NoteSheet?
     @State private var shareItem: ShareItem?
     @State private var exportingDocument = false
@@ -40,7 +38,8 @@ struct NoteDetailView: View {
     @State private var scrollPosition = ScrollPosition()
     @State private var cache = TranscriptCache()
     @State private var resumeFollow: Task<Void, Never>?
-    @State private var started = false
+    /// The search kept with the stack was brought back into this view.
+    @State private var restored = false
     /// The saved progress of a stopped or failed job, for its read-only draft.
     @State private var savedDraft: [DraftWord] = []
 
@@ -48,7 +47,6 @@ struct NoteDetailView: View {
         self.noteID = noteID
         self.start = start
         _screen = State(initialValue: NoteScreenState(query: query))
-        _savedQuery = SceneStorage(wrappedValue: "", "note.search.\(noteID.uuidString)")
     }
 
     private var note: Note? { library.note(noteID) }
@@ -69,15 +67,19 @@ struct NoteDetailView: View {
             if let note, playerKey != nil { playback.show(note, owner: playerOwner) } else { playback.leave(playerOwner) }
         }
         .task(id: job.map { "\($0.state)-\($0.doneMs)" }) {
-            savedDraft = job.map { $0.state == .paused || $0.state == .failed } == true ? processing.savedDraft(noteID) : []
+            let stopped = job.map { $0.state == .paused || $0.state == .failed } == true
+            let draft = stopped ? await processing.savedDraft(noteID) : []
+            if !Task.isCancelled { savedDraft = draft }
         }
         .onDisappear {
             playback.leave(playerOwner)
             resumeFollow?.cancel()
         }
         .onAppear(perform: appeared)
+        .onChange(of: router.session(noteID).started) { _, started in if !started { runStart() } }
         .onChange(of: NoteScreenState.isGone(note)) { _, gone in if gone { router.close(noteID: noteID) } }
-        .onChange(of: screen.search?.query) { _, query in if restoresSceneState { savedQuery = query ?? "" } }
+        .onChange(of: screen.search?.query) { _, query in router.keepSearch(query, for: noteID) }
+        .backButtonTitle(router.below(noteID: noteID) == .library ? NoteCopy.backToLibrary : nil)
         .sheet(item: $sheet, content: sheetContent)
         .alert(dialogTitle, isPresented: dialogShown, presenting: screen.dialog, actions: dialogActions,
                message: dialogMessage)
@@ -99,23 +101,12 @@ struct NoteDetailView: View {
             : .empty
         let matches = screen.search.map { cache.matches(transcript, query: $0.query) } ?? []
         let current = screen.search?.current(of: matches.count) ?? 0
+        let currentMatch = matches.indices.contains(current) ? matches[current] : nil
         return ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: Spacing.section) {
                     NoteHeader(note: note, subtitle: NoteSubtitle.of(note, mode: mode, now: clock.now, calendar: calendar))
-                    if mode.showsReading, let chips = NoteChips.of(note) {
-                        NoteChipsRow(chips: chips, toggleTrust: { screen.toggleTrust() },
-                                     openVersions: { run(screen.versionsTapped(readOnly: readOnly)) },
-                                     openSpeakers: { run(screen.speakersTapped(readOnly: readOnly)) })
-                    }
-                    RecordingNotices(noteID: noteID)
-                    NoteBannersView(note: note, job: job, mode: mode, facts: bannerFacts,
-                                    act: { _, action in run(screen.bannerAction(action, note: note, job: job)) },
-                                    dismiss: { run(screen.dismiss($0, note: note, job: job)) })
-                    switch mode {
-                    case .processing, .queued: ProcessingCard(note: note)
-                    default: EmptyView()
-                    }
+                    ForEach(mode.sections, id: \.self) { section($0, note: note, mode: mode) }
                     if mode.hasPlayer, !note.bookmarks.isEmpty {
                         BookmarksSection(note: note, isExpanded: $showBookmarks, seek: seek)
                     }
@@ -141,9 +132,11 @@ struct NoteDetailView: View {
                 geometry.height = metrics.height; geometry.maxOffset = metrics.maxOffset
             }
             .onScrollPhaseChange { _, phase in scrolled(phase) }
-            .onChange(of: matches.indices.contains(current) ? matches[current] : nil) { _, match in
-                guard let match else { return }
-                withAnimation { proxy.scrollTo(match.turnID, anchor: .center) }
+            // Also on the first value: a search the Library opened scrolls to its first match.
+            .task(id: currentMatch) {
+                guard let currentMatch else { return }
+                await Task.yield()
+                reveal(currentMatch, in: transcript, proxy: proxy)
             }
         }
         .safeAreaInset(edge: .top, spacing: 0) {
@@ -174,6 +167,34 @@ struct NoteDetailView: View {
                          perform: { perform($0, note: note, readOnly: readOnly) })
             }
         }
+    }
+
+    @ViewBuilder private func section(_ section: NoteSection, note: Note, mode: NoteMode) -> some View {
+        switch section {
+        case .card: ProcessingCard(note: note)
+        case .chips:
+            if let chips = NoteChips.of(note) {
+                NoteChipsRow(chips: chips, toggleTrust: { screen.toggleTrust() },
+                             openVersions: { run(screen.versionsTapped(readOnly: readOnly)) },
+                             openSpeakers: { run(screen.speakersTapped(readOnly: readOnly)) })
+            }
+        case .banners:
+            RecordingNotices(noteID: noteID)
+            NoteBannersView(note: note, job: job, mode: mode, facts: bannerFacts,
+                            act: { _, action in run(screen.bannerAction(action, note: note, job: job)) },
+                            dismiss: { run(screen.dismiss($0, note: note, job: job)) })
+        }
+    }
+
+    /// Scrolls the current search match into the middle of the pane, unless its line is in view already; without
+    /// animation under Reduce Motion.
+    private func reveal(_ match: TranscriptMatch, in transcript: NoteTranscript, proxy: ScrollViewProxy) {
+        if let turn = transcript.turn(match.turnID), let frame = geometry.frames[match.turnID], geometry.height > 0 {
+            let fraction = turn.text.isEmpty ? 0 : Double(match.range.lowerBound) / Double(turn.text.count)
+            let lineY = frame.minY - geometry.top + frame.height * fraction
+            if lineY >= 0, lineY + 24 <= geometry.height { return }
+        }
+        withAnimation(reduceMotion ? nil : .default) { proxy.scrollTo(match.turnID, anchor: .center) }
     }
 
     private var bannerFacts: NoteBannerFacts {
@@ -311,17 +332,25 @@ struct NoteDetailView: View {
         }
     }
 
-    /// Runs the Library's start action once for this screen (a route restored with the scene carries none), and
-    /// brings back the search kept with the scene.
+    /// Brings back the search the stack kept for this screen (when SwiftUI built the view again), and runs the
+    /// Library's start action.
     private func appeared() {
-        guard !started else { return }
-        started = true
-        if screen.search == nil, restoresSceneState, !savedQuery.isEmpty { screen = NoteScreenState(query: savedQuery) }
+        if !restored {
+            restored = true
+            if let kept = router.session(noteID).search { screen.search = NoteScreenState(query: kept).search }
+        }
+        runStart()
+    }
+
+    /// Runs the Library's start action once for the screen: the router remembers that it ran, and a route restored
+    /// with the scene carries none.
+    private func runStart() {
+        guard let start, !router.session(noteID).started else { return }
+        router.markStarted(noteID)
         switch start {
-        case .export(let format)?: export(format)
-        case .documentInfo?: sheet = .documentInfo
-        case .rename?: sheet = .rename
-        case nil: break
+        case .export(let format): export(format)
+        case .documentInfo: sheet = .documentInfo
+        case .rename: sheet = .rename
         }
     }
 

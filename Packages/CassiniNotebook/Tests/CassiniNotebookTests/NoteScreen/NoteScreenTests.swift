@@ -21,6 +21,17 @@ import Testing
         return note
     }
 
+    /// The reading content comes below a Queued card or a failure banner, chips first (Android `NoteModeBody`).
+    @Test func theReadingContentComesBelowTheCardOrTheFailureBanner() {
+        #expect(NoteMode.reading.sections == [.chips, .banners])
+        #expect(NoteMode.queued(ahead: 0, overDocument: true).sections == [.card, .chips, .banners])
+        #expect(NoteMode.queued(ahead: 0, overDocument: false).sections == [.card, .banners])
+        #expect(NoteMode.processing.sections == [.card, .banners])
+        #expect(NoteMode.failed(overDocument: true).sections == [.banners, .chips])
+        #expect(NoteMode.failed(overDocument: false).sections == [.banners])
+        #expect(NoteMode.audioOnly.sections == [.banners])
+    }
+
     // ports: NoteViewModelTest#theModeFollowsTheJobAndTheDocument
     @Test func theModeFollowsTheJobAndTheDocument() {
         let note = F.weeklySync

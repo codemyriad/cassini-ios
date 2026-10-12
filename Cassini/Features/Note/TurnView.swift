@@ -33,6 +33,8 @@ struct TurnView: View, @MainActor Equatable {
     var actions = TranscriptActions()
     /// Where the paragraph is, for auto-follow.
     var geometry: FollowGeometry?
+    /// Under VoiceOver the words carry no links: the paragraph is one element that plays from its start.
+    @Environment(\.accessibilityVoiceOverEnabled) private var voiceOver
 
     static func == (a: TurnView, b: TurnView) -> Bool {
         a.turn == b.turn && a.activeIndex == b.activeIndex && a.matches == b.matches && a.currentMatch == b.currentMatch
@@ -114,7 +116,7 @@ struct TurnView: View, @MainActor Equatable {
         return Int(url.absoluteString.dropFirst(scheme.count + 1))
     }
 
-    /// The paragraph with its word links (reading), its unsettled words (draft), the active word and the search hits.
+    /// The paragraph with its word links (reading, without VoiceOver), its unsettled words (draft), the active word and the search hits.
     private var attributed: AttributedString {
         var result = AttributedString(turn.text)
         let characters = result.characters
@@ -124,10 +126,12 @@ struct TurnView: View, @MainActor Equatable {
             return start..<characters.index(start, offsetBy: offsets.count)
         }
         switch style {
-        case .reading:
+        case .reading where !voiceOver:
             for index in turn.words.indices where index != activeIndex {
                 if let word = range(turn.range(ofWord: index)) { result[word].link = URL(string: "\(Self.scheme):\(index)") }
             }
+        case .reading:
+            break
         case .draft:
             if let from = turn.unsettledFrom, turn.words.indices.contains(from),
                let rest = range(turn.offsets[from]..<turn.text.count) {

@@ -62,6 +62,29 @@ public enum NoteMode: Hashable, Sendable {
     }
 }
 
+/// A part of the top of the Note screen's content (above the draft or the transcript).
+public enum NoteSection: Hashable, Sendable {
+    /// The Queued card or the progress card.
+    case card
+    /// The chips row of the reading content.
+    case chips
+    case banners
+}
+
+extension NoteMode {
+    /// The top of the content, in order (Android `NoteModeBody` and `ReadAndListenBody`): the reading content, chips
+    /// first, comes below a Queued card or a failure banner, and the card comes before the banners.
+    public var sections: [NoteSection] {
+        switch self {
+        case .reading: [.chips, .banners]
+        case .queued(_, let overDocument): overDocument ? [.card, .chips, .banners] : [.card, .banners]
+        case .processing: [.card, .banners]
+        case .failed(let overDocument): overDocument ? [.banners, .chips] : [.banners]
+        case .paused, .audioOnly, .unplayable: [.banners]
+        }
+    }
+}
+
 extension Note {
     /// The note has a transcript to read, was transcribed and found no words, or came from a Cassini document (whose
     /// transcript may be unreadable): it opens in reading mode (Android's DOCUMENT audio kind).

@@ -45,7 +45,7 @@ struct RootView: View {
             if restoresNavigation { router.restore(savedPath) }
         }
         .onChange(of: sizeClass) { _, size in router.isSplit = size == .regular }
-        .onChange(of: router.path) { _, _ in if restoresNavigation { savedPath = router.encodedPath } }
+        .onChange(of: router.encodedPath) { _, path in if restoresNavigation { savedPath = path } }
         .environment(\.restoresSceneState, restoresNavigation)
     }
 }
