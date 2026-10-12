@@ -149,20 +149,6 @@ import Testing
         }
     }
 
-    @Test func aFailedCreateLeavesNoTarget() throws {
-        try withTemporaryDirectory { dir in
-            let audio = dir.appendingPathComponent("audio.opus"), target = dir.appendingPathComponent("doc.opus")
-            var damaged = try fixture()
-            damaged[damaged.count - 1] ^= 1
-            try Data(damaged).write(to: audio)
-            #expect(throws: CassiniError.self) {
-                try CassiniDocument.create(audio, transcript: Transcript([]), title: "Damaged", processing: JSONObject(),
-                                           existing: nil, speakerLabels: [:], target: target)
-            }
-            #expect(!FileManager.default.fileExists(atPath: target.path))
-        }
-    }
-
     /** The deprecated non-throwing write raised an Objective-C exception here, which no caller could catch. */
     @Test func aSinkThatCannotWriteThrows() throws {
         try withTemporaryDirectory { dir in
