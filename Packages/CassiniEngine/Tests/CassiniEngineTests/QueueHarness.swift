@@ -58,6 +58,17 @@ import CassiniNotebook
         try QueueHarness(root: root, suite: suite, clock: clock, checkpoints: checkpoints)
     }
 
+    /// A launch over a copy of `harness`'s files and preferences as they are now, as after a kill at this point:
+    /// whatever `harness` writes later never reaches it. Saved progress is shared.
+    static func snapshot(of harness: QueueHarness) throws -> QueueHarness {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.copyItem(at: harness.root, to: root)
+        let suite = "cassini.queue-tests.\(UUID().uuidString)"
+        let source = UserDefaults(suiteName: harness.suite)!.persistentDomain(forName: harness.suite) ?? [:]
+        UserDefaults(suiteName: suite)!.setPersistentDomain(source, forName: suite)
+        return try QueueHarness(root: root, suite: suite, clock: harness.clock, checkpoints: harness.checkpoints)
+    }
+
     /// A plain note, as a finished recording leaves it.
     func note(_ title: String) async throws -> UUID {
         var note = Note(title: title, createdAt: clock.now, audioFilename: "audio.m4a")

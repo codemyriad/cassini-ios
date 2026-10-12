@@ -7,6 +7,9 @@ public struct ReconcileReport: Hashable, Sendable {
     public var requeued: [UUID] = []
     /// A running job passed its automatic attempts and waits for Resume.
     public var interrupted: [UUID] = []
+    /// A running job under the `system` hold: iOS took the time back and Cassini was killed before the pause was
+    /// written. It is paused by the system, as it would have been.
+    public var pausedBySystem: [UUID] = []
     /// A paused job without saved progress starts again from the beginning.
     public var restarted: [UUID] = []
     /// Saved progress no longer matches: the job failed with `CHECKPOINT_MISMATCH`.
@@ -48,8 +51,10 @@ public enum Reconcile {
     ///     `work/` stays for Restore. A job Cassini closed before Trash had finished with is ended the same way here.
     ///   - existing: every note Cassini read; a `work/` directory of a note it could not read is left alone.
     ///   - activeNoteID: the note being recorded now, which is never touched.
+    ///   - hold: the stored queue hold. Under `system` no job is claimed, so a job still running was the one iOS
+    ///     stopped; it is paused by the system instead of being counted as a crash.
     public static func plan(jobs: [Job], checkpoints: [UUID: CheckpointStatus], work: Set<UUID>, trashed: Set<UUID>,
-                            existing: Set<UUID>, activeNoteID: UUID?, now: Date) -> Plan {
+                            existing: Set<UUID>, activeNoteID: UUID?, hold: QueueHold? = nil, now: Date) -> Plan {
         var plan = Plan()
         let owned = Set(jobs.map(\.noteID))
         for job in jobs.sorted(by: { $0.seq < $1.seq }) where job.noteID != activeNoteID {
@@ -59,7 +64,7 @@ public enum Reconcile {
                 continue
             }
             switch job.state {
-            case .running: running(job, checkpoint, now, &plan)
+            case .running: running(job, checkpoint, hold, now, &plan)
             case .paused: paused(job, checkpoint, now, &plan)
             case .queued, .failed, .needsConsent: break
             }
@@ -70,12 +75,21 @@ public enum Reconcile {
         return plan
     }
 
-    private static func running(_ job: Job, _ checkpoint: CheckpointStatus, _ now: Date, _ plan: inout Plan) {
+    private static func running(_ job: Job, _ checkpoint: CheckpointStatus, _ hold: QueueHold?, _ now: Date,
+                                _ plan: inout Plan) {
         var changed = job
         changed.updatedAt = now
         if checkpoint == .mismatch {
             plan.jobs.append(mismatch(changed))
             plan.report.mismatched.append(job.noteID)
+            return
+        }
+        if hold == .system {
+            // Not a crash: the attempts stay as they were.
+            changed.state = .paused
+            changed.pauseReason = .system
+            plan.jobs.append(changed.withNumbers(of: checkpoint))
+            plan.report.pausedBySystem.append(job.noteID)
             return
         }
         changed.attempts = job.attempts + 1

@@ -637,7 +637,7 @@ import CassiniNotebook
         #expect(h.background.activeCount == 1)
 
         h.coordinator.setVisible(false)
-        await h.background.expireAll()
+        h.background.expireAll()
         #expect(first.stopRequest == .pause(.system), "the job learns of it before the handler returns")
         #expect(h.settings.queueHold == .system)
         #expect(h.background.activeCount == 0)
@@ -700,28 +700,43 @@ import CassiniNotebook
         #expect(h.background.endedCount == 1, "it ends with the queue")
     }
 
-    @Test func theBackgroundTimeLastsUntilThePauseIsStoredAndTold() async throws {
-        let h = try QueueHarness(); defer { h.tearDown() }
-        try await h.start(visible: false)
-        let a = try await h.note("A")
-        await h.coordinator.transcribe(a)
-        let first = try await h.run(0)
-        first.pauseOnStop = false // the step that runs goes on after the stop, as on a device
+    @Test func aKillRightAfterIOSTookTheTimeBackKeepsTheJobPausedByTheSystem() async throws {
+        let first = try QueueHarness(); defer { first.tearDown() }
+        try await first.start(visible: false)
+        let a = try await first.note("A"), b = try await first.note("B")
+        await first.coordinator.transcribe(a)
+        await first.coordinator.transcribe(b)
+        let run = try await first.run(0)
+        run.pauseOnStop = false // the step that runs goes on after the stop, as on a device
+        first.checkpoints.save(a, .saved(doneMs: 28_000, totalMs: 60_000, words: 40))
 
-        await h.background.expireAll()
+        // The token ends before iOS's handler returns, and iOS kills Cassini at once: only what was stored before
+        // then survives. Copy the files and preferences now, before the pause write the handler started can run.
+        first.background.expireAll()
+        #expect(first.background.activeCount == 0, "the time ends before the handler returns")
+        #expect(first.settings.queueHold == .system)
+        let killed = try QueueHarness.snapshot(of: first)
+        defer { killed.tearDown() }
+        #expect(try JobRepository(root: killed.root).load().first { $0.noteID == a }?.state == .running,
+                "the pause had not landed")
 
-        // iOS suspends Cassini as soon as its time ends: by then the pause is on disk and the person is told, so a
-        // kill while suspended keeps the job paused by the system instead of requeueing it.
-        #expect(h.background.activeCount == 0)
-        let stored = try JobRepository(root: h.root).load()
-        #expect(stored.map(\.noteID) == [a])
-        #expect(stored.first?.state == .paused && stored.first?.pauseReason == .system)
-        #expect(h.notifier.posted.map(\.kind) == [.pausedBySystem])
-        #expect(await h.notes.note(a)?.status == .audioOnly)
+        let report = try await killed.start(visible: false)
+        #expect(report.pausedBySystem == [a])
+        #expect(report.requeued.isEmpty)
+        let job = try #require(await killed.job(a))
+        #expect(job.state == .paused && job.pauseReason == .system)
+        #expect(job.attempts == 0, "a system stop is not a crash")
+        #expect(job.doneMs == 28_000, "the job has the numbers of its saved progress")
+        #expect(await killed.notes.note(a)?.status == .audioOnly)
+        #expect(killed.notifier.posted.map(\.kind) == [.pausedBySystem], "the notification the kill lost is posted")
+        #expect(killed.settings.queueHold == .system)
+        killed.coordinator.setVisible(true)
+        try await killed.settle()
+        #expect(killed.runner.runs.isEmpty, "the queue stays held until Continue")
+        #expect(await killed.job(b)?.state == .queued)
 
-        first.finish(.paused(.system))
-        await h.coordinator.awaitIdle()
-        #expect(h.notifier.posted.count == 1, "the job's own end tells nothing more")
+        run.finish(.paused(.system))
+        await first.coordinator.awaitIdle()
     }
 
     @Test func afterIOSTookTheTimeBackTheNextDrainAsksForNewTime() async throws {
@@ -731,7 +746,7 @@ import CassiniNotebook
         await h.coordinator.transcribe(a)
         await h.coordinator.transcribe(b)
         _ = try await h.run(0)
-        await h.background.expireAll()
+        h.background.expireAll()
         try await h.waitUntil("A is paused") { await h.job(a)?.state == .paused }
         await h.coordinator.awaitIdle()
 

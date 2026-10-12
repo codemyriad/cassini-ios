@@ -8,19 +8,17 @@ import CassiniEngine
 /// and progress, and its Stop button, like iOS taking the time back, runs the work's expiration handler. The queue
 /// asks for it once per drain, from the screen, and gives each next job its title with `update`. When iOS refuses
 /// that request (it is only granted while Cassini is on the screen, and not under heavy load), and for other work
-/// such as saving the last edits, it falls back to the finite time of `beginBackgroundTask`. Either way the
-/// expiration handler has run on the main actor before iOS's handler returns. The time is then held until the steps it
-/// returned have landed (the paused job written, its notification posted), for at most `expiryGrace`, because iOS
-/// suspends Cassini as soon as the time ends and anything left would only run, if at all, when it returns.
+/// such as saving the last edits, it falls back to the finite time of `beginBackgroundTask`. Either way the work's
+/// expiration handler runs on the main actor and the token ends before iOS's handler returns, exactly once: UIKit
+/// terminates an app whose finite task is still running after its expiration handler, and documents no time after it.
+/// What the work starts from its handler (the paused job's write) is best-effort; the queue's stored `system` hold lets
+/// the launch repair finish it when Cassini is killed while suspended.
 @MainActor final class UIKitBackgroundRunner: BackgroundRunner {
     /// Matches `BGTaskSchedulerPermittedIdentifiers` (`app.codemyriad.cassini.transcription.*`). One identifier
     /// serves every drain: at most one continued task is held at a time.
     static let identifier = "app.codemyriad.cassini.transcription.queue"
 
-    /// What an expired token's work may still take to land; iOS leaves a few seconds after its expiration handler.
-    static let expiryGrace: Duration = .seconds(2)
-
-    private typealias Expiry = @MainActor () -> Task<Void, Never>?
+    private typealias Expiry = @MainActor () -> Void
 
     private enum Held {
         case finite(UIBackgroundTaskIdentifier, onExpire: Expiry)
@@ -46,8 +44,6 @@ import CassiniEngine
     }
 
     private var held: [BackgroundToken: Held] = [:]
-    /// Tokens iOS took back whose work's last steps are still landing; their time ends with `finishExpiry`.
-    private var expiring: [BackgroundToken: Held] = [:]
     private var registered = false
 
     private static var subtitle: String {
@@ -55,7 +51,7 @@ import CassiniEngine
                comment: "Subtitle of the system's progress while a note is transcribed")
     }
 
-    func begin(title: String, progress: Progress, onExpire: @escaping @MainActor () -> Task<Void, Never>?) -> BackgroundToken {
+    func begin(title: String, progress: Progress, onExpire: @escaping @MainActor () -> Void) -> BackgroundToken {
         let token = BackgroundToken()
         if progress.totalUnitCount > 0, let continued = submit(title: title, progress: progress, onExpire: onExpire) {
             held[token] = .continued(continued)
@@ -96,7 +92,7 @@ import CassiniEngine
     /// Asks iOS to run the work as continued processing; nil when it refuses or a continued task is held already.
     private func submit(title: String, progress: Progress, onExpire: @escaping Expiry) -> Continued? {
         let isContinued: (Held) -> Bool = { if case .continued = $0 { true } else { false } }
-        guard !held.values.contains(where: isContinued), !expiring.values.contains(where: isContinued), register() else {
+        guard !held.values.contains(where: isContinued), register() else {
             return nil
         }
         let request = BGContinuedProcessingTaskRequest(identifier: Self.identifier, title: title, subtitle: Self.subtitle)
@@ -139,27 +135,10 @@ import CassiniEngine
         }
     }
 
-    /// iOS takes the token's time back: its work learns of it now, and the time ends once the steps it returned have
-    /// landed or the grace is over, whichever comes first.
+    /// iOS takes the token's time back: its work learns of it, then the token ends, both before iOS's handler returns.
     private func expire(_ token: BackgroundToken) {
         guard let entry = held.removeValue(forKey: token) else { return }
-        expiring[token] = entry
-        guard let landing = entry.onExpire() else {
-            finishExpiry(token)
-            return
-        }
-        Task { [weak self] in
-            await landing.value
-            self?.finishExpiry(token)
-        }
-        Task { [weak self] in
-            try? await Task.sleep(for: Self.expiryGrace)
-            self?.finishExpiry(token)
-        }
-    }
-
-    private func finishExpiry(_ token: BackgroundToken) {
-        guard let entry = expiring.removeValue(forKey: token) else { return }
+        entry.onExpire()
         release(entry, success: false)
     }
 }

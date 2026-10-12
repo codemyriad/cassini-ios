@@ -31,7 +31,7 @@ import CassiniEngineTesting
         await waitUntil { graph.processing.state.running?.fraction == 0.5 }
         XCTAssertEqual(test.background.activeCount, 1)
 
-        await test.background.expireAll()
+        test.background.expireAll()
 
         XCTAssertEqual(test.background.activeCount, 0)
         XCTAssertEqual(test.background.endedCount, 1)

@@ -26,10 +26,16 @@
   Android's `onTimeout` does: the job's stop is signalled before iOS's expiration handler returns (on the main thread
   at once, or with a synchronous hop to it), the queue is held (`system`), the job shows as paused by the system at
   once, and while Cassini is hidden the notification "Transcription paused by iOS · iOS needed the time back. Open
-  Cassini to resume." is posted. iOS suspends Cassini as soon as the time ends, so the runner keeps it until the
-  paused job is written to `jobs.json` and `note.json` and the notification is handed to iOS, for at most two seconds
-  (`UIKitBackgroundRunner.expiryGrace`); a kill while suspended then keeps the job paused by the system. A job starts
-  only once the drain's background time is held and carries its title. The paused job takes the numbers of the last saved progress when it ends, but the
+  Cassini to resume." is posted. The runner ends the token (`endBackgroundTask`, or `setTaskCompleted(success:
+  false)` for the continued task) before iOS's expiration handler returns, exactly once: UIKit terminates an app whose
+  finite task is still running after its handler, and Apple documents no time after it, so no grace is kept for
+  either path. Only the `system` hold is stored before the handler returns (in `UserDefaults`, which reach `cfprefsd`
+  at once); the paused job's write and the notification are started then and may not land before iOS suspends or
+  kills Cassini. Android writes the pause inside `onTimeout`; on iOS the launch repair finishes it instead: under the
+  stored `system` hold no job is claimed, so a job still `running` in `jobs.json` is the one iOS stopped, and
+  `Reconcile` pauses it by the system with the numbers of its saved progress and its attempts unchanged, rather than
+  queueing it again as a crash (`ReconcileReport.pausedBySystem`); the notification the kill lost is posted when
+  Cassini comes back hidden. A job starts only once the drain's background time is held and carries its title. The paused job takes the numbers of the last saved progress when it ends, but the
   notification carries no "Paused at" numbers (`aSystemStopReachesTheJobAtOnceAndThePausedNoticeGetsTheLastCheckpoint`
   is ported without its notification part). The old behaviour (expiry cancelled every queued job) is gone.
 - **On the screen.** Cassini counts as hidden only in `.background`; `.inactive` (Control Center, the app switcher, a
@@ -102,9 +108,9 @@
   `replace(_:removing:)` (the launch repair's one write), `assume(_:removing:)` (the repair in memory when it cannot be
   written), `load(now:)` with `JobStore.Failure` and `isWritable`. `JobRepository.moveAside(at:)`.
 - Ports: `BackgroundRunner.update(_:title:)` (the next job of a drain in the same background time);
-  `BackgroundRunner.begin`'s `onExpire` now returns `Task<Void, Never>?`, the steps that must land before the time
-  ends (callers with nothing to finish return nil), and `FakeBackgroundRunner.expireAll()` is async and ends each
-  token once those steps landed; `TranscriptionCoordinator.systemStop()` returns its steps; and
+  `FakeBackgroundRunner.expireAll()` ends each token right after its handler, before anything the handler started
+  runs, as a suspension or kill at that point would; `TranscriptionCoordinator.systemStop()` returns its best-effort
+  steps (`@discardableResult`); `Reconcile.plan` takes the stored `hold:` (default nil); and
   `Transcribing.installAssets(locale:progress:)` (the standalone speech model install). Their fakes implement them;
   `FakeTranscriber` now asks for consent like Apple's when its model is not downloaded and the request may not
   download it, and `FakeCheckpoints` can hold a note's status read.

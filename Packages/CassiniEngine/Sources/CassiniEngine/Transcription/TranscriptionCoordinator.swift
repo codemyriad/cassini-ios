@@ -275,9 +275,10 @@ public final class TranscriptionCoordinator {
     }
 
     /// iOS takes the background time back, or the person pressed Stop in the system's progress: the running job
-    /// learns of it before this returns, the queue is held, and its job shows as paused by the system at once.
-    /// Returns the steps that must land before the background time ends: the job stored as paused by the system and,
-    /// while Cassini is hidden, the notification that tells it.
+    /// learns of it and the `system` hold is stored before this returns, and its job shows as paused by the system at
+    /// once. The returned steps (the job stored as paused by the system and, while Cassini is hidden, the notification
+    /// that tells it) may not run before iOS suspends or kills Cassini; the launch repair then reads the stored hold
+    /// and pauses the job by the system itself.
     @discardableResult
     public func systemStop() -> Task<Void, Never>? {
         let current = active
@@ -332,7 +333,7 @@ public final class TranscriptionCoordinator {
         for id in Set(jobs.map(\.noteID)).union(work) { checkpoints[id] = await parts.checkpoints.status(of: id) }
         let plan = Reconcile.plan(
             jobs: jobs, checkpoints: checkpoints, work: work, trashed: trashed, existing: Set(notes.map(\.id)),
-            activeNoteID: activeNoteID, now: parts.clock.now)
+            activeNoteID: activeNoteID, hold: settings.queueHold, now: parts.clock.now)
         do { try await parts.jobs.replace(plan.jobs, removing: plan.removeJobs) } catch {
             // The repair goes on in memory, so no job stays running without a run; the next write saves it.
             log.error("Cannot save the repaired queue: \(String(describing: error))")
@@ -350,6 +351,10 @@ public final class TranscriptionCoordinator {
         await refresh()
         for id in plan.report.interrupted {
             if let note = await parts.notes.note(id) { await notifyHidden(id, note.title, .transcriptionStopped) }
+        }
+        // Killed before the system pause was told: tell it now, when Cassini comes back hidden.
+        for id in plan.report.pausedBySystem {
+            if let note = await parts.notes.note(id) { await notifyHidden(id, note.title, .pausedBySystem) }
         }
         if let loadFailure { throw loadFailure }
         return plan.report
@@ -410,11 +415,9 @@ public final class TranscriptionCoordinator {
         // A new progress each time: a progress joins the system's task only once.
         backgroundProgress = Progress(totalUnitCount: 100)
         background = parts.background.begin(title: title, progress: backgroundProgress) { [weak self] in
-            // The runner ends the token once the returned steps have landed; an ended token never expires, so this
-            // is the drain's.
-            guard let self else { return nil }
-            background = nil
-            return systemStop()
+            // The runner ends the token right after this; an ended token never expires, so this is the drain's.
+            self?.background = nil
+            self?.systemStop()
         }
     }
 

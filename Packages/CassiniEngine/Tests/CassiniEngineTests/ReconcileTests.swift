@@ -158,13 +158,47 @@ import CassiniNotebook
         let plan = Reconcile.plan(jobs: jobs, checkpoints: [queued: saved, running: saved], work: [queued, running],
                                   trashed: all, existing: all, activeNoteID: nil, now: now)
         #expect(plan.removeJobs == [queued], "a queued job leaves the queue")
-        let stopped = try? #require(plan.jobs.first { $0.noteID == running })
+        let stopped = plan.jobs.first { $0.noteID == running }
         #expect(stopped?.state == .paused && stopped?.pauseReason == .user, "a running job is paused with its progress")
         #expect(stopped?.doneMs == 28_000)
         #expect(stopped?.attempts == 0, "it was stopped, not interrupted")
         #expect(!plan.jobs.contains { $0.noteID == paused }, "a paused job stays as it is")
         #expect(plan.deleteWork.isEmpty, "Restore needs the saved progress")
         #expect(plan.report.trashed == [queued, running])
+    }
+
+    @Test func aJobStillRunningUnderTheSystemHoldIsPausedByTheSystem() throws {
+        // iOS took the time back and Cassini was killed before the pause was written: only the hold was stored.
+        let tree = tree()
+        let plan = Reconcile.plan(jobs: tree.jobs, checkpoints: tree.checkpoints, work: tree.work,
+                                  trashed: tree.trashed, existing: tree.existing, activeNoteID: active, hold: .system,
+                                  now: now)
+        for id in [runningBare, runningSaved, runningThird, runningBareThird] {
+            let stopped = try job(id, in: plan, tree)
+            #expect(stopped.state == .paused && stopped.pauseReason == .system)
+            #expect(stopped.attempts == tree.jobs.first { $0.noteID == id }?.attempts, "it was stopped, not a crash")
+            #expect(stopped.updatedAt == now)
+        }
+        #expect(try job(runningSaved, in: plan, tree).doneMs == 28_000, "it keeps the numbers of its saved progress")
+        #expect(try job(runningBare, in: plan, tree).doneMs == 0)
+        #expect(try job(runningMismatch, in: plan, tree).failure == .checkpointMismatch)
+        #expect(try job(active, in: plan, tree) == tree.jobs.first { $0.noteID == active })
+        #expect(Set(plan.report.pausedBySystem) == [runningBare, runningSaved, runningThird, runningBareThird])
+        #expect(plan.report.requeued.isEmpty && plan.report.interrupted.isEmpty)
+
+        let again = Reconcile.plan(jobs: applied(plan, to: tree).jobs, checkpoints: tree.checkpoints,
+                                   work: tree.work.subtracting(plan.deleteWork), trashed: [], existing: tree.existing,
+                                   activeNoteID: active, hold: .system, now: now)
+        #expect(again.jobs.isEmpty && again.report.isEmpty, "a second run changes nothing")
+    }
+
+    @Test func aJobStillRunningUnderTheUserHoldIsCountedAsACrash() throws {
+        let tree = tree()
+        let plan = Reconcile.plan(jobs: tree.jobs, checkpoints: tree.checkpoints, work: tree.work,
+                                  trashed: tree.trashed, existing: tree.existing, activeNoteID: active, hold: .user,
+                                  now: now)
+        #expect(try job(runningBare, in: plan, tree).state == .queued)
+        #expect(plan.report.pausedBySystem.isEmpty)
     }
 
     @Test func workOfANoteThatCouldNotBeReadStays() {
