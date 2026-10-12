@@ -39,8 +39,8 @@ import CassiniNotebook
         let center = NoticeCenter(settings: store, notifier: notifier) { false }
         let older = recovered(createdAt: 300, recoveredAt: 800, duration: 1)
         let latest = recovered(createdAt: 400, recoveredAt: 900, duration: 2)
-        var shown = [older, latest]
-        center.register { $0.recovered = shown }
+        let shown = Box([older, latest])
+        center.register { $0.recovered = shown.value }
         #expect(center.latestRecovered == latest)
         center.dismiss(.recovered)
         #expect(store.recoveredAck == latest.recoveredAt)
@@ -49,7 +49,7 @@ import CassiniNotebook
 
         // A later recovery shows again; the acknowledgement never goes back.
         let next = recovered(createdAt: 450, recoveredAt: 950, duration: 3)
-        shown = [older, next]
+        shown.value = [older, next]
         #expect(center.facts.recovered == [next])
         store.acknowledgeRecovered(upTo: Date(timeIntervalSince1970: 100))
         #expect(store.recoveredAck == latest.recoveredAt)
@@ -116,16 +116,22 @@ import CassiniNotebook
     @Test func consentIsRecordedOrAnInstalledSpeechModel() async {
         defer { cleanUp() }
         let store = settings()
-        var ready = false
-        let center = NoticeCenter(settings: store, notifier: notifier) { ready }
+        let ready = Box(false)
+        let center = NoticeCenter(settings: store, notifier: notifier) { ready.value }
         await center.refresh()
         #expect(!center.facts.consented)
-        ready = true
+        ready.value = true
         await center.refresh()
         #expect(center.facts.consented)
-        ready = false
+        ready.value = false
         await center.refresh()
         store.recordConsent()
         #expect(center.facts.consented)
     }
+}
+
+/// A value the closures under test read while the test changes it.
+@MainActor private final class Box<Value> {
+    var value: Value
+    init(_ value: Value) { self.value = value }
 }
