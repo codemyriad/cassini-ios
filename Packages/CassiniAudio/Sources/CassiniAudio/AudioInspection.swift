@@ -29,7 +29,9 @@ public struct AudioInspection: Sendable {
 }
 
 public enum AudioArchive {
+    /// Writes `source` as M4A to `destination`, replacing a copy an earlier, unfinished attempt left there.
     public static func compress(source: URL, destination: URL) async throws {
+        if FileManager.default.fileExists(atPath: destination.path) { try FileManager.default.removeItem(at: destination) }
         let asset = AVURLAsset(url: source)
         guard let export = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetAppleM4A) else {
             throw AudioError.unreadable
