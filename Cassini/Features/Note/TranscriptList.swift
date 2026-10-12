@@ -41,7 +41,8 @@ struct TranscriptList: View {
 
 struct TranscriptEmptyState: View {
     let note: Note
-    let requestTranscription: () -> Void
+    /// Transcribe, or Try again after a failure; nil when this state offers neither.
+    let requestTranscription: (() -> Void)?
     @Environment(RecordingStore.self) private var recording
     var body: some View {
         VStack(spacing: 16) {
@@ -49,7 +50,7 @@ struct TranscriptEmptyState: View {
             Text(note.status == .ready ? "No speech found" : "Let your recording become words.").font(.system(.title2, design: .serif)).multilineTextAlignment(.center)
             Text(note.status == .ready ? "Try a different language or check that voices are audible in the recording." : "A searchable transcript, with every passage connected to the original audio.")
                 .font(.subheadline).foregroundStyle(Color.muted).multilineTextAlignment(.center)
-            if note.status != .transcribing && note.status != .queued {
+            if let requestTranscription, note.status != .transcribing && note.status != .queued {
                 Button(action: requestTranscription) { Label(note.status == .failed ? "Try again" : "Transcribe", systemImage: "text.badge.waveform") }
                     .buttonStyle(PrimaryButtonStyle()).frame(maxWidth: 290).disabled(recording.finishingNoteID == note.id)
             }

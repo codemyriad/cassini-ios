@@ -63,21 +63,13 @@ extension JobFailure {
 }
 
 extension UnplayableReason {
-    var message: String {
+    /// The UNPLAYABLE banner's body: nil for Android's one reason, which the banner's own copy says.
+    var bannerText: String? {
         switch self {
-        case .interrupted:
-            String(localized: "This recording can’t be played. Cassini closed before the recording was saved. You can still save the file.",
-                   table: "Failures")
+        case .interrupted: nil
         case .unsupportedFormat:
             String(localized: "This device cannot play the imported Opus container. Its verified transcript is available, and the original Cassini document is preserved for sharing.",
                    table: "Failures")
         }
-    }
-}
-
-extension Note {
-    /// Why the audio cannot be played, or nil when it can.
-    var playbackProblem: String? {
-        if case .unplayable(let reason) = audio { reason.message } else { nil }
     }
 }

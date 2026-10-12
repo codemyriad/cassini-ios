@@ -215,7 +215,11 @@ import CassiniNotebook
     // ports: NoticeCenterTest#everyAppEmittedRowIsProduced
     @Test func everyAppEmittedRowIsProduced() {
         let produced = Set(produceAll().map(\.kind))
-        let expected = Set(BannerKind.allCases.filter { $0.appEmitted && $0.group != .trust })
+        // The Note screen's own: the trust banners are `DocumentTrust`'s, PLAIN_AUDIO and UNPLAYABLE `NoteBanners`'
+        // (CassiniEngine `NoteBannersTests`).
+        let noteScreen: Set<BannerKind> = [.trustVerified, .trustNotVerified, .trustAudioChanged, .trustUnreadable,
+                                           .trustNewerFormat, .plainAudio, .unplayable]
+        let expected = Set(BannerKind.allCases.filter { $0.appEmitted }).subtracting(noteScreen)
         #expect(expected.subtracting(produced).isEmpty, "\(expected.subtracting(produced))")
         let catalogueOnly: Set<BannerKind> = [.txCalculating, .txBattery, .dlDownloading, .dlChecking]
         #expect(produced.isDisjoint(with: catalogueOnly))

@@ -72,8 +72,10 @@ enum BannerCopy {
         case .trustNewerFormat: String(localized: "This version can’t be read here yet. The audio still plays.", table: "Notices")
         // The reason why there is no transcript (too long to transcribe), else "No transcript yet."
         case .plainAudio: args.text.flatMap { $0.isEmpty ? nil : $0 } ?? String(localized: "No transcript yet.", table: "Notices")
+        // Why it can't be played when it is not Android's one reason (iOS: a container this device can't decode).
         case .unplayable:
-            String(localized: "Cassini closed before the recording was saved. You can still save the file.", table: "Notices")
+            args.text.flatMap { $0.isEmpty ? nil : $0 }
+                ?? String(localized: "Cassini closed before the recording was saved. You can still save the file.", table: "Notices")
 
         case .recPausedOtherApp: String(localized: "Resume when your call ends. Nothing was lost.", table: "Notices")
         case .recInputLost: String(localized: "Check your microphone, then resume. Nothing was lost.", table: "Notices")

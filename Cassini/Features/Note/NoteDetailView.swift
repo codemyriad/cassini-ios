@@ -52,7 +52,11 @@ struct NoteDetailView: View {
                             if showSearch { InNoteSearchBar(query: $query) { showSearch = false; query = "" } }
                             if !note.bookmarks.isEmpty { BookmarksSection(note: note, isExpanded: $showBookmarks, seek: seek) }
                             if note.transcript.isEmpty {
-                                TranscriptEmptyState(note: note, requestTranscription: { requestTranscription() })
+                                // An audio-only note's PLAIN_AUDIO banner offers Transcribe (or says why not); an
+                                // unplayable one has nothing to transcribe.
+                                let offersTranscribe = note.audio.isPlayable
+                                    && !NoteBanners.audioOnly(note, job: processing.state.jobs[noteID])
+                                TranscriptEmptyState(note: note, requestTranscription: offersTranscribe ? { requestTranscription() } : nil)
                             } else {
                                 TranscriptList(note: note, query: query, activeSegment: activeSegment, followPlayback: $followPlayback,
                                                showSpeakers: { showingSpeakers = true }, edit: { editing = $0 }, seek: seek,
@@ -119,10 +123,10 @@ struct NoteDetailView: View {
         }
         let job = processing.state.jobs[noteID]
         if job == nil, let failure = note.failure { NoticeCard(title: failure.transcriptionMessage, symbol: "exclamationmark.circle") }
-        BannerList(specs: NoteBanners.banners(note, job: job, failureText: \.transcriptionMessage, dismissed: closedBanners),
+        BannerList(specs: NoteBanners.banners(note, job: job, failureText: \.transcriptionMessage,
+                                              unplayableText: \.bannerText, dismissed: closedBanners),
                    onAction: { _, action in perform(action, note: note, job: job) },
                    onDismiss: { dismiss($0, note: note, job: job) })
-        if let problem = note.playbackProblem { NoticeCard(title: problem, symbol: "waveform.slash") }
         if playback.failed(noteID) {
             NoticeCard(title: String(localized: "This audio can’t be played", table: "Playback"), symbol: "waveform.slash")
         }

@@ -409,23 +409,6 @@
         }
       }
     },
-    "This recording can’t be played. Cassini closed before the recording was saved. You can still save the file.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "This recording can’t be played. Cassini closed before the recording was saved. You can still save the file."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Questa registrazione non si può riprodurre. Cassini si è chiusa prima che la registrazione fosse salvata. Puoi comunque salvare il file."
-          }
-        }
-      }
-    },
     "This recording is too long to transcribe on this device.": {
       "extractionState": "manual",
       "localizations": {

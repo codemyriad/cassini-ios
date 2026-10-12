@@ -122,7 +122,7 @@ public enum BannerKind: String, CaseIterable, Hashable, Sendable {
         case .trustUnreadable: Entry(tone: .error, group: .trust, actions: [.transcribeAgain])
         case .trustNewerFormat: Entry(tone: .error, group: .trust)
         case .plainAudio: Entry(tone: .plain, group: .trust, uses: [.text], actions: [.transcribe])
-        case .unplayable: Entry(tone: .error, group: .trust)
+        case .unplayable: Entry(tone: .error, group: .trust, uses: [.text])
 
         case .recPausedOtherApp: Entry(tone: .warn, group: .recording, actions: [.resume])
         case .recInputLost: Entry(tone: .warn, group: .recording, actions: [.resume])

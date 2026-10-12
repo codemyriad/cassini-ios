@@ -113,6 +113,7 @@ private func vary(_ args: BannerArgs, _ arg: BannerArg) -> BannerArgs {
         #expect(BannerCopy.body(.txFailed, BannerArgs()) == "Your recording is kept.")
         #expect(BannerCopy.body(.plainAudio, BannerArgs()) == "No transcript yet.")
         #expect(BannerCopy.body(.plainAudio, BannerArgs(text: "Too long.")) == "Too long.")
+        #expect(BannerCopy.body(.unplayable, BannerArgs(text: "Can’t decode.")) == "Can’t decode.", "iOS: its reason")
         let paused = "iOS ended the time Cassini had in the background. Resume to continue where it stopped."
         #expect(BannerCopy.body(.txPaused, BannerArgs(bySystem: true)) == paused)
         #expect(BannerCopy.body(.txPausedEarly, BannerArgs(bySystem: true)) == paused)

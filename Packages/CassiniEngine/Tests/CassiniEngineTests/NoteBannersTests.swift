@@ -101,4 +101,64 @@ import CassiniNotebook
         #expect(NoteBanners.banners(plain, job: failed, failureText: text, dismissed: [id]).isEmpty)
         #expect(NoteBanners.command(for: .open, note: plain, job: failed) == nil, "not a Note banner's action")
     }
+
+    // ports: NoteViewModelTest#aPlainNoteIsAudioOnlyAndAnUnplayableOneHasNoPlayer (its banners)
+    @Test func aPlainNoteIsAudioOnlyAndAnUnplayableOneHasNoPlayer() throws {
+        #expect(NoteBanners.audioOnly(plain, job: nil))
+        let banner = try #require(NoteBanners.banners(plain, job: nil, failureText: text).first)
+        #expect(NoteBanners.banners(plain, job: nil, failureText: text).map(\.kind) == [.plainAudio])
+        #expect(banner.args.text == nil, "No transcript yet.")
+        #expect(banner.actions == [.transcribe])
+        #expect(NoteBanners.command(for: .transcribe, note: plain, job: nil) == .transcribe(.transcribe))
+
+        var unplayable = document(.ok)
+        unplayable.audio = .unplayable(.interrupted)
+        #expect(!NoteBanners.audioOnly(unplayable, job: nil))
+        #expect(NoteBanners.banners(unplayable, job: nil, failureText: text) == [BannerSpec(.unplayable)])
+        unplayable.transcript = []
+        unplayable.document = nil
+        #expect(NoteBanners.banners(unplayable, job: nil, failureText: text).map(\.kind) == [.unplayable],
+                "never Plain audio too")
+
+        // iOS: an imported container this device cannot decode says so.
+        unplayable.audio = .unplayable(.unsupportedFormat)
+        let opus = NoteBanners.banners(unplayable, job: nil, failureText: text,
+                                       unplayableText: { $0 == .unsupportedFormat ? "Can't decode." : nil })
+        #expect(opus == [BannerSpec(.unplayable, BannerArgs(text: "Can't decode."))])
+    }
+
+    @Test func plainAudioOffersNoTranscribeForAudioTooLongOrStillBeingCaptured() throws {
+        var long = plain
+        long.duration = Limits.maxTranscribeDuration + 1
+        let tooLong = try #require(NoteBanners.banners(long, job: nil, failureText: text).first)
+        #expect(tooLong.kind == .plainAudio)
+        #expect(tooLong.args.text == "failed: LONG", "says why there is no transcript")
+        #expect(tooLong.actions.isEmpty)
+
+        var live = plain
+        live.audio = .live
+        let capturing = try #require(NoteBanners.banners(live, job: nil, failureText: text).first)
+        #expect(capturing.kind == .plainAudio)
+        #expect(capturing.args.text == nil)
+        #expect(capturing.actions.isEmpty)
+    }
+
+    @Test func plainAudioIsOnlyForANoteWithoutTranscriptOrJob() {
+        #expect(NoteBanners.audioOnly(plain, job: job(.needsConsent)), "waiting for the speech model is no job yet")
+        for state in [JobState.queued, .running, .paused, .failed] {
+            #expect(!NoteBanners.audioOnly(plain, job: job(state)))
+            #expect(!NoteBanners.banners(plain, job: job(state), failureText: text).contains { $0.kind == .plainAudio })
+        }
+        #expect(!NoteBanners.audioOnly(document(.ok), job: nil))
+        var noSpeech = plain
+        noSpeech.status = .ready
+        #expect(!NoteBanners.audioOnly(noSpeech, job: nil), "a finished transcript that found no speech")
+        var emptyDocument = plain
+        emptyDocument.document = DocumentInfo(state: .ok)
+        #expect(!NoteBanners.audioOnly(emptyDocument, job: nil))
+
+        let banner = BannerSpec(.plainAudio)
+        #expect(NoteBanners.dismissal(of: banner, note: plain, job: nil) == .hide(id: banner.id))
+        #expect(NoteBanners.banners(plain, job: nil, failureText: text, dismissed: [banner.id]).isEmpty)
+    }
 }
