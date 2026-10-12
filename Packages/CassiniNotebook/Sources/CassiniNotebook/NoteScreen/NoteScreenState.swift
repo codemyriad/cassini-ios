@@ -96,23 +96,28 @@ public struct NoteScreenState: Hashable, Sendable {
     /// The trust chip shows or hides the trust banner.
     public mutating func toggleTrust() { trustToggled.toggle() }
 
-    public mutating func bannerAction(_ action: NoteBanner.Action, note: Note, job: Job?) -> NoteEffect? {
+    /// A banner button (Android `NoteViewModel.bannerAction`): Resume, Try again, Retry and Download again go on with
+    /// the job's kind; Start over asks first.
+    public mutating func bannerAction(_ action: BannerAction, note: Note, job: Job?) -> NoteEffect? {
         switch action {
-        case .resume, .tryAgain: return .transcribe(job?.kind ?? .transcribe)
+        case .resume, .tryAgain, .retry, .downloadAgain: return .transcribe(job?.kind ?? .transcribe)
         case .startOver:
             dialog = .startOver
             return nil
         case .transcribe: return .transcribe(.transcribe)
         case .transcribeAgain: return transcribeAgain(note)
         case .playAnyway: return .acknowledgeTrustAndPlay
-        case .continueQueue: return .continueQueue
+        case .continue: return .continueQueue
+        case .open, .openNote, .openSettings, .turnOn, .download, .cancel, .chooseAnother, .record, .import:
+            // Not on a Note banner.
+            return nil
         }
     }
 
     /// Transcribe again: refused for a document that cannot take a new version, and asked first for one that becomes a
     /// fresh document.
     public mutating func transcribeAgain(_ note: Note) -> NoteEffect? {
-        if TranscribeAgainRule.refused(note) { return nil }
+        if note.refusesNewVersion { return nil }
         if TranscribeAgainRule.needsFreshConfirmation(note) {
             dialog = .transcribeFresh
             return nil
@@ -120,9 +125,9 @@ public struct NoteScreenState: Hashable, Sendable {
         return .transcribe(.transcribeAgain)
     }
 
-    /// Hides `banner`; a dismissed final failure removes its job instead, so the transcript shows again.
-    public mutating func dismiss(_ banner: NoteBanner, note: Note, job: Job?) -> NoteEffect? {
-        if banner.kind == .failed, let job, NoteBanners.finalFailure(job, refused: TranscribeAgainRule.refused(note)) {
+    /// Closes `banner` on this screen; a closed final failure removes its job instead, so the note shows as it was.
+    public mutating func dismiss(_ banner: BannerSpec, note: Note, job: Job?) -> NoteEffect? {
+        if banner.kind == .txFailed, let job, Notices.finalFailure(job, noNewVersion: note.refusesNewVersion) {
             return .clearFailed
         }
         dismissed.insert(banner.id)

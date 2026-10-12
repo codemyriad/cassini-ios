@@ -118,9 +118,10 @@ public final class RecordingScreenModel {
 
     public var levels: [Float] { controller.bars.levels }
 
-    public var banner: RecordingBanner? {
-        RecordingBanner.banners(state: controller.state, microphoneOff: microphoneDenied && !controller.state.inProgress,
-                                ended: endedOutcome).first
+    /// The banner the screen shows: the first of `Notices.recording`, from the catalogue.
+    public var banner: BannerSpec? {
+        Notices.recording(controller.state, microphoneOff: microphoneDenied && !controller.state.inProgress,
+                          ended: endedOutcome).first
     }
 
     /// The outcome the screen shows: the one it kept, or the recorder's before the screen has taken it.
@@ -192,13 +193,15 @@ public final class RecordingScreenModel {
     /// Library, or the header's chevron: back to the Library while the recording continues.
     public func minimise() { close() }
 
-    public func perform(_ action: RecordingBanner.Action) {
+    /// A button of the banner; the screen's banners have no other actions.
+    public func perform(_ action: BannerAction) {
         switch action {
         case .resume: controller.resume()
         case .openSettings: onEffect?(.openSettings)
         case .tryAgain: startCapture()
         case .openNote:
             if let noteID = ended?.noteID { leave(.openNote(noteID, modelDownload: false)) } else { close() }
+        default: break
         }
     }
 

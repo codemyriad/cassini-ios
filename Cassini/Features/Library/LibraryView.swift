@@ -3,13 +3,12 @@ import CassiniEngine
 import CassiniNotebook
 
 /// The Library (board 00, features.md section 1): the wordmark, the search with the privacy line, the activity area
-/// (notices, the recording card, the transcription banner, imports), then the day sections or, while searching, the
+/// (the banners, the recording card, the transcription banner), then the day sections or, while searching, the
 /// flat results. Import audio and Record are pinned to the bottom.
 struct LibraryView: View {
     @Environment(LibraryScreenModel.self) private var model
     @Environment(NoticesStore.self) private var notices
     @Environment(ImportStore.self) private var imports
-    @Environment(RecordingStore.self) private var recording
     @Environment(Router.self) private var router
     @Environment(ErrorPresenter.self) private var errors
     @Environment(\.dynamicTypeSize) private var dynamicType
@@ -30,10 +29,8 @@ struct LibraryView: View {
                 filters.padding(.top, 6)
                 activity.padding(.top, 6)
                 if !content.loading || content.emptyState == .unavailable {
-                    if let state = content.emptyState {
-                        LibraryEmptyStateView(state: state, record: record, importAudio: { importing = true })
-                            .padding(.top, 8)
-                    }
+                    // The banners say when there are no notes, no matches or no library; the Starred filter has its own.
+                    if content.emptyState == .noStarred { NoStarredState().padding(.top, 8) }
                     if let results = content.results {
                         ForEach(results) { row($0, day: $0.day ?? .today) }
                     } else {
@@ -96,18 +93,12 @@ struct LibraryView: View {
         }.padding(.top, 18)
     }
 
-    /// Notices, the queue hold, the recording card, the transcription banner and the imports.
+    /// The banners (NoticeCenter's notices and the list's own states), the recording card and the transcription banner.
     @ViewBuilder private var activity: some View {
-        ForEach(notices.notices) { notice in
-            HStack(alignment: .top) {
-                NoticeCard(title: notice.text)
-                Button { notices.dismiss(notice.id) } label: { Image(systemName: "xmark").frame(width: HitTarget.minimum, height: HitTarget.minimum) }
-                    .accessibilityLabel(LibraryCopy.dismissNotice)
-            }
-        }
-        QueueHeldBanner()
+        BannerList(specs: notices.library(model.content.facts),
+                   onAction: { spec, action in notices.perform(action, on: spec) { importing = true } },
+                   onDismiss: notices.dismiss)
         LibraryActivity()
-        ImportActivity()
     }
 
     /// All and Starred (an iOS extra), with the number of notes shown.
@@ -141,8 +132,6 @@ struct LibraryView: View {
         }
         .contextMenu { NoteActionsMenu(noteID: row.id) }
     }
-
-    private func record() { Task { await recording.start() } }
 
     /// The presented confirmation's action; the model clears the dialog.
     private func confirm(_ dialog: LibraryDialog) { Task { await model.confirm(dialog) } }

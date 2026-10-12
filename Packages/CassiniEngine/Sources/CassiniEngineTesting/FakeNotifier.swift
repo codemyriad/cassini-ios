@@ -11,6 +11,8 @@ public final class FakeNotifier: Notifier {
 
     public var posted: [ResultNotification] { state.withLock { $0.posted } }
     public var requestCount: Int { state.withLock { $0.requests } }
+    /// The user changes the permission in Settings.
+    public func setAuthorization(_ auth: NotificationAuth) { state.withLock { $0.auth = auth } }
 
     public func authorizationStatus() async -> NotificationAuth { state.withLock { $0.auth } }
     public func requestOnce() async { state.withLock { $0.requests += 1 } }

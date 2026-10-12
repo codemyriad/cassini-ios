@@ -38,7 +38,9 @@ import CassiniEngineTesting
         XCTAssertGreaterThan(recovered.duration, 1)
         XCTAssertLessThan(recovered.duration, 2)
         XCTAssertEqual(test.graph.recording.recovered.map(\.noteID), [note.id])
-        XCTAssertTrue(test.graph.notices.notices.contains { $0.text.hasPrefix("1 recording recovered.") })
+        let banner = try XCTUnwrap(test.graph.notices.library(LibraryFacts(loading: true)).first { $0.kind == .recovered })
+        XCTAssertEqual(BannerCopy.title(banner), "1 recording recovered")
+        XCTAssertEqual(banner.args.count, 1)
         XCTAssertFalse(test.graph.processing.state.isQueued(note.id), "recovery never queues")
     }
 

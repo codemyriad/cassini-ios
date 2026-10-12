@@ -517,24 +517,6 @@
         }
       }
     },
-    "No notes yet": {
-      "comment": "Empty library",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No notes yet"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ancora nessuna nota"
-          }
-        }
-      }
-    },
     "Notes": {
       "comment": "Library headline at accessibility text sizes",
       "extractionState": "manual",
@@ -549,24 +531,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Note"
-          }
-        }
-      }
-    },
-    "Nothing matches “%@”": {
-      "comment": "A search found nothing",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nothing matches “%@”"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nessun risultato per “%@”"
           }
         }
       }
@@ -675,24 +639,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Registra una nuova nota"
-          }
-        }
-      }
-    },
-    "Record something, or import an audio file.": {
-      "comment": "Empty library",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Record something, or import an audio file."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Registra qualcosa o importa un file audio."
           }
         }
       }
@@ -1273,24 +1219,6 @@
         }
       }
     },
-    "Try another word or title.": {
-      "comment": "A search found nothing",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Try another word or title."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Prova un’altra parola o un titolo."
-          }
-        }
-      }
-    },
     "Try transcribing %@ again": {
       "comment": "VoiceOver label of the inline Try again",
       "extractionState": "manual",
@@ -1323,24 +1251,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ieri"
-          }
-        }
-      }
-    },
-    "Your files are kept. Free some storage, then open Cassini again.": {
-      "comment": "The library could not be read",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Your files are kept. Free some storage, then open Cassini again."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "I file sono al sicuro. Libera spazio, poi apri di nuovo Cassini."
           }
         }
       }

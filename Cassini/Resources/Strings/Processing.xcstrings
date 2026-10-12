@@ -210,39 +210,6 @@
         }
       }
     },
-    "Paused at %@ of %@. Pick up where you left off. The draft so far is kept.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "In pausa a %1$@ di %2$@. Riprendi da dove avevi lasciato. La bozza fin qui è conservata."
-          }
-        }
-      }
-    },
-    "Paused at %@ of %@. iOS ended the time Cassini had in the background. Resume to continue where it stopped.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "In pausa a %1$@ di %2$@. iOS ha chiuso il tempo in background di Cassini. Riprendi per continuare da dove si è fermata."
-          }
-        }
-      }
-    },
-    "Paused before any words were found. Resume to start transcribing.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "In pausa prima di trovare parole. Riprendi per iniziare la trascrizione."
-          }
-        }
-      }
-    },
     "Plugged in": {
       "extractionState": "manual",
       "localizations": {

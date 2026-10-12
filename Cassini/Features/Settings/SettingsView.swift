@@ -2,7 +2,7 @@ import SwiftUI
 import CassiniEngine
 import CassiniNotebook
 
-/// Settings: App language, Transcription, the notifications banner, On-device models, Speakers, Privacy, Your
+/// Settings: App language, Transcription, the banners (notifications off, saved voices unreadable), On-device models, Speakers, Privacy, Your
 /// library and About, in that order.
 struct SettingsView: View {
     @Environment(SettingsAdapter.self) private var ports
@@ -21,7 +21,7 @@ struct SettingsView: View {
             model.onEffect = { [router] effect in
                 switch effect {
                 case .open(let route): router.push(route)
-                case .openNotificationSettings: openNotificationSettings()
+                case .openNotificationSettings: NoticesStore.openNotificationSettings()
                 case .openAppLanguageSettings: openSystemSettings()
                 }
             }
@@ -37,15 +37,18 @@ struct SettingsView: View {
 private struct SettingsForm: View {
     let model: SettingsModel
     @Environment(SettingsStore.self) private var settings
+    @Environment(NoticesStore.self) private var notices
 
     var body: some View {
         @Bindable var settings = settings
         Form {
             AppLanguageSection(open: model.openAppLanguage)
             TranscriptionSection(model: model, language: $settings.speechLanguage, autoTranscribe: $settings.autoTranscribe)
-            if model.notificationsOff {
+            let banners = notices.settingsBanners
+            if !banners.isEmpty {
                 Section {
-                    NotificationsOffBanner(turnOn: model.turnOnNotifications)
+                    BannerList(specs: banners, onAction: { spec, action in notices.perform(action, on: spec) },
+                               onDismiss: notices.dismiss)
                 }
                 .listRowInsets(EdgeInsets()).listRowBackground(Color.clear)
             }
@@ -203,29 +206,6 @@ struct SettingsRowLabel: View {
         }
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
-    }
-}
-
-/// "Notifications are off · Progress shows only in the app." with Turn on.
-private struct NotificationsOffBanner: View {
-    let turnOn: () -> Void
-
-    var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 12) {
-            Image(systemName: "bell.slash").foregroundStyle(Tone.warn.color)
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Notifications are off", tableName: "Settings").font(.subheadline.weight(.semibold))
-                Text("Progress shows only in the app.", tableName: "Settings").font(.subheadline).foregroundStyle(Color.muted)
-            }
-            Spacer(minLength: 0)
-            Button(action: turnOn) { Text("Turn on", tableName: "Settings").foregroundStyle(Color.ember) }
-                .font(.subheadline.weight(.semibold)).frame(minHeight: HitTarget.minimum)
-                .buttonStyle(.borderless)
-        }
-        .foregroundStyle(Color.ink)
-        .padding(16)
-        .background(Tone.warn.background, in: RoundedRectangle(cornerRadius: Radius.control))
-        .accessibilityElement(children: .contain)
     }
 }
 

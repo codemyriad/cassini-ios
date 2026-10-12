@@ -474,23 +474,6 @@
         }
       }
     },
-    "Notifications are off": {
-      "comment": "Settings banner title",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Notifications are off"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Le notifiche sono disattivate"
-          }
-        }
-      }
-    },
     "On-device models": {
       "comment": "Settings section header",
       "localizations": {
@@ -555,23 +538,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Privacy"
-          }
-        }
-      }
-    },
-    "Progress shows only in the app.": {
-      "comment": "Settings banner body",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Progress shows only in the app."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "I progressi si vedono solo nell’app."
           }
         }
       }
@@ -878,23 +844,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "La trascrizione avviene su questo dispositivo. L’audio non lo lascia mai."
-          }
-        }
-      }
-    },
-    "Turn on": {
-      "comment": "Settings banner action: opens the notification settings",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Turn on"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Attiva"
           }
         }
       }

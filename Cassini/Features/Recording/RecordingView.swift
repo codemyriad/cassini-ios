@@ -20,7 +20,8 @@ struct RecordingView: View {
                     RecordingTitleField(title: Binding(get: { screen.title }, set: { screen.setTitle($0) }))
                         .padding(.top, 28)
                     if let banner = screen.banner {
-                        RecordingBannerCard(banner: banner) { screen.perform($0) }.padding(.top, 8)
+                        Banner(spec: banner, style: .onDark, onAction: { screen.perform($0) })
+                        .padding(.top, 8)
                     }
                     Spacer(minLength: 24)
                     VStack(spacing: 28) {
@@ -140,37 +141,6 @@ private struct RecordingTimer: View {
             .minimumScaleFactor(0.5).lineLimit(1)
             .accessibilityLabel(Text("Recording duration", tableName: "Recording"))
             .accessibilityValue(RecordingCopy.spoken(elapsed))
-    }
-}
-
-/// A banner in light tones on the dark screen.
-private struct RecordingBannerCard: View {
-    let banner: RecordingBanner
-    let perform: (RecordingBanner.Action) -> Void
-
-    private static let ink = Color(red: 0.12, green: 0.17, blue: 0.19)
-    private var tint: Color {
-        banner.tone == .error ? Color(red: 0.76, green: 0.22, blue: 0.10) : Color(red: 0.55, green: 0.34, blue: 0.02)
-    }
-
-    var body: some View {
-        let text = RecordingCopy.banner(banner)
-        VStack(alignment: .leading, spacing: 6) {
-            Label {
-                Text(text.title).font(.subheadline.weight(.semibold)).foregroundStyle(tint)
-            } icon: {
-                Image(systemName: banner.tone == .error ? "exclamationmark.circle.fill" : "exclamationmark.triangle.fill").foregroundStyle(tint)
-            }
-            Text(text.body).font(.footnote).foregroundStyle(Self.ink)
-            if let action = banner.action, let title = text.action {
-                Button(title) { perform(action) }.font(.footnote.weight(.semibold)).foregroundStyle(tint)
-                    .frame(minHeight: HitTarget.minimum).accessibilityIdentifier("recordingBannerAction")
-            }
-        }
-        .padding(14).frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(white: 0.97), in: RoundedRectangle(cornerRadius: Radius.control))
-        .accessibilityElement(children: .contain)
-        .onAppear { AccessibilityNotification.Announcement(text.title).post() }
     }
 }
 

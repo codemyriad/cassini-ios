@@ -33,12 +33,10 @@ import CassiniNotebook
         XCTAssertTrue(FileManager.default.fileExists(atPath: test.root.appendingPathComponent(note.id.uuidString).path))
         XCTAssertTrue(graph.trash.voicesUnavailable)
         XCTAssertNil(graph.errors.current, "no alert, however often the purge runs")
-        // The one notice today is the load's own ("Saved voices could not be read"); the purge adds none. The lasting
-        // fact below is for WP9's NoticeCenter, which builds the banners from `contribute(to:)`.
-        XCTAssertEqual(graph.notices.notices.count, 1, "only the load's notice of the unreadable voices")
-        var facts = NoticeFacts()
-        graph.trash.contribute(to: &facts)
-        XCTAssertTrue(facts.voicesUnavailable)
+        // One lasting notice, in Settings, however often the purge runs.
+        XCTAssertTrue(graph.noticeCenter.facts.voicesUnavailable)
+        XCTAssertEqual(graph.notices.settingsBanners.map(\.kind), [.voicesUnreadable])
+        XCTAssertFalse(graph.notices.library(LibraryFacts(loading: true)).contains { $0.kind == .voicesUnreadable })
     }
 
     func testTheLaunchPurgesExpiredNotesAndLeavesNoFolder() async throws {

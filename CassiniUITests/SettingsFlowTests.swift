@@ -5,7 +5,7 @@ import XCTest
 final class SettingsFlowTests: XCTestCase {
     @MainActor private func openSettings(_ arguments: [String] = []) -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed", "library"] + arguments
+        app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed", "library", "--notifications-denied"] + arguments
         app.launch()
         XCTAssertTrue(app.textFields["librarySearch"].waitForExistence(timeout: 15))
         app.buttons["Settings"].tap()

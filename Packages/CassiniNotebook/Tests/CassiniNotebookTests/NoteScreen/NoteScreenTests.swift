@@ -50,9 +50,6 @@ import Testing
         let paused = NoteMode.of(note, job: job(.paused, doneMs: 400, for: note))
         #expect(paused == .paused(doneMs: 400, totalMs: 4_000, hasCheckpoint: true))
         #expect(paused.showsDraft && paused.hasPlayer, "paused has the read-only draft and the player")
-        let banners = NoteBanners.of(note, job: job(.paused, doneMs: 400, for: note), mode: paused, facts: .init())
-        #expect(banners.map(\.kind) == [.paused])
-        #expect(banners[0].doneMs == 400 && banners[0].totalMs == 4_000)
 
         #expect(NoteMode.of(note, job: job(.failed, for: note)) == .failed(overDocument: true))
         #expect(NoteMode.of(note, job: job(.needsConsent, for: note)) == .reading)
@@ -64,13 +61,12 @@ import Testing
                 "reading mode has no subtitle")
     }
 
-    // ports: NoteViewModelTest#aPlainNoteIsAudioOnlyAndAnUnplayableOneHasNoPlayer
+    // ports: NoteViewModelTest#aPlainNoteIsAudioOnlyAndAnUnplayableOneHasNoPlayer (its modes; the banners are
+    // CassiniEngine's NoteBannersTests)
     @Test func aPlainNoteIsAudioOnlyAndAnUnplayableOneHasNoPlayer() {
         var plain = F.weeklySync
         plain.transcript = []; plain.status = .audioOnly; plain.speakers = nil
         #expect(NoteMode.of(plain, job: nil) == .audioOnly)
-        #expect(NoteBanners.of(plain, job: nil, mode: .audioOnly, facts: .init()).map(\.kind) == [.plainAudio])
-        #expect(NoteBanners.of(plain, job: nil, mode: .audioOnly, facts: .init())[0].actions == [.transcribe])
         #expect(NoteTranscripts.sealed(plain).isEmpty)
 
         var unplayable = plain
@@ -78,19 +74,7 @@ import Testing
         let mode = NoteMode.of(unplayable, job: nil)
         #expect(mode == .unplayable)
         #expect(!mode.hasPlayer)
-        #expect(NoteBanners.of(unplayable, job: nil, mode: mode, facts: .init()).map(\.kind) == [.unplayable])
         #expect(TranscribeRow.of(unplayable, job: nil) == nil, "nothing to transcribe")
-    }
-
-    /// iOS: a note being recorded, or too long to transcribe, says so without offering Transcribe.
-    @Test func plainAudioOffersTranscribeOnlyWhenItCanBeTranscribed() {
-        var recording = F.weeklySync
-        recording.transcript = []; recording.status = .recording; recording.audio = .live
-        #expect(NoteBanners.of(recording, job: nil, mode: .audioOnly, facts: .init())[0].actions.isEmpty)
-        var long = recording
-        long.audio = .plain; long.status = .audioOnly; long.duration = Limits.maxTranscribeDuration + 1
-        let banner = NoteBanners.of(long, job: nil, mode: .audioOnly, facts: .init())[0]
-        #expect(banner.tooLong && banner.actions.isEmpty)
     }
 
     // ports: NoteViewModelTest#aJobRowMakesTheSealedTranscriptReadOnly
@@ -121,12 +105,10 @@ import Testing
         #expect(screen.editPassage(note.transcript[0].id, readOnly: nil) == .editPassage(note.transcript[0].id))
     }
 
-    // ports: NoteViewModelTest#aDocumentThatIsNotOkCannotBeRenamedAndTranscribesFresh
+    // ports: NoteViewModelTest#aDocumentThatIsNotOkCannotBeRenamedAndTranscribesFresh (its banner is in NoteBannersTests)
     @Test func aDocumentThatIsNotOkCannotBeRenamedAndTranscribesFresh() {
         let note = document(.staleAudio)
         #expect(ReadOnlyReason.of(note, job: nil) == .trust)
-        let banners = NoteBanners.of(note, job: nil, mode: .reading, facts: .init())
-        #expect(banners.map(\.kind) == [.trustAudioChanged])
         var screen = NoteScreenState()
         #expect(screen.speakerTapped("a", readOnly: .trust) == nil)
         #expect(screen.dialog == .readOnly(.trust))
@@ -135,26 +117,6 @@ import Testing
         #expect(screen.dialog == .transcribeFresh)
         #expect(screen.confirmDialog() == .transcribe(.transcribeAgain))
         #expect(screen.dialog == nil)
-    }
-
-    // ports: NoteViewModelTest#theTrustChipTogglesTheBannerAndPlayAnywayAcknowledges
-    @Test func theTrustChipTogglesTheBannerAndPlayAnywayAcknowledges() {
-        let verified = document(.ok)
-        var screen = NoteScreenState()
-        func banners(_ note: Note) -> [NoteBanner.Kind] {
-            NoteBanners.of(note, job: nil, mode: .reading, facts: .init(trustToggled: screen.trustToggled)).map(\.kind)
-        }
-        #expect(banners(verified).isEmpty)
-        screen.toggleTrust()
-        #expect(banners(verified) == [.trustVerified])
-        screen.toggleTrust()
-        #expect(banners(verified).isEmpty)
-
-        let unverified = document(.unverified)
-        #expect(banners(unverified) == [.trustNotVerified])
-        #expect(NoteChips.of(unverified)?.trust == .notVerified)
-        #expect(screen.bannerAction(.playAnyway, note: unverified, job: nil) == .acknowledgeTrustAndPlay)
-        #expect(banners(document(.unverified, acknowledged: true)).isEmpty, "acknowledged: the banner stays hidden")
     }
 
     // ports: NoteViewModelTest#aWordTapSeeksAndPlaysAndFollowModeResumes
@@ -230,7 +192,7 @@ import Testing
         #expect(NoteScreenState.isGone(nil), "deleted for good")
     }
 
-    // ports: NoteViewModelTest#pausedRowsResumeOrStartOverWithConfirmation
+    // ports: NoteViewModelTest#pausedRowsResumeOrStartOverWithConfirmation (its banner is in NoteBannersTests)
     @Test func pausedRowsResumeOrStartOverWithConfirmation() {
         let note = F.weeklySync
         let paused = job(.paused, .transcribeAgain, doneMs: 1_000, for: note)
@@ -242,60 +204,6 @@ import Testing
         #expect(screen.confirmDialog() == .startOver)
         #expect(TranscribeRow.of(note, job: job(.queued, for: note)) == .removeFromQueue)
         #expect(TranscribeRow.of(note, job: job(.running, for: note)) == .stop)
-    }
-
-    // ports: NoteViewModelTest#anUnverifiedDocumentOffersNoTranscribeAgainAndItsFailureClears
-    @Test func anUnverifiedDocumentOffersNoTranscribeAgainAndItsFailureClears() {
-        let note = document(.unverified)
-        let failed = job(.failed, .transcribeAgain, failure: .documentRefused(.unverified), for: note)
-        #expect(TranscribeRow.of(note, job: failed) == .transcribeAgainUnavailable)
-        var screen = NoteScreenState()
-        #expect(screen.transcribeAgain(note) == nil)
-        #expect(screen.dialog == nil, "nothing to confirm either")
-        let banner = NoteBanners.of(note, job: failed, mode: .failed(overDocument: true), facts: .init())
-            .first { $0.kind == .failed }!
-        #expect(banner.failure == .documentRefused(.unverified))
-        #expect(banner.actions.isEmpty, "no Try again: it fails the same way")
-        #expect(screen.dismiss(banner, note: note, job: failed) == .clearFailed)
-        #expect(screen.dismissed.isEmpty)
-    }
-
-    /// Every banner can be dismissed by its id; a failure with saved progress offers Try again and Start over.
-    @Test func bannersAreDismissedByIdAndFollowTheirOrder() {
-        let note = F.weeklySync
-        var screen = NoteScreenState()
-        let failed = job(.failed, doneMs: 1_000, failure: .save, for: note)
-        let mode = NoteMode.of(note, job: failed)
-        let banner = NoteBanners.of(note, job: failed, mode: mode, facts: .init())[0]
-        #expect(banner.kind == .failed && banner.actions == [.tryAgain, .startOver])
-        #expect(screen.dismiss(banner, note: note, job: failed) == nil)
-        #expect(NoteBanners.of(note, job: failed, mode: mode, facts: .init(dismissed: screen.dismissed)).isEmpty)
-
-        let paused = job(.paused, doneMs: 0, pause: .system, for: note)
-        let held = NoteBanners.of(note, job: paused, mode: NoteMode.of(note, job: paused),
-                                  facts: .init(queueHold: .user, waitingJobs: 2))
-        #expect(held.map(\.kind) == [.pausedEarly, .queueHeld])
-        #expect(held[0].bySystem && held[1].count == 2)
-        #expect(screen.bannerAction(.continueQueue, note: note, job: paused) == .continueQueue)
-
-        let mismatch = job(.failed, failure: .checkpointMismatch, for: note)
-        #expect(NoteBanners.of(note, job: mismatch, mode: NoteMode.of(note, job: mismatch), facts: .init())
-            .map(\.kind) == [.checkpointMismatch])
-        let memory = job(.paused, doneMs: 10, pause: .memory, for: note)
-        #expect(NoteBanners.of(note, job: memory, mode: NoteMode.of(note, job: memory), facts: .init()).map(\.kind) == [.memory])
-    }
-
-    /// iOS: one voice comes from the speaker step's failure, and only without a job.
-    @Test func oneVoiceAndNoSpeakersComeFromTheSpeakerStep() {
-        var note = F.weeklySync
-        note.speakerAnalysisFailure = .speakers
-        #expect(NoteBanners.of(note, job: nil, mode: .reading, facts: .init()).map(\.kind) == [.oneVoice])
-        #expect(NoteBanners.of(note, job: job(.queued, for: note), mode: .queued(ahead: 0, overDocument: true),
-                               facts: .init()).isEmpty)
-        note.speakerAnalysisFailure = .empty
-        #expect(NoteBanners.of(note, job: nil, mode: .reading, facts: .init()).map(\.kind) == [.noSpeakers])
-        #expect(NoteBanners.of(F.weeklySync, job: nil, mode: .reading, facts: .init(playbackFailed: true)).map(\.kind)
-            == [.playbackFailed])
     }
 
     /// The chips: trust for a document, the version chip from two versions on, and the speakers.

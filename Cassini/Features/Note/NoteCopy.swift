@@ -25,10 +25,6 @@ enum NoteCopy {
     static let removeFromQueue = String(localized: "Remove from queue", table: "Note")
     static let resume = String(localized: "Resume", table: "Note")
     static let startOver = String(localized: "Start over", table: "Note")
-    static let tryAgain = String(localized: "Try again", table: "Note")
-    static let playAnyway = String(localized: "Play anyway", table: "Note")
-    static let continueQueue = String(localized: "Continue", table: "Note")
-    static let dismiss = String(localized: "Dismiss", table: "Note")
     static let close = String(localized: "Close", table: "Note")
     static let cancel = String(localized: "Cancel", table: "Note")
 

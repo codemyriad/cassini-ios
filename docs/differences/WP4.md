@@ -70,8 +70,7 @@
   the rows) when each job begins, its events and its end, and the system's progress follows `JobProgress`'s percent.
   A transcribe of a note with saved progress keeps the language the checkpoint began in (the job's, else the note's),
   because the checkpoint must match it; the Settings language applies once there is none (Start over). A paused
-  transcription posts WP5's "Paused at … of …" notice through `TranscriptionCoordinator.onPause`, except for a note
-  going to Recently Deleted and for a speakers-only job. A `CHECKPOINT_MISMATCH` keeps its `work/` until Start over,
+  transcription shows as the Note's TX_PAUSED banner (WP9; the interim `onPause` notice is gone). A `CHECKPOINT_MISMATCH` keeps its `work/` until Start over,
   as Android's banner offers (WP5's interim queue dropped it at once).
 - **Held queue.** The Library shows "Transcription paused · N waiting" with Continue while a hold keeps queued notes
   from starting. Whether it shows is the pure `ProcessingState.heldWaiting` (tested in CassiniEngine); `QueueHeldBanner`

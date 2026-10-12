@@ -48,10 +48,8 @@ import CassiniNotebook
     /// Reads every note, then follows the changes others write. It subscribes before reading, so a change saved
     /// while the notes are read is applied after them rather than lost; a note placed meanwhile is kept.
     func load() async {
-        guard let noteStore else {
-            errors.present("Could not open your library: \(loadFailure ?? "")")
-            return
-        }
+        // A library that cannot be opened is the Library's "Your notes can't be opened" banner (`loadFailure`).
+        guard let noteStore else { return }
         let stream = await noteStore.changes()
         do {
             try FileManager.default.setAttributes([.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
@@ -64,7 +62,6 @@ import CassiniNotebook
             isLoaded = true
         } catch {
             loadFailure = error.localizedDescription
-            errors.present("Could not open your library: \(error.localizedDescription)")
             return
         }
         changes = Task { [weak self] in

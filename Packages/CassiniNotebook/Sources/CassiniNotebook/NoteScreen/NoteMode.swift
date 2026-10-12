@@ -159,15 +159,9 @@ extension Note {
     public static let mergedVersionName = "Merged speakers"
 }
 
-/// What a Transcribe again does to a document (Android `LibraryMapping.transcribeAgainRefused` and
-/// `needsFreshConfirmation`).
+/// What a Transcribe again does to a document (Android `needsFreshConfirmation`); whether it is refused is
+/// `Note.refusesNewVersion`.
 public enum TranscribeAgainRule {
-    /// The document cannot take a new version here (unverified or newer format).
-    public static func refused(_ note: Note) -> Bool {
-        guard let state = note.document?.state else { return false }
-        return state == .unverified || state == .unknownFormat
-    }
-
     /// Transcribe again makes a fresh document, which asks first ("Earlier versions can't be kept…").
     public static func needsFreshConfirmation(_ note: Note) -> Bool {
         guard let state = note.document?.state else { return false }

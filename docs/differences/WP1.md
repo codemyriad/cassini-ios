@@ -92,9 +92,11 @@
 - **Import picker types** are `ImportStore.contentTypes`: `public.audio`, the `org.xiph.opus` type Info.plist declares
   (`.opus` and `.ogg`), and whatever type the system gives `.ogg`. A hosted test checks `.opus`, `.ogg`, `.m4a`,
   `.mp3` and `.wav` files are offered and a PDF is not.
-- **Notices.** Until WP9's notice center renders the Library banners, the Library keeps its own empty states
-  (`LibraryMapping.emptyState`, from `LibraryFacts`) and shows `NoticesStore`'s messages and the queue-held banner
-  above the activity area. WP9 can take `.empty`, `.noMatch` and `.unavailable` into its catalogue.
+- **Notices.** The Library's banners are WP9's catalogue (`NoticesStore.library(content.facts)`): the empty library,
+  a search that found nothing and a library that cannot be opened are LIB_EMPTY, LIB_NO_MATCH and LIB_UNAVAILABLE, as
+  on Android. `LibraryContent.facts` carries the Library's own facts for them; `LibraryMapping.emptyState` still
+  names the state (the Import and Record buttons go off for `.unavailable`), and only the iOS-only Starred filter
+  keeps its own illustrated state (`NoStarredState`).
 
 ## Interface changes (for the integrator)
 

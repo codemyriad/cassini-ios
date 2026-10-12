@@ -130,7 +130,8 @@ import CassiniEngineTesting
         XCTAssertEqual(try checkpoints.load(note.id)?.doneMs, 1_000)
         XCTAssertNil(graph.library.note(note.id)?.failure)
         XCTAssertNotNil(graph.library.note(note.id)?.trashedAt)
-        XCTAssertEqual(graph.notices.notices.map(\.text), [], "a trashed note says nothing about its pause")
+        XCTAssertFalse(graph.notices.library(LibraryFacts(loading: true)).contains { $0.kind.group == .transcription },
+                       "a trashed note says nothing about its pause")
 
         graph.trash.restore(note.id)
         XCTAssertTrue(graph.processing.hasSavedProgress(note.id))
@@ -250,7 +251,11 @@ import CassiniEngineTesting
         await graph.processing.coordinator?.awaitIdle()
         await waitUntil { graph.library.note(note.id)?.status == .audioOnly }
         XCTAssertNil(graph.library.note(note.id)?.failure)
-        XCTAssertEqual(graph.notices.notices.map(\.text), ["Paused before any words were found. Resume to start transcribing."])
+        let banners = Notices.job(graph.processing.state.jobs[note.id])
+        XCTAssertEqual(banners.map(\.kind), [.txPausedEarly], "the Note screen says it stopped before any words")
+        XCTAssertEqual(banners.first.map(BannerCopy.title), "Paused before any words were found")
+        XCTAssertEqual(banners.first.flatMap { BannerCopy.body($0) }, "Resume to start transcribing.")
+        XCTAssertEqual(banners.first?.actions, [.resume])
     }
 
     func testAFinishedJobSavesTheTranscriptAndEndsItsBackgroundTask() async throws {

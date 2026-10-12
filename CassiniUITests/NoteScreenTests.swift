@@ -218,8 +218,7 @@ final class NoteScreenTests: XCTestCase {
         XCTAssertTrue(subtitle.hasPrefix("Yesterday, 9:41") && subtitle.hasSuffix("AM · 00:24"), subtitle)
         XCTAssertTrue(app.buttons["Transcribe"].exists)
         XCTAssertFalse(app.buttons["searchTranscript"].exists, "no search without a transcript")
-        app.buttons["Dismiss"].tap()
-        XCTAssertTrue(wait("exists == false", app.staticTexts["Plain audio"]), "banners are dismissed by id")
+        XCTAssertFalse(app.buttons["Dismiss"].exists, "Plain audio has no close, as in Android's catalogue")
     }
 }
 

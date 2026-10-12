@@ -20,14 +20,14 @@ import CassiniNotebook
     @ObservationIgnored private let checkpoints: any CheckpointStoring
     @ObservationIgnored private let analyzer: any SpeakerAnalyzing
     @ObservationIgnored private let library: LibraryStore
-    @ObservationIgnored private let notices: NoticesStore
+    @ObservationIgnored private let notices: NoticeCenter
     /// Notes whose audio is still being written; they cannot be queued yet.
     @ObservationIgnored private var finalizing: Set<UUID> = []
     /// Notes waiting for their job to end on their way to Recently Deleted; they cannot be queued meanwhile.
     @ObservationIgnored private var trashing: Set<UUID> = []
 
     init(coordinator: TranscriptionCoordinator?, progress: JobProgress, checkpoints: any CheckpointStoring,
-         models: ModelInstalls, analyzer: any SpeakerAnalyzing, library: LibraryStore, notices: NoticesStore) {
+         models: ModelInstalls, analyzer: any SpeakerAnalyzing, library: LibraryStore, notices: NoticeCenter) {
         self.coordinator = coordinator
         self.progress = progress
         self.checkpoints = checkpoints
@@ -35,7 +35,6 @@ import CassiniNotebook
         self.analyzer = analyzer
         self.library = library
         self.notices = notices
-        coordinator?.onPause = { [weak self] id, reason in self?.postPaused(id, reason: reason) }
     }
 
     var state: ProcessingState { coordinator?.state ?? ProcessingState() }
@@ -51,7 +50,10 @@ import CassiniNotebook
         guard let coordinator else { return .refused(.noNote) }
         if finalizing.contains(id) { return .refused(.recording) }
         if trashing.contains(id) { return .refused(.trashed) }
-        return await coordinator.transcribe(id, kind: kind, origin: origin)
+        let outcome = await coordinator.transcribe(id, kind: kind, origin: origin)
+        // The first Transcribe from the screen asks to notify the results; the queue does not wait for the answer.
+        if origin == .screen { Task { [notices] in await notices.askNotificationsOnce() } }
+        return outcome
     }
 
     /// `transcribe` without waiting for its outcome.
@@ -65,6 +67,16 @@ import CassiniNotebook
         guard let coordinator, !finalizing.contains(id) else { return .audioOnly }
         return await coordinator.handOff(id)
     }
+
+    /// Download again or Try again on a download failure banner: the part whose install failed installs again, the
+    /// speech model when none failed.
+    func retryInstall() {
+        let failed = models.download.flatMap { $0.failure == nil ? nil : $0.part }
+        models.install([failed ?? .speech])
+    }
+
+    /// The user closed the failure of the last install; the next install may fail again.
+    func dismissInstallFailure() { models.dismissFailure() }
 
     /// Whether the note has a stopped transcription to resume.
     func hasSavedProgress(_ id: UUID) -> Bool { checkpoints.exists(id) }
@@ -152,28 +164,13 @@ import CassiniNotebook
 
     // MARK: Notices
 
-    /// Says where a stopped transcription stands: how far its saved progress goes, or that it found no words yet.
-    private func postPaused(_ id: UUID, reason: PauseReason) {
-        guard let checkpoint = try? checkpoints.load(id), checkpoint.doneMs > 0 else {
-            notices.post(String(localized: "Paused before any words were found. Resume to start transcribing.",
-                                table: "Processing"))
-            return
-        }
-        let done = TimeText.clock(Double(checkpoint.doneMs) / 1000)
-        let total = TimeText.clock(Double(max(checkpoint.totalMs, checkpoint.doneMs)) / 1000)
-        notices.post(reason == .system
-            ? String(localized: "Paused at \(done) of \(total). iOS ended the time Cassini had in the background. Resume to continue where it stopped.",
-                     table: "Processing")
-            : String(localized: "Paused at \(done) of \(total). Pick up where you left off. The draft so far is kept.",
-                     table: "Processing"))
-    }
-
     /// Adds what the queue knows to the facts the banners are built from.
     func contribute(to facts: inout NoticeFacts) {
         let state = state
         facts.queueHold = state.hold
         facts.waitingJobs = state.queue.count
-        facts.jobRunning = state.running != nil
+        // A job runs, or a model installs on its own.
+        facts.jobRunning = state.running != nil || (models.download != nil && models.download?.failure == nil)
         facts.failedJobs = state.jobs.values.filter { $0.state == .failed }
             .reduce(into: [:]) { $0[$1.noteID] = $1.failure ?? .unknown }
         if let download = models.download { facts.download = download }

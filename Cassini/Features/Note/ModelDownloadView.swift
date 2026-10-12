@@ -81,7 +81,9 @@ private struct ModelDownloadActions: View {
     var body: some View {
         VStack(spacing: 10) {
             if let bytes = model.noSpaceBytes {
-                NoSpaceBanner(bytes: bytes) { Task { await model.download() } }.padding(.bottom, 6)
+                Banner(spec: Notices.download(.notEnoughStorage, requiredFreeBytes: bytes, announce: true),
+                       onAction: { _ in Task { await model.download() } })
+                    .padding(.bottom, 6)
             }
             Button { Task { await model.download() } } label: {
                 ZStack {
@@ -97,29 +99,6 @@ private struct ModelDownloadActions: View {
                 .frame(maxWidth: .infinity, minHeight: HitTarget.minimum)
                 .disabled(model.busy)
         }
-    }
-}
-
-private struct NoSpaceBanner: View {
-    let bytes: Int64
-    let retry: () -> Void
-
-    var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 12) {
-            Image(systemName: "externaldrive.badge.exclamationmark").foregroundStyle(Tone.warn.color)
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Not enough storage", tableName: "Transcription").font(.subheadline.weight(.semibold))
-                Text("Free about \(bytes.formatted(.byteCount(style: .file))) and try again.", tableName: "Transcription")
-                    .font(.subheadline).foregroundStyle(Color.muted)
-            }
-            Spacer(minLength: 0)
-            Button(action: retry) { Text("Retry", tableName: "Transcription") }
-                .font(.subheadline.weight(.semibold)).tint(.ember).frame(minHeight: HitTarget.minimum)
-        }
-        .foregroundStyle(Color.ink)
-        .padding(16)
-        .background(Tone.warn.background, in: RoundedRectangle(cornerRadius: Radius.control))
-        .accessibilityElement(children: .contain)
     }
 }
 

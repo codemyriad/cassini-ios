@@ -13,7 +13,12 @@ final class ModelDownloadFlowTests: XCTestCase {
     }
 
     @MainActor private func transcribeTheWalk(_ app: XCUIApplication) {
-        app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Thoughts from the morning walk")).firstMatch.tap()
+        // Without the speech model the Library starts with "Record now, transcribe later", which pushes the row down
+        // under the capture bar.
+        XCTAssertTrue(app.otherElements["banner.DL_RECORD_NOW"].waitForExistence(timeout: 5))
+        let row = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Thoughts from the morning walk")).firstMatch
+        app.swipeUp()
+        row.tap()
         XCTAssertTrue(app.buttons["Transcribe"].waitForExistence(timeout: 5))
         app.buttons["Transcribe"].tap()
         XCTAssertTrue(app.staticTexts["Transcribe on this device"].waitForExistence(timeout: 5))

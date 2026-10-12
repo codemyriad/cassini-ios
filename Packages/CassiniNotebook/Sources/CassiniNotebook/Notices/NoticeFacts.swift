@@ -1,11 +1,14 @@
 import Foundation
 
+/// A recording the launch recovered. `createdAt` is when it was recorded and orders the recordings; `recoveredAt` is
+/// when this launch recovered it, which the acknowledgement of the RECOVERED banner compares with.
 public struct RecoveredRecording: Hashable, Sendable {
     public var noteID: UUID
+    public var createdAt: Date
     public var recoveredAt: Date
     public var duration: TimeInterval
-    public init(noteID: UUID, recoveredAt: Date, duration: TimeInterval) {
-        self.noteID = noteID; self.recoveredAt = recoveredAt; self.duration = duration
+    public init(noteID: UUID, createdAt: Date, recoveredAt: Date, duration: TimeInterval) {
+        self.noteID = noteID; self.createdAt = createdAt; self.recoveredAt = recoveredAt; self.duration = duration
     }
 }
 
@@ -49,8 +52,11 @@ public struct DownloadFact: Hashable, Sendable {
 
 /// Everything the banners are built from. The coordinators publish facts; the notice rules order and word them.
 public struct NoticeFacts: Hashable, Sendable {
-    /// Recordings recovered after Cassini closed unexpectedly, oldest first.
+    /// Recordings recovered after Cassini closed unexpectedly, not yet seen and still in the library.
     public var recovered: [RecoveredRecording]
+    /// When a finished recording last stayed in its original quality because compression could not finish; nil once
+    /// that notice is closed. iOS only.
+    public var compressionFailedAt: Date?
     /// Note directories whose metadata could not be read; they are kept on disk.
     public var unreadableNotes: Int
     /// The library itself could not be opened.
@@ -71,15 +77,26 @@ public struct NoticeFacts: Hashable, Sendable {
     public var download: DownloadFact?
     public var notificationsOff: Bool
 
-    public init(recovered: [RecoveredRecording] = [], unreadableNotes: Int = 0, libraryUnavailable: Bool = false,
+    public init(recovered: [RecoveredRecording] = [], compressionFailedAt: Date? = nil, unreadableNotes: Int = 0, libraryUnavailable: Bool = false,
                 voicesUnavailable: Bool = false, queueHold: QueueHold? = nil, waitingJobs: Int = 0,
                 jobRunning: Bool = false, consented: Bool = true, failedJobs: [UUID: JobFailure] = [:],
                 importing: [String] = [], importFailure: ImportFailureFact? = nil, download: DownloadFact? = nil, notificationsOff: Bool = false) {
-        self.recovered = recovered; self.unreadableNotes = unreadableNotes; self.libraryUnavailable = libraryUnavailable
+        self.recovered = recovered; self.compressionFailedAt = compressionFailedAt; self.unreadableNotes = unreadableNotes; self.libraryUnavailable = libraryUnavailable
         self.voicesUnavailable = voicesUnavailable; self.queueHold = queueHold; self.waitingJobs = waitingJobs
         self.jobRunning = jobRunning; self.consented = consented
         self.failedJobs = failedJobs; self.importing = importing; self.importFailure = importFailure
         self.download = download; self.notificationsOff = notificationsOff
+    }
+}
+
+extension NoticeFacts {
+    /// The latest recorded of the recovered recordings, which RECOVERED times and opens (Android picks the note created
+    /// last); of two recorded at the same moment, the later in the list.
+    public var latestRecovered: RecoveredRecording? {
+        recovered.reduce(nil) { latest, next in
+            guard let latest, latest.createdAt > next.createdAt else { return next }
+            return latest
+        }
     }
 }
 

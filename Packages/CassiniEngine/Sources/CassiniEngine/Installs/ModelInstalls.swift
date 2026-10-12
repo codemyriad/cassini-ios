@@ -190,6 +190,12 @@ import CassiniNotebook
         installFailures = []
     }
 
+    /// The user closed the failure of the last standalone install: the download notice goes, while the part's row
+    /// shows it as failed until its next install.
+    public func dismissFailure() {
+        if download?.failure != nil { download = nil }
+    }
+
     /// Installs one part for install `number`; its failure, or nil. A cancel is no failure.
     private func install(_ part: ModelPart, _ number: Int) async -> DownloadFact? {
         let report: @Sendable (Double?) -> Void = { [weak self] fraction in
@@ -206,7 +212,9 @@ import CassiniNotebook
             return nil
         } catch {
             if error is CancellationError || Task.isCancelled || installNumber != number { return nil }
-            let (failure, bytes) = Self.failure(error)
+            var (failure, bytes) = Self.failure(error)
+            // iOS does not tell a speech asset's size: "Free about N MB" says what the plan asks for.
+            if part == .speech, bytes == 0 { bytes = ModelPlan.speechInstallBytes }
             failures[part] = failure
             if part == .speech { speechFailureLanguage = language }
             return DownloadFact(part: part, failure: failure, requiredFreeBytes: bytes, at: clock.now)

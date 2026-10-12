@@ -46,9 +46,6 @@ public final class TranscriptionCoordinator {
     public var isDraining: Bool { drainTask != nil }
     /// Why the stored queue could not be read at launch, for the notice that tells it; nil when it was read.
     public private(set) var loadFailure: JobStore.Failure?
-    /// Told when a transcription stopped and kept what it saved, once its outcome is written: the paused notice. Not
-    /// told for a note going to Recently Deleted, nor for a speakers-only job, which keeps nothing of its own.
-    @ObservationIgnored public var onPause: (@MainActor (_ noteID: UUID, _ reason: PauseReason) -> Void)?
 
     @ObservationIgnored private let parts: Parts
     @ObservationIgnored private let settings: SettingsStore
@@ -580,11 +577,9 @@ public final class TranscriptionCoordinator {
             await notifyHidden(current.noteID, current.title, .failed(.download(download.error)))
         case .needsConsent:
             await notifyHidden(current.noteID, current.title, .readyToTranscribe)
-        case .paused(let reason):
-            // A cancelled download that left no job says nothing: the note is back to its state from before.
-            let kept = current.cancel != .restore || state.jobs[current.noteID]?.state == .paused
-            if current.job.kind != .speakersOnly, !trashed.contains(current.noteID), kept { onPause?(current.noteID, reason) }
-        case .cancelled:
+        case .paused, .cancelled:
+            // A pause shows as the Note's TX_PAUSED banner; the paused-by-iOS notification is posted where the
+            // background time ends.
             break
         }
     }

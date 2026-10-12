@@ -1,6 +1,7 @@
 import Foundation
 
-/// The banners of the Recording screen. The screen shows the first of `RecordingBanner.banners`.
+/// The banners of the Recording screen. The screen shows the first of `Notices.recording`; each banner's catalogue
+/// kind (`Notices.spec`) gives its tone, copy and button.
 public enum RecordingBanner: Hashable, Sendable {
     /// "Microphone access is off": Open settings.
     case microphoneOff
@@ -17,33 +18,7 @@ public enum RecordingBanner: Hashable, Sendable {
     /// "Storage almost full — about N min left".
     case storageLow(minutes: Int)
 
-    public enum Tone: Int, Comparable, Sendable {
-        case error, warn
-        public static func < (lhs: Self, rhs: Self) -> Bool { lhs.rawValue < rhs.rawValue }
-    }
-
-    public enum Action: Hashable, Sendable {
-        case openSettings, tryAgain, openNote, resume
-    }
-
-    public var tone: Tone {
-        switch self {
-        case .microphoneOff, .couldNotStart, .microphoneFailed: .error
-        case .stoppedForSpace, .pausedByOtherApp, .inputLost, .storageLow: .warn
-        }
-    }
-
-    public var action: Action? {
-        switch self {
-        case .microphoneOff: .openSettings
-        case .couldNotStart: .tryAgain
-        case .microphoneFailed, .stoppedForSpace: .openNote
-        case .pausedByOtherApp, .inputLost: .resume
-        case .storageLow: nil
-        }
-    }
-
-    /// The banners for the recorder `state`, errors first. `microphoneOff` is true while microphone access is denied;
+    /// The banners for the recorder `state`, errors first (by their catalogue tone). `microphoneOff` is true while microphone access is denied;
     /// `ended` is the outcome the screen still shows after the capture ended (the recorder may be idle again).
     public static func banners(state: RecordingState, microphoneOff: Bool, ended: RecordingOutcome? = nil) -> [RecordingBanner] {
         var banners: [RecordingBanner] = []
@@ -65,6 +40,7 @@ public enum RecordingBanner: Hashable, Sendable {
             if case .lowStorage(let minutes) = active.warning { banners.append(.storageLow(minutes: minutes)) }
         }
         // A stable sort: within a tone, the order above.
-        return banners.enumerated().sorted { ($0.element.tone, $0.offset) < ($1.element.tone, $1.offset) }.map(\.element)
+        let rank = { (banner: RecordingBanner) in Notices.rank(Notices.spec(banner).kind.tone) }
+        return banners.enumerated().sorted { (rank($0.element), $0.offset) < (rank($1.element), $1.offset) }.map(\.element)
     }
 }

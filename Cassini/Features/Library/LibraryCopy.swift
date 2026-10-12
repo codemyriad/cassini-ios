@@ -156,15 +156,7 @@ enum LibraryCopy {
 
     // MARK: Empty states
 
-    static let emptyTitle = String(localized: "No notes yet", table: "Library", comment: "Empty library")
-    static let emptyBody = String(localized: "Record something, or import an audio file.", table: "Library", comment: "Empty library")
-    static func noMatchTitle(_ query: String) -> String {
-        String(localized: "Nothing matches “\(query)”", table: "Library", comment: "A search found nothing")
-    }
-    static let noMatchBody = String(localized: "Try another word or title.", table: "Library", comment: "A search found nothing")
     static let unavailableTitle = String(localized: "Your notes can’t be opened", table: "Library", comment: "The library could not be read")
-    static let unavailableBody = String(localized: "Your files are kept. Free some storage, then open Cassini again.",
-                                        table: "Library", comment: "The library could not be read")
     static let noStarredTitle = String(localized: "Keep your favorites close.", table: "Library", comment: "Starred filter with nothing (iOS extra)")
     static let noStarredBody = String(localized: "Star a note to find it here.", table: "Library", comment: "Starred filter with nothing (iOS extra)")
 }

@@ -280,23 +280,6 @@
         }
       }
     },
-    "Cassini closed before the recording was saved. You can still save the file.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cassini closed before the recording was saved. You can still save the file."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cassini si è chiusa prima di salvare la registrazione. Puoi comunque salvare il file."
-          }
-        }
-      }
-    },
     "Close": {
       "extractionState": "manual",
       "localizations": {
@@ -310,23 +293,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Chiudi"
-          }
-        }
-      }
-    },
-    "Close other apps or try a shorter clip.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Close other apps or try a shorter clip."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Chiudi altre app o prova una clip più breve."
           }
         }
       }
@@ -365,40 +331,6 @@
         }
       }
     },
-    "Continue": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Continue"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Continua"
-          }
-        }
-      }
-    },
-    "Continue when you’re ready.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Continue when you’re ready."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Continua quando vuoi."
-          }
-        }
-      }
-    },
     "Copy text": {
       "extractionState": "manual",
       "localizations": {
@@ -412,40 +344,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Copia il testo"
-          }
-        }
-      }
-    },
-    "Couldn’t transcribe": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Couldn’t transcribe"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Trascrizione non riuscita"
-          }
-        }
-      }
-    },
-    "Dismiss": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dismiss"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Chiudi"
           }
         }
       }
@@ -791,23 +689,6 @@
         }
       }
     },
-    "No transcript yet.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No transcript yet."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ancora nessuna trascrizione."
-          }
-        }
-      }
-    },
     "No words were found in this recording.": {
       "extractionState": "manual",
       "localizations": {
@@ -821,23 +702,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Non sono state trovate parole in questa registrazione."
-          }
-        }
-      }
-    },
-    "Not enough memory": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Not enough memory"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Memoria insufficiente"
           }
         }
       }
@@ -872,91 +736,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Testo del passaggio"
-          }
-        }
-      }
-    },
-    "Paused at %@ of %@": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Paused at %@ of %@"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "In pausa a %1$@ di %2$@"
-          }
-        }
-      }
-    },
-    "Paused before any words were found": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Paused before any words were found"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "In pausa prima di trovare parole"
-          }
-        }
-      }
-    },
-    "Pick up where you left off. The draft so far is kept.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Pick up where you left off. The draft so far is kept."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Riprendi da dove avevi lasciato. La bozza fin qui è conservata."
-          }
-        }
-      }
-    },
-    "Plain audio": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Plain audio"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Solo audio"
-          }
-        }
-      }
-    },
-    "Play anyway": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Play anyway"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Riproduci comunque"
           }
         }
       }
@@ -1131,23 +910,6 @@
         }
       }
     },
-    "Resume to start transcribing.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Resume to start transcribing."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Riprendi per iniziare la trascrizione."
-          }
-        }
-      }
-    },
     "Resumed from %@": {
       "extractionState": "manual",
       "localizations": {
@@ -1195,23 +957,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Salva"
-          }
-        }
-      }
-    },
-    "Saved progress no longer matches": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Saved progress no longer matches"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "I progressi salvati non corrispondono più"
           }
         }
       }
@@ -1331,23 +1076,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Voci"
-          }
-        }
-      }
-    },
-    "Speakers couldn’t be told apart in this recording.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Speakers couldn’t be told apart in this recording."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Non è stato possibile distinguere le voci in questa registrazione."
           }
         }
       }
@@ -1472,23 +1200,6 @@
         }
       }
     },
-    "The recording or models changed. Your recording is kept.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The recording or models changed. Your recording is kept."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "La registrazione o i modelli sono cambiati. La registrazione resta."
-          }
-        }
-      }
-    },
     "This file can’t take a new version here.": {
       "extractionState": "manual",
       "localizations": {
@@ -1519,23 +1230,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Questo passaggio è cambiato mentre lo modificavi."
-          }
-        }
-      }
-    },
-    "This recording can’t be played": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "This recording can’t be played"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Questa registrazione non si può riprodurre"
           }
         }
       }
@@ -1676,70 +1370,6 @@
         }
       }
     },
-    "Transcription paused · %lld waiting": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "variations": {
-            "plural": {
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Transcription paused · %lld waiting"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Transcription paused · %lld waiting"
-                }
-              }
-            }
-          }
-        },
-        "it": {
-          "variations": {
-            "plural": {
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Trascrizione in pausa · %lld in attesa"
-                }
-              },
-              "many": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Trascrizione in pausa · %lld in attesa"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Trascrizione in pausa · %lld in attesa"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "Try again": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Try again"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Riprova"
-          }
-        }
-      }
-    },
     "Unassigned": {
       "extractionState": "manual",
       "localizations": {
@@ -1843,23 +1473,6 @@
         }
       }
     },
-    "Your recording is kept.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Your recording is kept."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "La registrazione resta."
-          }
-        }
-      }
-    },
     "auto": {
       "extractionState": "manual",
       "localizations": {
@@ -1877,23 +1490,6 @@
         }
       },
       "comment": "Badge of a speaker named automatically from a saved voice"
-    },
-    "iOS ended the time Cassini had in the background. Resume to continue where it stopped.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "iOS ended the time Cassini had in the background. Resume to continue where it stopped."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "iOS ha chiuso il tempo che Cassini aveva in background. Riprendi per continuare da dove si è fermata."
-          }
-        }
-      }
     },
     "· edited": {
       "extractionState": "manual",

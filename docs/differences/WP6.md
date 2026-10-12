@@ -7,7 +7,7 @@
     (paragraphs, names, tints, "auto", the suggestion slot, the active-word index), `TranscriptSearch` and
     `InNoteSearch`, and `PassageEdit` (`TranscriptSegment.revised`, `Note.revisePassage`).
   - `NoteScreen/`: `NoteMode` (with `showsDraft`, `hasPlayer`, `showsReading`), `ReadOnlyReason`, `NoteChips` and
-    `VersionChip`, `TranscribeAgainRule`, `NoteSubtitle`, `NoteBanners`, `PlaybackFollow`, `NoteScreenState` (the
+    `VersionChip`, `TranscribeAgainRule`, `NoteSubtitle`, `NoteBannerFacts`, `PlaybackFollow`, `NoteScreenState` (the
     parts of Android's `NoteViewModel` that need no store: the read-only gate, word taps, banner actions and
     dismissals, dialogs, search; each event returns a `NoteEffect`), `TranscribeRow` and `DocumentInfoFacts`.
 - **App** (`Cassini/Features/Note/`): `NoteDetailView` composes the stores, keeps `NoteScreenState` and carries out
@@ -50,12 +50,14 @@
   renamable headers do not exist: draft headers are labels. The gate covers speaker headers, the speaker count, the
   Speakers and Transcript versions menu items and Edit passage; renaming the note is always allowed. While the gate is
   closed the suggestion cards are not shown (WP8's card writes on its own, so it cannot take the gate's dialog).
-- **Banners** are drawn by the screen (`NoteBannerView`) until WP9's catalogue exists; every one has Dismiss, which
-  hides it by id (a final failure removes its job, as on Android). iOS adds "No speakers were detected" (the speaker
-  step found none) and WP7's "This audio can't be played". A model download failure inside a job shows as "Couldn't
-  transcribe" with the failure's text rather than Android's DL_* banners; the "paused by the system" body names iOS.
-  One voice comes from the speaker step's failure (`speakerAnalysisFailure == .speakers`), not from a diarization
-  record, and offers Transcribe again as Android does.
+- **Banners** are WP9's catalogue banners, built for the mode by CassiniEngine's `NoteBanners.banners` (Android
+  `NoteViewModel.banners`): plain audio or unplayable, the trust banner over the reading content (Transcribe again
+  asks the fresh-transcript question), the job's banner (`Notices.job`, with the download failures), one voice, and
+  the held queue below a paused job. Only the catalogue's dismissible kinds have a close, as on Android (a final
+  failure's close removes its job); a pause for memory shows as a pause (iOS has no TX_MEMORY). iOS adds two notices
+  outside the catalogue: "No speakers were detected" (the speaker step found none) and WP7's "This audio can't be
+  played". One voice comes from the speaker step's failure (`speakerAnalysisFailure`, other than finding nobody), not
+  from a diarization record, and offers Transcribe again as Android does.
 - **Back label.** iOS keeps the system back button, so the swipe back keeps working. Its title is "Back to library"
   when the Library is below the note (`Router.below(noteID:)`); UIKit reads it from the Library's navigation item,
   which `backButtonTitle(_:)` sets. iOS 26 draws the button as a chevron, so the title is what VoiceOver reads and what

@@ -8,8 +8,12 @@ import CassiniNotebook
 @MainActor @Observable final class RecordingStore {
     let controller: RecordingController
     let screen: RecordingScreenModel
-    /// Recordings recovered at this launch, oldest first, for the "recording recovered" notice.
+    /// Recordings recovered at this launch, oldest first, for the "recording recovered" notice; `contribute(to:)`
+    /// leaves out the ones no longer in the library.
     private(set) var recovered: [RecoveredRecording] = []
+    /// When a finished recording last stayed in its original quality because its compression failed; nil once the
+    /// notice is closed.
+    private(set) var compressionFailedAt: Date?
 
     @ObservationIgnored private let recovery: CaptureRecovery
     /// Notes rebuilt from bare audio at this launch, until they are reported with the repaired ones.
@@ -17,7 +21,6 @@ import CassiniNotebook
     @ObservationIgnored private let library: LibraryStore
     @ObservationIgnored private let playback: PlaybackStore
     @ObservationIgnored private let router: Router
-    @ObservationIgnored private let notices: NoticesStore
 
     struct Parts {
         var environment: AppEnvironment
@@ -26,14 +29,13 @@ import CassiniNotebook
         var playback: PlaybackStore
         var settings: SettingsStore
         var router: Router
-        var notices: NoticesStore
         var ready: @MainActor () async -> Void
     }
 
     init(_ parts: Parts) {
         let environment = parts.environment
         let locale = environment.locale, timeZone = environment.timeZone
-        library = parts.library; playback = parts.playback; router = parts.router; notices = parts.notices
+        library = parts.library; playback = parts.playback; router = parts.router
         controller = RecordingController(parts: .init(
             ready: parts.ready, notes: LibraryRecordingNotes(library: parts.library), capture: environment.capture, storage: environment.storage,
             audio: environment.audio, settings: parts.settings, handoff: ProcessingHandoff(parts.processing),
@@ -48,7 +50,8 @@ import CassiniNotebook
         recovery = CaptureRecovery(audio: environment.audio, repairer: CAFCaptureRepairer(), clock: environment.clock,
                                    recoveredTitle: { RecordingCopy.recoveredTitle(RecordingTitles.day($0, locale: locale, timeZone: timeZone)) })
         screen.onEffect = { [weak self] in self?.perform($0) }
-        controller.onCompressionFailed = { [weak self] _ in self?.notices.post(RecordingCopy.compressionFailed) }
+        let clock = environment.clock
+        controller.onCompressionFailed = { [weak self] _ in self?.compressionFailedAt = clock.now }
         controller.observe { [weak self] state in self?.playback.setBlocked(state.inProgress) }
         RecordingIntentRouter.handler = { [weak self] action, noteID in self?.perform(action, for: noteID) }
     }
@@ -106,12 +109,22 @@ import CassiniNotebook
         guard let store = library.noteStore else { return }
         let repaired = await recovery.recover(in: store, activeNoteID: state.noteID)
         await library.refresh() // The reconcile that follows reads the mirror.
-        let created = { [library] (recording: RecoveredRecording) in library.note(recording.noteID)?.createdAt ?? .distantPast }
-        recovered = (rebuilt + repaired).sorted { created($0) < created($1) }
+        recovered = (rebuilt + repaired).sorted { $0.createdAt < $1.createdAt }
         rebuilt = []
-        guard !recovered.isEmpty else { return }
-        let captured = recovered.reduce(0) { $0 + $1.duration }
-        notices.post(RecordingCopy.recovered(count: recovered.count, captured: captured))
+    }
+
+    // MARK: Notices
+
+    /// Adds the recovered recordings still in the library (not deleted, not in Recently Deleted) and a failed
+    /// compression to the facts the banners are built from.
+    func contribute(to facts: inout NoticeFacts) {
+        facts.recovered = recovered.filter { library.note($0.noteID).map { $0.trashedAt == nil } ?? false }
+        facts.compressionFailedAt = compressionFailedAt
+    }
+
+    /// The user closed a recording notice.
+    func dismissNotice(_ kind: BannerKind) {
+        if kind == .recCompressionFailed { compressionFailedAt = nil }
     }
 
     // MARK: Effects

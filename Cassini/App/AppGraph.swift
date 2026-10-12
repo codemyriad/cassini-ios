@@ -8,8 +8,9 @@ import CassiniNotebook
     let startup = Startup()
     let router = Router()
     let errors = ErrorPresenter()
-    let notices = NoticesStore()
     let settings: SettingsStore
+    let noticeCenter: NoticeCenter
+    let notices: NoticesStore
     let library: LibraryStore
     let voices: VoicesStore
     let playback: PlaybackStore
@@ -26,6 +27,9 @@ import CassiniNotebook
         self.environment = environment
         settings = SettingsStore(defaults: environment.defaults, clock: environment.clock,
                                  defaultLanguage: environment.locale.identifier(.bcp47))
+        noticeCenter = NoticeCenter(settings: settings, notifier: environment.notifier) { [settings, transcriber = environment.transcriber] in
+            await transcriber.assetStatus(locale: Locale(identifier: settings.speechLanguage)) == .ready
+        }
         library = LibraryStore(root: environment.root, errors: errors)
         voices = VoicesStore(library: library, settings: settings, errors: errors, clock: environment.clock)
         playback = PlaybackStore(playback: environment.playback, library: library, preview: { note, position in
@@ -34,9 +38,9 @@ import CassiniNotebook
             return note.transcriptPreview?.display
         })
         processing = Self.processing(environment: environment, library: library, voices: voices, settings: settings,
-                                     notices: notices)
+                                     notices: noticeCenter)
         recording = RecordingStore(.init(environment: environment, library: library, processing: processing,
-                                         playback: playback, settings: settings, router: router, notices: notices,
+                                         playback: playback, settings: settings, router: router,
                                          ready: { [startup] in _ = await startup.ready() }))
         let importService = library.noteStore.map {
             ImportService(notes: $0, files: CoordinatedFileImporter(storage: environment.storage), audio: environment.audio,
@@ -59,13 +63,32 @@ import CassiniNotebook
             analyzer: environment.analyzer, storage: environment.storage, notifier: environment.notifier,
             root: environment.root)
         settingsPorts = SettingsAdapter(settings: settings, library: library, voices: voices, processing: processing,
-                                        notifier: environment.notifier, transcriber: environment.transcriber)
+                                        notices: noticeCenter, transcriber: environment.transcriber)
+        notices = NoticesStore(center: noticeCenter, router: router, processing: processing, recording: recording)
+        registerNotices()
         registerStartup()
+    }
+
+    /// Every source of the banners' facts, and what each does when its banner is closed.
+    private func registerNotices() {
+        noticeCenter.register({ [processing] in processing.contribute(to: &$0) },
+                              dismiss: { [processing] in if $0.isDownloadFailure { processing.dismissInstallFailure() } })
+        noticeCenter.register({ [recording] in recording.contribute(to: &$0) },
+                              dismiss: { [recording] in recording.dismissNotice($0) })
+        noticeCenter.register({ [imports] in imports.contribute(to: &$0) },
+                              dismiss: { [imports] in imports.dismissNotice($0) })
+        noticeCenter.register { [trash] in trash.contribute(to: &$0) }
+        noticeCenter.register { [library, voices] facts in
+            facts.unreadableNotes = library.unreadableCount
+            facts.libraryUnavailable = library.loadFailure != nil
+            // A damaged list is set aside and offers Forget everyone in Saved voices; newer or unreadable is told here.
+            if library.loadFailure == nil, voices.isUnavailable { facts.voicesUnavailable = true }
+        }
     }
 
     /// The transcription queue and the job it runs, over the library's notes. Without a library there is no queue.
     private static func processing(environment: AppEnvironment, library: LibraryStore, voices: VoicesStore,
-                                   settings: SettingsStore, notices: NoticesStore) -> ProcessingStore {
+                                   settings: SettingsStore, notices: NoticeCenter) -> ProcessingStore {
         let progress = JobProgress(battery: UIDeviceBattery(), onFinalization: { [settings] in settings.recordFinalization($0) })
         let checkpoints: any CheckpointStoring = library.noteStore.map { CheckpointFiles(notes: $0) } ?? NoLibraryWork()
         let coordinator = library.noteStore.map { notes in
@@ -120,6 +143,18 @@ import CassiniNotebook
         return report
     }
 
+    /// Opens what a notification tap or a link asks for, once the app is ready.
+    func handle(_ link: DeepLink) {
+        let handler = DeepLinkHandler(router: router, library: library, processing: processing, recording: recording,
+                                      ready: { [startup] in _ = await startup.ready() })
+        Task { await handler.handle(link) }
+    }
+
+    /// Cassini came back to the screen: the notification permission and the speech model may have changed in Settings.
+    func becameActive() {
+        Task { [noticeCenter] in await noticeCenter.refresh() }
+    }
+
     /// Saves the playback position and keeps the app awake until every pending write has landed.
     func enterBackground() {
         let token = environment.background.begin(title: "Saving your recordings", progress: Progress(), onExpire: {})
@@ -140,14 +175,10 @@ import CassiniNotebook
         }
         #endif
         startup.register(.load) { [recording] in await recording.rebuildBareDirectories() }
-        startup.register(.load) { [library, voices, notices] in
+        startup.register(.load) { [library, voices, noticeCenter] in
             await library.load()
-            if library.unreadableCount > 0 {
-                notices.post("\(library.unreadableCount) recording documents could not be read. Their files have been preserved.")
-            }
-            if library.loadFailure == nil, !(await voices.load()) {
-                notices.post("Saved voices could not be read. Their files have been preserved. Recordings remain available.")
-            }
+            if library.loadFailure == nil { await voices.load() }
+            await noticeCenter.refresh()
         }
         startup.register(.recover) { [recording] in await recording.recoverInterrupted() }
         startup.register(.reconcile) { [processing, recording] in

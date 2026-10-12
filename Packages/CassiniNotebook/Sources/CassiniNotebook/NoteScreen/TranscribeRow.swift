@@ -26,6 +26,6 @@ public enum TranscribeRow: Hashable, Sendable {
         }
         guard note.audio.isPlayable else { return nil }
         guard note.hasDocument else { return .transcribe }
-        return TranscribeAgainRule.refused(note) ? .transcribeAgainUnavailable : .transcribeAgain
+        return note.refusesNewVersion ? .transcribeAgainUnavailable : .transcribeAgain
     }
 }

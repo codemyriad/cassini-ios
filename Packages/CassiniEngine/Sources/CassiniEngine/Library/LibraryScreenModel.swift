@@ -66,10 +66,13 @@ public struct LibraryContent: Hashable, Sendable {
     /// The flat results while a query is open; nil when not searching.
     public var results: [LibraryRow]?
     public var emptyState: LibraryEmptyState?
+    /// What only the Library knows, for its banners (`Notices.library`).
+    public var facts: LibraryFacts
 
     public init(loading: Bool = false, sections: [DaySection] = [], results: [LibraryRow]? = nil,
-                emptyState: LibraryEmptyState? = nil) {
+                emptyState: LibraryEmptyState? = nil, facts: LibraryFacts = LibraryFacts()) {
         self.loading = loading; self.sections = sections; self.results = results; self.emptyState = emptyState
+        self.facts = facts
     }
 }
 
@@ -176,15 +179,17 @@ public final class LibraryScreenModel {
         let context = RowContext(processing: processing, recording: ports.recording())
         let loading = ports.loading(), unavailable = ports.unavailable()
         let live = favoritesOnly ? index.entries.filter(\.note.isFavorite) : index.entries
-        var facts = LibraryFacts(loading: loading, liveNotes: index.entries.count, unavailable: unavailable)
+        let audioOnly = index.entries.contains { $0.note.status == .audioOnly && $0.note.transcript.isEmpty }
+        var facts = LibraryFacts(loading: loading, liveNotes: index.entries.count, audioOnly: audioOnly,
+                                 unavailable: unavailable)
         guard isSearching else {
             facts.results = live.count
             return LibraryContent(loading: loading, sections: LibraryMapping.sections(live, context: context, now: now, calendar: calendar),
-                                  emptyState: LibraryMapping.emptyState(facts, favoritesOnly: favoritesOnly))
+                                  emptyState: LibraryMapping.emptyState(facts, favoritesOnly: favoritesOnly), facts: facts)
         }
         // Until the first search answers, the results are empty and say nothing. Afterwards a new query or a changed
         // note shows the last results, over the notes as they are now, until the search over them answers.
-        guard let found else { return LibraryContent(loading: loading, results: []) }
+        guard let found else { return LibraryContent(loading: loading, results: [], facts: facts) }
         let current = found.revision == index.revision ? found.hits : index.current(found.hits, query: SearchQuery(found.query))
         let hits = current.filter { !favoritesOnly || $0.entry.note.isFavorite }
         if found.query == searched {
@@ -192,7 +197,7 @@ public final class LibraryScreenModel {
             facts.results = hits.count
         }
         return LibraryContent(loading: loading, results: LibraryMapping.results(hits, context: context, now: now, calendar: calendar),
-                              emptyState: LibraryMapping.emptyState(facts, favoritesOnly: favoritesOnly))
+                              emptyState: LibraryMapping.emptyState(facts, favoritesOnly: favoritesOnly), facts: facts)
     }
 
     /// The note of a row, as the rows were last built.

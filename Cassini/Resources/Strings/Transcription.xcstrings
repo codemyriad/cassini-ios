@@ -35,40 +35,6 @@
         }
       }
     },
-    "Continue": {
-      "comment": "Held queue banner action: start the queue again",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Continue"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Continua"
-          }
-        }
-      }
-    },
-    "Continue when you’re ready.": {
-      "comment": "Held queue banner body",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Continue when you’re ready."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Continua quando vuoi."
-          }
-        }
-      }
-    },
     "Download": {
       "comment": "Model download button without a note",
       "localizations": {
@@ -103,23 +69,6 @@
         }
       }
     },
-    "Free about %@ and try again.": {
-      "comment": "Banner body: the space to free",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Free about %@ and try again."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Libera circa %@ e riprova."
-          }
-        }
-      }
-    },
     "Needs about %@ free while installing. Each file is checked before it is used.": {
       "comment": "Model download footnote with the free space the install needs",
       "localizations": {
@@ -133,23 +82,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Servono circa %@ liberi durante l’installazione. Ogni file viene verificato prima dell’uso."
-          }
-        }
-      }
-    },
-    "Not enough storage": {
-      "comment": "Banner title: not enough free space for the models",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Not enough storage"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Spazio insufficiente"
           }
         }
       }
@@ -201,23 +133,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ripristina questa registrazione da Eliminati di recente per trascriverla."
-          }
-        }
-      }
-    },
-    "Retry": {
-      "comment": "Banner action",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Retry"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Riprova"
           }
         }
       }
@@ -354,47 +269,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Trascrizione di “%@”"
-          }
-        }
-      }
-    },
-    "Transcription paused · %lld waiting": {
-      "comment": "Held queue banner title with the notes waiting",
-      "localizations": {
-        "en": {
-          "variations": {
-            "plural": {
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Transcription paused · %lld waiting"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Transcription paused · %lld waiting"
-                }
-              }
-            }
-          }
-        },
-        "it": {
-          "variations": {
-            "plural": {
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Trascrizione in pausa · %lld in attesa"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Trascrizione in pausa · %lld in attesa"
-                }
-              }
-            }
           }
         }
       }

@@ -5,39 +5,47 @@ import CassiniNotebook
 // The parts of the Note screen that follow fast-changing state (the playback position, the job's progress, the
 // recording) live in their own views, so that state redraws them and not the screen around them.
 
-/// The banners of the note, the playback failure among them (the one fact here that moves with the player).
+/// The banners of the note (the catalogue's, from `NoteBanners`), then the iOS notices: no speakers found, and the
+/// playback failure, the one fact here that moves with the player.
 struct NoteBannersView: View {
     let note: Note
     let job: Job?
     let mode: NoteMode
     let facts: NoteBannerFacts
-    let act: (NoteBanner, NoteBanner.Action) -> Void
-    let dismiss: (NoteBanner) -> Void
+    let act: (BannerSpec, BannerAction) -> Void
+    let dismiss: (BannerSpec) -> Void
     @Environment(PlaybackStore.self) private var playback
 
     var body: some View {
-        var facts = facts
-        facts.playbackFailed = playback.failed(note.id)
         // The player's state changes on every tick; the banners only when it fails, so a list that compares equal is
         // not drawn again.
-        return NoteBannerList(banners: NoteBanners.of(note, job: job, mode: mode, facts: facts), act: act, dismiss: dismiss)
+        NoteBannerList(specs: NoteBanners.banners(note, job: job, mode: mode, facts: facts,
+                                                  failureText: \.transcriptionMessage, unplayableText: \.bannerText),
+                       noSpeakers: NoteBanners.noSpeakers(note, job: job),
+                       playbackFailed: mode.hasPlayer && playback.failed(note.id), act: act, dismiss: dismiss)
             .equatable()
     }
 }
 
 private struct NoteBannerList: View, @MainActor Equatable {
-    let banners: [NoteBanner]
-    let act: (NoteBanner, NoteBanner.Action) -> Void
-    let dismiss: (NoteBanner) -> Void
+    let specs: [BannerSpec]
+    let noSpeakers: Bool
+    let playbackFailed: Bool
+    let act: (BannerSpec, BannerAction) -> Void
+    let dismiss: (BannerSpec) -> Void
 
-    static func == (a: NoteBannerList, b: NoteBannerList) -> Bool { a.banners == b.banners }
+    static func == (a: NoteBannerList, b: NoteBannerList) -> Bool {
+        a.specs == b.specs && a.noSpeakers == b.noSpeakers && a.playbackFailed == b.playbackFailed
+    }
 
     var body: some View {
         #if DEBUG
         let _ = RenderProbe.rendered("banners")
         #endif
-        ForEach(banners) { banner in
-            NoteBannerView(banner: banner, act: { act(banner, $0) }, dismiss: { dismiss(banner) })
+        BannerList(specs: specs, onAction: act, onDismiss: dismiss)
+        if noSpeakers { NoticeCard(title: JobFailure.empty.speakerAnalysisMessage, symbol: "person.2.slash") }
+        if playbackFailed {
+            NoticeCard(title: String(localized: "This audio can’t be played", table: "Playback"), symbol: "waveform.slash")
         }
     }
 }
