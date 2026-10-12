@@ -75,5 +75,5 @@
   speaker label a button that opens `NameSpeakerSheet` (and the "auto" badge on the label) is left to WP6, which owns
   `TurnView`; the sheet only needs `NameSpeakerSheet(noteID:speakerID:)`. A passage edit should keep a version through
   `saveCurrentVersion` in its own mutator.
-- **For WP7:** the sample plays through `PlaybackStore.playSample(_:from:duration:)`; swap in `playRange` when it
-  exists.
+- **Sample playback (done in WP7):** the sample plays through `PlaybackStore.playSample(_:from:to:)` (the
+  controller's `playRange`), only while the note owns the player; see WP7.md.
