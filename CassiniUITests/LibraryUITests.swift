@@ -244,7 +244,8 @@ final class LibraryUITests: XCTestCase {
         let damaged = scrolledRow(app, "Damaged document")
         XCTAssertTrue(damaged.waitForExistence(timeout: 5))
         damaged.press(forDuration: 1)
-        app.buttons["Transcribe again"].tap()
+        // The item reads "Transcribe again, Adds version 2."
+        app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Transcribe again'")).firstMatch.tap()
         let fresh = app.alerts["Transcribe again?"]
         XCTAssertTrue(fresh.waitForExistence(timeout: 5), "a document whose versions can't be kept asks first")
         fresh.buttons["Cancel"].tap()
