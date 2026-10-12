@@ -60,10 +60,10 @@ public struct CassiniDocument: Equatable, Sendable {
      * The non-chunk tags every write derives from the manifest it embeds. A source's own spelling of them may be
      * stale (SPEC.md "When a tag and the manifest disagree"), so a writer drops it rather than carrying it forward.
      */
-    private static let derivedNames: Set<String> = Set([
+    private static let derivedNames: Set<[UInt8]> = Set(([
         "CASSINI_FORMAT", "CASSINI_PROFILE", "CASSINI_PAYLOAD_SCHEMA", "CASSINI_TRANSCRIPT_IDS", "CASSINI_TRANSCRIPT_DEFAULT",
         "CASSINI_DECODE_HINT", "CASSINI_SPEAKER_COUNT", "CASSINI_MEETING_ID", "CASSINI_CREATED_AT",
-    ] + audioMirrors.map { "CASSINI_AUDIO_\($0.suffix)" } + meetingMirrors.map { $0.tag })
+    ] + audioMirrors.map { "CASSINI_AUDIO_\($0.suffix)" } + meetingMirrors.map { $0.tag }).map { Array($0.utf8) })
 
     /** The name of a comment, ASCII upper case: the bytes before the first `=`. */
     static func tagName(_ comment: String) -> String { tagName(Array(comment.utf8)) }
@@ -106,7 +106,7 @@ public struct CassiniDocument: Equatable, Sendable {
             let name = asciiUppercased(utf8[..<equals])
             let value = String(decoding: utf8[utf8.index(after: equals)...], as: UTF8.self)
             if tags.set(name, value) &&
-                (name == "CASSINI_FORMAT" || name.hasPrefix(manifestPrefix) || name.hasPrefix("CASSINI_TX_")) { duplicates.append(name) }
+                (sameBytes(name, "CASSINI_FORMAT") || hasBytePrefix(name, manifestPrefix) || hasBytePrefix(name, "CASSINI_TX_")) { duplicates.append(name) }
         }
         // Only a file that names itself Cassini can have invalid Cassini metadata; anything else is plain audio.
         guard tags["CASSINI_FORMAT"] != nil || parsed.undecodableCassiniNames.contains("CASSINI_FORMAT") else { return document }
@@ -323,11 +323,17 @@ public struct CassiniDocument: Equatable, Sendable {
                     continue
                 }
                 let name = tagName(entry)
-                if name.hasPrefix("CASSINI_") { undecodableCassiniNames.append(name) }
+                if hasBytePrefix(name, "CASSINI_") { undecodableCassiniNames.append(name) }
                 opaque.append(entry)
                 warnings.append("non-utf8-comment: \(name)")
             }
         }
+    }
+
+    /** The comments of the OpusTags packet [tags] that a seal without an existing document keeps: all but `CASSINI_*`. */
+    static func foreignComments(_ tags: [UInt8]) throws -> (text: [String], opaque: [[UInt8]]) {
+        let foreign = try rawComments(tags).filter { !hasBytePrefix(tagName($0), "CASSINI_") }
+        return (foreign.compactMap { try? utf8($0) }, foreign.filter { (try? utf8($0)) == nil })
     }
 
     public static func tagsPacket(_ comments: [String], opaque: [[UInt8]] = []) -> [UInt8] {
@@ -342,15 +348,17 @@ public struct CassiniDocument: Equatable, Sendable {
 
     /** [comments] with the first TITLE set to [title] where it stands and later ones dropped, or one appended. */
     static func withTitle(_ comments: [String], _ title: String) -> [String] {
-        guard let first = comments.firstIndex(where: { tagName($0) == "TITLE" }) else { return comments + ["TITLE=\(title)"] }
+        guard let first = comments.firstIndex(where: { isTitle($0) }) else { return comments + ["TITLE=\(title)"] }
         return comments.indices.compactMap { i in
-            guard tagName(comments[i]) == "TITLE" else { return comments[i] }
+            guard isTitle(comments[i]) else { return comments[i] }
             return i == first ? "TITLE=\(title)" : nil
         }
     }
 
+    private static func isTitle(_ comment: String) -> Bool { sameBytes(tagName(comment), "TITLE") }
+
     private static func isManifestTag(_ name: String) -> Bool {
-        fields.contains { manifestPrefix + $0.suffix == name } || fullMatch(name, "CASSINI_PAYLOAD_[0-9]+")
+        fields.contains { sameBytes(manifestPrefix + $0.suffix, name) } || fullMatch(name, "CASSINI_PAYLOAD_[0-9]+")
     }
 
     /**
@@ -358,7 +366,7 @@ public struct CassiniDocument: Equatable, Sendable {
      * a summary or mirror copy, or the descriptor copy of any transcript chunk set. Transcript chunks are not derived.
      */
     private static func isDerived(_ name: String) -> Bool {
-        derivedNames.contains(name) || isManifestTag(name) ||
+        derivedNames.contains(Array(name.utf8)) || isManifestTag(name) ||
             fullMatch(name, "CASSINI_TX_[A-Z0-9_]+_PAYLOAD_(MIME|ENCODING|CHUNK_COUNT|SHA256|RAW_BYTES|GZIP_BYTES)")
     }
 
@@ -409,7 +417,7 @@ public struct CassiniDocument: Equatable, Sendable {
 
         /** These comments with one TITLE of [title]: an undecodable TITLE cannot stay beside it. */
         func titled(_ title: String) -> Comments {
-            Comments(text: withTitle(text, title), opaque: opaque.filter { tagName($0) != "TITLE" })
+            Comments(text: withTitle(text, title), opaque: opaque.filter { !sameBytes(tagName($0), "TITLE") })
         }
 
         /**
@@ -418,14 +426,15 @@ public struct CassiniDocument: Equatable, Sendable {
          * and the rest of [fresh] follows in its own order.
          */
         func deriving(_ fresh: [String]) -> Comments {
-            var pending = Dictionary(fresh.map { (tagName($0), $0) }, uniquingKeysWith: { first, _ in first })
+            // Keyed by bytes: Swift's `==` would let a foreign name spelled with, say, KELVIN SIGN stand for a derived one.
+            var pending = Dictionary(fresh.map { (Array(tagName($0).utf8), $0) }, uniquingKeysWith: { first, _ in first })
             var out: [String] = []
             for comment in text {
                 let name = tagName(comment)
                 guard isDerived(name) else { out.append(comment); continue }
-                if let replacement = pending.removeValue(forKey: name) { out.append(replacement) }
+                if let replacement = pending.removeValue(forKey: Array(name.utf8)) { out.append(replacement) }
             }
-            out += fresh.filter { pending[tagName($0)] != nil }
+            out += fresh.filter { pending[Array(tagName($0).utf8)] != nil }
             return Comments(text: out, opaque: opaque)
         }
     }
@@ -596,10 +605,10 @@ public struct CassiniDocument: Equatable, Sendable {
         var comments: Comments
         if let existing {
             // A verified document's transcript chunks stay; every copy of its manifest is rebuilt from the new one.
-            comments = Comments(text: existing.comments.filter { !tagName($0).hasPrefix(prefix) }, opaque: existing.opaqueComments)
+            comments = Comments(text: existing.comments.filter { !hasBytePrefix(tagName($0), prefix) }, opaque: existing.opaqueComments)
         } else {
-            let foreign = try rawComments(stream.tags).filter { !tagName($0).hasPrefix("CASSINI_") }
-            comments = Comments(text: foreign.compactMap { try? utf8($0) }, opaque: foreign.filter { (try? utf8($0)) == nil })
+            let foreign = try foreignComments(stream.tags)
+            comments = Comments(text: foreign.text, opaque: foreign.opaque)
         }
         comments = comments.titled(try manifest.object("meeting").string("title"))
         comments = comments.deriving(try copies(of: manifest) + bodyTags.filter { !isDerived(tagName($0)) } + manifestTags(manifest))

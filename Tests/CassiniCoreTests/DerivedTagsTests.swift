@@ -180,3 +180,26 @@ struct StaleCopiesInPublishedVectorsTests {
         }
     }
 }
+
+/** A writer recognises derived tags by the bytes of their names, as the reader does. */
+@Suite struct DerivedTagNamesTests {
+    // "CASSINI_PAYLOAD_CHUNK_COUNT" with KELVIN SIGN, which Swift's `==` equates with "K": a foreign tag to a reader.
+    let lookalike = "CASSINI_PAYLOAD_CHUN\u{212A}_COUNT=9"
+
+    @Test func aForeignTagThatLooksLikeADerivedOneSurvivesARelabel() throws {
+        let sealed = CassiniDocument.read(try CassiniDocument.create(silence(), transcript: Transcript([Word("spk_1", 0, 20, "Ciao")]),
+                                                                     title: "Riunione", processing: JSONObject()))
+        let out = ArraySink()
+        try OggOpus.rewrite(ArraySource(silence()), tags: CassiniDocument.tagsPacket([lookalike] + sealed.comments), to: out)
+        try withTemporaryDirectory { dir in
+            let source = dir.appendingPathComponent("a.opus")
+            try Data(out.bytes).write(to: source)
+            let before = CassiniDocument.read(source)
+            try #require(before.state == .ok)
+            let after = try CassiniDocument.relabel(source, existing: before, labels: ["spk_1": "Anna"], target: dir.appendingPathComponent("b.opus"))
+            #expect(after.state == .ok)
+            #expect(after.comments.filter { $0.utf8.elementsEqual(lookalike.utf8) }.count == 1)
+            #expect(after.comments.filter { $0.utf8.starts(with: "CASSINI_PAYLOAD_CHUNK_COUNT=".utf8) }.count == 1)
+        }
+    }
+}

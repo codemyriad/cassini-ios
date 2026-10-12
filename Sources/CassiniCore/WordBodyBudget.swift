@@ -9,8 +9,8 @@
  *
  * The body limit is per transcript, but every variant and the manifest share one OpusTags packet of at most
  * [OggOpus.maxHeaderBytes] (8 MiB). A body at the budget encodes to roughly a third of that for repetitive text and
- * more for real speech, so a file holds at most two full-length variants and possibly only one. Before adding a
- * variant to an existing document, check [fitsHeader] once the words are final.
+ * more for real speech, so a file holds at most two full-length variants and possibly only one, and an imported file's
+ * own tags take their share. Check [fitsHeader] once the words are final, before the seal.
  */
 public enum WordBodyBudget {
     /** The body bytes that a transcript may have: the format limit less a margin of 256 KiB. */
@@ -56,17 +56,35 @@ public enum WordBodyBudget {
     public static let maxHeaderBytes = Int64(OggOpus.maxHeaderBytes) - (256 << 10)
 
     /**
-     * The OpusTags bytes of [existing]'s comments (none for a fresh seal) plus [transcript]'s encoded chunk set.
-     * This compresses the whole body, so call it once when the words are final, not per window.
+     * The OpusTags bytes of [existing]'s comments plus [transcript]'s encoded chunk set: what a seal beside a verified
+     * document writes, less the growth of its manifest. Stale copies that the seal replaces are counted too, so this
+     * errs high. It compresses the whole body, so call it once when the words are final, not per window.
      */
-    public static func headerBytes(adding transcript: Transcript, to existing: CassiniDocument?) throws -> Int64 {
-        let kept = existing.map { CassiniDocument.tagsPacket($0.comments, opaque: $0.opaqueComments).count } ?? 0
-        let body = try CassiniPayload.encode(prefix: "CASSINI_TX_WORDS_00000000_PAYLOAD_", mime: CassiniPayload.wordMime, text: transcript.json())
-        return Int64(kept) + body.tags.reduce(0) { $0 + Int64($1.utf8.count) + 4 }
+    public static func headerBytes(adding transcript: Transcript, to existing: CassiniDocument) throws -> Int64 {
+        try headerBytes(adding: transcript, keeping: CassiniDocument.tagsPacket(existing.comments, opaque: existing.opaqueComments))
+    }
+
+    /**
+     * As [headerBytes(adding:to:)] for a fresh seal of [source], which keeps every foreign comment of the audio: an
+     * imported file's cover art or lyrics count against the same limit.
+     */
+    public static func headerBytes(adding transcript: Transcript, sealing source: ByteSource) throws -> Int64 {
+        let foreign = try CassiniDocument.foreignComments(OggOpus.headers(source).tags)
+        return try headerBytes(adding: transcript, keeping: CassiniDocument.tagsPacket(foreign.text, opaque: foreign.opaque))
     }
 
     /** Whether sealing [transcript] beside [existing] keeps the header within [maxHeaderBytes]. */
-    public static func fitsHeader(_ transcript: Transcript, beside existing: CassiniDocument?) throws -> Bool {
+    public static func fitsHeader(_ transcript: Transcript, beside existing: CassiniDocument) throws -> Bool {
         try headerBytes(adding: transcript, to: existing) <= maxHeaderBytes
+    }
+
+    /** Whether a fresh seal of [transcript] into [source] keeps the header within [maxHeaderBytes]. */
+    public static func fitsHeader(_ transcript: Transcript, sealing source: ByteSource) throws -> Bool {
+        try headerBytes(adding: transcript, sealing: source) <= maxHeaderBytes
+    }
+
+    private static func headerBytes(adding transcript: Transcript, keeping kept: [UInt8]) throws -> Int64 {
+        let body = try CassiniPayload.encode(prefix: "CASSINI_TX_WORDS_00000000_PAYLOAD_", mime: CassiniPayload.wordMime, text: transcript.json())
+        return Int64(kept.count) + body.tags.reduce(0) { $0 + Int64($1.utf8.count) + 4 }
     }
 }

@@ -52,10 +52,24 @@ import Testing
 
     @Test func aVariantFitsTheHeaderOnlyWhileTheTagsLeaveRoom() throws {
         let transcript = Transcript(LongRun().words(LongRun.hourMs / 60))
-        #expect(try WordBodyBudget.fitsHeader(transcript, beside: nil))
+        #expect(try WordBodyBudget.fitsHeader(transcript, sealing: ArraySource(silence())))
         let full = CassiniDocument(state: .ok, comments: ["X_FILL=" + String(repeating: "x", count: Int(WordBodyBudget.maxHeaderBytes) - 1024)])
         #expect(try !WordBodyBudget.fitsHeader(transcript, beside: full))
         let small = CassiniDocument(state: .ok, comments: ["X_FILL=x"])
-        #expect(try WordBodyBudget.headerBytes(adding: transcript, to: small) > WordBodyBudget.headerBytes(adding: transcript, to: nil))
+        #expect(try WordBodyBudget.headerBytes(adding: transcript, to: small) > WordBodyBudget.headerBytes(adding: transcript, to: CassiniDocument(state: .ok)))
+    }
+
+    /** A fresh seal keeps the source's foreign comments, so an imported file's cover art takes header space. */
+    @Test func aFreshSealCountsTheForeignCommentsOfItsSource() throws {
+        let transcript = Transcript([Word("spk_1", 0, 20, "Ciao")])
+        // A source the reader accepts, with too little room left for even the manifest.
+        let cover = "METADATA_BLOCK_PICTURE=" + String(repeating: "A", count: OggOpus.maxHeaderBytes - 512 - 23)
+        let source = try silence([cover])
+        try #require(CassiniDocument.read(source).state == .plainAudio)
+        #expect(try !WordBodyBudget.fitsHeader(transcript, sealing: ArraySource(source)))
+        #expect(throws: CassiniError.self) { _ = try CassiniDocument.create(source, transcript: transcript, title: "Import", processing: JSONObject()) }
+        // Its own Cassini tags are replaced, so they do not count.
+        let stale = try silence(["CASSINI_FILL=" + String(repeating: "x", count: OggOpus.maxHeaderBytes - 4096)])
+        #expect(try WordBodyBudget.fitsHeader(transcript, sealing: ArraySource(stale)))
     }
 }

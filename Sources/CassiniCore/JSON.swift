@@ -25,6 +25,9 @@ func sameBytes(_ a: String?, _ b: String?) -> Bool {
     }
 }
 
+/** Whether [text] starts with the UTF-8 bytes of [prefix]; `hasPrefix` would accept a canonically equivalent start. */
+func hasBytePrefix(_ text: String, _ prefix: String) -> Bool { text.utf8.starts(with: prefix.utf8) }
+
 /** Tag names fold ASCII case only; `uppercased()` would also turn letters such as "ſ" into "S". */
 func asciiUppercased<Bytes: Sequence>(_ bytes: Bytes) -> String where Bytes.Element == UInt8 {
     String(decoding: bytes.map { (0x61...0x7A).contains($0) ? $0 - 0x20 : $0 }, as: UTF8.self)
