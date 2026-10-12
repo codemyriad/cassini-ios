@@ -25,7 +25,7 @@ import CassiniNotebook
     @ObservationIgnored private let clock: any AppClock
     @ObservationIgnored private var speakersOnly: Set<UUID> = []
     @ObservationIgnored private var runningKind: JobKind?
-    /// Running notes stopped because they are moving to Recently Deleted: their pause posts no notice.
+    /// Notes on their way to Recently Deleted: they cannot be queued, and a running job's pause posts no notice.
     @ObservationIgnored private var trashing: Set<UUID> = []
     /// Notes whose audio is still being written; they cannot be queued yet.
     @ObservationIgnored private var finalizing: Set<UUID> = []
@@ -50,7 +50,7 @@ import CassiniNotebook
     /// that resumes in the language it began in, as the checkpoint must match it.
     func enqueue(_ id: UUID, speakersOnly onlySpeakers: Bool = false) {
         guard let note = library.note(id), note.trashedAt == nil, !note.isRecording, note.audio.isPlayable,
-              !state.isRunning(id), !finalizing.contains(id), !state.isQueued(id), library.audioURL(note) != nil else { return }
+              !state.isRunning(id), !trashing.contains(id), !finalizing.contains(id), !state.isQueued(id), library.audioURL(note) != nil else { return }
         let language = onlySpeakers || checkpoints.exists(id) ? nil : settings.speechLanguage
         guard library.update(id, { note in
             note.status = .queued; note.failure = nil
@@ -93,13 +93,28 @@ import CassiniNotebook
 
     /// Moving to Recently Deleted: the running job stops and keeps its progress, as Stop does, and a queued note leaves
     /// the queue with its saved progress, so a restored note resumes. Nothing is posted about the stop.
-    func trash(_ id: UUID) {
+    ///
+    /// Waits for the running job to end, then runs `moveToTrash`, as Android trashes a note only once its job has
+    /// finished. Until then the note cannot be queued again, so no job runs for it once it is in Recently Deleted.
+    func trash(_ id: UUID, then moveToTrash: () -> Bool) async -> Bool {
+        trashing.insert(id)
+        defer { trashing.remove(id) }
         if state.isRunning(id) {
-            trashing.insert(id)
             stop?.stop(.pause(.user))
+            await task?.value
         } else {
             dequeue(id)
         }
+        return moveToTrash()
+    }
+
+    /// Before a note is deleted for good: a job still running for it is cancelled and has ended when this returns, so
+    /// nothing writes into the note's folder after it is removed (Android's purge: `cancelAndJoin`).
+    func end(_ id: UUID) async {
+        removeFromQueue(id)
+        guard state.isRunning(id) else { return }
+        stop?.stop(.cancel)
+        await task?.value
     }
 
     /// At launch: jobs that were queued or running when Cassini closed are not resumed; their notes can be
@@ -181,7 +196,6 @@ import CassiniNotebook
         progress.end()
         state.running = nil
         runningKind = nil
-        trashing.remove(id)
         stop = nil
         task = nil
         processNext()

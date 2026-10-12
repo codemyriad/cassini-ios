@@ -90,7 +90,8 @@ import CassiniEngineTesting
         graph.processing.enqueue(running.id)
         graph.processing.enqueue(queued.id)
 
-        XCTAssertTrue(graph.trash.moveToTrash(queued.id))
+        let moved = await graph.trash.moveToTrash(queued.id)
+        XCTAssertTrue(moved)
         XCTAssertFalse(graph.processing.state.isQueued(queued.id))
         XCTAssertTrue(checkpoints.exists(queued.id), "Restore needs the checkpoint")
         XCTAssertTrue(graph.processing.state.isRunning(running.id), "the running note is untouched")
@@ -113,8 +114,9 @@ import CassiniEngineTesting
         graph.processing.enqueue(note.id)
         await waitUntil { graph.processing.progress.fraction(for: note.id) ?? 0 > 0 }
 
-        XCTAssertTrue(graph.trash.moveToTrash(note.id))
-        await waitUntil { graph.processing.state.running == nil }
+        let moved = await graph.trash.moveToTrash(note.id)
+        XCTAssertTrue(moved)
+        XCTAssertNil(graph.processing.state.running, "the note moves once its job has ended")
         XCTAssertTrue(checkpoints.exists(note.id))
         XCTAssertEqual(try checkpoints.load(note.id)?.doneMs, 1_000)
         XCTAssertNil(graph.library.note(note.id)?.failure)
@@ -130,6 +132,47 @@ import CassiniEngineTesting
         graph.processing.stop(note.id)
         await waitUntil { graph.processing.state.running == nil }
         XCTAssertEqual(try checkpoints.load(note.id)?.doneMs, 1_000)
+    }
+
+    func testDeletingARunningNoteForGoodRightAfterTrashingItLeavesNoFolder() async throws {
+        let test = TestGraph(transcriber: FakeTranscriber(.frozen(done: 1.5, total: 2)))
+        defer { test.tearDown() }
+        let note = try await seedPlainNote(in: test)
+        let graph = test.graph
+        graph.settings.downloadsAllowed = true
+        graph.settings.identifySpeakers = false
+        let folder = try XCTUnwrap(graph.library.directory(for: note.id))
+        graph.processing.enqueue(note.id)
+        await waitUntil { graph.processing.progress.fraction(for: note.id) ?? 0 > 0 }
+
+        let moved = await graph.trash.moveToTrash(note.id)
+        XCTAssertTrue(moved)
+        await graph.trash.deletePermanently(note.id)
+        await graph.library.settle()
+        await waitUntil { graph.processing.state.running == nil }
+        XCTAssertNil(graph.library.note(note.id))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: folder.path), "no late checkpoint brings the folder back")
+        XCTAssertNil(graph.errors.current)
+    }
+
+    func testARestoredNoteCanBeTranscribedRightAway() async throws {
+        let test = TestGraph(transcriber: FakeTranscriber(.frozen(done: 1.5, total: 2)))
+        defer { test.tearDown() }
+        let note = try await seedPlainNote(in: test)
+        let graph = test.graph
+        graph.settings.downloadsAllowed = true
+        graph.settings.identifySpeakers = false
+        graph.processing.enqueue(note.id)
+        await waitUntil { graph.processing.progress.fraction(for: note.id) ?? 0 > 0 }
+
+        let moved = await graph.trash.moveToTrash(note.id)
+        XCTAssertTrue(moved)
+        graph.trash.restore(note.id)
+        graph.processing.enqueue(note.id)
+        XCTAssertTrue(graph.processing.state.isRunning(note.id) || graph.processing.state.isQueued(note.id),
+                      "Transcribe right after Restore queues the note")
+        graph.processing.stop(note.id)
+        await waitUntil { graph.processing.state.running == nil }
     }
 
     func testARetryAfterAMismatchStartsOver() async throws {
@@ -246,11 +289,12 @@ import CassiniEngineTesting
         XCTAssertTrue(try voices.voiceLibrary?.prints(noteID: note.id).isEmpty == true, "an analysis from before Forget everyone keeps no voiceprints")
 
         let trash = second.graph.trash
-        XCTAssertTrue(trash.moveToTrash(note.id))
+        let moved = await trash.moveToTrash(note.id)
+        XCTAssertTrue(moved)
         XCTAssertNotNil(library.note(note.id)?.trashedAt)
         trash.restore(note.id)
         XCTAssertNil(library.note(note.id)?.trashedAt)
-        trash.moveToTrash(note.id)
+        await trash.moveToTrash(note.id)
         await library.settle()
         test.clock.advance(by: .seconds(30 * 86_400))
         await trash.purgeExpired()
@@ -286,7 +330,7 @@ import CassiniEngineTesting
         XCTAssertEqual(library.note(target.id)?.transcript.first?.speaker, "Alex")
         XCTAssertEqual(library.note(target.id)?.speakers?.first?.linkedVoiceID, voiceID)
         XCTAssertEqual(voices.savedVoices.first?.samples.count, 1, "An automatic match must not enroll new evidence")
-        test.graph.trash.moveToTrash(source.id)
+        await test.graph.trash.moveToTrash(source.id)
         try await voices.applySpeakerAnalysis(analysis, to: target.id, generation: generation)
         XCTAssertNil(library.note(target.id)?.speakers?.first?.suggestedVoiceID)
         XCTAssertNil(library.note(target.id)?.speakers?.first?.linkedVoiceID)
@@ -409,7 +453,8 @@ import CassiniEngineTesting
         let graph = test.graph
         graph.router.isSplit = true
         graph.router.show(.note(note.id))
-        XCTAssertTrue(graph.trash.moveToTrash(note.id))
+        let moved = await graph.trash.moveToTrash(note.id)
+        XCTAssertTrue(moved)
         XCTAssertEqual(graph.router.path, [])
     }
 

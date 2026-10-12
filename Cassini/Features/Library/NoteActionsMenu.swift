@@ -11,7 +11,7 @@ struct NoteActionsMenu: View {
             library.update(note.id) { $0.isFavorite.toggle() }
         }
         if !note.isRecording {
-            Button("Move to Recently Deleted", systemImage: "trash", role: .destructive) { trash.moveToTrash(note.id) }
+            Button("Move to Recently Deleted", systemImage: "trash", role: .destructive) { Task { await trash.moveToTrash(note.id) } }
         }
     }
 }

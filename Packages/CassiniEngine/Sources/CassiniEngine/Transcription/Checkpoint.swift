@@ -59,11 +59,15 @@ public struct CheckpointFiles: CheckpointStoring {
         return nil
     }
 
-    /// Throws `CheckpointSpaceError` when the write failed on a full volume.
+    /// Throws `CheckpointSpaceError` when the write failed on a full volume. Creates only the `work/` folder: once the
+    /// note's folder is gone (the note was deleted for good while its job was stopping), the save fails instead of
+    /// leaving a folder with no note in it.
     public func save(_ state: CheckpointState, for noteID: UUID) throws {
         let folder = directory(for: noteID)
         do {
-            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            if !FileManager.default.fileExists(atPath: folder.path) {
+                try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: false)
+            }
             let main = folder.appendingPathComponent(Self.filename)
             let backup = folder.appendingPathComponent(Self.backupFilename)
             let temporary = folder.appendingPathComponent(Self.filename + ".tmp")

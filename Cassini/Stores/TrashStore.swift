@@ -33,22 +33,26 @@ import CassiniNotebook
     }
 
     /// Closes the note wherever it is open. A queued or running transcription stops and keeps its progress, so a
-    /// restored note resumes. False while the note is being recorded.
-    @discardableResult func moveToTrash(_ id: UUID) -> Bool {
-        guard recording.state.noteID != id, let note = library.note(id) else { return false }
-        if note.status == .queued || processing.state.isRunning(id) { processing.trash(id) }
+    /// restored note resumes; the note moves once its job has ended. False while the note is being recorded.
+    @discardableResult func moveToTrash(_ id: UUID) async -> Bool {
+        guard recording.state.noteID != id, library.note(id) != nil else { return false }
         if playback.state.noteID == id { playback.stop() }
-        let now = clock.now
-        guard library.update(id, { $0.trashedAt = now }) else { return false }
+        let moved = await processing.trash(id) {
+            guard recording.state.noteID != id else { return false }
+            let now = clock.now
+            return library.update(id) { $0.trashedAt = now }
+        }
+        guard moved else { return false }
         router.close(noteID: id)
         return true
     }
 
     func restore(_ id: UUID) { library.update(id) { $0.trashedAt = nil } }
 
-    /// Removes the note's voice samples, then its files. Needs the saved voices to be readable.
+    /// Ends any job still running for the note, then removes its voice samples, then its files. Needs the saved voices to be readable.
     func deletePermanently(_ id: UUID) async {
         guard library.note(id)?.trashedAt != nil else { return }
+        await processing.end(id)
         do {
             try voices.removeEvidence(noteID: id)
             try await library.delete(id)

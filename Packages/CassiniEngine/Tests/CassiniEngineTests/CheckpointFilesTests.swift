@@ -14,8 +14,10 @@ import CassiniNotebook
                         doneMs: doneMs, totalMs: 90_000, elapsedMs: 10)
     }
 
+    /// Files for notes under `root`; the note's own folder exists, as it does for a note in the library.
     private func files(availableBytes: @escaping @Sendable (URL) -> Int64 = CheckpointFiles.availableBytes) -> CheckpointFiles {
         let root = root
+        try? FileManager.default.createDirectory(at: root.appendingPathComponent(id.uuidString), withIntermediateDirectories: true)
         return CheckpointFiles(noteDirectory: { root.appendingPathComponent($0.uuidString, isDirectory: true) },
                                availableBytes: availableBytes)
     }
@@ -79,5 +81,13 @@ import CassiniNotebook
         try files.discard(id)
         #expect(!files.exists(id))
         #expect(FileManager.default.fileExists(atPath: note.path))
+    }
+
+    @Test func aSaveForANoteWhoseFolderIsGoneLeavesNothingBehind() throws {
+        let files = self.files()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let other = UUID()
+        #expect(throws: (any Error).self) { try files.save(state(30_000), for: other) }
+        #expect(!FileManager.default.fileExists(atPath: root.appendingPathComponent(other.uuidString).path))
     }
 }

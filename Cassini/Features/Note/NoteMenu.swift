@@ -37,7 +37,7 @@ struct NoteMenu: View {
                 .disabled(note.status == .transcribing || note.status == .queued || finishing || !note.audio.isPlayable)
             Divider()
             Button("Move to Recently Deleted", systemImage: "trash", role: .destructive) {
-                trash.moveToTrash(note.id)
+                Task { await trash.moveToTrash(note.id) }
             }
         } label: { Image(systemName: "ellipsis").frame(minWidth: 32, minHeight: 32) }.accessibilityLabel("Recording actions")
     }
