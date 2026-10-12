@@ -11,10 +11,12 @@ import CassiniNotebook
     public func clear() { events.removeAll() }
 }
 
-/// Notes in memory. `delete` can fail, and runs `onDelete` first.
+/// Notes in memory. `delete` can fail, for every note or for some, and runs `onDelete` first.
 @MainActor public final class FakeTrashNotes: TrashNotes {
     public private(set) var stored: [UUID: Note] = [:]
     public var deleteError: (any Error)?
+    /// Notes whose delete fails every time.
+    public var undeletable: Set<UUID> = []
     public var onDelete: @MainActor (UUID) -> Void = { _ in }
     private let log: TrashLog
 
@@ -41,6 +43,7 @@ import CassiniNotebook
         log.record("files \(stored[id]?.title ?? "?")")
         onDelete(id)
         if let deleteError { throw deleteError }
+        if undeletable.contains(id) { throw CocoaError(.fileWriteNoPermission) }
         stored[id] = nil
     }
 }

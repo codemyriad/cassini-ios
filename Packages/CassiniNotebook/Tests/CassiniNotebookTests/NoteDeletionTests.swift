@@ -19,6 +19,18 @@ struct NoteDeletionTests {
         #expect(try repository.load().notes.isEmpty)
     }
 
+    @Test func aDirectoryAlreadyGoneCountsAsDeleted() throws {
+        let repository = try NoteRepository(root: root)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let note = Note(title: "Gone already")
+        try repository.save(note)
+        try FileManager.default.removeItem(at: repository.directory(for: note.id))
+
+        try repository.delete(note.id)
+
+        #expect(try FileManager.default.contentsOfDirectory(atPath: root.path).isEmpty)
+    }
+
     // ports: PurgeOrderTest#aRebuildAfterTheFileDeleteDoesNotBringTheNoteBack
     @Test func aDeleteCutShortIsNeitherReadNorKeptByTheNextLoad() throws {
         let repository = try NoteRepository(root: root)

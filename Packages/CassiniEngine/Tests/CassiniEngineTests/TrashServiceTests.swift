@@ -123,6 +123,38 @@ import CassiniNotebook
         #expect(undo.snackbar == nil, "nothing was pending")
     }
 
+    @Test func theSnackbarsTimeRunsFromWhenItWasShown() throws {
+        let start = ContinuousClock.now
+        let undo = TrashUndo(now: { start })
+        undo.offer(TrashedNote(noteID: UUID(), title: "A"))
+        undo.showPending(duration: .seconds(10))
+        #expect(try #require(undo.snackbar).deadline == start + .seconds(10))
+    }
+
+    @Test func aNoteLeavingRecentlyDeletedAnotherWayTakesItsSnackbar() async throws {
+        let a = note("A"), b = note("B")
+        await trash.moveToTrash(a)
+        undo.showPending(duration: .seconds(10))
+        #expect(trash.restore(a))
+        #expect(undo.snackbar == nil, "restored from Recently Deleted: no Undo left")
+
+        await trash.moveToTrash(b)
+        undo.showPending(duration: .seconds(10))
+        #expect(try await trash.deleteNow(b))
+        #expect(undo.snackbar == nil, "deleted for good: no Undo left")
+    }
+
+    @Test func theStopConfirmationAsksAgainWhileItsNoteIsInTheLibrary() async {
+        let running = note("Running", job: .running)
+        let trashed = note("Trashed", deleted: clock.now)
+        #expect(trash.askAgain(running))
+        #expect(trash.stopConfirmation == TrashedNote(noteID: running, title: "Running"))
+        trash.cancelStop()
+        #expect(!trash.askAgain(trashed))
+        #expect(!trash.askAgain(UUID()))
+        #expect(trash.stopConfirmation == nil)
+    }
+
     @Test func aSnackbarTimesOutOnlyWhileItIsTheOneShown() async throws {
         let a = note("A"), b = note("B")
         await trash.moveToTrash(a)
@@ -165,7 +197,6 @@ import CassiniNotebook
         #expect(!trash.restore(b), "not in Recently Deleted")
     }
 
-    // ports: TrashViewModelTest#emptyAsksWithTheCountAndCancelKeepsEverything (Empty deletes them all)
     @Test func emptyDeletesEveryNote() async throws {
         note("a", deleted: Self.at(2026, 10, 2, 18))
         note("b", deleted: Self.at(2026, 10, 8, 23))
@@ -173,6 +204,48 @@ import CassiniNotebook
         #expect(try await trash.emptyTrash() == 2)
         #expect(trash.items.isEmpty)
         #expect(notes.notes.map(\.id) == [live])
+    }
+
+    // ports: TrashViewModelTest#deleteNowAsksFirstAndTheDialogSurvivesProcessDeath
+    @Test func deleteNowAsksFirstAndTheDialogSurvivesProcessDeath() async throws {
+        let a = note("Test recording", deleted: Self.at(2026, 10, 2, 18))
+        note("Standup", deleted: Self.at(2026, 10, 8, 23))
+        let dialogs = TrashDialogs()
+
+        dialogs.askDeleteNow(a)
+        #expect(dialogs.dialog(in: trash.items) == .delete(id: a, title: "Test recording"))
+        #expect(log.events.isEmpty, "nothing is deleted before Delete")
+
+        let saved = try JSONEncoder().encode(dialogs.request)
+        let restored = TrashDialogs(request: try JSONDecoder().decode(TrashDialogRequest.self, from: saved))
+        let dialog = try #require(restored.dialog(in: trash.items))
+        #expect(dialog == .delete(id: a, title: "Test recording"))
+        try await restored.confirm(dialog, with: trash)
+        #expect(notes.note(a) == nil)
+        #expect(restored.request == nil)
+        #expect(restored.dialog(in: trash.items) == nil)
+    }
+
+    // ports: TrashViewModelTest#emptyAsksWithTheCountAndCancelKeepsEverything
+    @Test func emptyAsksWithTheCountAndCancelKeepsEverything() async throws {
+        note("Test recording", deleted: Self.at(2026, 10, 2, 18))
+        note("Standup", deleted: Self.at(2026, 10, 8, 23))
+        note("Today's", deleted: Self.at(2026, 10, 9, 1))
+        let dialogs = TrashDialogs()
+
+        dialogs.askEmpty(items: trash.items)
+        #expect(dialogs.dialog(in: trash.items) == .emptyAll(count: 3))
+        dialogs.dismiss()
+        #expect(dialogs.dialog(in: trash.items) == nil)
+        #expect(trash.items.count == 3, "Cancel keeps everything")
+        #expect(log.events.isEmpty)
+
+        dialogs.askEmpty(items: trash.items)
+        try await dialogs.confirm(try #require(dialogs.dialog(in: trash.items)), with: trash)
+        #expect(trash.items.isEmpty)
+        // Empty is hidden on an empty Recently Deleted; asking alone opens nothing.
+        dialogs.askEmpty(items: trash.items)
+        #expect(dialogs.request == nil)
     }
 
     // MARK: Jobs (NoteRepositoryTest)
@@ -247,7 +320,7 @@ import CassiniNotebook
         clock.advance(by: .seconds(31 * Self.day))
         voices.errorAfterRemoving = Crash()
 
-        await #expect(throws: TrashError.deleteFailed(noteID: purged)) { try await trash.purgeExpired() }
+        await #expect(throws: TrashError.deleteFailed(noteIDs: [purged])) { try await trash.purgeExpired() }
         #expect(notes.note(purged)?.trashedAt != nil, "the note is still in Recently Deleted")
 
         voices.errorAfterRemoving = nil
@@ -262,7 +335,7 @@ import CassiniNotebook
         clock.advance(by: .seconds(31 * Self.day))
         notes.deleteError = Crash()
 
-        await #expect(throws: TrashError.deleteFailed(noteID: purged)) { try await trash.purgeExpired() }
+        await #expect(throws: TrashError.deleteFailed(noteIDs: [purged])) { try await trash.purgeExpired() }
         #expect(notes.note(purged)?.trashedAt != nil)
 
         notes.deleteError = nil
@@ -270,6 +343,50 @@ import CassiniNotebook
         #expect(notes.note(purged) == nil)
         #expect(notes.note(live) != nil)
         #expect(try await trash.purgeExpired() == 0)
+    }
+
+    @Test func aNoteThatFailsEveryTimeDoesNotStopThePurgeOfTheOthers() async throws {
+        let stuck = note("stuck", deleted: clock.now)
+        let expired = note("expired", deleted: clock.now.addingTimeInterval(1)) // Purged after the stuck one.
+        let recent = note("recent", deleted: clock.now.addingTimeInterval(20 * Self.day))
+        clock.advance(by: .seconds(31 * Self.day))
+        notes.undeletable = [stuck]
+
+        await #expect(throws: TrashError.deleteFailed(noteIDs: [stuck])) { try await trash.purgeExpired() }
+
+        #expect(notes.note(expired) == nil, "the next expired note still goes")
+        #expect(notes.note(stuck)?.trashedAt != nil, "the stuck one stays for the next run")
+        #expect(notes.note(recent) != nil)
+        #expect(host.purges == [clock.now], "the purge is recorded")
+    }
+
+    @Test func aNoteThatFailsEveryTimeDoesNotStopEmpty() async throws {
+        let stuck = note("stuck", deleted: clock.now)
+        let other = note("other", deleted: clock.now.addingTimeInterval(1))
+        let third = note("third", deleted: clock.now.addingTimeInterval(2))
+        notes.undeletable = [stuck, third]
+
+        await #expect(throws: TrashError.deleteFailed(noteIDs: [stuck, third])) { try await trash.emptyTrash() }
+
+        #expect(notes.note(other) == nil)
+        #expect(trash.items.map(\.id) == [stuck, third], "every failed note stays and is named")
+        notes.undeletable = []
+        #expect(try await trash.emptyTrash() == 2)
+    }
+
+    @Test func voicesLostDuringAPurgeLeaveTheNextNoteAndItsJob() async throws {
+        let first = note("first", deleted: clock.now, job: .paused)
+        let second = note("second", deleted: clock.now.addingTimeInterval(1), job: .paused)
+        clock.advance(by: .seconds(31 * Self.day))
+        queue.onCancel = { [voices] id in if id == first { voices.isReadable = false } }
+
+        await #expect(throws: TrashError.voicesUnavailable) { try await trash.purgeExpired() }
+
+        #expect(notes.note(first) != nil, "its voiceprints could not be removed")
+        #expect(notes.note(second) != nil)
+        #expect(queue.jobs[second] != nil, "the next note keeps its job")
+        #expect(log.events == ["job first"])
+        #expect(trash.voicesUnavailable)
     }
 
     // ports: PurgeOrderTest#aRestoreAfterTheTrashSnapshotKeepsTheNote
@@ -321,7 +438,7 @@ import CassiniNotebook
         let purged = note("purged", deleted: clock.now)
         voices.prints = [purged]
         voices.errorAfterRemoving = Crash()
-        await #expect(throws: TrashError.deleteFailed(noteID: purged)) { try await trash.deleteNow(purged) }
+        await #expect(throws: TrashError.deleteFailed(noteIDs: [purged])) { try await trash.deleteNow(purged) }
 
         #expect(trash.restore(purged), "the failed delete gave the note back")
         #expect(notes.note(purged)?.trashedAt == nil)

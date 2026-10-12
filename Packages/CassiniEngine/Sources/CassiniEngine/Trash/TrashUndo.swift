@@ -11,6 +11,8 @@ import CassiniNotebook
         public let id: Int
         public let note: TrashedNote
         public let duration: Duration
+        /// When it goes: its time runs from when it was shown, also while the Library is covered.
+        public let deadline: ContinuousClock.Instant
     }
 
     /// A note moved to Recently Deleted whose snackbar the Library has not shown yet.
@@ -19,8 +21,9 @@ import CassiniNotebook
     /// Puts a note back; `TrashService` sets it.
     @ObservationIgnored var restore: (@MainActor (UUID) -> Bool)?
     @ObservationIgnored private var shown = 0
+    @ObservationIgnored private let now: @MainActor () -> ContinuousClock.Instant
 
-    public init() {}
+    public init(now: @escaping @MainActor () -> ContinuousClock.Instant = { .now }) { self.now = now }
 
     public func offer(_ note: TrashedNote) { pending = note }
 
@@ -35,7 +38,14 @@ import CassiniNotebook
     public func showPending(duration: Duration) {
         guard let note = pending, take(note) else { return }
         shown += 1
-        snackbar = Snackbar(id: shown, note: note, duration: duration)
+        snackbar = Snackbar(id: shown, note: note, duration: duration, deadline: now() + duration)
+    }
+
+    /// The note left Recently Deleted another way (Restore, Delete now, Empty, the purge): nothing offers Undo for it
+    /// any more.
+    public func forget(_ noteID: UUID) {
+        if pending?.noteID == noteID { pending = nil }
+        if snackbar?.note.noteID == noteID { snackbar = nil }
     }
 
     /// Undo: the snackbar goes and its note comes back.

@@ -50,6 +50,7 @@ import CassiniNotebook
 public enum TrashError: Error, Equatable {
     /// The saved voices could not be read; nothing was deleted.
     case voicesUnavailable
-    /// A step of the note's delete failed; the note stays in Recently Deleted for the next purge.
-    case deleteFailed(noteID: UUID)
+    /// A step of these notes' deletes failed, oldest deletion first; they stay in Recently Deleted for the next purge.
+    /// The other notes were still deleted.
+    case deleteFailed(noteIDs: [UUID])
 }

@@ -7,7 +7,6 @@ struct TrashDialogTests {
     private let a = TrashItem(id: UUID(), title: "Test recording", duration: 60, deletedOn: .today, daysLeft: 30)
     private let b = TrashItem(id: UUID(), title: "Standup", duration: 0, deletedOn: .yesterday, daysLeft: 29)
 
-    // ports: TrashViewModelTest#deleteNowAsksFirstAndTheDialogSurvivesProcessDeath
     @Test func deleteNowAsksAboutItsNoteAndTheRequestSurvivesBeingStored() throws {
         let request = TrashDialogRequest.delete(a.id)
         #expect(request.dialog(in: [a, b]) == .delete(id: a.id, title: "Test recording"))
@@ -19,7 +18,6 @@ struct TrashDialogTests {
         #expect(TrashDialogRequest.delete(a.id).dialog(in: [b]) == nil)
     }
 
-    // ports: TrashViewModelTest#emptyAsksWithTheCountAndCancelKeepsEverything
     @Test func emptyAsksWithTheCountAndAsksNothingOnceEmpty() {
         #expect(TrashDialogRequest.empty.dialog(in: [a, b]) == .emptyAll(count: 2))
         #expect(TrashDialogRequest.empty.dialog(in: []) == nil)

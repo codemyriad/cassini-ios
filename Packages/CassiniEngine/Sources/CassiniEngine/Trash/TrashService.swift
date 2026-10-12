@@ -77,6 +77,15 @@ import CassiniNotebook
 
     public func cancelStop() { stopConfirmation = nil }
 
+    /// The confirmation kept with the scene asks again after Cassini was closed, as Android keeps it in
+    /// `SavedStateHandle`: while the note is in the library and outside Recently Deleted. False when it does not.
+    @discardableResult
+    public func askAgain(_ id: UUID) -> Bool {
+        guard let note = parts.notes.note(id), note.trashedAt == nil, parts.host.mayTrash(id) else { return false }
+        stopConfirmation = TrashedNote(noteID: id, title: note.title)
+        return true
+    }
+
     /// Moves the note now, stopping its job and keeping its progress, and offers Undo on the Library. The note
     /// remembers its job for Restore. False while it is being recorded, or when it is not in the library.
     @discardableResult
@@ -104,6 +113,7 @@ import CassiniNotebook
         let job = note.trashedJob
         guard parts.notes.update(id, { $0.trashedAt = nil; $0.trashedJob = nil }) else { return false }
         parts.queue.restore(id, trashedJob: job)
+        parts.undo.forget(id)
         return true
     }
 
@@ -113,34 +123,39 @@ import CassiniNotebook
     @discardableResult
     public func deleteNow(_ id: UUID) async throws(TrashError) -> Bool {
         try checkVoices()
-        return try await purge(id) { _ in true }
+        var tally = Tally()
+        tally.add(try await purge(id) { _ in true }, id)
+        return try tally.result() == 1
     }
 
     /// "Empty": deletes every note that was in Recently Deleted when it started. A note restored meanwhile stays, and
-    /// so does one moved there again since (it has a new deletion time). Returns how many went.
+    /// so does one moved there again since (it has a new deletion time). A note that fails stays, and the others are
+    /// still deleted (`TrashError.deleteFailed` names every one that stayed). Returns how many went.
     @discardableResult
     public func emptyTrash() async throws(TrashError) -> Int {
         try checkVoices()
-        var deleted = 0
+        var tally = Tally()
         for (id, deletedAt) in trashed() {
-            if try await purge(id, eligible: { $0 == deletedAt }) { deleted += 1 }
+            tally.add(try await purge(id, eligible: { $0 == deletedAt }), id)
         }
-        return deleted
+        return try tally.result()
     }
 
     /// Deletes the notes whose 30 days are over. Runs at launch after the queue's repair, when Cassini comes back to
-    /// the screen, and when Recently Deleted opens. Returns how many went.
+    /// the screen, and when Recently Deleted opens. As with Empty, a note that fails stays for the next run and the
+    /// others still go; the purge is recorded either way, as Android's `recordPurge` after `purgeExpired`. Returns how
+    /// many went.
     @discardableResult
     public func purgeExpired() async throws(TrashError) -> Int {
         try checkVoices()
         let now = parts.clock.now
         let cutoff = TrashPolicy.purgeCutoff(now: now, calendar: parts.calendar)
-        var deleted = 0
+        var tally = Tally()
         for (id, deletedAt) in trashed() where deletedAt < cutoff {
-            if try await purge(id, eligible: { $0 < cutoff }) { deleted += 1 }
+            tally.add(try await purge(id, eligible: { $0 < cutoff }), id)
         }
         parts.host.didPurge(at: now)
-        return deleted
+        return try tally.result()
     }
 
     /// The notes in Recently Deleted with their deletion time, oldest first.
@@ -154,24 +169,46 @@ import CassiniNotebook
         if voicesUnavailable { throw .voicesUnavailable }
     }
 
+    /// What became of one note asked to be deleted.
+    private enum Outcome { case deleted, skipped, failed }
+
+    /// The notes one operation deleted, and those whose delete failed.
+    private struct Tally {
+        var deleted = 0
+        var failed: [UUID] = []
+
+        mutating func add(_ outcome: Outcome, _ id: UUID) {
+            switch outcome {
+            case .deleted: deleted += 1
+            case .skipped: break
+            case .failed: failed.append(id)
+            }
+        }
+
+        func result() throws(TrashError) -> Int {
+            guard failed.isEmpty else { throw .deleteFailed(noteIDs: failed) }
+            return deleted
+        }
+    }
+
     /// Claims the note when it is still in Recently Deleted and `eligible` accepts its deletion time, then deletes it
-    /// step by step. False when it was not claimed.
-    private func purge(_ id: UUID, eligible: (Date) -> Bool) async throws(TrashError) -> Bool {
+    /// step by step. Skipped when it was not claimed; failed when a step failed, and the note stays. Saved voices that
+    /// cannot be read stop the whole run before the note's job is touched.
+    private func purge(_ id: UUID, eligible: (Date) -> Bool) async throws(TrashError) -> Outcome {
         guard let deletedAt = parts.notes.note(id)?.trashedAt, eligible(deletedAt), purging.insert(id).inserted else {
-            return false
+            return .skipped
         }
         defer { purging.remove(id) }
+        try checkVoices()
         await parts.queue.cancelAndRemove(id)
-        guard parts.voices.isReadable else {
-            voicesUnavailable = true
-            throw TrashError.voicesUnavailable
-        }
+        try checkVoices() // They may have gone while the job stopped.
         do {
             try await parts.voices.removeEvidence(noteID: id)
             try await parts.notes.delete(id)
         } catch {
-            throw TrashError.deleteFailed(noteID: id)
+            return .failed
         }
-        return true
+        parts.undo.forget(id)
+        return .deleted
     }
 }

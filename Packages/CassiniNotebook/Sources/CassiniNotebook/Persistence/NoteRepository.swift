@@ -54,12 +54,15 @@ public struct NoteRepository: Sendable {
 
     /// Deletes the note's directory. It is first renamed out of the notes (`<id>.purging`), in one atomic step, so a
     /// delete that Cassini closed in the middle of never leaves audio without its `note.json` for a launch to rebuild
-    /// into a note again; the next `load` finishes it.
+    /// into a note again; the next `load` finishes it. A directory that is already gone counts as deleted, as on
+    /// Android.
     public func delete(_ id: UUID) throws {
         let fileManager = FileManager.default
         let doomed = purgingDirectory(for: id)
         if fileManager.fileExists(atPath: doomed.path) { try fileManager.removeItem(at: doomed) }
-        try fileManager.moveItem(at: directory(for: id), to: doomed)
+        let directory = directory(for: id)
+        guard fileManager.fileExists(atPath: directory.path) else { return }
+        try fileManager.moveItem(at: directory, to: doomed)
         try? fileManager.removeItem(at: doomed) // Gone from the notes already; a leftover goes at the next load.
     }
 
