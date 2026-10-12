@@ -3,10 +3,13 @@ import PackageDescription
 
 let package = Package(
     name: "Cassini",
-    platforms: [.iOS(.v17), .macOS(.v14)],
+    platforms: [.iOS("26.0"), .macOS("26.0")],
     products: [
         .library(name: "CassiniCore", targets: ["CassiniCore"]),
         .library(name: "CassiniNotebook", targets: ["CassiniNotebook"]),
+        .library(name: "CassiniEngine", targets: ["CassiniEngine"]),
+        // Fakes for tests and UI-test launches; the app imports it only in Debug builds.
+        .library(name: "CassiniEngineTesting", targets: ["CassiniEngineTesting"]),
         .library(name: "CassiniInference", targets: ["CassiniInference"]),
         .library(name: "CassiniAudio", targets: ["CassiniAudio"])
     ],
@@ -17,11 +20,14 @@ let package = Package(
         .target(name: "COpusBridge", dependencies: [.product(name: "Copus", package: "swift-opus")]),
         .target(name: "CassiniAudio", dependencies: ["CassiniCore", "COpusBridge"], path: "Packages/CassiniAudio/Sources/CassiniAudio"),
         .testTarget(name: "CassiniInferenceTests", dependencies: ["CassiniInference"], path: "Packages/CassiniInference/Tests/CassiniInferenceTests"),
-        .target(name: "CassiniInference", dependencies: ["CassiniNotebook", .product(name: "FluidAudio", package: "FluidAudio")], path: "Packages/CassiniInference/Sources/CassiniInference"),
+        .target(name: "CassiniInference", dependencies: ["CassiniEngine", "CassiniNotebook", .product(name: "FluidAudio", package: "FluidAudio")], path: "Packages/CassiniInference/Sources/CassiniInference"),
         .target(name: "CZlib", path: "Sources/CZlib", publicHeadersPath: ".", linkerSettings: [.linkedLibrary("z")]),
         .target(name: "CassiniCore", dependencies: ["CZlib"], swiftSettings: [.swiftLanguageMode(.v5)]),
         .testTarget(name: "CassiniCoreTests", dependencies: ["CassiniCore"], swiftSettings: [.swiftLanguageMode(.v5)]),
         .target(name: "CassiniNotebook", dependencies: ["CassiniCore"], path: "Packages/CassiniNotebook/Sources/CassiniNotebook"),
-        .testTarget(name: "CassiniNotebookTests", dependencies: ["CassiniNotebook", "CassiniCore"], path: "Packages/CassiniNotebook/Tests/CassiniNotebookTests")
+        .testTarget(name: "CassiniNotebookTests", dependencies: ["CassiniNotebook", "CassiniCore"], path: "Packages/CassiniNotebook/Tests/CassiniNotebookTests"),
+        .target(name: "CassiniEngine", dependencies: ["CassiniNotebook"], path: "Packages/CassiniEngine/Sources/CassiniEngine"),
+        .target(name: "CassiniEngineTesting", dependencies: ["CassiniEngine", "CassiniNotebook"], path: "Packages/CassiniEngine/Sources/CassiniEngineTesting"),
+        .testTarget(name: "CassiniEngineTests", dependencies: ["CassiniEngine", "CassiniEngineTesting", "CassiniNotebook"], path: "Packages/CassiniEngine/Tests/CassiniEngineTests")
     ]
 )

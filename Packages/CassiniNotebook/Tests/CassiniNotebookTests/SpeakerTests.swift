@@ -74,7 +74,7 @@ import Testing
 @Test func transcriptExportNeverContainsVoiceLinksOrPrivateEvidence() throws {
     var note = Note(title: "Privacy")
     var speaker = NoteSpeaker(id: "speaker", name: "Alex")
-    let privateID = UUID(); speaker.voiceID = privateID; speaker.suggestedVoiceID = privateID; speaker.excludedVoiceIDs = [privateID]
+    let privateID = UUID(); speaker.match = .confirmed(voice: privateID, score: 0.9); speaker.excludedVoiceIDs = [privateID]
     note.speakers = [speaker]
     note.transcript = [.init(text: "Hello", start: 0, end: 1, speaker: "Alex", speakerID: "speaker")]
     note.saveCurrentVersion(name: "Original")

@@ -1,27 +1,6 @@
 import Foundation
 
-public struct NoteSpeaker: Codable, Identifiable, Hashable, Sendable {
-    public var id: String
-    public var name: String
-    public var voiceID: UUID?
-    public var suggestedVoiceID: UUID?
-    public var excludedVoiceIDs: [UUID] = []
-    public init(id: String, name: String) { self.id = id; self.name = name }
-}
-
-public struct TranscriptVersion: Codable, Identifiable, Hashable, Sendable {
-    public var id: UUID = UUID()
-    public var name: String
-    public var portableID: String?
-    public var createdAt: Date = Date()
-    public var segments: [TranscriptSegment]
-    public var speakers: [NoteSpeaker]
-    public init(name: String, segments: [TranscriptSegment], speakers: [NoteSpeaker]) {
-        self.name = name; self.segments = segments; self.speakers = speakers
-    }
-}
-
-public struct SpeakerTurn: Sendable {
+public struct SpeakerTurn: Hashable, Sendable {
     public var speakerID: String
     public var start: Double
     public var end: Double
@@ -124,13 +103,5 @@ extension Note {
         for index in transcript.indices where transcript[index].speakerID == source { transcript[index].speakerID = target }
         speakers?.removeAll { $0.id == source }; refreshSpeakerLabels()
         selectedVersionID = nil; saveCurrentVersion(name: "Merged speakers")
-    }
-}
-
-public enum TrashPolicy {
-    public static let retentionDays = 30
-    public static func daysLeft(since deleted: Date, now: Date = Date(), calendar: Calendar = .current) -> Int {
-        let elapsed = calendar.dateComponents([.day], from: calendar.startOfDay(for: deleted), to: calendar.startOfDay(for: now)).day ?? 0
-        return min(retentionDays, max(0, retentionDays - elapsed))
     }
 }

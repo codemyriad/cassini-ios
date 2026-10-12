@@ -1,6 +1,6 @@
 import Foundation
 
-public enum TranscriptFormat: String, CaseIterable, Identifiable, Sendable {
+public enum TranscriptFormat: String, CaseIterable, Codable, Identifiable, Sendable {
     case text = "txt", subtitles = "srt", webVTT = "vtt", json = "json"
     public var id: String { rawValue }
     public var title: String {
@@ -11,7 +11,7 @@ public enum TranscriptFormat: String, CaseIterable, Identifiable, Sendable {
             let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted, .sortedKeys]; encoder.dateEncodingStrategy = .iso8601
             var copy = note
             func publicSpeakers(_ speakers: [NoteSpeaker]) -> [NoteSpeaker] {
-                speakers.map { value in var s = value; s.voiceID = nil; s.suggestedVoiceID = nil; s.excludedVoiceIDs = []; return s }
+                speakers.map { value in var s = value; s.match = .unmatched; s.excludedVoiceIDs = []; return s }
             }
             copy.speakers = publicSpeakers(copy.speakers ?? [])
             copy.versions = copy.versions?.map { value in var version = value; version.speakers = publicSpeakers(version.speakers); return version }
