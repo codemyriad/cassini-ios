@@ -37,12 +37,29 @@ public enum OpusAudio {
         guard written == info.sampleCount else { throw CassiniError("Truncated Opus audio") }
     }
 
+    /// Encodes `source` (any file AVFoundation reads) as 48 kHz mono Ogg Opus at `destination`. Every channel is mixed
+    /// into the mono signal, so speech on one side of a stereo file is kept. Nothing is left at `destination` when it
+    /// throws, a failure to write the end of the file included.
     public static func encode(_ source: URL, to destination: URL) throws {
+        let sink = try FileSink(destination)
+        do {
+            try encode(source, into: sink)
+            try sink.close()
+        } catch {
+            try? sink.close()
+            try? FileManager.default.removeItem(at: destination)
+            throw error
+        }
+    }
+
+    private static func encode(_ source: URL, into sink: FileSink) throws {
         let input = try AVAudioFile(forReading: source)
         guard let format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 48_000, channels: 1, interleaved: false),
               let converter = AVAudioConverter(from: input.processingFormat, to: format),
               let inputBuffer = AVAudioPCMBuffer(pcmFormat: input.processingFormat, frameCapacity: 4096),
               let output = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 960) else { throw CassiniError("Cannot prepare Opus conversion") }
+        // Without it the converter keeps only the first channel of a stereo source.
+        converter.downmix = true
         var status: Int32 = 0
         guard let encoder = opus_encoder_create(48_000, 1, OPUS_APPLICATION_AUDIO, &status), status == OPUS_OK else { throw failure(status) }
         defer { opus_encoder_destroy(encoder) }
@@ -50,8 +67,6 @@ public enum OpusAudio {
         guard lookahead >= 0, cassini_opus_bitrate(encoder, 48_000) == OPUS_OK else { throw CassiniError("Cannot configure Opus encoder") }
         let preSkip = Int(lookahead)
         let head = Array("OpusHead".utf8) + [1, 1, UInt8(preSkip & 255), UInt8(preSkip >> 8), 0x80, 0xBB, 0, 0, 0, 0, 0]
-        let sink = try FileSink(destination)
-        defer { try? sink.close() }
         let muxer = try OggOpus.LiveMuxer(sink, head: head, tags: CassiniDocument.tagsPacket([]))
         var packet = [UInt8](repeating: 0, count: 4000), samples: Int64 = 0, encoded: Int64 = 0
         var ended = false
@@ -87,7 +102,7 @@ public enum OpusAudio {
             guard size > 0 else { throw failure(size) }
             try muxer.add(Array(packet.prefix(Int(size)))); encoded += 960
         }
-        try muxer.finish(finalGranule: samples + Int64(preSkip)); try sink.flush()
+        try muxer.finish(finalGranule: samples + Int64(preSkip))
     }
     private static func failure(_ code: Int32) -> CassiniError { CassiniError("Opus: \(String(cString: opus_strerror(code)))") }
 }
