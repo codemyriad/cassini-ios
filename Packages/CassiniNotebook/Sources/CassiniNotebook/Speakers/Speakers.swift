@@ -45,9 +45,8 @@ extension Note {
     /// change may run again passes the version's `id` and `date`, so that the rerun makes the same version.
     public mutating func saveCurrentVersion(name: String, id versionID: UUID = UUID(), date: Date = Date()) {
         guard !transcript.isEmpty else { return }
+        guard shownVersionIndex == nil else { return }
         var history = versions ?? []
-        if let id = selectedVersionID, let current = history.first(where: { $0.id == id }),
-           current.segments == transcript, current.speakers == speakers ?? [] { return }
         var version = TranscriptVersion(name: name, segments: transcript, speakers: speakers ?? [])
         version.id = versionID; version.createdAt = date
         history.append(version); selectedVersionID = version.id
@@ -63,12 +62,36 @@ extension Note {
     /// The version numbers a merge shows: the one shown now and the one it adds ("This adds version 3; version 2
     /// stays available"). Versions are numbered from 1 in the order they were kept.
     public var mergeVersionNumbers: (shown: Int, added: Int) {
-        let history = versions ?? []
-        if let id = selectedVersionID, let index = history.firstIndex(where: { $0.id == id }),
-           history[index].segments == transcript, history[index].speakers == speakers ?? [] {
-            return (index + 1, history.count + 1)
-        }
-        return (history.count + 1, history.count + 2)
+        let count = versions?.count ?? 0
+        if let index = shownVersionIndex { return (index + 1, count + 1) }
+        return (count + 1, count + 2)
+    }
+
+    /// The index of the selected version when it holds the transcript and speakers shown.
+    var shownVersionIndex: Int? {
+        guard let id = selectedVersionID, let index = versions?.firstIndex(where: { $0.id == id }),
+              let version = versions?[index], version.segments == transcript, version.speakers == speakers ?? []
+        else { return nil }
+        return index
+    }
+
+    /// Runs a change to the shown speakers that adds no version (naming, a match, a rejection, a new speaker). When
+    /// the selected version held the shown transcript, it takes the change too, so it still holds it: the change
+    /// neither counts as another version nor breaks a run of passage edits. Android keeps speakers on the shown
+    /// variant the same way.
+    mutating func changeShownSpeakers(_ change: (inout Note) -> Void) {
+        let shown = shownVersionIndex
+        change(&self)
+        guard let shown else { return }
+        versions?[shown].segments = transcript
+        versions?[shown].speakers = speakers ?? []
+    }
+
+    /// How many versions the note has: the kept ones, and the transcript shown when no kept version holds it. The
+    /// version chip and Document info both count this way.
+    public var versionCount: Int {
+        guard !transcript.isEmpty || !(versions ?? []).isEmpty else { return 0 }
+        return max(versions?.count ?? 0, mergeVersionNumbers.shown)
     }
 
     /// Names a speaker, trimmed and cut to `Limits.nameMaxLength`; a blank name changes nothing.
@@ -76,7 +99,9 @@ extension Note {
         guard let index = speakers?.firstIndex(where: { $0.id == id }) else { return }
         let trimmed = String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(Limits.nameMaxLength))
         guard !trimmed.isEmpty else { return }
-        speakers?[index].name = trimmed; refreshSpeakerLabels()
+        changeShownSpeakers { note in
+            note.speakers?[index].name = trimmed; note.refreshSpeakerLabels()
+        }
     }
 
     /// Shows everything `source` said as `target`, keeping the transcript before the merge as a version. The merged
@@ -93,12 +118,12 @@ extension Note {
         speakers?.removeAll { $0.id == source }
         refreshSpeakerLabels()
         selectedVersionID = nil
-        saveCurrentVersion(name: "Merged speakers", id: stamp.after, date: stamp.date)
+        saveCurrentVersion(name: Self.mergedVersionName, id: stamp.after, date: stamp.date)
     }
 
     public mutating func addSpeaker(id: String, name: String) {
         let trimmed = String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(Limits.nameMaxLength))
         guard !trimmed.isEmpty, speaker(id) == nil else { return }
-        speakers = (speakers ?? []) + [NoteSpeaker(id: id, name: trimmed)]
+        changeShownSpeakers { $0.speakers = ($0.speakers ?? []) + [NoteSpeaker(id: id, name: trimmed)] }
     }
 }

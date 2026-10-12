@@ -24,7 +24,8 @@ final class SpeakerNamingFlowTests: XCTestCase {
         XCTAssertTrue(yes.waitForExistence(timeout: 10))
         XCTAssertTrue(element(app, containing: "Is this Sam Rivera?").exists)
         yes.tap()
-        XCTAssertTrue(app.staticTexts["Sam Rivera"].waitForExistence(timeout: 5), "the passage carries the name")
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Sam Rivera, at")).firstMatch
+            .waitForExistence(timeout: 5), "the passage carries the name")
         XCTAssertFalse(app.buttons["suggestionYes"].exists)
 
         app.navigationBars.buttons.element(boundBy: 0).tap()

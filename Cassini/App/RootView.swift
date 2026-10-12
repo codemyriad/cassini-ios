@@ -45,7 +45,7 @@ struct RootView: View {
             if restoresNavigation { router.restore(savedPath) }
         }
         .onChange(of: sizeClass) { _, size in router.isSplit = size == .regular }
-        .onChange(of: router.path) { _, _ in if restoresNavigation { savedPath = router.encodedPath } }
+        .onChange(of: router.encodedPath) { _, path in if restoresNavigation { savedPath = path } }
         .environment(\.restoresSceneState, restoresNavigation)
     }
 }
@@ -55,7 +55,7 @@ private struct RouteDestination: View {
     var body: some View {
         switch route {
         case .library: LibraryView()
-        case .note(let id, _, _): NoteDetailView(noteID: id)
+        case .note(let id, let query, let start): NoteDetailView(noteID: id, query: query, start: start)
         case .settings: SettingsView()
         case .savedVoices: SavedVoicesView()
         case .trash: TrashView()

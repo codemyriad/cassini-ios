@@ -45,7 +45,7 @@ import CassiniEngineTesting
     /// Named sets of notes for UI tests and screenshots. `statuses` has a note for each Library row status but
     /// Recording (the recording seed shows that one).
     enum Seed: String, CaseIterable {
-        case library, search, speakers, trash, voices, processing, recording, statuses
+        case library, search, speakers, trash, voices, processing, recording, statuses, long
     }
 
     var calendar: Calendar {

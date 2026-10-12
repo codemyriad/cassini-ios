@@ -69,6 +69,14 @@ import CassiniNotebook
     /// Whether the note has a stopped transcription to resume.
     func hasSavedProgress(_ id: UUID) -> Bool { checkpoints.exists(id) }
 
+    /// The words of the note's saved progress, for the read-only draft of a stopped or failed job; empty without any,
+    /// or when it cannot be read. Read off the main actor: a long recording's checkpoint holds hours of words.
+    func savedDraft(_ id: UUID) async -> [DraftWord] { await Self.draft(id, in: checkpoints) }
+
+    @concurrent private static func draft(_ id: UUID, in checkpoints: any CheckpointStoring) async -> [DraftWord] {
+        (try? checkpoints.load(id))?.draftWords ?? []
+    }
+
     /// Stop and keep progress on the running note (also Cancel analysis); on a queued one, Remove from queue.
     func stop(_ id: UUID) {
         guard coordinator?.stop(id) != true else { return }

@@ -9,12 +9,12 @@ struct RenameNoteSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form { TextField("Recording title", text: $title).accessibilityIdentifier("recordingTitleField") }
-                .navigationTitle("Rename recording").navigationBarTitleDisplayMode(.inline)
+            Form { TextField(NoteCopy.titleField, text: $title).accessibilityIdentifier("recordingTitleField") }
+                .navigationTitle(NoteCopy.rename).navigationBarTitleDisplayMode(.inline)
                 .toolbar {
-                    ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                    ToolbarItem(placement: .cancellationAction) { Button(NoteCopy.cancel) { dismiss() } }
                     ToolbarItem(placement: .confirmationAction) {
-                        Button("Save") {
+                        Button(NoteCopy.save) {
                             guard let fitted = NoteTitles.fit(title) else { return }
                             if library.update(noteID, { $0.title = fitted }) { dismiss() }
                         }.disabled(NoteTitles.fit(title) == nil)

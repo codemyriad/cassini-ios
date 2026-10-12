@@ -1,25 +1,66 @@
 import SwiftUI
 import CassiniNotebook
 
+/// The note's title and, outside reading mode, the subtitle "Today, 10:02 · 48:13".
 struct NoteHeader: View {
     let note: Note
-    /// Shows or hides the trust banner of a note from a Cassini document.
-    var toggleTrust: () -> Void = {}
+    let subtitle: NoteSubtitle?
     @Environment(\.locale) private var locale
+    @Environment(\.timeZone) private var timeZone
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 15) {
-            HStack {
-                StatusPill(status: note.status)
-                if let trust = DocumentTrust.of(note) { DocumentTrustChip(trust: trust, toggle: toggleTrust) }
-                Spacer()
-                Text(note.createdAt, format: Date.FormatStyle(date: .abbreviated, time: .shortened)).font(.caption).foregroundStyle(Color.muted)
+        #if DEBUG
+        let _ = RenderProbe.rendered("header")
+        #endif
+        VStack(alignment: .leading, spacing: 8) {
+            Text(note.title).font(.system(.largeTitle, design: .serif)).tracking(-0.7).foregroundStyle(Color.ink)
+                .textSelection(.enabled).accessibilityAddTraits(.isHeader).accessibilityIdentifier("noteTitle")
+            if let subtitle {
+                Text(NoteCopy.subtitle(subtitle, locale: locale, timeZone: timeZone))
+                    .font(.subheadline.monospacedDigit()).foregroundStyle(Color.muted)
+                    .accessibilityIdentifier("noteSubtitle")
             }
-            Text(note.title).font(.system(.largeTitle, design: .serif)).tracking(-0.7).foregroundStyle(Color.ink).textSelection(.enabled).accessibilityIdentifier("noteTitle")
-            HStack(spacing: 16) {
-                Label(TimeText.clock(note.duration), systemImage: "waveform")
-                if note.wordCount > 0 { Text("\(note.wordCount.formatted()) words") }
-                Text(locale.localizedString(forIdentifier: note.language) ?? note.language).lineLimit(1)
-            }.font(.caption).foregroundStyle(Color.muted)
         }
+    }
+}
+
+/// The chips row of the reading content: the trust chip (a tap shows or hides the trust banner), the version chip
+/// (opens the versions) and the speaker count (opens Speakers).
+struct NoteChipsRow: View {
+    let chips: NoteChips
+    let toggleTrust: () -> Void
+    let openVersions: () -> Void
+    let openSpeakers: () -> Void
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) { content }
+            VStack(alignment: .leading, spacing: 8) { content }
+        }
+    }
+
+    @ViewBuilder private var content: some View {
+        if let trust = chips.trust { DocumentTrustChip(trust: trust, toggle: toggleTrust).frame(minHeight: HitTarget.minimum) }
+        if let version = chips.version {
+            Button(action: openVersions) {
+                Label(NoteCopy.version(version), systemImage: "clock.arrow.circlepath")
+                    .font(.caption.weight(.medium)).foregroundStyle(Color.ink)
+                    .padding(.horizontal, 10).padding(.vertical, 5)
+                    .background(Color.ink.opacity(0.06), in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .frame(minHeight: HitTarget.minimum)
+            .accessibilityIdentifier("versionChip")
+        }
+        // iOS: the count opens the note's Speakers list (Android shows it as a caption).
+        Button(action: openSpeakers) {
+            Label(NoteCopy.speakerCount(chips.speakers), systemImage: "person.2")
+                .font(.caption.weight(.medium)).foregroundStyle(Color.muted)
+                .padding(.horizontal, 10).padding(.vertical, 5)
+                .background(Color.ink.opacity(0.06), in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .frame(minHeight: HitTarget.minimum)
+        .accessibilityIdentifier("speakersButton")
     }
 }
