@@ -15,6 +15,8 @@ final class TextLimitTests: XCTestCase {
 
     /// Types past `limit` into `field`, then one more character; it shows `limit` characters each time.
     @MainActor private func fillPastTheLimit(_ field: XCUIElement, _ limit: Int, file: StaticString = #filePath, line: UInt = #line) {
+        // The cursor goes to the end, so the deletes clear the whole field.
+        field.coordinate(withNormalizedOffset: CGVector(dx: 0.98, dy: 0.5)).tap()
         let count = (field.value as? String)?.count ?? 0
         field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: count + 2))
         field.typeText(String(repeating: "a", count: limit + 1))

@@ -78,7 +78,7 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(banner.waitForExistence(timeout: 15))
         XCTAssertTrue(waitFor(banner, label: "Transcribing Weekly planning call"), banner.label)
         XCTAssertTrue(waitFor(banner, label: "1 more in queue"), banner.label)
-        XCTAssertTrue(app.buttons["Import audio"].isEnabled)
+        XCTAssertTrue(app.buttons["importButton"].isEnabled)
         XCTAssertEqual(app.buttons["recordButton"].label, "Record a new note")
         banner.tap()
         XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(timeout: 5))

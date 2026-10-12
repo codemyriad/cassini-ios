@@ -110,6 +110,7 @@ struct CaptureBar: View {
                     .font(.subheadline.weight(.semibold)).frame(minWidth: 88, minHeight: 52)
             }
             .accessibilityHint(unavailable ? LibraryCopy.unavailableTitle : "")
+            .accessibilityIdentifier("importButton")
             Button { Task { await recording.start() } } label: {
                 if let active {
                     Label(LibraryCopy.recordingButton(TimeText.clock(active.elapsed)), systemImage: "waveform")
