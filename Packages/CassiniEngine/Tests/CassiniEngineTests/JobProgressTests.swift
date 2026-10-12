@@ -15,14 +15,13 @@ import CassiniNotebook
         func reading() -> (percent: Int, charging: Bool)? { (64, true) }
     }
 
-    @Test func theRowsFollowEveryPublishAndTheFinalizationIsMeasured() {
+    @Test func theRowsFollowTheCardAndTheFinalizationIsMeasured() {
         let uptime = Uptime()
-        let progress = JobProgress(battery: Battery(), uptimeMs: { uptime.value })
-        let id = UUID()
-        var publishes = 0, finalization: Int64?
-        progress.onPublish = { publishes += 1 }
-        progress.onFinalization = { finalization = $0 }
+        var finalization: Int64?
+        let progress = JobProgress(battery: Battery(), uptimeMs: { uptime.value }, onFinalization: { finalization = $0 })
+        let id = UUID(), other = UUID()
         #expect(progress.phase(for: id) == nil)
+        #expect(progress.processingPhase(for: id) == nil)
         progress.begin(id, finalizationMs: nil)
         progress.apply(.started(JobStart(totalMs: 10_000, speakers: false, prints: false)))
         progress.apply(.windowDone(doneMs: 5_000, totalMs: 10_000, words: []))
@@ -30,10 +29,11 @@ import CassiniNotebook
         uptime.advance(1_000)
         progress.refresh()
         #expect(progress.fraction == 0.5)
-        #expect(progress.processingPhase == .transcribing)
+        #expect(progress.processingPhase(for: id) == .transcribing)
+        #expect(progress.fraction(for: id) == 0.5)
+        #expect(progress.fraction(for: other) == nil && progress.processingPhase(for: other) == nil)
         guard case .transcribing(let running, _) = progress.phase(for: id) else { Issue.record("Not running"); return }
         #expect(running.battery == .pluggedIn(percentNow: 64))
-        #expect(publishes >= 3)
         progress.apply(.stageChanged(.saving))
         uptime.advance(700)
         progress.apply(.ended(.done))

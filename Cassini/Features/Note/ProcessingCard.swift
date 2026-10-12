@@ -28,7 +28,7 @@ struct ProcessingCard: View {
             Text("Queued", tableName: "Processing").font(.subheadline.weight(.medium))
             Text("Starts after the current transcription.", tableName: "Processing")
                 .font(.caption).foregroundStyle(Color.muted)
-            Button { processing.cancel(note.id) } label: {
+            Button { processing.dequeue(note.id) } label: {
                 Text("Remove from queue", tableName: "Processing").frame(maxWidth: .infinity, minHeight: HitTarget.minimum)
             }
             .buttonStyle(.bordered)

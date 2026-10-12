@@ -70,6 +70,27 @@ enum ProgressText {
         }
     }
 
+    /// Line 2 of the library's progress banner (WP9): "About 6–9 min left", "About 6 min left", "Under 1 min left",
+    /// "Calculating time left…", "Finishing…".
+    static func timeLeftLine(_ timeLeft: TimeLeft) -> String {
+        switch timeLeft {
+        case .calculating: return String(localized: "Calculating time left…", table: "Processing")
+        case .finishing: return String(localized: "Finishing…", table: "Processing")
+        case .range:
+            guard let span = timeLeft.minutes else {
+                return noBreakAfterNumbers(String(localized: "Under 1 min left", table: "Processing"))
+            }
+            let duration = if span.lowerBound == span.upperBound {
+                hoursMinutes(span.lowerBound)
+            } else if span.upperBound < 60 {
+                noBreak(String(localized: "\(span.lowerBound)–\(span.upperBound) min", table: "Processing"))
+            } else {
+                hoursMinutes(span.lowerBound) + "–" + hoursMinutes(span.upperBound)
+            }
+            return String(localized: "About \(duration) left", table: "Processing")
+        }
+    }
+
     /// The Battery at finish stat: "54% → about 41%", "Plugged in", "Measuring…"; nil when hidden.
     static func battery(_ battery: BatteryLine) -> String? {
         switch battery {
@@ -107,4 +128,9 @@ enum ProgressText {
     }
 
     private static func noBreak(_ text: String) -> String { text.replacingOccurrences(of: " ", with: "\u{00A0}") }
+
+    /// A no-break space after each number, as in "Under 1\u{00A0}min left".
+    private static func noBreakAfterNumbers(_ text: String) -> String {
+        text.replacingOccurrences(of: #"(\d) "#, with: "$1\u{00A0}", options: .regularExpression)
+    }
 }

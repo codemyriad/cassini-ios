@@ -9,9 +9,9 @@ import CassiniNotebook
     func reading() -> (percent: Int, charging: Bool)?
 }
 
-/// The running job's progress card, as the Note screen and the library rows see it. The queue's driver calls `begin`
-/// when a job starts, `apply` for each of its events in order, and `end` when it is over; in between this ticks the
-/// job's `ProgressTracker` once a second.
+/// The running job's progress, the one place the Note screen's card and the library rows read it from. The queue's
+/// driver calls `begin` when a job starts, `apply` for each of its events in order, and `end` when it is over; in
+/// between this ticks the job's `ProgressTracker` once a second.
 @MainActor @Observable public final class JobProgress {
     public private(set) var noteID: UUID?
     public private(set) var phase: JobPhase = .starting
@@ -22,21 +22,27 @@ import CassiniNotebook
     @ObservationIgnored private let latestReading = BatteryBox()
     @ObservationIgnored private let uptimeMs: @Sendable () -> Int64
     @ObservationIgnored private var finalizingSince: Int64?
-    /// Called with the time from the end of the speaker analysis to the saved note, for the next estimate.
-    @ObservationIgnored public var onFinalization: ((Int64) -> Void)?
-    /// Called after every publish, at events and ticks alike.
-    @ObservationIgnored public var onPublish: (() -> Void)?
+    @ObservationIgnored private let onFinalization: (Int64) -> Void
 
     static let tickInterval = Duration.seconds(1)
 
+    /// `onFinalization` gets the time from the end of the speaker analysis to the saved note, for the next estimate.
     public init(battery: (any BatteryMonitoring)? = nil,
-                uptimeMs: @escaping @Sendable () -> Int64 = TranscriptionJob.uptimeMs) {
+                uptimeMs: @escaping @Sendable () -> Int64 = TranscriptionJob.uptimeMs,
+                onFinalization: @escaping (Int64) -> Void = { _ in }) {
         self.battery = battery
         self.uptimeMs = uptimeMs
+        self.onFinalization = onFinalization
     }
 
     /// The progress of `id`'s job while it runs.
     public func phase(for id: UUID) -> JobPhase? { noteID == id ? phase : nil }
+
+    /// What `id`'s library row shows while its job runs.
+    public func processingPhase(for id: UUID) -> ProcessingPhase? { noteID == id ? processingPhase : nil }
+
+    /// The bar of `id`'s library row, 0 to 1; nil while unknown or when it does not run.
+    public func fraction(for id: UUID) -> Double? { noteID == id ? fraction : nil }
 
     public func begin(_ id: UUID, finalizationMs: Int64?) {
         end()
@@ -55,7 +61,7 @@ import CassiniNotebook
         case .stageChanged(.matching, _, _), .stageChanged(.saving, _, _):
             if finalizingSince == nil { finalizingSince = now }
         case .ended(.done):
-            if let since = finalizingSince { onFinalization?(now - since) }
+            if let since = finalizingSince { onFinalization(now - since) }
         default:
             break
         }
@@ -108,7 +114,6 @@ import CassiniNotebook
 
     private func publish() {
         if phase != tracker.phase { phase = tracker.phase }
-        onPublish?()
     }
 
     private func readBattery() { latestReading.value = battery?.reading() }

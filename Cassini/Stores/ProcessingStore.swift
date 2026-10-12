@@ -5,6 +5,11 @@ import CassiniNotebook
 
 /// The transcription queue: one job at a time, in order, each run by a `TranscriptionJobRunning`. The queue lives in
 /// memory; a stopped job keeps its checkpoint, so transcribing the note again resumes it.
+///
+/// Saved progress (`work/`) is dropped only by `cancel` (Cancel, Recently Deleted), by a finished transcription, and by
+/// a failure no new try can use (`CHECKPOINT_MISMATCH`, `LONG`). Taking a note out of the queue (Remove from queue,
+/// Stop on a queued note, iOS taking the background time back) keeps it. The running job's progress is read from
+/// `progress`, not from `ProcessingState.running`.
 @MainActor @Observable final class ProcessingStore {
     private(set) var state = ProcessingState()
 
@@ -18,6 +23,7 @@ import CassiniNotebook
     @ObservationIgnored private let notices: NoticesStore
     @ObservationIgnored private let clock: any AppClock
     @ObservationIgnored private var speakersOnly: Set<UUID> = []
+    @ObservationIgnored private var runningKind: JobKind?
     /// Notes whose audio is still being written; they cannot be queued yet.
     @ObservationIgnored private var finalizing: Set<UUID> = []
     @ObservationIgnored private var task: Task<Void, Never>?
@@ -30,7 +36,6 @@ import CassiniNotebook
         self.job = job; self.progress = progress; self.checkpoints = checkpoints; self.analyzer = analyzer
         self.background = background; self.library = library; self.settings = settings; self.notices = notices
         self.clock = clock
-        progress.onPublish = { [weak self] in self?.showProgress() }
     }
 
     func speakerModelsReady() async -> Bool { await analyzer.modelStatus() == .ready }
@@ -38,30 +43,48 @@ import CassiniNotebook
     func beginFinalizing(_ id: UUID) { finalizing.insert(id) }
     func endFinalizing(_ id: UUID) { finalizing.remove(id) }
 
+    /// Queues the note. A transcription takes the speech language from Settings, unless the note has saved progress:
+    /// that resumes in the language it began in, as the checkpoint must match it.
     func enqueue(_ id: UUID, speakersOnly onlySpeakers: Bool = false) {
         guard let note = library.note(id), note.trashedAt == nil, !note.isRecording, note.audio.isPlayable,
               !state.isRunning(id), !finalizing.contains(id), !state.isQueued(id), library.audioURL(note) != nil else { return }
-        let language = settings.speechLanguage
+        let language = onlySpeakers || checkpoints.exists(id) ? nil : settings.speechLanguage
         guard library.update(id, { note in
             note.status = .queued; note.failure = nil
-            if !onlySpeakers { note.language = language }
+            if let language { note.language = language }
         }) else { return }
         if onlySpeakers { speakersOnly.insert(id) }
         state.queue.append(id)
         processNext()
     }
 
-    /// Takes the note out of the queue or cancels its job and drops its progress; its earlier transcript stays.
-    func cancel(_ id: UUID, failure: JobFailure? = nil) {
-        state.queue.removeAll { $0 == id }
-        speakersOnly.remove(id)
-        if state.isRunning(id) { stop?.stop(.cancel) } else { try? checkpoints.discard(id) }
-        resetStatus(id, failure: failure)
+    /// Whether the note has a stopped transcription to resume.
+    func hasSavedProgress(_ id: UUID) -> Bool { checkpoints.exists(id) }
+
+    /// Cancel (and Recently Deleted): stops the job or takes it out of the queue and drops its saved progress; the
+    /// earlier transcript stays. A speakers-only job has no progress of its own, so a paused transcription keeps its.
+    func cancel(_ id: UUID) {
+        if state.isRunning(id) {
+            stop?.stop(.cancel)
+        } else {
+            let transcribes = !speakersOnly.contains(id)
+            removeFromQueue(id)
+            if transcribes { try? checkpoints.discard(id) }
+        }
+        resetStatus(id, failure: nil)
+    }
+
+    /// Remove from queue: the note leaves the queue and keeps any saved progress, to resume later.
+    func dequeue(_ id: UUID) {
+        guard state.isQueued(id) else { return }
+        removeFromQueue(id)
+        resetStatus(id, failure: nil)
     }
 
     /// Stop and keep progress: the running job keeps what it has transcribed, and transcribing the note again resumes.
+    /// A queued note leaves the queue with its saved progress.
     func stop(_ id: UUID) {
-        guard state.isRunning(id) else { cancel(id); return }
+        guard state.isRunning(id) else { dequeue(id); return }
         stop?.stop(.pause(.user))
     }
 
@@ -80,6 +103,7 @@ import CassiniNotebook
               library.update(id, { $0.status = .transcribing }) else { processNext(); return }
         state.running = RunningJob(noteID: id, title: note.title)
         let kind: JobKind = speakersOnly.remove(id) != nil ? .speakersOnly : .transcribe
+        runningKind = kind
         let record = Job(noteID: id, seq: 0, kind: kind, state: .running, language: note.language.isEmpty
                          ? settings.speechLanguage : note.language, enqueuedAt: clock.now)
         let signal = StopSignal()
@@ -117,21 +141,17 @@ import CassiniNotebook
         progress.apply(event)
     }
 
-    /// The running row follows the progress card.
-    private func showProgress() {
-        guard let id = state.running?.noteID, progress.noteID == id else { return }
-        let phase = progress.processingPhase, fraction = progress.fraction
-        if state.running?.phase != phase { state.running?.phase = phase }
-        if state.running?.fraction != fraction { state.running?.fraction = fraction }
-    }
-
     private func finish(_ id: UUID, _ outcome: JobOutcome) {
+        let transcribes = runningKind != .speakersOnly
         switch outcome {
         case .done, .adoptPending:
             library.update(id) { $0.status = .ready; $0.failure = nil }
         case .paused(let reason):
             resetStatus(id, failure: reason == .user ? nil : .interrupted)
+            if transcribes { postPaused(id, reason: reason) }
         case .failed(let failure):
+            // No new try can use this checkpoint: Transcribe again starts over.
+            if transcribes, failure == .checkpointMismatch || failure == .long { try? checkpoints.discard(id) }
             library.update(id) { $0.status = .failed; $0.failure = failure }
         case .downloadFailed(let failure):
             library.update(id) { $0.status = .failed; $0.failure = .download(failure.error) }
@@ -140,24 +160,50 @@ import CassiniNotebook
             notices.post(String(localized: "A speech model is needed. Allow model downloads in Settings, then try again. Audio stays on this device.",
                                 table: "Processing"))
         case .cancelled:
-            try? checkpoints.discard(id)
+            if transcribes { try? checkpoints.discard(id) }
         }
         if let backgroundToken { background.end(backgroundToken) }
         backgroundToken = nil
         progress.end()
         state.running = nil
+        runningKind = nil
         stop = nil
         task = nil
         processNext()
+    }
+
+    private func removeFromQueue(_ id: UUID) {
+        state.queue.removeAll { $0 == id }
+        speakersOnly.remove(id)
     }
 
     private func resetStatus(_ id: UUID, failure: JobFailure?) {
         library.update(id) { $0.status = $0.transcript.isEmpty ? .audioOnly : .ready; $0.failure = failure }
     }
 
-    /// iOS takes the background time back: the running job stops now and keeps its progress, and the queue empties.
+    /// Says where a stopped transcription stands: how far its saved progress goes, or that it found no words yet.
+    private func postPaused(_ id: UUID, reason: PauseReason) {
+        guard let checkpoint = try? checkpoints.load(id), checkpoint.doneMs > 0 else {
+            notices.post(String(localized: "Paused before any words were found. Resume to start transcribing.",
+                                table: "Processing"))
+            return
+        }
+        let done = TimeText.clock(Double(checkpoint.doneMs) / 1000)
+        let total = TimeText.clock(Double(max(checkpoint.totalMs, checkpoint.doneMs)) / 1000)
+        notices.post(reason == .user
+            ? String(localized: "Paused at \(done) of \(total). Pick up where you left off. The draft so far is kept.",
+                     table: "Processing")
+            : String(localized: "Paused at \(done) of \(total). iOS ended the time Cassini had in the background. Resume to continue where it stopped.",
+                     table: "Processing"))
+    }
+
+    /// iOS takes the background time back: the running job stops now and keeps its progress, and the queued notes
+    /// leave the queue with theirs.
     private func suspendAll() {
-        for id in state.queue { cancel(id, failure: .interrupted) }
+        for id in state.queue {
+            removeFromQueue(id)
+            resetStatus(id, failure: .interrupted)
+        }
         if let running = state.running?.noteID {
             stop?.stop(.pause(.system))
             resetStatus(running, failure: .interrupted)

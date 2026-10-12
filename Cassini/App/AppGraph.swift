@@ -44,13 +44,12 @@ import CassiniNotebook
     /// The queue and the job it runs. Without a library there is nothing to transcribe, so the job finds no note.
     private static func processing(environment: AppEnvironment, library: LibraryStore, voices: VoicesStore,
                                    settings: SettingsStore, notices: NoticesStore) -> ProcessingStore {
-        let checkpoints = CheckpointFiles(root: environment.root)
-        let progress = JobProgress(battery: UIDeviceBattery())
-        progress.onFinalization = { [settings] in settings.recordFinalization($0) }
+        let progress = JobProgress(battery: UIDeviceBattery(), onFinalization: { [settings] in settings.recordFinalization($0) })
+        let checkpoints: any CheckpointStoring = library.noteStore.map { CheckpointFiles(notes: $0) } ?? NoLibraryWork()
         let job: any TranscriptionJobRunning = library.noteStore.map {
             TranscriptionJob(notes: $0, transcriber: environment.transcriber, analyzer: environment.analyzer,
-                             checkpoints: checkpoints, host: AppJobHost(settings: settings, voices: voices),
-                             clock: environment.clock)
+                             checkpoints: checkpoints, provenance: ProvenanceFiles(notes: $0),
+                             host: AppJobHost(settings: settings, voices: voices), clock: environment.clock)
         } ?? NoLibraryJob()
         return ProcessingStore(job: job, progress: progress, checkpoints: checkpoints, analyzer: environment.analyzer,
                                background: environment.background, library: library, settings: settings,
@@ -102,6 +101,14 @@ import CassiniNotebook
         startup.register(.reconcile) { [processing] in processing.reconcileOnStart() }
         startup.register(.purge) { [trash] in await trash.purgeExpired() }
     }
+}
+
+/// The work of the notes when the library could not be opened: there are none.
+private struct NoLibraryWork: CheckpointStoring {
+    func load(_ noteID: UUID) throws -> CheckpointState? { nil }
+    func save(_ state: CheckpointState, for noteID: UUID) throws { throw CocoaError(.fileWriteUnknown) }
+    func discard(_ noteID: UUID) throws {}
+    func exists(_ noteID: UUID) -> Bool { false }
 }
 
 /// The job when the library could not be opened: there is no note to transcribe.
