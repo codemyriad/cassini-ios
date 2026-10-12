@@ -9,6 +9,7 @@ struct NoteDetailView: View {
     @Environment(ProcessingStore.self) private var processing
     @Environment(RecordingStore.self) private var recording
     @Environment(Router.self) private var router
+    @Environment(ErrorPresenter.self) private var errors
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var query = ""
     @State private var showSearch = false
@@ -95,10 +96,14 @@ struct NoteDetailView: View {
         if let problem = note.playbackProblem { NoticeCard(title: problem, symbol: "waveform.slash") }
     }
 
-    /// Transcribe; without consent for the speech model, the model download screen asks first.
+    /// Transcribe; without consent for the speech model, the model download screen asks first, and a refusal says why.
     private func requestTranscription() {
         Task {
-            if await processing.transcribe(noteID) == .needsConsent { router.push(.modelDownload(noteID: noteID)) }
+            switch await processing.transcribe(noteID) {
+            case .needsConsent: router.push(.modelDownload(noteID: noteID))
+            case .refused(let refusal): errors.present(refusal.message)
+            case .queued: break
+            }
         }
     }
 

@@ -77,6 +77,60 @@ import CassiniEngineTesting
         XCTAssertNil(test.graph.processing.state.running)
     }
 
+    // ports: ProcessingCoordinatorTest#aQueuedJobWithoutConsentEndsNeedsConsentInTheRealJob
+    func testAQueuedJobWithoutConsentEndsNeedsConsentInTheRealJob() async throws {
+        // A queue from before the model was removed: the job is queued, there is no consent and nothing installed.
+        let test = TestGraph(transcriber: FakeTranscriber(.returns([], total: 1), status: .notDownloaded))
+        defer { test.tearDown() }
+        var note = Note(title: "Waiting", audioFilename: "audio.caf")
+        note.duration = 2
+        try NoteRepository(root: test.root).save(note)
+        try Data().write(to: test.root.appendingPathComponent(note.id.uuidString).appendingPathComponent("audio.caf"))
+        try JobRepository(root: test.root).save([Job(noteID: note.id, seq: 1, kind: .transcribe, enqueuedAt: test.clock.now)])
+        await test.graph.start()
+        let coordinator = try XCTUnwrap(test.graph.processing.coordinator)
+
+        coordinator.drain()
+        await waitUntil { coordinator.isDraining }
+        await coordinator.awaitIdle()
+        XCTAssertEqual(try JobRepository(root: test.root).load().map(\.state), [.needsConsent])
+        XCTAssertEqual(test.notifier.posted.map(\.noteID), [note.id])
+        XCTAssertEqual(test.notifier.posted.first?.kind, .readyToTranscribe)
+    }
+
+    /// Android's `RecordingController.next`: with the speech model installed nothing needs consent, so a finished
+    /// recording is queued even though no consent was ever recorded.
+    func testAFinishedRecordingIsQueuedWhenTheModelIsInstalledWithoutRecordedConsent() async throws {
+        let test = TestGraph(transcriber: FakeTranscriber(.frozen(done: 1, total: 2)))
+        defer { test.tearDown() }
+        let graph = test.graph
+        await graph.start()
+        graph.settings.identifySpeakers = false
+        XCTAssertNil(graph.settings.modelsConsentAt)
+
+        await graph.recording.start()
+        let id = try XCTUnwrap(graph.recording.state.noteID)
+        try await Task.sleep(for: .milliseconds(300))
+        await graph.recording.finish()
+        await waitUntil { graph.processing.state.isRunning(id) }
+        XCTAssertNotEqual(graph.router.path.last, .modelDownload(noteID: id), "nothing to ask")
+        graph.processing.stopAll()
+    }
+
+    func testAFinishedRecordingWithoutConsentOrInstalledModelOffersTheDownload() async throws {
+        let test = TestGraph(transcriber: FakeTranscriber(.returns([], total: 1), status: .notDownloaded))
+        defer { test.tearDown() }
+        let graph = test.graph
+        await graph.start()
+
+        await graph.recording.start()
+        let id = try XCTUnwrap(graph.recording.state.noteID)
+        try await Task.sleep(for: .milliseconds(300))
+        await graph.recording.finish()
+        XCTAssertEqual(graph.router.path.last, .modelDownload(noteID: id))
+        XCTAssertNil(graph.processing.state.jobs[id], "asking queues nothing")
+    }
+
     /// An analysis that began before Forget everyone keeps no voiceprints, even though it finishes after it.
     func testASpeakerAnalysisThatStartedBeforeForgetEveryoneKeepsNoVoiceprints() async throws {
         let late = SpeakerAnalysis(turns: [.init(speakerID: "late", start: 0, end: 12)],

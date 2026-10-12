@@ -28,7 +28,7 @@ import CassiniNotebook
         playback = PlaybackStore(playback: environment.playback, library: library, errors: errors, clock: environment.clock)
         processing = ProcessingStore(
             coordinator: Self.queue(environment, library: library, voices: voices, settings: settings),
-            analyzer: environment.analyzer)
+            transcriber: environment.transcriber, analyzer: environment.analyzer, clock: environment.clock)
         recording = RecordingStore(capture: environment.capture, audio: environment.audio, storage: environment.storage,
                                    library: library, processing: processing, playback: playback, settings: settings,
                                    router: router, errors: errors, notices: notices, clock: environment.clock,

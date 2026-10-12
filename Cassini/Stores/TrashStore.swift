@@ -38,7 +38,11 @@ import CassiniNotebook
         let job = processing.moveToTrash(id)
         if playback.state.noteID == id { playback.stop() }
         let now = clock.now
-        guard library.update(id, { $0.trashedAt = now; $0.trashedJob = job }) else { return false }
+        guard library.update(id, { $0.trashedAt = now; $0.trashedJob = job }) else {
+            // The note stays where it was: so does its job.
+            processing.restore(id, trashedJob: job)
+            return false
+        }
         router.close(noteID: id)
         return true
     }
@@ -49,13 +53,15 @@ import CassiniNotebook
         processing.restore(id, trashedJob: job)
     }
 
-    /// Removes the note's voice samples, then its files. Needs the saved voices to be readable.
+    /// Removes the note's voice samples, then its files, then its job. Needs the saved voices to be readable; when a
+    /// step fails the note stays in Recently Deleted with its job.
     func deletePermanently(_ id: UUID) async {
         guard library.note(id)?.trashedAt != nil else { return }
-        await processing.forget(id)
+        await processing.stopForDelete(id)
         do {
             try voices.removeEvidence(noteID: id)
             try await library.delete(id)
+            await processing.forget(id)
         } catch let error as VoicesStore.Unavailable {
             errors.present(error.message)
         } catch {

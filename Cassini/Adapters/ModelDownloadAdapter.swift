@@ -1,5 +1,4 @@
 import Foundation
-import Speech
 import CassiniEngine
 import CassiniNotebook
 
@@ -44,11 +43,11 @@ import CassiniNotebook
         await processing.transcribe(noteID, kind: processing.state.jobs[noteID]?.kind ?? .transcribe)
     }
 
-    /// The speech model is installed now; the speaker models download with the first speaker analysis.
+    /// The speech model is installed now, with its progress and failure in `ProcessingStore.speechInstall`; the
+    /// speaker models download with the first speaker analysis.
     func downloadModels(_ parts: [ModelPart]) {
         guard parts.contains(.speech) else { return }
-        let language = settings.speechLanguage
-        Task.detached { try? await SpeechAssets.install(language: language) }
+        processing.installSpeechModel(language: settings.speechLanguage)
     }
 
     func shouldAskNotifications() async -> Bool {
@@ -62,14 +61,3 @@ import CassiniNotebook
     }
 }
 
-/// Installs Apple's speech assets for a language, as a transcription would before its first word.
-enum SpeechAssets {
-    static func install(language: String) async throws {
-        guard SpeechTranscriber.isAvailable,
-              let locale = await SpeechTranscriber.supportedLocale(equivalentTo: Locale(identifier: language)) else { return }
-        let module = SpeechTranscriber(locale: locale, transcriptionOptions: [], reportingOptions: [], attributeOptions: [])
-        guard await AssetInventory.status(forModules: [module]) != .installed,
-              try await AssetInventory.reserve(locale: locale) else { return }
-        try await AssetInventory.assetInstallationRequest(supporting: [module])?.downloadAndInstall()
-    }
-}

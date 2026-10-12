@@ -4,14 +4,16 @@ import CassiniEngine
 
 /// Time to finish work after Cassini leaves the screen.
 ///
-/// Work that reports progress (a transcription job) runs as a `BGContinuedProcessingTask`: iOS shows its title and
-/// progress, and its Stop button, like iOS taking the time back, runs the work's expiration handler. When iOS refuses
+/// Work that reports progress (the transcription queue) runs as one `BGContinuedProcessingTask`: iOS shows its title
+/// and progress, and its Stop button, like iOS taking the time back, runs the work's expiration handler. The queue
+/// asks for it once per drain, from the screen, and gives each next job its title with `update`. When iOS refuses
 /// that request (it is only granted while Cassini is on the screen, and not under heavy load), and for other work
 /// such as saving the last edits, it falls back to the finite time of `beginBackgroundTask`. Either way the
-/// expiration handler runs synchronously on the main actor and the token ends right after it.
+/// expiration handler has run on the main actor before iOS's handler returns, and the token ends right after it.
 @MainActor final class UIKitBackgroundRunner: BackgroundRunner {
-    /// Matches `BGTaskSchedulerPermittedIdentifiers` (`app.codemyriad.cassini.transcription.*`).
-    static let identifierPrefix = "app.codemyriad.cassini.transcription"
+    /// Matches `BGTaskSchedulerPermittedIdentifiers` (`app.codemyriad.cassini.transcription.*`). One identifier
+    /// serves every drain: at most one continued task is held at a time.
+    static let identifier = "app.codemyriad.cassini.transcription.queue"
 
     private enum Held {
         case finite(UIBackgroundTaskIdentifier, onExpire: @MainActor () -> Void)
@@ -27,28 +29,41 @@ import CassiniEngine
 
     /// A continued-processing request, and its task once iOS has started it.
     private final class Continued {
-        let identifier: String
         let progress: Progress
         let onExpire: @MainActor () -> Void
+        var title: String
         var task: BGContinuedProcessingTask?
-        init(identifier: String, progress: Progress, onExpire: @escaping @MainActor () -> Void) {
-            self.identifier = identifier; self.progress = progress; self.onExpire = onExpire
+        init(title: String, progress: Progress, onExpire: @escaping @MainActor () -> Void) {
+            self.title = title; self.progress = progress; self.onExpire = onExpire
         }
     }
 
     private var held: [BackgroundToken: Held] = [:]
+    private var registered = false
+
+    private static var subtitle: String {
+        String(localized: "Your audio stays on this device", table: "Transcription",
+               comment: "Subtitle of the system's progress while a note is transcribed")
+    }
 
     func begin(title: String, progress: Progress, onExpire: @escaping @MainActor () -> Void) -> BackgroundToken {
         let token = BackgroundToken()
-        if progress.totalUnitCount > 0, let continued = submit(token, title: title, progress: progress, onExpire: onExpire) {
+        if progress.totalUnitCount > 0, let continued = submit(title: title, progress: progress, onExpire: onExpire) {
             held[token] = .continued(continued)
             return token
         }
         let identifier = UIApplication.shared.beginBackgroundTask(withName: title) { [weak self] in
+            // UIKit calls this on the main thread.
             MainActor.assumeIsolated { self?.expire(token) }
         }
         if identifier != .invalid { held[token] = .finite(identifier, onExpire: onExpire) }
         return token
+    }
+
+    func update(_ token: BackgroundToken, title: String) {
+        guard case .continued(let continued) = held[token] else { return }
+        continued.title = title
+        continued.task?.updateTitle(title, subtitle: Self.subtitle)
     }
 
     func end(_ token: BackgroundToken) {
@@ -59,44 +74,55 @@ import CassiniEngine
             if let task = continued.task {
                 task.setTaskCompleted(success: true)
             } else {
-                BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: continued.identifier)
+                BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: Self.identifier)
             }
         case nil:
             break
         }
     }
 
-    /// Asks iOS to run the work as continued processing; nil when it refuses.
-    private func submit(_ token: BackgroundToken, title: String, progress: Progress,
-                        onExpire: @escaping @MainActor () -> Void) -> Continued? {
-        let identifier = "\(Self.identifierPrefix).\(token.id.uuidString)"
-        let continued = Continued(identifier: identifier, progress: progress, onExpire: onExpire)
-        // Continued-processing handlers may be registered after launch; each identifier is registered once.
-        let registered = BGTaskScheduler.shared.register(forTaskWithIdentifier: identifier, using: .main) { [weak self] task in
-            MainActor.assumeIsolated { self?.started(task, token) }
+    /// Asks iOS to run the work as continued processing; nil when it refuses or a continued task is held already.
+    private func submit(title: String, progress: Progress, onExpire: @escaping @MainActor () -> Void) -> Continued? {
+        guard !held.values.contains(where: { if case .continued = $0 { true } else { false } }), register() else {
+            return nil
         }
-        guard registered else { return nil }
-        let subtitle = String(localized: "Your audio stays on this device", table: "Transcription",
-                              comment: "Subtitle of the system's progress while a note is transcribed")
-        let request = BGContinuedProcessingTaskRequest(identifier: identifier, title: title, subtitle: subtitle)
+        let request = BGContinuedProcessingTaskRequest(identifier: Self.identifier, title: title, subtitle: Self.subtitle)
         request.strategy = .fail
         do { try BGTaskScheduler.shared.submit(request) } catch { return nil }
-        return continued
+        return Continued(title: title, progress: progress, onExpire: onExpire)
     }
 
-    /// iOS started the continued-processing task of `token`.
-    private func started(_ task: BGTask, _ token: BackgroundToken) {
-        guard let task = task as? BGContinuedProcessingTask, case .continued(let continued) = held[token] else {
+    /// Registers the launch handler once; continued-processing handlers may be registered after launch.
+    private func register() -> Bool {
+        if registered { return true }
+        registered = BGTaskScheduler.shared.register(forTaskWithIdentifier: Self.identifier, using: .main) { [weak self] task in
+            MainActor.assumeIsolated { self?.started(task) }
+        }
+        return registered
+    }
+
+    /// iOS started the continued-processing task asked for last.
+    private func started(_ task: BGTask) {
+        let pending = held.first { _, entry in
+            if case .continued(let continued) = entry { continued.task == nil } else { false }
+        }
+        guard let task = task as? BGContinuedProcessingTask, let (token, entry) = pending,
+              case .continued(let continued) = entry else {
             // The work ended before iOS started its task.
             task.setTaskCompleted(success: true)
             return
         }
         continued.task = task
+        task.updateTitle(continued.title, subtitle: Self.subtitle)
         task.progress.totalUnitCount = 100
         task.progress.addChild(continued.progress, withPendingUnitCount: 100)
         task.expirationHandler = { [weak self] in
-            // iOS calls this on a queue of its own; the work learns of it on the main actor right away.
-            DispatchQueue.main.async { MainActor.assumeIsolated { self?.expire(token) } }
+            // The work must learn of it before this returns, so it does not start another step meanwhile.
+            if Thread.isMainThread {
+                MainActor.assumeIsolated { self?.expire(token) }
+            } else {
+                DispatchQueue.main.sync { MainActor.assumeIsolated { self?.expire(token) } }
+            }
         }
     }
 

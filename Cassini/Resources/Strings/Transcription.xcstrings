@@ -59,6 +59,23 @@
         }
       }
     },
+    "Cassini can’t play this audio, so there is nothing to transcribe.": {
+      "comment": "A Transcribe was refused: the audio cannot be decoded",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cassini can’t play this audio, so there is nothing to transcribe."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cassini non riesce a riprodurre questo audio, quindi non c’è niente da trascrivere."
+          }
+        }
+      }
+    },
     "Cassini closed while transcribing %@.": {
       "comment": "Notification body: Cassini closed during a transcription",
       "localizations": {
@@ -348,6 +365,23 @@
         }
       }
     },
+    "Restore this recording from Recently Deleted to transcribe it.": {
+      "comment": "A Transcribe was refused: the note is in Recently Deleted",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restore this recording from Recently Deleted to transcribe it."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ripristina questa registrazione da Eliminati di recente per trascriverla."
+          }
+        }
+      }
+    },
     "Retry": {
       "comment": "Banner action",
       "localizations": {
@@ -395,6 +429,74 @@
           "stringUnit": {
             "state": "translated",
             "value": "Distinzione delle voci"
+          }
+        }
+      }
+    },
+    "The transcription queue was saved by a newer version of Cassini, or can’t be read. Update Cassini to transcribe.": {
+      "comment": "A Transcribe was refused: the stored queue cannot be used",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The transcription queue was saved by a newer version of Cassini, or can’t be read. Update Cassini to transcribe."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La coda di trascrizione è stata salvata da una versione più recente di Cassini, o non si può leggere. Aggiorna Cassini per trascrivere."
+          }
+        }
+      }
+    },
+    "This recording is still being saved. Try again in a moment.": {
+      "comment": "A Transcribe was refused: the recording is still being written",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This recording is still being saved. Try again in a moment."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questa registrazione è ancora in salvataggio. Riprova tra un momento."
+          }
+        }
+      }
+    },
+    "This recording no longer exists.": {
+      "comment": "A Transcribe was refused: the note is gone",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This recording no longer exists."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questa registrazione non esiste più."
+          }
+        }
+      }
+    },
+    "This recording was saved by a newer version of Cassini. Update Cassini to transcribe it.": {
+      "comment": "A Transcribe was refused: the note's format is newer",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This recording was saved by a newer version of Cassini. Update Cassini to transcribe it."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questa registrazione è stata salvata da una versione più recente di Cassini. Aggiorna Cassini per trascriverla."
           }
         }
       }

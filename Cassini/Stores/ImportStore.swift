@@ -64,7 +64,9 @@ import CassiniNotebook
             }
             try await library.insert(note)
             router.openNote(note.id)
-            if portable == nil && settings.autoTranscribe && settings.downloadsAllowed { processing.request(note.id) }
+            if portable == nil, settings.autoTranscribe, await processing.handOff(note.id) == .askConsent {
+                router.offerModelDownload(for: note.id)
+            }
         } catch {
             try? FileManager.default.removeItem(at: folder)
             errors.present("Could not import audio: \(error.localizedDescription)")

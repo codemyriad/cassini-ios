@@ -12,7 +12,9 @@ import SwiftUI
                 .task { await graph.start() }
                 .onOpenURL { url in Task { await graph.imports.importAudio(url) } }
                 .onChange(of: scenePhase, initial: true) { _, phase in
-                    graph.processing.setVisible(phase == .active)
+                    // Inactive is still on the screen (Control Center, the app switcher, a system alert).
+                    if phase == .active { graph.processing.setVisible(true) }
+                    if phase == .background { graph.processing.setVisible(false) }
                     if phase == .active, graph.startup.isReady { Task { await graph.trash.purgeExpired() } }
                     if phase == .background { graph.enterBackground() }
                 }
