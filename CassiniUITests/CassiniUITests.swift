@@ -180,7 +180,7 @@ final class CassiniUITests: XCTestCase {
         let app = launch(); openFixture(app)
         app.buttons["speakersButton"].tap()
         XCTAssertTrue(app.navigationBars["Speakers"].waitForExistence(timeout: 5))
-        let alex = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Alex")).firstMatch
+        let alex = app.buttons["speaker-alex"]
         XCTAssertTrue(alex.waitForExistence(timeout: 5)); alex.tap()
         let field = app.textFields["speakerNameField"]
         XCTAssertTrue(field.waitForExistence(timeout: 5))

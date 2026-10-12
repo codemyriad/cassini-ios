@@ -94,7 +94,6 @@ struct NoteDetailView: View {
     // MARK: Content
 
     private func content(_ note: Note, mode: NoteMode) -> some View {
-        let readOnly = ReadOnlyReason.of(note, job: job)
         let transcript = mode.showsReading
             ? cache.sealed(note, voices: voices.savedVoices, suggestions: readOnly == nil ? voices.suggestions(for: note) : [])
             : .empty
@@ -130,7 +129,7 @@ struct NoteDetailView: View {
                     } else if !transcript.isEmpty {
                         ReadingTranscript(noteID: noteID, transcript: transcript, hits: TranscriptHits(matches, current: current),
                                           renamable: true, following: screen.follow.following,
-                                          actions: actions(transcript, readOnly: readOnly), geometry: geometry, proxy: proxy,
+                                          actions: transcriptActions, geometry: geometry, proxy: proxy,
                                           position: $scrollPosition, suggestion: { suggestionCard($0, in: transcript) })
                     }
                 }
@@ -187,10 +186,12 @@ struct NoteDetailView: View {
         Binding(get: { screen.search?.query ?? "" }, set: { screen.search?.setQuery($0) })
     }
 
-    private func actions(_ transcript: NoteTranscript, readOnly: ReadOnlyReason?) -> TranscriptActions {
+    /// The paragraphs' callbacks. A paragraph that did not change keeps the callbacks it was made with, so they read
+    /// the transcript and the read-only gate as they are when called, not as they were when it was drawn.
+    private var transcriptActions: TranscriptActions {
         TranscriptActions(
-            wordTap: { run(screen.wordTapped($0, in: transcript)) },
-            playTurn: { run(screen.playTurn($0, in: transcript)) },
+            wordTap: { run(screen.wordTapped($0, in: cache.shownSealed)) },
+            playTurn: { run(screen.playTurn($0, in: cache.shownSealed)) },
             nameSpeaker: { run(screen.speakerTapped($0, readOnly: readOnly)) },
             editPassage: { run(screen.editPassage($0, readOnly: readOnly)) },
             markMoment: { time in
@@ -200,12 +201,15 @@ struct NoteDetailView: View {
             })
     }
 
+    /// Why the transcript cannot be changed now.
+    private var readOnly: ReadOnlyReason? { note.flatMap { ReadOnlyReason.of($0, job: job) } }
+
     /// "Is this Luca?" above the first paragraph of a placeholder speaker a saved voice may be.
     private func suggestionCard(_ turn: NoteTurn, in transcript: NoteTranscript) -> AnyView? {
         guard let suggestion = turn.suggestion else { return nil }
         let ordinal = transcript.speakers.firstIndex(of: suggestion.speakerID) ?? 0
         return AnyView(SuggestionCard(noteID: noteID, suggestion: suggestion, ordinal: ordinal) { id in
-            run(screen.speakerTapped(id, readOnly: note.flatMap { ReadOnlyReason.of($0, job: job) }))
+            run(screen.speakerTapped(id, readOnly: readOnly))
         })
     }
 

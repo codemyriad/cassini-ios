@@ -119,6 +119,9 @@ struct DraftSection: View {
 
     private var sealedKey: SealedKey?
     private var sealedValue = NoteTranscript.empty
+
+    /// The reading transcript last made.
+    var shownSealed: NoteTranscript { sealedValue }
     private var draftKey: DraftState?
     private var draftValue = NoteTranscript.empty
     private var savedKey: [DraftWord]?

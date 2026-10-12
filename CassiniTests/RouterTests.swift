@@ -64,9 +64,9 @@ import CassiniEngine
         router.push(.note(a, start: .rename)); router.push(.savedVoices)
         let restored = Router()
         restored.restore(router.encodedPath)
-        XCTAssertEqual(restored.path, router.path)
+        XCTAssertEqual(restored.path, [.note(a), .savedVoices], "the start action ran once and is not restored")
         restored.restore(Data("garbage".utf8))
-        XCTAssertEqual(restored.path, router.path, "an unreadable saved stack changes nothing")
+        XCTAssertEqual(restored.path, [.note(a), .savedVoices], "an unreadable saved stack changes nothing")
     }
 
     func testRecordingIsAFullScreenCover() {

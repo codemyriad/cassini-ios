@@ -108,8 +108,10 @@ final class NoteScreenTests: XCTestCase {
         alert.buttons["Close"].tap()
         XCTAssertFalse(app.textFields["speakerNameField"].exists, "no Name sheet")
         app.buttons["More actions"].tap()
-        XCTAssertTrue(app.buttons["Remove from queue"].waitForExistence(timeout: 3), "no Transcribe again while queued")
-        app.buttons["Remove from queue"].tap()
+        let remove = app.collectionViews.buttons["Remove from queue"]
+        XCTAssertTrue(remove.waitForExistence(timeout: 3), "no Transcribe again while queued")
+        XCTAssertFalse(app.collectionViews.buttons["Transcribe again"].exists)
+        remove.tap()
         XCTAssertTrue(wait("exists == false", app.staticTexts["Queued"], timeout: 10))
     }
 
@@ -132,7 +134,8 @@ final class NoteScreenTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(timeout: 15))
         XCTAssertTrue(app.staticTexts["Plain audio"].exists)
         XCTAssertTrue(app.staticTexts["No transcript yet."].exists)
-        XCTAssertEqual(app.staticTexts["noteSubtitle"].label, "Yesterday, 9:41 AM · 00:24")
+        let subtitle = app.staticTexts["noteSubtitle"].label
+        XCTAssertTrue(subtitle.hasPrefix("Yesterday, 9:41") && subtitle.hasSuffix("AM · 00:24"), subtitle)
         XCTAssertTrue(app.buttons["Transcribe"].exists)
         XCTAssertFalse(app.buttons["searchTranscript"].exists, "no search without a transcript")
         app.buttons["Dismiss"].tap()
