@@ -3,7 +3,10 @@ import Observation
 import CassiniEngine
 import CassiniNotebook
 
-/// Saved voices and the speakers of each note.
+/// Saved voices and the speakers of each note: the app's side of `VoiceStore`. Naming effects are worked out by
+/// `NamingCommit` and written note first, voices after; the voice side is worked out again on the `VoiceStore` actor
+/// against the voices as they are then, so overlapping edits keep each other. A voice write that fails puts the note's
+/// links back.
 @MainActor @Observable final class VoicesStore {
     /// The saved voices could not be read; their files are kept.
     struct Unavailable: Error {
@@ -15,207 +18,248 @@ import CassiniNotebook
         let message: String
     }
 
-    private(set) var savedVoices: [SavedVoice] = []
-    @ObservationIgnored private(set) var voiceLibrary: VoiceLibrary?
+    private(set) var snapshot = VoiceSnapshot()
+    @ObservationIgnored private(set) var store: VoiceStore?
     @ObservationIgnored private let library: LibraryStore
     @ObservationIgnored private let settings: SettingsStore
     @ObservationIgnored private let errors: ErrorPresenter
+    @ObservationIgnored private let clock: any AppClock
 
-    init(library: LibraryStore, settings: SettingsStore, errors: ErrorPresenter) {
-        self.library = library; self.settings = settings; self.errors = errors
+    init(library: LibraryStore, settings: SettingsStore, errors: ErrorPresenter, clock: any AppClock) {
+        self.library = library; self.settings = settings; self.errors = errors; self.clock = clock
     }
 
-    /// Opens the private voice files. False when they could not be read.
-    @discardableResult func load() -> Bool {
-        guard let root = library.root else { return false }
-        do {
-            let voices = try VoiceLibrary(root: root)
-            voiceLibrary = voices
-            savedVoices = voices.voices
-            return true
-        } catch {
-            return false
-        }
-    }
+    var savedVoices: [SavedVoice] { snapshot.voices }
+    /// The saved voices cannot be changed: newer, damaged or unreadable, or the private folder could not be opened.
+    var isReadOnly: Bool { store == nil || snapshot.isReadOnly }
+    var hasEvidence: Bool { snapshot.hasEvidence }
+    /// Whether Saved voices offers Forget all voice data with no person listed: there are prints to delete, or the list
+    /// is damaged and only Forget everyone starts it again.
+    var offersForgetAllData: Bool { snapshot.canForgetEveryone && (hasEvidence || snapshot.problem == .damaged) }
 
-    var hasEvidence: Bool { voiceLibrary?.hasEvidence == true }
+    /// Saved voices as the screen lists them.
+    var summaries: [SavedVoiceSummary] {
+        SavedVoiceList.summaries(savedVoices, notes: library.notes, model: settings.speakerModelIdentity)
+    }
 
     func voice(_ id: UUID?) -> SavedVoice? { id.flatMap { id in savedVoices.first { $0.id == id } } }
 
-    func speakerPrint(noteID: UUID, speakerID: String) -> SpeakerPrint? {
-        try? voiceLibrary?.prints(noteID: noteID).last { $0.speakerID == speakerID }
+    /// The "Is this Luca?" cards of a note.
+    func suggestions(for note: Note) -> [SpeakerSuggestion] { SpeakerSuggestions.of(note, voices: savedVoices) }
+
+    /// Opens the private voice files, off the main actor. False when they cannot be used as they are; they are kept.
+    @discardableResult func load() async -> Bool {
+        guard let root = library.root else { return false }
+        let clock = clock
+        do {
+            store = try await Task.detached { try VoiceStore(root: root, now: { clock.now }) }.value
+        } catch {
+            return false
+        }
+        await refresh()
+        return !snapshot.isReadOnly
     }
 
-    /// Puts a finished analysis into the note: fresh speaker ids, attributed passages, and matches to saved voices.
-    /// Voiceprints are kept only while `generation` is still current.
+    func refresh() async {
+        guard let store else { return }
+        snapshot = await store.snapshot()
+    }
+
+    /// Reads the saved voices again when the last read failed for a passing reason, before they are used.
+    private func retryUnreadable() async {
+        if snapshot.problem == .unreadable { await refresh() }
+    }
+
+    /// Drops the voiceprints of notes that no longer exist, at launch. A note folder that could not be read keeps its
+    /// prints (`VoiceLibrary.sweepOrphans`).
+    func sweepOrphans() async throws {
+        guard let store, library.loadFailure == nil else { return }
+        try await store.sweepOrphans(keeping: Set(library.notes.map(\.id)))
+        await refresh()
+    }
+
+    // MARK: - Speaker analysis
+
+    /// Puts a finished analysis into the note: speakers of their own, attributed passages, and matches to saved voices.
+    /// Voiceprints are kept, and voices matched, only while `generation` is still current: an analysis that began
+    /// before Forget everyone keeps nothing. Rejected voices stay rejected for the speakers that overlap the old ones.
     func applySpeakerAnalysis(_ analysis: SpeakerAnalysis, to id: UUID, generation: Int) async throws {
-        guard library.note(id)?.trashedAt == nil else { return }
-        let keepsEvidence = generation == settings.voicesGeneration
+        await retryUnreadable()
+        guard let note = library.note(id), note.trashedAt == nil else { return }
         if let model = analysis.prints.first?.model { settings.speakerModelIdentity = model }
-        // A new analysis gets a fresh namespace: old versions keep their original identities.
-        let prefix = UUID().uuidString + "_"
-        let turns = analysis.turns.map { SpeakerTurn(speakerID: prefix + $0.speakerID, start: $0.start, end: $0.end) }
-        let prints = analysis.prints.map { value in var copy = value; copy.speakerID = prefix + value.speakerID; return copy }
-        let speakers = analyzedSpeakers(turns: turns, prints: prints, in: id, matching: keepsEvidence)
-        if keepsEvidence, let voiceLibrary {
-            let existing = try voiceLibrary.prints(noteID: id)
-            try voiceLibrary.savePrints(existing + prints, noteID: id)
+        let (turns, prints) = SpeakerAttribution.namespaced(turns: analysis.turns, prints: analysis.prints,
+                                                             prefix: UUID().uuidString + "_")
+        if generation == settings.voicesGeneration, let store {
+            // A note's prints are kept even if the saved voices can't be changed now; the note keeps working without.
+            try? await store.appendPrints(prints, noteID: id)
         }
-        let before = UUID(), after = UUID(), date = Date()
+        let matches = generation == settings.voicesGeneration
+            ? VoiceMatcher.match(prints: prints, voices: activeVoices(excluding: id), excluded: note.carriedExclusions(for: turns))
+            : [:]
+        let names = Dictionary(savedVoices.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
+        let autoName = settings.automaticallyNameVoices
+        let stamp = VersionStamp(date: clock.now)
         let saved = await library.commit(id) { note in
             guard note.trashedAt == nil else { return }
-            note.saveCurrentVersion(name: "Before speaker analysis", id: before, date: date)
-            note.speakers = speakers
-            note.transcript = SpeakerAttribution.assign(note.transcript, turns: turns)
-            note.refreshSpeakerLabels(); note.selectedVersionID = nil
-            note.saveCurrentVersion(name: "Speaker analysis", id: after, date: date)
-            note.speakerAnalysisFailure = speakers.isEmpty ? .empty : nil
+            note.applySpeakerAnalysis(turns: turns, matches: matches, voiceNames: names, autoName: autoName, stamp: stamp)
         }
         guard saved != nil else { throw CocoaError(.fileWriteUnknown) }
+        await refresh()
     }
 
-    /// The speakers in order of first turn, each matched to a saved voice when `matching`. Automatic naming is opt-in,
-    /// uses a high threshold and a rival margin, and never enrols evidence by itself.
-    private func analyzedSpeakers(turns: [SpeakerTurn], prints: [SpeakerPrint], in id: UUID, matching: Bool) -> [NoteSpeaker] {
-        var seen: Set<String> = []
-        let ids = turns.sorted { $0.start < $1.start }.compactMap { seen.insert($0.speakerID).inserted ? $0.speakerID : nil }
-        let activeVoices = savedVoices.map { voice in
+    /// The saved voices with the samples of `noteID` and of notes in Recently Deleted left out.
+    private func activeVoices(excluding noteID: UUID) -> [SavedVoice] {
+        savedVoices.map { voice in
             var copy = voice
-            copy.samples.removeAll { sample in library.note(sample.noteID)?.trashedAt != nil || sample.noteID == id }
+            copy.samples.removeAll { $0.noteID == noteID || library.note($0.noteID)?.trashedAt != nil }
             return copy
         }
-        let matches = matching ? VoiceMatcher.match(prints: prints, voices: activeVoices) : [:]
-        return ids.enumerated().map { offset, speakerID in
-            var speaker = NoteSpeaker(id: speakerID, name: "Speaker \(offset + 1)")
-            guard let match = matches[speakerID], let voice = voice(match.voiceID) else { return speaker }
-            if settings.automaticallyNameVoices && match.automatic {
-                speaker.name = voice.name
-                speaker.match = .auto(voice: voice.id, score: match.score)
-            } else {
-                speaker.match = .suggested(voice: voice.id, score: match.score)
+    }
+
+    // MARK: - Naming
+
+    /// What the Name a speaker sheet needs about the speaker; nil when the note or the speaker is gone.
+    func namingInput(noteID: UUID, speakerID: String) async -> NamingInput? {
+        await retryUnreadable()
+        guard let note = library.note(noteID), let index = note.speakers?.firstIndex(where: { $0.id == speakerID }),
+              let speaker = note.speakers?[index] else { return nil }
+        let print = await print(noteID: noteID, speakerID: speakerID)
+        let stats = SpeakerStats.of(note.transcript)
+        let stat = stats.first { $0.speakerID == speakerID }
+        let targets = stats.filter { $0.speakerID != speakerID && $0.wordCount > 0 }.compactMap { other -> MergeTarget? in
+            note.speaker(other.speakerID).map {
+                MergeTarget(speakerID: $0.id, name: $0.name, ordinal: other.ordinal, speakingTime: other.speakingTime)
             }
-            return speaker
+        }
+        let versions = note.mergeVersionNumbers
+        return NamingInput(
+            speakerID: speakerID, label: speaker.name, ordinal: stat?.ordinal ?? index, speakingTime: stat?.speakingTime ?? 0,
+            sample: stat?.sample, print: print, match: speaker.match, voices: savedVoices, voicesReadOnly: isReadOnly,
+            voiceModelReady: print != nil || settings.speakerModelIdentity != nil, currentModel: settings.speakerModelIdentity,
+            mergeTargets: targets, versions: MergeVersions(shown: versions.shown, added: versions.added),
+            canSample: note.audio.isPlayable)
+    }
+
+    /// Carries out the sheet's effects for one speaker: the note first, then the saved voices.
+    func perform(_ effects: [NamingEffect], noteID: UUID, speakerID: String) async throws(SaveFailure) {
+        await retryUnreadable()
+        guard let note = library.note(noteID), let speaker = note.speaker(speakerID) else { return }
+        let print = await print(noteID: noteID, speakerID: speakerID)
+        let newVoiceID = UUID(), stamp = VersionStamp(date: clock.now)
+        let plan: @Sendable ([SavedVoice], Bool) -> NamingCommit = { voices, readOnly in
+            NamingCommit.plan(effects, noteID: noteID, speaker: speaker, print: print, voices: voices, voicesReadOnly: readOnly,
+                              newVoiceID: newVoiceID, stamp: stamp)
+        }
+        let commit = plan(savedVoices, isReadOnly)
+        switch commit.refused {
+        case .readOnly?: throw SaveFailure(message: SpeakersCopy.voicesReadOnly)
+        case .noPrint?: throw SaveFailure(message: SpeakersCopy.tooLittleSpeech)
+        case nil: try await write(commit, plan: plan, noteID: noteID, before: note)
         }
     }
 
-    /// Names a speaker, optionally linking or remembering its voice.
-    func saveSpeaker(noteID: UUID, speakerID: String, name: String, voiceID: UUID?, remember: Bool, renameSaved: Bool) throws(SaveFailure) {
-        guard let voiceLibrary else { throw SaveFailure(message: "Saved voice storage is unavailable. Your voice files have been preserved.") }
-        guard let note = library.note(noteID), note.speakers?.contains(where: { $0.id == speakerID }) == true else { return }
-        let clean = String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(100))
-        guard !clean.isEmpty else { return }
-        if let voiceID, let other = note.speakers?.first(where: { $0.id != speakerID && $0.linkedVoiceID == voiceID }) {
-            throw SaveFailure(message: "This saved voice is already assigned to \(other.name). Merge these speakers if they are the same person.")
-        }
-        var voices = savedVoices
-        var link = voiceID
-        if remember {
-            guard let print = speakerPrint(noteID: noteID, speakerID: speakerID), print.speechSeconds >= 6 else {
-                throw SaveFailure(message: "At least six seconds of isolated speech are needed to remember this voice.")
-            }
-            if let id = link, let voiceIndex = voices.firstIndex(where: { $0.id == id }) {
-                voices[voiceIndex].samples.removeAll { $0.noteID == noteID && $0.print.speakerID == speakerID }
-                voices[voiceIndex].samples.append(VoiceSample(noteID: noteID, print: print))
-            } else {
-                let voice = SavedVoice(name: clean, samples: [VoiceSample(noteID: noteID, print: print)])
-                voices.append(voice); link = voice.id
-            }
-        }
-        if renameSaved, let link, let voiceIndex = voices.firstIndex(where: { $0.id == link }) { voices[voiceIndex].name = clean }
+    /// "Yes, Luca": names the speaker after the voice and confirms it, remembering the speaker's print in it.
+    func accept(_ suggestion: SpeakerSuggestion, noteID: UUID) async throws(SaveFailure) {
+        try await perform([.relabel(speakerID: suggestion.speakerID, name: suggestion.voiceName),
+                           .rememberVoice(speakerID: suggestion.speakerID, voiceID: suggestion.voiceID, name: suggestion.voiceName)],
+                          noteID: noteID, speakerID: suggestion.speakerID)
+    }
+
+    /// "Not Luca": the voice is never offered for this speaker again.
+    func reject(_ suggestion: SpeakerSuggestion, noteID: UUID) async throws(SaveFailure) {
+        try await perform([.reject(speakerID: suggestion.speakerID, voiceID: suggestion.voiceID, voiceName: suggestion.voiceName,
+                                   unenrol: false, restorePlaceholder: false)],
+                          noteID: noteID, speakerID: suggestion.speakerID)
+    }
+
+    /// Writes the note's side of `commit`, then the voices: `plan` runs again on the `VoiceStore` actor against the
+    /// voices as they are then. When that gives the note other changes (a voice forgotten meanwhile), they follow; the
+    /// notes drop their links to forgotten voices only once the voices are written.
+    private func write(_ commit: NamingCommit, plan: @escaping @Sendable ([SavedVoice], Bool) -> NamingCommit,
+                       noteID: UUID, before: Note) async throws(SaveFailure) {
+        let changes = commit.changes
+        guard await library.commit(noteID, { $0.apply(changes) }) != nil else { throw SaveFailure(message: SpeakersCopy.noteNotSaved) }
+        guard let store else { return }
+        let written: NamingCommit
         do {
-            try voiceLibrary.save(voices); savedVoices = voices
+            written = try await store.commit(plan)
         } catch {
-            throw SaveFailure(message: "Could not save voice: \(error.localizedDescription)")
+            // The voices stay as they were, so the note's links go back too; the names typed stay.
+            await library.commit(noteID) { $0.restoreVoiceLinks(from: before) }
+            await refresh()
+            throw SaveFailure(message: SpeakersCopy.voiceNotSaved(error.localizedDescription))
         }
-        let linked = link
-        library.update(noteID) { note in
-            guard let index = note.speakers?.firstIndex(where: { $0.id == speakerID }) else { return }
-            note.renameSpeaker(speakerID, name: clean)
-            let previous = note.speakers?[index].match
-            note.speakers?[index].match = linked.map { .confirmed(voice: $0, score: previous?.voiceID == $0 ? previous?.score ?? 0 : 0) } ?? .unmatched
+        if written.changes != changes {
+            let current = written.changes
+            await library.commit(noteID) { $0.apply(current) }
         }
-        if renameSaved, let link { renameVoice(link, name: clean) }
+        await refresh()
+        for voice in written.forgotten { library.updateAll { $0.unlinkVoice(voice) } }
     }
 
-    func rejectVoice(noteID: UUID, speakerID: String, voiceID: UUID) {
-        library.update(noteID) { note in
-            guard let index = note.speakers?.firstIndex(where: { $0.id == speakerID }), let speaker = note.speakers?[index] else { return }
-            note.speakers?[index].excludedVoiceIDs.append(voiceID)
-            if speaker.linkedVoiceID == voiceID { note.speakers?[index].name = "Speaker \(index + 1)" }
-            note.speakers?[index].match = .rejected(voice: voiceID, score: speaker.match.score ?? 0)
-            note.refreshSpeakerLabels()
-        }
+    private func print(noteID: UUID, speakerID: String) async -> SpeakerPrint? {
+        try? await store?.prints(noteID: noteID).last { $0.speakerID == speakerID }
     }
 
-    func renameVoice(_ id: UUID, name: String) {
-        let clean = String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(100))
-        guard !clean.isEmpty, let index = savedVoices.firstIndex(where: { $0.id == id }), let voiceLibrary else { return }
-        var voices = savedVoices; voices[index].name = clean
-        do {
-            try voiceLibrary.save(voices); savedVoices = voices
-            library.updateAll { note in
-                for speaker in note.speakers ?? [] where speaker.linkedVoiceID == id { note.renameSpeaker(speaker.id, name: clean) }
-            }
-        } catch { errors.present(error.localizedDescription) }
+    // MARK: - Saved voices
+
+    /// Renames a saved voice. Names already in notes stay, as on Android.
+    func rename(_ id: UUID, name: String) async -> VoiceEdit {
+        guard let store else { return .readOnly }
+        let outcome = await store.rename(id, name: name)
+        await refresh()
+        return outcome
     }
 
-    func forgetAllVoices() {
-        guard let voiceLibrary else { errors.present("Saved voice storage is unavailable."); return }
+    /// Forgets one saved voice: the notes drop their links to it first, then the voice goes. Names stay.
+    func forget(_ id: UUID) async -> VoiceEdit {
+        guard let store, !isReadOnly else { return .readOnly }
+        library.updateAll { $0.unlinkVoice(id) }
+        let outcome = await store.forget(id)
+        await refresh()
+        return outcome
+    }
+
+    /// Forget everyone: the generation moves on first, so an analysis already running keeps nothing; then every voice
+    /// and every print goes, and the notes drop their links. Names stay.
+    func forgetEveryone() async -> VoiceEdit {
+        guard let store, snapshot.canForgetEveryone else { return .readOnly }
         settings.advanceVoicesGeneration()
-        do {
-            try voiceLibrary.forgetAll(); savedVoices = voiceLibrary.voices
-            library.updateAll { note in
-                for index in (note.speakers ?? []).indices where note.speakers?[index].match.isRejection == false {
-                    note.speakers?[index].match = .unmatched
-                }
-            }
-        } catch {
-            savedVoices = voiceLibrary.voices
-            errors.present("Some voice data could not be removed: \(error.localizedDescription). Try Forget all voice data again.")
-        }
+        let outcome = await store.forgetEveryone()
+        // A forget that failed keeps the voices, so the notes keep their links to them.
+        if outcome == .done { library.updateAll { $0.reconcileVoices([]) } }
+        await refresh()
+        return outcome
     }
 
-    func forgetVoice(_ id: UUID) {
-        guard let voiceLibrary else { return }
-        do {
-            try voiceLibrary.save(savedVoices.filter { $0.id != id }); savedVoices = voiceLibrary.voices
-            library.updateAll { note in
-                for index in (note.speakers ?? []).indices {
-                    if let match = note.speakers?[index].match, match.voiceID == id, !match.isRejection {
-                        note.speakers?[index].match = .unmatched
-                    }
-                }
-            }
-        } catch { errors.present(error.localizedDescription) }
-    }
+    // MARK: - Notes
 
+    /// Shows another version of the transcript. Links to voices forgotten meanwhile are dropped; names stay. While the
+    /// saved voices cannot be read the list is not known, so every link stays.
     func selectTranscriptVersion(noteID: UUID, versionID: UUID) {
-        let known = Dictionary(uniqueKeysWithValues: savedVoices.map { ($0.id, $0.name) })
+        let known: Set<UUID>? = isReadOnly ? nil : Set(savedVoices.map(\.id))
         library.update(noteID) { note in
             note.selectVersion(versionID)
-            for index in (note.speakers ?? []).indices {
-                guard let speaker = note.speakers?[index], let voiceID = speaker.match.voiceID, !speaker.match.isRejection else { continue }
-                if let name = known[voiceID] {
-                    if speaker.linkedVoiceID != nil { note.speakers?[index].name = name }
-                } else {
-                    note.speakers?[index].match = .unmatched
-                }
-            }
-            note.refreshSpeakerLabels()
+            if let known { note.reconcileVoices(known) }
         }
     }
 
     func addSpeaker(noteID: UUID, name: String) {
-        let speaker = NoteSpeaker(id: UUID().uuidString, name: name)
-        library.update(noteID) { note in note.speakers = (note.speakers ?? []) + [speaker] }
+        let id = UUID().uuidString
+        library.update(noteID) { $0.addSpeaker(id: id, name: name) }
     }
 
-    /// Removes the note's voiceprints and its samples from saved voices, before the note is deleted for good.
-    func removeEvidence(noteID: UUID) throws {
-        guard let voiceLibrary else {
-            throw Unavailable(message: "Saved voice storage could not be read. Restore access before permanent deletion so voice samples can be removed safely.")
+    /// Removes the note's voiceprints and its samples from saved voices, before the note is deleted for good. A voice
+    /// left without samples is forgotten, and every note drops its links to it.
+    func removeEvidence(noteID: UUID) async throws {
+        guard let store else { throw Unavailable(message: SpeakersCopy.evidenceUnavailable) }
+        let forgotten: [UUID]
+        do {
+            forgotten = try await store.removeEvidence(noteID: noteID)
+        } catch is VoiceLibraryError {
+            throw Unavailable(message: SpeakersCopy.evidenceUnavailable)
         }
-        try voiceLibrary.removeEvidence(noteID: noteID)
-        savedVoices = voiceLibrary.voices
+        await refresh()
+        for voice in forgotten { library.updateAll { $0.unlinkVoice(voice) } }
     }
 }

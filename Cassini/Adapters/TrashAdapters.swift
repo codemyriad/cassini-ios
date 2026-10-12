@@ -14,7 +14,8 @@ extension ProcessingStore: TrashQueue {
 }
 
 extension VoicesStore: VoiceEvidence {
-    var isReadable: Bool { voiceLibrary != nil }
+    /// Newer, damaged or unreadable saved voices stop every permanent deletion, as before WP8's read-only voices.
+    var isReadable: Bool { !isReadOnly }
 }
 
 @MainActor final class AppTrashHost: TrashHost {
