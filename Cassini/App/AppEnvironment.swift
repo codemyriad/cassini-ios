@@ -25,6 +25,8 @@ import CassiniEngineTesting
     /// Result notifications; `SilentNotifier` stands in until the notification adapter lands.
     var notifier: any Notifier
     var launch = LaunchOptions()
+    /// Where exports wait for the share sheet; the launch sweep empties it.
+    var exports = URL.temporaryDirectory.appendingPathComponent("Exports", isDirectory: true)
 
     /// What a UI-test launch asks for.
     struct LaunchOptions {

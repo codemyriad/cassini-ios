@@ -78,7 +78,7 @@ import Testing
     note.speakers = [speaker]
     note.transcript = [.init(text: "Hello", start: 0, end: 1, speaker: "Alex", speakerID: "speaker")]
     note.saveCurrentVersion(name: "Original")
-    let json = String(decoding: try TranscriptFormat.json.data(for: note), as: UTF8.self)
+    let json = String(decoding: try JSONExport.data(note), as: UTF8.self)
     #expect(!json.contains(privateID.uuidString))
     #expect(!json.contains("vector"))
     #expect(json.contains("Alex"))
