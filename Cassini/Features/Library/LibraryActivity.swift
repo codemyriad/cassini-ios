@@ -77,7 +77,6 @@ struct ProgressBannerCard: View {
             .background(Tone.info.background, in: RoundedRectangle(cornerRadius: Radius.control))
         }
         .buttonStyle(.plain)
-        .accessibilityElement(children: .ignore)
         .accessibilityLabel([title, step.map(ProgressText.percent), line].compactMap { $0 }.joined(separator: ", "))
         .accessibilityHint(banner.noteID == nil ? LibraryCopy.openSettings : LibraryCopy.openNote)
         .accessibilityAddTraits(.updatesFrequently)

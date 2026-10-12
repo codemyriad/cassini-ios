@@ -17,6 +17,8 @@ struct NameSpeakerSheet: View {
     @State private var saving = false
     @State private var saveError: String?
     @State private var pulse = false
+    /// The field's own text: a name cut to its limit is put back into the field, which a computed binding cannot do.
+    @State private var nameField = ""
     @AccessibilityFocusState private var questionFocused: Bool
 
     var body: some View {
@@ -57,7 +59,13 @@ struct NameSpeakerSheet: View {
         Form {
             Section { header(ui) }
             Section {
-                TextField(SpeakersCopy.nameField, text: Binding(get: { ui.name }, set: { send(.nameChanged($0)) }))
+                TextField(SpeakersCopy.nameField, text: $nameField)
+                    .onAppear { nameField = ui.name }
+                    .onChange(of: nameField) { _, text in
+                        send(.nameChanged(text))
+                        if let name = state?.name, name != text { nameField = name }
+                    }
+                    .onChange(of: ui.name) { _, name in if name != nameField { nameField = name } }
                     .textInputAutocapitalization(.words)
                     .autocorrectionDisabled()
                     .submitLabel(.done)

@@ -21,7 +21,6 @@ struct LibraryEmptyStateView: View {
                 .controlSize(.large).tint(.ember)
             }
             .frame(maxWidth: .infinity).padding(.bottom, 22)
-            .accessibilityIdentifier("libraryEmpty")
         case .noMatch(let query):
             banner(LibraryCopy.noMatchTitle(query), LibraryCopy.noMatchBody, tone: .plain, symbol: "magnifyingglass")
                 .accessibilityIdentifier("libraryNoMatch")
