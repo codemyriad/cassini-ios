@@ -55,6 +55,12 @@ Run on a physical iPhone with Live Activities enabled:
 - Unplug wired headphones while recording through their microphone: the recording pauses with "Paused — audio input
   disconnected".
 - Force-quit Cassini from the app switcher while recording, then relaunch: the recording is listed with a playable
-  duration and the "recording recovered" notice shows.
+  duration and the "recording recovered" notice shows. The Live Activity is gone from the Lock Screen and the Dynamic
+  Island at the latest once Cassini has relaunched.
+- Crash or kill Cassini while recording (Xcode's Stop), relaunch and start a new recording: only the new recording's
+  Live Activity shows. If the old one is still visible before the relaunch, its Pause and Finish do nothing to the new
+  recording.
+- Minimise a recording, return through the Library's "Recording in progress" card and through the Live Activity, then
+  Minimise and Finish from there: each leads back to the Library or opens the note.
 - Fill the storage to about 15 minutes of recording above the floor: the warning shows, then the recording stops and
   saves at the floor without transcribing.
