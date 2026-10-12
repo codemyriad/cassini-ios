@@ -30,7 +30,7 @@ final class TextLimitTests: XCTestCase {
         let app = launch(["--seed", "voices"])
         XCTAssertTrue(app.buttons["Settings"].waitForExistence(timeout: 15))
         app.buttons["Settings"].tap()
-        let savedVoices = app.buttons["Saved voices"]
+        let savedVoices = app.buttons["savedVoicesRow"]
         for _ in 0..<6 where !savedVoices.isHittable { app.swipeUp() }
         savedVoices.tap()
         let options = app.buttons["Options for Alex Moreau"]
