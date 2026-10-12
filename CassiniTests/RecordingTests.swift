@@ -1,0 +1,113 @@
+import XCTest
+import AVFoundation
+import CassiniNotebook
+import CassiniEngine
+import CassiniEngineTesting
+@testable import Cassini
+
+/// Recording through the app graph: the Library's note mirror, the router, real CAF repair, inspection and M4A
+/// compression.
+@MainActor final class RecordingTests: XCTestCase {
+    /// Two seconds of a tone in the recorder's format: 48 kHz 16-bit mono PCM in CAF.
+    private func writeCapture(to url: URL) throws {
+        let settings: [String: Any] = [AVFormatIDKey: kAudioFormatLinearPCM, AVSampleRateKey: 48_000, AVNumberOfChannelsKey: 1,
+                                       AVLinearPCMBitDepthKey: 16, AVLinearPCMIsFloatKey: false, AVLinearPCMIsBigEndianKey: false]
+        let file = try AVAudioFile(forWriting: url, settings: settings)
+        let buffer = try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: 96_000))
+        buffer.frameLength = 96_000
+        for index in 0..<96_000 { buffer.floatChannelData![0][index] = Float(sin(Double(index) * 2 * .pi * 440 / 48_000)) * 0.3 }
+        try file.write(from: buffer)
+    }
+
+    func testARecordingKilledMidCaptureIsRecoveredWithAPlayableDuration() async throws {
+        let test = TestGraph(); defer { test.tearDown() }
+        let repository = try NoteRepository(root: test.root)
+        var note = Note(title: "Killed", audioFilename: "capture.caf")
+        note.status = .recording; note.audio = .live
+        try repository.save(note)
+        let url = repository.audioURL(for: note)
+        try writeCapture(to: url)
+        // The process died before the CAF header was written: the data chunk claims all two seconds.
+        let bytes = try Data(contentsOf: url)
+        try bytes.prefix(bytes.count * 6 / 10).write(to: url)
+
+        await test.graph.start()
+        await test.graph.library.settle()
+        let recovered = try XCTUnwrap(test.graph.library.note(note.id))
+        XCTAssertEqual(recovered.audio, .plain)
+        XCTAssertGreaterThan(recovered.duration, 1)
+        XCTAssertLessThan(recovered.duration, 2)
+        XCTAssertEqual(test.graph.recording.recovered.map(\.noteID), [note.id])
+        XCTAssertTrue(test.graph.notices.notices.contains { $0.text.hasPrefix("1 recording recovered.") })
+        XCTAssertFalse(test.graph.processing.state.isQueued(note.id), "recovery never queues")
+    }
+
+    func testADirectoryThatKeptItsAudioIsRebuiltBeforeTheLibraryLoads() async throws {
+        let test = TestGraph(); defer { test.tearDown() }
+        let id = UUID()
+        let folder = test.root.appendingPathComponent(id.uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try writeCapture(to: folder.appendingPathComponent("capture.caf"))
+
+        await test.graph.start()
+        let note = try XCTUnwrap(test.graph.library.note(id))
+        XCTAssertTrue(note.title.hasPrefix("Recovered recording "))
+        XCTAssertEqual(note.origin, .recovered)
+        XCTAssertEqual(note.duration, 2, accuracy: 0.01)
+        XCTAssertEqual(test.graph.library.unreadableCount, 0)
+    }
+
+    func testFinishingARecordingOpensItsNoteCompressesAndQueuesIt() async throws {
+        let test = TestGraph(); defer { test.tearDown() }
+        let graph = test.graph
+        await graph.start()
+        graph.settings.recordConsent()
+        graph.settings.identifySpeakers = false
+
+        await graph.recording.start()
+        XCTAssertEqual(graph.router.fullScreen, .recording)
+        await waitUntil { graph.recording.state.isActive }
+        let id = try XCTUnwrap(graph.recording.state.noteID)
+        XCTAssertEqual(graph.library.note(id)?.audio, .live, "the Library shows the recording at once")
+        XCTAssertEqual(graph.recording.screen.title, "Voice note 7 Oct, 09:41")
+        XCTAssertEqual(test.liveActivity.started.map(\.noteID), [id])
+
+        graph.recording.screen.finish()
+        await waitUntil { graph.router.path == [.note(id)] }
+        XCTAssertNil(graph.router.fullScreen)
+        await graph.recording.controller.settle()
+        await graph.library.settle()
+        let note = try XCTUnwrap(graph.library.note(id))
+        XCTAssertEqual(note.audio, .plain)
+        XCTAssertEqual(note.title, "Voice note 7 Oct, 09:41")
+        XCTAssertEqual(note.audioFilename, "audio.m4a")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: test.root.appendingPathComponent(id.uuidString).appendingPathComponent("capture.caf").path))
+        await waitUntil { graph.processing.state.isQueued(id) || graph.processing.state.isRunning(id) || graph.library.note(id)?.status == .ready }
+    }
+
+    func testTheLiveActivityButtonsControlTheRecording() async throws {
+        let test = TestGraph(); defer { test.tearDown() }
+        let graph = test.graph
+        await graph.start()
+        await graph.recording.start()
+        await waitUntil { graph.recording.state.isActive }
+        RecordingIntentRouter.perform(.pause)
+        XCTAssertEqual(graph.recording.state.activeRecording?.pause, .user)
+        XCTAssertEqual(test.liveActivity.updates.last?.isPaused, true)
+        RecordingIntentRouter.perform(.resume)
+        XCTAssertNil(graph.recording.state.activeRecording?.pause)
+        graph.router.dismissRecording()
+        graph.recording.returnToRecording()
+        XCTAssertEqual(graph.router.fullScreen, .recording)
+        RecordingIntentRouter.perform(.finish)
+        await waitUntil { if case .note = graph.router.path.last { true } else { false } }
+        XCTAssertFalse(test.liveActivity.isRunning)
+    }
+
+    private func waitUntil(timeout: Duration = .seconds(10), _ condition: @MainActor () -> Bool) async {
+        let clock = ContinuousClock()
+        let deadline = clock.now + timeout
+        while !condition() && clock.now < deadline { try? await Task.sleep(for: .milliseconds(10)) }
+        XCTAssertTrue(condition(), "timed out")
+    }
+}

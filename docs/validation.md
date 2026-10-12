@@ -41,3 +41,20 @@ The AMI recording used for the optional check came from the [FluidInference AMI 
 ## Device work remaining
 
 UI tests use isolated, explicitly seeded silent audio. This Mac has no microphone input, so the capture test verifies the missing-input error and recovery. Real-device checks remain necessary for microphone capture, Apple recognition/model installation, speaker accuracy, memory/thermal behavior, screen-locked capture, Bluetooth routes, and phone interruptions. Minimum supported iOS 26 needs a device pass. Automatic voice naming is optional and off by default pending representative-device calibration. No App Store upload or distribution signing was performed.
+
+## Recording device checklist
+
+Run on a physical iPhone with Live Activities enabled:
+
+- Record, lock the phone: the Lock Screen shows the recording with its running time. Pause from the Lock Screen: the
+  time stops and the button becomes Resume; Resume, then Finish from the Lock Screen: the note opens in Cassini with
+  the audio saved.
+- The Dynamic Island shows the recording (iPhone with a Dynamic Island) and a tap returns to the Recording screen.
+- Receive a phone call while recording: the recording pauses with "Paused — another app is using audio" and stays
+  paused after the call until Resume.
+- Unplug wired headphones while recording through their microphone: the recording pauses with "Paused — audio input
+  disconnected".
+- Force-quit Cassini from the app switcher while recording, then relaunch: the recording is listed with a playable
+  duration and the "recording recovered" notice shows.
+- Fill the storage to about 15 minutes of recording above the floor: the warning shows, then the recording stops and
+  saves at the floor without transcribing.

@@ -85,21 +85,23 @@ final class CassiniUITests: XCTestCase {
             return false
         }
         app.buttons["recordButton"].tap()
-        if !app.buttons["Pause"].waitForExistence(timeout: 8) {
-            let alert = app.alerts["Something needs attention"]
-            XCTAssertTrue(alert.exists)
-            XCTAssertTrue(alert.staticTexts["No microphone is available. Connect an audio input and try again."].exists || alert.staticTexts["The microphone could not start. Check your audio connection and try again."].exists)
+        let pause = app.buttons["Pause recording"]
+        let couldNotStart = app.staticTexts["Couldn’t start the microphone"]
+        XCTAssertTrue(pause.waitForExistence(timeout: 8) || couldNotStart.exists)
+        if couldNotStart.exists {
+            // A host without an audio input: the screen says so and offers Try again.
+            XCTAssertTrue(app.buttons["Try again"].exists)
             capture("Microphone unavailable")
-            alert.buttons["OK"].tap()
-            XCTAssertTrue(app.buttons["recordButton"].isEnabled)
+            app.buttons["Library"].tap()
+            XCTAssertTrue(app.buttons["recordButton"].waitForExistence(timeout: 5))
             XCTAssertTrue(app.buttons["Import"].isEnabled)
             return
         }
         capture("Recording")
-        app.buttons["Pause"].tap()
-        XCTAssertTrue(app.buttons["Resume"].exists)
-        app.buttons["Resume"].tap()
-        XCTAssertTrue(app.buttons["Pause"].exists)
+        pause.tap()
+        XCTAssertTrue(app.buttons["Resume recording"].waitForExistence(timeout: 3))
+        app.buttons["Resume recording"].tap()
+        XCTAssertTrue(pause.waitForExistence(timeout: 3))
         app.buttons["finishRecording"].tap()
         XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.buttons["playButton"].isEnabled)
@@ -151,13 +153,30 @@ final class CassiniUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(timeout: 15))
         XCTAssertEqual(app.staticTexts["noteTitle"].label, "Thoughts from the morning walk")
     }
+    // ports: RecordingFlowTest (record, pause, resume, minimise, return, finish)
     @MainActor func testTheRecordingSeedRecordsWithoutAMicrophone() {
         let app = launch(seed: false, arguments: ["--seed", "recording"])
         app.buttons["recordButton"].tap()
-        XCTAssertTrue(app.buttons["Pause"].waitForExistence(timeout: 8))
+        let pause = app.buttons["Pause recording"]
+        XCTAssertTrue(pause.waitForExistence(timeout: 8))
+        let title = app.textFields["recordingTitle"]
+        XCTAssertEqual(title.value as? String, "Voice note 8 Oct, 09:41", "the field starts with the default title")
+        XCTAssertTrue(app.images["Microphone level, last 7 seconds"].exists || app.otherElements["Microphone level, last 7 seconds"].exists)
+        XCTAssertTrue(app.staticTexts["PCM 48 kHz"].exists)
         capture("Recording")
+        pause.tap()
+        XCTAssertTrue(app.buttons["Resume recording"].waitForExistence(timeout: 3))
+        app.buttons["Resume recording"].tap()
+        XCTAssertTrue(pause.waitForExistence(timeout: 3))
+        app.buttons["Library"].tap()
+        let returnButton = app.buttons["recordButton"]
+        XCTAssertTrue(returnButton.waitForExistence(timeout: 5))
+        XCTAssertEqual(returnButton.label, "Return to recording", "the recording continues in the Library")
+        returnButton.tap()
+        XCTAssertTrue(app.buttons["finishRecording"].waitForExistence(timeout: 5))
         app.buttons["finishRecording"].tap()
         XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(timeout: 10))
+        XCTAssertEqual(app.staticTexts["noteTitle"].label, "Voice note 8 Oct, 09:41")
         XCTAssertTrue(app.buttons["playButton"].isEnabled)
     }
     @MainActor func testTheProcessingSeedShowsAJobInProgress() {
