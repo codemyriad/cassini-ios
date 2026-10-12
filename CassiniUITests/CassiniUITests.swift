@@ -26,7 +26,7 @@ final class CassiniUITests: XCTestCase {
         capture("Empty library")
         app.buttons["Settings"].tap()
         XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.switches["Allow speech model downloads"].exists)
+        XCTAssertTrue(app.switches["Transcribe after recording or import"].exists)
         capture("Settings")
         goBack(app)
         XCTAssertTrue(app.buttons["recordButton"].waitForExistence(timeout: 5))
