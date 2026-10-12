@@ -6,14 +6,17 @@ import CassiniNotebook
 public protocol RecordingNotes: Sendable {
     /// Writes a new note.
     func create(_ note: Note) async throws
+    /// The note as the screens show it; nil when there is no such note.
+    func note(_ id: UUID) async -> Note?
     /// Where the note's audio file is; nil when the library is not open.
     func captureURL(for note: Note) async -> URL?
     /// Applies `change` and writes the note; nil when there is no such note or the write failed.
     func update(_ id: UUID, _ change: @escaping @Sendable (inout Note) -> Void) async throws -> Note?
     /// Removes the note and its directory: a recording that did not start or captured nothing.
     func discard(_ id: UUID) async throws
-    /// Shows `change` on screen without writing it, until the next launch: a finished recording whose seal could not be
-    /// written still opens as a plain note.
+    /// Shows `change` on screen although it could not be written, and writes it with the note's next successful write:
+    /// a finished recording whose seal failed still opens, and stays, a plain note. `change` follows the rules of
+    /// `NoteEdit`, since it may run more than once.
     func showUnsaved(_ id: UUID, _ change: @escaping @Sendable (inout Note) -> Void) async
 }
 

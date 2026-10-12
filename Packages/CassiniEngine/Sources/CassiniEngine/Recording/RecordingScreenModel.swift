@@ -29,6 +29,9 @@ public enum RecordingEffect: Hashable, Sendable {
 ///   speech model is missing. A storage stop, a microphone failure and a failed start stay with their banner.
 /// - The model lives as long as the app, and the screen is shown again in many ways (the Library's card, the Live
 ///   Activity, an automatic stop). Each showing leads away at most once: `appeared()` (and `enter()`) start a new one.
+///   Leading away also drops a start that was waiting for microphone access, so it never begins off screen.
+/// - The end of a recording is handled in the turn it is told: the banner, the phase and `.show` change together. Only
+///   the speech-model lookup of a saved finish waits, and it leads away only if nothing newer began meanwhile.
 @MainActor @Observable
 public final class RecordingScreenModel {
     public struct Ports {
@@ -67,6 +70,8 @@ public final class RecordingScreenModel {
     /// This showing of the screen has already led away; nothing more until it is shown again.
     @ObservationIgnored private var leaving = false
     @ObservationIgnored private var prefilled: UUID?
+    /// Counts the showings and starts; a deferred lead-away belongs to the one it was made in.
+    @ObservationIgnored private var generation = 0
 
     public init(controller: RecordingController, ports: Ports) {
         self.controller = controller
@@ -80,8 +85,11 @@ public final class RecordingScreenModel {
         let recorder = controller.state
         let idle = !recorder.inProgress
         if idle, microphoneDenied || pendingStart { return .needsPermission }
-        if idle, ended?.outcome == .couldNotStart { return .starting }
-        if idle, ended != nil { return .stopping }
+        switch idle ? endedOutcome : nil {
+        case .couldNotStart: return .starting
+        case .stoppedForSpace, .microphoneFailed: return .stopping
+        case .saved, nil: break
+        }
         switch recorder {
         case .active(let active): return active.pause == nil ? .recording : .paused
         case .finishing, .ended: return .stopping
@@ -112,13 +120,23 @@ public final class RecordingScreenModel {
 
     public var banner: RecordingBanner? {
         RecordingBanner.banners(state: controller.state, microphoneOff: microphoneDenied && !controller.state.inProgress,
-                                ended: ended?.outcome).first
+                                ended: endedOutcome).first
+    }
+
+    /// The outcome the screen shows: the one it kept, or the recorder's before the screen has taken it.
+    private var endedOutcome: RecordingOutcome? {
+        if let ended { return ended.outcome }
+        if case .ended(_, let outcome) = controller.state { return outcome }
+        return nil
     }
 
     // MARK: Entry and permission
 
     /// The screen is shown, however it was brought up: it may lead away again.
-    public func appeared() { leaving = false }
+    public func appeared() {
+        leaving = false
+        generation += 1
+    }
 
     /// The screen is shown to record: starts a recording unless one is in progress, asking for the microphone first.
     public func enter() async {
@@ -148,6 +166,7 @@ public final class RecordingScreenModel {
     }
 
     private func startCapture() {
+        generation += 1
         pendingStart = false
         microphoneDenied = false
         ended = nil
@@ -200,37 +219,48 @@ public final class RecordingScreenModel {
         case .ended(let noteID, let outcome):
             guard sawCapture else { return }
             sawCapture = false
-            Task { await self.ended(noteID, outcome) }
+            ended(noteID, outcome)
         case .idle:
             break
         }
     }
 
-    private func ended(_ noteID: UUID?, _ outcome: RecordingOutcome) async {
-        if case .saved(let next) = outcome {
-            controller.dismissEnded()
-            guard let noteID else { return close() }
-            let download = next == .askConsent ? await ports.modelsMissing() : false
-            leave(.openNote(noteID, modelDownload: download))
-        } else {
+    /// Runs in the turn the end is told, so the banner, the phase and `.show` never disagree.
+    private func ended(_ noteID: UUID?, _ outcome: RecordingOutcome) {
+        guard case .saved(let next) = outcome else {
             ended = Ended(outcome: outcome, noteID: noteID)
             controller.dismissEnded()
             if outcome != .couldNotStart {
                 appeared()
                 onEffect?(.show)
             }
+            return
+        }
+        controller.dismissEnded()
+        guard let noteID else { return close() }
+        guard next == .askConsent else { return leave(.openNote(noteID, modelDownload: false)) }
+        let asked = generation
+        Task {
+            let download = await ports.modelsMissing()
+            // A new showing or recording since the finish owns the screen now.
+            guard asked == generation, !controller.state.inProgress else { return }
+            leave(.openNote(noteID, modelDownload: download))
         }
     }
 
     private func leave(_ effect: RecordingEffect) {
+        dropPendingStart()
         guard !leaving else { return }
         leaving = true
         onEffect?(effect)
     }
 
-    private func close() {
-        guard !leaving else { return }
-        leaving = true
-        onEffect?(.close)
+    private func close() { leave(.close) }
+
+    /// A start waiting for microphone access belongs to the screen; once it leads away, coming back from Settings
+    /// must not start a recording off screen.
+    private func dropPendingStart() {
+        pendingStart = false
+        microphoneDenied = false
     }
 }

@@ -5,7 +5,8 @@ import CassiniNotebook
 
 /// The notes as the screens see them: a main-actor mirror of `NoteStore`. Edits show at once and are written in
 /// order as `NoteEdit`s, so a note saved meanwhile by another writer keeps both changes; a failed write puts the note
-/// back as stored and reports the error.
+/// back as stored and reports the error. A change that must stick although its write failed (`showUnsaved`) stays on
+/// screen and rides along with the note's next write until one succeeds.
 @MainActor @Observable final class LibraryStore {
     /// Newest first.
     private(set) var notes: [Note] = []
@@ -19,6 +20,13 @@ import CassiniNotebook
     /// Queued edits per note; while a note has any, the mirror shows them rather than what others save.
     @ObservationIgnored private var pendingWrites: [UUID: Int] = [:]
     @ObservationIgnored private var changes: Task<Void, Never>?
+    /// Changes shown but not yet written, per note, each with a token so a write clears only what it carried.
+    @ObservationIgnored private var unsaved: [UUID: Unsaved] = [:]
+
+    private struct Unsaved {
+        let token = UUID()
+        let change: @Sendable (inout Note) -> Void
+    }
 
     init(root: URL, errors: ErrorPresenter) {
         self.errors = errors
@@ -26,6 +34,12 @@ import CassiniNotebook
             noteStore = nil
             loadFailure = error.localizedDescription
         }
+    }
+
+    /// A library over `noteStore`, for tests.
+    init(noteStore: NoteStore, errors: ErrorPresenter) {
+        self.errors = errors
+        self.noteStore = noteStore
     }
 
     /// Reads every note, then follows the changes others write.
@@ -66,7 +80,8 @@ import CassiniNotebook
         guard let noteStore, let edit = applyLocally(id, change) else { return false }
         guard !edit.changesNothing else { return true }
         pendingWrites[id, default: 0] += 1
-        _ = enqueue { await self.write(edit, in: noteStore) }
+        let carried = unsaved[id]?.token
+        _ = enqueue { await self.write(edit, carrying: carried, in: noteStore) }
         return true
     }
 
@@ -76,23 +91,37 @@ import CassiniNotebook
     func commit(_ id: UUID, _ change: @escaping @Sendable (inout Note) -> Void) async -> Note? {
         guard let noteStore, let edit = applyLocally(id, change) else { return nil }
         pendingWrites[id, default: 0] += 1
-        return await enqueue { await self.write(edit, in: noteStore) }.value
+        let carried = unsaved[id]?.token
+        return await enqueue { await self.write(edit, carrying: carried, in: noteStore) }.value
     }
 
-    /// Changes the note on screen only: a change that could not be written. It lasts until the note is saved again or
-    /// the app relaunches.
-    func showUnsaved(_ id: UUID, _ change: @escaping @Sendable (inout Note) -> Void) { _ = applyLocally(id, change) }
+    /// Shows a change whose write failed. It stays on screen over whatever is stored, and is written with the note's
+    /// next write, which then keeps it on disk; until that succeeds the next launch sees the note as stored. `change`
+    /// follows the rules of `update(_:_:)`.
+    func showUnsaved(_ id: UUID, _ change: @escaping @Sendable (inout Note) -> Void) {
+        guard note(id) != nil else { return }
+        let earlier = unsaved[id]?.change
+        unsaved[id] = Unsaved { note in
+            earlier?(&note)
+            change(&note)
+        }
+        _ = applyLocally(id, change)
+    }
 
     /// Applies `change` to every note, writing only the notes it changed.
     func updateAll(_ change: @escaping @Sendable (inout Note) -> Void) {
         guard let noteStore else { return }
-        let edits = notes.map { NoteEdit($0, change) }.filter { !$0.changesNothing }
+        let edits = notes.map { edit($0, change) }.filter { !$0.changesNothing }
         guard !edits.isEmpty else { return }
         for edit in edits { place(edit.after) }
         let ids = edits.map(\.id)
         for id in ids { pendingWrites[id, default: 0] += 1 }
+        let carried = ids.compactMap { id in unsaved[id].map { (id, $0.token) } }
         _ = enqueue {
-            do { try await noteStore.applyAll(edits) } catch { self.reportSaveFailure(error) }
+            do {
+                try await noteStore.applyAll(edits)
+                for (id, token) in carried { self.clearUnsaved(id, token: token, written: true) }
+            } catch { self.reportSaveFailure(error) }
             for id in ids { await self.finishWrite(id, in: noteStore) }
         }
     }
@@ -108,6 +137,7 @@ import CassiniNotebook
         guard let noteStore else { throw CocoaError(.fileWriteUnknown) }
         try await enqueueThrowing { try await noteStore.delete(id) }
         notes.removeAll { $0.id == id }
+        unsaved[id] = nil
     }
 
     /// Waits until every write asked for so far has finished.
@@ -116,20 +146,37 @@ import CassiniNotebook
     /// Applies `change` to the mirror; nil when there is no such note.
     private func applyLocally(_ id: UUID, _ change: @escaping @Sendable (inout Note) -> Void) -> NoteEdit? {
         guard let note = note(id) else { return nil }
-        let edit = NoteEdit(note, change)
+        let edit = edit(note, change)
         if !edit.changesNothing { place(edit.after) }
         return edit
     }
 
+    /// An edit of the shown `note` that writes its unsaved change first, so the edit lands it on disk too. The mirror
+    /// shows the unsaved change already, so it only makes a difference on the stored note.
+    private func edit(_ note: Note, _ change: @escaping @Sendable (inout Note) -> Void) -> NoteEdit {
+        guard let pending = unsaved[note.id]?.change else { return NoteEdit(note, change) }
+        return NoteEdit(note) { note in
+            pending(&note)
+            change(&note)
+        }
+    }
+
     /// Writes one edit; runs only from the queue of writes. Returns the note as written, nil when the write failed.
-    private func write(_ edit: NoteEdit, in noteStore: NoteStore) async -> Note? {
+    /// `carried` is the unsaved change the edit includes, cleared once it is written.
+    private func write(_ edit: NoteEdit, carrying carried: UUID?, in noteStore: NoteStore) async -> Note? {
         let written: Note?
         do { written = try await noteStore.apply(edit) } catch {
             reportSaveFailure(error)
             written = nil
         }
+        if let carried { clearUnsaved(edit.id, token: carried, written: written != nil) }
         await finishWrite(edit.id, in: noteStore)
         return written
+    }
+
+    /// Forgets the unsaved change once a write carried it to disk, unless a newer one was shown since.
+    private func clearUnsaved(_ id: UUID, token: UUID, written: Bool) {
+        if written, unsaved[id]?.token == token { unsaved[id] = nil }
     }
 
     /// Counts a queued write of the note as done. After the last one, the mirror takes the note as stored: with
@@ -172,8 +219,10 @@ import CassiniNotebook
         }
     }
 
-    /// Puts the note in its place, newest first.
+    /// Puts the note in its place, newest first, with its unsaved change on top.
     private func place(_ note: Note) {
+        var note = note
+        unsaved[note.id]?.change(&note)
         if let index = notes.firstIndex(where: { $0.id == note.id }) {
             if notes[index].createdAt == note.createdAt { notes[index] = note; return }
             notes.remove(at: index)

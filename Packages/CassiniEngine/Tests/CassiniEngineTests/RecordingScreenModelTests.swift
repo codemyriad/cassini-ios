@@ -10,6 +10,8 @@ import CassiniNotebook
         let h: RecordingHarness
         let permission: FakeMicrophonePermission
         var missing = false
+        /// While true the speech-model lookup waits.
+        var lookupHeld = false
         var effects: [RecordingEffect] = []
         let model: RecordingScreenModel
 
@@ -18,7 +20,10 @@ import CassiniNotebook
             permission = FakeMicrophonePermission(access: access, answer: answer)
             var screen: Screen?
             model = RecordingScreenModel(controller: h.controller, ports: .init(
-                permission: permission, modelsMissing: { screen?.missing ?? false },
+                permission: permission, modelsMissing: {
+                    while screen?.lookupHeld == true { try? await Task.sleep(for: .milliseconds(5)) }
+                    return screen?.missing ?? false
+                },
                 notifier: notifier ? h.notifier : nil, settings: h.settings))
             screen = self
             model.onEffect = { [weak self] in self?.effects.append($0) }
@@ -94,6 +99,21 @@ import CassiniNotebook
         s.permission.access = .granted
         s.model.appBecameActive()
         try await s.h.waitFor("the capture") { s.model.phase == .recording }
+        #expect(s.model.banner == nil)
+    }
+
+    // The model outlives the screen: a start waiting for access must not begin once the user has left.
+    @Test func leavingWhileAccessIsOffDropsTheWaitingStart() async throws {
+        let s = try Screen(access: .undetermined, answer: false); defer { s.h.tearDown() }
+        await s.model.enter()
+        #expect(s.model.phase == .needsPermission)
+        s.model.minimise()
+        #expect(s.effects == [.close])
+        s.permission.access = .granted
+        s.model.appBecameActive()
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(s.h.capture.starts == 0)
+        #expect(s.h.controller.state == .idle)
         #expect(s.model.banner == nil)
     }
 
@@ -174,6 +194,22 @@ import CassiniNotebook
         let effect = try await finish(s)
         let id = try #require(await s.h.store.all().first?.id)
         #expect(effect == .openNote(id, modelDownload: false))
+    }
+
+    @Test func aSlowModelLookupDoesNotLeadAwayFromANewerRecording() async throws {
+        let s = try Screen(consented: false); defer { s.h.tearDown() }
+        s.missing = true
+        s.lookupHeld = true
+        await s.model.enter()
+        try await s.h.waitFor("the capture") { s.model.phase == .recording }
+        s.model.finish()
+        try await s.h.waitFor("the end") { s.h.controller.state == .idle }
+        await s.model.enter()
+        try await s.h.waitFor("the second capture") { s.model.phase == .recording }
+        s.lookupHeld = false
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(s.effects.isEmpty, "the new recording keeps the screen")
+        #expect(s.h.controller.state.isActive)
     }
 
     // ports: RecordingViewModelTest#aStorageStopStaysWithItsBannerAndOpensTheNote

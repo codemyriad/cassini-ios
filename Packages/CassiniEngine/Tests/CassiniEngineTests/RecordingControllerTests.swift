@@ -323,6 +323,22 @@ import CassiniNotebook
         #expect(await h.note(active.noteID)?.status == .audioOnly)
     }
 
+    // The note opens at once and shows "Waiting to transcribe" with Cancel while its audio is compressed.
+    @Test func aTranscriptionCancelledWhileCompressingIsNotHandedOff() async throws {
+        let h = try RecordingHarness(); defer { h.tearDown() }
+        h.audio.set(held: true)
+        let active = try await h.startRecording()
+        h.controller.finish()
+        #expect(try await h.awaitEnded() == .ended(noteID: active.noteID, outcome: .saved(.transcribe)))
+        #expect(await h.note(active.noteID)?.status == .queued)
+        _ = try await h.store.update(active.noteID) { $0.status = .audioOnly }
+        h.audio.set(held: false)
+        await h.controller.settle()
+        #expect(h.handoff.handedOff.isEmpty, "the cancel stands")
+        #expect(await h.note(active.noteID)?.status == .audioOnly)
+        #expect(await h.note(active.noteID)?.audioFilename == "audio.m4a")
+    }
+
     @Test func anUnreadableCaptureIsNotLeftQueued() async throws {
         let h = try RecordingHarness(); defer { h.tearDown() }
         h.audio.set(summary: nil)

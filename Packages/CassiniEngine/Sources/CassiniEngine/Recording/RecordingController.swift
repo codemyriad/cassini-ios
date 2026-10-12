@@ -17,8 +17,9 @@ import CassiniNotebook
 /// - The finish makes the note plain with its duration and ends with `saved(next)`; then the audio is compressed to
 ///   M4A, and the note is handed to transcription when `next` is `transcribe`. Such a note is sealed as queued, so a
 ///   kill during the compression leaves it marked interrupted at the next launch; a refused hand-off makes it audio
-///   only. A seal that cannot be written is shown on screen anyway (`RecordingNotes.showUnsaved`), and the note opens
-///   audio only; the next launch's recovery seals it on disk.
+///   only, and a note no longer queued when the compression ends (its transcription was cancelled) is not handed off.
+///   A seal that cannot be written is shown on screen anyway and written with the note's next write
+///   (`RecordingNotes.showUnsaved`), and the note opens audio only; failing that, the next launch's recovery seals it.
 /// - Another app taking the audio pauses the recording; it stays paused until the user resumes.
 @MainActor @Observable
 public final class RecordingController {
@@ -333,7 +334,8 @@ public final class RecordingController {
             finalizing.remove(id)
             compressions[id] = nil
             parts.handoff.audioReady(id)
-            guard transcribe else { return }
+            // Cancelled while compressing ("Waiting to transcribe" shows Cancel): the user's choice stands.
+            guard transcribe, await parts.notes.note(id)?.status == .queued else { return }
             if !readable || !parts.handoff.handOff(id) {
                 _ = try? await parts.notes.update(id) { if $0.status == .queued { $0.status = .audioOnly } }
             }

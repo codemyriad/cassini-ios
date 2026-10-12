@@ -8,6 +8,7 @@ struct LibraryRecordingNotes: RecordingNotes {
     let library: LibraryStore
 
     func create(_ note: Note) async throws { try await library.insert(note) }
+    func note(_ id: UUID) async -> Note? { await library.note(id) }
     func captureURL(for note: Note) async -> URL? { await library.audioURL(note) }
     func update(_ id: UUID, _ change: @escaping @Sendable (inout Note) -> Void) async throws -> Note? { await library.commit(id, change) }
     func discard(_ id: UUID) async throws { try await library.delete(id) }

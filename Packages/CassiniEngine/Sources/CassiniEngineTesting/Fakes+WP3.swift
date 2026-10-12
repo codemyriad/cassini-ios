@@ -53,7 +53,9 @@ import CassiniNotebook
 
 /// File-level audio work without AVFoundation: the summary is scripted, compression copies the file.
 public final class FakeAudioProcessing: AudioProcessing {
-    private struct State { var summary: AudioSummary?; var compressFails = false; var compressed: [URL] = []; var inspected: [URL] = [] }
+    private struct State {
+        var summary: AudioSummary?; var compressFails = false; var held = false; var compressed: [URL] = []; var inspected: [URL] = []
+    }
     private let state: Mutex<State>
 
     /// `summary` nil makes every file unreadable.
@@ -63,6 +65,8 @@ public final class FakeAudioProcessing: AudioProcessing {
     public var inspected: [URL] { state.withLock { $0.inspected } }
     public func set(summary: AudioSummary?) { state.withLock { $0.summary = summary } }
     public func set(compressFails: Bool) { state.withLock { $0.compressFails = compressFails } }
+    /// While held, every compression waits before it starts.
+    public func set(held: Bool) { state.withLock { $0.held = held } }
 
     public func inspect(_ url: URL) async throws -> AudioSummary {
         let summary = state.withLock { state in state.inspected.append(url); return state.summary }
@@ -71,6 +75,7 @@ public final class FakeAudioProcessing: AudioProcessing {
     }
 
     public func compress(_ source: URL, to destination: URL) async throws {
+        while state.withLock({ $0.held }) { try await Task.sleep(for: .milliseconds(5)) }
         if state.withLock({ $0.compressFails }) { throw CocoaError(.fileWriteUnknown) }
         try? FileManager.default.removeItem(at: destination)
         try FileManager.default.copyItem(at: source, to: destination)
@@ -147,6 +152,10 @@ public final class CountingRecordingNotes: RecordingNotes {
     /// The notes as shown after `showUnsaved`, by id.
     public var unsaved: [UUID: Note] { unsavedNotes.withLock { $0 } }
     public func create(_ note: Note) async throws { try await store.create(note) }
+    public func note(_ id: UUID) async -> Note? {
+        if let shown = unsaved[id] { return shown }
+        return await store.note(id)
+    }
     public func captureURL(for note: Note) async -> URL? { store.captureURL(for: note) }
     public func update(_ id: UUID, _ change: @escaping @Sendable (inout Note) -> Void) async throws -> Note? {
         guard !failUpdates else { return nil }
