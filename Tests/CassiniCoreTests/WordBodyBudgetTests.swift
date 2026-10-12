@@ -31,7 +31,7 @@ import Testing
 
     /**
      * A body at the budget is accepted by the payload codec and stays well inside the header limit once encoded. A
-     * compact body holds more words than Android's pretty-printed one, so its tags take about a quarter of the limit.
+     * compact body holds more words than Android's pretty-printed one, so its tags take up to a third of the limit.
      */
     // ports: WordBodyBudgetTest#aBodyAtTheBudgetEncodes
     @Test func aBodyAtTheBudgetEncodes() throws {
@@ -48,5 +48,14 @@ import Testing
         #expect(try ref.number("chunkCount") <= 4096)
         #expect(tags.reduce(0) { $0 + $1.utf8.count + 4 } < OggOpus.maxHeaderBytes / 3)
         #expect((130_000...160_000).contains(words.count), "\(words.count) words")
+    }
+
+    @Test func aVariantFitsTheHeaderOnlyWhileTheTagsLeaveRoom() throws {
+        let transcript = Transcript(LongRun().words(LongRun.hourMs / 60))
+        #expect(try WordBodyBudget.fitsHeader(transcript, beside: nil))
+        let full = CassiniDocument(state: .ok, comments: ["X_FILL=" + String(repeating: "x", count: Int(WordBodyBudget.maxHeaderBytes) - 1024)])
+        #expect(try !WordBodyBudget.fitsHeader(transcript, beside: full))
+        let small = CassiniDocument(state: .ok, comments: ["X_FILL=x"])
+        #expect(try WordBodyBudget.headerBytes(adding: transcript, to: small) > WordBodyBudget.headerBytes(adding: transcript, to: nil))
     }
 }
