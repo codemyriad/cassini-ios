@@ -1,37 +1,93 @@
 import SwiftUI
+import CassiniEngine
 import CassiniNotebook
 
+/// Recently Deleted: an intro and a card per note, oldest deletion first, or a plain card when there are none. The
+/// notes whose 30 days are over go when it opens. Delete now and Empty ask first; the open confirmation is kept with
+/// the scene and goes away when its note leaves Recently Deleted.
 struct TrashView: View {
-    @Environment(TrashStore.self) private var trash
-    @State private var pendingDelete: Note?
-    @State private var emptying = false
+    @Environment(TrashService.self) private var trash
+    @Environment(ErrorPresenter.self) private var errors
+    @Environment(\.restoresSceneState) private var restoresSceneState
+    @SceneStorage("trash.dialog") private var savedDialog: Data?
+    @State private var dialogs = TrashDialogs()
 
     var body: some View {
-        let notes = trash.notes
-        Group {
-            if notes.isEmpty {
-                ContentUnavailableView("Nothing here", systemImage: "trash", description: Text("Deleted recordings can be restored for 30 days."))
-            } else {
-                List {
-                    Section {
-                        ForEach(notes) { note in TrashCard(note: note) { pendingDelete = note } }
-                    } footer: { Text("Recordings expire after 30 days. Permanent deletion removes audio, transcripts, and voice samples from this recording.") }
-                }.scrollContentBackground(.hidden)
+        let items = trash.items
+        let dialog = dialogs.dialog(in: items)
+        ScrollView {
+            VStack(alignment: .leading, spacing: Spacing.tight) {
+                if items.isEmpty {
+                    TrashEmptyCard()
+                } else {
+                    Text(TrashCopy.intro).font(.subheadline).foregroundStyle(Color.muted)
+                        .padding(.horizontal, 4).padding(.bottom, 6)
+                    ForEach(items) { item in
+                        TrashCard(item: item, restore: { trash.restore(item.id) }, deleteNow: { dialogs.askDeleteNow(item.id) })
+                    }
+                }
+            }
+            .padding(.horizontal, 16).padding(.top, 6).padding(.bottom, 24)
+            .frame(maxWidth: ReadableWidth.library).frame(maxWidth: .infinity)
+        }
+        .background(Color.paper)
+        .navigationTitle(TrashCopy.title).navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if !items.isEmpty {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(TrashCopy.empty, role: .destructive) { dialogs.askEmpty(items: items) }.tint(.ember)
+                }
             }
         }
-        .background(Color.paper).navigationTitle("Recently Deleted").navigationBarTitleDisplayMode(.inline)
-        .toolbar { ToolbarItem(placement: .topBarTrailing) { if !notes.isEmpty { Button("Empty", role: .destructive) { emptying = true } } } }
-        .task { await trash.purgeExpired() }
-        .alert("Empty Recently Deleted?", isPresented: $emptying) {
-            Button("Cancel", role: .cancel) {}
-            Button("Delete all forever", role: .destructive) { Task { await trash.emptyTrash() } }
-        } message: { Text("Permanently deletes all \(notes.count) recordings in Recently Deleted and their voice samples. This cannot be undone.") }
-        .alert("Delete recording forever?", isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } })) {
-            Button("Cancel", role: .cancel) { pendingDelete = nil }
-            Button("Delete forever", role: .destructive) {
-                if let note = pendingDelete { Task { await trash.deletePermanently(note.id) } }
-                pendingDelete = nil
+        .task { _ = try? await trash.purgeExpired() }
+        .alert(dialog.map(Self.title) ?? "", isPresented: Binding(get: { dialog != nil }, set: { if !$0 { dialogs.dismiss() } }),
+               presenting: dialog) { dialog in
+            Button(TrashCopy.cancel, role: .cancel) { dialogs.dismiss() }
+            Button(TrashCopy.delete, role: .destructive) { confirm(dialog) }
+        } message: { dialog in
+            switch dialog {
+            case .delete: Text(TrashCopy.deleteBody)
+            case .emptyAll: Text(TrashCopy.deleteAllBody)
             }
-        } message: { Text("“\(pendingDelete?.title ?? "")” and its transcript will be permanently deleted. This cannot be undone.") }
+        }
+        .onAppear {
+            if restoresSceneState { dialogs.request = savedDialog.flatMap { try? JSONDecoder().decode(TrashDialogRequest.self, from: $0) } }
+        }
+        .onChange(of: dialogs.request) { _, request in
+            if restoresSceneState { savedDialog = request.flatMap { try? JSONEncoder().encode($0) } }
+        }
+    }
+
+    private static func title(_ dialog: TrashDialog) -> String {
+        switch dialog {
+        case .delete(_, let title): TrashCopy.deleteTitle(title)
+        case .emptyAll(let count): TrashCopy.deleteAllTitle(count)
+        }
+    }
+
+    private func confirm(_ dialog: TrashDialog) {
+        Task {
+            do throws(TrashError) {
+                try await dialogs.confirm(dialog, with: trash)
+            } catch {
+                switch error {
+                case .deleteFailed(let ids): errors.present(TrashCopy.notDeleted(ids, in: trash.items))
+                case .voicesUnavailable: errors.present(TrashCopy.voicesUnavailable)
+                }
+            }
+        }
+    }
+}
+
+/// Recently Deleted with no notes.
+private struct TrashEmptyCard: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(TrashCopy.isEmpty).font(.headline).foregroundStyle(Color.ink)
+            Text(TrashCopy.isEmptyBody).font(.subheadline).foregroundStyle(Color.muted)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading).padding(16)
+        .background(Tone.plain.background, in: RoundedRectangle(cornerRadius: Radius.control))
+        .accessibilityElement(children: .combine)
     }
 }

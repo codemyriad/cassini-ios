@@ -166,10 +166,7 @@ import CassiniNotebook
         Task { await coordinator.restore(id, trashedJob: trashedJob) }
     }
 
-    /// Before a permanent delete: a job that still runs stops and keeps its progress, and this returns once it ended.
-    func stopForDelete(_ id: UUID) async { await coordinator?.cancel(id, discard: false) }
-
-    /// After a permanent delete: the job goes.
+    /// The first step of a permanent delete: a job that still runs stops and is awaited, then the job goes.
     func forget(_ id: UUID) async { await coordinator?.forget(id) }
 
     // MARK: Notices

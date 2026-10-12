@@ -10,6 +10,7 @@ struct NoteDetailView: View {
     @Environment(RecordingStore.self) private var recording
     @Environment(Router.self) private var router
     @Environment(ErrorPresenter.self) private var errors
+    @Environment(VoicesStore.self) private var voices
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var query = ""
     @State private var showSearch = false
@@ -19,6 +20,7 @@ struct NoteDetailView: View {
     @State private var editing: TranscriptSegment?
     @State private var showingSpeakers = false
     @State private var showingVersions = false
+    @State private var naming: SpeakerRef?
     @State private var shareItem: ShareItem?
     @State private var trustToggled = false
     /// This screen, as the owner of the player.
@@ -50,7 +52,8 @@ struct NoteDetailView: View {
                                 TranscriptEmptyState(note: note, requestTranscription: requestTranscription)
                             } else {
                                 TranscriptList(note: note, query: query, activeSegment: activeSegment, followPlayback: $followPlayback,
-                                               showSpeakers: { showingSpeakers = true }, edit: { editing = $0 }, seek: seek)
+                                               showSpeakers: { showingSpeakers = true }, edit: { editing = $0 }, seek: seek,
+                                               suggestion: suggestionCard(in: note))
                             }
                         }.padding(Spacing.gutter).frame(maxWidth: ReadableWidth.note).frame(maxWidth: .infinity)
                     }
@@ -93,7 +96,8 @@ struct NoteDetailView: View {
         }
         .sheet(isPresented: $showingSpeakers) { SpeakersView(noteID: noteID) }
         .sheet(isPresented: $showingVersions) { TranscriptVersionsView(noteID: noteID) }
-        .sheet(item: $shareItem) { item in ShareSheet(url: item.url) }
+        .sheet(item: $naming) { NameSpeakerSheet(noteID: noteID, speakerID: $0.id) }
+        .shareSheet(item: $shareItem)
     }
 
     @ViewBuilder private func notices(_ note: Note) -> some View {
@@ -110,6 +114,18 @@ struct NoteDetailView: View {
         if let problem = note.playbackProblem { NoticeCard(title: problem, symbol: "waveform.slash") }
         if playback.failed(noteID) {
             NoticeCard(title: String(localized: "This audio can’t be played", table: "Playback"), symbol: "waveform.slash")
+        }
+    }
+
+    /// "Is this Luca?" above the first passage of each speaker a saved voice may be.
+    private func suggestionCard(in note: Note) -> (TranscriptSegment) -> AnyView? {
+        let cards = Dictionary(voices.suggestions(for: note).map { ($0.segmentID, $0) }, uniquingKeysWith: { first, _ in first })
+        guard !cards.isEmpty else { return { _ in nil } }
+        let ordinals = Dictionary(SpeakerStats.of(note.transcript).map { ($0.speakerID, $0.ordinal) }, uniquingKeysWith: { a, _ in a })
+        return { segment in
+            cards[segment.id].map { card in
+                AnyView(SuggestionCard(noteID: noteID, suggestion: card, ordinal: ordinals[card.speakerID] ?? 0) { naming = SpeakerRef(id: $0) })
+            }
         }
     }
 

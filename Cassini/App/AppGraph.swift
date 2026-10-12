@@ -16,7 +16,7 @@ import CassiniNotebook
     let processing: ProcessingStore
     let recording: RecordingStore
     let imports: ImportStore
-    let trash: TrashStore
+    let trash: TrashService
     let exports: ExportStore
 
     init(environment: AppEnvironment) {
@@ -24,7 +24,7 @@ import CassiniNotebook
         settings = SettingsStore(defaults: environment.defaults, clock: environment.clock,
                                  defaultLanguage: environment.locale.identifier(.bcp47))
         library = LibraryStore(root: environment.root, errors: errors)
-        voices = VoicesStore(library: library, settings: settings, errors: errors)
+        voices = VoicesStore(library: library, settings: settings, errors: errors, clock: environment.clock)
         playback = PlaybackStore(playback: environment.playback, library: library)
         processing = Self.processing(environment: environment, library: library, voices: voices, settings: settings,
                                      notices: notices)
@@ -37,10 +37,13 @@ import CassiniNotebook
         }
         imports = ImportStore(service: importService, library: library, processing: processing, settings: settings,
                               router: router, clock: environment.clock) { [startup] in _ = await startup.ready() }
-        trash = TrashStore(library: library, voices: voices, processing: processing, playback: playback,
-                           recording: recording, settings: settings, router: router, errors: errors,
-                           clock: environment.clock, calendar: environment.calendar)
-        exports = ExportStore(library: library, portable: PortableExportService(audio: environment.audio))
+        trash = TrashService(.init(
+            notes: library, queue: processing, voices: voices,
+            host: AppTrashHost(recording: recording, playback: playback, router: router, settings: settings),
+            undo: TrashUndo(), clock: environment.clock, calendar: environment.calendar))
+        exports = ExportStore(library: library, portable: PortableExportService(audio: environment.audio),
+                              folder: environment.exports,
+                              locale: environment.locale, timeZone: environment.timeZone) { [startup] in _ = await startup.ready() }
         processing.modelDownload = ModelDownloadAdapter(
             settings: settings, processing: processing, transcriber: environment.transcriber,
             analyzer: environment.analyzer, storage: environment.storage, notifier: environment.notifier,
@@ -112,7 +115,7 @@ import CassiniNotebook
             if library.unreadableCount > 0 {
                 notices.post("\(library.unreadableCount) recording documents could not be read. Their files have been preserved.")
             }
-            if library.loadFailure == nil, !voices.load() {
+            if library.loadFailure == nil, !(await voices.load()) {
                 notices.post("Saved voices could not be read. Their files have been preserved. Recordings remain available.")
             }
         }
@@ -120,7 +123,10 @@ import CassiniNotebook
         startup.register(.reconcile) { [processing, recording] in
             try await processing.reconcileOnStart(activeNoteID: recording.state.noteID)
         }
-        startup.register(.purge) { [trash] in await trash.purgeExpired() }
+        startup.register(.voiceLinks) { [voices] in try await voices.sweepOrphans() }
+        // Unreadable saved voices delete nothing; the report keeps the failure and the trash its fact, with no alert.
+        startup.register(.purge) { [trash] in try await trash.purgeExpired() }
+        startup.register(.sweep) { [exports, clock = environment.clock] in await exports.sweep(now: clock.now) }
     }
 }
 
@@ -140,7 +146,7 @@ extension View {
             .environment(graph.settings).environment(graph.library).environment(graph.voices)
             .environment(graph.playback).environment(graph.processing).environment(graph.processing.progress)
             .environment(graph.recording)
-            .environment(graph.imports).environment(graph.trash).environment(graph.exports)
+            .environment(graph.imports).environment(graph.trash).environment(graph.trash.undo).environment(graph.exports)
             .environment(\.clock, graph.environment.clock)
             .environment(\.locale, graph.environment.locale)
             .environment(\.timeZone, graph.environment.timeZone)
