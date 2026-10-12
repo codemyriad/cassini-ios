@@ -14,7 +14,7 @@ Each note lives under Application Support/Cassini/<UUID>/:
 
 Metadata is written atomically before updating observable UI state. One corrupt document cannot prevent other notes loading. Unknown versions and damaged files are kept in place and reported. No whole-library destructive reset or migration fallback is used.
 
-The application support directory uses protection until first device unlock, allowing a started recording to continue after screen lock. Files are eligible for system backup; app copy explains this. Permanent deletion removes voice samples first and then the note directory. Individual and bulk deletion require confirmation; 30-day automatic expiry follows calendar days in the current device time zone and runs on activation/trash access. Exports use unique temporary directories and the system share sheet.
+The application support directory uses protection until first device unlock, allowing a started recording to continue after screen lock. Files are eligible for system backup; app copy explains this. Permanent deletion (`TrashService`) removes the note's job first, then its voice samples, then the note directory, which is renamed out of the library before it is removed so an interrupted delete cannot be rebuilt into a note. Individual and bulk deletion require confirmation; 30-day automatic expiry follows calendar days in the current device time zone and runs at launch, on activation and when Recently Deleted opens. Exports use unique temporary directories and the system share sheet.
 
 ## Recording lifecycle
 
