@@ -25,7 +25,7 @@ import CassiniNotebook
                                  defaultLanguage: environment.locale.identifier(.bcp47))
         library = LibraryStore(root: environment.root, errors: errors)
         voices = VoicesStore(library: library, settings: settings, errors: errors, clock: environment.clock)
-        playback = PlaybackStore(playback: environment.playback, library: library, errors: errors, clock: environment.clock)
+        playback = PlaybackStore(playback: environment.playback, library: library)
         processing = Self.processing(environment: environment, library: library, voices: voices, settings: settings,
                                      notices: notices)
         recording = RecordingStore(.init(environment: environment, library: library, processing: processing,
@@ -94,7 +94,8 @@ import CassiniNotebook
     func enterBackground() {
         let token = environment.background.begin(title: "Saving your recordings", progress: Progress(), onExpire: {})
         playback.savePosition()
-        Task { [library, background = environment.background] in
+        Task { [playback, library, background = environment.background] in
+            await playback.settle()
             await library.settle()
             background.end(token)
         }

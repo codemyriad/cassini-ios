@@ -23,9 +23,14 @@ struct NoteDetailView: View {
     @State private var naming: SpeakerRef?
     @State private var shareItem: ShareItem?
     @State private var trustToggled = false
+    /// This screen, as the owner of the player.
+    @State private var playerOwner = PlaybackOwner()
 
     private var note: Note? { library.note(noteID) }
-    private var ownsPlayer: Bool { playback.state.noteID == noteID }
+    private var ownsPlayer: Bool { playback.owns(noteID) }
+    /// What the player opens; a change opens, reloads or leaves it. It follows the same block as the player, so the
+    /// player opens again as soon as a recording lets it go.
+    private var playerKey: NotePlayer.Key? { NotePlayer.key(for: note, blocked: playback.isBlocked) }
     private var activeSegment: UUID? {
         guard ownsPlayer else { return nil }
         let position = playback.state.position
@@ -59,8 +64,10 @@ struct NoteDetailView: View {
                     }
                 }
                 .safeAreaInset(edge: .bottom, spacing: 0) {
-                    PlaybackBar(note: note, addBookmark: { showBookmarks = true })
-                        .disabled(recording.state.isActive || !ownsPlayer)
+                    if NotePlayer.hasPlayer(note) {
+                        PlaybackBar(note: note, addBookmark: { showBookmarks = true })
+                            .disabled(playback.isBlocked || !ownsPlayer)
+                    }
                 }
                 .toolbar {
                     ToolbarItemGroup(placement: .topBarTrailing) {
@@ -75,8 +82,10 @@ struct NoteDetailView: View {
         }
         .background(Color.paper)
         .navigationBarTitleDisplayMode(.inline)
-        .task(id: noteID) { if let note, !recording.state.isActive { playback.load(note) } }
-        .onDisappear { if ownsPlayer { playback.pause() } }
+        .task(id: playerKey) {
+            if let note, playerKey != nil { playback.show(note, owner: playerOwner) } else { playback.leave(playerOwner) }
+        }
+        .onDisappear { playback.leave(playerOwner) }
         .sheet(isPresented: $renaming) { RenameNoteSheet(noteID: noteID) }
         .sheet(item: $editing) { segment in
             SegmentEditor(segment: segment, speakers: note?.speakers ?? []) { revised in
@@ -103,6 +112,9 @@ struct NoteDetailView: View {
         if let failure = note.failure { NoticeCard(title: failure.transcriptionMessage, symbol: "exclamationmark.circle") }
         if let failure = note.speakerAnalysisFailure { NoticeCard(title: failure.speakerAnalysisMessage, symbol: "person.2") }
         if let problem = note.playbackProblem { NoticeCard(title: problem, symbol: "waveform.slash") }
+        if playback.failed(noteID) {
+            NoticeCard(title: String(localized: "This audio can’t be played", table: "Playback"), symbol: "waveform.slash")
+        }
     }
 
     /// "Is this Luca?" above the first passage of each speaker a saved voice may be.
@@ -120,7 +132,7 @@ struct NoteDetailView: View {
     /// Android `BannerAction.PLAY_ANYWAY`: the note stops showing its not-verified banner, and plays.
     private func playAnyway(_ note: Note) {
         library.update(noteID) { $0.document?.trustAcknowledged = true }
-        if ownsPlayer { playback.play() } else { playback.play(note, from: 0) }
+        if ownsPlayer { playback.play() }
     }
 
     /// Transcribe; without consent for the speech model, the model download screen asks first, and a refusal says why.
@@ -135,7 +147,7 @@ struct NoteDetailView: View {
     }
 
     private func seek(_ time: TimeInterval) {
-        guard !recording.state.isActive, let note, note.audio.isPlayable else { return }
+        guard !recording.state.isActive, let note else { return }
         playback.play(note, from: time)
     }
 }

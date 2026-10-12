@@ -42,8 +42,8 @@ final class CassiniUITests: XCTestCase {
         openFixture(app)
         capture("Transcript")
         app.buttons["playButton"].tap()
-        XCTAssertTrue(app.buttons["Pause playback"].waitForExistence(timeout: 3))
-        app.buttons["Pause playback"].tap()
+        XCTAssertTrue(app.buttons["Pause"].waitForExistence(timeout: 3))
+        app.buttons["Pause"].tap()
         app.buttons["Recording actions"].tap()
         app.buttons["Rename"].tap()
         let title = app.textFields["recordingTitleField"]
@@ -56,6 +56,33 @@ final class CassiniUITests: XCTestCase {
         app.terminate()
         let reopened = launch(seed: false, reset: false)
         XCTAssertTrue(reopened.buttons.matching(NSPredicate(format: "label CONTAINS %@", "A saved conversation")).firstMatch.exists)
+    }
+    // ports: TranscriptSemanticsTest#thePlayerButtonsAreDescribedAndBigEnough
+    // ports: TranscriptSemanticsTest#theSliderIsPositionWithTenSecondSteps (label and value; the steps are in PlaybackSkipTests)
+    @MainActor func testThePlayerIsDescribedAndItsButtonsAreBigEnough() {
+        let app = launch(); openFixture(app)
+        let play = app.buttons["playButton"]
+        XCTAssertTrue(play.waitForExistence(timeout: 5))
+        XCTAssertEqual(play.label, "Play")
+        XCTAssertEqual(play.value as? String, "Paused")
+        let position = app.descendants(matching: .any)["playbackPosition"]
+        XCTAssertEqual(position.label, "Position")
+        XCTAssertEqual(position.value as? String, "00:00 of 00:24")
+        for button in [play, app.buttons["Back 10 seconds"], app.buttons["Forward 10 seconds"]] {
+            XCTAssertTrue(button.exists)
+            XCTAssertGreaterThanOrEqual(button.frame.width, 44, button.label)
+            XCTAssertGreaterThanOrEqual(button.frame.height, 44, button.label)
+        }
+        app.buttons["Forward 10 seconds"].tap()
+        XCTAssertEqual(position.value as? String, "00:10 of 00:24")
+        app.buttons["Back 10 seconds"].tap()
+        XCTAssertEqual(position.value as? String, "00:00 of 00:24")
+        play.tap()
+        let playing = NSPredicate(format: "label == %@ AND value == %@", "Pause", "Playing")
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: playing, object: play)], timeout: 3), .completed)
+        play.tap()
+        XCTAssertEqual(play.label, "Play")
+        XCTAssertEqual(play.value as? String, "Paused")
     }
     @MainActor private func row(_ app: XCUIApplication, _ title: String) -> XCUIElement {
         app.buttons.matching(NSPredicate(format: "label CONTAINS %@", title)).firstMatch
@@ -147,7 +174,7 @@ final class CassiniUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.buttons["playButton"].isEnabled)
         app.buttons["playButton"].tap()
-        XCTAssertTrue(app.buttons["Pause playback"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["Pause"].waitForExistence(timeout: 3))
     }
     @MainActor func testSpeakerRenameAppliesToAllPassagesAndPersists() {
         let app = launch(); openFixture(app)

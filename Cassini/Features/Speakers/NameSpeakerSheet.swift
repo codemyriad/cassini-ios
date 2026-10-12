@@ -15,7 +15,6 @@ struct NameSpeakerSheet: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var state: NamingState?
     @State private var saving = false
-    @State private var sampling = false
     @State private var saveError: String?
     @State private var pulse = false
     @AccessibilityFocusState private var questionFocused: Bool
@@ -41,12 +40,14 @@ struct NameSpeakerSheet: View {
         }
         .tint(.ember)
         .task { state = await voices.namingInput(noteID: noteID, speakerID: speakerID).map(SpeakerNaming.open) }
-        .onChange(of: playback.state.isPlaying) { _, playing in if !playing { sampling = false } }
-        .onDisappear { if sampling { playback.pause() } }
+        .onDisappear { playback.stopSample() }
         .alert(SpeakersCopy.couldNotSave, isPresented: Binding(get: { saveError != nil }, set: { if !$0 { saveError = nil } })) {
             Button(SpeakersCopy.ok) { saveError = nil }
         } message: { Text(saveError ?? "") }
     }
+
+    /// A sample of this note is playing; it ends by itself at its end, on a pause, an interruption or a lost output.
+    private var sampling: Bool { playback.owns(noteID) && playback.state.sample != nil }
 
     private var mergeShown: Binding<Bool> {
         Binding(get: { state?.merge != nil }, set: { if !$0, state?.merge != nil { send(.closeMerge) } })
@@ -97,7 +98,7 @@ struct NameSpeakerSheet: View {
                     .background(Color.ember.opacity(0.12), in: Circle())
             }
             .buttonStyle(.plain).foregroundStyle(Color.ember)
-            .disabled(!ui.canSample)
+            .disabled(!ui.canSample || !playback.owns(noteID))
             .accessibilityLabel(sampling ? SpeakersCopy.stopSample : SpeakersCopy.playSample)
         }
     }
@@ -180,11 +181,9 @@ struct NameSpeakerSheet: View {
 
     private func toggleSample(_ window: SampleWindow) {
         if sampling {
-            playback.pause()
-            sampling = false
+            playback.stopSample()
         } else if let note = library.note(noteID) {
-            playback.playSample(note, from: window.start, duration: window.duration)
-            sampling = playback.state.isPlaying
+            _ = playback.playSample(note, from: window.start, to: window.start + window.duration)
         }
     }
 
@@ -198,7 +197,7 @@ struct NameSpeakerSheet: View {
     }
 
     private func close() {
-        if sampling { playback.pause() }
+        playback.stopSample()
         dismiss()
     }
 }
