@@ -86,15 +86,18 @@ public final class TranscriptionCoordinator {
     @discardableResult
     public func transcribe(_ noteID: UUID, kind: JobKind = .transcribe, origin: StartOrigin = .screen) async -> TranscribeOutcome {
         await readiness.wait()
-        // A job stopped a moment ago may still be ending; its outcome must not overwrite this request.
-        if let current = active, current.noteID == noteID, await parts.jobs.job(noteID)?.state != .running {
-            await current.finished.wait()
+        // A job asked to stop may still be ending: this request waits for its outcome, so that outcome never
+        // overwrites it and the note is queued again once it has ended.
+        if let current = active, current.noteID == noteID {
+            let stopping = current.stop.request != nil || current.cancel != nil
+            let stillRunning = await parts.jobs.job(noteID)?.state == .running
+            if stopping || !stillRunning { await current.finished.wait() }
         }
-        let note = await parts.notes.note(noteID)
+        guard let note = await parts.notes.note(noteID) else { return .refused(.noNote) }
         if let refusal = EnqueueRules.refusal(for: note) { return .refused(refusal) }
-        let language = EnqueueRules.language(for: kind, speechLanguage: settings.speechLanguage)
-        let jobLanguage = language ?? note?.language ?? ""
-        guard await parts.consent.allows(kind, jobLanguage) else {
+        let spoken = EnqueueRules.language(for: kind, speechLanguage: settings.speechLanguage)
+        let language = Language(job: spoken ?? note.language, setsNote: spoken != nil)
+        guard await parts.consent.allows(kind, language.job) else {
             return await lock.run { await needConsent(noteID, kind: kind, language: language) }
         }
         let resume = await parts.jobs.job(noteID)?.state == .paused
@@ -474,23 +477,30 @@ public final class TranscriptionCoordinator {
 
     // MARK: Helpers
 
-    private func enqueue(_ noteID: UUID, kind: JobKind, language: String?) async -> TranscribeOutcome {
+    /// The language a job is queued with, and whether the note takes it too (only for the transcribe kinds).
+    private struct Language {
+        var job: String
+        var setsNote: Bool
+        var forNote: String? { setsNote ? job : nil }
+    }
+
+    private func enqueue(_ noteID: UUID, kind: JobKind, language: Language) async -> TranscribeOutcome {
         let existing = await parts.jobs.job(noteID)
         if let existing, existing.state == .queued || existing.state == .running { return .queued(changed: false) }
-        guard await write({ try await $0.enqueue(noteID, kind: kind, language: language, now: self.parts.clock.now) }) != nil else {
+        guard await write({ try await $0.enqueue(noteID, kind: kind, language: language.job, now: self.parts.clock.now) }) != nil else {
             return .queued(changed: false)
         }
         trashing.remove(noteID)
-        await mirror(noteID, language: language)
+        await mirror(noteID, language: language.forNote)
         await refresh()
         return .queued(changed: true)
     }
 
-    private func needConsent(_ noteID: UUID, kind: JobKind, language: String?) async -> TranscribeOutcome {
+    private func needConsent(_ noteID: UUID, kind: JobKind, language: Language) async -> TranscribeOutcome {
         if await parts.jobs.job(noteID)?.state == .running { return .queued(changed: false) }
-        await write { try await $0.enqueue(noteID, kind: kind, language: language, now: self.parts.clock.now) }
+        await write { try await $0.enqueue(noteID, kind: kind, language: language.job, now: self.parts.clock.now) }
         await write { try await $0.transition(noteID, now: self.parts.clock.now) { $0.state = .needsConsent } }
-        await mirror(noteID, language: language)
+        await mirror(noteID, language: language.forNote)
         await refresh()
         return .needsConsent
     }
