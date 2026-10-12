@@ -154,7 +154,8 @@ import CassiniEngineTesting
         let note = try await seedPlainNote(in: test)
         let library = test.graph.library
         library.updateAll { $0.isFavorite = true }
-        library.update(note.id) { $0.addBookmark(at: 1) }
+        let added = UUID()
+        library.update(note.id) { $0.addBookmark(at: 1, id: added) }
         let bookmark = try XCTUnwrap(library.note(note.id)?.bookmarks.first)
         library.update(note.id) { $0.bookmarks.removeAll { $0.id == bookmark.id } }
         await library.settle()
@@ -163,6 +164,32 @@ import CassiniEngineTesting
         let stored = try NoteRepository(root: test.root).load().notes.first { $0.id == note.id }
         XCTAssertEqual(stored?.bookmarks, [])
         XCTAssertEqual(stored?.isFavorite, true)
+        XCTAssertNil(test.graph.errors.current)
+    }
+
+    func testAWriteMadeStraightToTheStoreWhileEditsAreQueuedKeepsEveryChange() async throws {
+        let test = TestGraph(); defer { test.tearDown() }
+        let note = try await seedPlainNote(in: test)
+        let library = test.graph.library
+        let noteStore = try XCTUnwrap(library.noteStore)
+        let bookmark = UUID()
+        library.update(note.id) { $0.isFavorite = true }
+        library.update(note.id) { $0.addBookmark(at: 1, id: bookmark) }
+        // An engine writer (a transcription job, say) saves the note before the queued edits reach the store.
+        try await noteStore.mutate(note.id) {
+            $0.transcript = [TranscriptSegment(text: "Hello there.", start: 0, end: 1)]
+            $0.status = .ready
+        }
+        library.update(note.id) { $0.playbackPosition = 1.5 }
+        await library.settle()
+
+        let stored = try XCTUnwrap(NoteRepository(root: test.root).load().notes.first { $0.id == note.id })
+        XCTAssertEqual(stored.isFavorite, true)
+        XCTAssertEqual(stored.bookmarks.map(\.id), [bookmark])
+        XCTAssertEqual(stored.text, "Hello there.")
+        XCTAssertEqual(stored.status, .ready)
+        XCTAssertEqual(stored.playbackPosition, 1.5)
+        XCTAssertEqual(library.note(note.id), stored, "the screens show the note as stored")
         XCTAssertNil(test.graph.errors.current)
     }
 

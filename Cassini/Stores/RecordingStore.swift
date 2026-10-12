@@ -111,7 +111,8 @@ import CassiniNotebook
 
     func addBookmark(at time: TimeInterval) {
         guard let id = state.noteID else { return }
-        library.update(id) { $0.addBookmark(at: time) }
+        let bookmark = UUID()
+        library.update(id) { $0.addBookmark(at: time, id: bookmark) }
     }
 
     /// Stops the capture, seals the note, opens it, then compresses the audio and queues the transcription.

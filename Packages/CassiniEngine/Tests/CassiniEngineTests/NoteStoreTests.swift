@@ -101,20 +101,45 @@ import CassiniNotebook
         #expect(object?["failureMessage"] == nil)
     }
 
-    @Test func aReplacementIsWrittenOnlyOverTheNoteItWasMadeFrom() async throws {
+    @Test func anEditOfTheStoredNoteWritesItsResultAsMade() async throws {
         defer { try? FileManager.default.removeItem(at: root) }
         let (store, persistence) = try store()
         let note = Note(title: "First")
         try await store.save(note)
-        var renamed = note; renamed.title = "Second"
-        #expect(try await store.replace(note, with: renamed) == renamed)
+        let edit = NoteEdit(note) { $0.title = "Second" }
+        #expect(try await store.apply(edit) == edit.after)
         #expect(persistence.saveCount == 2)
-        #expect(try await store.replace(renamed, with: renamed) == renamed)
-        #expect(persistence.saveCount == 2, "an unchanged replacement writes nothing")
+        #expect(try await store.apply(NoteEdit(edit.after) { $0.title = "Second" }) == edit.after)
+        #expect(persistence.saveCount == 2, "an edit that changes nothing writes nothing")
+    }
 
-        var stale = note; stale.isFavorite = true
-        await #expect(throws: NoteStoreError.changedElsewhere) { try await store.replace(note, with: stale) }
-        #expect(await store.note(note.id) == renamed)
-        #expect(persistence.saveCount == 2)
+    @Test func anEditKeepsWhatAnotherWriterSavedAfterItWasMade() async throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        let (store, _) = try store()
+        var note = Note(title: "Recording")
+        note.duration = 5
+        try await store.save(note)
+        let bookmark = UUID()
+        let starred = NoteEdit(note) { $0.isFavorite = true }
+        let marked = NoteEdit(starred.after) { $0.addBookmark(at: 2, id: bookmark) }
+        try await store.mutate(note.id) { $0.transcript = [TranscriptSegment(text: "Hello", start: 0, end: 1)] }
+
+        try await store.applyAll([starred, marked])
+
+        let stored = try #require(await store.note(note.id))
+        #expect(stored.isFavorite)
+        #expect(stored.bookmarks.map(\.id) == [bookmark])
+        #expect(stored.transcript.map(\.text) == ["Hello"])
+    }
+
+    @Test func anEditOfANoteDeletedSinceWritesNothing() async throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        let (store, persistence) = try store()
+        let note = Note(title: "Gone")
+        try await store.save(note)
+        try await store.delete(note.id)
+        #expect(try await store.apply(NoteEdit(note) { $0.title = "Back" }) == nil)
+        #expect(try await store.applyAll([NoteEdit(note) { $0.title = "Back" }]) == [])
+        #expect(persistence.saveCount == 1)
     }
 }

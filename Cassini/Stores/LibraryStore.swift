@@ -4,7 +4,8 @@ import CassiniEngine
 import CassiniNotebook
 
 /// The notes as the screens see them: a main-actor mirror of `NoteStore`. Edits show at once and are written in
-/// order; a failed write puts the note back as stored and reports the error.
+/// order as `NoteEdit`s, so a note saved meanwhile by another writer keeps both changes; a failed write puts the note
+/// back as stored and reports the error.
 @MainActor @Observable final class LibraryStore {
     /// Newest first.
     private(set) var notes: [Note] = []
@@ -15,9 +16,8 @@ import CassiniNotebook
     @ObservationIgnored let noteStore: NoteStore?
     @ObservationIgnored private let errors: ErrorPresenter
     @ObservationIgnored private var tail: Task<Void, Never>?
+    /// Queued edits per note; while a note has any, the mirror shows them rather than what others save.
     @ObservationIgnored private var pendingWrites: [UUID: Int] = [:]
-    /// Notes whose last write failed while more of their writes were queued.
-    @ObservationIgnored private var failedWrites: Set<UUID> = []
     @ObservationIgnored private var changes: Task<Void, Never>?
 
     init(root: URL, errors: ErrorPresenter) {
@@ -57,51 +57,38 @@ import CassiniNotebook
     func directory(for id: UUID) -> URL? { noteStore?.directory(for: id) }
     var root: URL? { noteStore?.root }
 
-    /// Changes the note now and writes the result in the background. False when there is no such note.
+    /// Changes the note now and writes the change in the background. False when there is no such note.
     ///
-    /// `change` runs once, here; the store receives the changed note, so ids and dates made inside it are the ones
-    /// written. The write is refused when the stored note is not the one `change` saw, which only happens after an
-    /// earlier write of the note failed.
+    /// `change` may run again on the stored note when another writer saved it in between, so ids and dates it stamps
+    /// on the note should be made before it.
     @discardableResult
-    func update(_ id: UUID, _ change: (inout Note) -> Void) -> Bool {
-        guard let noteStore, let (before, after) = applyLocally(id, change) else { return false }
-        guard after != before else { return true }
+    func update(_ id: UUID, _ change: @escaping @Sendable (inout Note) -> Void) -> Bool {
+        guard let noteStore, let edit = applyLocally(id, change) else { return false }
+        guard !edit.changesNothing else { return true }
         pendingWrites[id, default: 0] += 1
-        _ = enqueue { await self.write(before, after, in: noteStore) }
+        _ = enqueue { await self.write(edit, in: noteStore) }
         return true
     }
 
     /// Changes the note now and waits for the write. Nil when there is no such note or the write failed.
     @discardableResult
-    func commit(_ id: UUID, _ change: (inout Note) -> Void) async -> Note? {
-        guard let noteStore, let (before, after) = applyLocally(id, change) else { return nil }
+    func commit(_ id: UUID, _ change: @escaping @Sendable (inout Note) -> Void) async -> Note? {
+        guard let noteStore, let edit = applyLocally(id, change) else { return nil }
         pendingWrites[id, default: 0] += 1
-        return await enqueue { await self.write(before, after, in: noteStore) }.value
+        return await enqueue { await self.write(edit, in: noteStore) }.value
     }
 
     /// Applies `change` to every note, writing only the notes it changed.
-    func updateAll(_ change: (inout Note) -> Void) {
+    func updateAll(_ change: @escaping @Sendable (inout Note) -> Void) {
         guard let noteStore else { return }
-        var replacements: [(expected: Note, updated: Note)] = []
-        for index in notes.indices {
-            let before = notes[index]
-            change(&notes[index])
-            if notes[index] != before { replacements.append((before, notes[index])) }
-        }
-        guard !replacements.isEmpty else { return }
-        let ids = replacements.map(\.updated.id)
+        let edits = notes.map { NoteEdit($0, change) }.filter { !$0.changesNothing }
+        guard !edits.isEmpty else { return }
+        for edit in edits { place(edit.after) }
+        let ids = edits.map(\.id)
         for id in ids { pendingWrites[id, default: 0] += 1 }
         _ = enqueue {
-            defer {
-                for id in ids {
-                    self.pendingWrites[id, default: 1] -= 1
-                    if self.pendingWrites[id] == 0 { self.failedWrites.remove(id) }
-                }
-            }
-            do { try await noteStore.replaceAll(replacements) } catch { self.reportSaveFailure(error, for: ids) }
-            for id in ids where self.pendingWrites[id] == 1 {
-                if let stored = await noteStore.note(id) { self.place(stored) }
-            }
+            do { try await noteStore.applyAll(edits) } catch { self.reportSaveFailure(error) }
+            for id in ids { await self.finishWrite(id, in: noteStore) }
         }
     }
 
@@ -121,39 +108,34 @@ import CassiniNotebook
     /// Waits until every write asked for so far has finished.
     func settle() async { await tail?.value }
 
-    /// The note before and after `change`, which is applied to the mirror; nil when there is no such note.
-    private func applyLocally(_ id: UUID, _ change: (inout Note) -> Void) -> (before: Note, after: Note)? {
-        guard let index = notes.firstIndex(where: { $0.id == id }) else { return nil }
-        let before = notes[index]
-        change(&notes[index])
-        let after = notes[index]
-        if after.createdAt != before.createdAt { place(after) }
-        return (before, after)
+    /// Applies `change` to the mirror; nil when there is no such note.
+    private func applyLocally(_ id: UUID, _ change: @escaping @Sendable (inout Note) -> Void) -> NoteEdit? {
+        guard let note = note(id) else { return nil }
+        let edit = NoteEdit(note, change)
+        if !edit.changesNothing { place(edit.after) }
+        return edit
     }
 
-    /// Writes one change; runs only from the queue of writes.
-    private func write(_ before: Note, _ after: Note, in noteStore: NoteStore) async -> Note? {
-        let id = after.id
-        defer {
-            pendingWrites[id, default: 1] -= 1
-            if pendingWrites[id] == 0 { failedWrites.remove(id) }
+    /// Writes one edit; runs only from the queue of writes. Returns the note as written, nil when the write failed.
+    private func write(_ edit: NoteEdit, in noteStore: NoteStore) async -> Note? {
+        let written: Note?
+        do { written = try await noteStore.apply(edit) } catch {
+            reportSaveFailure(error)
+            written = nil
         }
-        do {
-            let saved = try await noteStore.replace(before, with: after)
-            if pendingWrites[id] == 1 { place(saved) }
-            return saved
-        } catch {
-            if let stored = await noteStore.note(id) { place(stored) }
-            reportSaveFailure(error, for: [id])
-            return nil
-        }
+        await finishWrite(edit.id, in: noteStore)
+        return written
     }
 
-    /// Reports a failed write once: the writes of the same note queued after it are refused as changed elsewhere.
-    private func reportSaveFailure(_ error: any Error, for ids: [UUID]) {
-        let followsAFailure = error as? NoteStoreError == .changedElsewhere && ids.allSatisfy(failedWrites.contains)
-        failedWrites.formUnion(ids)
-        guard !followsAFailure else { return }
+    /// Counts a queued write of the note as done. After the last one, the mirror takes the note as stored: with
+    /// every queued edit, and with what others saved while the edits were queued, which `apply(_:)` skipped.
+    private func finishWrite(_ id: UUID, in noteStore: NoteStore) async {
+        if pendingWrites[id] == 1, let stored = await noteStore.note(id), pendingWrites[id] == 1 { place(stored) }
+        pendingWrites[id, default: 1] -= 1
+        if pendingWrites[id] == 0 { pendingWrites[id] = nil }
+    }
+
+    private func reportSaveFailure(_ error: any Error) {
         errors.present("Could not save changes: \(error.localizedDescription)")
     }
 

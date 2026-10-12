@@ -44,7 +44,8 @@ struct TurnView: View {
 
     private func addBookmark() {
         let time = segment.start
-        library.update(noteID) { $0.addBookmark(at: time) }
+        let bookmark = UUID()
+        library.update(noteID) { $0.addBookmark(at: time, id: bookmark) }
     }
 
     private var linkedText: AttributedString {

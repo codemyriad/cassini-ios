@@ -34,8 +34,8 @@ struct PlaybackBar: View {
                 Button { playback.skip(15) } label: { Image(systemName: "goforward.15").font(.title2).frame(width: 48, height: 48) }.accessibilityLabel("Forward 15 seconds")
                 Spacer()
                 Button {
-                    let time = position
-                    library.update(note.id) { $0.addBookmark(at: time) }
+                    let time = position, bookmark = UUID()
+                    library.update(note.id) { $0.addBookmark(at: time, id: bookmark) }
                     addBookmark()
                 } label: { Image(systemName: "bookmark").font(.title3).frame(width: 48, height: 48) }.accessibilityLabel("Mark this moment")
             }.foregroundStyle(Color.ink)

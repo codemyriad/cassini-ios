@@ -11,11 +11,34 @@ public protocol NotePersisting: Sendable {
 
 extension NoteRepository: NotePersisting {}
 
-public enum NoteStoreError: LocalizedError, Equatable {
-    /// The stored note is no longer the one the change was made from; nothing was written.
-    case changedElsewhere
+/// A change made to a copy of a note, kept so the store can run it again on a newer note. Ids and dates the change
+/// stamps on the note should be made before the change, so that running it again gives the same values.
+public struct NoteEdit: Sendable {
+    /// The note the change was made to.
+    public let before: Note
+    /// `before` with the change applied.
+    public let after: Note
+    public let change: @Sendable (inout Note) -> Void
 
-    public var errorDescription: String? { "The recording was changed while this edit was being saved." }
+    public var id: UUID { before.id }
+    public var changesNothing: Bool { after == before }
+
+    public init(_ note: Note, _ change: @escaping @Sendable (inout Note) -> Void) {
+        var copy = note
+        change(&copy)
+        before = note
+        after = copy
+        self.change = change
+    }
+
+    /// `after` when `current` is still the note the change was made to; otherwise the change applied to `current`, so
+    /// that what another writer saved in between is kept.
+    public func applied(to current: Note) -> Note {
+        guard current != before else { return after }
+        var copy = current
+        change(&copy)
+        return copy
+    }
 }
 
 public enum NoteChange: Hashable, Sendable {
@@ -70,23 +93,27 @@ public actor NoteStore {
         return copy
     }
 
-    /// Writes `updated` in place of `expected`, unless the stored note is no longer `expected`. Writes nothing when
-    /// the two are equal. Returns the stored note.
+    /// Writes `edit` over the stored note: its result when nobody wrote the note since the edit was made, otherwise its
+    /// change applied to the stored note. Writes nothing when that leaves the note as it is. Nil when there is no such
+    /// note.
     @discardableResult
-    public func replace(_ expected: Note, with updated: Note) throws -> Note {
-        precondition(expected.id == updated.id, "a replacement keeps the note's id")
-        guard notes[expected.id] == expected else { throw NoteStoreError.changedElsewhere }
-        if updated != expected { try save(updated) }
+    public func apply(_ edit: NoteEdit) throws -> Note? {
+        guard let current = notes[edit.id] else { return nil }
+        let updated = edit.applied(to: current)
+        if updated != current { try save(updated) }
         return updated
     }
 
-    /// `replace(_:with:)` for several notes, in order; stops at the first that fails. Returns the notes it wrote.
+    /// `apply(_:)` for several edits, in order; stops at the first write that fails. Returns the notes it wrote.
     @discardableResult
-    public func replaceAll(_ replacements: [(expected: Note, updated: Note)]) throws -> [Note] {
+    public func applyAll(_ edits: [NoteEdit]) throws -> [Note] {
         var written: [Note] = []
-        for (expected, updated) in replacements {
-            try replace(expected, with: updated)
-            if updated != expected { written.append(updated) }
+        for edit in edits {
+            guard let current = notes[edit.id] else { continue }
+            let updated = edit.applied(to: current)
+            guard updated != current else { continue }
+            try save(updated)
+            written.append(updated)
         }
         return written
     }

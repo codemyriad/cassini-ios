@@ -46,10 +46,13 @@
   Android's `memory`.
 - **Notice facts** carry Android's `jobRunning`, `consented` and the download's `requiredFreeBytes`; `LibraryFacts`
   is next to them. Android's `encoderMissing` and `m4a` are not there: the iOS app always has its Opus encoder.
-- **Note writes.** `LibraryStore.update`/`commit`/`updateAll` run the change once, on the main-actor mirror, and send
-  the result to `NoteStore.replace(_:with:)`, which writes only over the note the change was made from. Ids and dates
-  made inside a change are therefore the ones written. Anything that writes notes must go through `LibraryStore`;
-  a write made straight to `NoteStore` makes the next queued edit of that note fail as changed elsewhere.
+- **Note writes.** `NoteStore` is where concurrent note writes meet. Engine writers (jobs, recording, trash,
+  import) call `NoteStore.mutate` directly. `LibraryStore.update`/`commit`/`updateAll` apply a `@Sendable` change to
+  the main-actor mirror at once and send it as a `NoteEdit` to `NoteStore.apply(_:)`: when nobody saved the note
+  since the edit was made, the edit's result is written as the screens show it; otherwise the change runs again on the
+  stored note, so both writes survive. After a note's last queued edit lands, the mirror takes the stored note. Ids
+  and dates a change stamps on the note are made before the change (`addBookmark(at:id:)`), so running it again gives
+  the same values.
 - **Going to the background** holds a background task until every queued note write (the playback position
   included) has landed.
 - **Playback interruptions.** The player pauses inside the interruption and route-change observers; `PlaybackStore`
