@@ -63,9 +63,19 @@ public enum NoteMode: Hashable, Sendable {
 }
 
 extension Note {
-    /// The note has a transcript to read, or came from a Cassini document (whose transcript may be unreadable): it
-    /// opens in reading mode (Android's DOCUMENT audio kind).
-    public var hasDocument: Bool { !transcript.isEmpty || document != nil }
+    /// The note has a transcript to read, was transcribed and found no words, or came from a Cassini document (whose
+    /// transcript may be unreadable): it opens in reading mode (Android's DOCUMENT audio kind).
+    public var hasDocument: Bool { !transcript.isEmpty || document != nil || status == .ready }
+
+    /// "No speech" shows only for a transcript that was read and has no words: not for a draft, and not for a
+    /// document whose transcript cannot be read.
+    public func saysNoSpeech(in mode: NoteMode) -> Bool {
+        guard mode.showsReading, !mode.showsDraft, transcript.isEmpty else { return false }
+        switch document?.state {
+        case .unreadable?, .invalidMetadata?, .unknownFormat?: return false
+        default: return true
+        }
+    }
 }
 
 /// Why the shown transcript cannot be renamed, merged, switched or edited now, and the message an attempt shows.
