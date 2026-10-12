@@ -191,7 +191,8 @@ import CassiniEngineTesting
         let voices = test.graph.voices
         try await remember("Anna", in: note.id, voices: voices)
         let anna = try XCTUnwrap(voices.savedVoices.first)
-        let input = try XCTUnwrap(await voices.namingInput(noteID: note.id, speakerID: "a"))
+        let opened = await voices.namingInput(noteID: note.id, speakerID: "a")
+        let input = try XCTUnwrap(opened)
         var state = SpeakerNaming.open(input)
         state = try XCTUnwrap(SpeakerNaming.reduce(state, .nameChanged("Annette")).state)
         state = try XCTUnwrap(SpeakerNaming.reduce(state, .keepSaved).state)

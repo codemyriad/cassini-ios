@@ -25,7 +25,12 @@ enum TestFixtures {
         var main = fixture(now: now)
         if seed == .speakers || seed == .voices {
             let sam = try seedVoices(root: store.root, seed: seed)
-            if seed == .speakers { main.speakers?[1].match = .suggested(voice: sam, score: 0.78) }
+            if seed == .speakers {
+                // Sam is not named yet, and the saved voice "Sam Rivera" may be them: the note asks "Is this Sam Rivera?".
+                main.speakers?[1].name = DefaultLabels.placeholder(2)
+                main.speakers?[1].match = .suggested(voice: sam, score: 0.78)
+                main.refreshSpeakerLabels()
+            }
         }
         var notes = [main, walk(now: now)]
         switch seed {

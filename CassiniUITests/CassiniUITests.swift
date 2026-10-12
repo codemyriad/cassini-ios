@@ -117,7 +117,7 @@ final class CassiniUITests: XCTestCase {
         let field = app.textFields["speakerNameField"]
         XCTAssertTrue(field.waitForExistence(timeout: 5))
         field.tap(); field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 30)); field.typeText("Alice")
-        app.buttons["Save"].tap()
+        app.buttons["saveSpeakerName"].tap()
         XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Alice")).firstMatch.waitForExistence(timeout: 5))
         capture("Speakers")
         app.buttons["Done"].tap()
