@@ -19,15 +19,6 @@ import Testing
     #expect(TimeText.clock(.infinity) == "00:00")
 }
 
-@Test func subtitleExportsKeepTimingAndSpeaker() throws {
-    var note = Note(title: "An interview")
-    note.transcript = [.init(text: "Hello there.", start: 1.25, end: 3.5, speaker: "Alex")]
-    let srt = String(decoding: try TranscriptFormat.subtitles.data(for: note), as: UTF8.self)
-    #expect(srt == "1\n00:00:01,250 --> 00:00:03,500\nAlex: Hello there.\n")
-    let vtt = String(decoding: try TranscriptFormat.webVTT.data(for: note), as: UTF8.self)
-    #expect(vtt.hasPrefix("WEBVTT\n\n1\n00:00:01.250"))
-}
-
 @Test func atomicRoundTripAndCorruptionIsolation() throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }

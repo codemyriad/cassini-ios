@@ -1,37 +1,62 @@
+import CassiniCore
 import Foundation
 
+/// The transcript exports of features.md section 6, and the iOS-only JSON.
 public enum TranscriptFormat: String, CaseIterable, Codable, Identifiable, Sendable {
     case text = "txt", subtitles = "srt", webVTT = "vtt", json = "json"
+
     public var id: String { rawValue }
-    public var title: String {
-        switch self { case .text: "Plain text"; case .subtitles: "Subtitles · SRT"; case .webVTT: "Subtitles · WebVTT"; case .json: "Timed transcript · JSON" }
+    public var fileExtension: String { rawValue }
+}
+
+/// The localized lines a transcript export needs; the writers themselves hold no copy.
+public struct ExportTexts: Sendable {
+    /// The TXT subtitle line from the note's creation time, duration and number of speakers.
+    public var subtitle: @Sendable (_ createdAt: Date, _ durationMs: Int64, _ speakers: Int) -> String
+    /// The TXT body of a transcript without words.
+    public var emptyText: String
+    /// The label of passages without a speaker.
+    public var unassignedLabel: String
+
+    public init(subtitle: @escaping @Sendable (Date, Int64, Int) -> String, emptyText: String, unassignedLabel: String) {
+        self.subtitle = subtitle; self.emptyText = emptyText; self.unassignedLabel = unassignedLabel
     }
-    public func data(for note: Note) throws -> Data {
-        if self == .json {
-            let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted, .sortedKeys]; encoder.dateEncodingStrategy = .iso8601
-            var copy = note
-            func publicSpeakers(_ speakers: [NoteSpeaker]) -> [NoteSpeaker] {
-                speakers.map { value in var s = value; s.match = .unmatched; s.excludedVoiceIDs = []; return s }
-            }
-            copy.speakers = publicSpeakers(copy.speakers ?? [])
-            copy.versions = copy.versions?.map { value in var version = value; version.speakers = publicSpeakers(version.speakers); return version }
-            return try encoder.encode(copy)
-        }
-        let content: String
-        switch self {
+}
+
+/// Whether a note's transcript can be exported, and why not.
+public enum TranscriptExportAvailability: Hashable, Sendable {
+    case available
+    /// The note has no transcript yet: "Available after transcription".
+    case afterTranscription
+    /// The note is a document Cassini cannot read: "Not available for this transcript".
+    case notReadable
+}
+
+public enum TranscriptExports {
+    /// Document states whose transcript cannot be exported (features.md section 6).
+    public static let notExportable: Set<DocumentState> = [.unreadable, .unknownFormat]
+
+    /// A note exports its transcript once it has one: a finished transcription (even one without words) or a
+    /// transcript kept from before. A live capture and an unreadable or unknown-format document do not.
+    public static func availability(of note: Note) -> TranscriptExportAvailability {
+        if let state = note.document?.state, notExportable.contains(state) { return .notReadable }
+        if note.isRecording || (note.transcript.isEmpty && note.status != .ready) { return .afterTranscription }
+        return .available
+    }
+
+    /// The bytes of `note`'s transcript (or `version`'s) in `format`: UTF-8 without BOM, `\n` line endings.
+    public static func data(_ note: Note, format: TranscriptFormat, version: TranscriptVersion? = nil,
+                            texts: ExportTexts) throws -> Data {
+        let transcript = ExportTranscript(note: note, version: version, unassignedLabel: texts.unassignedLabel)
+        let text: String
+        switch format {
+        case .json: return try JSONExport.data(note, version: version)
+        case .subtitles: text = SrtWriter.write(transcript)
+        case .webVTT: text = VttWriter.write(transcript)
         case .text:
-            content = note.title + "\n\n" + note.transcript.map {
-                "[\(TimeText.clock($0.start))] " + ($0.speaker.map { "\($0): " } ?? "") + $0.text
-            }.joined(separator: "\n\n") + "\n"
-        case .subtitles, .webVTT:
-            let separator = self == .webVTT ? "." : ","
-            content = (self == .webVTT ? "WEBVTT\n\n" : "") + note.transcript.enumerated().map { index, segment in
-                let label = segment.speaker.map { "\($0): " } ?? ""
-                let text = (label + segment.text).replacingOccurrences(of: "\n\n", with: "\n")
-                return "\(index + 1)\n\(TimeText.subtitle(segment.start, separator: separator)) --> \(TimeText.subtitle(max(segment.start + 0.001, segment.end), separator: separator))\n\(text)\n"
-            }.joined(separator: "\n")
-        case .json: fatalError("Handled above")
+            let subtitle = texts.subtitle(note.createdAt, transcript.durationMs, transcript.speakerCount)
+            text = TextExport.write(transcript, subtitle: subtitle, emptyText: texts.emptyText)
         }
-        return Data(content.utf8)
+        return Data(text.utf8)
     }
 }
