@@ -17,6 +17,8 @@ public enum NoteEffect: Hashable, Sendable {
     /// Open Name a speaker.
     case nameSpeaker(String)
     case openVersions
+    /// The note's Speakers list (iOS): renames and merges start there.
+    case openSpeakers
     /// Open the passage editor.
     case editPassage(UUID)
     case transcribe(JobKind)
@@ -56,6 +58,9 @@ public struct NoteScreenState: Hashable, Sendable {
 
     /// The version chip or Transcript versions.
     public mutating func versionsTapped(readOnly: ReadOnlyReason?) -> NoteEffect? { gated(readOnly, .openVersions) }
+
+    /// The speaker count or Speakers in the menu.
+    public mutating func speakersTapped(readOnly: ReadOnlyReason?) -> NoteEffect? { gated(readOnly, .openSpeakers) }
 
     /// Edit passage.
     public mutating func editPassage(_ segmentID: UUID, readOnly: ReadOnlyReason?) -> NoteEffect? {

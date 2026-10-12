@@ -37,8 +37,8 @@ public struct NoteTurn: Identifiable, Hashable, Sendable {
     public let unsettledFrom: Int?
     /// "Is this Luca?" above this paragraph: the speaker's first one, while it is a placeholder.
     public let suggestion: SpeakerSuggestion?
-    /// The passages the paragraph shows, in order (for Edit passage).
-    public let segmentIDs: [UUID]
+    /// The passages the paragraph shows, in order, each with where it starts in the paragraph (for Edit passage).
+    public let passages: [PassageRef]
 
     /// The character range of word `index` in `text`.
     public func range(ofWord index: Int) -> Range<Int> {
@@ -55,6 +55,13 @@ public struct NoteTurn: Identifiable, Hashable, Sendable {
         }
         return low
     }
+}
+
+/// A passage of the note as a paragraph shows it: its id and the start of its first word there.
+public struct PassageRef: Hashable, Sendable {
+    public var id: UUID
+    public var start: TimeInterval
+    public init(id: UUID, start: TimeInterval) { self.id = id; self.start = start }
 }
 
 /// Word `index` of the paragraph `turnID` (the active word, a word tap).
@@ -221,11 +228,13 @@ public enum NoteTranscripts {
             let to = paragraphEnd(words, from: from)
             let run = words[from..<to]
             let made = template(run.first!.speaker, seen.insert(run.first!.speaker).inserted)
-            var segmentIDs: [UUID] = []
-            for word in run { if let id = word.segmentID, segmentIDs.last != id { segmentIDs.append(id) } }
+            var passages: [PassageRef] = []
+            for word in run {
+                if let id = word.segmentID, passages.last?.id != id { passages.append(PassageRef(id: id, start: word.start)) }
+            }
             turns.append(NoteTurn(id: "w\(from)", speakerID: run.first!.speaker, name: made.name, tint: made.tint,
                                   start: run.first!.start, auto: made.auto, words: Array(run),
-                                  suggestion: made.suggestion, segmentIDs: segmentIDs))
+                                  suggestion: made.suggestion, passages: passages))
             from = to
         }
         return NoteTranscript(turns: turns)
@@ -247,7 +256,7 @@ public enum NoteTranscripts {
 
 extension NoteTurn {
     init(id: String, speakerID: String?, name: SpeakerName, tint: SpeakerTint, start: TimeInterval, auto: Bool,
-         words: [TranscriptWord], unsettledFrom: Int? = nil, suggestion: SpeakerSuggestion?, segmentIDs: [UUID]) {
+         words: [TranscriptWord], unsettledFrom: Int? = nil, suggestion: SpeakerSuggestion?, passages: [PassageRef]) {
         var text = "", offsets: [Int] = [], length = 0
         for (index, word) in words.enumerated() {
             if index > 0, word.spaceBefore { text += " "; length += 1 }
@@ -257,11 +266,11 @@ extension NoteTurn {
         self.id = id; self.speakerID = speakerID; self.name = name; self.tint = tint; self.start = start
         self.auto = auto; self.words = words.map { TurnWord(text: $0.text, start: $0.start) }
         self.text = text; self.offsets = offsets; self.unsettledFrom = unsettledFrom
-        self.suggestion = suggestion; self.segmentIDs = segmentIDs
+        self.suggestion = suggestion; self.passages = passages
     }
 
     func with(unsettledFrom: Int?) -> NoteTurn {
         NoteTurn(id: id, speakerID: speakerID, name: name, tint: tint, start: start, auto: auto, words: words,
-                 text: text, offsets: offsets, unsettledFrom: unsettledFrom, suggestion: suggestion, segmentIDs: segmentIDs)
+                 text: text, offsets: offsets, unsettledFrom: unsettledFrom, suggestion: suggestion, passages: passages)
     }
 }

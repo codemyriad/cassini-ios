@@ -97,12 +97,17 @@ import Testing
         screen.dismissDialog()
         #expect(screen.editPassage(note.transcript[0].id, readOnly: reason) == nil)
         #expect(screen.dialog == .readOnly(.jobPending))
+        screen.dismissDialog()
+        #expect(screen.speakersTapped(readOnly: reason) == nil)
+        #expect(screen.dialog == .readOnly(.jobPending))
         #expect(screen.confirmDialog() == nil, "the notice only closes")
         #expect(TranscribeRow.of(note, job: queued) == .removeFromQueue, "no Transcribe again while queued")
 
         #expect(ReadOnlyReason.of(note, job: job(.needsConsent, for: note)) == nil, "waiting for consent is no job")
         #expect(screen.speakerTapped("b", readOnly: nil) == .nameSpeaker("b"))
         #expect(screen.versionsTapped(readOnly: nil) == .openVersions)
+        #expect(screen.speakersTapped(readOnly: nil) == .openSpeakers)
+        #expect(screen.editPassage(note.transcript[0].id, readOnly: nil) == .editPassage(note.transcript[0].id))
     }
 
     // ports: NoteViewModelTest#aDocumentThatIsNotOkCannotBeRenamedAndTranscribesFresh

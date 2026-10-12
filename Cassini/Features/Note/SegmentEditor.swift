@@ -1,42 +1,83 @@
 import SwiftUI
+import CassiniEngine
 import CassiniNotebook
 
+/// Edit passage (iOS extra): the passage's text and speaker. Save writes it only while the transcript still holds the
+/// passage as it was; otherwise the editor stays open and says "This passage changed while you were editing." While a
+/// job runs for the note, the editor is locked: it says why and cannot save.
 struct SegmentEditor: View {
+    let noteID: UUID
     let segment: TranscriptSegment
-    let speakers: [NoteSpeaker]
-    let save: (TranscriptSegment) -> Void
+    @Environment(LibraryStore.self) private var library
+    @Environment(ProcessingStore.self) private var processing
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.clock) private var clock
     @State private var text: String
     @State private var speaker: String
+    @State private var problem: String?
+    @State private var saving = false
 
-    init(segment: TranscriptSegment, speakers: [NoteSpeaker], save: @escaping (TranscriptSegment) -> Void) {
-        self.segment = segment; self.speakers = speakers; self.save = save
+    init(noteID: UUID, segment: TranscriptSegment) {
+        self.noteID = noteID; self.segment = segment
         _text = State(initialValue: segment.text); _speaker = State(initialValue: segment.speakerID ?? "")
     }
+
+    private var note: Note? { library.note(noteID) }
+    private var speakers: [NoteSpeaker] { note?.speakers ?? [] }
+    /// A job for the note makes the transcript read-only.
+    private var locked: Bool { note.flatMap { ReadOnlyReason.of($0, job: processing.state.jobs[noteID]) } != nil }
 
     var body: some View {
         NavigationStack {
             Form {
-                Section("Passage at \(TimeText.clock(segment.start))") { TextEditor(text: $text).frame(minHeight: 180).accessibilityLabel("Passage text") }
-                Section {
-                    Picker("Speaker", selection: $speaker) { Text("Unassigned").tag(""); ForEach(speakers) { Text($0.name).tag($0.id) } }
-                } header: { Text("Speaker") } footer: { Text("Assign this passage to a speaker. Rename or merge people from Speakers.") }
-            }.navigationTitle("Edit passage").navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Save") { save(revised); dismiss() }.disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                if let message = locked ? NoteCopy.passageLocked : problem {
+                    Section {
+                        Label(message, systemImage: "exclamationmark.triangle").foregroundStyle(Color.toneError)
+                            .accessibilityIdentifier("passageProblem")
                     }
                 }
-        }.tint(.ember)
+                Section(NoteCopy.editPassage(at: segment.start)) {
+                    TextEditor(text: $text).frame(minHeight: 180).accessibilityLabel(NoteCopy.passageText)
+                        .accessibilityIdentifier("passageText")
+                }
+                Section {
+                    Picker(NoteCopy.speaker, selection: $speaker) {
+                        Text(NoteCopy.unassigned).tag("")
+                        ForEach(speakers) { Text($0.name).tag($0.id) }
+                    }
+                } header: { Text(NoteCopy.speaker) } footer: { Text(NoteCopy.speakerFooter) }
+            }
+            .disabled(locked)
+            .navigationTitle(NoteCopy.editPassage).navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button(NoteCopy.cancel) { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(NoteCopy.save) { save() }
+                        .disabled(locked || saving || !TranscriptSegment.isSavable(text))
+                        .accessibilityIdentifier("savePassage")
+                }
+            }
+        }
+        .tint(.ember)
+        .interactiveDismissDisabled(text != segment.text)
     }
 
-    private var revised: TranscriptSegment {
-        var revised = segment
-        revised.text = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        if revised.text != segment.text { revised.words = [] }
-        revised.speakerID = speaker.isEmpty ? nil : speaker
-        revised.speaker = speakers.first { $0.id == speaker }?.name
-        return revised
+    private func save() {
+        let original = segment
+        let revised = segment.revised(text: text, speakerID: speaker.isEmpty ? nil : speaker, speakers: speakers)
+        guard note?.holds(original) == true else {
+            problem = NoteCopy.passageChanged
+            return
+        }
+        guard revised != original else { dismiss(); return }
+        saving = true
+        let stamp = VersionStamp(date: clock.now)
+        Task {
+            // The change runs again on the stored note when someone else saved it meanwhile; it then finds the passage
+            // gone, and the editor says so.
+            let saved = await library.commit(noteID) { _ = $0.revisePassage(original, to: revised, stamp: stamp) }
+            saving = false
+            if saved?.holds(revised) == true { dismiss() } else { problem = NoteCopy.passageChanged }
+        }
     }
 }

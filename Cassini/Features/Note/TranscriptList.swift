@@ -1,58 +1,132 @@
 import SwiftUI
 import CassiniNotebook
 
-/// The transcript, passage by passage. `suggestion` puts a card above a passage, e.g. "Is this Luca?".
-struct TranscriptList: View {
-    let note: Note
-    let query: String
-    let activeSegment: UUID?
-    @Binding var followPlayback: Bool
-    let showSpeakers: () -> Void
-    let edit: (TranscriptSegment) -> Void
-    let seek: (TimeInterval) -> Void
-    var suggestion: (TranscriptSegment) -> AnyView? = { _ in nil }
+/// Where the paragraphs on screen are and how the transcript is scrolled, for auto-follow. A plain reference, not
+/// observed state: only the follow step reads it, so a scroll never redraws the transcript.
+@MainActor final class FollowGeometry {
+    /// Each paragraph's frame in the scroll view's visible coordinates, while it is laid out.
+    var frames: [String: CGRect] = [:]
+    /// The scroll view's content offset, and its top inset (the bars over the content).
+    var offset: CGFloat = 0
+    var top: CGFloat = 0
+    /// The height between the insets: the transcript's pane.
+    var height: CGFloat = 0
+    var maxOffset: CGFloat = 0
+}
 
-    private var matching: [TranscriptSegment] {
-        note.transcript.filter { query.isEmpty || $0.text.localizedStandardContains(query) || ($0.speaker?.localizedStandardContains(query) ?? false) }
-    }
+/// The search hits of a transcript, by paragraph, and the current one.
+struct TranscriptHits: Equatable {
+    var ranges: [String: [Range<Int>]] = [:]
+    var current: TranscriptMatch?
 
-    var body: some View {
-        HStack {
-            Text("TRANSCRIPT").font(.caption.weight(.semibold)).tracking(1.6).foregroundStyle(Color.muted).accessibilityAddTraits(.isHeader)
-            Spacer()
-            Button { followPlayback.toggle() } label: {
-                Label(followPlayback ? "Following" : "Follow audio", systemImage: "text.line.first.and.arrowtriangle.forward")
-            }.font(.caption).accessibilityValue(followPlayback ? "On" : "Off")
-        }
-        Button(action: showSpeakers) { Label("Speakers · \(note.speakers?.count ?? 0)", systemImage: "person.2") }.accessibilityIdentifier("speakersButton")
-        LazyVStack(alignment: .leading, spacing: 8) {
-            let segments = matching
-            ForEach(segments) { segment in
-                if let card = suggestion(segment) { card }
-                TurnView(noteID: note.id, segment: segment, query: query, isActive: activeSegment == segment.id, edit: edit, seek: seek)
-                    .id(segment.id)
-            }
-            if !query.isEmpty && segments.isEmpty { ContentUnavailableView.search(text: query) }
-        }
-        Text("Tap a word to listen from that moment. Touch and hold a passage to edit it or label its speaker.")
-            .font(.caption).foregroundStyle(Color.muted).padding(.top, 8)
+    init(_ matches: [TranscriptMatch] = [], current index: Int = 0) {
+        for match in matches { ranges[match.turnID, default: []].append(match.range) }
+        current = matches.indices.contains(index) ? matches[index] : nil
     }
 }
 
-struct TranscriptEmptyState: View {
-    let note: Note
-    let requestTranscription: () -> Void
-    @Environment(RecordingStore.self) private var recording
+/// The transcript, paragraph by paragraph, in a lazy stack: only the paragraphs near the screen are made, and each one
+/// is drawn again only when what it shows changes (`TurnView` is `Equatable`). `activeWord` is the only input that
+/// moves with playback. `suggestion` puts a card above a paragraph, e.g. "Is this Luca?".
+struct TranscriptList: View {
+    let transcript: NoteTranscript
+    var activeWord: WordRef?
+    var hits = TranscriptHits()
+    var style: TurnView.Style = .reading
+    var renamable = true
+    var actions = TranscriptActions()
+    var geometry: FollowGeometry?
+    var suggestion: (NoteTurn) -> AnyView? = { _ in nil }
+
     var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: note.status == .ready ? "text.bubble" : "text.alignleft").font(.system(size: 30, weight: .light)).foregroundStyle(Color.ember)
-            Text(note.status == .ready ? "No speech found" : "Let your recording become words.").font(.system(.title2, design: .serif)).multilineTextAlignment(.center)
-            Text(note.status == .ready ? "Try a different language or check that voices are audible in the recording." : "A searchable transcript, with every passage connected to the original audio.")
-                .font(.subheadline).foregroundStyle(Color.muted).multilineTextAlignment(.center)
-            if note.status != .transcribing && note.status != .queued {
-                Button(action: requestTranscription) { Label(note.status == .failed ? "Try again" : "Transcribe", systemImage: "text.badge.waveform") }
-                    .buttonStyle(PrimaryButtonStyle()).frame(maxWidth: 290).disabled(recording.finishingNoteID == note.id)
+        LazyVStack(alignment: .leading, spacing: 14) {
+            ForEach(transcript.turns) { turn in
+                if let card = suggestion(turn) { card }
+                TurnView(turn: turn,
+                         activeIndex: activeWord?.turnID == turn.id ? activeWord?.index : nil,
+                         matches: hits.ranges[turn.id] ?? [],
+                         currentMatch: hits.current?.turnID == turn.id ? hits.current?.range : nil,
+                         style: style, renamable: renamable, actions: actions, geometry: geometry)
+                    .equatable()
+                    .id(turn.id)
             }
-        }.padding(.vertical, 40).frame(maxWidth: .infinity)
+        }
+    }
+}
+
+/// The reading transcript with the active word: the one view that reads the playback position, so a tick redraws
+/// this list's diff and nothing above it. While following, a new active word whose line left the top 70 % of the
+/// pane scrolls it to 30 %, without animation under Reduce Motion.
+struct ReadingTranscript: View {
+    let noteID: UUID
+    let transcript: NoteTranscript
+    let hits: TranscriptHits
+    let renamable: Bool
+    let following: Bool
+    let actions: TranscriptActions
+    let geometry: FollowGeometry
+    let proxy: ScrollViewProxy
+    @Binding var position: ScrollPosition
+    let suggestion: (NoteTurn) -> AnyView?
+    @Environment(PlaybackStore.self) private var playback
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        // The note's own player marks the word, also while paused; another note's player, or a failed one, marks none.
+        let active = playback.owns(noteID) ? transcript.activeWord(at: playback.state.position) : nil
+        TranscriptList(transcript: transcript, activeWord: active, hits: hits, renamable: renamable, actions: actions,
+                       geometry: geometry, suggestion: suggestion)
+            .onChange(of: active) { _, word in
+                guard following, playback.state.isPlaying, let word else { return }
+                follow(word)
+            }
+    }
+
+    private func follow(_ word: WordRef) {
+        let animation: Animation? = reduceMotion ? nil : .easeInOut(duration: 0.25)
+        guard let turn = transcript.turn(word.turnID), let frame = geometry.frames[word.turnID], geometry.height > 0 else {
+            withAnimation(animation) { proxy.scrollTo(word.turnID, anchor: UnitPoint(x: 0.5, y: PlaybackFollow.anchor)) }
+            return
+        }
+        // The word's line, from where its first character sits in the paragraph.
+        let fraction = turn.text.isEmpty ? 0 : Double(turn.offsets[word.index]) / Double(turn.text.count)
+        let lineY = frame.minY - geometry.top + frame.height * fraction
+        guard let delta = PlaybackFollow.scroll(lineY: lineY, height: geometry.height) else { return }
+        let target = min(max(geometry.offset + delta, -geometry.top), geometry.maxOffset)
+        withAnimation(animation) { position.scrollTo(y: target) }
+    }
+}
+
+/// "Follow playback", 16 pt above the player while the note plays and auto-follow is paused.
+struct FollowChip: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Label(NoteCopy.followPlayback, systemImage: "text.line.first.and.arrowtriangle.forward")
+                .font(.subheadline.weight(.semibold))
+                .padding(.horizontal, 16).frame(minHeight: HitTarget.minimum)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(Color.paper)
+        .background(Color.ink, in: Capsule())
+        .shadow(color: .black.opacity(0.15), radius: 8, y: 2)
+        .padding(.bottom, 16)
+        .accessibilityIdentifier("followPlayback")
+    }
+}
+
+/// "No speech": a transcript that was read and has no words.
+struct NoSpeechState: View {
+    var body: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "text.bubble").font(.system(size: 30, weight: .light)).foregroundStyle(Color.ember)
+                .accessibilityHidden(true)
+            Text(NoteCopy.noSpeechTitle).font(.system(.title2, design: .serif))
+            Text(NoteCopy.noSpeechBody).font(.subheadline).foregroundStyle(Color.muted).multilineTextAlignment(.center)
+        }
+        .padding(.vertical, 40).frame(maxWidth: .infinity)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("noSpeech")
     }
 }

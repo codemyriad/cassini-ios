@@ -2,6 +2,13 @@ import Foundation
 import Observation
 import CassiniEngine
 
+extension Route {
+    /// The route without the start action of a note.
+    var withoutStart: Route {
+        if case .note(let id, let query, _) = self { .note(id, query: query) } else { self }
+    }
+}
+
 /// Screens shown over everything else.
 enum FullScreenRoute: String, Identifiable, Hashable {
     case recording
@@ -57,7 +64,9 @@ enum FullScreenRoute: String, Identifiable, Hashable {
         path = Array(current.dropFirst())
     }
 
-    var encodedPath: Data? { try? JSONEncoder().encode(path) }
+    /// The stack as the scene keeps it. A note's start action (an export, Document info, Rename) runs once, when the
+    /// Library opens the note, so a restored stack carries none.
+    var encodedPath: Data? { try? JSONEncoder().encode(path.map(\.withoutStart)) }
 
     func restore(_ data: Data?) {
         guard path.isEmpty, let data, let restored = try? JSONDecoder().decode([Route].self, from: data) else { return }

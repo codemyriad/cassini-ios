@@ -2,68 +2,91 @@ import SwiftUI
 import CassiniEngine
 import CassiniNotebook
 
-/// The "…" menu of a note.
+/// What a row of the note's "…" menu asks the Note screen to do.
+enum NoteMenuAction {
+    case toggleStar, speakers, versions, rename, documentInfo
+    case exportTranscript(TranscriptFormat)
+    case exportDocument, shareAudio
+    case transcribe, transcribeAgain, stop, removeFromQueue, resume, startOver
+    case moveToTrash
+}
+
+/// The "…" menu of a note (Android's Note actions sheet as a system menu): star, speakers, versions, rename, document
+/// info, the exports, the transcription row for the note's job, and Move to Recently Deleted.
 struct NoteMenu: View {
     let note: Note
-    @Binding var renaming: Bool
-    @Binding var showingSpeakers: Bool
-    @Binding var showingVersions: Bool
-    @Binding var shareItem: ShareItem?
-    let requestTranscription: () -> Void
-    @Environment(LibraryStore.self) private var library
-    @Environment(TrashService.self) private var trash
-    @Environment(ExportStore.self) private var exports
+    let transcribeRow: TranscribeRow?
+    /// A Cassini document is being prepared.
+    let exportingDocument: Bool
+    let perform: (NoteMenuAction) -> Void
     @Environment(RecordingStore.self) private var recording
-    @Environment(ErrorPresenter.self) private var errors
-    @State private var exportingDocument = false
 
     var body: some View {
         let finishing = recording.finishingNoteID == note.id
         Menu {
-            Button(note.isFavorite ? "Remove star" : "Star recording", systemImage: note.isFavorite ? "star.slash" : "star") {
-                library.update(note.id) { $0.isFavorite.toggle() }
+            Button(note.isFavorite ? NoteCopy.removeStar : NoteCopy.star, systemImage: note.isFavorite ? "star.slash" : "star") {
+                perform(.toggleStar)
             }
-            Button("Speakers", systemImage: "person.2") { showingSpeakers = true }
-            Button("Transcript versions", systemImage: "clock.arrow.circlepath") { showingVersions = true }
-            Button("Rename", systemImage: "pencil") { renaming = true }
+            if note.hasDocument {
+                Button(NoteCopy.speakers, systemImage: "person.2") { perform(.speakers) }
+                if (note.versions ?? []).count > 0 {
+                    Button(NoteCopy.versions, systemImage: "clock.arrow.circlepath") { perform(.versions) }
+                }
+            }
+            Button(NoteCopy.rename, systemImage: "pencil") { perform(.rename) }
+            if note.hasDocument { Button(NoteCopy.documentInfo, systemImage: "info.circle") { perform(.documentInfo) } }
+            Divider()
             let unavailable = ExportCopy.reason(TranscriptExports.availability(of: note))
             Menu {
-                ForEach(TranscriptFormat.allCases) { format in Button(ExportCopy.title(format)) { export(format) } }
+                ForEach(TranscriptFormat.allCases) { format in
+                    Button(ExportCopy.title(format)) { perform(.exportTranscript(format)) }
+                }
             } label: {
-                Text("Export transcript")
+                Text(NoteCopy.exportTranscript)
                 if let unavailable { Text(unavailable) }
                 Image(systemName: "square.and.arrow.up")
-            }.disabled(unavailable != nil)
-            Button(exportingDocument ? "Preparing Cassini document…" : "Export Cassini document", systemImage: "doc.badge.arrow.up") { exportDocument() }
-                .disabled(exportingDocument || note.transcript.isEmpty || note.status == .transcribing || finishing)
-            Button("Share original audio", systemImage: "waveform") {
-                if let url = library.originalAudioURL(note) { shareItem = ShareItem(url: url) }
-            }.disabled(finishing)
-            Button("Transcribe again", systemImage: "arrow.clockwise", action: requestTranscription)
-                .disabled(note.status == .transcribing || note.status == .queued || finishing || !note.audio.isPlayable)
-            Divider()
-            Button(TrashCopy.moveToTrash, systemImage: "trash", role: .destructive) {
-                Task { await trash.requestTrash(note.id) }
             }
-        } label: { Image(systemName: "ellipsis").frame(minWidth: 32, minHeight: 32) }.accessibilityLabel("Recording actions")
-    }
-
-    private func export(_ format: TranscriptFormat) {
-        Task {
-            do throws(ExportError) { share(try await exports.exportTranscript(note.id, format: format)) }
-            catch { errors.present(ExportCopy.message(error)) }
+            .disabled(unavailable != nil)
+            Button(exportingDocument ? NoteCopy.preparingDocument : NoteCopy.exportDocument, systemImage: "doc.badge.arrow.up") {
+                perform(.exportDocument)
+            }
+            .disabled(exportingDocument || note.transcript.isEmpty || transcribeRow == .stop || finishing)
+            Button(NoteCopy.shareAudio, systemImage: "waveform") { perform(.shareAudio) }.disabled(finishing)
+            if let transcribeRow {
+                Divider()
+                transcription(transcribeRow, disabled: finishing)
+            }
+            if !note.isRecording {
+                Divider()
+                Button(TrashCopy.moveToTrash, systemImage: "trash", role: .destructive) { perform(.moveToTrash) }
+            }
+        } label: {
+            Image(systemName: "ellipsis").frame(minWidth: HitTarget.minimum, minHeight: HitTarget.minimum)
         }
+        .accessibilityLabel(NoteCopy.moreActions)
+        .accessibilityIdentifier("noteActions")
     }
 
-    /// Offers an export, removing it once the share sheet is gone.
-    private func share(_ url: URL) { shareItem = exports.shareItem(url) }
-
-    private func exportDocument() {
-        exportingDocument = true
-        Task {
-            do { share(try await exports.exportPortable(note.id)) }
-            catch { errors.present(error.localizedDescription) }
-            exportingDocument = false
+    @ViewBuilder private func transcription(_ row: TranscribeRow, disabled: Bool) -> some View {
+        switch row {
+        case .transcribe:
+            Button(NoteCopy.transcribe, systemImage: "text.badge.waveform") { perform(.transcribe) }.disabled(disabled)
+        case .transcribeAgain:
+            Button(NoteCopy.transcribeAgain, systemImage: "arrow.clockwise") { perform(.transcribeAgain) }.disabled(disabled)
+        case .transcribeAgainUnavailable:
+            Button {} label: {
+                Text(NoteCopy.transcribeAgain)
+                Text(NoteCopy.noNewVersion)
+                Image(systemName: "arrow.clockwise")
+            }
+            .disabled(true)
+        case .stop:
+            Button(NoteCopy.stopKeepProgress, systemImage: "stop.circle") { perform(.stop) }
+        case .removeFromQueue:
+            Button(NoteCopy.removeFromQueue, systemImage: "minus.circle") { perform(.removeFromQueue) }
+        case .resumeOrStartOver:
+            Button(NoteCopy.resume, systemImage: "play.circle") { perform(.resume) }
+            Button(NoteCopy.startOver, systemImage: "arrow.counterclockwise") { perform(.startOver) }
         }
     }
 }
