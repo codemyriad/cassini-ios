@@ -32,7 +32,8 @@ struct ConformanceTests {
     // ports: CassiniDocumentTest#publishedConformanceVectors
     @Test(arguments: ConformanceVector.all)
     func publishedConformanceVector(_ vector: ConformanceVector) throws {
-        let document = CassiniDocument.read(try bytes(Conformance.directory.appendingPathComponent(vector.file)))
+        let file = try bytes(Conformance.directory.appendingPathComponent(vector.file))
+        let document = CassiniDocument.read(file)
         let expect = vector.expect
         let mustNot = Set((expect["mustNot"]?.array ?? []).compactMap { $0.string })
         let states = try ([expect] + vector.alsoAcceptable).map { try #require(DocumentState(rawValue: $0.string("state"))) }
@@ -52,15 +53,40 @@ struct ConformanceTests {
             for variant in document.variants { if let transcript = variant.transcript { actual[variant.id] = Int64(transcript.words.count) } }
             #expect(expected == actual)
         }
-        for warning in (expect["warnings"]?.array ?? []).compactMap({ $0.object }) {
-            let code = try warning.string("code")
-            let wanted = warning["tag"]?.string.map { "\(code): \($0)" } ?? code
-            #expect(document.warnings.contains(wanted), "missing warning \(wanted) in \(document.warnings)")
+        if let wanted = expect["speakerIds"]?.array {
+            #expect(wanted.compactMap { $0.string } == document.manifest?["speakers"]?.array?.compactMap { $0.object?["id"]?.string })
+        }
+        if let wanted = expect["audioOpusSha256"]?.string {
+            let claimed = try document.manifest.map { try $0.object("integrity").string("opusAudioSha256") }
+            #expect(try claimed ?? OggOpus.read(file).digest() == wanted)
+        }
+        if let wanted = expect["manifestKind"]?.string { #expect(document.manifest?["kind"]?.string == wanted) }
+        if let wanted = expect["manifestVersion"] { #expect(document.manifest?["version"] == wanted) }
+        if let wanted = expect["formatId"]?.string {
+            #expect(comments(document) { $0 == "CASSINI_FORMAT" } == ["CASSINI_FORMAT=\(wanted)"])
+        }
+        switch expect["payloadTrust"]?.string {
+        case "verified": #expect(document.manifest != nil)
+        case "unverified", "mismatched": #expect(document.manifest == nil)
+        default: break
+        }
+        if let warnings = expect["warnings"]?.array {
+            let wanted = try warnings.compactMap { $0.object }.map { warning in
+                let code = try warning.string("code")
+                return warning["tag"]?.string.map { "\(code): \($0)" } ?? code
+            }
+            for warning in wanted { #expect(document.warnings.contains(warning), "missing warning \(warning) in \(document.warnings)") }
+            let codes = Set(wanted.map(code))
+            #expect(document.warnings.allSatisfy { codes.contains(code($0)) }, "unexpected warnings in \(document.warnings)")
         }
         let reported = document.warnings + document.variants.compactMap { $0.error }
         for error in (expect["errors"]?.array ?? []).compactMap({ $0.object }) {
             let code = try error.string("code")
-            #expect(reported.contains { $0.hasPrefix(code) }, "missing error \(code) in \(reported)")
+            if let tag = error["tag"]?.string {
+                #expect(reported.contains("\(code): \(tag)"), "missing error \(code): \(tag) in \(reported)")
+            } else {
+                #expect(reported.contains { self.code($0) == code }, "missing error \(code) in \(reported)")
+            }
         }
         let transcripts = document.variants.compactMap { $0.transcript }
         if mustNot.contains("emit-transcript") { #expect(transcripts.isEmpty) }
@@ -69,5 +95,10 @@ struct ConformanceTests {
         if mustNot.contains("fail") { #expect(document.state != .invalidMetadata) }
         if mustNot.contains("present-as-current") { #expect(document.manifest == nil && transcripts.isEmpty) }
         if document.manifest == nil { #expect(document.variants.isEmpty) }
+    }
+
+    /** The code of a reported warning or error: the text before `: TAG`, if any. */
+    func code(_ reported: String) -> String {
+        reported.range(of: ": ").map { String(reported[..<$0.lowerBound]) } ?? reported
     }
 }
