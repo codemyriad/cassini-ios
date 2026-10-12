@@ -34,6 +34,15 @@
   The Note's TX_QUEUE_HELD on a paused note is not shown (the Library shows the hold). One voice is a finished
   transcript whose speaker analysis failed (`speakerAnalysisFailure`), the iOS form of Android's "speakers not told
   apart". Closed job banners stay closed while the screen is open.
+- **Plain audio and unplayable.** `NoteBanners` builds them as Android's `NoteViewModel.banners`: PLAIN_AUDIO ("No
+  transcript yet.", Transcribe) for an audio-only note (no transcript, no document, not a finished "No speech found",
+  and no job but one waiting for the speech model's consent), with the LONG failure text and no Transcribe when the
+  audio is too long to transcribe, and no Transcribe while it is still being captured; UNPLAYABLE for unplayable
+  audio. They replace the note's "can't be played" notice card, and the empty transcript's Transcribe button is not
+  offered beside them. iOS differences: UNPLAYABLE's body says an imported container this device can't decode when
+  that is the reason (`args.text`; Android's one reason keeps its copy), and an unplayable Cassini document still
+  shows its transcript and trust banner (WP12). A playback error at run time keeps the iOS-only "This audio can't be
+  played" card (Android shows no banner for it).
 - **Trust banners** are catalogue banners now. Their Transcribe again (audio changed, unreadable) is not offered yet:
   it needs WP6's fresh-transcript question; Play anyway is.
 - **Dismissal.** RECOVERED is acknowledged in `notices.recoveredAck` (it never goes back). An import error is closed
@@ -84,8 +93,10 @@
   `TranscriptionCoordinator.onPause` is removed. `jobRunning` counts a standalone speech install; its failure carries
   the plan's `requiredFreeBytes`.
 - `RecoveredRecording.init(noteID:createdAt:recoveredAt:duration:)` (new `createdAt`), `NoticeFacts.latestRecovered`.
-- `NoteBanners` (CassiniEngine `Notices/`): `banners(_:job:failureText:dismissed:)`, `command(for:note:job:)`,
+- `NoteBanners` (CassiniEngine `Notices/`): `banners(_:job:failureText:unplayableText:dismissed:)`, `audioOnly(_:job:)`, `command(for:note:job:)`,
   `dismissal(of:note:job:)`, `oneVoice(_:)`, `downloadFreeBytes`. `Note.refusesNewVersion`, `DownloadError.failure`.
+- `BannerKind.unplayable` uses `.text`. App: `Note.playbackProblem` is gone and `UnplayableReason.message` is
+  `bannerText` (nil for `.interrupted`); `TranscriptEmptyState.requestTranscription` is optional (nil: no button).
 - `RecordingScreenModel.banner` is a catalogue `BannerSpec?` and `perform(_:)` takes a `BannerAction`;
   `RecordingBanner.Tone`, `.tone`, `.Action` and `.action` are gone (the catalogue has them). `Notices.modelDownload`
   and `Notices.downloading` are gone; `RecordingLink.matches` is gone and `DeepLinks` names its scheme and hosts.
@@ -110,8 +121,8 @@ dismissal in CassiniEngine `NoticeCenterTests`), `DeepLinksTest` (`parsesTheNoti
 `everyKindResolvesInItalian` and `italianCopyWithArguments` are WP14's, with a spot check here. Hosted
 `DeepLinkHandlingTests` cover the acceptance criterion (a tap opens the note on a cold start) and Resume (a paused
 transcribe-again job goes on from its checkpoint with its kind). `NoteViewModelTest`
-(`pausedRowsResumeOrStartOverWithConfirmation`, `anUnverifiedDocumentOffersNoTranscribeAgainAndItsFailureClears`;
-the banner part, CassiniEngine `NoteBannersTests`), `LibraryViewModelTest` (`recoveredBannerOpensTheLatestNoteAndDismisses`,
+(`pausedRowsResumeOrStartOverWithConfirmation`, `anUnverifiedDocumentOffersNoTranscribeAgainAndItsFailureClears`,
+`aPlainNoteIsAudioOnlyAndAnUnplayableOneHasNoPlayer`; the banner part, CassiniEngine `NoteBannersTests`), `LibraryViewModelTest` (`recoveredBannerOpensTheLatestNoteAndDismisses`,
 `queueHeldBannerContinues`; hosted `NoticesStoreTests`) and `LibraryMappingTest`'s `transcribeAgainRefused` part
 (CassiniNotebook `FailureRulesTests`).
 Not ported: the ongoing-notification tests (`theOngoingTextFollowsThePhase`, `timeLeftUsesTheFormsOfTheProgressCard`;
