@@ -58,7 +58,7 @@ import CassiniEngineTesting
         AppEnvironment(
             root: URL.applicationSupportDirectory.appendingPathComponent("Cassini", isDirectory: true),
             defaults: .standard, clock: SystemClock(), locale: .autoupdatingCurrent, timeZone: .autoupdatingCurrent,
-            transcriber: AppleSpeechTranscriber(), analyzer: SpeakerAnalyzer(), capture: AVCaptureAdapter(),
+            transcriber: AppleSpeechTranscriber(), analyzer: SpeakerAnalyzer(storage: FileSystemStorageProbe()), capture: AVCaptureAdapter(),
             microphone: AVMicrophonePermission(), liveActivity: ActivityKitAdapter(), playback: AVPlaybackAdapter(), audio: LocalAudioProcessing(), storage: FileSystemStorageProbe(),
             background: UIKitBackgroundRunner(), notifier: SilentNotifier())
     }

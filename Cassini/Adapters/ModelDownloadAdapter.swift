@@ -43,11 +43,10 @@ import CassiniNotebook
         await processing.transcribe(noteID, kind: processing.state.jobs[noteID]?.kind ?? .transcribe)
     }
 
-    /// The speech model is installed now, with its progress and failure in `ProcessingStore.speechInstall`; the
-    /// speaker models download with the first speaker analysis.
+    /// The parts are installed now, one after another, with their progress and failure in
+    /// `ProcessingStore.models` (the Settings rows and the download notice).
     func downloadModels(_ parts: [ModelPart]) {
-        guard parts.contains(.speech) else { return }
-        processing.installSpeechModel(language: settings.speechLanguage)
+        processing.models.install(parts)
     }
 
     func shouldAskNotifications() async -> Bool {
