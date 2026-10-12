@@ -163,12 +163,14 @@ private struct PrivacySection: View {
                                     ? String(localized: "None yet", table: "Settings")
                                     : String(localized: "\(model.voices) people", table: "Settings"))
             }
+            .accessibilityIdentifier("savedVoicesRow")
             Button(action: model.openTrash) {
                 SettingsRowLabel(title: String(localized: "Recently Deleted", table: "Settings"),
                                  subtitle: model.trash == 0
                                     ? String(localized: "Empty", table: "Settings")
                                     : String(localized: "\(model.trash) notes", table: "Settings"))
             }
+            .accessibilityIdentifier("recentlyDeletedRow")
         } header: {
             Text("Privacy", tableName: "Settings")
         }
