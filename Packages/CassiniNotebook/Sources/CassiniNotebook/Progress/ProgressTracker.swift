@@ -75,8 +75,11 @@ public struct ProgressTracker: Sendable {
         }
     }
 
-    /// Publishes the running numbers.
-    public mutating func tick(at nowMs: Int64) { publish(at: nowMs, done: false) }
+    /// Publishes the running numbers; nothing once the run is stopping or over.
+    public mutating func tick(at nowMs: Int64) {
+        guard isTicking else { return }
+        publish(at: nowMs, done: false)
+    }
 
     // MARK: - Events
 

@@ -5,7 +5,7 @@ public struct TranscriptionRequest: Hashable, Sendable {
     public var url: URL
     /// BCP-47.
     public var language: String
-    /// Where in the audio to begin, for a resumed job.
+    /// Where in the audio to begin, for a resumed job. Result times stay on the recording's clock.
     public var startOffset: TimeInterval
     /// Whether a missing speech model may be downloaded.
     public var allowDownload: Bool
@@ -21,6 +21,8 @@ public enum TranscriptionEvent: Hashable, Sendable {
     case progress(done: TimeInterval, total: TimeInterval)
     /// A result that will not change any more.
     case finalized(TranscriptSegment)
+    /// The words heard after the last finalized result so far; they may still change. Nil when there are none.
+    case volatile(TranscriptSegment?)
 }
 
 public struct TranscriptionResult: Hashable, Sendable {
