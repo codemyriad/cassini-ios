@@ -12,6 +12,9 @@ public protocol RecordingNotes: Sendable {
     func update(_ id: UUID, _ change: @escaping @Sendable (inout Note) -> Void) async throws -> Note?
     /// Removes the note and its directory: a recording that did not start or captured nothing.
     func discard(_ id: UUID) async throws
+    /// Shows `change` on screen without writing it, until the next launch: a finished recording whose seal could not be
+    /// written still opens as a plain note.
+    func showUnsaved(_ id: UUID, _ change: @escaping @Sendable (inout Note) -> Void) async
 }
 
 extension NoteStore: RecordingNotes {
@@ -19,6 +22,8 @@ extension NoteStore: RecordingNotes {
     public nonisolated func captureURL(for note: Note) -> URL? { audioURL(for: note) }
     public func update(_ id: UUID, _ change: @escaping @Sendable (inout Note) -> Void) throws -> Note? { try mutate(id, change) }
     public func discard(_ id: UUID) throws { try delete(id) }
+    /// The store is what the screens show; there is nothing to change beside it.
+    public func showUnsaved(_ id: UUID, _ change: @escaping @Sendable (inout Note) -> Void) {}
 }
 
 /// Hands a finished recording to transcription.

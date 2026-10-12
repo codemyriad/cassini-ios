@@ -24,10 +24,11 @@ import CassiniNotebook
         h.controller.finish(title: "Riunione di lunedì")
         let ended = try await h.awaitEnded()
         #expect(ended == .ended(noteID: active.noteID, outcome: .saved(.transcribe)))
+        #expect(await h.note(active.noteID)?.status == .queued, "a kill before the hand-off leaves it interrupted")
         await h.controller.settle()
         let note = try #require(await h.note(active.noteID))
         #expect(note.audio == .plain)
-        #expect(note.status == .audioOnly)
+        #expect(note.status == .queued, "the fake queue leaves the mark")
         #expect(note.title == "Riunione di lunedì")
         #expect(note.duration == 2, "the duration read back from the file")
         #expect(note.waveform == [0.5, 0.5])
@@ -310,5 +311,56 @@ import CassiniNotebook
         #expect(note.audioFilename == "capture.caf")
         #expect(FileManager.default.fileExists(atPath: h.store.audioURL(for: note).path))
         #expect(h.handoff.handedOff == [active.noteID], "the original audio is transcribed")
+    }
+
+    // ports: RecordingControllerTest#aRefusedHandOffIsAudioOnly
+    @Test func aRefusedHandOffMakesTheNoteAudioOnly() async throws {
+        let h = try RecordingHarness(); defer { h.tearDown() }
+        h.handoff.accepts = false
+        let active = try await h.startRecording()
+        h.controller.finish()
+        _ = try await h.awaitEnded()
+        await h.controller.settle()
+        #expect(await h.note(active.noteID)?.status == .audioOnly)
+    }
+
+    @Test func anUnreadableCaptureIsNotLeftQueued() async throws {
+        let h = try RecordingHarness(); defer { h.tearDown() }
+        h.audio.set(summary: nil)
+        let active = try await h.startRecording()
+        h.controller.finish()
+        _ = try await h.awaitEnded()
+        await h.controller.settle()
+        let note = try #require(await h.note(active.noteID))
+        #expect(note.status == .audioOnly)
+        #expect(note.failure == .audio)
+        #expect(h.handoff.handedOff.isEmpty)
+    }
+
+    @Test func aSealThatCannotBeWrittenStillShowsAPlainNote() async throws {
+        let h = try RecordingHarness(); defer { h.tearDown() }
+        let active = try await h.startRecording()
+        h.capture.elapsed = 12
+        h.notes.failUpdates = true
+        h.controller.finish(title: "Standup")
+        #expect(try await h.awaitEnded() == .ended(noteID: active.noteID, outcome: .saved(.audioOnly)))
+        await h.controller.settle()
+        let shown = try #require(h.notes.unsaved[active.noteID])
+        #expect(shown.audio == .plain)
+        #expect(shown.status == .audioOnly)
+        #expect(!shown.isRecording)
+        #expect(shown.title == "Standup")
+        #expect(shown.duration == 12)
+        #expect(await h.note(active.noteID)?.audio == .live, "recovery seals it at the next launch")
+        #expect(h.audio.compressed.isEmpty)
+        #expect(h.handoff.handedOff.isEmpty)
+    }
+
+    @Test func theCurrentTimeIsReadFromTheCapture() async throws {
+        let h = try RecordingHarness(); defer { h.tearDown() }
+        #expect(h.controller.currentElapsed == 0)
+        try await h.startRecording()
+        h.capture.elapsed = 3.25
+        #expect(h.controller.currentElapsed == 3.25)
     }
 }

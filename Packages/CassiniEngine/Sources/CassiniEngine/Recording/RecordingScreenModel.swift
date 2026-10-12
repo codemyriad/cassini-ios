@@ -27,6 +27,8 @@ public enum RecordingEffect: Hashable, Sendable {
 /// - Entry while a recording is in progress shows it.
 /// - Finish: a saved recording opens its note, with the model download on top when consent was never asked and the
 ///   speech model is missing. A storage stop, a microphone failure and a failed start stay with their banner.
+/// - The model lives as long as the app, and the screen is shown again in many ways (the Library's card, the Live
+///   Activity, an automatic stop). Each showing leads away at most once: `appeared()` (and `enter()`) start a new one.
 @MainActor @Observable
 public final class RecordingScreenModel {
     public struct Ports {
@@ -62,6 +64,7 @@ public final class RecordingScreenModel {
     @ObservationIgnored private let ports: Ports
     /// A capture began while this screen was in use: only then does its end lead away.
     @ObservationIgnored private var sawCapture = false
+    /// This showing of the screen has already led away; nothing more until it is shown again.
     @ObservationIgnored private var leaving = false
     @ObservationIgnored private var prefilled: UUID?
 
@@ -86,7 +89,14 @@ public final class RecordingScreenModel {
         }
     }
 
-    public var title: String { controller.state.activeRecording?.title ?? (controller.state.inProgress ? shown?.title ?? "" : "") }
+    public var title: String {
+        switch controller.state {
+        case .active(let active): active.title
+        case .starting: controller.startingTitle ?? ""
+        case .finishing: shown?.title ?? ""
+        case .idle, .ended: ""
+        }
+    }
 
     public var elapsed: TimeInterval {
         if let active = controller.state.activeRecording { return active.elapsed }
@@ -107,9 +117,12 @@ public final class RecordingScreenModel {
 
     // MARK: Entry and permission
 
-    /// The screen is shown: starts a recording unless one is in progress, asking for the microphone first.
+    /// The screen is shown, however it was brought up: it may lead away again.
+    public func appeared() { leaving = false }
+
+    /// The screen is shown to record: starts a recording unless one is in progress, asking for the microphone first.
     public func enter() async {
-        leaving = false
+        appeared()
         guard !controller.state.inProgress else { return }
         if ports.permission.access == .granted {
             startCapture()
@@ -202,7 +215,10 @@ public final class RecordingScreenModel {
         } else {
             ended = Ended(outcome: outcome, noteID: noteID)
             controller.dismissEnded()
-            if outcome != .couldNotStart { onEffect?(.show) }
+            if outcome != .couldNotStart {
+                appeared()
+                onEffect?(.show)
+            }
         }
     }
 

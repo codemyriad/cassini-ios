@@ -219,4 +219,74 @@ import CassiniNotebook
         #expect(effects.isEmpty)
         #expect(h.capture.starts == 2)
     }
+
+    // The model outlives each showing of the screen: shown again without `enter()` (the Library's card, the Live
+    // Activity), it leads away again.
+    @Test func aMinimisedRecordingShownAgainLeadsAwayAgain() async throws {
+        let s = try Screen(); defer { s.h.tearDown() }
+        await s.model.enter()
+        try await s.h.waitFor("the capture") { s.model.phase == .recording }
+        s.model.minimise()
+        s.model.minimise()
+        #expect(s.effects == [.close], "one showing leads away once")
+        s.model.appeared()
+        s.model.minimise()
+        #expect(s.effects == [.close, .close])
+        s.model.appeared()
+        s.model.finish()
+        try await s.h.waitFor("the note") { s.effects.count == 3 }
+        let id = try #require(await s.h.store.all().first?.id)
+        #expect(s.effects.last == .openNote(id, modelDownload: false))
+        #expect(s.model.phase == .starting && !s.h.controller.state.inProgress)
+    }
+
+    @Test func anAutomaticStopWhileMinimisedShowsTheScreenAndOpensTheNote() async throws {
+        let s = try Screen(); defer { s.h.tearDown() }
+        await s.model.enter()
+        try await s.h.waitFor("the capture") { s.model.phase == .recording }
+        let id = try #require(s.h.controller.state.noteID)
+        s.model.minimise()
+        s.h.storage.set(availableBytes: Limits.minRecordingFreeBytes - 1)
+        try await s.h.waitFor("the banner") { s.model.banner == .stoppedForSpace }
+        #expect(s.effects == [.close, .show])
+        s.model.perform(.openNote)
+        #expect(s.effects.last == .openNote(id, modelDownload: false))
+    }
+
+    @Test func anAutomaticStopWhileMinimisedCanBeMinimisedAgain() async throws {
+        let s = try Screen(); defer { s.h.tearDown() }
+        await s.model.enter()
+        try await s.h.waitFor("the capture") { s.model.phase == .recording }
+        s.model.minimise()
+        s.h.capture.send(.failed)
+        try await s.h.waitFor("the banner") { s.model.banner == .microphoneFailed }
+        s.model.minimise()
+        #expect(s.effects == [.close, .show, .close])
+    }
+
+    // ports: RecordingControllerTest#aTitleTypedWhileStartingIsKept
+    @Test func aTitleTypedWhileStartingIsKept() async throws {
+        let s = try Screen(); defer { s.h.tearDown() }
+        s.h.isReady = false
+        await s.model.enter()
+        #expect(s.model.phase == .starting)
+        s.model.setTitle("Standup")
+        #expect(s.model.title == "Standup")
+        s.h.isReady = true
+        try await s.h.waitFor("the capture") { s.model.phase == .recording }
+        #expect(s.model.title == "Standup", "not replaced by the default")
+        let id = try #require(s.h.controller.state.noteID)
+        try await s.h.waitFor("the title write") { await s.h.note(id)?.title == "Standup" }
+    }
+
+    @Test func laterObserversSeeTheStateAnEarlierOneMade() async throws {
+        let s = try Screen(); defer { s.h.tearDown() }
+        var seen: [RecordingState] = []
+        s.h.controller.observe { seen.append($0) }
+        await s.model.enter()
+        try await s.h.waitFor("the prefill") { s.model.title == "Voice note 8 Oct, 09:41" }
+        #expect(seen.last == s.h.controller.state)
+        let titles = seen.compactMap { $0.activeRecording?.title }
+        #expect(titles.prefix(2) == ["", "Voice note 8 Oct, 09:41"], "in the order they were set")
+    }
 }

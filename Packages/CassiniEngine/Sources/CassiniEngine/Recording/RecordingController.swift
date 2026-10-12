@@ -9,12 +9,16 @@ import CassiniNotebook
 /// - Start and end are serialised: a Finish during the start waits for it, and a start while a recording is in progress
 ///   returns false.
 /// - Title edits are written 500 ms after the last change; the finish writes the final value, and a blank title
-///   becomes the default ("Voice note 8 Oct, 08:14").
+///   becomes the default ("Voice note 8 Oct, 08:14"). A title typed while the capture starts is kept and written once
+///   it runs.
 /// - A recording has no time limit. The policy loop runs once a second, paused or not, and stops the recording only
 ///   when the free space falls below the floor (`RecordingPolicy`). That stop, and a failed microphone, save the audio
 ///   and never queue a transcription.
 /// - The finish makes the note plain with its duration and ends with `saved(next)`; then the audio is compressed to
-///   M4A, and the note is handed to transcription when `next` is `transcribe`.
+///   M4A, and the note is handed to transcription when `next` is `transcribe`. Such a note is sealed as queued, so a
+///   kill during the compression leaves it marked interrupted at the next launch; a refused hand-off makes it audio
+///   only. A seal that cannot be written is shown on screen anyway (`RecordingNotes.showUnsaved`), and the note opens
+///   audio only; the next launch's recovery seals it on disk.
 /// - Another app taking the audio pauses the recording; it stays paused until the user resumes.
 @MainActor @Observable
 public final class RecordingController {
@@ -64,6 +68,8 @@ public final class RecordingController {
     public private(set) var bars = WaveformBars()
     /// Notes whose audio is still being compressed after the finish.
     public private(set) var finalizing: Set<UUID> = []
+    /// The title typed while the capture starts; the recording takes it once it runs.
+    public private(set) var startingTitle: String?
 
     /// Whether the app is on screen; an automatic stop in the background posts a notification.
     @ObservationIgnored public var isAppActive = true
@@ -79,6 +85,8 @@ public final class RecordingController {
     @ObservationIgnored private var events: Task<Void, Never>?
     @ObservationIgnored private var captureURL: URL?
     @ObservationIgnored private var activity: RecordingActivityState?
+    /// States not yet told to every observer, oldest first.
+    @ObservationIgnored private var undelivered: [RecordingState] = []
 
     public init(parts: Parts) {
         self.parts = parts
@@ -93,20 +101,32 @@ public final class RecordingController {
     /// Starts a recording. False when one is already in progress.
     @discardableResult public func start() -> Bool {
         guard !state.inProgress else { return false }
+        startingTitle = nil
         setState(.starting)
         serialized { await self.begin() }
         return true
     }
 
     /// The title field changed: the state keeps the text as typed (up to the title limit), and the note gets it 500 ms
-    /// after the last change.
+    /// after the last change. While the capture starts the text waits in `startingTitle`.
     public func setTitle(_ text: String) {
-        guard var active = state.activeRecording else { return }
-        active.title = String(text.prefix(NoteTitles.maxLength))
-        guard active != state.activeRecording else { return }
-        setState(.active(active))
-        scheduleTitleWrite(for: active.noteID)
+        let title = String(text.prefix(NoteTitles.maxLength))
+        switch state {
+        case .starting:
+            startingTitle = title
+        case .active(var active):
+            guard active.title != title else { return }
+            active.title = title
+            setState(.active(active))
+            scheduleTitleWrite(for: active.noteID)
+        case .idle, .finishing, .ended:
+            break
+        }
     }
+
+    /// The time captured so far, read from the microphone now; 0 without a recording. `ActiveRecording.elapsed` is
+    /// refreshed only once a second.
+    public var currentElapsed: TimeInterval { state.activeRecording == nil ? 0 : parts.capture.elapsed }
 
     public func pause() {
         guard var active = state.activeRecording else { return }
@@ -161,10 +181,13 @@ public final class RecordingController {
             let format = try await parts.capture.start(url: url)
             captureURL = url
             bars = WaveformBars()
-            var active = ActiveRecording(noteID: note.id, title: "", defaultTitle: defaultTitle, format: format,
+            let typed = startingTitle ?? ""
+            startingTitle = nil
+            var active = ActiveRecording(noteID: note.id, title: typed, defaultTitle: defaultTitle, format: format,
                                          elapsed: parts.capture.elapsed)
             active.space = policyCheck(elapsed: active.elapsed, at: url).space
             setState(.active(active))
+            if !typed.isEmpty { scheduleTitleWrite(for: note.id) }
             let activity = activityState(active)
             self.activity = activity
             parts.liveActivity?.start(noteID: note.id, activity)
@@ -172,6 +195,7 @@ public final class RecordingController {
         } catch {
             if let created { try? await parts.notes.discard(created) }
             captureURL = nil
+            startingTitle = nil
             setState(.ended(noteID: nil, outcome: .couldNotStart))
         }
     }
@@ -264,17 +288,24 @@ public final class RecordingController {
         }
         let finalTitle = NoteTitles.clean(title ?? current.title) ?? current.defaultTitle
         let tooLong = duration > Limits.maxTranscribeDuration
-        let sealed = (try? await parts.notes.update(id) { note in
-            note.title = finalTitle; note.duration = duration; note.audio = .plain; note.status = .audioOnly
+        let after = stop == .user ? next(tooLong: tooLong) : .audioOnly
+        // Marked queued at once: a kill before the hand-off leaves the note interrupted, not silently audio only.
+        let status: NoteStatus = after == .transcribe ? .queued : .audioOnly
+        let seal: @Sendable (inout Note) -> Void = { note in
+            note.title = finalTitle; note.duration = duration; note.audio = .plain; note.status = status
             if tooLong { note.failure = .long }
-        }) ?? nil
+        }
+        let sealed = (try? await parts.notes.update(id, seal)) ?? nil
+        if sealed == nil {
+            // Stays live on disk until the next launch's recovery; on screen it is a plain note now.
+            await parts.notes.showUnsaved(id) { seal(&$0); $0.status = .audioOnly }
+        }
         let outcome: RecordingOutcome = switch stop {
-        case .user: .saved(sealed == nil ? .audioOnly : next(tooLong: tooLong))
+        case .user: .saved(sealed == nil ? .audioOnly : after)
         case .space: .stoppedForSpace
         case .microphone: .microphoneFailed
         }
-        // A note that could not be sealed stays live on disk; recovery finishes it at the next launch.
-        if sealed != nil { compress(id, url, thenTranscribe: outcome == .saved(.transcribe)) }
+        if sealed != nil { compress(id, url, thenTranscribe: after == .transcribe) }
         setState(.ended(noteID: id, outcome: outcome))
         if stop != .user, !isAppActive, let notifier = parts.notifier {
             let notification = ResultNotification(noteID: id, title: finalTitle,
@@ -302,7 +333,10 @@ public final class RecordingController {
             finalizing.remove(id)
             compressions[id] = nil
             parts.handoff.audioReady(id)
-            if readable, transcribe { _ = parts.handoff.handOff(id) }
+            guard transcribe else { return }
+            if !readable || !parts.handoff.handOff(id) {
+                _ = try? await parts.notes.update(id) { if $0.status == .queued { $0.status = .audioOnly } }
+            }
         }
     }
 
@@ -331,11 +365,17 @@ public final class RecordingController {
 
     // MARK: Helpers
 
-    /// Changes `state` and tells the observers. An observer may act on the controller; its changes come after.
+    /// Changes `state` and tells the observers. Every observer sees every state in order: a change an observer makes
+    /// is told once all of them have seen the current one, so the last state each sees is `state`.
     private func setState(_ next: RecordingState) {
         guard next != state else { return }
         state = next
-        for observer in observers { observer(next) }
+        undelivered.append(next)
+        guard undelivered.count == 1 else { return } // A delivery is under way; it tells this one too.
+        while let current = undelivered.first {
+            for observer in observers { observer(current) }
+            undelivered.removeFirst()
+        }
     }
 
     /// Runs `work` after every operation asked for before it.

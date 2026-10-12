@@ -131,20 +131,35 @@ public final class FakeCaptureRepairer: CaptureRepairing {
     public func repairCapture(at url: URL) throws { repaired.withLock { $0.append(url) } }
 }
 
-/// `RecordingNotes` over a `NoteStore` that counts the title writes.
+/// `RecordingNotes` over a `NoteStore` that counts the title writes, and whose updates can be made to fail.
 public final class CountingRecordingNotes: RecordingNotes {
     public let store: NoteStore
     private let titles = Mutex(0)
+    private let failing = Mutex(false)
+    private let unsavedNotes = Mutex<[UUID: Note]>([:])
     public init(store: NoteStore) { self.store = store }
     public var titleWrites: Int { titles.withLock { $0 } }
+    /// While true every update writes nothing and returns nil, as a failed write does.
+    public var failUpdates: Bool {
+        get { failing.withLock { $0 } }
+        set { failing.withLock { $0 = newValue } }
+    }
+    /// The notes as shown after `showUnsaved`, by id.
+    public var unsaved: [UUID: Note] { unsavedNotes.withLock { $0 } }
     public func create(_ note: Note) async throws { try await store.create(note) }
     public func captureURL(for note: Note) async -> URL? { store.captureURL(for: note) }
     public func update(_ id: UUID, _ change: @escaping @Sendable (inout Note) -> Void) async throws -> Note? {
+        guard !failUpdates else { return nil }
         let before = await store.note(id)
         let after = try await store.update(id, change)
         if let before, let after, before.title != after.title { titles.withLock { $0 += 1 } }
         return after
     }
     public func discard(_ id: UUID) async throws { try await store.discard(id) }
+    public func showUnsaved(_ id: UUID, _ change: @escaping @Sendable (inout Note) -> Void) async {
+        guard var note = await store.note(id) else { return }
+        change(&note)
+        unsavedNotes.withLock { $0[id] = note }
+    }
 }
 #endif

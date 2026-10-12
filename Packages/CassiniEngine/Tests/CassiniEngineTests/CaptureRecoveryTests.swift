@@ -136,7 +136,9 @@ import CassiniNotebook
         try Data([1]).write(to: folder.appendingPathComponent("capture.caf"))
         try Data([2]).write(to: folder.appendingPathComponent("audio.m4a"))
 
-        #expect(await recovery.rebuild(in: repository) == [id])
+        let rebuilt = await recovery.rebuild(in: repository)
+        #expect(rebuilt.map(\.noteID) == [id])
+        #expect(rebuilt.first?.duration == 42, "reported with what it holds")
         let note = try #require(try repository.load().notes.first)
         #expect(note.id == id)
         #expect(note.title == "Recovered recording 8 Oct")
@@ -157,7 +159,7 @@ import CassiniNotebook
         try Data([2]).write(to: folder.appendingPathComponent("audio.m4a"))
         audio.set(summary: nil)
 
-        #expect(await recovery.rebuild(in: repository) == [id])
+        #expect(await recovery.rebuild(in: repository).map(\.noteID) == [id])
         let note = try #require(try repository.load().notes.first)
         #expect(note.audioFilename == "audio.m4a")
         #expect(note.audio == .unplayable(.interrupted))
