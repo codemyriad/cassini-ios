@@ -31,18 +31,17 @@ import CassiniNotebook
     /// Whether the player of `noteID` could not open its file.
     func failed(_ noteID: UUID) -> Bool { state.noteID == noteID && state.status == .failed }
 
-    /// The Note screen `owner` shows `note`'s player: opens its file at the saved position, or, when the note's audio
-    /// changed since it was opened (the compressed copy replaced the capture), opens the new file where it was.
+    /// While a recording runs the player is closed and nothing opens.
+    var isBlocked: Bool { controller.isBlocked }
+
+    /// The Note screen `owner` shows `note`'s player: `PlaybackController.show` with the note's file, which opens it at
+    /// the saved position or reloads it when the audio changed (the compressed copy replaced the capture).
     func show(_ note: Note, owner: PlaybackOwner) {
         guard note.audio.isPlayable, let source = source(for: note) else {
             controller.leave(owner)
             return
         }
-        if let open = controller.openSource, open.noteID == note.id, open.url != source.url || open.signature != source.signature,
-           controller.reload(source, owner: owner) || failed(note.id) {
-            return
-        }
-        controller.open(source, at: note.playbackPosition, owner: owner)
+        controller.show(source, at: note.playbackPosition, owner: owner)
     }
 
     /// The screen `owner` is gone, or its note lost its player (a transcription started).
@@ -102,7 +101,8 @@ import CassiniNotebook
 typealias NotePreview = @Sendable (Note, TimeInterval) -> String?
 
 /// Playback positions saved to the note through the Library, so the screens show them at once and they are written in
-/// order with the note's other edits. A final save also stores the Library preview at that position.
+/// order with the note's other edits. A final save also stores the Library preview at that position. A save that
+/// fails is dropped without an alert, as on Android: the next one counts.
 @MainActor final class LibraryPlaybackPositions: PlaybackPositions {
     private let library: LibraryStore
     private let preview: NotePreview?
@@ -113,7 +113,7 @@ typealias NotePreview = @Sendable (Note, TimeInterval) -> String?
 
     func save(_ noteID: UUID, position: TimeInterval, final: Bool) async {
         let preview = final ? preview : nil
-        await library.commit(noteID) { note in
+        await library.commit(noteID, reportsFailure: false) { note in
             note.playbackPosition = position
             if let preview, let text = preview(note, position) { note.previewText = text }
         }

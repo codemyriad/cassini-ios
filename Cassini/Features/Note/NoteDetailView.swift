@@ -26,13 +26,9 @@ struct NoteDetailView: View {
 
     private var note: Note? { library.note(noteID) }
     private var ownsPlayer: Bool { playback.owns(noteID) }
-    /// Whether the note shows its player: playable audio that is not being transcribed.
-    private func hasPlayer(_ note: Note) -> Bool { note.audio.isPlayable && note.status != .transcribing }
-    /// What the player opens; a change opens, reloads or leaves it.
-    private var playerKey: PlayerKey {
-        guard let note, hasPlayer(note), !recording.state.isActive else { return .none }
-        return .file(note.audioFilename, duration: note.duration)
-    }
+    /// What the player opens; a change opens, reloads or leaves it. It follows the same block as the player, so the
+    /// player opens again as soon as a recording lets it go.
+    private var playerKey: NotePlayer.Key? { NotePlayer.key(for: note, blocked: playback.isBlocked) }
     private var activeSegment: UUID? {
         guard ownsPlayer else { return nil }
         let position = playback.state.position
@@ -65,9 +61,9 @@ struct NoteDetailView: View {
                     }
                 }
                 .safeAreaInset(edge: .bottom, spacing: 0) {
-                    if hasPlayer(note) {
+                    if NotePlayer.hasPlayer(note) {
                         PlaybackBar(note: note, addBookmark: { showBookmarks = true })
-                            .disabled(recording.state.isActive || !ownsPlayer)
+                            .disabled(playback.isBlocked || !ownsPlayer)
                     }
                 }
                 .toolbar {
@@ -83,8 +79,8 @@ struct NoteDetailView: View {
         }
         .background(Color.paper)
         .navigationBarTitleDisplayMode(.inline)
-        .task(id: PlayerTask(noteID: noteID, key: playerKey)) {
-            if let note, playerKey != .none { playback.show(note, owner: playerOwner) } else { playback.leave(playerOwner) }
+        .task(id: playerKey) {
+            if let note, playerKey != nil { playback.show(note, owner: playerOwner) } else { playback.leave(playerOwner) }
         }
         .onDisappear { playback.leave(playerOwner) }
         .sheet(isPresented: $renaming) { RenameNoteSheet(noteID: noteID) }
@@ -120,7 +116,7 @@ struct NoteDetailView: View {
     /// Android `BannerAction.PLAY_ANYWAY`: the note stops showing its not-verified banner, and plays.
     private func playAnyway(_ note: Note) {
         library.update(noteID) { $0.document?.trustAcknowledged = true }
-        playback.play()
+        if ownsPlayer { playback.play() }
     }
 
     /// Transcribe; without consent for the speech model, the model download screen asks first, and a refusal says why.
@@ -138,15 +134,4 @@ struct NoteDetailView: View {
         guard !recording.state.isActive, let note else { return }
         playback.play(note, from: time)
     }
-}
-
-/// The file a Note screen's player opens: none while the note has no player.
-private enum PlayerKey: Hashable {
-    case none
-    case file(String, duration: Double)
-}
-
-private struct PlayerTask: Hashable {
-    let noteID: UUID
-    let key: PlayerKey
 }

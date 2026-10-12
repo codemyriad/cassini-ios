@@ -7,9 +7,11 @@ import CassiniNotebook
 /// Playback through `AVAudioPlayer`, with Now Playing metadata and the lock-screen controls (iOS extras).
 ///
 /// - The audio session is taken on `play()` and given back on pause and unload with `.notifyOthersOnDeactivation`, so
-///   the audio another app was playing resumes.
+///   the audio another app was playing resumes. `load` swaps the file and keeps the session, so a reload that plays on
+///   does not hand the audio to other apps for a moment.
 /// - Only the start of an interruption pauses (never its end), and so does losing the output in use (unplugged
-///   headphones). The player pauses inside the observer; the controller hears about it from `events` afterwards.
+///   headphones). The system has usually paused the player already when an interruption begins, so the event is sent
+///   whether or not it was still playing; the controller ignores it when it was paused.
 /// - At the end of the file the position stays at the end, so the controller saves the duration.
 @MainActor final class AVPlaybackAdapter: AudioPlayback {
     let events: AsyncStream<PlaybackEvent>
@@ -61,17 +63,17 @@ import CassiniNotebook
     }
 
     func load(url: URL, at position: TimeInterval, title: String) throws {
-        unload()
+        closePlayer()
         let audio = try AVAudioPlayer(contentsOf: url)
-        guard audio.duration > 0, audio.prepareToPlay() else { throw AudioError.unreadable }
+        // The rate only takes effect when it is enabled before the player is prepared.
         audio.enableRate = true; audio.rate = rate; audio.delegate = ending
+        guard audio.duration > 0, audio.prepareToPlay() else { throw AudioError.unreadable }
         player = audio; self.title = title
         seek(position)
     }
 
     func unload() {
-        player?.stop(); player = nil
-        finished = false
+        closePlayer()
         releaseSession()
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
     }
@@ -104,9 +106,15 @@ import CassiniNotebook
     }
 
     private func pauseAndReport(_ event: PlaybackEvent) {
-        guard isPlaying else { return }
+        guard player != nil else { return }
         pause()
         continuation.yield(event)
+    }
+
+    /// Stops and drops the open player, keeping the audio session and the Now Playing entry.
+    private func closePlayer() {
+        player?.stop(); player = nil
+        finished = false
     }
 
     private func reachedEnd() {

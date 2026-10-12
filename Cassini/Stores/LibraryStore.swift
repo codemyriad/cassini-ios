@@ -89,12 +89,13 @@ import CassiniNotebook
     }
 
     /// Changes the note now and waits for the write; `change` follows the rules of `update(_:_:)`. Nil when there is no
-    /// such note or the write failed.
+    /// such note or the write failed. A failed write shows the save alert unless `reportsFailure` is false (a playback
+    /// position, which the next save replaces).
     @discardableResult
-    func commit(_ id: UUID, _ change: @escaping @Sendable (inout Note) -> Void) async -> Note? {
+    func commit(_ id: UUID, reportsFailure: Bool = true, _ change: @escaping @Sendable (inout Note) -> Void) async -> Note? {
         guard let noteStore, let edit = applyLocally(id, change) else { return nil }
         pendingWrites[id, default: 0] += 1
-        return await enqueue { await self.write(edit, in: noteStore) }.value
+        return await enqueue { await self.write(edit, in: noteStore, reportsFailure: reportsFailure) }.value
     }
 
     /// Shows a change whose write failed. It stays on screen over whatever others store, beneath the edits made after
@@ -178,14 +179,14 @@ import CassiniNotebook
 
     /// Writes one edit with the note's unsaved changes; runs only from the queue of writes. Returns the note as
     /// written, nil when the write failed.
-    private func write(_ edit: NoteEdit, in noteStore: NoteStore) async -> Note? {
+    private func write(_ edit: NoteEdit, in noteStore: NoteStore, reportsFailure: Bool = true) async -> Note? {
         let (edit, carried) = carryingUnsaved(edit)
         let written: Note?
         do {
             written = try await noteStore.apply(edit)
             clearUnsaved(edit.id, carried)
         } catch {
-            reportSaveFailure(error)
+            if reportsFailure { reportSaveFailure(error) }
             written = nil
         }
         await finishWrite(edit.id, in: noteStore)
