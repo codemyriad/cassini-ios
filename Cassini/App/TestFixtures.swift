@@ -8,6 +8,8 @@ enum TestFixtures {
     static let fixtureID = UUID(uuidString: "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA")!
     static let walkID = UUID(uuidString: "BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB")!
     static let processingID = UUID(uuidString: "CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC")!
+    static let longID = UUID(uuidString: "DDDDDDDD-DDDD-DDDD-DDDD-DDDDDDDDDDDD")!
+    static let silentID = UUID(uuidString: "EEEEEEEE-EEEE-EEEE-EEEE-EEEEEEEEEEEE")!
     static let fixtureDuration: TimeInterval = 24
     static let processingDuration: TimeInterval = 48 * 60 + 13
 
@@ -47,6 +49,10 @@ enum TestFixtures {
             var yesterday = transcribed("Duplicate voice memo", at: now.addingTimeInterval(-2 * 86_400), "A second copy of the memo.")
             yesterday.trashedAt = now.addingTimeInterval(-86_400)
             notes += [week, yesterday]
+        case .long:
+            var silent = Note(id: silentID, title: "Silent memo", createdAt: now.addingTimeInterval(-4 * 3600), audioFilename: "audio.wav")
+            silent.duration = fixtureDuration; silent.status = .ready; silent.language = "en-US"; silent.waveform = waveform
+            notes += [long(now: now), silent]
         case .processing:
             var call = Note(id: processingID, title: "Weekly planning call", createdAt: now.addingTimeInterval(-20 * 60), audioFilename: "audio.wav")
             call.duration = processingDuration; call.language = "en-US"; call.waveform = waveform
@@ -75,6 +81,20 @@ enum TestFixtures {
         note.speakers = [NoteSpeaker(id: "alex", name: "Alex"), NoteSpeaker(id: "sam", name: "Sam")]
         note.bookmarks = [.init(time: 14, label: "Make room for focused work")]
         note.waveform = waveform
+        return note
+    }
+
+    /// Three hours of two speakers in 60 passages; only the last one says "lighthouse".
+    private static func long(now: Date) -> Note {
+        var note = Note(id: longID, title: "Three hour workshop", createdAt: now.addingTimeInterval(-3 * 3600), audioFilename: "audio.wav")
+        note.duration = 3 * 3600; note.status = .ready; note.language = "en-US"; note.waveform = waveform
+        note.speakers = [NoteSpeaker(id: "alex", name: "Alex"), NoteSpeaker(id: "sam", name: "Sam")]
+        note.transcript = (0..<60).map { index in
+            let speaker = note.speakers![index % 2]
+            let text = index == 59 ? "We end the day at the lighthouse." : "Passage \(index + 1) goes over the plan for the next quarter in some detail, one point at a time."
+            return TranscriptSegment(text: text, start: Double(index) * 180, end: Double(index + 1) * 180,
+                                     speaker: speaker.name, speakerID: speaker.id)
+        }
         return note
     }
 

@@ -33,8 +33,6 @@ struct TurnView: View, @MainActor Equatable {
     var actions = TranscriptActions()
     /// Where the paragraph is, for auto-follow.
     var geometry: FollowGeometry?
-    /// Under VoiceOver the words carry no links: the paragraph is one element that plays from its start.
-    @Environment(\.accessibilityVoiceOverEnabled) private var voiceOver
 
     static func == (a: TurnView, b: TurnView) -> Bool {
         a.turn == b.turn && a.activeIndex == b.activeIndex && a.matches == b.matches && a.currentMatch == b.currentMatch
@@ -43,7 +41,7 @@ struct TurnView: View, @MainActor Equatable {
 
     var body: some View {
         #if DEBUG
-        let _ = TurnRenderProbe.rendered(turn.id)
+        let _ = RenderProbe.rendered(turn.id)
         #endif
         VStack(alignment: .leading, spacing: 2) {
             TurnHeader(turn: turn, button: style == .reading && renamable && turn.speakerID != nil) {
@@ -65,8 +63,8 @@ struct TurnView: View, @MainActor Equatable {
                 geometry?.frames[turn.id] = frame
             }
             .onDisappear { geometry?.frames[turn.id] = nil }
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(Text(verbatim: turn.text))
+            // Assistive technologies see the plain paragraph: its word links would each be an element of their own.
+            .accessibilityRepresentation { Text(verbatim: turn.text) }
             .accessibilityIdentifier("turn-\(turn.id)")
         switch style {
         case .reading:
@@ -116,7 +114,7 @@ struct TurnView: View, @MainActor Equatable {
         return Int(url.absoluteString.dropFirst(scheme.count + 1))
     }
 
-    /// The paragraph with its word links (reading, without VoiceOver), its unsettled words (draft), the active word and the search hits.
+    /// The paragraph with its word links (reading), its unsettled words (draft), the active word and the search hits.
     private var attributed: AttributedString {
         var result = AttributedString(turn.text)
         let characters = result.characters
@@ -126,12 +124,10 @@ struct TurnView: View, @MainActor Equatable {
             return start..<characters.index(start, offsetBy: offsets.count)
         }
         switch style {
-        case .reading where !voiceOver:
+        case .reading:
             for index in turn.words.indices where index != activeIndex {
                 if let word = range(turn.range(ofWord: index)) { result[word].link = URL(string: "\(Self.scheme):\(index)") }
             }
-        case .reading:
-            break
         case .draft:
             if let from = turn.unsettledFrom, turn.words.indices.contains(from),
                let rest = range(turn.offsets[from]..<turn.text.count) {
@@ -192,8 +188,9 @@ private struct TurnHeader: View {
 }
 
 #if DEBUG
-/// Counts paragraph renders, for the test that a new active word redraws only the paragraphs it concerns.
-@MainActor enum TurnRenderProbe {
+/// Counts renders by key (a paragraph's id, or a part of the Note screen), for the tests that a playback tick redraws
+/// only the paragraphs it concerns.
+@MainActor enum RenderProbe {
     private(set) static var renders: [String: Int] = [:]
     static func rendered(_ id: String) { renders[id, default: 0] += 1 }
     static func reset() { renders = [:] }

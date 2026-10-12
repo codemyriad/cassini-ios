@@ -16,15 +16,29 @@ struct NoteBannersView: View {
     @Environment(PlaybackStore.self) private var playback
 
     var body: some View {
+        var facts = facts
+        facts.playbackFailed = playback.failed(note.id)
+        // The player's state changes on every tick; the banners only when it fails, so a list that compares equal is
+        // not drawn again.
+        return NoteBannerList(banners: NoteBanners.of(note, job: job, mode: mode, facts: facts), act: act, dismiss: dismiss)
+            .equatable()
+    }
+}
+
+private struct NoteBannerList: View, @MainActor Equatable {
+    let banners: [NoteBanner]
+    let act: (NoteBanner, NoteBanner.Action) -> Void
+    let dismiss: (NoteBanner) -> Void
+
+    static func == (a: NoteBannerList, b: NoteBannerList) -> Bool { a.banners == b.banners }
+
+    var body: some View {
+        #if DEBUG
+        let _ = RenderProbe.rendered("banners")
+        #endif
         ForEach(banners) { banner in
             NoteBannerView(banner: banner, act: { act(banner, $0) }, dismiss: { dismiss(banner) })
         }
-    }
-
-    private var banners: [NoteBanner] {
-        var facts = facts
-        facts.playbackFailed = playback.failed(note.id)
-        return NoteBanners.of(note, job: job, mode: mode, facts: facts)
     }
 }
 

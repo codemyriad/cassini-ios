@@ -9,6 +9,9 @@ struct NoteHeader: View {
     @Environment(\.timeZone) private var timeZone
 
     var body: some View {
+        #if DEBUG
+        let _ = RenderProbe.rendered("header")
+        #endif
         VStack(alignment: .leading, spacing: 8) {
             Text(note.title).font(.system(.largeTitle, design: .serif)).tracking(-0.7).foregroundStyle(Color.ink)
                 .textSelection(.enabled).accessibilityAddTraits(.isHeader).accessibilityIdentifier("noteTitle")

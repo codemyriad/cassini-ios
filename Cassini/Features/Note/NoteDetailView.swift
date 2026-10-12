@@ -53,6 +53,9 @@ struct NoteDetailView: View {
     private var job: Job? { processing.state.jobs[noteID] }
 
     var body: some View {
+        #if DEBUG
+        let _ = RenderProbe.rendered("screen")
+        #endif
         Group {
             if let note {
                 content(note, mode: NoteMode.of(note, job: job, ahead: processing.state.ahead(of: noteID) ?? 0))
@@ -180,9 +183,14 @@ struct NoteDetailView: View {
             }
         case .banners:
             RecordingNotices(noteID: noteID)
+            // The callbacks read the note and its job when called: an unchanged list keeps the ones it was made with.
             NoteBannersView(note: note, job: job, mode: mode, facts: bannerFacts,
-                            act: { _, action in run(screen.bannerAction(action, note: note, job: job)) },
-                            dismiss: { run(screen.dismiss($0, note: note, job: job)) })
+                            act: { _, action in
+                                if let note = self.note { run(screen.bannerAction(action, note: note, job: self.job)) }
+                            },
+                            dismiss: { banner in
+                                if let note = self.note { run(screen.dismiss(banner, note: note, job: self.job)) }
+                            })
         }
     }
 

@@ -28,6 +28,7 @@ final class NoteScreenTests: XCTestCase {
         let app = open()
         let turns = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "turn-"))
         XCTAssertEqual(turns.count, 3)
+        XCTAssertEqual(app.links.count, 0, "no stop per word: the words are not links to VoiceOver")
         XCTAssertEqual(turns.element(boundBy: 0).label,
                        "What if being productive meant paying closer attention, rather than doing more?")
         let alex = header(app, "Alex")
@@ -115,6 +116,85 @@ final class NoteScreenTests: XCTestCase {
         XCTAssertTrue(wait("exists == false", app.staticTexts["Queued"], timeout: 10))
     }
 
+    /// The back button reads "Back to library" to VoiceOver.
+    @MainActor func testTheBackButtonSaysBackToLibrary() {
+        let app = open()
+        let back = app.navigationBars.buttons["Back to library"]
+        XCTAssertTrue(back.waitForExistence(timeout: 5))
+        back.tap()
+        XCTAssertTrue(app.textFields["librarySearch"].waitForExistence(timeout: 5))
+    }
+
+    // ports: NoteViewModelTest#searchFromTheLibraryIsPrefilledAndStepsThroughMatches
+    /// A note opened from a Library search opens with its search filled in, scrolled to the first match, here the
+    /// last of 60 paragraphs.
+    @MainActor func testANoteOpenedFromALibrarySearchScrollsToTheFirstMatch() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed", "long"]
+        app.launch()
+        let search = app.textFields["librarySearch"]
+        XCTAssertTrue(search.waitForExistence(timeout: 15))
+        search.tap()
+        search.typeText("lighthouse")
+        let row = app.staticTexts["Three hour workshop"]
+        XCTAssertTrue(row.waitForExistence(timeout: 5))
+        row.tap()
+        let counter = app.staticTexts["searchCounter"]
+        XCTAssertTrue(counter.waitForExistence(timeout: 10))
+        XCTAssertEqual(counter.label, "1 of 1")
+        XCTAssertEqual(app.textFields["transcriptSearch"].value as? String, "lighthouse")
+        let match = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "We end the day at the lighthouse."))
+            .firstMatch
+        XCTAssertTrue(match.waitForExistence(timeout: 5))
+        XCTAssertTrue(wait("hittable == true", match), "the match is on screen")
+    }
+
+    // ports: ScreenBehaviourTest#aDocumentWithNoWordsSaysSo
+    @MainActor func testANoteTranscribedToNoWordsSaysSo() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed", "long", "--open-fixture",
+                               "EEEEEEEE-EEEE-EEEE-EEEE-EEEEEEEEEEEE"]
+        app.launch()
+        XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.descendants(matching: .any)["noSpeech"].waitForExistence(timeout: 5))
+    }
+
+    // ports: NoteOverlaysBehaviourTest#renameConfirmsTheNewTitle
+    /// The title can be renamed while the transcript is read-only.
+    @MainActor func testAQueuedNoteCanStillBeRenamed() {
+        let app = open(seed: "processing")
+        app.buttons["More actions"].tap()
+        app.buttons["Transcribe again"].tap()
+        XCTAssertTrue(app.staticTexts["Queued"].waitForExistence(timeout: 10))
+        app.buttons["More actions"].tap()
+        app.collectionViews.buttons["Rename"].tap()
+        let field = app.textFields["recordingTitleField"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        field.tap()
+        field.clearAndType("Supplier call")
+        app.buttons["Save"].tap()
+        XCTAssertTrue(wait("label == 'Supplier call'", app.staticTexts["noteTitle"]))
+    }
+
+    // ports: SheetBehaviourTest#aPlainNoteDisablesTextExportAndHasNoDocumentInfo
+    @MainActor func testAPlainNotesMenuHasNoDocumentInfoAndCannotExportText() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed-test-data", "--open-fixture",
+                               "BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB"]
+        app.launch()
+        XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(timeout: 15))
+        app.buttons["More actions"].tap()
+        let share = app.collectionViews.buttons["Share original audio"]
+        XCTAssertTrue(app.collectionViews.buttons["Transcribe"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.collectionViews.buttons["Document info"].exists)
+        let export = app.collectionViews.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Export transcript")).firstMatch
+        XCTAssertEqual(export.label, "Export transcript, Available after transcription")
+        XCTAssertTrue(share.exists && share.isEnabled, "the audio can be shared")
+        export.tap()
+        let text = app.collectionViews.buttons["Transcript as text"]
+        XCTAssertTrue(!text.waitForExistence(timeout: 2) || !text.isEnabled, "no transcript to export")
+    }
+
     @MainActor func testDocumentInfoShowsTheNotesFacts() {
         let app = open()
         app.buttons["More actions"].tap()
@@ -140,5 +220,14 @@ final class NoteScreenTests: XCTestCase {
         XCTAssertFalse(app.buttons["searchTranscript"].exists, "no search without a transcript")
         app.buttons["Dismiss"].tap()
         XCTAssertTrue(wait("exists == false", app.staticTexts["Plain audio"]), "banners are dismissed by id")
+    }
+}
+
+private extension XCUIElement {
+    func clearAndType(_ text: String) {
+        if let current = value as? String, !current.isEmpty {
+            typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: current.count))
+        }
+        typeText(text)
     }
 }

@@ -123,8 +123,11 @@ struct LibraryView: View {
         }.buttonStyle(.plain).accessibilityAddTraits(selected ? .isSelected : [])
     }
 
+    /// Opens the note, with the search query while searching: its in-note search starts with it (Android
+    /// `LibraryViewModel.open`).
     private func open(_ note: Note) {
-        if note.isRecording { router.presentRecording() } else { router.show(.note(note.id)) }
+        let search = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        if note.isRecording { router.presentRecording() } else { router.show(.note(note.id, query: search.isEmpty ? nil : search)) }
     }
 
     private func dayLabel(_ date: Date) -> String {

@@ -16,8 +16,13 @@
   `Equatable` over what it draws; `TranscriptCache` builds the transcript once per change of the passages, speakers,
   voices or suggestions. Strings are in `Resources/Strings/Note.xcstrings` (English and Italian).
 - **Interface changes:** `NoteDetailView(noteID:query:start:)` (RootView passes the route's query and start action);
-  `Router.encodedPath` drops start actions (`Route.withoutStart`); `ProcessingStore.savedDraft(_:)` reads the saved
-  progress for the read-only draft; `NoteMenu` sends `NoteMenuAction`s to the screen instead of acting itself.
+  `Router` keeps a `NoteSession` per open note (`session(_:)`, `markStarted(_:)`, `keepSearch(_:for:)`,
+  `below(noteID:)`), and `Router.encodedPath` drops start actions and carries each note's search as the screen left it
+  (RootView saves it whenever it changes, not only when the path does); `ProcessingStore.savedDraft(_:)` is `async`
+  and reads the saved progress off the main actor; `NoteMenu` sends `NoteMenuAction`s to the screen instead of acting
+  itself; the Library passes its search query when it opens a note (Android `LibraryViewModel.open`), which it did not
+  before. `NoteMode.sections` orders the card, the chips and the banners. `Note.versionCount` counts versions for the
+  chip and Document info alike. The `long` UI-test seed adds a three-hour note and a note transcribed to no words.
 
 ## Differences from Android
 
@@ -34,7 +39,9 @@
   from a Cassini document (Android: the DOCUMENT audio kind). The chips row shows on all of them; the trust chip only
   for documents. The speaker count is a button that opens the note's Speakers list (iOS extra; Android shows a
   caption). The version chip counts kept versions (`Note.versions`): "· speakers merged" for the merge's version,
-  "· transcribed again" for any later version (an identify-speakers run included), nothing for the first.
+  "· edited" for the version that holds passage edits, "· transcribed again" for any other later version (an
+  identify-speakers run included), nothing for the first. Below a Queued card the chips come first, then the
+  banners; below a failure banner, the chips follow it (Android `NoteModeBody`).
 - **Read-only gate.** Any job row except one waiting for consent makes the transcript read-only (the same "Wait until
   transcription finishes"), and a document whose trust is not ok gives "Fix the transcript first: Transcribe again".
   iOS has no draft naming (speakers are told apart after the words), so Android's SAVING reason and the draft's
@@ -47,8 +54,10 @@
   transcribe" with the failure's text rather than Android's DL_* banners; the "paused by the system" body names iOS.
   One voice comes from the speaker step's failure (`speakerAnalysisFailure == .speakers`), not from a diarization
   record, and offers Transcribe again as Android does.
-- **Back label.** iOS keeps the system back button, so the swipe back keeps working; its label is the system's, not
-  "Back to library".
+- **Back label.** iOS keeps the system back button, so the swipe back keeps working. Its title is "Back to library"
+  when the Library is below the note (`Router.below(noteID:)`); UIKit reads it from the Library's navigation item,
+  which `backButtonTitle(_:)` sets. iOS 26 draws the button as a chevron, so the title is what VoiceOver reads and what
+  the long-press menu shows. In split view the note is the detail's root and has no back button.
 - **Header.** The title is the screen's heading; the subtitle "Today, 10:02 · 48:13" shows outside reading mode, as
   on Android. The status pill, word count and language row are gone from the header (Document info has them).
 - **Active word** is drawn inverted with the attributed string's background (not a rounded rectangle 3 pt wider), and
@@ -59,23 +68,42 @@
   16 pt above the player; 4 s after the scrolling stops, following resumes. A drag while paused leaves it on. The
   draft does not auto-scroll to new text (Android scrolls the end of the draft into view while the card stays), so the
   card always stays in view.
-- **Search** opens prefilled from `Route.note(query:)` and is kept with the scene (`@SceneStorage`, per note). The bar
-  sits pinned above the transcript; the counter is announced to VoiceOver when it changes.
+- **Search** opens prefilled from `Route.note(query:)` (the Library's query) and scrolls to its first match, as on
+  every later match, unless that match's line is in view already; without animation under Reduce Motion. It is kept
+  with the navigation entry, as Android keeps it in the screen's `SavedStateHandle`: the router remembers the search
+  of each open note screen, so a view SwiftUI builds again keeps it, and the stack kept with the scene carries it as
+  the route's query, so a restored screen shows the search as the user left it, closed included. It goes when the
+  screen leaves the stack, so the same note opened again starts with only the Library's query. The bar sits pinned
+  above the transcript; the counter is announced to VoiceOver when it changes.
 - **Edit passage** (iOS extra). A paragraph that spans several passages offers one "Passage at 01:23" per passage. Save
   writes only while the transcript still holds the passage as it was; otherwise the editor stays open with "This
-  passage changed while you were editing." A changed text drops the passage's word times. The edit keeps the
-  transcript before it as a version ("Before passage edit"). While a job runs, the editor is locked and says why.
+  passage changed while you were editing." A changed text drops the passage's word times. A run of edits keeps one
+  version: the first edit keeps the transcript before it ("Before passage edit", unless a kept version holds it
+  already, as the transcription's does) and adds an "Edited passages" version that is then shown; later edits change
+  that version in place while it is shown, so many typo fixes add one copy of the transcript, not one each. Editing
+  another version adds a new "Edited passages" version after the kept ones. While a job runs, the editor is locked and
+  says why.
 - **Document info** has no meeting id, and the model row names Apple's speech model ("Apple SpeechTranscriber") from
   the run's provenance record (WP5); without a record of the run that made the transcript, the transcription, model
   and speakers rows are hidden. It adds "Made by" for an imported document's vendor.
-- **Start actions** (`export`, `documentInfo`, `rename`) run once when the screen appears; the stack kept with the
-  scene carries none, so a restored screen does not run them again (Android keeps a `started` flag in its saved
-  state).
+- **Start actions** (`export`, `documentInfo`, `rename`) run once when the screen appears. The router records that
+  they ran (Android keeps a `started` flag in its saved state), so a screen SwiftUI builds again, e.g. on an iPad
+  size-class change, does not run them again; the stack kept with the scene carries none.
+- **Word links** are drawn for taps only: assistive technologies see each paragraph as its plain text
+  (`accessibilityRepresentation`), one element with no stop per word, under VoiceOver and Voice Control alike.
+- **Off the main actor:** the checkpoint behind a stopped job's draft and Document info's run record and file size
+  are read off the main actor, then shown.
 - **Not ported** (no iOS counterpart): `TurnHistoryTest` (streaming diarization windows; iOS tells speakers apart once,
   offline, after the words), the word-cache and fast-opening cases of `NoteViewModelTest` (iOS reads the transcript
-  with the note; there is no paged word cache or `RecentWords`), the export and naming cases (WP13 and WP8 own them),
-  and the Compose-only cases of `ModeBehaviourTest`, `NoteOverlaysBehaviourTest` and `SheetBehaviourTest` (the sheets
-  and dialogs here are system sheets, menus and alerts; the Name, Merge and Versions sheets are WP8's).
+  with the note; there is no paged word cache or `RecentWords`), the export and naming cases (WP13 and WP8 own them).
+  Of the Compose behaviour tests, the cases with an iOS counterpart are UI tests (below); the rest are not ported:
+  `ModeBehaviourTest`'s layout cases (the card staying fixed above the draft, the 160 dp draft space, the header lift;
+  iOS scrolls card and draft together, and the order is the pure `NoteMode.sections`), `NoteOverlaysBehaviourTest`'s
+  sheet and dialog plumbing (event emission from Compose dialogs; iOS uses system alerts and menus, and the Name,
+  Merge, Versions and stop-and-trash sheets are WP8's and WP12's), `SheetBehaviourTest`'s busy "Saving…" row (iOS has
+  no draft naming) and `aNoteBeingRecordedCannotMoveToTrash` (a note being recorded opens the Recording screen, not
+  this one; the menu still leaves Move to Recently Deleted out for it), and `ScreenBehaviourTest`'s search-header and
+  system-back cases (iOS has no system back; the search has Close).
 
 ## Tests
 
@@ -89,8 +117,13 @@ name), and from `NoteViewModelTest`: `theModeFollowsTheJobAndTheDocument`,
 `aNoteTrashedElsewhereClosesTheScreen`, `pausedRowsResumeOrStartOverWithConfirmation`,
 `anUnverifiedDocumentOffersNoTranscribeAgainAndItsFailureClears`, `documentInfoReadsTheDocumentFactsWhenOpened`;
 `ScreenBehaviourTest`'s drag cases as pure `PlaybackFollow` tests and as UI tests. Hosted: `RouterTests` (a restored
-stack carries no start action, `aRowStartedFromTheLibraryRunsOnceOnly`) and `TranscriptRenderTests` (a new active
-word redraws only the paragraphs of the old and the new word; a tick inside a word redraws none). UI
-(`NoteScreenTests`): one element per paragraph and header, word tap plays, drag and the Follow playback chip, search
+stack carries no start action, `aRowStartedFromTheLibraryRunsOnceOnly` for the screen and a fresh open, the search
+kept changed or closed, a search that goes with its screen) and `TranscriptRenderTests` over a three-hour note of 180
+paragraphs (the list alone, and the whole Note screen over the app's player: a new active word redraws only the
+paragraphs of the old and the new word, never the screen, its header or its banners; a tick inside a word redraws
+nothing). Pure: two passage edits in a row keep one edited version, and the chip and Document info agree on it. UI
+(`NoteScreenTests`): one element per paragraph and header and no links, the "Back to library" back button, a Library
+search opening the note scrolled to its first match 60 paragraphs down, "No speech", renaming a queued note, the plain
+note's menu (no Document info, no text export), word tap plays, drag and the Follow playback chip, search
 "1 of 3" with wrap-around and "No matches", the read-only dialog on a queued note, Document info, and the plain-audio
 banner with its subtitle.

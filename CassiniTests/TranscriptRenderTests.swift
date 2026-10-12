@@ -1,10 +1,11 @@
 import SwiftUI
 import XCTest
+import CassiniEngine
 import CassiniNotebook
 @testable import Cassini
 
-/// The transcript redraws only the paragraphs whose active word changed (the plan's render-count check for long
-/// notes; Android `TurnParagraph`'s recomposition probe).
+/// The transcript redraws only the paragraphs whose active word changed, and a playback tick leaves the rest of the
+/// Note screen alone (the plan's render-count check for long notes; Android `TurnParagraph`'s recomposition probe).
 @MainActor final class TranscriptRenderTests: XCTestCase {
     @Observable final class Model {
         var active: WordRef?
@@ -18,17 +19,21 @@ import CassiniNotebook
         }
     }
 
-    /// An hour of one speaker, then another: 120-word sentences make paragraphs of 120 words.
-    private func longNote() -> Note {
-        var note = Note(title: "Long")
+    /// Three hours of two speakers, a minute each, with word times: 120-word sentences make paragraphs of 120 words.
+    private func longNote(passages: Int = 180) -> Note {
+        var note = Note(title: "Long", audioFilename: "audio.caf")
+        note.status = .ready
+        note.duration = Double(passages) * 60
+        note.speakers = [NoteSpeaker(id: "a", name: "Ada"), NoteSpeaker(id: "b", name: "Bruno")]
         var start = 0.0
-        for passage in 0..<60 {
+        for passage in 0..<passages {
             let words = (0..<120).map { i -> TimedWord in
                 defer { start += 0.5 }
                 return TimedWord(text: i == 119 ? "end." : "word\(i)", start: start, end: start + 0.4)
             }
             note.transcript.append(TranscriptSegment(text: words.map(\.text).joined(separator: " "), start: words[0].start,
-                                                     end: words[119].end, speakerID: passage < 30 ? "a" : "b", words: words))
+                                                     end: words[119].end, speaker: passage % 2 == 0 ? "Ada" : "Bruno",
+                                                     speakerID: passage % 2 == 0 ? "a" : "b", words: words))
         }
         return note
     }
@@ -40,35 +45,81 @@ import CassiniNotebook
 
     func testANewActiveWordRedrawsOnlyTheParagraphsThatHoldTheOldAndTheNewWord() {
         let transcript = NoteTranscripts.sealed(longNote())
-        XCTAssertEqual(transcript.turns.count, 60)
+        XCTAssertEqual(transcript.turns.count, 180)
         let model = Model()
         let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
         window.rootViewController = UIHostingController(rootView: Host(model: model, transcript: transcript))
         window.makeKeyAndVisible()
         settle(window)
         let first = transcript.turns[0].id, second = transcript.turns[1].id
-        XCTAssertFalse(TurnRenderProbe.renders.isEmpty, "the paragraphs on screen were drawn")
-        XCTAssertNil(TurnRenderProbe.renders[transcript.turns[59].id], "paragraphs far off screen are not made")
+        XCTAssertFalse(RenderProbe.renders.isEmpty, "the paragraphs on screen were drawn")
+        XCTAssertNil(RenderProbe.renders[transcript.turns[179].id], "paragraphs far off screen are not made")
 
-        TurnRenderProbe.reset()
+        RenderProbe.reset()
         model.active = WordRef(turnID: first, index: 3)
         settle(window)
-        XCTAssertEqual(Set(TurnRenderProbe.renders.keys), [first])
+        XCTAssertEqual(Set(RenderProbe.renders.keys), [first])
 
-        TurnRenderProbe.reset()
+        RenderProbe.reset()
         model.active = WordRef(turnID: first, index: 4)
         settle(window)
-        XCTAssertEqual(Set(TurnRenderProbe.renders.keys), [first])
+        XCTAssertEqual(Set(RenderProbe.renders.keys), [first])
 
-        TurnRenderProbe.reset()
+        RenderProbe.reset()
         model.active = WordRef(turnID: second, index: 0)
         settle(window)
-        XCTAssertEqual(Set(TurnRenderProbe.renders.keys), [first, second])
+        XCTAssertEqual(Set(RenderProbe.renders.keys), [first, second])
 
-        TurnRenderProbe.reset()
+        RenderProbe.reset()
         model.active = WordRef(turnID: second, index: 0)
         settle(window)
-        XCTAssertTrue(TurnRenderProbe.renders.isEmpty, "a tick inside the same word redraws nothing")
+        XCTAssertTrue(RenderProbe.renders.isEmpty, "a tick inside the same word redraws nothing")
         window.isHidden = true
+    }
+
+    /// The whole Note screen over the app's player: moving the position redraws the paragraphs of the old and the new
+    /// active word, and not the screen, its header or its banners.
+    func testAPlaybackTickOnTheNoteScreenRedrawsOnlyTheActiveParagraphs() async throws {
+        let test = TestGraph(); defer { test.tearDown() }
+        let note = longNote()
+        try NoteRepository(root: test.root).save(note)
+        try Data().write(to: test.root.appendingPathComponent(note.id.uuidString).appendingPathComponent("audio.caf"))
+        test.playback.fileDuration = note.duration
+        await test.graph.start()
+        let transcript = NoteTranscripts.sealed(note)
+        XCTAssertEqual(transcript.turns.count, 180)
+
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        window.rootViewController = UIHostingController(
+            rootView: NavigationStack { NoteDetailView(noteID: note.id) }.environment(test.graph))
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true }
+        settle(window)
+        let playback = test.graph.playback
+        XCTAssertTrue(playback.owns(note.id), "the screen opened the player")
+        XCTAssertNotNil(RenderProbe.renders["header"])
+
+        let first = transcript.turns[0].id, second = transcript.turns[1].id
+        playback.seek(1.1)
+        settle(window)
+        RenderProbe.reset()
+        playback.seek(1.6)
+        settle(window)
+        XCTAssertEqual(Set(RenderProbe.renders.keys), [first], "a new word in the same paragraph")
+
+        // The lazy stack finishes its work over a few run loop passes; once it has, nothing draws on its own.
+        settle(window); settle(window)
+        RenderProbe.reset()
+        settle(window)
+        XCTAssertTrue(RenderProbe.renders.isEmpty, "an idle screen draws nothing: \(RenderProbe.renders)")
+
+        playback.seek(1.7)
+        settle(window)
+        XCTAssertTrue(RenderProbe.renders.isEmpty, "a tick inside the same word: \(RenderProbe.renders)")
+
+        RenderProbe.reset()
+        playback.seek(60.1)
+        settle(window)
+        XCTAssertEqual(Set(RenderProbe.renders.keys), [first, second], "the old and the new active paragraph only")
     }
 }

@@ -44,7 +44,7 @@ import CassiniEngineTesting
 
     /// Named sets of notes for UI tests and screenshots.
     enum Seed: String, CaseIterable {
-        case library, search, speakers, trash, voices, processing, recording
+        case library, search, speakers, trash, voices, processing, recording, long
     }
 
     var calendar: Calendar {

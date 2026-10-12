@@ -38,8 +38,9 @@ struct NoteMenu: View {
             Divider()
             let unavailable = ExportCopy.reason(TranscriptExports.availability(of: note))
             Menu {
+                // A disabled submenu still opens on iOS, so its rows are disabled as well.
                 ForEach(TranscriptFormat.allCases) { format in
-                    Button(ExportCopy.title(format)) { perform(.exportTranscript(format)) }
+                    Button(ExportCopy.title(format)) { perform(.exportTranscript(format)) }.disabled(unavailable != nil)
                 }
             } label: {
                 Text(NoteCopy.exportTranscript)

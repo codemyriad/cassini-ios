@@ -10,7 +10,7 @@ struct RenameNoteSheet: View {
     var body: some View {
         NavigationStack {
             Form { TextField(NoteCopy.titleField, text: $title).accessibilityIdentifier("recordingTitleField") }
-                .navigationTitle(NoteCopy.renameTitle).navigationBarTitleDisplayMode(.inline)
+                .navigationTitle(NoteCopy.rename).navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) { Button(NoteCopy.cancel) { dismiss() } }
                     ToolbarItem(placement: .confirmationAction) {
