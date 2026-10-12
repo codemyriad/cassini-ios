@@ -111,7 +111,7 @@ final class AudioPipelineTests: XCTestCase {
         }
         let portable = try await test.graph.exports.exportPortable(id)
         defer { try? FileManager.default.removeItem(at: portable.deletingLastPathComponent()) }
-        XCTAssertEqual(CassiniDocument.read(portable).state, "ok")
+        XCTAssertEqual(CassiniDocument.read(portable).state, .ok)
         let original = try Data(contentsOf: portable)
         test.clock.advance(by: .seconds(60))
         await test.graph.imports.importAudio(portable)

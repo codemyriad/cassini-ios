@@ -19,7 +19,7 @@ public enum CassiniPayload {
     public static func decode(_ chunks: [String], rawBytes: Int64, gzipBytes: Int64, sha256: String) throws -> String {
         try check((0...Int64(maxRaw)).contains(rawBytes) && (18...Int64(maxRaw)).contains(gzipBytes), "Payload size out of range")
         try check(fullMatch(sha256, "[0-9a-f]{64}"), "Invalid payload digest")
-        let encoded = chunks.joined().filter { !" \t\r\n".contains($0) }
+        let encoded = stripWhitespace(chunks.joined())
         try check(fullMatch(encoded, "[A-Za-z0-9_-]+={0,2}"), "Invalid base64url")
         let bare = encoded.filter { $0 != "=" }
         if bare.count != encoded.count { try check(encoded.count % 4 == 0, "Invalid base64url padding") }
@@ -31,10 +31,21 @@ public enum CassiniPayload {
         try check(base64url(compressed) == bare, "Non-canonical base64url")
         try check(Int64(compressed.count) == gzipBytes, "Payload gzip size mismatch")
         let raw = try gunzip(compressed, limit: Int(rawBytes))
-        try check(Int64(raw.count) == rawBytes && sha(raw) == sha256, "Payload digest mismatch")
+        try check(Int64(raw.count) == rawBytes, "payload-size-mismatch")
+        try check(sha(raw) == sha256, "payload-sha256-mismatch")
         let text = try utf8(raw)
         _ = try JSON.parseObject(text)
         return text
+    }
+
+    /**
+     * Drops ASCII space, tab, CR and LF one scalar at a time. Filtering Characters would miss a lone LF or CR
+     * beside another one, because "\r\n" is a single grapheme.
+     */
+    static func stripWhitespace(_ text: String) -> String {
+        var scalars = String.UnicodeScalarView()
+        scalars.append(contentsOf: text.unicodeScalars.filter { ![0x20, 0x09, 0x0D, 0x0A].contains($0.value) })
+        return String(scalars)
     }
 
     public static func encode(prefix: String, mime: String, text: String) throws -> (ref: JSONObject, tags: [String]) {

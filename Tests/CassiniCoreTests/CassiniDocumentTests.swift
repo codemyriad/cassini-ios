@@ -1,53 +1,37 @@
 @testable import CassiniCore
 import Foundation
-import XCTest
+import Testing
 
-/** The published suite lives in ../cassini-format; CASSINI_CONFORMANCE overrides, CASSINI_CONFORMANCE_REQUIRED=1 forbids skipping. */
-func conformanceDirectory() throws -> URL {
-    let env = ProcessInfo.processInfo.environment
-    let directory = env["CASSINI_CONFORMANCE"].map { URL(fileURLWithPath: $0) } ??
-        URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("../../../cassini-format/spec/conformance").standardized
-    var isDirectory: ObjCBool = false
-    let exists = FileManager.default.fileExists(atPath: directory.path, isDirectory: &isDirectory) && isDirectory.boolValue
-    if env["CASSINI_CONFORMANCE_REQUIRED"] == "1" { XCTAssertTrue(exists, "Required Cassini conformance directory is missing: \(directory.path)") }
-    try XCTSkipUnless(exists, "Checkout cassini-format beside this repository for the published conformance suite")
-    return directory
-}
-
-func bytes(_ url: URL) throws -> [UInt8] { [UInt8](try Data(contentsOf: url)) }
-
-func silence() throws -> [UInt8] {
-    let head = Array("OpusHead".utf8) + [1, 1, 0, 0, 0x80, 0xBB, 0, 0, 0, 0, 0]
-    let tags = CassiniDocument.tagsPacket(["X_CUSTOM=keep=me"])
-    return try OggOpus.mux(OggOpus.Stream(head: head, tags: tags, audio: [[0xF8, 0xFF, 0xFE]], finalGranule: 960, validFraming: true), tags: tags)
-}
-
-final class CassiniDocumentTests: XCTestCase {
-    func testPublishedConformanceVectors() throws {
-        let directory = try conformanceDirectory()
-        let index = try JSON.parseObject(String(decoding: try bytes(directory.appendingPathComponent("index.json")), as: UTF8.self))
-        var failures: [String] = []
-        for vector in try index.array("vectors").compactMap({ $0.object }) {
-            let expected = try vector.object("expect")
-            let id = try vector.string("id")
-            let doc = CassiniDocument.read(try bytes(directory.appendingPathComponent(try vector.string("file"))))
-            let state = try expected.string("state")
-            if state != doc.state && !(state == "unverified" && doc.state == "ok") { failures.append("\(id): expected \(state), got \(doc.state) \(doc.warnings)") }
-            if let ids = expected["transcriptIds"]?.array { XCTAssertEqual(ids.compactMap { $0.string }, doc.variants.map { $0.id }, id) }
-            if let wanted = expected["defaultTranscriptId"]?.string, !wanted.isEmpty { XCTAssertEqual(wanted, doc.defaultId, id) }
-            if let counts = expected["wordCounts"]?.object {
-                var expectedCounts: [String: Int64] = [:]
-                for key in counts.keys { expectedCounts[key] = try counts.number(key) }
-                var actual: [String: Int64] = [:]
-                for v in doc.variants { if let t = v.transcript { actual[v.id] = Int64(t.words.count) } }
-                XCTAssertEqual(expectedCounts, actual, id)
-            }
-            if doc.manifest == nil { XCTAssertTrue(doc.variants.isEmpty, id) }
-        }
-        XCTAssertTrue(failures.isEmpty, failures.joined(separator: "\n"))
+private func relabelled(_ data: [UInt8], _ labels: [String: String]) throws -> (CassiniDocument, CassiniDocument) {
+    try withTemporaryDirectory { dir in
+        let source = dir.appendingPathComponent("a.opus")
+        try Data(data).write(to: source)
+        let before = CassiniDocument.read(source)
+        return (before, try CassiniDocument.relabel(source, existing: before, labels: labels, target: dir.appendingPathComponent("b.opus")))
     }
+}
 
-    func testRetiredAsrProvenanceSurvivesAnInt8Retranscription() throws {
+/**
+ * [data] with its manifest replaced by [edit]'s result and its tags by [tags]: a writer's mistake made on purpose.
+ * The manifest tags are re-encoded; nothing is verified.
+ */
+private func rewritten(_ data: [UInt8], tags: ([String]) -> [String] = { $0 }, manifest edit: (inout JSONObject) throws -> Void) throws -> [UInt8] {
+    let document = CassiniDocument.read(data)
+    var manifest = try #require(document.manifest)
+    try edit(&manifest)
+    let manifestTags = try CassiniPayload.encode(prefix: "CASSINI_PAYLOAD_", mime: CassiniPayload.mime, text: manifest.serialized()).tags
+    let manifestNames = Set(manifestTags.map { CassiniDocument.tagName($0) })
+    let kept = tags(document.comments.filter { !manifestNames.contains(CassiniDocument.tagName($0)) })
+    let out = ArraySink()
+    try OggOpus.rewrite(ArraySource(data), tags: CassiniDocument.tagsPacket(kept + manifestTags), to: out)
+    return out.bytes
+}
+
+@Suite struct CassiniDocumentTests {
+    let transcript = Transcript([Word("spk_1", 0, 20, "Ciao")], language: "it")
+
+    // ports: CassiniDocumentTest#retiredAsrProvenanceSurvivesAnInt8Retranscription
+    @Test func retiredAsrProvenanceSurvivesAnInt8Retranscription() throws {
         let transcript = Transcript([Word("spk_1", 0, 20, "Prima.")], language: "it")
         let provenance = JSONObject([("model", .string("nvidia/parakeet-tdt-0.6b-v3 FP32")),
                                      ("x-segmentation", .string("live 5 s steps with 1 s recorded overlap"))])
@@ -58,20 +42,21 @@ final class CassiniDocumentTests: XCTestCase {
         let nextBytes = try CassiniDocument.create(first, transcript: retranscribed, title: "Ignored",
                                                    processing: JSONObject([("model", .string("nvidia/parakeet-tdt-0.6b-v3 INT8"))]), existing: original)
         let next = CassiniDocument.read(nextBytes)
-        XCTAssertEqual("ok", next.state)
-        XCTAssertEqual(2, next.variants.count)
-        XCTAssertEqual(original.variants[0].body, next.variants[0].body)
+        #expect(next.state == .ok)
+        #expect(next.variants.count == 2)
+        #expect(original.variants[0].body == next.variants[0].body)
         let path: (CassiniDocument) -> JSON? = { $0.manifest?["provenance"]?.object?["speechToText"]?.object?[original.variants[0].id] }
-        XCTAssertEqual(path(original)?.serialized(), path(next)?.serialized())
-        XCTAssertEqual(try OggOpus.read(first).digest(), try OggOpus.read(nextBytes).digest())
+        #expect(path(original)?.serialized() == path(next)?.serialized())
+        #expect(try OggOpus.read(first).digest() == OggOpus.read(nextBytes).digest())
     }
 
-    func testNewDocumentSealsAudioAndAppendedVariantPreservesExtensions() throws {
-        let transcript = Transcript([Word("spk_1", 0, 20, "Ciao")], language: "it")
+    // ports: CassiniDocumentTest#newDocumentSealsAudioAndAppendedVariantPreservesExtensions
+    @Test func newDocumentSealsAudioAndAppendedVariantPreservesExtensions() throws {
         let first = try CassiniDocument.create(silence(), transcript: transcript, title: "Italian sample", processing: JSONObject([("engine", .string("sherpa-onnx"))]))
         let original = CassiniDocument.read(first)
-        XCTAssertEqual("ok", original.state); XCTAssertEqual(transcript, original.selected()?.transcript)
-        XCTAssertTrue(original.comments.contains("X_CUSTOM=keep=me"))
+        #expect(original.state == .ok)
+        #expect(original.selected()?.transcript == transcript)
+        #expect(original.comments.contains("X_CUSTOM=keep=me"))
         var withPrivate = original
         withPrivate.comments += ["CASSINI_AUDIO_FUTURE=keep", "CASSINI_PAYLOAD_FUTURE=keep"]
         withPrivate.manifest!["extension"] = .object(JSONObject([("keep", .bool(true))]))
@@ -80,30 +65,19 @@ final class CassiniDocumentTests: XCTestCase {
         withPrivate.manifest!["speakers"] = .array(speakers)
         var english = transcript; english.language = "en"
         let next = CassiniDocument.read(try CassiniDocument.create(first, transcript: english, title: "Ignored", processing: JSONObject(), existing: withPrivate))
-        XCTAssertEqual("ok", next.state); XCTAssertEqual(2, next.variants.count)
-        XCTAssertTrue(next.comments.contains("CASSINI_AUDIO_FUTURE=keep")); XCTAssertTrue(next.comments.contains("CASSINI_PAYLOAD_FUTURE=keep"))
-        XCTAssertEqual(next.manifest?["extension"]?.object?["keep"], .bool(true))
-        XCTAssertEqual(next.manifest?["speakers"]?.array?[0].object?["pronouns"], .string("they"))
-        XCTAssertEqual(original.variants[0].body, next.variants[0].body)
-        XCTAssertEqual(try OggOpus.read(first).digest(),
-                       try OggOpus.read(try CassiniDocument.create(first, transcript: transcript, title: "Again", processing: JSONObject(), existing: original)).digest())
+        #expect(next.state == .ok)
+        #expect(next.variants.count == 2)
+        #expect(next.comments.contains("CASSINI_AUDIO_FUTURE=keep"))
+        #expect(next.comments.contains("CASSINI_PAYLOAD_FUTURE=keep"))
+        #expect(next.manifest?["extension"]?.object?["keep"] == .bool(true))
+        #expect(next.manifest?["speakers"]?.array?[0].object?["pronouns"] == .string("they"))
+        #expect(original.variants[0].body == next.variants[0].body)
+        let again = try CassiniDocument.create(first, transcript: transcript, title: "Again", processing: JSONObject(), existing: original)
+        #expect(try OggOpus.read(first).digest() == OggOpus.read(again).digest())
     }
 
-    private func relabelled(_ data: [UInt8], _ labels: [String: String]) throws -> (CassiniDocument, CassiniDocument) {
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: dir) }
-        let source = dir.appendingPathComponent("a.opus")
-        try Data(data).write(to: source)
-        let before = CassiniDocument.read(source)
-        return (before, try CassiniDocument.relabel(source, existing: before, labels: labels, target: dir.appendingPathComponent("b.opus")))
-    }
-
-    private func tags(_ doc: CassiniDocument, _ filter: (String) -> Bool) -> [String] {
-        doc.comments.filter { filter(String($0[..<($0.firstIndex(of: "=") ?? $0.endIndex)])) }
-    }
-
-    func testRelabelChangesOnlyTheLabels() throws {
+    // ports: CassiniDocumentTest#relabelChangesOnlyTheLabels
+    @Test func relabelChangesOnlyTheLabels() throws {
         let transcript = Transcript([Word("spk_1", 0, 20, "Ciao"), Word("spk_2", 20, 40, "Salve")], language: "it")
         let first = try CassiniDocument.create(silence(), transcript: transcript, title: "Two", processing: JSONObject([("engine", .string("sherpa-onnx"))]))
         var base = CassiniDocument.read(first)
@@ -113,77 +87,197 @@ final class CassiniDocumentTests: XCTestCase {
         base.manifest!["speakers"] = .array(speakers)
         let (before, after) = try relabelled(try CassiniDocument.create(first, transcript: transcript, title: "Ignored", processing: JSONObject(), existing: base),
                                              ["spk_1": "  Anna "])
-        XCTAssertEqual("ok", after.state); XCTAssertTrue(after.warnings.isEmpty)
-        XCTAssertEqual("Anna", after.speakerLabel("spk_1")); XCTAssertEqual("spk_2", after.speakerLabel("spk_2"))
-        XCTAssertEqual(after.manifest?["speakers"]?.array?[0].object?["pronouns"], .string("she"))
-        XCTAssertEqual(after.manifest?["x"]?.object?["keep"], .bool(true))
-        XCTAssertEqual(before.manifest?["meeting"]?.serialized(), after.manifest?["meeting"]?.serialized())
-        XCTAssertEqual(before.manifest?["integrity"]?.serialized(), after.manifest?["integrity"]?.serialized())
-        XCTAssertEqual(before.variants.map { $0.id }, after.variants.map { $0.id })
-        XCTAssertEqual(before.variants.map { $0.body }, after.variants.map { $0.body })
-        XCTAssertEqual(tags(before) { !$0.hasPrefix("CASSINI_PAYLOAD_") }, tags(after) { !$0.hasPrefix("CASSINI_PAYLOAD_") })
+        #expect(after.state == .ok)
+        #expect(after.warnings.isEmpty)
+        #expect(after.speakerLabel("spk_1") == "Anna")
+        #expect(after.speakerLabel("spk_2") == "spk_2")
+        #expect(after.manifest?["speakers"]?.array?[0].object?["pronouns"] == .string("she"))
+        #expect(after.manifest?["x"]?.object?["keep"] == .bool(true))
+        #expect(before.manifest?["meeting"]?.serialized() == after.manifest?["meeting"]?.serialized())
+        #expect(before.manifest?["integrity"]?.serialized() == after.manifest?["integrity"]?.serialized())
+        #expect(before.variants.map { $0.id } == after.variants.map { $0.id })
+        #expect(before.variants.map { $0.body } == after.variants.map { $0.body })
+        #expect(comments(before) { !$0.hasPrefix("CASSINI_PAYLOAD_") } == comments(after) { !$0.hasPrefix("CASSINI_PAYLOAD_") })
         let fixed: (String) -> Bool = { $0 == "CASSINI_PAYLOAD_SCHEMA" || $0 == "CASSINI_PAYLOAD_MIME" }
-        XCTAssertEqual(tags(before, fixed), tags(after, fixed))
-        XCTAssertNotEqual(tags(before) { $0 == "CASSINI_PAYLOAD_SHA256" }, tags(after) { $0 == "CASSINI_PAYLOAD_SHA256" })
-        XCTAssertNotEqual(tags(before) { $0 == "CASSINI_PAYLOAD_RAW_BYTES" }, tags(after) { $0 == "CASSINI_PAYLOAD_RAW_BYTES" })
+        #expect(comments(before, named: fixed) == comments(after, named: fixed))
+        #expect(comments(before) { $0 == "CASSINI_PAYLOAD_SHA256" } != comments(after) { $0 == "CASSINI_PAYLOAD_SHA256" })
+        #expect(comments(before) { $0 == "CASSINI_PAYLOAD_RAW_BYTES" } != comments(after) { $0 == "CASSINI_PAYLOAD_RAW_BYTES" })
         var expected = before.manifest!
         var renamed = expected["speakers"]!.array!
         var first0 = renamed[0].object!; first0["label"] = .string("Anna"); renamed[0] = .object(first0)
         expected["speakers"] = .array(renamed)
-        XCTAssertEqual(expected.serialized(), after.manifest?.serialized())
+        #expect(expected.serialized() == after.manifest?.serialized())
     }
 
-    func testRelabelRejectsUnknownSpeakersAndBlankLabels() throws {
-        let data = try CassiniDocument.create(silence(), transcript: Transcript([Word("spk_1", 0, 20, "Ciao")], language: "it"), title: "One", processing: JSONObject())
-        for labels in [["spk_9": "Anna"], ["spk_1": "  "]] {
-            XCTAssertThrowsError(try relabelled(data, labels), "\(labels)")
-        }
+    // ports: CassiniDocumentTest#relabelRejectsUnknownSpeakersAndBlankLabels
+    @Test(arguments: [["spk_9": "Anna"], ["spk_1": "  "]])
+    func relabelRejectsUnknownSpeakersAndBlankLabels(labels: [String: String]) throws {
+        let data = try CassiniDocument.create(silence(), transcript: transcript, title: "One", processing: JSONObject())
+        #expect(throws: CassiniError.self) { try relabelled(data, labels) }
     }
 
-    func testRelabelConformanceVectorWithUnknownMembers() throws {
-        let file = try conformanceDirectory().appendingPathComponent("opus/014-unknown-manifest-member.opus")
-        let (before, after) = try relabelled(try bytes(file), ["spk_a": "Anna"])
-        XCTAssertEqual("ok", after.state); XCTAssertEqual("Anna", after.speakerLabel("spk_a"))
-        XCTAssertEqual(before.speakerLabel("spk_b"), after.speakerLabel("spk_b"))
-        XCTAssertTrue(after.manifest!.has("cassiniFutureField"))
-        XCTAssertEqual(before.manifest?["speakers"]?.array?[0].object?["pronouns"], after.manifest?["speakers"]?.array?[0].object?["pronouns"])
-        XCTAssertEqual(before.variants.map { $0.body }, after.variants.map { $0.body })
-        XCTAssertEqual(before.manifest?["integrity"]?.object?["opusAudioSha256"], after.manifest?["integrity"]?.object?["opusAudioSha256"])
+    // ports: CassiniDocumentTest#relabelConformanceVectorWithUnknownMembers
+    @Test(.enabled(if: Conformance.available, Comment(rawValue: Conformance.missing)))
+    func relabelConformanceVectorWithUnknownMembers() throws {
+        let (before, after) = try relabelled(try Conformance.vector("014-unknown-manifest-member"), ["spk_a": "Anna"])
+        #expect(after.state == .ok)
+        #expect(after.speakerLabel("spk_a") == "Anna")
+        #expect(before.speakerLabel("spk_b") == after.speakerLabel("spk_b"))
+        #expect(after.manifest!.has("cassiniFutureField"))
+        #expect(before.manifest?["speakers"]?.array?[0].object?["pronouns"] == after.manifest?["speakers"]?.array?[0].object?["pronouns"])
+        #expect(before.variants.map { $0.body } == after.variants.map { $0.body })
+        #expect(before.manifest?["integrity"]?.object?["opusAudioSha256"] == after.manifest?["integrity"]?.object?["opusAudioSha256"])
     }
 
-    func testStrictPayloadRejectsDuplicatesTrailingGzipAndBadLengths() throws {
-        for text in ["{\"x\":1,\"x\":2}", "{\"a\":{\"x\":1,\"x\":2}}", "{\"x\":NaN}", "{\"x\":01}", "{'x':1}"] {
-            XCTAssertThrowsError(try JSON.parseObject(text), text)
-        }
-        let (ref, tags) = try CassiniPayload.encode(prefix: "TEST_", mime: CassiniPayload.mime, text: "{\"ok\":true}")
-        let chunk = String(tags.last!.split(separator: "=", maxSplits: 1)[1])
-        XCTAssertEqual("{\"ok\":true}", try CassiniPayload.decode([chunk], rawBytes: ref.number("rawBytes"), gzipBytes: ref.number("gzipBytes"), sha256: ref.string("sha256")))
-        let compressed = try ref.number("gzipBytes")
-        var standard = chunk.replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")
-        standard += String(repeating: "=", count: (4 - standard.count % 4) % 4)
-        let raw = [UInt8](Data(base64Encoded: standard)!)
-        let doubled = CassiniPayload.base64url(raw + raw)
-        XCTAssertThrowsError(try CassiniPayload.decode([doubled], rawBytes: ref.number("rawBytes"), gzipBytes: compressed * 2, sha256: ref.string("sha256")))
-    }
-
-    func testTruncatedAudioKeepsReadableMetadata() throws {
+    // ports: CassiniDocumentTest#truncatedAudioKeepsReadableMetadata
+    @Test func truncatedAudioKeepsReadableMetadata() throws {
         let data = try CassiniDocument.create(silence(), transcript: Transcript([]), title: "Truncated", processing: JSONObject())
-        let doc = CassiniDocument.read(Array(data.dropLast()))
-        XCTAssertEqual("unverified", doc.state)
-        XCTAssertNotNil(doc.selected()?.transcript)
+        let document = CassiniDocument.read(Array(data.dropLast()))
+        #expect(document.state == .unverified)
+        #expect(document.selected()?.transcript != nil)
     }
 
-    func testCrcFailureKeepsTranscriptButDoesNotVerifyAudio() throws {
+    // ports: CassiniDocumentTest#crcFailureKeepsTranscriptButDoesNotVerifyAudio
+    @Test func crcFailureKeepsTranscriptButDoesNotVerifyAudio() throws {
         var data = try CassiniDocument.create(silence(), transcript: Transcript([]), title: "CRC", processing: JSONObject())
         data[22] ^= 1
-        let doc = CassiniDocument.read(data)
-        XCTAssertEqual("unverified", doc.state); XCTAssertNotNil(doc.selected()?.transcript)
+        let document = CassiniDocument.read(data)
+        #expect(document.state == .unverified)
+        #expect(document.selected()?.transcript != nil)
     }
 
-    func testTokensBecomeWordsWithoutStretchingOverPunctuation() throws {
+    @Test func tokensBecomeWordsWithoutStretchingOverPunctuation() throws {
         let words = try Transcript.timedWordsFromTokens(["▁Ciao", ",", "▁come", "▁va", "?"],
                                                         timestamps: [0.0, 0.9, 1.0, 1.4, 2.0], durations: [0.4, 0.0, 0.3, 0.2, 0.08])
-        XCTAssertEqual(words.map { $0.word }, [Word("spk_1", 0, 400, "Ciao,"), Word("spk_1", 1000, 1300, "come"), Word("spk_1", 1400, 1600, "va?")])
-        XCTAssertEqual(words.map { $0.capMs }, [900, 1300, 2080])
+        #expect(words.map { $0.word } == [Word("spk_1", 0, 400, "Ciao,"), Word("spk_1", 1000, 1300, "come"), Word("spk_1", 1400, 1600, "va?")])
+        #expect(words.map { $0.capMs } == [900, 1300, 2080])
+    }
+}
+
+/** Only the digest copy blocks verification; every other disagreement between a tag and the manifest only warns. */
+@Suite(.enabled(if: Conformance.available, Comment(rawValue: Conformance.missing)))
+struct VerificationGateTests {
+    @Test(arguments: [("007-chunk-count-too-high", "CASSINI_TX_RAW_ASR_PAYLOAD_CHUNK_COUNT"),
+                      ("017-dangling-transcript-id", "CASSINI_TRANSCRIPT_IDS")])
+    func aStaleConvenienceTagStillVerifies(vector: String, tag: String) throws {
+        let document = CassiniDocument.read(try Conformance.vector(vector))
+        #expect(document.state == .ok)
+        #expect(document.warnings.contains("tag-manifest-disagreement: \(tag)"))
+        #expect(document.selected()?.transcript != nil)
+    }
+
+    @Test func aDisagreeingDigestCopyLeavesTheAudioUnverified() throws {
+        let document = CassiniDocument.read(try Conformance.vector("011-tag-manifest-disagreement"))
+        #expect(document.state == .unverified)
+        #expect(document.warnings == ["tag-manifest-disagreement: CASSINI_AUDIO_OPUS_SHA256"])
+    }
+
+    @Test func staleAudioSaysWhatDiffers() throws {
+        let document = CassiniDocument.read(try Conformance.vector("010-stale-audio"))
+        #expect(document.state == .staleAudio)
+        #expect(document.warnings.contains("audio-digest-mismatch"))
+        #expect(document.warnings.contains("audio-shape-mismatch"))
+    }
+
+    /** Re-sealing a source without a verified manifest must not keep its chunk sets: vector 010's words prefix repeats. */
+    @Test(arguments: ["010-stale-audio", "015-unknown-major-version"])
+    func aFreshSealDropsEveryCassiniTagOfTheSource(vector: String) throws {
+        let source = try Conformance.vector(vector)
+        let foreign = CassiniDocument.read(source).comments.filter { !CassiniDocument.tagName($0).hasPrefix("CASSINI_") }
+        let transcript = Transcript([Word("spk_1", 0, 20, "Ciao")])
+        let sealed = CassiniDocument.read(try CassiniDocument.create(source, transcript: transcript, title: "Resealed", processing: JSONObject()))
+        #expect(sealed.state == .ok)
+        #expect(sealed.variants.map { $0.id } == ["words"])
+        #expect(sealed.selected()?.transcript == transcript)
+        #expect(sealed.title == "Resealed")
+        #expect(comments(sealed) { $0.hasPrefix("CASSINI_TX_") && !$0.hasPrefix("CASSINI_TX_WORDS_PAYLOAD_") }.isEmpty)
+        let kept = sealed.comments.filter { !CassiniDocument.tagName($0).hasPrefix("CASSINI_") && CassiniDocument.tagName($0) != "TITLE" }
+        #expect(kept == foreign.filter { CassiniDocument.tagName($0) != "TITLE" })
+    }
+}
+
+@Suite struct CommentDecodingTests {
+    let latin1Title = Array("TITLE=Caf".utf8) + [0xE9]
+    let latin1Artist = Array("ARTIST=Ren".utf8) + [0xE9, 0x65]
+
+    @Test func aForeignCommentThatIsNotUtf8IsSkippedWithAWarning() throws {
+        let document = CassiniDocument.read(try silence(["X_CUSTOM=keep=me"], opaque: [latin1Title]))
+        #expect(document.state == .plainAudio)
+        #expect(document.comments == ["X_CUSTOM=keep=me"])
+        #expect(document.opaqueComments == [latin1Title])
+        #expect(document.warnings == ["non-utf8-comment: TITLE"])
+    }
+
+    @Test func aSealCarriesForeignBytesForwardAndReplacesAnUndecodableTitle() throws {
+        let sealed = try CassiniDocument.create(silence(["X_CUSTOM=keep=me"], opaque: [latin1Title, latin1Artist]),
+                                                transcript: Transcript([Word("spk_1", 0, 20, "Ciao")]), title: "Riunione", processing: JSONObject())
+        let document = CassiniDocument.read(sealed)
+        #expect(document.state == .ok)
+        #expect(document.opaqueComments == [latin1Artist])
+        #expect(comments(document) { $0 == "TITLE" } == ["TITLE=Riunione"])
+        #expect(document.comments.contains("X_CUSTOM=keep=me"))
+    }
+
+    @Test func aCassiniCommentThatIsNotUtf8MakesTheMetadataInvalid() throws {
+        let document = CassiniDocument.read(try silence([], opaque: [Array("CASSINI_FORMAT=org.cassini.portable-meeting/1".utf8) + [0xE9]]))
+        #expect(document.state == .invalidMetadata)
+    }
+
+    @Test func tagNamesFoldAsciiCaseOnly() throws {
+        // "ſ" upper-cases to "S" in Unicode, but a tag name is ASCII: this is not CASSINI_FORMAT.
+        let document = CassiniDocument.read(try silence(["caſſini_format=org.cassini.portable-meeting/1"]))
+        #expect(document.state == .plainAudio)
+        #expect(CassiniDocument.tagName("cassini_Format=x") == "CASSINI_FORMAT")
+        #expect(CassiniDocument.tagName("caſſini_format=x") == "CAſſINI_FORMAT")
+    }
+}
+
+@Suite struct SealTitleTests {
+    @Test func aSealWritesTheManifestTitleIntoTheTitleTag() throws {
+        let first = try CassiniDocument.create(silence(["TITLE=voice-memo", "X_CUSTOM=keep=me"]), transcript: Transcript([Word("spk_1", 0, 20, "Ciao")]),
+                                               title: "  Call with Luca \n", processing: JSONObject())
+        let original = CassiniDocument.read(first)
+        #expect(original.title == "Call with Luca")
+        #expect(Array(original.comments.prefix(2)) == ["TITLE=Call with Luca", "X_CUSTOM=keep=me"])
+        // A rename made in the manifest reaches the tag when a variant is added.
+        var renamed = original
+        var meeting = try #require(renamed.manifest?["meeting"]?.object)
+        meeting["title"] = .string("Standup")
+        renamed.manifest!["meeting"] = .object(meeting)
+        let next = CassiniDocument.read(try CassiniDocument.create(first, transcript: Transcript([Word("spk_1", 0, 20, "Salve")]),
+                                                                   title: "Ignored", processing: JSONObject(), existing: renamed))
+        #expect(next.state == .ok)
+        #expect(comments(next) { $0 == "TITLE" } == ["TITLE=Standup"])
+    }
+
+    @Test func theWordBodyIsCompactAndTheDescriptorOmitsAnUnknownLanguage() throws {
+        let document = CassiniDocument.read(try CassiniDocument.create(silence(), transcript: Transcript([Word("spk_1", 0, 20, "Ciao")]),
+                                                                       title: "Compact", processing: JSONObject()))
+        let body = try #require(document.selected()?.body)
+        #expect(!body.contains("\n") && !body.contains(" "))
+        #expect(document.selected()?.descriptor.has("language") == false)
+    }
+}
+
+@Suite struct TranscriptMediaTypeTests {
+    /** The words format decides whether a body can be read; a different media type is only a warning. */
+    @Test func anUnexpectedMimeIsAWarningNotAnUnavailableTranscript() throws {
+        let transcript = Transcript([Word("spk_1", 0, 20, "Ciao")])
+        let source = try CassiniDocument.create(silence(), transcript: transcript, title: "Hint", processing: JSONObject())
+        let data = try rewritten(source, tags: { tags in
+            tags.map { CassiniDocument.tagName($0) == "CASSINI_TX_WORDS_PAYLOAD_MIME" ? "CASSINI_TX_WORDS_PAYLOAD_MIME=application/json" : $0 }
+        }) { manifest in
+            var transcripts = try manifest.array("transcripts")
+            var descriptor = try #require(transcripts[0].object)
+            var ref = try descriptor.object("payloadRef")
+            ref["mime"] = .string("application/json")
+            descriptor["payloadRef"] = .object(ref)
+            transcripts[0] = .object(descriptor)
+            manifest["transcripts"] = .array(transcripts)
+        }
+        let document = CassiniDocument.read(data)
+        #expect(document.state == .ok)
+        #expect(document.selected()?.transcript == transcript)
+        #expect(document.warnings == ["transcript-mime-mismatch: words"])
     }
 }

@@ -1,8 +1,8 @@
 @testable import CassiniCore
 import Foundation
-import XCTest
+import Testing
 
-final class OggOpusStreamTests: XCTestCase {
+@Suite struct OggOpusStreamTests {
     private let head = Array("OpusHead".utf8) + [1, 1, 0x38, 1, 0x80, 0xBB, 0, 0, 0, 0, 0]
 
     /** The whole-buffer muxer as it shipped on Android before streaming, kept as the golden reference. */
@@ -54,8 +54,7 @@ final class OggOpusStreamTests: XCTestCase {
 
     private func fixtures() throws -> [[UInt8]] {
         var vectors: [[UInt8]] = []
-        if let directory = try? conformanceDirectory(),
-           let files = FileManager.default.enumerator(at: directory, includingPropertiesForKeys: nil) {
+        if Conformance.available, let files = FileManager.default.enumerator(at: Conformance.directory, includingPropertiesForKeys: nil) {
             for case let url as URL in files where url.pathExtension == "opus" {
                 let data = try bytes(url)
                 if let stream = try? OggOpus.read(data), stream.validFraming && !stream.audio.isEmpty { vectors.append(data) }
@@ -64,27 +63,29 @@ final class OggOpusStreamTests: XCTestCase {
         return vectors + [try fixture()]
     }
 
-    func testRewriteIsByteIdenticalToTheLegacyMux() throws {
+    // ports: OggOpusStreamTest#rewriteIsByteIdenticalToTheLegacyMux
+    @Test func rewriteIsByteIdenticalToTheLegacyMux() throws {
         let tags = CassiniDocument.tagsPacket(["TITLE=rewritten", "X_PAD=" + String(repeating: "y", count: 300)])
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: dir) }
-        for data in try fixtures() {
-            let stream = try OggOpus.read(data)
-            let expected = try legacyMux(stream, tags, 99)
-            let out = ArraySink()
-            let info = try OggOpus.rewrite(ArraySource(data), tags: tags, to: out, serial: 99)
-            XCTAssertEqual(expected, out.bytes)
-            XCTAssertEqual(expected, try OggOpus.mux(stream, tags: tags, serial: 99))
-            XCTAssertEqual(try stream.digest(), try info.digest()); XCTAssertEqual(stream.sampleCount, info.sampleCount)
-            let source = dir.appendingPathComponent("source.opus"), target = dir.appendingPathComponent("target.opus")
-            try Data(data).write(to: source)
-            XCTAssertEqual(try stream.digest(), try OggOpus.rewrite(source, tags: tags, to: target, serial: 99).digest())
-            XCTAssertEqual(expected, try bytes(target))
+        try withTemporaryDirectory { dir in
+            for data in try fixtures() {
+                let stream = try OggOpus.read(data)
+                let expected = try legacyMux(stream, tags, 99)
+                let out = ArraySink()
+                let info = try OggOpus.rewrite(ArraySource(data), tags: tags, to: out, serial: 99)
+                #expect(out.bytes == expected)
+                #expect(try OggOpus.mux(stream, tags: tags, serial: 99) == expected)
+                #expect(try stream.digest() == info.digest())
+                #expect(stream.sampleCount == info.sampleCount)
+                let source = dir.appendingPathComponent("source.opus"), target = dir.appendingPathComponent("target.opus")
+                try Data(data).write(to: source)
+                #expect(try stream.digest() == OggOpus.rewrite(source, tags: tags, to: target, serial: 99).digest())
+                #expect(try bytes(target) == expected)
+            }
         }
     }
 
-    func testMuxerStreamsTheSameBytesAndDropsFlushPackets() throws {
+    // ports: OggOpusStreamTest#muxerStreamsTheSameBytesAndDropsFlushPackets
+    @Test func muxerStreamsTheSameBytesAndDropsFlushPackets() throws {
         let tags = CassiniDocument.tagsPacket([])
         for data in try fixtures() {
             let stream = try OggOpus.read(data)
@@ -100,47 +101,74 @@ final class OggOpusStreamTests: XCTestCase {
             for packet in stream.audio + [stream.audio.last!] { try muxer.add(packet) }
             try muxer.finish()
             let trimmed = OggOpus.Stream(head: stream.head, tags: stream.tags, audio: used, finalGranule: stream.finalGranule, validFraming: true)
-            XCTAssertEqual(try legacyMux(trimmed, tags, 7), out.bytes)
+            #expect(try legacyMux(trimmed, tags, 7) == out.bytes)
         }
         let stream = try OggOpus.read(try fixture())
         let short = try OggOpus.Muxer(ArraySink(), head: stream.head, tags: tags, finalGranule: stream.finalGranule + 1_000_000, serial: 7)
         for packet in stream.audio { try short.add(packet) }
-        XCTAssertThrowsError(try short.finish())
+        #expect(throws: CassiniError.self) { try short.finish() }
     }
 
-    func testScanMatchesTheWholeBufferReader() throws {
+    // ports: OggOpusStreamTest#scanMatchesTheWholeBufferReader
+    @Test func scanMatchesTheWholeBufferReader() throws {
         for data in try fixtures() {
             let stream = try OggOpus.read(data), info = try OggOpus.scan(ArraySource(data))
-            XCTAssertEqual(try stream.digest(), try info.digest())
-            XCTAssertEqual(stream.sampleCount, info.sampleCount); XCTAssertEqual(stream.durationMs, info.durationMs)
-            XCTAssertEqual(stream.tags, info.tags)
+            #expect(try stream.digest() == info.digest())
+            #expect(stream.sampleCount == info.sampleCount)
+            #expect(stream.durationMs == info.durationMs)
+            #expect(stream.tags == info.tags)
         }
     }
 
-    func testCorruptCrcIsRejectedWhileStreaming() throws {
+    // ports: OggOpusStreamTest#corruptCrcIsRejectedWhileStreaming
+    @Test func corruptCrcIsRejectedWhileStreaming() throws {
         let data = try fixture()
         var changed = data
         changed[changed.count - 1] ^= 1 // the final page's payload
         let info = try OggOpus.scan(ArraySource(changed))
-        XCTAssertFalse(info.validFraming)
-        XCTAssertThrowsError(try info.digest())
-        XCTAssertThrowsError(try OggOpus.rewrite(ArraySource(changed), tags: info.tags, to: ArraySink()))
-        XCTAssertThrowsError(try OggOpus.scan(ArraySource(Array(data.dropLast()))))
+        #expect(!info.validFraming)
+        #expect(throws: CassiniError.self) { try info.digest() }
+        #expect(throws: CassiniError.self) { try OggOpus.rewrite(ArraySource(changed), tags: info.tags, to: ArraySink()) }
+        #expect(throws: CassiniError.self) { try OggOpus.scan(ArraySource(Array(data.dropLast()))) }
     }
 
-    func testFileDocumentsVerifyFromDiskAndHeadersOnlyStayUnverified() throws {
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: dir) }
-        let audio = dir.appendingPathComponent("audio.opus"), target = dir.appendingPathComponent("doc.opus")
-        try Data(try fixture()).write(to: audio)
-        let transcript = Transcript([Word("spk_1", 0, 20, "Ciao")], language: "it")
-        let doc = try CassiniDocument.create(audio, transcript: transcript, title: "Streamed", processing: JSONObject(),
-                                             existing: nil, speakerLabels: [:], target: target)
-        XCTAssertEqual("ok", doc.state)
-        XCTAssertEqual("ok", CassiniDocument.read(target).state)
-        let headers = CassiniDocument.read(target, verify: false)
-        XCTAssertEqual("unverified", headers.state); XCTAssertEqual(transcript, headers.selected()?.transcript)
-        XCTAssertEqual(try OggOpus.scan(audio).digest(), try OggOpus.scan(target).digest())
+    // ports: OggOpusStreamTest#fileDocumentsVerifyFromDiskAndHeadersOnlyStayUnverified
+    @Test func fileDocumentsVerifyFromDiskAndHeadersOnlyStayUnverified() throws {
+        try withTemporaryDirectory { dir in
+            let audio = dir.appendingPathComponent("audio.opus"), target = dir.appendingPathComponent("doc.opus")
+            try Data(try fixture()).write(to: audio)
+            let transcript = Transcript([Word("spk_1", 0, 20, "Ciao")], language: "it")
+            let document = try CassiniDocument.create(audio, transcript: transcript, title: "Streamed", processing: JSONObject(),
+                                                      existing: nil, speakerLabels: [:], target: target)
+            #expect(document.state == .ok)
+            #expect(CassiniDocument.read(target).state == .ok)
+            let headers = CassiniDocument.read(target, verify: false)
+            #expect(headers.state == .unverified)
+            #expect(headers.selected()?.transcript == transcript)
+            #expect(try OggOpus.scan(audio).digest() == OggOpus.scan(target).digest())
+        }
+    }
+
+    /** The deprecated non-throwing write raised an Objective-C exception here, which no caller could catch. */
+    @Test func aSinkThatCannotWriteThrows() throws {
+        try withTemporaryDirectory { dir in
+            let sink = try FileSink(dir.appendingPathComponent("out.opus"))
+            try sink.close()
+            #expect(throws: (any Error).self) { try sink.write([UInt8](repeating: 1, count: 1 << 16)) }
+        }
+    }
+
+    /** A legal Ogg stream whose OpusTags packet passes the 8 MiB this reader accepts: declined, never plain audio. */
+    @Test func anOversizeHeaderIsInvalidMetadataNotPlainAudio() throws {
+        let tags = CassiniDocument.tagsPacket(["CASSINI_FORMAT=\(CassiniDocument.format)", "X_BIG=" + String(repeating: "x", count: OggOpus.maxHeaderBytes)])
+        let out = ArraySink()
+        let writer = OggOpus.Writer(out, 1)
+        try writer.packet(head, flags: 2, granule: 0)
+        try writer.packet(tags, flags: 0, granule: 0)
+        try writer.packet([0xF8, 0xFF, 0xFE], flags: 4, granule: 960)
+        #expect(throws: OggOpus.HeaderTooLarge.self) { try OggOpus.headers(ArraySource(out.bytes)) }
+        let document = CassiniDocument.read(out.bytes)
+        #expect(document.state == .invalidMetadata)
+        #expect(document.warnings == ["comment-header-too-large"])
     }
 }

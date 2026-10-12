@@ -13,7 +13,7 @@ public struct PortableTranscript: Sendable {
 
     public static func read(from url: URL) -> PortableTranscript? {
         let document = CassiniDocument.read(url)
-        guard document.state == "ok", let selected = document.selected()?.transcript else { return nil }
+        guard document.state == .ok, let selected = document.selected()?.transcript else { return nil }
         var selectedID: UUID?
         let versions = document.variants.compactMap { variant -> TranscriptVersion? in
             guard let transcript = variant.transcript else { return nil }
@@ -64,7 +64,7 @@ public struct PortableTranscript: Sendable {
         }
         guard !words.isEmpty else { throw CassiniError("A transcript is required for a Cassini document") }
         let labels = Dictionary((note.speakers ?? []).map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
-        if existing.state == "ok", var manifest = existing.manifest {
+        if existing.state == .ok, var manifest = existing.manifest {
             if var meeting = manifest["meeting"]?.object { meeting["title"] = .string(note.title); manifest["meeting"] = .object(meeting) }
             if let oldSpeakers = manifest["speakers"]?.array {
                 manifest["speakers"] = .array(oldSpeakers.map { entry in
@@ -76,6 +76,6 @@ public struct PortableTranscript: Sendable {
         }
         _ = try CassiniDocument.create(opus, transcript: Transcript(words, language: note.language), title: note.title,
             processing: JSONObject([("engine", .string("cassini-ios")), ("kind", .string("user-edited"))]),
-            existing: existing.state == "ok" ? existing : nil, speakerLabels: labels, target: destination)
+            existing: existing.state == .ok ? existing : nil, speakerLabels: labels, target: destination)
     }
 }
