@@ -55,7 +55,7 @@ import CassiniEngineTesting
             defaults: .standard, clock: SystemClock(), locale: .autoupdatingCurrent, timeZone: .autoupdatingCurrent,
             transcriber: AppleSpeechTranscriber(), analyzer: SpeakerAnalyzer(), capture: AVCaptureAdapter(),
             playback: AVPlaybackAdapter(), audio: LocalAudioProcessing(), storage: FileSystemStorageProbe(),
-            background: UIKitBackgroundRunner(), notifier: UNNotifier())
+            background: UIKitBackgroundRunner(), notifier: SilentNotifier())
     }
 
     /// The environment the process arguments ask for.

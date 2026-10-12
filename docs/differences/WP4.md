@@ -108,8 +108,9 @@
   `EnqueueRefusal`, `TranscribeOutcome`, `DequeueOutcome`), the `JobCheckpoints` port with `CheckpointStatus` (the
   windowed job's checkpoint store should conform to it), `ModelConsent`, `ModelPlan`, `ModelDownloadModel` and its
   `ModelDownloadPorts`. Testing fakes: `FakeJobRunner`, `FakeCheckpoints`.
-- `AppEnvironment` has a `notifier` (live: `UNNotifier`; UI tests: a `FakeNotifier` that never asks) and the
-  `--models-missing` UI-test flag. `ProcessingStore` is now a thin layer over the coordinator: `transcribe(_:kind:origin:)`
+- `AppEnvironment` has a `notifier` (live: `SilentNotifier`, a stand-in that never asks and posts nothing until WP9's
+  `UNNotifier` replaces it, with the copy of every kind in WP9's `Notices` table; UI tests: a `FakeNotifier` that
+  never asks) and the `--models-missing` UI-test flag. `ProcessingStore` is now a thin layer over the coordinator: `transcribe(_:kind:origin:)`
   returns the outcome, `request(_:kind:origin:)` fires it, and `moveToTrash`, `restore`, `forget`, `cancel`, `stopAll`,
   `continueQueue`, `startOver`, `clearFailed` and `setVisible` forward to the coordinator; `handOff`, `stopForDelete`,
   `installSpeechModel(language:)` and `speechInstall` are new, and its init takes the transcriber and the clock. `TrashStore` stores the

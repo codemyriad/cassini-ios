@@ -1,64 +1,6 @@
 {
   "sourceLanguage": "en",
   "strings": {
-    "%@ is waiting. Open Cassini to start.": {
-      "comment": "Notification body: a note waits for the model download",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ is waiting. Open Cassini to start."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ è in attesa. Apri Cassini per iniziare."
-          }
-        }
-      }
-    },
-    "%lld speakers · %@": {
-      "comment": "Notification body: speakers and duration of a transcribed note",
-      "localizations": {
-        "en": {
-          "variations": {
-            "plural": {
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld speaker · %@"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld speakers · %@"
-                }
-              }
-            }
-          }
-        },
-        "it": {
-          "variations": {
-            "plural": {
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld voce · %@"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld voci · %@"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "Cassini can’t play this audio, so there is nothing to transcribe.": {
       "comment": "A Transcribe was refused: the audio cannot be decoded",
       "localizations": {
@@ -72,23 +14,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Cassini non riesce a riprodurre questo audio, quindi non c’è niente da trascrivere."
-          }
-        }
-      }
-    },
-    "Cassini closed while transcribing %@.": {
-      "comment": "Notification body: Cassini closed during a transcription",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cassini closed while transcribing %@."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cassini si è chiuso durante la trascrizione di %@."
           }
         }
       }
@@ -144,23 +69,6 @@
         }
       }
     },
-    "Couldn’t transcribe %@": {
-      "comment": "Notification title: a note could not be transcribed",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Couldn’t transcribe %@"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Impossibile trascrivere %@"
-          }
-        }
-      }
-    },
     "Download": {
       "comment": "Model download button without a note",
       "localizations": {
@@ -208,40 +116,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Libera circa %@ e riprova."
-          }
-        }
-      }
-    },
-    "Less than 200 MB free. The recording so far is saved.": {
-      "comment": "Notification body: a recording stopped for lack of space",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Less than 200 MB free. The recording so far is saved."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Meno di 200 MB liberi. La registrazione fatta finora è salvata."
-          }
-        }
-      }
-    },
-    "Microphone stopped working": {
-      "comment": "Notification title: the microphone failed",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Microphone stopped working"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Il microfono ha smesso di funzionare"
           }
         }
       }
@@ -297,23 +171,6 @@
         }
       }
     },
-    "Ready to transcribe": {
-      "comment": "Notification title: a note waits for the model download",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ready to transcribe"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Pronta da trascrivere"
-          }
-        }
-      }
-    },
     "Recognising saved voices": {
       "comment": "Model part",
       "localizations": {
@@ -327,40 +184,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Riconoscimento delle voci salvate"
-          }
-        }
-      }
-    },
-    "Recording ended. The audio so far is in your library.": {
-      "comment": "Notification body: the microphone failed",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Recording ended. The audio so far is in your library."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Registrazione terminata. L’audio registrato finora è nella libreria."
-          }
-        }
-      }
-    },
-    "Recording stopped": {
-      "comment": "Notification title: a recording stopped for lack of space",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Recording stopped"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Registrazione interrotta"
           }
         }
       }
@@ -518,23 +341,6 @@
         }
       }
     },
-    "Transcribed: %@": {
-      "comment": "Notification title: a note was transcribed",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Transcribed: %@"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Trascritta: %@"
-          }
-        }
-      }
-    },
     "Transcribing “%@”": {
       "comment": "The system's progress while a note is transcribed",
       "localizations": {
@@ -548,23 +354,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Trascrizione di “%@”"
-          }
-        }
-      }
-    },
-    "Transcription paused by iOS": {
-      "comment": "Notification title: iOS ended the background time",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Transcription paused by iOS"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Trascrizione sospesa da iOS"
           }
         }
       }
@@ -610,23 +399,6 @@
         }
       }
     },
-    "Transcription stopped": {
-      "comment": "Notification title: Cassini closed during a transcription",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Transcription stopped"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Trascrizione interrotta"
-          }
-        }
-      }
-    },
     "Where the models come from · Privacy": {
       "comment": "Model download link to the licenses",
       "localizations": {
@@ -657,23 +429,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Il tuo audio resta su questo dispositivo"
-          }
-        }
-      }
-    },
-    "iOS needed the time back. Open Cassini to resume.": {
-      "comment": "Notification body: iOS ended the background time",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "iOS needed the time back. Open Cassini to resume."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "iOS ha ripreso il tempo in background. Apri Cassini per riprendere."
           }
         }
       }
