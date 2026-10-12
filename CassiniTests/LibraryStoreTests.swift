@@ -82,4 +82,63 @@ import CassiniEngineTesting
         XCTAssertEqual(library.note(id)?.playbackPosition, 5)
         XCTAssertEqual(library.note(id)?.isRecording, false)
     }
+
+    func testARenameAfterAFailedSealShowsAndKeepsTheNewTitle() async throws {
+        let id = try await recordingWithAFailedSeal()
+        library.update(id) { $0.title = "Retro" } // RenameNoteSheet.
+        XCTAssertEqual(library.note(id)?.title, "Retro", "the rename shows over the seal at once")
+        await library.settle()
+        XCTAssertEqual(library.note(id)?.title, "Retro")
+        let onDisk = try XCTUnwrap(try stored(id))
+        XCTAssertEqual(onDisk.title, "Retro")
+        XCTAssertEqual(onDisk.audio, .plain, "the rename carried the seal beneath it")
+    }
+
+    func testARenameWhileTheSealIsWrittenIsNotUndoneByTheNextWrite() async throws {
+        let id = try await recordingWithAFailedSeal()
+        library.update(id) { $0.title = "Retro" }
+        library.update(id) { $0.isFavorite = true }
+        library.update(id) { $0.playbackPosition = 4 }
+        await library.settle()
+        let onDisk = try XCTUnwrap(try stored(id))
+        XCTAssertEqual(onDisk.title, "Retro", "later writes do not replay the seal over the rename")
+        XCTAssertEqual(onDisk.isFavorite, true)
+        XCTAssertEqual(onDisk.playbackPosition, 4)
+        XCTAssertEqual(onDisk.audio, .plain)
+        XCTAssertEqual(library.note(id)?.title, "Retro")
+    }
+
+    func testARenameWhoseWriteFailsLetsTheNextWriteCarryTheSeal() async throws {
+        let id = try await recordingWithAFailedSeal()
+        persistence.failSaves(true)
+        library.update(id) { $0.title = "Retro" }
+        await library.settle()
+        XCTAssertEqual(library.note(id)?.title, "Standup", "the failed rename is put back, the seal still shown")
+        persistence.failSaves(false)
+        library.update(id) { $0.isFavorite = true }
+        await library.settle()
+        let onDisk = try XCTUnwrap(try stored(id))
+        XCTAssertEqual(onDisk.title, "Standup")
+        XCTAssertEqual(onDisk.audio, .plain)
+        XCTAssertEqual(onDisk.isFavorite, true)
+    }
+
+    func testATranscriptionQueuedAfterAFailedSealShowsItsStatus() async throws {
+        let id = try await recordingWithAFailedSeal()
+        persistence.failSaves(true) // The disk is still full.
+        // As ProcessingStore.enqueue and processNext.
+        library.update(id) { $0.status = .queued; $0.failure = nil }
+        XCTAssertEqual(library.note(id)?.status, .queued)
+        library.update(id) { $0.status = .transcribing }
+        XCTAssertEqual(library.note(id)?.status, .transcribing)
+        XCTAssertEqual(library.note(id)?.isRecording, false)
+        await library.settle()
+        persistence.failSaves(false)
+        library.update(id) { $0.status = .transcribing }
+        XCTAssertEqual(library.note(id)?.status, .transcribing)
+        await library.settle()
+        XCTAssertEqual(library.note(id)?.status, .transcribing)
+        XCTAssertEqual(try stored(id)?.status, .transcribing)
+        XCTAssertEqual(try stored(id)?.audio, .plain)
+    }
 }

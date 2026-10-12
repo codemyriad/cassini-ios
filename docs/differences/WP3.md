@@ -47,8 +47,10 @@
 - **Automatic transcription off** (an iOS setting Android does not have) makes every finish audio only.
 - **A seal that cannot be written** leaves the note live on disk. It is shown sealed (plain, audio only, its title and
   duration) through `RecordingNotes.showUnsaved` (`LibraryStore.showUnsaved`), so it opens as a note and not as a
-  recording. The Library keeps that change over the stored note, also over what other writers save, and writes it with
-  the note's next write (a rename, the playback position, a favourite); once one succeeds it is on disk. If none does,
+  recording. The Library keeps that change over the stored note, also over what other writers save, but beneath the
+  edits made after it (a rename or a transcription's status shows at once). The next write to run (a rename, the
+  playback position, a favourite) writes it beneath its own change; once one succeeds it is on disk and later writes no
+  longer carry it, so they cannot undo an edit to a field it set. If none does,
   the next launch's recovery makes the note plain. The Library reports the failed write, nothing is compressed or
   queued, and the outcome is `saved(audioOnly)`.
 - **A title typed while the microphone starts** is kept (`RecordingController.startingTitle`) and written once the
