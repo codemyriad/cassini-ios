@@ -1,22 +1,43 @@
 import SwiftUI
 import CassiniNotebook
 
+/// A note in Recently Deleted: its title and duration, "Deleted Oct 2 · 23 days left", then Restore and Delete now.
 struct TrashCard: View {
-    let note: Note
-    let deleteForever: () -> Void
-    @Environment(TrashStore.self) private var trash
+    let item: TrashItem
+    let restore: () -> Void
+    let deleteNow: () -> Void
+    @Environment(\.calendar) private var calendar
+    @Environment(\.locale) private var locale
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(note.title).font(.headline)
-            if let date = note.trashedAt {
-                Text("Deleted \(date.formatted(date: .abbreviated, time: .omitted)) · \(trash.daysLeft(note)) days left").font(.caption).foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(item.title).font(.headline).foregroundStyle(Color.ink).frame(maxWidth: .infinity, alignment: .leading)
+                Text(TimeText.clock(item.duration)).font(.caption.monospacedDigit()).foregroundStyle(Color.muted)
             }
-            Text(TimeText.clock(note.duration)).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
-            HStack {
-                Button("Restore", systemImage: "arrow.uturn.backward") { trash.restore(note.id) }.buttonStyle(.bordered)
-                Spacer()
-                Button("Delete forever", systemImage: "trash", role: .destructive, action: deleteForever).buttonStyle(.borderless)
+            Text(meta).font(.caption).foregroundStyle(Color.muted)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) { buttons }
+                VStack(alignment: .leading, spacing: 8) { buttons }
             }
-        }.padding(.vertical, 8)
+            .padding(.top, 8)
+        }
+        .padding(.horizontal, 14).padding(.top, 14).padding(.bottom, 10)
+        .cardBackground(radius: Radius.control)
+    }
+
+    private var meta: String {
+        TrashCopy.deleted(item.deletedOn, calendar: calendar, locale: locale) + " · " + TrashCopy.daysLeft(item.daysLeft)
+    }
+
+    @ViewBuilder private var buttons: some View {
+        Button(action: restore) {
+            Text(TrashCopy.restore).font(.subheadline.weight(.semibold)).padding(.horizontal, 14).frame(minHeight: HitTarget.minimum)
+        }
+        .buttonStyle(.bordered).buttonBorderShape(.capsule).tint(.ink)
+        Button(role: .destructive, action: deleteNow) {
+            Text(TrashCopy.deleteNow).font(.subheadline.weight(.semibold)).padding(.horizontal, 14).frame(minHeight: HitTarget.minimum)
+        }
+        .buttonStyle(.borderless).tint(.ember)
     }
 }

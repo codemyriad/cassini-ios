@@ -32,6 +32,7 @@ struct RootView: View {
             }
         }
         .fullScreenCover(item: $router.fullScreen) { _ in RecordingView() }
+        .trashStopConfirmation()
         .alert("Something needs attention", isPresented: Binding(get: { errors.current != nil }, set: { if !$0, let id = errors.current?.id { errors.dismiss(id) } }),
                presenting: errors.current) { error in
             Button("OK", role: .cancel) {}

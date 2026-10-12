@@ -65,6 +65,7 @@ struct LibraryView: View {
             .frame(maxWidth: ReadableWidth.library).frame(maxWidth: .infinity)
         }
         .background(Color.paper)
+        .trashUndoSnackbar()
         .safeAreaInset(edge: .bottom, spacing: 0) { CaptureBar(importing: $importing) }
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {

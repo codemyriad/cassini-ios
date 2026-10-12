@@ -57,18 +57,59 @@ final class CassiniUITests: XCTestCase {
         let reopened = launch(seed: false, reset: false)
         XCTAssertTrue(reopened.buttons.matching(NSPredicate(format: "label CONTAINS %@", "A saved conversation")).firstMatch.exists)
     }
+    @MainActor private func row(_ app: XCUIApplication, _ title: String) -> XCUIElement {
+        app.buttons.matching(NSPredicate(format: "label CONTAINS %@", title)).firstMatch
+    }
     @MainActor func testTrashAndRestore() {
         let app = launch()
         openFixture(app)
         app.buttons["Recording actions"].tap()
         app.buttons["Move to Recently Deleted"].tap()
         XCTAssertTrue(app.textFields["librarySearch"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "A quieter kind of productivity")).firstMatch.exists)
+        XCTAssertTrue(app.staticTexts["“A quieter kind of productivity” moved to Recently Deleted"].waitForExistence(timeout: 5),
+                      "every move lands on the Library with its snackbar")
+        XCTAssertFalse(row(app, "A quieter kind of productivity").exists)
         app.buttons["Recently Deleted"].tap()
         XCTAssertTrue(app.buttons["Restore"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Deleted today · 30 days left"].exists)
         app.buttons["Restore"].tap()
+        XCTAssertTrue(app.staticTexts["Recently Deleted is empty"].waitForExistence(timeout: 5))
         goBack(app)
-        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "A quieter kind of productivity")).firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(row(app, "A quieter kind of productivity").waitForExistence(timeout: 5))
+    }
+    // ports: LibraryViewModelTest#trashShowsTheSnackbarAndUndoRestores
+    @MainActor func testUndoOnTheSnackbarBringsTheNoteBack() {
+        let app = launch()
+        let note = row(app, "Thoughts from the morning walk")
+        XCTAssertTrue(note.waitForExistence(timeout: 5))
+        note.press(forDuration: 1)
+        app.buttons["Move to Recently Deleted"].tap()
+        let snackbar = app.staticTexts["“Thoughts from the morning walk” moved to Recently Deleted"]
+        XCTAssertTrue(snackbar.waitForExistence(timeout: 5))
+        XCTAssertFalse(row(app, "Thoughts from the morning walk").exists)
+        capture("Undo snackbar")
+        app.buttons["Undo"].tap()
+        XCTAssertTrue(row(app, "Thoughts from the morning walk").waitForExistence(timeout: 5))
+        XCTAssertFalse(snackbar.exists)
+    }
+    // ports: LibraryViewModelTest#trashOfARunningNoteAsksFirst
+    @MainActor func testMovingARunningNoteAsksFirst() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed", "processing", "--open-fixture", "CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC"]
+        app.launch()
+        XCTAssertTrue(app.descendants(matching: .any)["progressHeadline"].waitForExistence(timeout: 15))
+        app.buttons["Recording actions"].tap()
+        app.buttons["Move to Recently Deleted"].tap()
+        let alert = app.alerts["Stop transcription and move to Recently Deleted?"]
+        XCTAssertTrue(alert.waitForExistence(timeout: 5))
+        alert.buttons["Cancel"].tap()
+        XCTAssertTrue(app.staticTexts["noteTitle"].exists, "Cancel keeps the note where it is")
+        app.buttons["Recording actions"].tap()
+        app.buttons["Move to Recently Deleted"].tap()
+        XCTAssertTrue(alert.waitForExistence(timeout: 5))
+        alert.buttons["Move to Recently Deleted"].tap()
+        XCTAssertTrue(app.staticTexts["“Weekly planning call” moved to Recently Deleted"].waitForExistence(timeout: 10))
+        XCTAssertFalse(row(app, "Weekly planning call").exists)
     }
     @MainActor func testTranscribeWithTheModelInstalledStartsWithoutAskingAndWritesTheTranscript() {
         let app = launch()
@@ -131,19 +172,34 @@ final class CassiniUITests: XCTestCase {
         app.buttons["Recording actions"].tap(); app.buttons["Move to Recently Deleted"].tap()
         XCTAssertTrue(app.buttons["Recently Deleted"].waitForExistence(timeout: 5)); app.buttons["Recently Deleted"].tap()
         XCTAssertTrue(app.buttons["Empty"].waitForExistence(timeout: 5)); app.buttons["Empty"].tap()
-        XCTAssertTrue(app.alerts["Empty Recently Deleted?"].waitForExistence(timeout: 5))
-        app.alerts.buttons["Cancel"].tap()
+        let alert = app.alerts["Delete 1 note for good?"]
+        XCTAssertTrue(alert.waitForExistence(timeout: 5))
+        alert.buttons["Cancel"].tap()
         XCTAssertTrue(app.buttons["Restore"].exists)
-        app.buttons["Empty"].tap(); app.alerts.buttons["Delete all forever"].tap()
-        XCTAssertTrue(app.staticTexts["Nothing here"].waitForExistence(timeout: 5))
+        app.buttons["Empty"].tap(); alert.buttons["Delete"].tap()
+        XCTAssertTrue(app.staticTexts["Recently Deleted is empty"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["Empty"].exists, "Empty is hidden on an empty Recently Deleted")
+    }
+    @MainActor func testDeleteNowAsksAboutTheNoteAndRemovesOnlyIt() {
+        let app = launch(seed: false, arguments: ["--seed", "trash"])
+        app.buttons["Recently Deleted"].tap()
+        XCTAssertTrue(app.staticTexts["Old interview draft"].waitForExistence(timeout: 5))
+        app.buttons.matching(identifier: "Delete now").firstMatch.tap()
+        let alert = app.alerts["Delete “Old interview draft” for good?"]
+        XCTAssertTrue(alert.waitForExistence(timeout: 5), "the oldest deletion is on top")
+        alert.buttons["Delete"].tap()
+        XCTAssertTrue(app.staticTexts["Duplicate voice memo"].waitForExistence(timeout: 5))
+        let gone = NSPredicate(format: "exists == false")
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: gone, object: app.staticTexts["Old interview draft"])],
+                                      timeout: 5), .completed)
     }
 
     @MainActor func testSeededTrashShowsDaysLeftFromTheFixedClock() {
         let app = launch(seed: false, arguments: ["--seed", "trash"])
         app.buttons["Recently Deleted"].tap()
         XCTAssertTrue(app.staticTexts["Old interview draft"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "23 days left")).firstMatch.exists)
-        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "29 days left")).firstMatch.exists)
+        XCTAssertTrue(app.staticTexts["Deleted Oct 1 · 23 days left"].exists)
+        XCTAssertTrue(app.staticTexts["Deleted yesterday · 29 days left"].exists)
         capture("Trash")
     }
     @MainActor func testOpenFixtureOpensTheNamedNote() {

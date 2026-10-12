@@ -33,8 +33,10 @@ public struct NoteRepository: Sendable {
         try encoder.encode(note).write(to: folder.appendingPathComponent(Self.metadataFilename), options: .atomic)
     }
 
+    /// Reads every note, after finishing the deletes Cassini closed in the middle of.
     public func load() throws -> LoadReport {
         let folders = try FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)
+        removeInterruptedDeletes(in: folders)
         var report = LoadReport()
         for folder in folders where UUID(uuidString: folder.lastPathComponent) != nil {
             do {
@@ -50,7 +52,33 @@ public struct NoteRepository: Sendable {
         return report
     }
 
-    public func delete(_ id: UUID) throws { try FileManager.default.removeItem(at: directory(for: id)) }
+    /// Deletes the note's directory. It is first renamed out of the notes (`<id>.purging`), in one atomic step, so a
+    /// delete that Cassini closed in the middle of never leaves audio without its `note.json` for a launch to rebuild
+    /// into a note again; the next `load` finishes it. A directory that is already gone counts as deleted, as on
+    /// Android.
+    public func delete(_ id: UUID) throws {
+        let fileManager = FileManager.default
+        let doomed = purgingDirectory(for: id)
+        if fileManager.fileExists(atPath: doomed.path) { try fileManager.removeItem(at: doomed) }
+        let directory = directory(for: id)
+        guard fileManager.fileExists(atPath: directory.path) else { return }
+        try fileManager.moveItem(at: directory, to: doomed)
+        try? fileManager.removeItem(at: doomed) // Gone from the notes already; a leftover goes at the next load.
+    }
+
+    private static let purgingSuffix = ".purging"
+
+    private func purgingDirectory(for id: UUID) -> URL {
+        root.appendingPathComponent(id.uuidString + Self.purgingSuffix, isDirectory: true)
+    }
+
+    /// Finishes the deletes that Cassini closed in the middle of.
+    private func removeInterruptedDeletes(in folders: [URL]) {
+        for folder in folders where folder.lastPathComponent.hasSuffix(Self.purgingSuffix)
+            && UUID(uuidString: String(folder.lastPathComponent.dropLast(Self.purgingSuffix.count))) != nil {
+            try? FileManager.default.removeItem(at: folder)
+        }
+    }
 
     /// A file name a note may point at inside its own directory: no paths, no hidden files, never the metadata itself.
     public static func isAllowedFilename(_ name: String) -> Bool {

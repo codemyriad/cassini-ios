@@ -156,7 +156,7 @@ import CassiniEngineTesting
 
         let moved = await graph.trash.moveToTrash(note.id)
         XCTAssertTrue(moved)
-        await graph.trash.deletePermanently(note.id)
+        try await graph.trash.deleteNow(note.id)
         await graph.library.settle()
         await waitUntil { graph.processing.state.running == nil }
         XCTAssertNil(graph.library.note(note.id))
@@ -367,7 +367,7 @@ import CassiniEngineTesting
         await trash.moveToTrash(note.id)
         await library.settle()
         test.clock.advance(by: .seconds(30 * 86_400))
-        await trash.purgeExpired()
+        try await trash.purgeExpired()
         XCTAssertNil(library.note(note.id))
         XCTAssertTrue(try voices.voiceLibrary?.prints(noteID: note.id).isEmpty == true)
         XCTAssertFalse(FileManager.default.fileExists(atPath: test.root.appendingPathComponent(note.id.uuidString).path))

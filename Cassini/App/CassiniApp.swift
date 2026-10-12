@@ -18,7 +18,7 @@ import SwiftUI
                     // Inactive is still on the screen (Control Center, the app switcher, a system alert).
                     if phase == .active { graph.processing.setVisible(true) }
                     if phase == .background { graph.processing.setVisible(false) }
-                    if phase == .active, graph.startup.isReady { Task { await graph.trash.purgeExpired() } }
+                    if phase == .active, graph.startup.isReady { Task { _ = try? await graph.trash.purgeExpired() } }
                     if phase == .background { graph.enterBackground() }
                 }
         }

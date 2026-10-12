@@ -1,0 +1,503 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "%lld days left": {
+      "comment": "Recently Deleted card: days before the note is deleted for good",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld day left"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld days left"
+                }
+              }
+            }
+          }
+        },
+        "it": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld giorno rimasto"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld giorni rimasti"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld notes could not be deleted. They stay in Recently Deleted.": {
+      "comment": "Empty failed for several notes; the others were deleted",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld note could not be deleted. It stays in Recently Deleted."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld notes could not be deleted. They stay in Recently Deleted."
+                }
+              }
+            }
+          }
+        },
+        "it": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Non è stato possibile eliminare %lld nota. Resta in Eliminati di recente."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Non è stato possibile eliminare %lld note. Restano in Eliminati di recente."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Cancel": {
+      "comment": "Confirmation button: keep everything",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancel"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Annulla"
+          }
+        }
+      }
+    },
+    "Delete": {
+      "comment": "Confirmation button: delete for good",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elimina"
+          }
+        }
+      }
+    },
+    "Delete %lld notes for good?": {
+      "comment": "Empty confirmation title",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Delete %lld note for good?"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Delete %lld notes for good?"
+                }
+              }
+            }
+          }
+        },
+        "it": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Eliminare %lld nota per sempre?"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Eliminare %lld note per sempre?"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Delete now": {
+      "comment": "Recently Deleted card: delete the note for good",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete now"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elimina ora"
+          }
+        }
+      }
+    },
+    "Delete “%@” for good?": {
+      "comment": "Delete now confirmation title",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete “%@” for good?"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminare “%@” per sempre?"
+          }
+        }
+      }
+    },
+    "Deleted %@": {
+      "comment": "Recently Deleted card: the day the note was deleted, e.g. Deleted Oct 2",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deleted %@"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminata %@"
+          }
+        }
+      }
+    },
+    "Deleted today": {
+      "comment": "Recently Deleted card: the note was deleted today",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deleted today"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminata oggi"
+          }
+        }
+      }
+    },
+    "Deleted yesterday": {
+      "comment": "Recently Deleted card: the note was deleted yesterday",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deleted yesterday"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminata ieri"
+          }
+        }
+      }
+    },
+    "Empty": {
+      "comment": "Recently Deleted toolbar: delete every note there",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Empty"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Svuota"
+          }
+        }
+      }
+    },
+    "Its audio, transcripts and voiceprints from this note are deleted. This can’t be undone.": {
+      "comment": "Delete now confirmation body",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Its audio, transcripts and voiceprints from this note are deleted. This can’t be undone."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’audio, le trascrizioni e le impronte vocali di questa nota vengono eliminati. Non si può annullare."
+          }
+        }
+      }
+    },
+    "Kept for 30 days, then deleted.": {
+      "comment": "Confirmation body before moving a note to Recently Deleted",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kept for 30 days, then deleted."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Conservata per 30 giorni, poi eliminata."
+          }
+        }
+      }
+    },
+    "Move to Recently Deleted": {
+      "comment": "Note action and confirmation button",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move to Recently Deleted"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sposta in Eliminati di recente"
+          }
+        }
+      }
+    },
+    "Notes here are deleted for good after 30 days, with their audio, transcripts and voiceprints from those notes.": {
+      "comment": "Recently Deleted intro",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notes here are deleted for good after 30 days, with their audio, transcripts and voiceprints from those notes."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le note qui vengono eliminate per sempre dopo 30 giorni, con il loro audio, le trascrizioni e le impronte vocali di quelle note."
+          }
+        }
+      }
+    },
+    "Notes you delete stay here for 30 days.": {
+      "comment": "Recently Deleted with no notes, body",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notes you delete stay here for 30 days."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le note che elimini restano qui per 30 giorni."
+          }
+        }
+      }
+    },
+    "Recently Deleted": {
+      "comment": "The Recently Deleted screen's title",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recently Deleted"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminati di recente"
+          }
+        }
+      }
+    },
+    "Recently Deleted is empty": {
+      "comment": "Recently Deleted with no notes",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recently Deleted is empty"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminati di recente è vuoto"
+          }
+        }
+      }
+    },
+    "Restore": {
+      "comment": "Recently Deleted card: put the note back in the library",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restore"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ripristina"
+          }
+        }
+      }
+    },
+    "Saved voices could not be read, so nothing was deleted. Their files are kept.": {
+      "comment": "Delete now or Empty while the saved voices cannot be read",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saved voices could not be read, so nothing was deleted. Their files are kept."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non è stato possibile leggere le voci salvate, quindi non è stato eliminato nulla. I loro file sono conservati."
+          }
+        }
+      }
+    },
+    "Stop transcription and move to Recently Deleted?": {
+      "comment": "Confirmation before moving a note whose transcription runs",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop transcription and move to Recently Deleted?"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fermare la trascrizione e spostare in Eliminati di recente?"
+          }
+        }
+      }
+    },
+    "Their audio, transcripts and voiceprints are deleted. This can’t be undone.": {
+      "comment": "Empty confirmation body",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Their audio, transcripts and voiceprints are deleted. This can’t be undone."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’audio, le trascrizioni e le impronte vocali vengono eliminati. Non si può annullare."
+          }
+        }
+      }
+    },
+    "Undo": {
+      "comment": "Library snackbar action: put the note back",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Undo"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Annulla"
+          }
+        }
+      }
+    },
+    "“%@” could not be deleted. It stays in Recently Deleted.": {
+      "comment": "Delete now or Empty failed for one note",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@” could not be deleted. It stays in Recently Deleted."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non è stato possibile eliminare “%@”. Resta in Eliminati di recente."
+          }
+        }
+      }
+    },
+    "“%@” moved to Recently Deleted": {
+      "comment": "Library snackbar after a note was moved to Recently Deleted",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@” moved to Recently Deleted"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@” spostata in Eliminati di recente"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}
