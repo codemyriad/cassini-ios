@@ -104,6 +104,7 @@ import CassiniNotebook
     func recoverInterrupted() async {
         guard let store = library.noteStore else { return }
         let repaired = await recovery.recover(in: store, activeNoteID: state.noteID)
+        await library.refresh() // The reconcile that follows reads the mirror.
         let created = { [library] (recording: RecoveredRecording) in library.note(recording.noteID)?.createdAt ?? .distantPast }
         recovered = (rebuilt + repaired).sorted { created($0) < created($1) }
         rebuilt = []

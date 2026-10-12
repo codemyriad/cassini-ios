@@ -143,6 +143,13 @@ import CassiniNotebook
     /// Waits until every write asked for so far has finished.
     func settle() async { await tail?.value }
 
+    /// Takes the stored notes now, without waiting for their changes to arrive: after work that wrote `NoteStore`
+    /// directly, such as the launch's recovery. Notes with queued edits keep showing them.
+    func refresh() async {
+        guard let noteStore else { return }
+        for note in await noteStore.all() where pendingWrites[note.id, default: 0] == 0 { place(note) }
+    }
+
     /// Applies `change` to the mirror; nil when there is no such note.
     private func applyLocally(_ id: UUID, _ change: @escaping @Sendable (inout Note) -> Void) -> NoteEdit? {
         guard let note = note(id) else { return nil }
