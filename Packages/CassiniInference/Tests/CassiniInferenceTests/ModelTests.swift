@@ -1,12 +1,13 @@
 import Foundation
 import Testing
+import CassiniEngine
 import CassiniInference
 
 /// Opt-in real-model test. The supplied recording and downloaded weights stay outside source control.
 @Test(.enabled(if: ProcessInfo.processInfo.environment["CASSINI_SPEAKER_AUDIO"] != nil))
 func realSpeakerModelRunsAndReusesOfflineCache() async throws {
     let path = try #require(ProcessInfo.processInfo.environment["CASSINI_SPEAKER_AUDIO"])
-    let analyzer = SpeakerAnalyzer()
+    let analyzer = SpeakerAnalyzer(storage: UnlimitedStorage())
     let url = URL(fileURLWithPath: path)
     let first = try await analyzer.analyze(url: url, allowDownload: true) { _ in }
     #expect(!first.turns.isEmpty)
@@ -18,4 +19,8 @@ func realSpeakerModelRunsAndReusesOfflineCache() async throws {
     let second = try await analyzer.analyze(url: url, allowDownload: false) { _ in }
     #expect(Set(first.turns.map(\.speakerID)).count == Set(second.turns.map(\.speakerID)).count)
     #expect(second.prints.allSatisfy { $0.vector.count == 256 && $0.vector.allSatisfy(\.isFinite) })
+}
+
+private struct UnlimitedStorage: StorageProbe {
+    func availableBytes(at url: URL) -> Int64 { .max }
 }

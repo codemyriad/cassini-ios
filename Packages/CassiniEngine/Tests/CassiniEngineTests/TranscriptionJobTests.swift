@@ -685,6 +685,8 @@ private struct FailingAnalyzer: SpeakerAnalyzing {
     }
     var modelIdentity: String? { get async { "m:1" } }
     func modelStatus() async -> ModelPartStatus { .ready }
+    func refreshModelStatus() async -> ModelPartStatus { .ready }
+    func installModels(progress: @escaping @Sendable (Double?) -> Void) async throws {}
 }
 
 private extension JobEvent {

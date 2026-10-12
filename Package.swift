@@ -19,7 +19,7 @@ let package = Package(
         .testTarget(name: "CassiniAudioTests", dependencies: ["CassiniAudio", "CassiniCore"], path: "Packages/CassiniAudio/Tests/CassiniAudioTests"),
         .target(name: "COpusBridge", dependencies: [.product(name: "Copus", package: "swift-opus")]),
         .target(name: "CassiniAudio", dependencies: ["CassiniCore", "COpusBridge"], path: "Packages/CassiniAudio/Sources/CassiniAudio"),
-        .testTarget(name: "CassiniInferenceTests", dependencies: ["CassiniInference"], path: "Packages/CassiniInference/Tests/CassiniInferenceTests"),
+        .testTarget(name: "CassiniInferenceTests", dependencies: ["CassiniInference", "CassiniEngine", "CassiniNotebook"], path: "Packages/CassiniInference/Tests/CassiniInferenceTests"),
         .target(name: "CassiniInference", dependencies: ["CassiniEngine", "CassiniNotebook", .product(name: "FluidAudio", package: "FluidAudio")], path: "Packages/CassiniInference/Sources/CassiniInference"),
         .target(name: "CZlib", path: "Sources/CZlib", publicHeadersPath: ".", linkerSettings: [.linkedLibrary("z")]),
         .target(name: "CassiniCore", dependencies: ["CZlib"]),
