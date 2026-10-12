@@ -29,10 +29,9 @@ import CassiniNotebook
         processing = ProcessingStore(transcriber: environment.transcriber, analyzer: environment.analyzer,
                                      background: environment.background, library: library, voices: voices,
                                      settings: settings, notices: notices)
-        recording = RecordingStore(capture: environment.capture, audio: environment.audio, storage: environment.storage,
-                                   library: library, processing: processing, playback: playback, settings: settings,
-                                   router: router, errors: errors, notices: notices, clock: environment.clock,
-                                   locale: environment.locale, timeZone: environment.timeZone)
+        recording = RecordingStore(.init(environment: environment, library: library, processing: processing,
+                                         playback: playback, settings: settings, router: router, notices: notices,
+                                         ready: { [startup] in _ = await startup.ready() }))
         imports = ImportStore(library: library, processing: processing, settings: settings, audio: environment.audio,
                               storage: environment.storage, router: router, errors: errors, clock: environment.clock)
         trash = TrashStore(library: library, voices: voices, processing: processing, playback: playback,
@@ -74,6 +73,7 @@ import CassiniNotebook
             }
         }
         #endif
+        startup.register(.load) { [recording] in await recording.rebuildBareDirectories() }
         startup.register(.load) { [library, voices, notices] in
             await library.load()
             if library.unreadableCount > 0 {
