@@ -80,6 +80,9 @@ enum ProgressText {
         }
     }
 
+    /// "62%".
+    static func percent(_ value: Int) -> String { String(localized: "\(value)%", table: "Processing") }
+
     /// "29:52 / 48:13", the Processed stat.
     static func processed(doneMs: Int64, totalMs: Int64) -> String {
         TimeText.clock(Double(doneMs) / 1000) + " / " + TimeText.clock(Double(totalMs) / 1000)

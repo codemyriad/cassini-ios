@@ -30,6 +30,7 @@ import CassiniNotebook
         self.job = job; self.progress = progress; self.checkpoints = checkpoints; self.analyzer = analyzer
         self.background = background; self.library = library; self.settings = settings; self.notices = notices
         self.clock = clock
+        progress.onPublish = { [weak self] in self?.showProgress() }
     }
 
     func speakerModelsReady() async -> Bool { await analyzer.modelStatus() == .ready }
@@ -114,8 +115,14 @@ import CassiniNotebook
     private func report(_ event: JobEvent, for id: UUID) {
         guard state.isRunning(id) else { return }
         progress.apply(event)
-        state.running?.phase = progress.processingPhase
-        state.running?.fraction = progress.fraction
+    }
+
+    /// The running row follows the progress card.
+    private func showProgress() {
+        guard let id = state.running?.noteID, progress.noteID == id else { return }
+        let phase = progress.processingPhase, fraction = progress.fraction
+        if state.running?.phase != phase { state.running?.phase = phase }
+        if state.running?.fraction != fraction { state.running?.fraction = fraction }
     }
 
     private func finish(_ id: UUID, _ outcome: JobOutcome) {

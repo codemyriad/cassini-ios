@@ -24,6 +24,8 @@ import CassiniNotebook
     @ObservationIgnored private var finalizingSince: Int64?
     /// Called with the time from the end of the speaker analysis to the saved note, for the next estimate.
     @ObservationIgnored public var onFinalization: ((Int64) -> Void)?
+    /// Called after every publish, at events and ticks alike.
+    @ObservationIgnored public var onPublish: (() -> Void)?
 
     static let tickInterval = Duration.seconds(1)
 
@@ -59,7 +61,7 @@ import CassiniNotebook
         }
         if case .started = event { readBattery() }
         tracker.apply(event, at: now)
-        phase = tracker.phase
+        publish()
         if tracker.isTicking { startTicking() } else { stopTicking() }
     }
 
@@ -68,7 +70,7 @@ import CassiniNotebook
         guard noteID != nil else { return }
         readBattery()
         tracker.tick(at: uptimeMs())
-        phase = tracker.phase
+        publish()
     }
 
     public func end() {
@@ -102,6 +104,11 @@ import CassiniNotebook
     public var fraction: Double? {
         guard case .transcribing(let progress, _) = phase, let percent = progress.percent else { return nil }
         return Double(percent) / 100
+    }
+
+    private func publish() {
+        if phase != tracker.phase { phase = tracker.phase }
+        onPublish?()
     }
 
     private func readBattery() { latestReading.value = battery?.reading() }

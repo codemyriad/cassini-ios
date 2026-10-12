@@ -118,7 +118,7 @@ private struct Header: View {
 
     private var announcement: String {
         guard let percent else { return headline }
-        return "\(headline), \((percent / 5 * 5).formatted(.percent.scale(1)))"
+        return "\(headline), \(ProgressText.percent(percent / 5 * 5))"
     }
 }
 
