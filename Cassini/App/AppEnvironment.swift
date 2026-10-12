@@ -35,6 +35,8 @@ import CassiniEngineTesting
         var openFixture: OpenFixture?
         /// Restores the navigation stack saved with the scene.
         var restoresNavigation = true
+        /// Shows the UI tests when the launch work is done (`launchFinished`).
+        var marksLaunchFinished = false
     }
 
     enum OpenFixture: Equatable {
@@ -109,7 +111,7 @@ extension AppEnvironment {
             microphone: seed == .recording ? FakeMicrophonePermission() : AVMicrophonePermission(),
             liveActivity: ActivityKitAdapter(), playback: AVPlaybackAdapter(), audio: LocalAudioProcessing(), storage: FileSystemStorageProbe(),
             background: UIKitBackgroundRunner(), notifier: FakeNotifier(auth: notificationsDenied ? .denied : .authorized),
-            launch: LaunchOptions(seed: seed, openFixture: openFixture, restoresNavigation: false))
+            launch: LaunchOptions(seed: seed, openFixture: openFixture, restoresNavigation: false, marksLaunchFinished: true))
     }
 
     /// `--seed <name>`; `--seed-test-data` is the library seed.
