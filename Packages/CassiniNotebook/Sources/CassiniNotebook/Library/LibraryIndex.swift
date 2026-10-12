@@ -71,12 +71,28 @@ public struct LibraryIndex: Sendable {
 
     public func entry(_ id: UUID) -> Entry? { cache[id] }
 
+    /// `hits` (of `query`, from an earlier copy of the index) over the notes as they are now: a note that went is
+    /// dropped, and a note that changed is matched again on its own, so a row never shows a trashed note or an old
+    /// title while the search over the new notes runs.
+    public func current(_ hits: [Hit], query: SearchQuery?) -> [Hit] {
+        hits.compactMap { hit in
+            guard let entry = cache[hit.entry.note.id] else { return nil }
+            if entry.note == hit.entry.note { return Hit(entry: entry, snippet: hit.snippet, titleSnippet: hit.titleSnippet) }
+            guard let query else { return Hit(entry: entry, snippet: "", titleSnippet: entry.note.title) }
+            let fields = entry.fields ?? SearchFields(entry.note)
+            guard fields.matches(query) else { return nil }
+            return Hit(entry: entry, snippet: fields.snippet(query), titleSnippet: fields.titleSnippet(query))
+        }
+    }
+
     /// The notes that match every phrase of `query`, newest first; every note when there is no query (only
     /// punctuation was typed).
     public mutating func search(_ query: SearchQuery?) -> [Hit] {
         guard let query else { return entries.map { Hit(entry: $0, snippet: "", titleSnippet: $0.note.title) } }
         var hits: [Hit] = []
         for index in entries.indices {
+            // A search replaced by a newer one stops early; its caller drops what it found.
+            if index % 64 == 0, Task.isCancelled { break }
             let fields = entries[index].fields ?? SearchFields(entries[index].note)
             if entries[index].fields == nil {
                 entries[index].fields = fields

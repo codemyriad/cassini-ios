@@ -166,6 +166,27 @@ struct LibraryMappingTests {
         #expect(index.entries[0].preview?.text == "First take of the meeting.")
     }
 
+    /// VoiceOver hears the banner at each stage change and each 5 % step, a download's and a check's included.
+    @Test func theBannerIsAnnouncedAtEachStageAndFivePercentStep() {
+        let id = UUID()
+        func banner(_ line: ProgressBanner.Line, percent: Int? = nil, title: String? = "Weekly") -> ProgressBanner {
+            ProgressBanner(noteID: id, title: title, percent: percent, fraction: nil, line: line, queued: 0)
+        }
+        let start = banner(.timeLeft(.calculating)).announcement
+        #expect(banner(.waiting).announcement != start, "waiting for the previous note is a stage of its own")
+        #expect(banner(.timeLeft(.range(lowMs: 1, highMs: 2))).announcement == start, "a new estimate is not")
+        #expect(banner(.timeLeft(.finishing)).announcement != start, "finishing is")
+        #expect(banner(.timeLeft(.calculating), percent: 3).announcement == start.with(step: 0))
+        #expect(banner(.timeLeft(.calculating), percent: 4).announcement == banner(.timeLeft(.calculating), percent: 1).announcement)
+        #expect(banner(.timeLeft(.calculating), percent: 5).announcement.step == 5)
+        let speech = banner(.downloading(.speech, percent: 46)).announcement
+        #expect(speech.step == 45, "the download's own percent")
+        #expect(banner(.downloading(.speech, percent: 49)).announcement == speech)
+        #expect(banner(.downloading(.speakers, percent: 46)).announcement != speech)
+        #expect(banner(.checking(percent: 46)).announcement.stage == .checking)
+        #expect(banner(.checking(percent: 46)).announcement != speech)
+    }
+
     // ports: LibraryMappingTest#transcriptionBannerInputs
     @Test func transcriptionBannerInputs() {
         #expect(LibraryMapping.progress(ProcessingState(), phase: nil) == nil)
@@ -266,4 +287,8 @@ struct LibraryMappingTests {
         #expect(LibraryMapping.emptyState(LibraryFacts(liveNotes: 3, results: 3)) == nil)
         #expect(LibraryMapping.emptyState(LibraryFacts(liveNotes: 3, results: 0), favoritesOnly: true) == .noStarred)
     }
+}
+
+private extension ProgressBanner.Announcement {
+    func with(step: Int?) -> Self { var copy = self; copy.step = step; return copy }
 }

@@ -9,9 +9,7 @@ struct LibraryView: View {
     @Environment(LibraryScreenModel.self) private var model
     @Environment(NoticesStore.self) private var notices
     @Environment(ImportStore.self) private var imports
-    @Environment(ProcessingStore.self) private var processing
     @Environment(RecordingStore.self) private var recording
-    @Environment(TrashService.self) private var trash
     @Environment(Router.self) private var router
     @Environment(ErrorPresenter.self) private var errors
     @Environment(\.dynamicTypeSize) private var dynamicType
@@ -20,8 +18,6 @@ struct LibraryView: View {
     @SceneStorage("library.query") private var savedQuery = ""
     @SceneStorage("library.favoritesOnly") private var savedFavoritesOnly = false
     @State private var importing = false
-    @State private var dialog: LibraryDialog?
-    @State private var voiceModelReady = false
     @State private var restored = false
 
     var body: some View {
@@ -73,7 +69,7 @@ struct LibraryView: View {
         .onAppear(perform: restoreSceneState)
         .onChange(of: model.query) { _, query in if restoresSceneState { savedQuery = query } }
         .onChange(of: model.favoritesOnly) { _, only in if restoresSceneState { savedFavoritesOnly = only } }
-        .task { voiceModelReady = await processing.speakerModelsReady() }
+        .task { await model.refreshSpeakerModels() }
         .fileImporter(isPresented: $importing, allowedContentTypes: ImportStore.contentTypes, allowsMultipleSelection: true) { result in
             switch result {
             case .success(let urls): imports.start(urls)
@@ -81,14 +77,12 @@ struct LibraryView: View {
             }
         }
         .sheet(item: renaming) { RenameNoteDialog(noteID: $0.id) }
-        .alert(LibraryCopy.startOverTitle, isPresented: confirming(\.startOver), presenting: dialog) { dialog in
-            Button(LibraryCopy.startOver, role: .destructive) { if case .startOver(let id) = dialog { startOver(id) } }
+        .alert(LibraryCopy.startOverTitle, isPresented: confirming(\.startOver), presenting: model.dialog) { dialog in
+            Button(LibraryCopy.startOver, role: .destructive) { confirm(dialog) }
             Button(LibraryCopy.cancel, role: .cancel) {}
         } message: { _ in Text(LibraryCopy.startOverBody) }
-        .alert(LibraryCopy.freshTitle, isPresented: confirming(\.transcribeFresh), presenting: dialog) { dialog in
-            Button(LibraryCopy.transcribeAgain) {
-                if case .transcribeFresh(let id) = dialog { Task { await model.transcribe(id, kind: .transcribeAgain) } }
-            }
+        .alert(LibraryCopy.freshTitle, isPresented: confirming(\.transcribeFresh), presenting: model.dialog) { dialog in
+            Button(LibraryCopy.transcribeAgain) { confirm(dialog) }
             Button(LibraryCopy.cancel, role: .cancel) {}
         } message: { _ in Text(LibraryCopy.freshBody) }
     }
@@ -141,22 +135,17 @@ struct LibraryView: View {
             switch action {
             case .open: model.open(row.id)
             case .resume: Task { await model.resume(row.id) }
-            case .rename: dialog = .rename(row.id)
-            case .trash: Task { await trash.requestTrash(row.id) }
+            case .rename: Task { await model.perform(.rename, on: row.id) }
+            case .trash: Task { await model.perform(.moveToTrash, on: row.id) }
             }
         }
-        .contextMenu {
-            if let note = model.note(row.id) { NoteActionsMenu(note: note, voiceModelReady: voiceModelReady, dialog: $dialog) }
-        }
+        .contextMenu { NoteActionsMenu(noteID: row.id) }
     }
 
     private func record() { Task { await recording.start() } }
 
-    private func startOver(_ id: UUID) {
-        Task {
-            if await processing.startOver(id) == .needsConsent { router.show(.modelDownload(noteID: id)) }
-        }
-    }
+    /// The presented confirmation's action; the model clears the dialog.
+    private func confirm(_ dialog: LibraryDialog) { Task { await model.confirm(dialog) } }
 
     private func restoreSceneState() {
         guard restoresSceneState, !restored else { return }
@@ -168,11 +157,12 @@ struct LibraryView: View {
     private struct RenameTarget: Identifiable { let id: UUID }
 
     private var renaming: Binding<RenameTarget?> {
-        Binding(get: { if case .rename(let id) = dialog { RenameTarget(id: id) } else { nil } }, set: { if $0 == nil { dialog = nil } })
+        Binding(get: { if case .rename(let id) = model.dialog { RenameTarget(id: id) } else { nil } },
+                set: { if $0 == nil, case .rename = model.dialog { model.dismissDialog() } })
     }
 
     private func confirming(_ kind: KeyPath<LibraryDialog, Bool>) -> Binding<Bool> {
-        Binding(get: { dialog?[keyPath: kind] ?? false }, set: { if !$0 { dialog = nil } })
+        Binding(get: { model.dialog?[keyPath: kind] ?? false }, set: { if !$0, model.dialog?[keyPath: kind] == true { model.dismissDialog() } })
     }
 }
 

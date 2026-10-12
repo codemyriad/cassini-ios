@@ -50,7 +50,7 @@ import CassiniNotebook
                               folder: environment.exports,
                               locale: environment.locale, timeZone: environment.timeZone) { [startup] in _ = await startup.ready() }
         libraryScreen = Self.libraryScreen(environment: environment, library: library, processing: processing,
-                                           recording: recording)
+                                           recording: recording, trash: trash)
         libraryScreen.connect(router: router, errors: errors)
         processing.modelDownload = ModelDownloadAdapter(
             settings: settings, processing: processing, transcriber: environment.transcriber,
@@ -86,13 +86,17 @@ import CassiniNotebook
 
     /// The Library over the notes, the queue and the recorder.
     private static func libraryScreen(environment: AppEnvironment, library: LibraryStore, processing: ProcessingStore,
-                                      recording: RecordingStore) -> LibraryScreenModel {
+                                      recording: RecordingStore, trash: TrashService) -> LibraryScreenModel {
         LibraryScreenModel(ports: .init(
             notes: { library.notes }, loading: { !library.isLoaded && library.loadFailure == nil },
             unavailable: { library.loadFailure != nil }, processing: { processing.state },
             phase: { processing.progress.phase(for: $0) }, install: { processing.speechInstall },
-            recording: { recording.state },
+            recording: { recording.state }, finishing: { recording.finishingNoteID },
             transcribe: { await processing.transcribe($0, kind: $1, origin: .screen) },
+            startOver: { await processing.startOver($0) },
+            stop: { processing.stop($0) }, dequeue: { processing.dequeue($0) },
+            update: { _ = library.update($0, $1) }, trash: { _ = await trash.requestTrash($0) },
+            speakerModelsReady: { await processing.speakerModelsReady() },
             clock: environment.clock, calendar: environment.calendar))
     }
 

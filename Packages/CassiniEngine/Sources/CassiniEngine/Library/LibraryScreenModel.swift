@@ -2,6 +2,51 @@ import Foundation
 import Observation
 import CassiniNotebook
 
+/// A confirmation or form the Library opens over itself (Android `LibraryDialog`).
+public enum LibraryDialog: Identifiable, Hashable, Sendable {
+    case rename(UUID)
+    /// "Start over?": the saved progress goes.
+    case startOver(UUID)
+    /// Transcribe again on a document whose versions cannot be kept.
+    case transcribeFresh(UUID)
+
+    public var id: Self { self }
+}
+
+/// A row of a note's actions menu (Android `NoteAction`, features.md section 6).
+public enum NoteAction: Hashable, Sendable {
+    case toggleStar
+    case rename
+    case transcribe
+    case transcribeAgain
+    /// Stop and keep progress.
+    case stop
+    case removeFromQueue
+    case resume
+    case startOver
+    case export(TranscriptFormat)
+    case documentInfo
+    case moveToTrash
+}
+
+/// What a note's actions menu offers (Android `NoteActionsUi`).
+public struct NoteMenu: Hashable, Sendable {
+    public var isFavorite: Bool
+    /// The note is being recorded: only Star and Rename.
+    public var recording: Bool
+    /// The transcribe row for the note's job.
+    public var transcribe: TranscribeAction
+    /// The recording's audio is still being written: Transcribe and Transcribe again wait for it.
+    public var transcribeWaits: Bool
+    public var export: TranscriptExportAvailability
+
+    public init(isFavorite: Bool, recording: Bool, transcribe: TranscribeAction, transcribeWaits: Bool,
+                export: TranscriptExportAvailability) {
+        self.isFavorite = isFavorite; self.recording = recording; self.transcribe = transcribe
+        self.transcribeWaits = transcribeWaits; self.export = export
+    }
+}
+
 /// Where the Library sends the user.
 public enum LibraryEffect: Hashable, Sendable {
     case openNote(Route)
@@ -29,12 +74,15 @@ public struct LibraryContent: Hashable, Sendable {
 }
 
 /// The Library (Android `LibraryViewModel`, features.md section 1): its rows built from the notes, the queue and the
-/// recorder; the search, run 150 ms after the last keystroke (an empty query at once); and where its rows, inline
-/// actions and progress banner lead.
+/// recorder; the search, run 150 ms after the last keystroke (an empty query at once); the actions menu of each row
+/// and its confirmations; and where its rows, inline actions and progress banner lead.
+///
+/// The notes are indexed when they change (observed through `Ports.notes`), not when the view reads `content`, so
+/// reading it has no side effects.
 @MainActor @Observable
 public final class LibraryScreenModel {
     public struct Ports {
-        /// Every note, newest first, Recently Deleted included.
+        /// Every note, newest first, Recently Deleted included. Observed: the index follows its changes.
         public var notes: @MainActor () -> [Note]
         /// The notes have not been read yet.
         public var loading: @MainActor () -> Bool
@@ -46,18 +94,37 @@ public final class LibraryScreenModel {
         /// A model download running on its own.
         public var install: @MainActor () -> DownloadFact?
         public var recording: @MainActor () -> RecordingState
+        /// The note whose recorded audio is still being written.
+        public var finishing: @MainActor () -> UUID?
         public var transcribe: @MainActor (UUID, JobKind) async -> TranscribeOutcome
+        public var startOver: @MainActor (UUID) async -> TranscribeOutcome
+        /// Stop and keep progress.
+        public var stop: @MainActor (UUID) -> Void
+        public var dequeue: @MainActor (UUID) -> Void
+        /// Saves a note's change.
+        public var update: @MainActor (UUID, @escaping @Sendable (inout Note) -> Void) -> Void
+        /// Move to Recently Deleted (it asks first while the note is transcribing).
+        public var trash: @MainActor (UUID) async -> Void
+        /// Whether the speaker models are installed, so names carry over to a new version.
+        public var speakerModelsReady: @MainActor () async -> Bool
         public var clock: any AppClock
         public var calendar: Calendar
 
         public init(notes: @escaping @MainActor () -> [Note], loading: @escaping @MainActor () -> Bool,
                     unavailable: @escaping @MainActor () -> Bool, processing: @escaping @MainActor () -> ProcessingState,
                     phase: @escaping @MainActor (UUID) -> JobPhase?, install: @escaping @MainActor () -> DownloadFact?,
-                    recording: @escaping @MainActor () -> RecordingState,
+                    recording: @escaping @MainActor () -> RecordingState, finishing: @escaping @MainActor () -> UUID?,
                     transcribe: @escaping @MainActor (UUID, JobKind) async -> TranscribeOutcome,
+                    startOver: @escaping @MainActor (UUID) async -> TranscribeOutcome,
+                    stop: @escaping @MainActor (UUID) -> Void, dequeue: @escaping @MainActor (UUID) -> Void,
+                    update: @escaping @MainActor (UUID, @escaping @Sendable (inout Note) -> Void) -> Void,
+                    trash: @escaping @MainActor (UUID) async -> Void,
+                    speakerModelsReady: @escaping @MainActor () async -> Bool,
                     clock: any AppClock, calendar: Calendar) {
             self.notes = notes; self.loading = loading; self.unavailable = unavailable; self.processing = processing
-            self.phase = phase; self.install = install; self.recording = recording; self.transcribe = transcribe
+            self.phase = phase; self.install = install; self.recording = recording; self.finishing = finishing
+            self.transcribe = transcribe; self.startOver = startOver; self.stop = stop; self.dequeue = dequeue
+            self.update = update; self.trash = trash; self.speakerModelsReady = speakerModelsReady
             self.clock = clock; self.calendar = calendar
         }
     }
@@ -72,15 +139,22 @@ public final class LibraryScreenModel {
     public private(set) var searched = ""
     /// Only starred notes (an iOS extra).
     public var favoritesOnly = false
+    /// The confirmation or form open over the Library.
+    public var dialog: LibraryDialog?
+    /// The speaker models are installed (Transcribe again says "Speaker names carry over.").
+    public private(set) var speakerModelsReady = false
 
     @ObservationIgnored public var onEffect: (@MainActor (LibraryEffect) -> Void)?
     @ObservationIgnored private let ports: Ports
     @ObservationIgnored private var index = LibraryIndex()
+    /// `index.revision`, observed, so the view reads the rows again when the notes change.
+    private var revision = 0
     @ObservationIgnored private var pendingSearch: Task<Void, Never>?
+    @ObservationIgnored private var pendingNotes: Task<Void, Never>?
     /// The last search's results: for `query` over the notes at `revision` of the index.
     private var found: Found?
     /// The search running off the main actor.
-    @ObservationIgnored private var running: (query: String, revision: Int, task: Task<Void, Never>)?
+    @ObservationIgnored private var running: (query: String, task: Task<Void, Never>)?
 
     private struct Found {
         let query: String
@@ -88,13 +162,16 @@ public final class LibraryScreenModel {
         let hits: [LibraryIndex.Hit]
     }
 
-    public init(ports: Ports) { self.ports = ports }
+    public init(ports: Ports) {
+        self.ports = ports
+        observeNotes()
+    }
 
     /// Whether a query is open: the rows are the flat results.
     public var isSearching: Bool { !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
     public var content: LibraryContent {
-        index.update(ports.notes())
+        _ = revision
         let processing = ports.processing(), now = ports.clock.now, calendar = ports.calendar
         let context = RowContext(processing: processing, recording: ports.recording())
         let loading = ports.loading(), unavailable = ports.unavailable()
@@ -106,10 +183,10 @@ public final class LibraryScreenModel {
                                   emptyState: LibraryMapping.emptyState(facts, favoritesOnly: favoritesOnly))
         }
         // Until the first search answers, the results are empty and say nothing. Afterwards a new query or a changed
-        // note shows the last results until the search over them answers.
-        if !searched.isEmpty, found?.query != searched || found?.revision != index.revision { search() }
+        // note shows the last results, over the notes as they are now, until the search over them answers.
         guard let found else { return LibraryContent(loading: loading, results: []) }
-        let hits = found.hits.filter { !favoritesOnly || $0.entry.note.isFavorite }
+        let current = found.revision == index.revision ? found.hits : index.current(found.hits, query: SearchQuery(found.query))
+        let hits = current.filter { !favoritesOnly || $0.entry.note.isFavorite }
         if found.query == searched {
             facts.query = searched
             facts.results = hits.count
@@ -129,6 +206,16 @@ public final class LibraryScreenModel {
         let processing = ports.processing()
         return LibraryMapping.progress(processing, phase: processing.running.flatMap { ports.phase($0.noteID) },
                                        install: ports.install())
+    }
+
+    /// What the long press on a row offers; nil for a note no longer in the Library.
+    public func menu(_ id: UUID) -> NoteMenu? {
+        _ = revision
+        guard let note = index.entry(id)?.note else { return nil }
+        return NoteMenu(isFavorite: note.isFavorite, recording: note.isRecording && ports.recording().noteID == id,
+                        transcribe: LibraryMapping.transcribeAction(note, job: ports.processing().jobs[id],
+                                                                    voiceModelReady: speakerModelsReady),
+                        transcribeWaits: ports.finishing() == id, export: TranscriptExports.availability(of: note))
     }
 
     // MARK: Events
@@ -162,39 +249,129 @@ public final class LibraryScreenModel {
         await transcribe(id, kind: job?.kind ?? .transcribe)
     }
 
-    /// Transcribe or Transcribe again from the note's actions.
+    /// Transcribe or Transcribe again: without consent the model download opens; a refusal says why.
     public func transcribe(_ id: UUID, kind: JobKind) async {
-        switch await ports.transcribe(id, kind) {
+        handle(await ports.transcribe(id, kind), for: id)
+    }
+
+    /// A row of the actions menu (Android `LibraryViewModel.sheetAction`). Rename, Start over and a Transcribe again
+    /// that replaces the versions open their dialog; the exports and Document info open the note, which starts them.
+    public func perform(_ action: NoteAction, on id: UUID) async {
+        guard let note = ports.notes().first(where: { $0.id == id }) else { return }
+        switch action {
+        case .toggleStar: ports.update(id) { $0.isFavorite.toggle() }
+        case .rename: dialog = .rename(id)
+        case .transcribe: await transcribe(id, kind: .transcribe)
+        case .transcribeAgain:
+            if LibraryMapping.transcribeAgainRefused(note) { return }
+            if LibraryMapping.needsFreshConfirmation(note) { dialog = .transcribeFresh(id) } else { await transcribe(id, kind: .transcribeAgain) }
+        case .stop: ports.stop(id)
+        case .removeFromQueue: ports.dequeue(id)
+        case .resume: await transcribe(id, kind: ports.processing().jobs[id]?.kind ?? .transcribe)
+        case .startOver: dialog = .startOver(id)
+        case .export(let format): onEffect?(.openNote(.note(id, start: .export(format))))
+        case .documentInfo: onEffect?(.openNote(.note(id, start: .documentInfo)))
+        case .moveToTrash: await ports.trash(id)
+        }
+    }
+
+    /// The open confirmation's action (Android `confirmDialog`): Start over, or the fresh Transcribe again. Rename
+    /// confirms with `rename(_:to:)`.
+    public func confirmDialog() async {
+        guard let dialog else { return }
+        await confirm(dialog)
+    }
+
+    /// The action of `dialog`, as it was presented (an alert may have cleared `dialog` before its button runs).
+    public func confirm(_ dialog: LibraryDialog) async {
+        if self.dialog == dialog { self.dialog = nil }
+        switch dialog {
+        case .rename: break
+        case .startOver(let id): handle(await ports.startOver(id), for: id)
+        case .transcribeFresh(let id): await transcribe(id, kind: .transcribeAgain)
+        }
+    }
+
+    public func dismissDialog() { dialog = nil }
+
+    /// Rename's Save: the trimmed title, at most `NoteTitles.maxLength`, stored only when it changed. A blank title
+    /// keeps the dialog open and returns false.
+    @discardableResult
+    public func rename(_ id: UUID, to title: String) -> Bool {
+        guard let cleaned = NoteTitles.clean(title) else { return false }
+        if dialog == .rename(id) { dialog = nil }
+        if note(id)?.title != cleaned { ports.update(id) { $0.title = cleaned } }
+        return true
+    }
+
+    /// Asks whether the speaker models are installed, for Transcribe again's "Speaker names carry over."
+    public func refreshSpeakerModels() async { speakerModelsReady = await ports.speakerModelsReady() }
+
+    /// Waits until the index has the latest notes and the search asked for last has answered (tests).
+    public func settle() async {
+        while pendingNotes != nil || pendingSearch != nil || running != nil {
+            await pendingNotes?.value
+            await pendingSearch?.value
+            await running?.task.value
+        }
+    }
+
+    private func handle(_ outcome: TranscribeOutcome, for id: UUID) {
+        switch outcome {
         case .needsConsent: onEffect?(.openModelDownload(noteID: id))
         case .refused(let refusal): onEffect?(.refused(refusal))
         case .queued: break
         }
     }
 
-    /// Waits for the search asked for last and its results (tests).
-    public func settleSearch() async {
-        await pendingSearch?.value
-        await running?.task.value
+    // MARK: Index and search
+
+    /// Indexes the notes now and again each time they change: the change is observed, and the index is brought up to
+    /// date on the main actor right after it.
+    private func observeNotes() {
+        pendingNotes = nil
+        let notes = withObservationTracking { ports.notes() } onChange: { [weak self] in
+            // The stores change on the main actor, so the update is scheduled right away and `settle()` sees it.
+            if Thread.isMainThread {
+                MainActor.assumeIsolated { self?.notesChanged() }
+            } else {
+                Task { @MainActor [weak self] in self?.notesChanged() }
+            }
+        }
+        index.update(notes)
+        guard index.revision != revision else { return }
+        revision = index.revision
+        if !searched.isEmpty, found?.revision != revision { search() }
+    }
+
+    private func notesChanged() {
+        guard pendingNotes == nil else { return }
+        pendingNotes = Task { @MainActor [weak self] in self?.observeNotes() }
     }
 
     /// Searches the notes for `searched` off the main actor, a thousand notes being more than a frame's work; the
-    /// tokens it works out are kept for the next search.
+    /// tokens it works out are kept for the next search. A search over notes that changed meanwhile still publishes
+    /// its results, then runs again over the new notes; a new query cancels it.
     private func search() {
-        let query = searched, revision = index.revision
-        guard running?.query != query || running?.revision != revision else { return }
-        running?.task.cancel()
-        let snapshot = index
+        let query = searched
+        if let running {
+            if running.query == query { return } // it searches again over the new notes when it answers
+            running.task.cancel()
+        }
+        let snapshot = index, revision = index.revision
         let task = Task { [weak self] in
-            let (hits, searched) = await Task.detached(priority: .userInitiated) {
+            let work = Task.detached(priority: .userInitiated) {
                 var copy = snapshot
                 return (copy.search(SearchQuery(query)), copy)
-            }.value
+            }
+            let (hits, searched) = await withTaskCancellationHandler { await work.value } onCancel: { work.cancel() }
             guard let self, !Task.isCancelled else { return }
             index.adoptTokens(from: searched)
             found = Found(query: query, revision: revision, hits: hits)
             running = nil
+            if self.searched == query, revision != index.revision { search() }
         }
-        running = (query, revision, task)
+        running = (query, task)
     }
 
     private func scheduleSearch() {
@@ -212,8 +389,8 @@ public final class LibraryScreenModel {
         pendingSearch = Task { [weak self, clock = ports.clock] in
             do { try await clock.sleep(for: Self.searchDebounce) } catch { return }
             guard let self, !Task.isCancelled else { return }
+            pendingSearch = nil
             searched = text
-            index.update(ports.notes())
             search()
         }
     }

@@ -2,77 +2,58 @@ import SwiftUI
 import CassiniEngine
 import CassiniNotebook
 
-/// A confirmation or form the Library opens over itself.
-enum LibraryDialog: Identifiable, Hashable {
-    case rename(UUID)
-    case startOver(UUID)
-    /// Transcribe again on a document whose versions cannot be kept.
-    case transcribeFresh(UUID)
-
-    var id: Self { self }
-}
-
-/// The long-press actions of a Library row: the iOS form of Android's Note actions sheet (features.md section 6). The
-/// exports and Document info belong to the Note screen, which opens and starts them.
+/// The long-press actions of a Library row: the iOS form of Android's Note actions sheet (features.md section 6). What
+/// it offers comes from `LibraryScreenModel.menu(_:)` and each row goes to `perform(_:on:)`; the exports and Document
+/// info belong to the Note screen, which opens and starts them.
 struct NoteActionsMenu: View {
-    let note: Note
-    let voiceModelReady: Bool
-    @Binding var dialog: LibraryDialog?
-    @Environment(LibraryStore.self) private var library
+    let noteID: UUID
     @Environment(LibraryScreenModel.self) private var model
-    @Environment(ProcessingStore.self) private var processing
-    @Environment(RecordingStore.self) private var recording
-    @Environment(TrashService.self) private var trash
-    @Environment(Router.self) private var router
 
     var body: some View {
-        let recordingNow = note.isRecording && recording.state.noteID == note.id
-        Button(note.isFavorite ? LibraryCopy.removeStar : LibraryCopy.star, systemImage: note.isFavorite ? "star.slash" : "star") {
-            library.update(note.id) { $0.isFavorite.toggle() }
-        }
-        Button(LibraryCopy.rename, systemImage: "pencil") { dialog = .rename(note.id) }
-        if !recordingNow {
-            transcribeItems
-            exportMenu
-            Button(LibraryCopy.documentInfo, systemImage: "info.circle") {
-                router.show(.note(note.id, start: .documentInfo))
+        if let menu = model.menu(noteID) {
+            Button(menu.isFavorite ? LibraryCopy.removeStar : LibraryCopy.star, systemImage: menu.isFavorite ? "star.slash" : "star") {
+                perform(.toggleStar)
             }
-            Divider()
-            Button(TrashCopy.moveToTrash, systemImage: "trash", role: .destructive) { Task { await trash.requestTrash(note.id) } }
+            Button(LibraryCopy.rename, systemImage: "pencil") { perform(.rename) }
+            if !menu.recording {
+                transcribeItems(menu)
+                exportMenu(menu.export)
+                Button(LibraryCopy.documentInfo, systemImage: "info.circle") { perform(.documentInfo) }
+                Divider()
+                Button(TrashCopy.moveToTrash, systemImage: "trash", role: .destructive) { perform(.moveToTrash) }
+            }
         }
     }
 
-    @ViewBuilder private var transcribeItems: some View {
-        let job = processing.state.jobs[note.id]
-        let finishing = recording.finishingNoteID == note.id
-        switch LibraryMapping.transcribeAction(note, job: job, voiceModelReady: voiceModelReady) {
+    @ViewBuilder private func transcribeItems(_ menu: NoteMenu) -> some View {
+        switch menu.transcribe {
         case .transcribe:
-            Button(LibraryCopy.transcribe, systemImage: "text.badge.plus") { transcribe(.transcribe) }.disabled(finishing)
+            Button(LibraryCopy.transcribe, systemImage: "text.badge.plus") { perform(.transcribe) }.disabled(menu.transcribeWaits)
         case .transcribeAgain(let version, let namesCarry):
-            Button { transcribeAgain() } label: {
+            Button { perform(.transcribeAgain) } label: {
                 Label(LibraryCopy.transcribeAgain, systemImage: "arrow.clockwise")
                 Text(LibraryCopy.addsVersion(version) + (namesCarry ? " " + LibraryCopy.namesCarry : ""))
-            }.disabled(finishing)
+            }.disabled(menu.transcribeWaits)
         case .transcribeAgainUnavailable:
             Button {} label: {
                 Label(LibraryCopy.transcribeAgain, systemImage: "arrow.clockwise")
                 Text(LibraryCopy.noNewVersion)
             }.disabled(true)
         case .stop:
-            Button(LibraryCopy.stop, systemImage: "stop.circle") { processing.stop(note.id) }
+            Button(LibraryCopy.stop, systemImage: "stop.circle") { perform(.stop) }
         case .removeFromQueue:
-            Button(LibraryCopy.removeFromQueue, systemImage: "minus.circle") { processing.dequeue(note.id) }
+            Button(LibraryCopy.removeFromQueue, systemImage: "minus.circle") { perform(.removeFromQueue) }
         case .resumeOrStartOver:
-            Button(LibraryCopy.resume, systemImage: "play.circle") { transcribe(job?.kind ?? .transcribe) }
-            Button(LibraryCopy.startOver, systemImage: "arrow.counterclockwise") { dialog = .startOver(note.id) }
+            Button(LibraryCopy.resume, systemImage: "play.circle") { perform(.resume) }
+            Button(LibraryCopy.startOver, systemImage: "arrow.counterclockwise") { perform(.startOver) }
         }
     }
 
-    private var exportMenu: some View {
-        let unavailable = ExportCopy.reason(TranscriptExports.availability(of: note))
+    private func exportMenu(_ availability: TranscriptExportAvailability) -> some View {
+        let unavailable = ExportCopy.reason(availability)
         return Menu {
             ForEach(TranscriptFormat.allCases) { format in
-                Button(ExportCopy.title(format)) { router.show(.note(note.id, start: .export(format))) }
+                Button(ExportCopy.title(format)) { perform(.export(format)) }
             }
         } label: {
             Label(LibraryCopy.export, systemImage: "square.and.arrow.up")
@@ -81,11 +62,7 @@ struct NoteActionsMenu: View {
         .disabled(unavailable != nil)
     }
 
-    private func transcribe(_ kind: JobKind) {
-        Task { await model.transcribe(note.id, kind: kind) }
-    }
-
-    private func transcribeAgain() {
-        if LibraryMapping.needsFreshConfirmation(note) { dialog = .transcribeFresh(note.id) } else { transcribe(.transcribeAgain) }
+    private func perform(_ action: NoteAction) {
+        Task { await model.perform(action, on: noteID) }
     }
 }

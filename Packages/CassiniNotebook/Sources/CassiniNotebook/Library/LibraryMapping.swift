@@ -106,6 +106,50 @@ public struct ProgressBanner: Hashable, Sendable {
         case .timeLeft, .waiting: false
         }
     }
+
+    /// What line 2 is about, without its numbers.
+    public enum Stage: Hashable, Sendable {
+        /// The time left, or working it out; a new estimate is not a new stage.
+        case timeLeft
+        /// Nothing is left but saving.
+        case finishing
+        case waiting
+        case downloading(ModelPart)
+        case checking
+    }
+
+    public var stage: Stage {
+        switch line {
+        case .timeLeft(.finishing): .finishing
+        case .timeLeft: .timeLeft
+        case .waiting: .waiting
+        case .downloading(let part, _): .downloading(part)
+        case .checking: .checking
+        }
+    }
+
+    /// The percent VoiceOver hears: the banner's, or while models are installed the download's or the check's.
+    public var spokenPercent: Int? {
+        if let percent { return percent }
+        switch line {
+        case .downloading(_, let percent), .checking(let percent): return percent
+        case .timeLeft, .waiting: return nil
+        }
+    }
+
+    public static let announceStep = 5
+
+    /// When VoiceOver hears the banner: at each change of its title or stage, and at each 5 % step, not at every
+    /// update.
+    public struct Announcement: Hashable, Sendable {
+        public var title: String?
+        public var stage: Stage
+        public var step: Int?
+    }
+
+    public var announcement: Announcement {
+        Announcement(title: title, stage: stage, step: spokenPercent.map { $0 / Self.announceStep * Self.announceStep })
+    }
 }
 
 /// What the transcribe item of a note's actions does, by its job (features.md section 6).

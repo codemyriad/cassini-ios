@@ -50,12 +50,10 @@ struct ProgressBannerCard: View {
     let banner: ProgressBanner
     let open: () -> Void
 
-    private static let announceStep = 5
-
     var body: some View {
         let title = LibraryCopy.progressTitle(banner)
         let line = LibraryCopy.progressLine(banner)
-        let step = banner.percent.map { $0 / Self.announceStep * Self.announceStep }
+        let step = banner.announcement.step
         Button(action: open) {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .firstTextBaseline) {
@@ -81,15 +79,10 @@ struct ProgressBannerCard: View {
         .accessibilityHint(banner.noteID == nil ? LibraryCopy.openSettings : LibraryCopy.openNote)
         .accessibilityAddTraits(.updatesFrequently)
         .accessibilityIdentifier("progressBanner")
-        .onChange(of: Announcement(title: title, step: step)) { _, _ in
+        .onChange(of: banner.announcement) { _, _ in
             AccessibilityNotification.Announcement([title, step.map(ProgressText.percent), line].compactMap { $0 }
                 .joined(separator: ", ")).post()
         }
-    }
-
-    private struct Announcement: Equatable {
-        var title: String
-        var step: Int?
     }
 }
 
