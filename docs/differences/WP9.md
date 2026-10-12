@@ -57,7 +57,7 @@
   iOS's per-category hidden-preview placeholder without `hiddenPreviewsShowTitle`: with previews hidden the Lock Screen
   shows "A note was transcribed", "A note couldn't be transcribed", "Open Cassini to resume." and so on, never the
   title. "Paused by iOS" and "Transcription stopped" carry Resume (a foreground action: Cassini opens the note and
-  resumes it). Results are posted only while Cassini is in the background (the coordinators check); one that lands as
+  resumes it if its job is still paused, as Android; otherwise it only opens the note). Results are posted only while Cassini is in the background (the coordinators check); one that lands as
   Cassini comes back is not shown over it. Typographic apostrophes are used ("Couldn’t transcribe").
 - **Permission.** Asked once, at the first recording (WP3), the first Transcribe from a screen (after the job is
   queued; the queue does not wait for the answer) or the model download (WP4). NOTIFICATIONS_OFF means denied:

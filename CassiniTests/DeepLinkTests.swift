@@ -85,18 +85,21 @@ import CassiniNotebook
         await graph.processing.coordinator?.awaitIdle()
     }
 
-    @Test func resumeOfANoteWithoutAJobTranscribesIt() async throws {
+    @Test func resumeOfANoteThatIsNoLongerPausedOnlyOpensIt() async throws {
         let test = TestGraph(transcriber: FakeTranscriber(.returns([TranscriptSegment(text: "Hello.", start: 0, end: 1)], total: 2)))
         defer { test.tearDown() }
         let note = try seed(test)
         test.graph.settings.downloadsAllowed = true
         test.graph.settings.identifySpeakers = false
         await test.graph.start()
+        // An old "Transcription paused" notification: its job was resumed from the screen and finished since.
         await DeepLinkHandler(router: test.graph.router, library: test.graph.library, processing: test.graph.processing,
                               recording: test.graph.recording, ready: {}).handle(.note(note.id, resume: true))
+        #expect(test.graph.router.path == [.note(note.id)])
         await test.graph.processing.coordinator?.awaitIdle()
-        await waitUntil { test.graph.library.note(note.id)?.transcript.isEmpty == false }
-        #expect(test.graph.library.note(note.id)?.transcript.map(\.text) == ["Hello."])
+        try? await Task.sleep(for: .milliseconds(50))
+        #expect(test.graph.processing.state.jobs[note.id] == nil, "Resume queues nothing for a note with no paused job")
+        #expect(test.graph.library.note(note.id)?.transcript.isEmpty == true)
     }
 
     @Test func theLiveActivityLinkOpensTheRecording() {

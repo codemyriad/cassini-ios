@@ -29,9 +29,10 @@ extension Router {
             guard let note = library.note(id), note.trashedAt == nil else { return }
             router.open(link: id)
             guard resume else { return }
-            // Resume from the notification: the job goes on from its saved progress, as from the screen.
-            let kind = processing.state.jobs[id]?.kind ?? .transcribe
-            if await processing.transcribe(id, kind: kind, origin: .screen) == .needsConsent {
+            // Resume from the notification: a paused job goes on from its saved progress, as from the screen. A note
+            // that is no longer paused (resumed already, or the notification is old) is left as it is.
+            guard let job = processing.state.jobs[id], job.state == .paused else { return }
+            if await processing.transcribe(id, kind: job.kind, origin: .screen) == .needsConsent {
                 router.offerModelDownload(for: id)
             }
         }
