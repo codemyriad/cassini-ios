@@ -1,0 +1,37 @@
+import Foundation
+import CassiniEngine
+import CassiniEngineTesting
+@testable import Cassini
+
+/// An app graph on a temporary root with its own preferences suite and fakes for the device, so a test never touches
+/// the real library or `UserDefaults.standard`.
+@MainActor final class TestGraph {
+    let root: URL
+    let suite: String
+    let clock: FakeClock
+    let background = FakeBackgroundRunner()
+    let playback = FakePlayback(fileDuration: 2)
+    let capture = FakeCapture()
+    let graph: AppGraph
+
+    init(root: URL? = nil, suite: String? = nil, clock: FakeClock = FakeClock(),
+         transcriber: any Transcribing = FakeTranscriber(.returns([], total: 1)), analyzer: any SpeakerAnalyzing = FakeAnalyzer()) {
+        self.root = root ?? FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        self.suite = suite ?? "cassini.tests.\(UUID().uuidString)"
+        self.clock = clock
+        let environment = AppEnvironment(
+            root: self.root, defaults: UserDefaults(suiteName: self.suite)!, clock: clock,
+            locale: Locale(identifier: "en_US"), timeZone: TimeZone(identifier: "UTC")!,
+            transcriber: transcriber, analyzer: analyzer, capture: capture, playback: playback,
+            audio: LocalAudioProcessing(), storage: FakeStorage(), background: background)
+        graph = AppGraph(environment: environment)
+    }
+
+    /// A second launch over the same files and preferences.
+    func reopened() -> TestGraph { TestGraph(root: root, suite: suite, clock: clock) }
+
+    func tearDown() {
+        try? FileManager.default.removeItem(at: root)
+        UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite)
+    }
+}

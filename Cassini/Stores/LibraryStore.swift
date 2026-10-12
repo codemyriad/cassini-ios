@@ -61,7 +61,7 @@ import CassiniNotebook
         guard let index = notes.firstIndex(where: { $0.id == id }), let noteStore else { return false }
         change(&notes[index])
         pendingWrites[id, default: 0] += 1
-        Task { await write(id, in: noteStore, change) }
+        _ = enqueue { await self.write(id, in: noteStore, change) }
         return true
     }
 
@@ -71,50 +71,46 @@ import CassiniNotebook
         guard let index = notes.firstIndex(where: { $0.id == id }), let noteStore else { return nil }
         change(&notes[index])
         pendingWrites[id, default: 0] += 1
-        return await write(id, in: noteStore, change)
+        return await enqueue { await self.write(id, in: noteStore, change) }.value
     }
 
     /// Applies `change` to every note, writing only the notes it changed.
     func updateAll(_ change: @escaping @Sendable (inout Note) -> Void) {
         guard let noteStore else { return }
         for index in notes.indices { change(&notes[index]) }
-        Task {
-            await serialized {
-                do { try await noteStore.mutateAll(change) } catch { self.reportSaveFailure(error) }
-                self.notes = await noteStore.all()
-            }
+        _ = enqueue {
+            do { try await noteStore.mutateAll(change) } catch { self.reportSaveFailure(error) }
+            self.notes = await noteStore.all()
         }
     }
 
     func insert(_ note: Note) async throws {
         guard let noteStore else { throw CocoaError(.fileWriteUnknown) }
-        try await serializedThrowing { try await noteStore.save(note) }
+        try await enqueueThrowing { try await noteStore.save(note) }
         place(note)
     }
 
     /// Deletes the note's directory and the note.
     func delete(_ id: UUID) async throws {
         guard let noteStore else { throw CocoaError(.fileWriteUnknown) }
-        try await serializedThrowing { try await noteStore.delete(id) }
+        try await enqueueThrowing { try await noteStore.delete(id) }
         notes.removeAll { $0.id == id }
     }
 
     /// Waits until every write asked for so far has finished.
     func settle() async { await tail?.value }
 
-    @discardableResult
+    /// Writes one change; runs only from the queue of writes.
     private func write(_ id: UUID, in noteStore: NoteStore, _ change: @escaping @Sendable (inout Note) -> Void) async -> Note? {
-        await serialized {
-            defer { self.pendingWrites[id, default: 1] -= 1 }
-            do {
-                let saved = try await noteStore.mutate(id, change)
-                if self.pendingWrites[id] == 1, let saved { self.place(saved) }
-                return saved
-            } catch {
-                if let stored = await noteStore.note(id) { self.place(stored) }
-                self.reportSaveFailure(error)
-                return nil
-            }
+        defer { pendingWrites[id, default: 1] -= 1 }
+        do {
+            let saved = try await noteStore.mutate(id, change)
+            if pendingWrites[id] == 1, let saved { place(saved) }
+            return saved
+        } catch {
+            if let stored = await noteStore.note(id) { place(stored) }
+            reportSaveFailure(error)
+            return nil
         }
     }
 
@@ -122,21 +118,21 @@ import CassiniNotebook
         errors.present("Could not save changes: \(error.localizedDescription)")
     }
 
-    /// Runs `body` after every earlier write.
-    private func serialized<T: Sendable>(_ body: @escaping @MainActor () async -> T) async -> T {
+    /// Queues `body` behind every write asked for so far; the queue is joined at once, so writes keep their order.
+    private func enqueue<T: Sendable>(_ body: @escaping @MainActor () async -> T) -> Task<T, Never> {
         let previous = tail
         let task = Task { @MainActor in
             await previous?.value
             return await body()
         }
         tail = Task { _ = await task.value }
-        return await task.value
+        return task
     }
 
-    private func serializedThrowing(_ body: @escaping @MainActor () async throws -> Void) async throws {
-        let result: Result<Void, any Error> = await serialized {
+    private func enqueueThrowing(_ body: @escaping @MainActor () async throws -> Void) async throws {
+        let result: Result<Void, any Error> = await enqueue {
             do { try await body(); return .success(()) } catch { return .failure(error) }
-        }
+        }.value
         try result.get()
     }
 

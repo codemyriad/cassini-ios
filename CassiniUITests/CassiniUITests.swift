@@ -1,12 +1,15 @@
 import XCTest
 
 final class CassiniUITests: XCTestCase {
-    @MainActor private func launch(seed: Bool = true, reset: Bool = true) -> XCUIApplication {
+    @MainActor private func launch(seed: Bool = true, reset: Bool = true, arguments: [String] = []) -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = ["--ui-testing"] + (reset ? ["--reset-test-data"] : []) + (seed ? ["--seed-test-data"] : [])
+        app.launchArguments = ["--ui-testing"] + (reset ? ["--reset-test-data"] : []) + (seed ? ["--seed-test-data"] : []) + arguments
         app.launch()
         XCTAssertTrue(app.textFields["librarySearch"].waitForExistence(timeout: 15))
         return app
+    }
+    @MainActor private func goBack(_ app: XCUIApplication) {
+        app.navigationBars.buttons.element(boundBy: 0).tap()
     }
     @MainActor private func openFixture(_ app: XCUIApplication) {
         let note = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "A quieter kind of productivity")).firstMatch
@@ -25,7 +28,8 @@ final class CassiniUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.switches["Allow speech model downloads"].exists)
         capture("Settings")
-        app.buttons["Done"].tap()
+        goBack(app)
+        XCTAssertTrue(app.buttons["recordButton"].waitForExistence(timeout: 5))
     }
     @MainActor func testSearchPlaybackRenameAndPersistence() {
         let app = launch()
@@ -63,7 +67,7 @@ final class CassiniUITests: XCTestCase {
         app.buttons["Recently Deleted"].tap()
         XCTAssertTrue(app.buttons["Restore"].waitForExistence(timeout: 5))
         app.buttons["Restore"].tap()
-        app.buttons["Done"].tap()
+        goBack(app)
         XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "A quieter kind of productivity")).firstMatch.waitForExistence(timeout: 5))
     }
     @MainActor func testTranscriptionConsentDoesNotStartWhenCancelled() {
@@ -132,4 +136,43 @@ final class CassiniUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Nothing here"].waitForExistence(timeout: 5))
     }
 
+    @MainActor func testSeededTrashShowsDaysLeftFromTheFixedClock() {
+        let app = launch(seed: false, arguments: ["--seed", "trash"])
+        app.buttons["Recently Deleted"].tap()
+        XCTAssertTrue(app.staticTexts["Old interview draft"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "23 days left")).firstMatch.exists)
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "29 days left")).firstMatch.exists)
+        capture("Trash")
+    }
+    @MainActor func testOpenFixtureOpensTheNamedNote() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed-test-data", "--open-fixture", "BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB"]
+        app.launch()
+        XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(timeout: 15))
+        XCTAssertEqual(app.staticTexts["noteTitle"].label, "Thoughts from the morning walk")
+    }
+    @MainActor func testTheRecordingSeedRecordsWithoutAMicrophone() {
+        let app = launch(seed: false, arguments: ["--seed", "recording"])
+        app.buttons["recordButton"].tap()
+        XCTAssertTrue(app.buttons["Pause"].waitForExistence(timeout: 8))
+        capture("Recording")
+        app.buttons["finishRecording"].tap()
+        XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["playButton"].isEnabled)
+    }
+    @MainActor func testTheProcessingSeedShowsAJobInProgress() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed", "processing", "--open-fixture", "CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC"]
+        app.launch()
+        XCTAssertTrue(app.staticTexts["Transcribing on this device…"].waitForExistence(timeout: 15))
+        capture("Processing")
+    }
+    @MainActor func testIPadShowsTheLibraryBesideTheNote() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad, "split view is for regular width")
+        XCUIDevice.shared.orientation = .landscapeLeft
+        let app = launch()
+        openFixture(app)
+        XCTAssertTrue(app.textFields["librarySearch"].isHittable, "the library stays beside the note")
+        capture("iPad split")
+    }
 }
