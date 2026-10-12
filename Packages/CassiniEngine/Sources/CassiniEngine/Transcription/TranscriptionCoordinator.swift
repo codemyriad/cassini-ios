@@ -457,9 +457,10 @@ public final class TranscriptionCoordinator {
         await current.events?.value
         await lock.run {
             await record(current, outcome)
+            // The jobs first: while `active` is set, Trash reads the job from it, and after, from `state.jobs`.
+            await refresh()
             active = nil
             state.running = nil
-            await refresh()
         }
         current.finished.signal()
         await announce(current, outcome)
