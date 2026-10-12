@@ -41,7 +41,7 @@ public struct CaptureRecovery: Sendable {
     public func rebuild(in repository: NoteRepository) async -> [RecoveredRecording] {
         let fileManager = FileManager.default
         guard let folders = try? fileManager.contentsOfDirectory(at: repository.root, includingPropertiesForKeys: nil) else { return [] }
-        var rebuilt: [(createdAt: Date, recording: RecoveredRecording)] = []
+        var rebuilt: [RecoveredRecording] = []
         for folder in folders.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
             guard let id = UUID(uuidString: folder.lastPathComponent), needsRebuild(folder),
                   let audioFile = Self.audioFile(in: folder) else { continue }
@@ -58,12 +58,12 @@ public struct CaptureRecovery: Sendable {
             apply(await finish(url), to: &note)
             do {
                 try repository.save(note)
-                rebuilt.append((createdAt, RecoveredRecording(noteID: id, recoveredAt: now, duration: note.duration)))
+                rebuilt.append(RecoveredRecording(noteID: id, createdAt: createdAt, recoveredAt: now, duration: note.duration))
             } catch {
                 continue // The files stay; the next launch tries again.
             }
         }
-        return rebuilt.sorted { $0.createdAt < $1.createdAt }.map(\.recording)
+        return rebuilt.sorted { $0.createdAt < $1.createdAt }
     }
 
     /// A missing `note.json`, or one that is not a note at all. A note from a newer Cassini, or one refused for its
@@ -104,7 +104,10 @@ public struct CaptureRecovery: Sendable {
             if isLive || lacksDuration {
                 let finished = await finish(store.audioURL(for: note))
                 guard let saved = try? await store.mutate(note.id, { apply(finished, to: &$0) }) else { continue }
-                if isLive { recovered.append(RecoveredRecording(noteID: note.id, recoveredAt: clock.now, duration: saved.duration)) }
+                if isLive {
+                    recovered.append(RecoveredRecording(noteID: note.id, createdAt: note.createdAt, recoveredAt: clock.now,
+                                                        duration: saved.duration))
+                }
             }
             removeLeftovers(of: await store.note(note.id) ?? note, in: store.directory(for: note.id))
         }

@@ -21,9 +21,10 @@ public enum Notices {
         if facts.queueHold != nil, facts.waitingJobs > 0 {
             notices.append(Notice(spec: BannerSpec(.txQueueHeld, BannerArgs(count: facts.waitingJobs))))
         }
-        if let latest = facts.recovered.max(by: { $0.recoveredAt < $1.recoveredAt }) {
+        if let latest = facts.latestRecovered {
             let args = BannerArgs(count: facts.recovered.count, ms1: milliseconds(latest.duration))
-            notices.append(Notice(spec: BannerSpec(.recovered, args, announce: true), at: latest.recoveredAt))
+            let at = facts.recovered.map(\.recoveredAt).max()
+            notices.append(Notice(spec: BannerSpec(.recovered, args, announce: true), at: at))
         }
         if let failedAt = facts.compressionFailedAt {
             notices.append(Notice(spec: BannerSpec(.recCompressionFailed, announce: true), at: failedAt))
@@ -144,20 +145,8 @@ public enum Notices {
 
     // MARK: Model download
 
-    /// The model download screen's banner: the progress of the running install, else its failure.
-    public static func modelDownload(_ fact: DownloadFact?) -> BannerSpec? {
-        guard let fact else { return nil }
-        if let error = fact.failure { return download(error, requiredFreeBytes: fact.requiredFreeBytes) }
-        return downloading(fact)
-    }
-
-    /// DL_DOWNLOADING for a running install; its percent is 0 until the size is known.
-    public static func downloading(_ fact: DownloadFact) -> BannerSpec {
-        let percent = fact.fraction.map { Int((min(max($0, 0), 1) * 100).rounded(.down)) } ?? 0
-        return BannerSpec(.dlDownloading, BannerArgs(percent: percent, part: fact.part))
-    }
-
-    /// The failure banner of a model download's `error`.
+    /// The failure banner of a model download's `error`. Apple installs its speech assets and reports only a fraction,
+    /// so no screen shows DL_DOWNLOADING or DL_CHECKING: the processing card shows a job's install.
     public static func download(_ error: DownloadError, requiredFreeBytes: Int64 = 0, announce: Bool = false) -> BannerSpec {
         switch error {
         case .noConnection: BannerSpec(.dlNoConnection, announce: announce)

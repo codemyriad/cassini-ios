@@ -43,3 +43,16 @@ public enum DocumentTrust: String, CaseIterable, Hashable, Sendable {
         }
     }
 }
+
+extension Note {
+    /// The document states that take no new transcript version (Android `LibraryMapping.REFUSED_STATES`): the audio
+    /// could not be checked, or the format is newer than this build.
+    public static let newVersionRefusedStates: Set<DocumentState> = [.unverified, .unknownFormat]
+
+    /// The note is a Cassini document that cannot take a new version (Android `LibraryMapping.transcribeAgainRefused`):
+    /// nothing offers Transcribe again, and a failed Transcribe again offers no Try again.
+    public var refusesNewVersion: Bool {
+        guard let document else { return false }
+        return Self.newVersionRefusedStates.contains(document.state)
+    }
+}

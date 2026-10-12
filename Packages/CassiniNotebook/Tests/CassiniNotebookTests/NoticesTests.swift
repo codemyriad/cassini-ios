@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import CassiniCore
 import CassiniNotebook
 
 /// Every app-emitted banner row comes out of `Notices` from constructed facts, with the catalogue's arguments and
@@ -54,13 +55,36 @@ import CassiniNotebook
 
     // ports: NoticeCenterTest#recoveredRow
     @Test func recoveredRow() {
-        let first = RecoveredRecording(noteID: UUID(), recoveredAt: Date(timeIntervalSince1970: 40), duration: 20)
-        let latest = RecoveredRecording(noteID: UUID(), recoveredAt: Date(timeIntervalSince1970: 50), duration: 312)
+        let first = recovered(createdAt: 10, recoveredAt: 40, duration: 20)
+        let latest = recovered(createdAt: 20, recoveredAt: 50, duration: 312)
         let spec = only(Notices.library(NoticeFacts(recovered: [first, latest]), LibraryFacts(loading: true)))
         #expect(spec?.kind == .recovered)
         #expect(spec?.args == BannerArgs(count: 2, ms1: 312_000), "the count, and the time of the latest")
         #expect(spec?.actions == [.open])
         #expect(spec?.dismissible == true)
+    }
+
+    @Test func theLatestRecoveredIsTheLastRecordedNotTheLastRecovered() {
+        // A rebuilt bare directory is recovered before the repaired live notes, whatever its recording time.
+        let rebuiltNewest = recovered(createdAt: 300, recoveredAt: 10, duration: 312)
+        let repairedOlder = recovered(createdAt: 100, recoveredAt: 20, duration: 20)
+        let facts = NoticeFacts(recovered: [repairedOlder, rebuiltNewest].shuffled())
+        #expect(facts.latestRecovered == rebuiltNewest)
+        #expect(only(Notices.library(facts, LibraryFacts(loading: true)))?.args.ms1 == 312_000)
+
+        // The same moment of recovery (one launch, or a fake clock): still the last recorded.
+        let tied = [recovered(createdAt: 100, recoveredAt: 5, duration: 1), recovered(createdAt: 200, recoveredAt: 5, duration: 2),
+                    recovered(createdAt: 150, recoveredAt: 5, duration: 3)]
+        #expect(NoticeFacts(recovered: tied).latestRecovered == tied[1])
+        // Recorded at the same moment too: the later in the list.
+        let twins = [recovered(createdAt: 100, recoveredAt: 5, duration: 1), recovered(createdAt: 100, recoveredAt: 5, duration: 2)]
+        #expect(NoticeFacts(recovered: twins).latestRecovered == twins[1])
+        #expect(NoticeFacts().latestRecovered == nil)
+    }
+
+    private func recovered(createdAt: TimeInterval, recoveredAt: TimeInterval, duration: TimeInterval) -> RecoveredRecording {
+        RecoveredRecording(noteID: UUID(), createdAt: Date(timeIntervalSince1970: createdAt),
+                           recoveredAt: Date(timeIntervalSince1970: recoveredAt), duration: duration)
     }
 
     // ports: NoticeCenterTest#transcriptionRows
@@ -114,13 +138,6 @@ import CassiniNotebook
     // ports: NoticeCenterTest#downloadRows
     @Test func downloadRows() {
         let at = Date(timeIntervalSince1970: 9)
-        let downloading = Notices.modelDownload(DownloadFact(part: .speakers, fraction: 0.46, at: at))
-        #expect(downloading?.kind == .dlDownloading)
-        #expect(downloading?.args == BannerArgs(percent: 46, part: .speakers))
-        #expect(downloading?.actions == [.cancel])
-        #expect(Notices.modelDownload(DownloadFact(part: .speech, at: at))?.args.percent == 0, "before its size is known")
-        #expect(Notices.modelDownload(nil) == nil)
-
         let kinds: [DownloadError: BannerKind] = [
             .noConnection: .dlNoConnection, .interrupted: .dlStopped, .hostNotAllowed: .dlStopped,
             .stoppedBySystem: .dlStopped, .notEnoughStorage: .dlNoSpace, .fileCheckFailed: .dlFileCheck,
@@ -129,10 +146,14 @@ import CassiniNotebook
         #expect(Set(kinds.keys) == Set(DownloadError.allCases))
         for (error, kind) in kinds {
             let fact = DownloadFact(part: .speech, failure: error, requiredFreeBytes: 901_000_000, at: at)
-            #expect(Notices.modelDownload(fact)?.kind == kind)
+            #expect(only(Notices.library(NoticeFacts(download: fact), LibraryFacts(loading: true)))?.kind == kind)
             #expect(only(Notices.job(job(.failed, failure: .download(error)), requiredFreeBytes: 5))?.kind == kind)
         }
         #expect(Notices.download(.notEnoughStorage, requiredFreeBytes: 901_000_000).args.bytes == 901_000_000)
+        let noSpace = DownloadFact(part: .speech, failure: .notEnoughStorage, requiredFreeBytes: 901_000_000, at: at)
+        #expect(only(Notices.library(NoticeFacts(download: noSpace), LibraryFacts(loading: true)))?.args.bytes == 901_000_000,
+                "the Library's no-space banner says the install's size")
+        #expect(only(Notices.job(job(.failed, failure: .download(.notEnoughStorage)), requiredFreeBytes: 7))?.args.bytes == 7)
         // iOS stopped it: the body says so, not that the connection dropped.
         #expect(Notices.download(.stoppedBySystem).args.bySystem)
         #expect(!Notices.download(.interrupted).args.bySystem)
@@ -196,13 +217,14 @@ import CassiniNotebook
         let produced = Set(produceAll().map(\.kind))
         let expected = Set(BannerKind.allCases.filter { $0.appEmitted && $0.group != .trust })
         #expect(expected.subtracting(produced).isEmpty, "\(expected.subtracting(produced))")
-        #expect(!produced.contains(.txCalculating) && !produced.contains(.txBattery))
+        let catalogueOnly: Set<BannerKind> = [.txCalculating, .txBattery, .dlDownloading, .dlChecking]
+        #expect(produced.isDisjoint(with: catalogueOnly))
     }
 
     // ports: NoticeCenterTest#ordersFailedAttentionInfoPlainNewestFirst
     @Test func ordersFailedAttentionInfoPlainNewestFirst() {
         let facts = NoticeFacts(
-            recovered: [RecoveredRecording(noteID: note, recoveredAt: Date(timeIntervalSince1970: 10), duration: 1)],
+            recovered: [recovered(createdAt: 1, recoveredAt: 10, duration: 1)],
             compressionFailedAt: Date(timeIntervalSince1970: 3),
             queueHold: .user, waitingJobs: 1, consented: false,
             importing: ["a.mp3"],
@@ -223,7 +245,7 @@ import CassiniNotebook
 
     @Test func twoFactsAtOnceBothShowInToneOrder() {
         let facts = NoticeFacts(
-            recovered: [RecoveredRecording(noteID: note, recoveredAt: Date(timeIntervalSince1970: 10), duration: 1)],
+            recovered: [recovered(createdAt: 1, recoveredAt: 10, duration: 1)],
             importFailure: ImportFailureFact(displayName: "b", kind: .tooLarge, at: Date(timeIntervalSince1970: 5)))
         #expect(Notices.library(facts, LibraryFacts(loading: true)).map(\.kind) == [.importTooLarge, .recovered])
     }
@@ -242,7 +264,7 @@ import CassiniNotebook
             all += Notices.recording(.idle, microphoneOff: false, ended: outcome)
         }
         all += Notices.library(NoticeFacts(
-            recovered: [RecoveredRecording(noteID: note, recoveredAt: .distantPast, duration: 1)],
+            recovered: [recovered(createdAt: 0, recoveredAt: 0, duration: 1)],
             compressionFailedAt: .distantPast, unreadableNotes: 1, queueHold: .user, waitingJobs: 2, jobRunning: true,
             consented: false, importing: ["x"], notificationsOff: true), LibraryFacts(liveNotes: 0, audioOnly: true))
         all += Notices.library(NoticeFacts(), LibraryFacts(liveNotes: 1, query: "q", results: 0))
@@ -257,19 +279,38 @@ import CassiniNotebook
         all += Notices.job(job(.failed, failure: .checkpointMismatch))
         all += Notices.job(job(.failed, failure: .audio))
         all += Notices.job(nil, oneVoice: true)
-        all.append(Notices.downloading(DownloadFact(part: .speech, fraction: 0.5, at: .distantPast)))
         all += DownloadError.allCases.map { Notices.download($0) }
-        // No standalone install verifies files on iOS (Apple installs its speech assets): the checking banner is the
-        // catalogue's only.
-        all.append(BannerSpec(.dlChecking, BannerArgs(percent: 80)))
         return all
+    }
+}
+
+@Suite struct FailureRulesTests {
+    // ports: ProcessingNotificationsTest (failureText: each download error has its own failure's text)
+    @Test func eachDownloadErrorStandsForItsOwnFailure() {
+        #expect(DownloadError.notEnoughStorage.failure == .space)
+        #expect(DownloadError.fileCheckFailed.failure == .modelVerify)
+        #expect(DownloadError.install.failure == .modelInstall)
+        for error in [DownloadError.noConnection, .interrupted, .hostNotAllowed, .stoppedBySystem] {
+            #expect(error.failure == .modelDownload, "\(error)")
+        }
+    }
+
+    // ports: LibraryMappingTest#documentRows (transcribeAgainRefused)
+    @Test func anUnverifiedOrNewerDocumentTakesNoNewVersion() {
+        var note = Note(title: "Doc", audioFilename: "audio.opus")
+        #expect(!note.refusesNewVersion, "a recording is no document")
+        for state in DocumentState.allCases {
+            note.document = DocumentInfo(state: state)
+            #expect(note.refusesNewVersion == (state == .unverified || state == .unknownFormat), "\(state)")
+        }
     }
 }
 
 @Suite struct BannerKindTests {
     // ports: BannerKindTest#flagsTonesAndGroups
     @Test func flagsTonesAndGroups() {
-        #expect(Set(BannerKind.allCases.filter { !$0.appEmitted }) == [.txCalculating, .txBattery])
+        // Apple installs its speech assets without a size or a file check of Cassini's: no download progress banner.
+        #expect(Set(BannerKind.allCases.filter { !$0.appEmitted }) == [.txCalculating, .txBattery, .dlDownloading, .dlChecking])
         #expect(Set(BannerKind.allCases.filter(\.dismissible)) == [.recovered, .recCompressionFailed, .notesUnreadable])
         let counts = Dictionary(grouping: BannerKind.allCases, by: \.group).mapValues(\.count)
         // Android's groups less NO_ENCODER, TX_MEMORY, IMPORT_WAV and REC_STOPPED_FILE_LIMIT, plus the iOS kinds.

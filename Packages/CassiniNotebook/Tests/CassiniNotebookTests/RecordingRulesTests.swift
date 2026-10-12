@@ -70,7 +70,7 @@ import CassiniNotebook
         #expect(RecordingBanner.banners(state: with(pause: .otherApp), microphoneOff: false) == [.pausedByOtherApp])
         #expect(RecordingBanner.banners(state: with(pause: .routeLost), microphoneOff: false) == [.inputLost])
         #expect(RecordingBanner.banners(state: with(warning: .lowStorage(minutesLeft: 10)), microphoneOff: false) == [.storageLow(minutes: 10)])
-        #expect(RecordingBanner.pausedByOtherApp.action == .resume)
+        #expect(Notices.spec(.pausedByOtherApp).actions == [.resume])
     }
 
     // ports: RecordingViewModelTest#aStorageStopStaysWithItsBannerAndOpensTheNote
@@ -79,10 +79,11 @@ import CassiniNotebook
         #expect(RecordingBanner.banners(state: .idle, microphoneOff: false, ended: .microphoneFailed) == [.microphoneFailed])
         #expect(RecordingBanner.banners(state: .idle, microphoneOff: false, ended: .couldNotStart) == [.couldNotStart])
         #expect(RecordingBanner.banners(state: .idle, microphoneOff: false, ended: .saved(.transcribe)).isEmpty)
-        #expect(RecordingBanner.stoppedForSpace.action == .openNote)
-        #expect(RecordingBanner.microphoneFailed.action == .openNote)
-        #expect(RecordingBanner.couldNotStart.action == .tryAgain)
-        #expect(RecordingBanner.microphoneOff.action == .openSettings)
+        #expect(Notices.spec(.stoppedForSpace).actions == [.openNote])
+        #expect(Notices.spec(.microphoneFailed).actions == [.openNote])
+        #expect(Notices.spec(.couldNotStart).actions == [.tryAgain])
+        #expect(Notices.spec(.microphoneOff).actions == [.openSettings])
+        #expect(Notices.spec(.storageLow(minutes: 3)).actions.isEmpty)
     }
 
     @Test func errorsComeBeforeWarnings() {

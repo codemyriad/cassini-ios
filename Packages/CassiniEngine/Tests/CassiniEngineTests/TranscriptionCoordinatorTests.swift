@@ -648,13 +648,10 @@ import CassiniNotebook
         #expect(await h.notes.note(a)?.language == "en-US")
     }
 
-    @Test func theRunningJobsProgressAndItsPauseAreTold() async throws {
-        @MainActor final class Told { var paused: [UUID: PauseReason] = [:] }
+    @Test func theRunningJobsProgressIsTold() async throws {
         let h = try QueueHarness(); defer { h.tearDown() }
-        let told = Told()
-        h.coordinator.onPause = { id, reason in told.paused[id] = reason }
         try await h.start()
-        let a = try await h.note("A"), speakers = try await h.note("Speakers"), trashed = try await h.note("Trashed")
+        let a = try await h.note("A")
 
         await h.coordinator.transcribe(a)
         let run = try await h.run(0)
@@ -665,17 +662,7 @@ import CassiniNotebook
         run.finish(.paused(.user))
         await h.coordinator.awaitIdle()
         #expect(h.progress.noteID == nil)
-        #expect(told.paused == [a: .user])
-
-        await h.coordinator.transcribe(speakers, kind: .speakersOnly)
-        try await h.run(1).finish(.paused(.user))
-        await h.coordinator.awaitIdle()
-        await h.coordinator.transcribe(trashed)
-        let last = try await h.run(2)
-        #expect(h.coordinator.moveToTrash(trashed)?.state == .paused)
-        last.finish(.paused(.user))
-        await h.coordinator.waitForJob(of: trashed)
-        #expect(told.paused == [a: .user], "neither a speakers-only job nor a note going to Recently Deleted says so")
+        #expect(h.coordinator.state.jobs[a]?.state == .paused)
     }
 
     // MARK: Background time

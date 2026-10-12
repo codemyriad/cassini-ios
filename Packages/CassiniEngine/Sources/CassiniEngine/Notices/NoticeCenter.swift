@@ -73,6 +73,8 @@ import CassiniNotebook
     public func dismiss(_ kind: BannerKind) {
         switch kind {
         case .recovered:
+            // The moment of recovery, not of recording, so the acknowledgement only moves forward and a later launch's
+            // recovery shows again.
             if let latest = facts.recovered.map(\.recoveredAt).max() { settings.acknowledgeRecovered(upTo: latest) }
         case .notesUnreadable:
             closed.insert(kind)
@@ -82,8 +84,9 @@ import CassiniNotebook
         for handler in dismissHandlers { handler(kind) }
     }
 
-    /// The latest recovered recording the RECOVERED banner opens; nil when the banner is not shown.
-    public var latestRecovered: RecoveredRecording? { facts.recovered.max { $0.recoveredAt < $1.recoveredAt } }
+    /// The latest recorded of the recovered recordings, which the RECOVERED banner opens; nil when the banner is not
+    /// shown.
+    public var latestRecovered: RecoveredRecording? { facts.latestRecovered }
 }
 
 extension BannerKind {

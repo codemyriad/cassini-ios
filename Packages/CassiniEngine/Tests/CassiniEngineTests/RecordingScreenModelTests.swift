@@ -90,7 +90,7 @@ import CassiniNotebook
         let s = try Screen(access: .undetermined, answer: false); defer { s.h.tearDown() }
         await s.model.enter()
         #expect(s.model.phase == .needsPermission)
-        #expect(s.model.banner == .microphoneOff)
+        #expect(s.model.banner?.kind == .recMicOff)
         s.model.perform(.openSettings)
         #expect(s.effects == [.openSettings])
 
@@ -144,12 +144,12 @@ import CassiniNotebook
         await s.model.enter()
         try await s.h.waitFor("the capture") { s.model.phase == .recording }
         s.h.capture.send(.interrupted)
-        try await s.h.waitFor("the banner") { s.model.banner == .pausedByOtherApp }
+        try await s.h.waitFor("the banner") { s.model.banner?.kind == .recPausedOtherApp }
         s.model.perform(.resume)
         #expect(s.model.phase == .recording)
         let perSecond = RecordingPolicy.pcmBytesPerSecond + RecordingPolicy.finishBytesPerSecond
         s.h.storage.set(availableBytes: Limits.minRecordingFreeBytes + 10 * 60 * perSecond)
-        try await s.h.waitFor("the warning") { s.model.banner == .storageLow(minutes: 10) }
+        try await s.h.waitFor("the warning") { s.model.banner == Notices.spec(.storageLow(minutes: 10)) }
     }
 
     private func finish(_ s: Screen) async throws -> RecordingEffect? {
@@ -219,7 +219,7 @@ import CassiniNotebook
         try await s.h.waitFor("the capture") { s.model.phase == .recording }
         let id = try #require(s.h.controller.state.noteID)
         s.h.storage.set(availableBytes: Limits.minRecordingFreeBytes - 1)
-        try await s.h.waitFor("the banner") { s.model.banner == .stoppedForSpace }
+        try await s.h.waitFor("the banner") { s.model.banner?.kind == .recStoppedStorage }
         #expect(s.model.phase == .stopping)
         #expect(s.effects == [.show], "the screen shows why the recording stopped")
         s.model.perform(.openNote)
@@ -231,7 +231,7 @@ import CassiniNotebook
         let s = try Screen(); defer { s.h.tearDown() }
         s.h.capture.startError = CocoaError(.featureUnsupported)
         await s.model.enter()
-        try await s.h.waitFor("the banner") { s.model.banner == .couldNotStart }
+        try await s.h.waitFor("the banner") { s.model.banner?.kind == .recCouldNotStart }
         #expect(s.model.phase == .starting)
         #expect(s.effects.isEmpty)
         s.h.capture.startError = nil
@@ -283,7 +283,7 @@ import CassiniNotebook
         let id = try #require(s.h.controller.state.noteID)
         s.model.minimise()
         s.h.storage.set(availableBytes: Limits.minRecordingFreeBytes - 1)
-        try await s.h.waitFor("the banner") { s.model.banner == .stoppedForSpace }
+        try await s.h.waitFor("the banner") { s.model.banner?.kind == .recStoppedStorage }
         #expect(s.effects == [.close, .show])
         s.model.perform(.openNote)
         #expect(s.effects.last == .openNote(id, modelDownload: false))
@@ -295,7 +295,7 @@ import CassiniNotebook
         try await s.h.waitFor("the capture") { s.model.phase == .recording }
         s.model.minimise()
         s.h.capture.send(.failed)
-        try await s.h.waitFor("the banner") { s.model.banner == .microphoneFailed }
+        try await s.h.waitFor("the banner") { s.model.banner?.kind == .recMicFailed }
         s.model.minimise()
         #expect(s.effects == [.close, .show, .close])
     }

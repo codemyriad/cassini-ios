@@ -14,16 +14,20 @@ import CassiniNotebook
         SettingsStore(defaults: UserDefaults(suiteName: suite)!, clock: clock, defaultLanguage: "en-US")
     }
     private func cleanUp() { UserDefaults(suiteName: suite)!.removePersistentDomain(forName: suite) }
+    private func recovered(createdAt: TimeInterval, recoveredAt: TimeInterval, duration: TimeInterval) -> RecoveredRecording {
+        RecoveredRecording(noteID: UUID(), createdAt: Date(timeIntervalSince1970: createdAt),
+                           recoveredAt: Date(timeIntervalSince1970: recoveredAt), duration: duration)
+    }
 
     @Test func everySourceAddsItsFactsAndTwoFactsBothShow() {
         defer { cleanUp() }
         let center = NoticeCenter(settings: settings(), notifier: notifier) { false }
-        let recovered = RecoveredRecording(noteID: UUID(), recoveredAt: Date(timeIntervalSince1970: 900), duration: 312)
-        center.register { $0.recovered = [recovered] }
+        let saved = recovered(createdAt: 400, recoveredAt: 900, duration: 312)
+        center.register { $0.recovered = [saved] }
         center.register { $0.importing = ["call.m4a"] }
         center.register { $0.queueHold = .user; $0.waitingJobs = 2 }
         let facts = center.facts
-        #expect(facts.recovered == [recovered])
+        #expect(facts.recovered == [saved])
         #expect(facts.importing == ["call.m4a"])
         #expect(facts.waitingJobs == 2)
         #expect(center.library(LibraryFacts(loading: true)).map(\.kind) == [.txQueueHeld, .recovered, .importing])
@@ -33,10 +37,10 @@ import CassiniNotebook
         defer { cleanUp() }
         let store = settings()
         let center = NoticeCenter(settings: store, notifier: notifier) { false }
-        let older = RecoveredRecording(noteID: UUID(), recoveredAt: Date(timeIntervalSince1970: 800), duration: 1)
-        let latest = RecoveredRecording(noteID: UUID(), recoveredAt: Date(timeIntervalSince1970: 900), duration: 2)
-        var recovered = [older, latest]
-        center.register { $0.recovered = recovered }
+        let older = recovered(createdAt: 300, recoveredAt: 800, duration: 1)
+        let latest = recovered(createdAt: 400, recoveredAt: 900, duration: 2)
+        var shown = [older, latest]
+        center.register { $0.recovered = shown }
         #expect(center.latestRecovered == latest)
         center.dismiss(.recovered)
         #expect(store.recoveredAck == latest.recoveredAt)
@@ -44,8 +48,8 @@ import CassiniNotebook
         #expect(center.library(LibraryFacts(loading: true)).isEmpty)
 
         // A later recovery shows again; the acknowledgement never goes back.
-        let next = RecoveredRecording(noteID: UUID(), recoveredAt: Date(timeIntervalSince1970: 950), duration: 3)
-        recovered = [older, next]
+        let next = recovered(createdAt: 450, recoveredAt: 950, duration: 3)
+        shown = [older, next]
         #expect(center.facts.recovered == [next])
         store.acknowledgeRecovered(upTo: Date(timeIntervalSince1970: 100))
         #expect(store.recoveredAck == latest.recoveredAt)
@@ -53,6 +57,21 @@ import CassiniNotebook
         let reopened = NoticeCenter(settings: settings(), notifier: notifier) { false }
         reopened.register { $0.recovered = [older, latest] }
         #expect(reopened.facts.recovered.isEmpty, "the acknowledgement is kept across launches")
+    }
+
+    @Test func theLatestRecoveredIsTheLastRecordedAndClosingAcknowledgesThemAll() {
+        defer { cleanUp() }
+        let store = settings()
+        let center = NoticeCenter(settings: store, notifier: notifier) { false }
+        // One launch recovers every recording at one moment; the rebuilt one was recorded last.
+        let rebuilt = recovered(createdAt: 700, recoveredAt: 900, duration: 312)
+        let repaired = recovered(createdAt: 500, recoveredAt: 900, duration: 20)
+        center.register { $0.recovered = [repaired, rebuilt] }
+        #expect(center.latestRecovered == rebuilt)
+        #expect(center.library(LibraryFacts(loading: true)).first?.args.ms1 == 312_000)
+        center.dismiss(.recovered)
+        #expect(store.recoveredAck == Date(timeIntervalSince1970: 900))
+        #expect(center.latestRecovered == nil)
     }
 
     @Test func closingABannerReachesEverySource() {

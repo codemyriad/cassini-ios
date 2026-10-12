@@ -33,7 +33,7 @@ import CassiniNotebook
         let store = try NoteStore(root: root)
         let note = try await liveNote(store)
         let recovered = await recovery.recover(in: store, activeNoteID: nil)
-        #expect(recovered == [RecoveredRecording(noteID: note.id, recoveredAt: clock.now, duration: 42)])
+        #expect(recovered == [RecoveredRecording(noteID: note.id, createdAt: note.createdAt, recoveredAt: clock.now, duration: 42)])
         #expect(repairer.urls == [store.audioURL(for: note)])
         let saved = try #require(await store.note(note.id))
         #expect(saved.audio == .plain)

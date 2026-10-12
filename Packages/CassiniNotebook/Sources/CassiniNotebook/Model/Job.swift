@@ -167,3 +167,17 @@ public struct TrashedJob: Codable, Hashable, Sendable {
     public var kind: JobKind
     public init(state: JobState, kind: JobKind) { self.state = state; self.kind = kind }
 }
+
+extension DownloadError {
+    /// The failure whose message a download error shows in "Couldn't transcribe" (Android
+    /// `ModelInstallOwner.failureOf`): no space, a failed file check and a failed install have their own; the rest
+    /// are a failed download.
+    public var failure: JobFailure {
+        switch self {
+        case .notEnoughStorage: .space
+        case .fileCheckFailed: .modelVerify
+        case .install: .modelInstall
+        case .noConnection, .interrupted, .hostNotAllowed, .stoppedBySystem: .modelDownload
+        }
+    }
+}
