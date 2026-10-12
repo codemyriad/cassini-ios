@@ -51,7 +51,7 @@ import CassiniNotebook
             analyzer: environment.analyzer, storage: environment.storage, notifier: environment.notifier,
             root: environment.root)
         settingsPorts = SettingsAdapter(settings: settings, library: library, voices: voices, processing: processing,
-                                        notifier: environment.notifier)
+                                        notifier: environment.notifier, transcriber: environment.transcriber)
         registerStartup()
     }
 
@@ -75,7 +75,7 @@ import CassiniNotebook
             return TranscriptionCoordinator(parts, settings: settings)
         }
         let models = ModelInstalls(transcriber: environment.transcriber, analyzer: environment.analyzer,
-                                   clock: environment.clock) { [settings] in settings.speechLanguage }
+                                   clock: environment.clock, job: progress) { [settings] in settings.speechLanguage }
         return ProcessingStore(coordinator: coordinator, progress: progress, checkpoints: checkpoints, models: models,
                                analyzer: environment.analyzer, library: library, notices: notices)
     }

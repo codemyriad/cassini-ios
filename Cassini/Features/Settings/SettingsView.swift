@@ -1,5 +1,4 @@
 import SwiftUI
-import Speech
 import CassiniEngine
 import CassiniNotebook
 
@@ -38,13 +37,12 @@ struct SettingsView: View {
 private struct SettingsForm: View {
     let model: SettingsModel
     @Environment(SettingsStore.self) private var settings
-    @Environment(JobProgress.self) private var progress
 
     var body: some View {
         @Bindable var settings = settings
         Form {
             AppLanguageSection(open: model.openAppLanguage)
-            TranscriptionSection(language: $settings.speechLanguage, autoTranscribe: $settings.autoTranscribe)
+            TranscriptionSection(model: model, language: $settings.speechLanguage, autoTranscribe: $settings.autoTranscribe)
             if model.notificationsOff {
                 Section {
                     NotificationsOffBanner(turnOn: model.turnOnNotifications)
@@ -74,8 +72,6 @@ private struct SettingsForm: View {
                 Text("About", tableName: "Settings")
             }
         }
-        // A job that ends may have installed models: read them again.
-        .onChange(of: progress.modelDownload == nil) { _, ended in if ended { Task { await model.appeared() } } }
     }
 }
 
@@ -110,27 +106,22 @@ private struct AppLanguageSection: View {
 }
 
 private struct TranscriptionSection: View {
+    let model: SettingsModel
     @Binding var language: String
     @Binding var autoTranscribe: Bool
     @Environment(\.locale) private var locale
-    @State private var locales: [Locale] = []
-    @State private var installed: Set<String> = []
 
     var body: some View {
         Section {
             Picker(selection: $language) {
-                if !locales.contains(where: { $0.identifier(.bcp47) == language }) {
-                    Text(name(of: language)).tag(language)
-                }
-                ForEach(locales, id: \.self) { candidate in
-                    let id = candidate.identifier(.bcp47)
+                ForEach(model.languageOptions(chosen: language, name: name(of:)), id: \.id) { option in
                     Group {
-                        if installed.contains(id) {
-                            Text("\(name(of: id)) · Installed", tableName: "Settings")
+                        if option.installed {
+                            Text("\(name(of: option.id)) · Installed", tableName: "Settings")
                         } else {
-                            Text(name(of: id))
+                            Text(name(of: option.id))
                         }
-                    }.tag(id)
+                    }.tag(option.id)
                 }
             } label: {
                 Text("Speech language", tableName: "Settings")
@@ -140,11 +131,6 @@ private struct TranscriptionSection: View {
             Text("Transcription", tableName: "Settings")
         } footer: {
             Text("A new language applies to the next transcription.", tableName: "Settings")
-        }
-        .task {
-            let supported = await SpeechTranscriber.supportedLocales
-            locales = supported.sorted { name(of: $0.identifier(.bcp47)) < name(of: $1.identifier(.bcp47)) }
-            installed = Set(await SpeechTranscriber.installedLocales.map { $0.identifier(.bcp47) })
         }
     }
 

@@ -113,11 +113,13 @@ public actor SpeakerModelInstaller {
                                progress: { reporter.yield(.fraction($0)) }, checking: { reporter.yield(.checking) })
         }
         current = Install(number: number, task: task)
-        Task {
+        let delivery = Task {
             for await report in reports { self.apply(report, for: number) }
         }
         Task {
             let result = await task.result
+            // Every report reaches the callers before the outcome does.
+            await delivery.value
             self.finish(number, result)
         }
         return number

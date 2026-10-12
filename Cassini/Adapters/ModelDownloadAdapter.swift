@@ -18,16 +18,11 @@ import CassiniNotebook
         self.analyzer = analyzer; self.storage = storage; self.notifier = notifier; self.root = root
     }
 
-    /// Apple's speech model for the chosen language, unless it is installed or cannot be used here; the speaker
-    /// models when speakers are told apart.
-    func plan() async -> ModelPlan {
-        var missing: [ModelPart] = []
-        switch await transcriber.assetStatus(locale: Locale(identifier: settings.speechLanguage)) {
-        case .ready, .unsupported: break
-        default: missing.append(.speech)
-        }
-        if settings.identifySpeakers, await analyzer.modelStatus() != .ready { missing.append(.speakers) }
-        return ModelPlan(missing: missing)
+    /// `ModelPlan.plan` over the speech assets of the chosen language and the speaker models' status.
+    func plan(for noteID: UUID?) async -> ModelPlan {
+        ModelPlan.plan(speech: await transcriber.assetStatus(locale: Locale(identifier: settings.speechLanguage)),
+                       speakers: await analyzer.modelStatus(), forNote: noteID != nil,
+                       identifySpeakers: settings.identifySpeakers, speakersInstallBytes: analyzer.modelInstallBytes)
     }
 
     func usableBytes() async -> Int64 { storage.availableBytes(at: root) }

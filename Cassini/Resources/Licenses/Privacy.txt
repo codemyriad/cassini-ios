@@ -24,11 +24,13 @@ Cassini downloads no model before you agree. The "Transcribe on this device" scr
 - Speech recognition: Apple's on-device speech models. iOS downloads them from Apple and keeps them; Cassini asks iOS to install the model for the speech language you choose.
 - Telling speakers apart and recognising saved voices (pyannote community-1, converted to Core ML by FluidInference): `huggingface.co`
 
-A host can send the download to a different host (a redirect). The speaker models come from these hosts:
+A host can send the download to a different host (a redirect). The speaker model downloads normally use these hosts:
 
 - `huggingface.co`
 - `*.huggingface.co`: the subdomains of `huggingface.co`
 - `*.hf.co`: the subdomains of `hf.co` (the file storage of Hugging Face)
+
+Cassini does not hold a redirect to these hosts. It checks the models instead: they are pinned to one revision, and every file must match its SHA-256 hash before Cassini uses it.
 
 A host receives the IP address of your device and the name of the file. The privacy policy of each host applies to these data. Cassini sends no cookies and no account data.
 
