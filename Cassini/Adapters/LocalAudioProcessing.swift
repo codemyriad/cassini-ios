@@ -16,4 +16,8 @@ struct LocalAudioProcessing: AudioProcessing {
     func decodeOpus(_ source: URL, to destination: URL) async throws {
         try await Task.detached(priority: .userInitiated) { try OpusAudio.decode(source, to: destination) }.value
     }
+
+    func encodeOpus(_ source: URL, to destination: URL) async throws {
+        try await Task.detached(priority: .userInitiated) { try OpusAudio.encode(source, to: destination) }.value
+    }
 }

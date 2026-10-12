@@ -28,24 +28,27 @@ import CassiniNotebook
         }
     }
 
-    /// Reads every note, then follows the changes others write.
+    /// Reads every note, then follows the changes others write. It subscribes before reading, so a change saved
+    /// while the notes are read is applied after them rather than lost; a note placed meanwhile is kept.
     func load() async {
         guard let noteStore else {
             errors.present("Could not open your library: \(loadFailure ?? "")")
             return
         }
+        let stream = await noteStore.changes()
         do {
             try FileManager.default.setAttributes([.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
                                                   ofItemAtPath: noteStore.root.path)
             let report = try await noteStore.load()
+            let placedMeanwhile = notes
             notes = report.notes
+            for note in placedMeanwhile where self.note(note.id) == nil { place(note) }
             unreadableCount = report.unreadableCount
         } catch {
             loadFailure = error.localizedDescription
             errors.present("Could not open your library: \(error.localizedDescription)")
             return
         }
-        let stream = await noteStore.changes()
         changes = Task { [weak self] in
             for await change in stream { self?.apply(change) }
         }
@@ -104,6 +107,12 @@ import CassiniNotebook
         guard let noteStore else { throw CocoaError(.fileWriteUnknown) }
         try await enqueueThrowing { try await noteStore.delete(id) }
         notes.removeAll { $0.id == id }
+    }
+
+    /// Shows a note that another writer (an import) just saved to `NoteStore`, ahead of its change notification.
+    func adopt(_ note: Note) {
+        guard pendingWrites[note.id, default: 0] == 0 else { return }
+        place(note)
     }
 
     /// Waits until every write asked for so far has finished.

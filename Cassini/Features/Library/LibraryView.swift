@@ -42,7 +42,7 @@ struct LibraryView: View {
                     }
                 }
                 if recording.state.isActive { ActiveRecordingCard() }
-                if imports.isImporting { Label("Importing audio…", systemImage: "arrow.down.doc").font(.subheadline).foregroundStyle(Color.muted) }
+                ImportActivity()
                 if visible.isEmpty { LibraryEmptyState(query: query, favoritesOnly: favoritesOnly) }
                 else {
                     ForEach(grouped, id: \.0) { date, notes in
@@ -82,9 +82,9 @@ struct LibraryView: View {
         }
         .onChange(of: query) { _, query in if restoresSceneState { savedQuery = query } }
         .onChange(of: favoritesOnly) { _, favoritesOnly in if restoresSceneState { savedFavoritesOnly = favoritesOnly } }
-        .fileImporter(isPresented: $importing, allowedContentTypes: [.audio], allowsMultipleSelection: false) { result in
+        .fileImporter(isPresented: $importing, allowedContentTypes: ImportStore.contentTypes, allowsMultipleSelection: true) { result in
             switch result {
-            case .success(let urls): if let url = urls.first { Task { await imports.importAudio(url) } }
+            case .success(let urls): imports.start(urls)
             case .failure(let error): errors.present(error.localizedDescription)
             }
         }

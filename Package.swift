@@ -26,8 +26,8 @@ let package = Package(
         .testTarget(name: "CassiniCoreTests", dependencies: ["CassiniCore"]),
         .target(name: "CassiniNotebook", dependencies: ["CassiniCore"], path: "Packages/CassiniNotebook/Sources/CassiniNotebook"),
         .testTarget(name: "CassiniNotebookTests", dependencies: ["CassiniNotebook", "CassiniCore"], path: "Packages/CassiniNotebook/Tests/CassiniNotebookTests"),
-        .target(name: "CassiniEngine", dependencies: ["CassiniNotebook"], path: "Packages/CassiniEngine/Sources/CassiniEngine"),
-        .target(name: "CassiniEngineTesting", dependencies: ["CassiniEngine", "CassiniNotebook"], path: "Packages/CassiniEngine/Sources/CassiniEngineTesting"),
+        .target(name: "CassiniEngine", dependencies: ["CassiniCore", "CassiniNotebook"], path: "Packages/CassiniEngine/Sources/CassiniEngine"),
+        .target(name: "CassiniEngineTesting", dependencies: ["CassiniCore", "CassiniEngine", "CassiniNotebook"], path: "Packages/CassiniEngine/Sources/CassiniEngineTesting"),
         .testTarget(name: "CassiniEngineTests", dependencies: ["CassiniEngine", "CassiniEngineTesting", "CassiniNotebook"], path: "Packages/CassiniEngine/Tests/CassiniEngineTests")
     ]
 )
