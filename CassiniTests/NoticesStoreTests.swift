@@ -123,4 +123,5 @@ private struct NoSpaceTranscriber: Transcribing {
     func installAssets(locale: Locale, progress: @escaping @Sendable (Double) -> Void) async throws {
         throw TranscriptionError.failed(.download(.notEnoughStorage))
     }
+    func speechLanguages() async -> [SpeechLanguage] { [] }
 }

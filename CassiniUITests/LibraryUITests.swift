@@ -167,8 +167,9 @@ final class LibraryUITests: XCTestCase {
         let app = launch([])
         XCTAssertTrue(app.staticTexts["No notes yet"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Record something, or import an audio file."].exists)
-        XCTAssertTrue(app.buttons["Record"].exists, "the empty state's own Record")
-        XCTAssertEqual(app.buttons.matching(NSPredicate(format: "label == 'Import audio'")).count, 2, "and its own Import")
+        XCTAssertTrue(app.buttons["Record"].exists, "the LIB_EMPTY banner's own Record")
+        XCTAssertTrue(app.buttons["Import"].exists, "and its own Import, as Android's banner")
+        XCTAssertTrue(app.buttons["Import audio"].exists, "beside the capture bar's Import audio")
         XCTAssertTrue(app.staticTexts["Transcribed on this device. Audio never leaves it."].exists)
         capture("Library empty")
     }

@@ -36,7 +36,9 @@ final class CassiniUITests: XCTestCase {
         capture("Library")
         let search = app.textFields["librarySearch"]
         search.tap(); search.typeText("Thursday")
-        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "A quieter kind of productivity")).firstMatch.exists)
+        // The search answers 150 ms after the last keystroke.
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "A quieter kind of productivity")).firstMatch
+            .waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Thoughts from the morning walk")).firstMatch.exists)
         app.buttons["Clear search"].tap()
         openFixture(app)
