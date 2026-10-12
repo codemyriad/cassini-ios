@@ -33,6 +33,9 @@ import CassiniNotebook
     /// The saved voices cannot be changed: newer, damaged or unreadable, or the private folder could not be opened.
     var isReadOnly: Bool { store == nil || snapshot.isReadOnly }
     var hasEvidence: Bool { snapshot.hasEvidence }
+    /// Whether Saved voices offers Forget all voice data with no person listed: there are prints to delete, or the list
+    /// is damaged and only Forget everyone starts it again.
+    var offersForgetAllData: Bool { snapshot.canForgetEveryone && (hasEvidence || snapshot.problem == .damaged) }
 
     /// Saved voices as the screen lists them.
     var summaries: [SavedVoiceSummary] {

@@ -288,6 +288,161 @@ import CassiniEngineTesting
         } catch {}
     }
 
+    /// A note whose note.json can't be read now keeps its folder, and so keeps its voiceprints through the sweep.
+    func testTheLaunchSweepKeepsThePrintsOfNotesThatCouldNotBeRead() async throws {
+        let test = TestGraph(); defer { test.tearDown() }
+        let unreadable = UUID()
+        let noteFolder = test.root.appendingPathComponent(unreadable.uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: noteFolder, withIntermediateDirectories: true)
+        try Data(#"{"schemaVersion":3}"#.utf8).write(to: noteFolder.appendingPathComponent(NoteRepository.metadataFilename))
+        let folder = test.root.appendingPathComponent("PrivateVoices", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try NoteVoiceCodec.encode([print]).write(to: folder.appendingPathComponent(NoteVoiceCodec.fileName(unreadable)))
+        let report = await test.graph.start()
+        XCTAssertTrue(report.ran.contains(.voiceLinks))
+        XCTAssertEqual(test.graph.library.unreadableCount, 1)
+        let prints = try await test.graph.voices.store?.prints(noteID: unreadable)
+        XCTAssertEqual(prints, [print])
+    }
+
+    /// While the saved voices can't be read, the list is not known: opening another version keeps every link.
+    func testSelectingAVersionWhileTheVoicesAreNewerKeepsTheLinks() async throws {
+        let test = TestGraph(); defer { test.tearDown() }
+        let alex = UUID()
+        var note = Note(title: "Versions")
+        note.status = .ready
+        note.speakers = [NoteSpeaker(id: "a", name: "Alex", match: .confirmed(voice: alex, score: 1))]
+        note.transcript = [.init(text: "Hello", start: 0, end: 8, speaker: "Alex", speakerID: "a")]
+        let first = UUID()
+        note.saveCurrentVersion(name: "First", id: first)
+        note.transcript = [.init(text: "Hello again", start: 0, end: 8, speaker: "Alex", speakerID: "a")]
+        note.saveCurrentVersion(name: "Second")
+        try NoteRepository(root: test.root).save(note)
+        let folder = test.root.appendingPathComponent("PrivateVoices", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try Data(#"{"version":2,"voices":[]}"#.utf8).write(to: folder.appendingPathComponent("voices.json"))
+        await test.graph.start()
+        XCTAssertTrue(test.graph.voices.isReadOnly)
+
+        test.graph.voices.selectTranscriptVersion(noteID: note.id, versionID: first)
+        await test.graph.library.settle()
+
+        let stored = try XCTUnwrap(NoteRepository(root: test.root).load().notes.first { $0.id == note.id })
+        XCTAssertEqual(stored.selectedVersionID, first)
+        XCTAssertEqual(stored.speakers?.first?.match, .confirmed(voice: alex, score: 1))
+        XCTAssertEqual(stored.versions?.map { $0.speakers.first?.match }, [.confirmed(voice: alex, score: 1), .confirmed(voice: alex, score: 1)])
+    }
+
+    /// Two names saved at once (two suggestion cards, say) both start from the same saved voices; both are kept.
+    func testOverlappingNamesKeepBothVoices() async throws {
+        let test = TestGraph(); defer { test.tearDown() }
+        let repository = try NoteRepository(root: test.root)
+        var notes: [Note] = []
+        for title in ["One", "Two"] {
+            var note = Note(title: title)
+            note.status = .ready
+            note.speakers = [NoteSpeaker(id: "a", name: "Speaker 1")]
+            note.transcript = [.init(text: "Hello", start: 0, end: 10, speaker: "Speaker 1", speakerID: "a")]
+            try repository.save(note)
+            notes.append(note)
+        }
+        await test.graph.start()
+        let voices = test.graph.voices
+        try await voices.store?.savePrints([print], noteID: notes[0].id)
+        try await voices.store?.savePrints([SpeakerPrint(speakerID: "a", model: "test", vector: [0, 1], speechSeconds: 10)],
+                                           noteID: notes[1].id)
+
+        let luca = Task { try await self.remember("Luca", in: notes[0].id, voices: voices) }
+        let sam = Task { try await self.remember("Sam", in: notes[1].id, voices: voices) }
+        try await luca.value
+        try await sam.value
+        await test.graph.library.settle()
+
+        let saved = await voices.store?.voices()
+        let stored = try XCTUnwrap(saved)
+        XCTAssertEqual(Set(stored.map(\.name)), ["Luca", "Sam"])
+        for (note, name) in zip(notes, ["Luca", "Sam"]) {
+            let voice = try XCTUnwrap(stored.first { $0.name == name })
+            XCTAssertEqual(voice.samples.map(\.noteID), [note.id])
+            XCTAssertEqual(test.graph.library.note(note.id)?.speakers?.first?.match.voiceID, voice.id)
+        }
+    }
+
+    /// Acceptance: the note is written but the voices can't be; the note's links go back and the error is shown.
+    func testAVoiceWriteThatFailsPutsTheNotesLinksBack() async throws {
+        let test = TestGraph(); defer { test.tearDown() }
+        let note = try await namedNote(in: test)
+        let voices = test.graph.voices, library = test.graph.library
+        try await remember("Alex", in: note.id, voices: voices)
+        let alex = try XCTUnwrap(voices.savedVoices.first)
+        library.update(note.id) { $0.saveCurrentVersion(name: "Named") }
+        await library.settle()
+        let folder = test.root.appendingPathComponent("PrivateVoices", isDirectory: true)
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: folder.path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: folder.path) }
+
+        do throws(VoicesStore.SaveFailure) {
+            // "Not Alex" on Alex's only sample would forget Alex everywhere.
+            try await voices.perform([.reject(speakerID: "a", voiceID: alex.id, voiceName: "Alex", unenrol: true, restorePlaceholder: false)],
+                                     noteID: note.id, speakerID: "a")
+            XCTFail("the voices were written into a folder that can't be written")
+        } catch {
+            XCTAssertNotEqual(error.message, SpeakersCopy.noteNotSaved)
+            XCTAssertTrue(error.message.contains("could not be written"), error.message)
+        }
+        await library.settle()
+        let stored = try XCTUnwrap(NoteRepository(root: test.root).load().notes.first { $0.id == note.id })
+        XCTAssertEqual(stored.speakers?.first?.match, .confirmed(voice: alex.id, score: 1))
+        XCTAssertEqual(stored.speakers?.first?.excludedVoiceIDs, [])
+        XCTAssertEqual(stored.versions?.last?.speakers.first?.match, .confirmed(voice: alex.id, score: 1))
+        XCTAssertEqual(voices.savedVoices, [alex])
+    }
+
+    /// Deleting a note for good takes its samples; a voice left with none is forgotten and unlinked everywhere.
+    func testRemovingTheOnlyEvidenceOfAVoiceForgetsIt() async throws {
+        let test = TestGraph(); defer { test.tearDown() }
+        let note = try await namedNote(in: test)
+        let voices = test.graph.voices
+        try await remember("Alex", in: note.id, voices: voices)
+        try await voices.removeEvidence(noteID: note.id)
+        XCTAssertTrue(voices.savedVoices.isEmpty)
+        XCTAssertEqual(test.graph.library.note(note.id)?.speakers?.first?.match, .unmatched)
+        XCTAssertEqual(test.graph.library.note(note.id)?.speakers?.first?.name, "Alex")
+    }
+
+    /// A damaged list with no voiceprints left: Forget all voice data is still offered and starts the list again.
+    func testADamagedListWithoutPrintsCanStillBeForgotten() async throws {
+        let test = TestGraph(); defer { test.tearDown() }
+        let folder = test.root.appendingPathComponent("PrivateVoices", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try Data("{".utf8).write(to: folder.appendingPathComponent("voices.json"))
+        await test.graph.start()
+        let voices = test.graph.voices
+        XCTAssertEqual(voices.snapshot.problem, .damaged)
+        XCTAssertFalse(voices.hasEvidence)
+        XCTAssertTrue(voices.offersForgetAllData)
+        let outcome = await voices.forgetEveryone()
+        XCTAssertEqual(outcome, .done)
+        XCTAssertFalse(voices.isReadOnly)
+        XCTAssertFalse(voices.offersForgetAllData)
+    }
+
+    /// A Forget everyone that could not delete everything keeps the notes' links to the voices it kept.
+    func testAForgetEveryoneThatFailsKeepsTheLinks() async throws {
+        let test = TestGraph(); defer { test.tearDown() }
+        let note = try await namedNote(in: test)
+        let voices = test.graph.voices
+        try await remember("Alex", in: note.id, voices: voices)
+        let folder = test.root.appendingPathComponent("PrivateVoices", isDirectory: true)
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: folder.path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: folder.path) }
+
+        let outcome = await voices.forgetEveryone()
+        guard case .failed = outcome else { return XCTFail("forgot everyone in a folder that can't be written: \(outcome)") }
+        XCTAssertEqual(voices.savedVoices.count, 1)
+        XCTAssertNotNil(test.graph.library.note(note.id)?.speakers?.first?.match.voiceID)
+    }
+
     private func waitUntil(timeout: Duration = .seconds(5), _ condition: @MainActor () -> Bool) async {
         let clock = ContinuousClock()
         let deadline = clock.now + timeout

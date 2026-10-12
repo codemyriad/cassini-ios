@@ -34,7 +34,8 @@
   voices); Android opens Name a speaker from the transcript only. Tapping a speaker opens the same Name a speaker sheet.
 - **Saved voices.** The options menu is a system menu, so its open state is not restored; the open dialog is kept with
   the scene (`@SceneStorage`). When nobody is saved but notes still hold voiceprints, iOS offers "Forget all voice
-  data" (kept iOS extension). The read-only banner is drawn by the screen until WP9's banner catalogue takes it over.
+  data" (kept iOS extension); it is also offered for a damaged list, which is empty and read-only, so the user always
+  has a way back. The read-only banner is drawn by the screen until WP9's banner catalogue takes it over.
 - **Copy.** Android's English, with "device" for "phone" ("Remember this voice on this device", "Voiceprints stay on
   this device") because Cassini also runs on iPad.
 - **Versions.** Rows read "Version N" with the version's name and date. Opening the sheet no longer saves the current
@@ -56,11 +57,18 @@
   `carriedExclusions(for:)`, `mergeSpeaker(_:into:stamp:)`, `apply(_: [SpeakerChange])`). `SpeakerStats` lives here,
   not in `Transcript/` as the plan's layout says, because WP8 owns `SpeakerStatsTest`; WP6 should use it.
 - **Files:** `Persistence/VoiceLibrary.swift`; the `VoiceStore` actor (Engine) adds `snapshot()`, `rename`, `forget`,
-  `forgetEveryone` (returning `VoiceEdit`), `appendPrints` and `sweepOrphans(keeping:)`.
+  `forgetEveryone` (returning `VoiceEdit`), `appendPrints`, `commit(_:)` (plans the voice side of a `NamingCommit`
+  against the current list and writes it in one actor step), `removeEvidence` (returns the voices it forgot) and
+  `sweepOrphans(keeping:)`.
 - **Writes:** `VoicesStore.perform(_:noteID:speakerID:)` writes the note first (one `LibraryStore.commit` of value
-  `SpeakerChange`s, safe to rerun) and the voices after; when the voices can't be written the note's links go back.
-  A note that can't be saved leaves the voices untouched.
-- **Launch:** the `.voiceLinks` startup slot deletes the print files of notes that no longer exist.
+  `SpeakerChange`s, safe to rerun) and the voices after, planned again on the `VoiceStore` actor so overlapping
+  writes (two suggestion cards, a rename, a permanent delete) keep each other. Links to forgotten voices are dropped in
+  every note only after the voices are written; when the voices can't be written the note's links go back, in every
+  version. A note that can't be saved leaves the voices untouched. While the saved voices are read-only, opening
+  another version keeps every link, and Forget everyone unlinks the notes only when it succeeded.
+- **Launch:** the `.voiceLinks` startup slot deletes the print files of notes that no longer exist: neither loaded nor
+  with a folder on disk, so a note whose `note.json` could not be read keeps its prints (as Android checks
+  `paths.note(id).exists()`).
 - **Seed:** in `--seed speakers` the second speaker is "Speaker 2" with a suggestion of the saved "Sam Rivera", so the
   note shows the suggestion card (used by `SpeakerNamingFlowTests` and the screenshots).
 - **For WP6:** `TranscriptList(suggestion:)` now gets `SuggestionCard`s from `NoteDetailView`. Making each turn's
