@@ -111,6 +111,25 @@ import CassiniNotebook
         #expect(transcriber.installs == 3, "nor is any later one")
     }
 
+    @Test func aFailedPartThatSucceedsWhenAskedForAgainEndsWithoutItsFailure() async throws {
+        let analyzer = ScriptedAnalyzer(status: .notDownloaded)
+        let transcriber = LanguageTranscriber(["en-US": .notDownloaded], gatedStatus: true, failsInstall: true)
+        let installs = ModelInstalls(transcriber: transcriber, analyzer: analyzer, clock: FakeClock()) { "en-US" }
+        installs.install([.speech])
+        try await until { transcriber.waitingReads == 1 }
+        #expect(installs.download?.failure == .noConnection)
+
+        transcriber.failsInstall = false
+        transcriber.set("en-US", .ready)
+        installs.install([.speech])
+        #expect(installs.download == DownloadFact(part: .speech, at: FakeClock().now), "the notice shows the new install")
+        #expect(installs.status(of: .speech) == .downloading(nil), "and so does the row")
+        try await until { transcriber.releaseReads(); return !installs.isInstalling }
+        #expect(transcriber.installs == 2)
+        #expect(installs.download == nil, "the earlier failure is not told")
+        #expect(installs.status(of: .speech) == .ready)
+    }
+
     @Test func anotherPartAskedForDuringTheClosingRefreshIsInstalled() async throws {
         let analyzer = ScriptedAnalyzer(status: .notDownloaded)
         let transcriber = LanguageTranscriber(["en-US": .notDownloaded], gatedStatus: true)
@@ -317,6 +336,7 @@ private final class LanguageTranscriber: Transcribing {
         var statuses: [String: ModelPartStatus]
         var installs = 0
         var cancelled = false
+        var failsInstall: Bool
         var finish: CheckedContinuation<Void, Never>?
         var reads: [CheckedContinuation<Void, Never>] = []
     }
@@ -324,16 +344,20 @@ private final class LanguageTranscriber: Transcribing {
     private let state: Mutex<State>
     private let gated: Bool
     private let gatedStatus: Bool
-    private let failsInstall: Bool
 
     init(_ statuses: [String: ModelPartStatus], gated: Bool = false, gatedStatus: Bool = false, failsInstall: Bool = false) {
-        state = Mutex(State(statuses: statuses))
-        self.gated = gated; self.gatedStatus = gatedStatus; self.failsInstall = failsInstall
+        state = Mutex(State(statuses: statuses, failsInstall: failsInstall))
+        self.gated = gated; self.gatedStatus = gatedStatus
     }
 
     var installs: Int { state.withLock { $0.installs } }
     var waitingReads: Int { state.withLock { $0.reads.count } }
     var cancelled: Bool { state.withLock { $0.cancelled } }
+    /// Whether the next installs fail with no connection.
+    var failsInstall: Bool {
+        get { state.withLock { $0.failsInstall } }
+        set { state.withLock { $0.failsInstall = newValue } }
+    }
 
     func set(_ language: String, _ status: ModelPartStatus) { state.withLock { $0.statuses[language] = status } }
 
@@ -363,8 +387,11 @@ private final class LanguageTranscriber: Transcribing {
     }
 
     func installAssets(locale: Locale, progress: @escaping @Sendable (Double) -> Void) async throws {
-        state.withLock { $0.installs += 1 }
-        if failsInstall { throw TranscriptionError.failed(.download(.noConnection)) }
+        let fails = state.withLock { state in
+            state.installs += 1
+            return state.failsInstall
+        }
+        if fails { throw TranscriptionError.failed(.download(.noConnection)) }
         guard gated else { return }
         await withTaskCancellationHandler {
             await withCheckedContinuation { continuation in

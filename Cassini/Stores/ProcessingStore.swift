@@ -85,10 +85,11 @@ import CassiniNotebook
 
     func stopAll() { coordinator?.stopAll() }
 
-    /// The download notice's Cancel, as Android's `cancelDownload()`: while the running job downloads a model, the job
-    /// stops and keeps its progress; otherwise the standalone install is cancelled. The files fetched so far stay.
+    /// The download notice's Cancel: while the running job downloads a model, see
+    /// `TranscriptionCoordinator.cancelDownload()`; otherwise the standalone install is cancelled. The files fetched
+    /// so far stay.
     func cancelDownload() {
-        if let id = progress.noteID, progress.modelDownload != nil, coordinator?.stop(id) == true { return }
+        if coordinator?.cancelDownload() == true { return }
         models.cancel()
     }
     func continueQueue() { coordinator?.continueQueue() }

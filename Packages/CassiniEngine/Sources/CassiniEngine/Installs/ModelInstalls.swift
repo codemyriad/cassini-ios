@@ -10,8 +10,8 @@ import CassiniNotebook
 ///   speech language changes and when the running job's model download ends. A refresh asked for while one runs
 ///   reads again once that one ends, so it never returns what was read before it was asked for.
 /// - `install(_:)` installs the parts one after another; a request while one runs adds the parts it does not cover,
-///   which install after it, so nothing is fetched twice. `cancel()` stops it, and a cancel is no failure. Its progress, then the failure of the first part that
-///   failed, is `download`, which the download notice and the Settings rows show. A failed part shows as failed until
+///   which install after it, so nothing is fetched twice. `cancel()` stops it, and a cancel is no failure. Its progress,
+///   then the failure of the first part that failed and was not asked for again, is `download`, which the download notice and the Settings rows show. A failed part shows as failed until
 ///   the next install of it; a failed speech install counts only for the language it was for.
 /// - `statuses` is what the Settings rows show: the running job's model download over the standalone install and the
 ///   stored status. Recognising saved voices uses the speaker models' install, so it always has their status.
@@ -35,6 +35,9 @@ import CassiniNotebook
     @ObservationIgnored private var queued: [ModelPart] = []
     /// The part the running standalone install fetches now; nil during its closing refresh.
     @ObservationIgnored private var inFlight: ModelPart?
+    /// The failures of the running standalone install, in the order they happened; a part asked for again drops its
+    /// own. The first one left is `download` once the install ends.
+    @ObservationIgnored private var installFailures: [DownloadFact] = []
     @ObservationIgnored private var refreshing: Task<Void, Never>?
     /// Refreshes asked for, and the last one whose read has ended.
     @ObservationIgnored private var refreshesAsked = 0
@@ -129,8 +132,14 @@ import CassiniNotebook
         let added = parts.filter { !queued.contains($0) && $0 != inFlight }
         guard !added.isEmpty else { return }
         for part in added { failures[part] = nil }
+        installFailures.removeAll { added.contains($0.part) }
         queued.append(contentsOf: added)
-        guard installing == nil else { return }
+        guard installing == nil else {
+            // During the closing refresh nothing is in flight: the part asked for shows as downloading at once.
+            if inFlight == nil { download = DownloadFact(part: queued[0], at: clock.now) }
+            return
+        }
+        installFailures = []
         installNumber += 1
         let number = installNumber
         download = DownloadFact(part: queued[0], at: clock.now)
@@ -147,6 +156,7 @@ import CassiniNotebook
         self.installing = nil
         inFlight = nil
         queued = []
+        installFailures = []
         download = nil
         installing.cancel()
         if part == .speakers {
@@ -158,7 +168,6 @@ import CassiniNotebook
     /// Installs the queued parts one after another, then reads every part again; parts asked for during that read are
     /// installed before the install ends. Install `number` stops at once when it is cancelled, after its refresh.
     private func drain(_ number: Int) async {
-        var firstFailure: DownloadFact?
         repeat {
             while installNumber == number, !queued.isEmpty {
                 let part = queued.removeFirst()
@@ -169,7 +178,7 @@ import CassiniNotebook
                 inFlight = nil
                 if let failure {
                     download = failure
-                    if firstFailure == nil { firstFailure = failure }
+                    installFailures.append(failure)
                 }
             }
             await refresh()
@@ -177,7 +186,8 @@ import CassiniNotebook
         // No await between the last look at `queued` and the end, so no request is left behind.
         guard installNumber == number else { return }
         installing = nil
-        download = firstFailure
+        download = installFailures.first
+        installFailures = []
     }
 
     /// Installs one part for install `number`; its failure, or nil. A cancel is no failure.
