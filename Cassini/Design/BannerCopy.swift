@@ -6,7 +6,9 @@ import CassiniNotebook
 /// arguments its kind `uses`, formatted.
 enum BannerCopy {
     static func title(_ spec: BannerSpec) -> String { title(spec.kind, spec.args) }
-    static func body(_ spec: BannerSpec) -> String? { body(spec.kind, spec.args) }
+    static func body(_ spec: BannerSpec, locale: Locale = .autoupdatingCurrent) -> String? {
+        body(spec.kind, spec.args, locale: locale)
+    }
 
     static func title(_ kind: BannerKind, _ args: BannerArgs) -> String {
         switch kind {
@@ -60,7 +62,8 @@ enum BannerCopy {
         }
     }
 
-    static func body(_ kind: BannerKind, _ args: BannerArgs) -> String? {
+    /// `locale` formats the decimal sizes ("1.4 GB").
+    static func body(_ kind: BannerKind, _ args: BannerArgs, locale: Locale = .autoupdatingCurrent) -> String? {
         switch kind {
         case .trustVerified: String(localized: "Audio matches the transcript exactly. Everything works.", table: "Notices")
         case .trustNotVerified: String(localized: "The audio could not be checked, so word timing may be off.", table: "Notices")
@@ -125,7 +128,7 @@ enum BannerCopy {
         case .importing: nil
         case .importTooLarge: String(localized: "Choose a file under 4 GB.", table: "Notices")
         case .importNoSpace:
-            String(localized: "This file needs about \(storage(args.bytes)) free. Free some space and try again.", table: "Notices")
+            String(localized: "This file needs about \(storage(args.bytes, locale: locale)) free. Free some space and try again.", table: "Notices")
         case .importOpen: String(localized: "It doesn’t look like audio Cassini can read.", table: "Notices")
         case .notificationsOff: String(localized: "Progress shows only in the app.", table: "Notices")
         case .voicesUnreadable:
@@ -189,9 +192,9 @@ enum BannerCopy {
     }
 
     /// "1.4 GB" from a gibibyte, else megabytes.
-    private static func storage(_ bytes: Int64) -> String {
+    private static func storage(_ bytes: Int64, locale: Locale) -> String {
         guard bytes >= gibibyte else { return megabytes(bytes) }
-        let gb = (Double(bytes) / Double(gibibyte)).formatted(.number.precision(.fractionLength(1)))
+        let gb = (Double(bytes) / Double(gibibyte)).formatted(.number.precision(.fractionLength(1)).locale(locale))
         return String(localized: "\(gb) GB", table: "Notices")
     }
 }

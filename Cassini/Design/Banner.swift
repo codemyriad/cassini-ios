@@ -19,7 +19,7 @@ struct Banner: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(tone.color)
                     .accessibilityAddTraits(.isHeader)
-                if let body = BannerCopy.body(spec) {
+                if let body = BannerCopy.body(spec, locale: locale) {
                     Text(body).font(.subheadline).foregroundStyle(Color.ink)
                 }
                 if !spec.actions.isEmpty { actions.padding(.top, 6) }
@@ -55,6 +55,7 @@ struct Banner: View {
     }
 
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.locale) private var locale
 
     private var actions: some View {
         // Side by side, or one under the other when they do not fit (large text).
