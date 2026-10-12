@@ -12,9 +12,12 @@
   On regular width the Library is the sidebar, so a note moved from the detail column closes there and the snackbar
   shows at the bottom of the sidebar.
 - **The stop confirmation** ("Stop transcription and move to Recently Deleted?") is presented from the root, so the
-  Library's menu and the Note screen's menu share it; Android has one dialog per screen. It is not restored after
-  Cassini is closed (Android keeps it in `SavedStateHandle`); the Delete now and Empty confirmations are, through scene
-  storage.
+  Library's menu and the Note screen's menu share it; Android has one dialog per screen. Like Android's
+  `SavedStateHandle`, scene storage (`trash.stopConfirmation`) brings it back after Cassini was closed, once the library
+  has loaded the note and while it is outside Recently Deleted (`TrashService.askAgain`); Android also does not ask
+  whether the job runs again. The Delete now and Empty confirmations are kept the same way (`trash.dialog`).
+- **Undo snackbar time** runs from when the snackbar showed (`TrashUndo.Snackbar.deadline`), also while the Library is
+  covered; a note restored or deleted from Recently Deleted takes its snackbar with it (`TrashUndo.forget`).
 - **Back label.** iOS has no system Back with "Back to library" / "Back to settings": the navigation bar shows the
   previous screen. `Route.trash` has no `from:`.
 - **Dates** follow the locale: "Deleted Oct 2" in en_US where Android's English shows "Deleted 2 Oct"; the year is shown
@@ -28,15 +31,26 @@
 - **Claims.** Android claims a note under its note lock; on iOS `TrashService` is main-actor and keeps the claimed ids,
   so Restore refuses a note being deleted and a delete that failed gives it back. The race tests that need two threads
   (`aRestoreRacingThePurgeNeverLosesARestoredNote`) do not apply; the interleavings at the first step are ported.
-- **Unreadable saved voices.** Nothing is deleted (not even the job), the purge sets one lasting fact
-  (`TrashService.voicesUnavailable`, contributed as `NoticeFacts.voicesUnavailable`) and raises no alert, however often
-  it runs; the launch report keeps the failure. Delete now and Empty, which the user asks for, say why in one alert.
+- **A note that fails to delete** stays in Recently Deleted and the others still go, as Android's `count { purge }`:
+  Empty and the purge throw `TrashError.deleteFailed(noteIDs:)` once at the end, naming every note that stayed, and the
+  purge is recorded (`didPurge`) either way. The alert names the note when one stayed, else how many. A note directory
+  already gone counts as deleted, as Android's `!dir.exists()`.
+- **Unreadable saved voices.** Nothing more is deleted (not even the next note's job: the voices are checked before
+  each job is removed, and stop the whole run), the purge sets one lasting fact (`TrashService.voicesUnavailable`) and
+  raises no alert, however often it runs; the launch report keeps the failure. Delete now and Empty, which the user
+  asks for, say why in one alert. No notice is built from the fact yet: the one notice shown today is the load's own
+  ("Saved voices could not be read"). WP9's NoticeCenter must call `trash.contribute(to:)` (and
+  `processing.contribute(to:)`) when it builds the `NoticeFacts`.
 - **Tests that change shape.** `TrashViewModelTest#backCloses` does not apply (the system Back pops the screen).
   `PurgeOrderTest#aRebuildAfterTheFileDeleteDoesNotBringTheNoteBack` is the `.purging` rename (`NoteDeletionTests`):
   iOS has no catalogue to rebuild, but the launch rebuilds bare audio directories.
 
 ## Interface changes (for the integrator)
 
+- `TrashError.deleteFailed(noteID:)` is now `deleteFailed(noteIDs:)`. `TrashDialogs` (CassiniEngine) holds the Trash
+  screen's Delete now / Empty request and its confirm and dismiss. `TrashService.askAgain(_:)` restores the stop
+  confirmation; `TrashUndo.forget(_:)` and `Snackbar.deadline` are new.
+- Integration: WP9's NoticeCenter calls `trash.contribute(to:)` to turn `voicesUnavailable` into its lasting notice.
 - `TrashStore` (app) is gone. `TrashService` (CassiniEngine `Trash/`) is in the environment and is `AppGraph.trash`;
   `TrashUndo` is `trash.undo` and also in the environment. Screens call `requestTrash(_:)` (asks first for a running
   note), `restore(_:)`, `deleteNow(_:)`, `emptyTrash()` and `purgeExpired()`; the last three throw `TrashError`.
@@ -53,7 +67,8 @@
 
 ## Tests
 
-Ported: `TrashPolicyTest` (all), `TrashViewModelTest` (the cards, restore, the dialogs and their storage, empty),
+Ported: `TrashPolicyTest` (all), `TrashViewModelTest` (the cards, restore, and over `TrashDialogs` the Delete now
+dialog after a process death and Empty's count, Cancel and Delete),
 `PurgeOrderTest` (`eachStepRunsBeforeTheNext`, both crash cases, `aRestoreAfterTheTrashSnapshotKeepsTheNote`,
 `anExpiredNoteRestoredAndTrashedAgainIsNotPurged`, `aRestoreDuringThePurgeOfTheSameNoteIsRefused`,
 `aRestoreAfterAFailedPurgeBringsTheDocumentBackWithoutItsVoices`), `LibraryViewModelTest`
