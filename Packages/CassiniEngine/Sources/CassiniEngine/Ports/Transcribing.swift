@@ -37,6 +37,8 @@ public enum TranscriptionError: Error, Hashable {
     case needsConsent
 }
 
+/// A transcriber that read its input to the end reports `.progress(done: total, total: total)` before it returns; one
+/// that cannot read the input to the end throws `TranscriptionError.failed(.open)` rather than returning what it has.
 public protocol Transcribing: Sendable {
     func transcribe(_ request: TranscriptionRequest,
                     events: @escaping @Sendable (TranscriptionEvent) -> Void) async throws -> TranscriptionResult
