@@ -18,6 +18,8 @@ import CassiniNotebook
     let imports: ImportStore
     let trash: TrashService
     let exports: ExportStore
+    /// What the Settings screen reads.
+    let settingsPorts: SettingsAdapter
 
     init(environment: AppEnvironment) {
         self.environment = environment
@@ -48,6 +50,8 @@ import CassiniNotebook
             settings: settings, processing: processing, transcriber: environment.transcriber,
             analyzer: environment.analyzer, storage: environment.storage, notifier: environment.notifier,
             root: environment.root)
+        settingsPorts = SettingsAdapter(settings: settings, library: library, voices: voices, processing: processing,
+                                        notifier: environment.notifier, transcriber: environment.transcriber)
         registerStartup()
     }
 
@@ -70,15 +74,17 @@ import CassiniNotebook
                 progress: progress)
             return TranscriptionCoordinator(parts, settings: settings)
         }
-        return ProcessingStore(coordinator: coordinator, progress: progress,
-                               checkpoints: checkpoints, transcriber: environment.transcriber,
-                               analyzer: environment.analyzer, library: library, notices: notices,
-                               clock: environment.clock)
+        let models = ModelInstalls(transcriber: environment.transcriber, analyzer: environment.analyzer,
+                                   clock: environment.clock, job: progress) { [settings] in settings.speechLanguage }
+        return ProcessingStore(coordinator: coordinator, progress: progress, checkpoints: checkpoints, models: models,
+                               analyzer: environment.analyzer, library: library, notices: notices)
     }
 
     /// Runs the launch steps once; the app is ready when it returns.
     @discardableResult func start() async -> StartupReport {
         let report = await startup.run()
+        // The models' status is read once the library is ready, without holding the launch for it.
+        Task { [models = processing.models] in await models.refresh() }
         #if DEBUG
         if let seed = environment.launch.seed { TestFixtures.prepare(seed, settings: settings, processing: processing) }
         switch environment.launch.openFixture {
@@ -147,6 +153,7 @@ extension View {
             .environment(graph.playback).environment(graph.processing).environment(graph.processing.progress)
             .environment(graph.recording)
             .environment(graph.imports).environment(graph.trash).environment(graph.trash.undo).environment(graph.exports)
+            .environment(graph.settingsPorts)
             .environment(\.clock, graph.environment.clock)
             .environment(\.locale, graph.environment.locale)
             .environment(\.timeZone, graph.environment.timeZone)

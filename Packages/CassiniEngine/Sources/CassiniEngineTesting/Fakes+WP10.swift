@@ -1,0 +1,22 @@
+#if DEBUG
+import Foundation
+import CassiniEngine
+
+extension FakeAnalyzer {
+    public func refreshModelStatus() async -> ModelPartStatus { await modelStatus() }
+
+    /// Reports the install as done at once; nothing is installed, so `modelStatus` stays as it was.
+    public func installModels(progress: @escaping @Sendable (Double?) -> Void) async throws { progress(1) }
+
+    /// The fake's install ends at once, so there is nothing to cancel.
+    public func cancelModelInstall() async {}
+
+    /// About what the real speaker models ask for.
+    public var modelInstallBytes: Int64 { 54_000_000 }
+}
+
+extension FakeTranscriber {
+    /// The fake's one language, installed when its assets are ready.
+    public func speechLanguages() async -> [SpeechLanguage] { [SpeechLanguage(id: "en-US", installed: status == .ready)] }
+}
+#endif

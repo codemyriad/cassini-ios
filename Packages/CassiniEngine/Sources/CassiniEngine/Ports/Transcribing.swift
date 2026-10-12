@@ -47,4 +47,15 @@ public protocol Transcribing: Sendable {
     /// reporting the fraction done. Does nothing when it is installed or not offered for `locale`; a failed download
     /// or install throws `TranscriptionError.failed(.download(_))`.
     func installAssets(locale: Locale, progress: @escaping @Sendable (Double) -> Void) async throws
+    /// The languages the speech model can transcribe here, each marked when its assets are installed.
+    func speechLanguages() async -> [SpeechLanguage]
+}
+
+/// A language of speech the transcriber offers.
+public struct SpeechLanguage: Hashable, Sendable {
+    /// BCP-47, as `SettingsStore.speechLanguage` stores it.
+    public var id: String
+    /// Its speech assets are on the device.
+    public var installed: Bool
+    public init(id: String, installed: Bool) { self.id = id; self.installed = installed }
 }

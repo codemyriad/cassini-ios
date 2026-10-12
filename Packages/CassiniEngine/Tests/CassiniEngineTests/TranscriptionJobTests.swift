@@ -328,6 +328,23 @@ import CassiniNotebook
         #expect(events.contains { $0.stage == .speakers })
     }
 
+    @Test func aSpeakersOnlyJobEndsWithTheSpeakerModelDownloadFailure() async throws {
+        let failure = SpeakerAnalysisError.download(.notEnoughStorage, requiredFreeBytes: 54_000_000)
+        let h = try await Harness(analyzer: InstallFailingAnalyzer(failure: failure))
+        let (outcome, _) = await h.run(kind: .speakersOnly)
+        #expect(outcome == .downloadFailed(DownloadFailure(error: .notEnoughStorage, part: .speakers,
+                                                           requiredFreeBytes: 54_000_000)))
+        #expect(h.applied.isEmpty)
+    }
+
+    @Test func aTranscriptionWhoseSpeakerModelsFailToDownloadKeepsItsWordsInOneVoice() async throws {
+        let h = try await Harness(analyzer: InstallFailingAnalyzer(failure: .download(.noConnection, requiredFreeBytes: 0)))
+        let (outcome, events) = await h.run()
+        #expect(outcome == .done)
+        #expect(events.contains(.speakersUnavailable))
+        #expect(await h.note()?.speakerAnalysisFailure == .speakers)
+    }
+
     @Test func aStopInTheSpeakerStepKeepsTheWordsAndResumesWithTheSpeakers() async throws {
         let analyzer = FakeAnalyzer(suspends: true)
         let h = try await Harness(analyzer: analyzer)
@@ -634,6 +651,8 @@ private final class ScriptedTranscriber: Transcribing, @unchecked Sendable {
     func assetStatus(locale: Locale) async -> ModelPartStatus { status }
 
     func installAssets(locale: Locale, progress: @escaping @Sendable (Double) -> Void) async throws { progress(1) }
+
+    func speechLanguages() async -> [SpeechLanguage] { [] }
 }
 
 /// The real files, recording each checkpoint saved.
@@ -677,6 +696,21 @@ private final class FakeHost: TranscriptionJobHost, @unchecked Sendable {
     }
 }
 
+/// An analyzer whose model install fails with `failure`.
+private struct InstallFailingAnalyzer: SpeakerAnalyzing {
+    let failure: SpeakerAnalysisError
+    func analyze(url: URL, allowDownload: Bool,
+                 progress: @escaping @Sendable (SpeakerAnalysisEvent) -> Void) async throws -> SpeakerAnalysis {
+        throw failure
+    }
+    var modelIdentity: String? { get async { nil } }
+    func modelStatus() async -> ModelPartStatus { .notDownloaded }
+    func refreshModelStatus() async -> ModelPartStatus { .notDownloaded }
+    func installModels(progress: @escaping @Sendable (Double?) -> Void) async throws { throw failure }
+    func cancelModelInstall() async {}
+    var modelInstallBytes: Int64 { 0 }
+}
+
 private struct FailingAnalyzer: SpeakerAnalyzing {
     struct Failure: Error {}
     func analyze(url: URL, allowDownload: Bool,
@@ -685,6 +719,10 @@ private struct FailingAnalyzer: SpeakerAnalyzing {
     }
     var modelIdentity: String? { get async { "m:1" } }
     func modelStatus() async -> ModelPartStatus { .ready }
+    func refreshModelStatus() async -> ModelPartStatus { .ready }
+    func installModels(progress: @escaping @Sendable (Double?) -> Void) async throws {}
+    func cancelModelInstall() async {}
+    var modelInstallBytes: Int64 { 0 }
 }
 
 private extension JobEvent {

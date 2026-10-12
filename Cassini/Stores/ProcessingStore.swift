@@ -15,32 +15,26 @@ import CassiniNotebook
     @ObservationIgnored let progress: JobProgress
     /// What the model download screen works with; set once the graph is built.
     @ObservationIgnored var modelDownload: (any ModelDownloadPorts)?
-    /// The standalone install of the speech model (the model download screen's Download): its progress, then its
-    /// failure; nil when none ran or it finished.
-    private(set) var speechInstall: DownloadFact?
+    /// The models outside any job: their stored status and the model download screen's standalone Download.
+    @ObservationIgnored let models: ModelInstalls
     @ObservationIgnored private let checkpoints: any CheckpointStoring
-    @ObservationIgnored private let transcriber: any Transcribing
     @ObservationIgnored private let analyzer: any SpeakerAnalyzing
     @ObservationIgnored private let library: LibraryStore
     @ObservationIgnored private let notices: NoticesStore
-    @ObservationIgnored private let clock: any AppClock
-    @ObservationIgnored private var installing: Task<Void, Never>?
     /// Notes whose audio is still being written; they cannot be queued yet.
     @ObservationIgnored private var finalizing: Set<UUID> = []
     /// Notes waiting for their job to end on their way to Recently Deleted; they cannot be queued meanwhile.
     @ObservationIgnored private var trashing: Set<UUID> = []
 
     init(coordinator: TranscriptionCoordinator?, progress: JobProgress, checkpoints: any CheckpointStoring,
-         transcriber: any Transcribing, analyzer: any SpeakerAnalyzing, library: LibraryStore, notices: NoticesStore,
-         clock: any AppClock) {
+         models: ModelInstalls, analyzer: any SpeakerAnalyzing, library: LibraryStore, notices: NoticesStore) {
         self.coordinator = coordinator
         self.progress = progress
         self.checkpoints = checkpoints
-        self.transcriber = transcriber
+        self.models = models
         self.analyzer = analyzer
         self.library = library
         self.notices = notices
-        self.clock = clock
         coordinator?.onPause = { [weak self] id, reason in self?.postPaused(id, reason: reason) }
     }
 
@@ -72,37 +66,6 @@ import CassiniNotebook
         return await coordinator.handOff(id)
     }
 
-    /// Installs Apple's speech model for `language` now, outside any job, with its progress and failure in
-    /// `speechInstall`. A second request while one runs joins it.
-    func installSpeechModel(language: String) {
-        guard installing == nil else { return }
-        speechInstall = DownloadFact(part: .speech, at: clock.now)
-        installing = Task { [weak self, transcriber] in
-            let failure: DownloadError?
-            do {
-                try await transcriber.installAssets(locale: Locale(identifier: language)) { fraction in
-                    Task { @MainActor in self?.reportInstall(fraction) }
-                }
-                failure = nil
-            } catch TranscriptionError.failed(.download(let error)) {
-                failure = error
-            } catch {
-                failure = .install
-            }
-            self?.finishInstall(failure)
-        }
-    }
-
-    private func reportInstall(_ fraction: Double) {
-        guard installing != nil else { return }
-        speechInstall = DownloadFact(part: .speech, fraction: fraction, at: clock.now)
-    }
-
-    private func finishInstall(_ failure: DownloadError?) {
-        installing = nil
-        speechInstall = failure.map { DownloadFact(part: .speech, failure: $0, at: clock.now) }
-    }
-
     /// Whether the note has a stopped transcription to resume.
     func hasSavedProgress(_ id: UUID) -> Bool { checkpoints.exists(id) }
 
@@ -121,6 +84,14 @@ import CassiniNotebook
     }
 
     func stopAll() { coordinator?.stopAll() }
+
+    /// The download notice's Cancel: while the running job downloads a model, see
+    /// `TranscriptionCoordinator.cancelDownload()`; otherwise the standalone install is cancelled. The files fetched
+    /// so far stay.
+    func cancelDownload() {
+        if coordinator?.cancelDownload() == true { return }
+        models.cancel()
+    }
     func continueQueue() { coordinator?.continueQueue() }
 
     func startOver(_ id: UUID) {
@@ -195,6 +166,6 @@ import CassiniNotebook
         facts.jobRunning = state.running != nil
         facts.failedJobs = state.jobs.values.filter { $0.state == .failed }
             .reduce(into: [:]) { $0[$1.noteID] = $1.failure ?? .unknown }
-        if let speechInstall { facts.download = speechInstall }
+        if let download = models.download { facts.download = download }
     }
 }

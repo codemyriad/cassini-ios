@@ -68,8 +68,9 @@ public final class TranscriptionCoordinator {
     @ObservationIgnored private var trashed: Set<UUID> = []
     @ObservationIgnored private let log = Logger(subsystem: "app.codemyriad.cassini", category: "queue")
 
-    /// How an interrupted job ends: `discard` (Start over) drops its work, `keep` pauses it with its progress.
-    private enum CancelMode { case discard, keep }
+    /// How an interrupted job ends: `discard` (Start over) drops its work, `keep` pauses it with its progress, and
+    /// `restore` (Cancel of a download) puts the note back to its state from before.
+    private enum CancelMode { case discard, keep, restore }
 
     /// The job that runs now.
     private final class Active {
@@ -141,6 +142,19 @@ public final class TranscriptionCoordinator {
     @discardableResult
     public func stop(_ noteID: UUID) -> Bool {
         guard let current = active, current.noteID == noteID else { return false }
+        current.stop.stop(.pause(.user))
+        return true
+    }
+
+    /// The download notice's Cancel while the running job downloads a model (its phase is downloading, whatever its
+    /// progress): the job stops, the files fetched so far stay, and the note goes back to its state from before:
+    /// paused by the user with its saved progress, else without a job ("Audio only" for a first Transcribe). False
+    /// when no job downloads; the standalone install is then the one to cancel.
+    @discardableResult
+    public func cancelDownload() -> Bool {
+        guard let current = active, case .downloading = state.running?.phase else { return false }
+        // A Start over at the same moment keeps its discard.
+        if current.cancel == nil { current.cancel = .restore }
         current.stop.stop(.pause(.user))
         return true
     }
@@ -511,9 +525,20 @@ public final class TranscriptionCoordinator {
     /// Writes the job for `outcome`; runs inside the serial section.
     private func record(_ current: Active, _ outcome: JobOutcome) async {
         let id = current.noteID
+        // One read: the mode does not change between the checks below.
+        let cancel = current.cancel
         let sealed = outcome == .done || outcome == .adoptPending
-        if current.cancel == .discard, !sealed {
+        if cancel == .discard, !sealed {
             await discardWork(id)
+            await mirror(id)
+            return
+        }
+        if cancel == .restore, Self.isStop(outcome) {
+            if case .saved = await parts.checkpoints.status(of: id) {
+                await markPaused(id, .user)
+            } else {
+                await write { try await $0.remove(id) }
+            }
             await mirror(id)
             return
         }
@@ -531,9 +556,16 @@ public final class TranscriptionCoordinator {
         case .needsConsent:
             await write { try await $0.transition(id, now: self.parts.clock.now) { $0.state = .needsConsent; $0.pauseReason = nil; $0.failure = nil } }
         case .cancelled:
-            await markPaused(id, current.cancel == .keep ? .user : .interrupted)
+            await markPaused(id, cancel == .keep ? .user : .interrupted)
         }
         await mirror(id)
+    }
+
+    private static func isStop(_ outcome: JobOutcome) -> Bool {
+        switch outcome {
+        case .paused, .cancelled: true
+        default: false
+        }
     }
 
     /// The result notification of `outcome`, only while Cassini is not on the screen.
@@ -549,7 +581,9 @@ public final class TranscriptionCoordinator {
         case .needsConsent:
             await notifyHidden(current.noteID, current.title, .readyToTranscribe)
         case .paused(let reason):
-            if current.job.kind != .speakersOnly, !trashed.contains(current.noteID) { onPause?(current.noteID, reason) }
+            // A cancelled download that left no job says nothing: the note is back to its state from before.
+            let kept = current.cancel != .restore || state.jobs[current.noteID]?.state == .paused
+            if current.job.kind != .speakersOnly, !trashed.contains(current.noteID), kept { onPause?(current.noteID, reason) }
         case .cancelled:
             break
         }

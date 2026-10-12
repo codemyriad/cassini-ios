@@ -9,30 +9,44 @@ public struct ModelPlan: Hashable, Sendable {
     /// Free space to have before the first byte; 0 when nothing is missing.
     public var requiredFreeBytes: Int64
 
-    public init(missing: [ModelPart], requiredFreeBytes: Int64? = nil) {
-        let ordered = ModelPart.allCases.filter(missing.contains)
-        self.missing = ordered
-        self.requiredFreeBytes = requiredFreeBytes ?? ordered.reduce(0) { $0 + Self.installBytes($1) }
+    public init(missing: [ModelPart], requiredFreeBytes: Int64) {
+        self.missing = ModelPart.allCases.filter(missing.contains)
+        self.requiredFreeBytes = requiredFreeBytes
+    }
+
+    /// The plan for `missing`, asking for `speechInstallBytes` for the speech model and `speakersInstallBytes` (what
+    /// the speaker models' installer checks, `SpeakerAnalyzing.modelInstallBytes`) for the speaker models, which serve
+    /// telling speakers apart and recognising saved voices.
+    public init(missing: [ModelPart], speakersInstallBytes: Int64) {
+        let speakers = missing.contains(.speakers) || missing.contains(.voices)
+        self.init(missing: missing, requiredFreeBytes: (missing.contains(.speech) ? Self.speechInstallBytes : 0)
+                  + (speakers ? speakersInstallBytes : 0))
+    }
+
+    /// What the model download screen installs. Apple's speech model counts unless it is ready or cannot be used for
+    /// the language. The speaker models count when they are not ready and either a note's job tells speakers apart
+    /// (`identifySpeakers`) or there is no note: the standalone download from a Settings row installs every part that
+    /// is not ready, whatever the Speakers switch says.
+    public static func plan(speech: ModelPartStatus, speakers: ModelPartStatus, forNote: Bool, identifySpeakers: Bool,
+                            speakersInstallBytes: Int64) -> ModelPlan {
+        var missing: [ModelPart] = []
+        if speech != .ready, speech != .unsupported { missing.append(.speech) }
+        if speakers != .ready, !forNote || identifySpeakers { missing.append(.speakers) }
+        return ModelPlan(missing: missing, speakersInstallBytes: speakersInstallBytes)
     }
 
     public var isEmpty: Bool { missing.isEmpty }
 
-    /// iOS does not tell an asset's size before it is downloaded, so the space check uses an estimate per part that
-    /// covers the download and the installed copy: Apple's speech assets for one language, and FluidAudio's speaker
-    /// models (one install serves telling speakers apart and recognising saved voices).
-    public static func installBytes(_ part: ModelPart) -> Int64 {
-        switch part {
-        case .speech: 512 * 1024 * 1024
-        case .speakers: 128 * 1024 * 1024
-        case .voices: 0
-        }
-    }
+    /// iOS does not tell the speech assets' size before they are downloaded, so the space check uses an estimate for
+    /// one language that covers the download and the installed copy.
+    public static let speechInstallBytes: Int64 = 512 * 1024 * 1024
 }
 
 /// What the model download screen reads and changes. The app binds it to its stores; tests pass a fake.
 @MainActor public protocol ModelDownloadPorts: AnyObject {
-    /// The missing parts and the free space their install needs.
-    func plan() async -> ModelPlan
+    /// The missing parts and the free space their install needs. With a note, the parts its job uses; without one
+    /// (the standalone download from Settings), every part that is not ready.
+    func plan(for noteID: UUID?) async -> ModelPlan
     /// Free bytes where the models go.
     func usableBytes() async -> Int64
     /// Agrees to downloading `parts`.
@@ -88,7 +102,7 @@ public final class ModelDownloadModel {
 
     /// Reads the plan once the screen is shown.
     public func load() async {
-        let plan = await ports.plan()
+        let plan = await ports.plan(for: noteID)
         if plan.isEmpty { await closeStale() } else { self.plan = plan }
     }
 
@@ -96,7 +110,7 @@ public final class ModelDownloadModel {
     public func download() async {
         guard !busy, !closing else { return }
         busy = true
-        let plan = await ports.plan()
+        let plan = await ports.plan(for: noteID)
         if plan.isEmpty { await closeStale(); return }
         self.plan = plan
         guard await ports.usableBytes() >= plan.requiredFreeBytes else {

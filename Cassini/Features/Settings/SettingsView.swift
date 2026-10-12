@@ -1,79 +1,261 @@
 import SwiftUI
-import Speech
 import CassiniEngine
 import CassiniNotebook
 
+/// Settings: App language, Transcription, the notifications banner, On-device models, Speakers, Privacy, Your
+/// library and About, in that order.
 struct SettingsView: View {
-    @Environment(SettingsStore.self) private var settings
-    @Environment(LibraryStore.self) private var library
+    @Environment(SettingsAdapter.self) private var ports
     @Environment(Router.self) private var router
-    @Environment(ProcessingStore.self) private var processing
-    @Environment(\.locale) private var locale
-    @State private var locales: [Locale] = []
-    @State private var installed: Set<String> = []
-    @State private var speakerModelsInstalled = false
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var model: SettingsModel?
+
+    var body: some View {
+        Group {
+            if let model { SettingsForm(model: model) } else { Color.paper }
+        }
+        .scrollContentBackground(.hidden).background(Color.paper)
+        .navigationTitle(Text("Settings", tableName: "Settings")).navigationBarTitleDisplayMode(.inline)
+        .task {
+            let model = self.model ?? SettingsModel(ports: ports)
+            model.onEffect = { [router] effect in
+                switch effect {
+                case .open(let route): router.push(route)
+                case .openNotificationSettings: openNotificationSettings()
+                case .openAppLanguageSettings: openSystemSettings()
+                }
+            }
+            self.model = model
+            await model.appeared()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active, let model { Task { await model.resumed() } }
+        }
+    }
+}
+
+private struct SettingsForm: View {
+    let model: SettingsModel
+    @Environment(SettingsStore.self) private var settings
 
     var body: some View {
         @Bindable var settings = settings
         Form {
-            Section {
-                VStack(spacing: 12) {
-                    OrbitMark(size: 54)
-                    Text("Your words. Your space.").font(.system(.title2, design: .serif))
-                    Text("Audio and transcripts stay on this device.\nNo account. No ads. No analytics.").font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
-                }.frame(maxWidth: .infinity).padding(.vertical, 18)
-            }.listRowBackground(Color.clear)
-            Section {
-                Picker("Language", selection: $settings.speechLanguage) {
-                    if !locales.contains(where: { $0.identifier(.bcp47) == settings.speechLanguage }) {
-                        Text(name(of: settings.speechLanguage)).tag(settings.speechLanguage)
-                    }
-                    ForEach(locales, id: \.self) { candidate in
-                        let id = candidate.identifier(.bcp47)
-                        Text(name(of: id) + (installed.contains(id) ? " · Installed" : "")).tag(id)
-                    }
+            AppLanguageSection(open: model.openAppLanguage)
+            TranscriptionSection(model: model, language: $settings.speechLanguage, autoTranscribe: $settings.autoTranscribe)
+            if model.notificationsOff {
+                Section {
+                    NotificationsOffBanner(turnOn: model.turnOnNotifications)
                 }
-                Toggle("Transcribe after recording or import", isOn: $settings.autoTranscribe)
-                Toggle("Allow speech model downloads", isOn: $settings.downloadsAllowed)
-            } header: { Text("Transcription") } footer: {
-                Text("Apple’s speech models run on your device. A language model may need a download of several hundred MB. Automatic transcription starts only when downloads are allowed. Keep Cassini open while transcribing long recordings. Changing language applies to new transcription jobs.")
+                .listRowInsets(EdgeInsets()).listRowBackground(Color.clear)
             }
             Section {
-                Toggle("Identify speakers after transcription", isOn: $settings.identifySpeakers)
-                Toggle("Allow speaker model downloads", isOn: $settings.speakerDownloadsAllowed)
-                Toggle("Automatically name strong voice matches", isOn: $settings.automaticallyNameVoices)
-                LabeledContent("Speaker models", value: speakerModelsInstalled ? "Installed" : "Not downloaded")
-                Button("Saved voices") { router.push(.savedVoices) }
-            } header: { Text("Speakers") } footer: {
-                Text("Core ML speaker models run locally. Enabling downloads allows Cassini to fetch several hundred MB from Hugging Face through FluidAudio. Voiceprints stay in private app storage, outside system backups and exports. Automatic naming is off by default. Matches can be wrong; review names. Disabling downloads still permits use of installed models. Only voices you explicitly remember become recognition samples.")
-            }
-            Section("Recording") {
-                LabeledContent("Saved format", value: "AAC · M4A")
-                LabeledContent("Capture quality", value: "48 kHz · 16-bit · Mono")
-                Text("Capture is saved in original quality first, then compressed to M4A. If compression is interrupted, the original recording is kept.").font(.footnote).foregroundStyle(.secondary)
-                Label("Continues with the screen locked", systemImage: "lock")
-                Button("Microphone permissions") { openSystemSettings() }
+                ForEach(model.models) { row in ModelRowView(row: row) { model.openModel(row.part) } }
+            } header: {
+                Text("On-device models", tableName: "Settings")
+            } footer: {
+                Text("Transcription runs on this device. Audio never leaves it.", tableName: "Settings")
             }
             Section {
-                LabeledContent("Recordings", value: "\(library.notes.filter { $0.trashedAt == nil }.count)")
-                LabeledContent("Audio duration", value: TimeText.clock(library.notes.reduce(0) { $0 + $1.duration }))
-                Text("Recordings use your device’s protected app storage and may be included in your system backups. Exports go only to the destinations you choose.").font(.footnote).foregroundStyle(.secondary)
-            } header: { Text("Your library") } footer: { Text("Recently Deleted keeps recordings for 30 days. Expired recordings are removed when Cassini next opens.") }
-            Section("About Cassini") {
-                LabeledContent("Version", value: "0.1.0")
-                Text("Made for listening closely.").font(.system(.body, design: .serif))
-                Text("On-device speaker analysis, editable speaker names, saved voices, and transcript history. Speaker matches are suggestions, and may need correction.").font(.footnote).foregroundStyle(.secondary)
-                Button("Licenses") { router.push(.licenses) }
+                Toggle(isOn: $settings.identifySpeakers) { Text("Identify speakers after transcription", tableName: "Settings") }
+                Toggle(isOn: $settings.automaticallyNameVoices) { Text("Name strong voice matches automatically", tableName: "Settings") }
+            } header: {
+                Text("Speakers", tableName: "Settings")
+            } footer: {
+                Text("Matches can be wrong; check the names. Only voices you save are used to recognise people.", tableName: "Settings")
+            }
+            PrivacySection(model: model)
+            LibrarySection(totals: model.library)
+            Section {
+                AboutCard(version: model.version, openNotices: model.openLicenses)
+            } header: {
+                Text("About", tableName: "Settings")
             }
         }
-        .scrollContentBackground(.hidden).background(Color.paper)
-        .navigationTitle("Settings").navigationBarTitleDisplayMode(.inline)
-        .task {
-            locales = await SpeechTranscriber.supportedLocales.sorted { name(of: $0.identifier(.bcp47)) < name(of: $1.identifier(.bcp47)) }
-            installed = Set(await SpeechTranscriber.installedLocales.map { $0.identifier(.bcp47) })
-            speakerModelsInstalled = await processing.speakerModelsReady()
+    }
+}
+
+/// iOS sets the app's language in the Settings app; the row shows it and opens Cassini's page there.
+private struct AppLanguageSection: View {
+    let open: () -> Void
+
+    private var current: String {
+        let code = Bundle.main.preferredLocalizations.first ?? "en"
+        return Locale(identifier: code).localizedString(forLanguageCode: code)?.localizedCapitalized ?? code
+    }
+
+    var body: some View {
+        Section {
+            Button(action: open) {
+                LabeledContent {
+                    HStack(spacing: 6) {
+                        Text(current)
+                        Image(systemName: "arrow.up.forward.app").imageScale(.small)
+                    }
+                } label: {
+                    Text("App language", tableName: "Settings").foregroundStyle(Color.ink)
+                }
+            }
+            .accessibilityHint(Text("Opens Cassini in the Settings app", tableName: "Settings"))
+        } header: {
+            Text("App language", tableName: "Settings")
+        } footer: {
+            Text("The language of speech is chosen separately, under Transcription.", tableName: "Settings")
+        }
+    }
+}
+
+private struct TranscriptionSection: View {
+    let model: SettingsModel
+    @Binding var language: String
+    @Binding var autoTranscribe: Bool
+    @Environment(\.locale) private var locale
+
+    var body: some View {
+        Section {
+            Picker(selection: $language) {
+                ForEach(model.languageOptions(chosen: language, name: name(of:)), id: \.id) { option in
+                    Group {
+                        if option.installed {
+                            Text("\(name(of: option.id)) · Installed", tableName: "Settings")
+                        } else {
+                            Text(name(of: option.id))
+                        }
+                    }.tag(option.id)
+                }
+            } label: {
+                Text("Speech language", tableName: "Settings")
+            }
+            Toggle(isOn: $autoTranscribe) { Text("Transcribe after recording or import", tableName: "Settings") }
+        } header: {
+            Text("Transcription", tableName: "Settings")
+        } footer: {
+            Text("A new language applies to the next transcription.", tableName: "Settings")
         }
     }
 
     private func name(of identifier: String) -> String { locale.localizedString(forIdentifier: identifier) ?? identifier }
+}
+
+/// "Saved voices" and "Recently Deleted", with their counts.
+private struct PrivacySection: View {
+    let model: SettingsModel
+
+    var body: some View {
+        Section {
+            Button(action: model.openVoices) {
+                SettingsRowLabel(title: String(localized: "Saved voices", table: "Settings"),
+                                 subtitle: model.voices == 0
+                                    ? String(localized: "None yet", table: "Settings")
+                                    : String(localized: "\(model.voices) people", table: "Settings"))
+            }
+            .accessibilityIdentifier("savedVoicesRow")
+            Button(action: model.openTrash) {
+                SettingsRowLabel(title: String(localized: "Recently Deleted", table: "Settings"),
+                                 subtitle: model.trash == 0
+                                    ? String(localized: "Empty", table: "Settings")
+                                    : String(localized: "\(model.trash) notes", table: "Settings"))
+            }
+            .accessibilityIdentifier("recentlyDeletedRow")
+        } header: {
+            Text("Privacy", tableName: "Settings")
+        }
+    }
+}
+
+/// The notes outside Recently Deleted and their audio.
+private struct LibrarySection: View {
+    let totals: SettingsModel.LibraryTotals
+
+    var body: some View {
+        Section {
+            LabeledContent {
+                Text(verbatim: "\(totals.notes)")
+            } label: {
+                Text("Recordings", tableName: "Settings")
+            }
+            LabeledContent {
+                Text(verbatim: TimeText.clock(totals.duration))
+            } label: {
+                Text("Audio duration", tableName: "Settings")
+            }
+        } header: {
+            Text("Your library", tableName: "Settings")
+        } footer: {
+            Text("Notes in Recently Deleted are not counted. They are deleted for good after 30 days.", tableName: "Settings")
+        }
+    }
+}
+
+/// A row that opens a screen: its title, a subtitle and a chevron.
+struct SettingsRowLabel: View {
+    let title: String
+    let subtitle: String
+
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).foregroundStyle(Color.ink)
+                Text(subtitle).font(.subheadline).foregroundStyle(Color.muted)
+            }
+            Spacer(minLength: 8)
+            Image(systemName: "chevron.forward").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
+        }
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// "Notifications are off · Progress shows only in the app." with Turn on.
+private struct NotificationsOffBanner: View {
+    let turnOn: () -> Void
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Image(systemName: "bell.slash").foregroundStyle(Tone.warn.color)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Notifications are off", tableName: "Settings").font(.subheadline.weight(.semibold))
+                Text("Progress shows only in the app.", tableName: "Settings").font(.subheadline).foregroundStyle(Color.muted)
+            }
+            Spacer(minLength: 0)
+            Button(action: turnOn) { Text("Turn on", tableName: "Settings").foregroundStyle(Color.ember) }
+                .font(.subheadline.weight(.semibold)).frame(minHeight: HitTarget.minimum)
+                .buttonStyle(.borderless)
+        }
+        .foregroundStyle(Color.ink)
+        .padding(16)
+        .background(Tone.warn.background, in: RoundedRectangle(cornerRadius: Radius.control))
+        .accessibilityElement(children: .contain)
+    }
+}
+
+/// "Cassini 0.1.0 — turns speech into searchable, timed text on your device." and the notices link.
+private struct AboutCard: View {
+    let version: String
+    let openNotices: () -> Void
+
+    /// The name and version in bold ink, then the tagline.
+    private var tagline: AttributedString {
+        var name = AttributedString("Cassini \(version)")
+        name.inlinePresentationIntent = .stronglyEmphasized
+        name.foregroundColor = Color.ink
+        return name + AttributedString(" ")
+            + AttributedString(String(localized: "— turns speech into searchable, timed text on your device.", table: "Settings"))
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 12) {
+                OrbitMark(size: 36)
+                Text(tagline).font(.subheadline).foregroundStyle(Color.muted)
+            }
+            HStack(spacing: 4) {
+                Text("Free software under GPLv3.", tableName: "Settings").foregroundStyle(Color.muted)
+                Button(action: openNotices) { Text("Source code and notices", tableName: "Settings").underline() }
+                    .tint(.ember).buttonStyle(.borderless)
+            }
+            .font(.subheadline)
+        }
+        .padding(.vertical, 6)
+    }
 }

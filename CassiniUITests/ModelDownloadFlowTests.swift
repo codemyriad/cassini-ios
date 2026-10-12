@@ -1,7 +1,7 @@
 import XCTest
 
 /// The model download screen on a device without Apple's speech model or the speaker models: a Transcribe opens the
-/// consent, its sources link opens Licenses with a plain Back, "Not now" goes back to the note without transcribing,
+/// consent, its sources link opens Source code and notices with a plain Back, "Not now" goes back to the note without transcribing,
 /// and "Download and transcribe" transcribes the note. Nothing is downloaded: the models are faked.
 final class ModelDownloadFlowTests: XCTestCase {
     @MainActor private func launchWithoutModels() -> XCUIApplication {
@@ -28,8 +28,8 @@ final class ModelDownloadFlowTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Telling speakers apart"].exists)
 
         app.buttons["Where the models come from · Privacy"].tap()
-        XCTAssertTrue(app.navigationBars["Licenses"].waitForExistence(timeout: 5))
-        app.navigationBars["Licenses"].buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(app.navigationBars["Source code and notices"].waitForExistence(timeout: 5))
+        app.navigationBars["Source code and notices"].buttons.element(boundBy: 0).tap()
 
         let notNow = app.buttons["Not now — keep the audio"]
         XCTAssertTrue(notNow.waitForExistence(timeout: 5))

@@ -56,6 +56,52 @@ import CassiniNotebook
         #expect(!h.coordinator.stop(a), "a note that does not run cannot be stopped")
     }
 
+    // ports: ProcessingCoordinatorTest#cancelDuringTheDownloadOfAJobPutsTheNoteBackToItsStateFromBefore
+    @Test func cancelDuringTheDownloadOfAJobPutsTheNoteBackToItsStateFromBefore() async throws {
+        @MainActor final class Told { var paused: [UUID: PauseReason] = [:] }
+        let h = try QueueHarness(); defer { h.tearDown() }
+        let told = Told()
+        h.coordinator.onPause = { id, reason in told.paused[id] = reason }
+        try await h.start()
+        let fresh = try await h.note("Fresh"), resumed = try await h.note("Resumed"), late = try await h.note("Late")
+        for id in [fresh, resumed, late] { await h.coordinator.transcribe(id) }
+        h.checkpoints.save(resumed, .saved(doneMs: 28_000, totalMs: 60_000, words: 40))
+
+        // A first Transcribe goes back to "Audio only": the job goes. The download has reported no progress yet.
+        let first = try await h.run(0)
+        #expect(!h.coordinator.cancelDownload(), "a job that does not download is not cancelled")
+        #expect(first.stopRequest == nil)
+        first.send(.downloading(nil))
+        try await h.waitUntil("the job downloads") { h.coordinator.state.running?.phase == .downloading(nil) }
+        #expect(h.coordinator.cancelDownload())
+        #expect(first.stopRequest == .pause(.user))
+        #expect(try await h.run(1).noteID == resumed)
+        #expect(await h.job(fresh) == nil)
+        #expect(await h.notes.note(fresh)?.status == .audioOnly)
+
+        // A note with saved progress goes back to paused by the user and keeps it.
+        let second = try await h.run(1)
+        second.send(.downloading(nil))
+        try await h.waitUntil("the job downloads") { h.coordinator.state.running?.phase == .downloading(nil) }
+        #expect(h.coordinator.cancelDownload())
+        #expect(try await h.run(2).noteID == late)
+        let paused = try #require(await h.job(resumed))
+        #expect(paused.state == .paused && paused.pauseReason == .user)
+        #expect(paused.doneMs == 28_000)
+        #expect(await h.checkpoints.status(of: resumed) == .saved(doneMs: 28_000, totalMs: 60_000, words: 40))
+
+        // A model download that starts once the job runs, before its size is known, is cancelled the same way.
+        let third = try await h.run(2)
+        third.send(.started(JobStart(totalMs: 10_000, speakers: true, prints: false)))
+        third.send(.stageChanged(.speakers, startMs: 0, endMs: 0))
+        third.send(.downloading(nil))
+        try await h.waitUntil("the job downloads") { h.coordinator.state.running?.phase == .downloading(nil) }
+        #expect(h.coordinator.cancelDownload())
+        await h.coordinator.awaitIdle()
+        #expect(await h.job(late) == nil)
+        #expect(told.paused == [resumed: .user], "only the note that kept a paused job says so")
+    }
+
     // ports: ProcessingCoordinatorTest#stopAllHoldsTheQueueUntilContinue
     @Test func stopAllHoldsTheQueueUntilContinue() async throws {
         let h = try QueueHarness(); defer { h.tearDown() }

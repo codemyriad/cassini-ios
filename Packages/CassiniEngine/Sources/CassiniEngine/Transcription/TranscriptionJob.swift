@@ -153,7 +153,7 @@ public struct TranscriptionJob: TranscriptionJobRunning {
         } else {
             events(.namingClosed(matching: speakers))
         }
-        if speakers, let outcome = await identifySpeakers(context) { return outcome }
+        if speakers, let outcome = await identifySpeakers(context, modelsRequired: !transcribes) { return outcome }
         events(.stageChanged(.saving))
         if transcribes { try? checkpoints.discard(job.noteID) }
         return .done
@@ -239,8 +239,10 @@ public struct TranscriptionJob: TranscriptionJobRunning {
 
     // MARK: - Speakers
 
-    /// The speaker step; nil when the job goes on to save, else how it ended.
-    private func identifySpeakers(_ context: Context) async -> JobOutcome? {
+    /// The speaker step; nil when the job goes on to save, else how it ended. The speaker models are best effort for a
+    /// transcription (every word stays one voice without them); a speakers-only job, which has nothing else to do,
+    /// ends with their download failure or missing consent instead.
+    private func identifySpeakers(_ context: Context, modelsRequired: Bool) async -> JobOutcome? {
         let events = context.events
         let totalMs = max(context.totalMs, context.knownMs)
         events(.stageChanged(.speakers, startMs: 0, endMs: 0))
@@ -264,7 +266,17 @@ public struct TranscriptionJob: TranscriptionJobRunning {
         let result = await task.result
         watch.cancel()
         if let request = stopped.value ?? context.stop.request { return Self.outcome(of: request) }
-        guard case .success(let analysis) = result else { return await speakersFailed(context) }
+        let analysis: SpeakerAnalysis
+        switch result {
+        case .success(let value):
+            analysis = value
+        case .failure(SpeakerAnalysisError.download(let error, let bytes)) where modelsRequired:
+            return .downloadFailed(DownloadFailure(error: error, part: .speakers, requiredFreeBytes: bytes))
+        case .failure(SpeakerAnalysisError.needsConsent) where modelsRequired:
+            return .needsConsent(missingBytes: 0)
+        case .failure:
+            return await speakersFailed(context)
+        }
         events(.stageChanged(.matching))
         do {
             try await host.applySpeakers(analysis, to: context.noteID, generation: context.settings.voicesGeneration)

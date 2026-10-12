@@ -1,0 +1,972 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "%@ · Installed": {
+      "comment": "Speech language picker: a language whose model is installed",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ · Installed"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ · Installata"
+          }
+        }
+      }
+    },
+    "%lld notes": {
+      "comment": "Recently Deleted row subtitle: how many notes it holds",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld note"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld notes"
+                }
+              }
+            }
+          }
+        },
+        "it": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld nota"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld note"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld people": {
+      "comment": "Saved voices row subtitle: how many voices are saved",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld person"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld people"
+                }
+              }
+            }
+          }
+        },
+        "it": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld persona"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld persone"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "A new language applies to the next transcription.": {
+      "comment": "Transcription footer",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A new language applies to the next transcription."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Una nuova lingua vale dalla prossima trascrizione."
+          }
+        }
+      }
+    },
+    "About": {
+      "comment": "Settings section header",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "About"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Informazioni"
+          }
+        }
+      }
+    },
+    "App language": {
+      "comment": "Settings section and row: the app's language, set in the Settings app",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App language"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lingua dell’app"
+          }
+        }
+      }
+    },
+    "Audio duration": {
+      "comment": "Your library: total audio of the notes outside Recently Deleted",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio duration"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Durata dell’audio"
+          }
+        }
+      }
+    },
+    "Checking files": {
+      "comment": "Model row status",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Checking files"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verifica dei file"
+          }
+        }
+      }
+    },
+    "Comes with telling speakers apart": {
+      "comment": "Model row subtitle: saved-voice recognition is installed with the speaker models",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Comes with telling speakers apart"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Incluso con la distinzione delle voci"
+          }
+        }
+      }
+    },
+    "Download failed — tries again next time": {
+      "comment": "Model row status",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download failed — tries again next time"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download non riuscito — riprova la prossima volta"
+          }
+        }
+      }
+    },
+    "Downloading %lld%%": {
+      "comment": "Model row status while its download runs",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Downloading %lld%%"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download %lld%%"
+          }
+        }
+      }
+    },
+    "Downloads with next transcription": {
+      "comment": "Model row status: agreed to and not downloaded yet",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Downloads with next transcription"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Si scarica con la prossima trascrizione"
+          }
+        }
+      }
+    },
+    "Empty": {
+      "comment": "Recently Deleted row subtitle when it holds no note",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Empty"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vuoto"
+          }
+        }
+      }
+    },
+    "Free software under GPLv3.": {
+      "comment": "About card",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Free software under GPLv3."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Software libero con licenza GPLv3."
+          }
+        }
+      }
+    },
+    "Identify speakers after transcription": {
+      "comment": "Speakers toggle",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Identify speakers after transcription"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riconosci chi parla dopo la trascrizione"
+          }
+        }
+      }
+    },
+    "Libraries Cassini uses and their licences": {
+      "comment": "Licenses row subtitle",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Libraries Cassini uses and their licences"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le librerie che Cassini usa e le loro licenze"
+          }
+        }
+      }
+    },
+    "Licences of the speech and voice models": {
+      "comment": "Licenses row subtitle",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Licences of the speech and voice models"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Licenze dei modelli vocali"
+          }
+        }
+      }
+    },
+    "Managed by iOS": {
+      "comment": "Model row subtitle: Apple's speech assets have no size before they are downloaded",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Managed by iOS"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gestito da iOS"
+          }
+        }
+      }
+    },
+    "Matches can be wrong; check the names. Only voices you save are used to recognise people.": {
+      "comment": "Speakers footer",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Matches can be wrong; check the names. Only voices you save are used to recognise people."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le corrispondenze possono sbagliare: controlla i nomi. Solo le voci che salvi servono a riconoscere le persone."
+          }
+        }
+      }
+    },
+    "Model notices": {
+      "comment": "Licenses row",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Model notices"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avvisi dei modelli"
+          }
+        }
+      }
+    },
+    "Name strong voice matches automatically": {
+      "comment": "Speakers toggle; off unless turned on",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Name strong voice matches automatically"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dai il nome alle voci molto simili in automatico"
+          }
+        }
+      }
+    },
+    "None yet": {
+      "comment": "Saved voices row subtitle when there is none",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "None yet"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ancora nessuna"
+          }
+        }
+      }
+    },
+    "Not available": {
+      "comment": "Model row status: the device or the speech language cannot use the part",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not available"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non disponibile"
+          }
+        }
+      }
+    },
+    "Not downloaded": {
+      "comment": "Model row status",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not downloaded"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non scaricato"
+          }
+        }
+      }
+    },
+    "Notes in Recently Deleted are not counted. They are deleted for good after 30 days.": {
+      "comment": "Your library footer",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notes in Recently Deleted are not counted. They are deleted for good after 30 days."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le note in Eliminati di recente non sono contate. Vengono eliminate definitivamente dopo 30 giorni."
+          }
+        }
+      }
+    },
+    "Notifications are off": {
+      "comment": "Settings banner title",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notifications are off"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le notifiche sono disattivate"
+          }
+        }
+      }
+    },
+    "On-device models": {
+      "comment": "Settings section header",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "On-device models"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modelli sul dispositivo"
+          }
+        }
+      }
+    },
+    "Opens Cassini in the Settings app": {
+      "comment": "Accessibility hint of the App language row",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opens Cassini in the Settings app"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apre Cassini nell’app Impostazioni"
+          }
+        }
+      }
+    },
+    "Opens the model download": {
+      "comment": "Accessibility hint of a model row that is a button",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opens the model download"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apre il download dei modelli"
+          }
+        }
+      }
+    },
+    "Privacy": {
+      "comment": "Settings section header and Licenses row",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Privacy"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Privacy"
+          }
+        }
+      }
+    },
+    "Progress shows only in the app.": {
+      "comment": "Settings banner body",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Progress shows only in the app."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I progressi si vedono solo nell’app."
+          }
+        }
+      }
+    },
+    "Ready": {
+      "comment": "Model row status",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ready"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pronto"
+          }
+        }
+      }
+    },
+    "Recently Deleted": {
+      "comment": "Privacy row",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recently Deleted"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminati di recente"
+          }
+        }
+      }
+    },
+    "Recognising saved voices": {
+      "comment": "Model row",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recognising saved voices"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riconoscimento delle voci salvate"
+          }
+        }
+      }
+    },
+    "Recordings": {
+      "comment": "Your library: notes outside Recently Deleted",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recordings"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registrazioni"
+          }
+        }
+      }
+    },
+    "Saved voices": {
+      "comment": "Privacy row",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saved voices"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voci salvate"
+          }
+        }
+      }
+    },
+    "Settings": {
+      "comment": "Settings screen title",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Settings"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impostazioni"
+          }
+        }
+      }
+    },
+    "Source code and notices": {
+      "comment": "About card link and Licenses screen title",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Source code and notices"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Codice sorgente e avvisi"
+          }
+        }
+      }
+    },
+    "Source code on GitHub": {
+      "comment": "Licenses row",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Source code on GitHub"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Codice sorgente su GitHub"
+          }
+        }
+      }
+    },
+    "Speakers": {
+      "comment": "Settings section header",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Speakers"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voci"
+          }
+        }
+      }
+    },
+    "Speech language": {
+      "comment": "Transcription picker: the language speech is recognised in",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Speech language"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lingua del parlato"
+          }
+        }
+      }
+    },
+    "Speech recognition": {
+      "comment": "Model row",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Speech recognition"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riconoscimento vocale"
+          }
+        }
+      }
+    },
+    "Telling speakers apart": {
+      "comment": "Model row",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Telling speakers apart"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Distinzione delle voci"
+          }
+        }
+      }
+    },
+    "The language of speech is chosen separately, under Transcription.": {
+      "comment": "App language footer",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The language of speech is chosen separately, under Transcription."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La lingua del parlato si sceglie a parte, in Trascrizione."
+          }
+        }
+      }
+    },
+    "The servers Cassini downloads models from": {
+      "comment": "Licenses row subtitle",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The servers Cassini downloads models from"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I server da cui Cassini scarica i modelli"
+          }
+        }
+      }
+    },
+    "Third-party notices": {
+      "comment": "Licenses row",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Third-party notices"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avvisi di terze parti"
+          }
+        }
+      }
+    },
+    "Transcribe after recording or import": {
+      "comment": "Transcription toggle",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcribe after recording or import"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascrivi dopo la registrazione o l’importazione"
+          }
+        }
+      }
+    },
+    "Transcription": {
+      "comment": "Settings section header",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcription"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascrizione"
+          }
+        }
+      }
+    },
+    "Transcription runs on this device. Audio never leaves it.": {
+      "comment": "On-device models footer",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcription runs on this device. Audio never leaves it."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La trascrizione avviene su questo dispositivo. L’audio non lo lascia mai."
+          }
+        }
+      }
+    },
+    "Turn on": {
+      "comment": "Settings banner action: opens the notification settings",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turn on"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Attiva"
+          }
+        }
+      }
+    },
+    "What Cassini keeps on this device and what it sends": {
+      "comment": "Licenses row subtitle",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What Cassini keeps on this device and what it sends"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cosa Cassini conserva su questo dispositivo e cosa invia"
+          }
+        }
+      }
+    },
+    "Where the models come from": {
+      "comment": "Licenses row",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Where the models come from"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Da dove vengono i modelli"
+          }
+        }
+      }
+    },
+    "Your library": {
+      "comment": "Settings section header",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your library"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La tua libreria"
+          }
+        }
+      }
+    },
+    "— turns speech into searchable, timed text on your device.": {
+      "comment": "About card, after “Cassini <version>”",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "— turns speech into searchable, timed text on your device."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "— trasforma il parlato in testo ricercabile e con i tempi, sul tuo dispositivo."
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}
