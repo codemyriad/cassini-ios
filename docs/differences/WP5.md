@@ -102,7 +102,10 @@
   cancelled.
 - Moving a note to Recently Deleted (`trash`) keeps its progress, as Android's `prepareTrash` does: a running job
   stops as "Stop and keep progress" (pause, user) without a "Paused at…" notice, and a queued note leaves the queue
-  with its checkpoint. A restored note resumes when it is transcribed again. Unlike Android, a note that was queued
+  with its checkpoint. As on Android, the note moves only once its job has ended (`moveToTrash` is async and awaits
+  the job), and it cannot be queued while it waits. Deleting a note for good first cancels and awaits any job still
+  running for it (Android's purge `cancelAndJoin`), and a checkpoint save creates only `work/`, never a missing note
+  folder. A restored note resumes when it is transcribed again. Unlike Android, a note that was queued
   is not queued again on restore: the interim queue has no trashed-job record (WP4).
 - A pause posts "Paused at 12:30 of 48:13. Pick up where you left off. The draft so far is kept." (Android's paused
   banner, title and body as one notice; an iOS body when the system paused it), or "Paused before any words were
