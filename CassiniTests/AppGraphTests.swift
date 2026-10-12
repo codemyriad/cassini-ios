@@ -26,7 +26,8 @@ import CassiniEngineTesting
         let graph = test.graph
         graph.settings.downloadsAllowed = true
         graph.settings.identifySpeakers = false
-        XCTAssertEqual(await graph.processing.transcribe(note.id), .queued(changed: true))
+        let outcome = await graph.processing.transcribe(note.id)
+        XCTAssertEqual(outcome, .queued(changed: true))
         await waitUntil { graph.processing.state.running?.fraction == 0.5 }
         XCTAssertEqual(test.background.activeCount, 1)
 
@@ -70,7 +71,8 @@ import CassiniEngineTesting
         let test = TestGraph(transcriber: FakeTranscriber(.returns([], total: 1), status: .notDownloaded))
         defer { test.tearDown() }
         let note = try await seedPlainNote(in: test)
-        XCTAssertEqual(await test.graph.processing.transcribe(note.id), .needsConsent)
+        let outcome = await test.graph.processing.transcribe(note.id)
+        XCTAssertEqual(outcome, .needsConsent)
         XCTAssertEqual(test.graph.processing.state.jobs[note.id]?.state, .needsConsent)
         XCTAssertNil(test.graph.processing.state.running)
     }
@@ -90,7 +92,8 @@ import CassiniEngineTesting
         let graph = test.graph
         graph.settings.speakerDownloadsAllowed = true
 
-        XCTAssertEqual(await graph.processing.transcribe(note.id, kind: .speakersOnly), .queued(changed: true))
+        let outcome = await graph.processing.transcribe(note.id, kind: .speakersOnly)
+        XCTAssertEqual(outcome, .queued(changed: true))
         await waitUntil { analyzer.analyzeCount == 1 }
         graph.voices.forgetAllVoices()
         analyzer.resume()
