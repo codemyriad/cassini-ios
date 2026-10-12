@@ -104,3 +104,13 @@ public struct DraftState: Hashable, Sendable {
     /// Whether `word` may still change.
     public func isTentative(_ word: DraftWord) -> Bool { word.endMs > tentativeFromMs }
 }
+
+extension TimeLeft {
+    /// Whole minutes from the floored low end to the rounded-up high end, at least 1; nil under a minute and when the
+    /// time left is not a range.
+    public var minutes: ClosedRange<Int64>? {
+        guard case .range(let lowMs, let highMs) = self, highMs >= 60_000 else { return nil }
+        let high = (highMs + 59_999) / 60_000
+        return min(max(lowMs / 60_000, 1), high)...high
+    }
+}
