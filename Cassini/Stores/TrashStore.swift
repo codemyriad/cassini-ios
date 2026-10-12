@@ -32,10 +32,11 @@ import CassiniNotebook
         note.trashedAt.map { TrashPolicy.daysLeft(since: $0, now: clock.now, calendar: calendar) } ?? TrashPolicy.retentionDays
     }
 
-    /// Closes the note wherever it is open. False while the note is being recorded.
+    /// Closes the note wherever it is open. A queued or running transcription stops and keeps its progress, so a
+    /// restored note resumes. False while the note is being recorded.
     @discardableResult func moveToTrash(_ id: UUID) -> Bool {
         guard recording.state.noteID != id, let note = library.note(id) else { return false }
-        if note.status == .queued || processing.state.isRunning(id) { processing.cancel(id) }
+        if note.status == .queued || processing.state.isRunning(id) { processing.trash(id) }
         if playback.state.noteID == id { playback.stop() }
         let now = clock.now
         guard library.update(id, { $0.trashedAt = now }) else { return false }

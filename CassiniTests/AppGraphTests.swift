@@ -76,6 +76,60 @@ import CassiniEngineTesting
         XCTAssertFalse(checkpoints.exists(paused.id))
     }
 
+    // ports: ProcessingCoordinatorTest#trashDeletesAQueuedRowButKeepsItsWork
+    func testTrashingAQueuedNoteKeepsItsSavedProgress() async throws {
+        let test = TestGraph(transcriber: FakeTranscriber(.frozen(done: 1, total: 2)))
+        defer { test.tearDown() }
+        let seeded = try await seedPlainNotes(2, in: test)
+        let running = seeded[0], queued = seeded[1]
+        let graph = test.graph
+        graph.settings.downloadsAllowed = true
+        graph.settings.identifySpeakers = false
+        let checkpoints = CheckpointFiles(notes: try XCTUnwrap(graph.library.noteStore))
+        try checkpoints.save(pausedCheckpoint(of: queued, in: test, language: graph.settings.speechLanguage), for: queued.id)
+        graph.processing.enqueue(running.id)
+        graph.processing.enqueue(queued.id)
+
+        XCTAssertTrue(graph.trash.moveToTrash(queued.id))
+        XCTAssertFalse(graph.processing.state.isQueued(queued.id))
+        XCTAssertTrue(checkpoints.exists(queued.id), "Restore needs the checkpoint")
+        XCTAssertTrue(graph.processing.state.isRunning(running.id), "the running note is untouched")
+
+        graph.trash.restore(queued.id)
+        XCTAssertTrue(graph.processing.hasSavedProgress(queued.id))
+        XCTAssertEqual(try checkpoints.load(queued.id)?.doneMs, 1_000)
+    }
+
+    // ports: ProcessingCoordinatorTest#trashStopsARunningJobAndKeepsItsProgress
+    func testTrashingARunningNoteKeepsItsProgressAndARestoredNoteResumes() async throws {
+        let test = TestGraph(transcriber: FakeTranscriber(.frozen(done: 1.5, total: 2)))
+        defer { test.tearDown() }
+        let note = try await seedPlainNote(in: test)
+        let graph = test.graph
+        graph.settings.downloadsAllowed = true
+        graph.settings.identifySpeakers = false
+        let checkpoints = CheckpointFiles(notes: try XCTUnwrap(graph.library.noteStore))
+        try checkpoints.save(pausedCheckpoint(of: note, in: test, language: graph.settings.speechLanguage), for: note.id)
+        graph.processing.enqueue(note.id)
+        await waitUntil { graph.processing.progress.fraction(for: note.id) ?? 0 > 0 }
+
+        XCTAssertTrue(graph.trash.moveToTrash(note.id))
+        await waitUntil { graph.processing.state.running == nil }
+        XCTAssertTrue(checkpoints.exists(note.id))
+        XCTAssertEqual(try checkpoints.load(note.id)?.doneMs, 1_000)
+        XCTAssertNil(graph.library.note(note.id)?.failure)
+        XCTAssertNotNil(graph.library.note(note.id)?.trashedAt)
+        XCTAssertEqual(graph.notices.notices.map(\.text), [], "a trashed note says nothing about its pause")
+
+        graph.trash.restore(note.id)
+        XCTAssertTrue(graph.processing.hasSavedProgress(note.id))
+        graph.processing.enqueue(note.id)
+        await waitUntil { graph.processing.progress.fraction(for: note.id) ?? 0 > 0 }
+        graph.processing.stop(note.id)
+        await waitUntil { graph.processing.state.running == nil }
+        XCTAssertEqual(try checkpoints.load(note.id)?.resumedFromMs, 1_000, "the run resumed from the saved progress")
+    }
+
     func testARetryAfterAMismatchStartsOver() async throws {
         let words = [TranscriptSegment(text: "Hello there.", start: 0, end: 1.5)]
         let test = TestGraph(transcriber: FakeTranscriber(.returns(words, total: 2)))
@@ -399,6 +453,15 @@ import CassiniEngineTesting
     private func checkpoint(of note: Note, in test: TestGraph, language: String) -> CheckpointState {
         CheckpointState(source: "audio.caf", signature: CheckpointState.signature(of: audioURL(note, in: test)),
                         language: language, segments: [], doneMs: 0, totalMs: 2_000, elapsedMs: 1_000)
+    }
+
+    /// A checkpoint that holds the first second of `note`'s words.
+    private func pausedCheckpoint(of note: Note, in test: TestGraph, language: String) -> CheckpointState {
+        var paused = checkpoint(of: note, in: test, language: language)
+        paused.segments = [TranscriptSegment(text: "Hello", start: 0, end: 0.8,
+                                             words: [.init(text: "Hello", start: 0, end: 0.8)])]
+        paused.doneMs = 1_000
+        return paused
     }
 
     private func waitUntil(timeout: Duration = .seconds(5), _ condition: @MainActor () -> Bool) async {

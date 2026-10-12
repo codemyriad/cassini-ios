@@ -94,11 +94,16 @@
 
 - "Stop and keep progress" pauses the running job; transcribing the note again resumes from its checkpoint, in the
   language the checkpoint has (the Settings language applies only to a note without saved progress).
-- `work/` is dropped only by Cancel (`cancel`) and Recently Deleted, by a finished transcription, and on
-  `CHECKPOINT_MISMATCH` or `LONG`, after which Transcribe again starts over. Remove from queue (`dequeue`), Stop on a
-  queued note and iOS ending the background time take the note out of the queue and keep its checkpoint, as Android's
-  dequeue (paused, user) and system stop do. When iOS ends the background time the running job pauses with its
-  checkpoint and the queued notes keep theirs. A speakers-only job never touches `work/`, even when cancelled.
+- `work/` is dropped only by Cancel (`cancel`), by a finished transcription, and on `CHECKPOINT_MISMATCH` or `LONG`,
+  after which Transcribe again starts over; Delete permanently removes it with the note's folder. Remove from queue
+  (`dequeue`), Stop on a queued note and iOS ending the background time take the note out of the queue and keep its
+  checkpoint, as Android's dequeue (paused, user) and system stop do. When iOS ends the background time the running
+  job pauses with its checkpoint and the queued notes keep theirs. A speakers-only job never touches `work/`, even when
+  cancelled.
+- Moving a note to Recently Deleted (`trash`) keeps its progress, as Android's `prepareTrash` does: a running job
+  stops as "Stop and keep progress" (pause, user) without a "Paused at…" notice, and a queued note leaves the queue
+  with its checkpoint. A restored note resumes when it is transcribed again. Unlike Android, a note that was queued
+  is not queued again on restore: the interim queue has no trashed-job record (WP4).
 - A pause posts "Paused at 12:30 of 48:13. Pick up where you left off. The draft so far is kept." (Android's paused
   banner, title and body as one notice; an iOS body when the system paused it), or "Paused before any words were
   found. Resume to start transcribing." when there is no checkpoint. `hasSavedProgress(_:)` tells WP4 and WP6 that a

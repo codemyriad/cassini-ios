@@ -6,9 +6,10 @@ import CassiniNotebook
 /// The transcription queue: one job at a time, in order, each run by a `TranscriptionJobRunning`. The queue lives in
 /// memory; a stopped job keeps its checkpoint, so transcribing the note again resumes it.
 ///
-/// Saved progress (`work/`) is dropped only by `cancel` (Cancel, Recently Deleted), by a finished transcription, and by
-/// a failure no new try can use (`CHECKPOINT_MISMATCH`, `LONG`). Taking a note out of the queue (Remove from queue,
-/// Stop on a queued note, iOS taking the background time back) keeps it. The running job's progress is read from
+/// Saved progress (`work/`) is dropped only by `cancel` (Cancel), by a finished transcription, and by a failure no new
+/// try can use (`CHECKPOINT_MISMATCH`, `LONG`); deleting the note for good removes it with the note's folder. Taking a
+/// note out of the queue (Remove from queue, Stop on a queued note, moving it to Recently Deleted, iOS taking the
+/// background time back) keeps it. The running job's progress is read from
 /// `progress`, not from `ProcessingState.running`.
 @MainActor @Observable final class ProcessingStore {
     private(set) var state = ProcessingState()
@@ -24,6 +25,8 @@ import CassiniNotebook
     @ObservationIgnored private let clock: any AppClock
     @ObservationIgnored private var speakersOnly: Set<UUID> = []
     @ObservationIgnored private var runningKind: JobKind?
+    /// Running notes stopped because they are moving to Recently Deleted: their pause posts no notice.
+    @ObservationIgnored private var trashing: Set<UUID> = []
     /// Notes whose audio is still being written; they cannot be queued yet.
     @ObservationIgnored private var finalizing: Set<UUID> = []
     @ObservationIgnored private var task: Task<Void, Never>?
@@ -61,7 +64,7 @@ import CassiniNotebook
     /// Whether the note has a stopped transcription to resume.
     func hasSavedProgress(_ id: UUID) -> Bool { checkpoints.exists(id) }
 
-    /// Cancel (and Recently Deleted): stops the job or takes it out of the queue and drops its saved progress; the
+    /// Cancel: stops the job or takes it out of the queue and drops its saved progress; the
     /// earlier transcript stays. A speakers-only job has no progress of its own, so a paused transcription keeps its.
     func cancel(_ id: UUID) {
         if state.isRunning(id) {
@@ -86,6 +89,17 @@ import CassiniNotebook
     func stop(_ id: UUID) {
         guard state.isRunning(id) else { dequeue(id); return }
         stop?.stop(.pause(.user))
+    }
+
+    /// Moving to Recently Deleted: the running job stops and keeps its progress, as Stop does, and a queued note leaves
+    /// the queue with its saved progress, so a restored note resumes. Nothing is posted about the stop.
+    func trash(_ id: UUID) {
+        if state.isRunning(id) {
+            trashing.insert(id)
+            stop?.stop(.pause(.user))
+        } else {
+            dequeue(id)
+        }
     }
 
     /// At launch: jobs that were queued or running when Cassini closed are not resumed; their notes can be
@@ -148,7 +162,7 @@ import CassiniNotebook
             library.update(id) { $0.status = .ready; $0.failure = nil }
         case .paused(let reason):
             resetStatus(id, failure: reason == .user ? nil : .interrupted)
-            if transcribes { postPaused(id, reason: reason) }
+            if transcribes, !trashing.contains(id) { postPaused(id, reason: reason) }
         case .failed(let failure):
             // No new try can use this checkpoint: Transcribe again starts over.
             if transcribes, failure == .checkpointMismatch || failure == .long { try? checkpoints.discard(id) }
@@ -167,6 +181,7 @@ import CassiniNotebook
         progress.end()
         state.running = nil
         runningKind = nil
+        trashing.remove(id)
         stop = nil
         task = nil
         processNext()
