@@ -289,7 +289,7 @@ import CassiniNotebook
     // ports: PurgeOrderTest#anExpiredNoteRestoredAndTrashedAgainIsNotPurged
     @Test func anExpiredNoteRestoredAndTrashedAgainIsNotPurged() async throws {
         let purged = note("purged", deleted: clock.now)
-        let live = note("live", deleted: clock.now)
+        let live = note("live", deleted: clock.now.addingTimeInterval(1)) // Purged second, oldest deletion first.
         clock.advance(by: .seconds(31 * Self.day))
         // After the expired notes were listed, the second goes back to the Library and to Recently Deleted again: its
         // 30 days start again.
