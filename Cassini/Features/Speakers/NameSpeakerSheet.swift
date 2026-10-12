@@ -31,8 +31,8 @@ struct NameSpeakerSheet: View {
                     TextField("Speaker name", text: $name).accessibilityIdentifier("speakerNameField")
                     if let note, let segment = note.transcript.first(where: { $0.speakerID == speaker.id }), note.audio.isPlayable {
                         Button("Play sample", systemImage: "play.circle") {
-                            playback.playSample(note, from: segment.start, duration: min(10, max(0.1, segment.end - segment.start)))
-                        }
+                            playback.playSample(note, from: segment.start, to: min(segment.end, segment.start + 10))
+                        }.disabled(!playback.owns(noteID))
                     }
                 } footer: { Text("Updates every passage by this speaker in the selected transcript.") }
                 if let voice = voices.voice(speaker.suggestedVoiceID) {
@@ -59,7 +59,7 @@ struct NameSpeakerSheet: View {
                 }
             }.navigationTitle("Name a speaker").navigationBarTitleDisplayMode(.inline)
                 .toolbar {
-                    ToolbarItem(placement: .cancellationAction) { Button("Cancel") { playback.pause(); dismiss() } }
+                    ToolbarItem(placement: .cancellationAction) { Button("Cancel") { playback.stopSample(); dismiss() } }
                     ToolbarItem(placement: .confirmationAction) {
                         Button("Save", action: save).disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     }
@@ -70,7 +70,7 @@ struct NameSpeakerSheet: View {
                         if library.update(noteID, { $0.mergeSpeaker(source, into: target) }) { dismiss() }
                     }
                 } message: { Text("A copy of the previous transcript is kept in Transcript versions.") }
-                .onDisappear { playback.cancelSample(); playback.pause() }
+                .onDisappear { playback.stopSample() }
                 .alert("Could not save speaker", isPresented: Binding(get: { saveError != nil }, set: { if !$0 { saveError = nil } })) {
                     Button("OK") { saveError = nil }
                 } message: { Text(saveError ?? "") }
@@ -80,7 +80,7 @@ struct NameSpeakerSheet: View {
     private func save() {
         do {
             try voices.saveSpeaker(noteID: noteID, speakerID: speaker.id, name: name, voiceID: voiceID, remember: remember, renameSaved: renameSaved)
-            playback.pause(); dismiss()
+            playback.stopSample(); dismiss()
         } catch {
             saveError = error.message
         }

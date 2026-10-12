@@ -1,0 +1,222 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "%@ of %@": {
+      "comment": "Accessibility value of the position slider: position of total duration, e.g. 11:44 of 23:50",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ of %@"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ di %@"
+          }
+        }
+      }
+    },
+    "Back 10 seconds": {
+      "comment": "Accessibility label of the skip-back button",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Back 10 seconds"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Indietro di 10 secondi"
+          }
+        }
+      }
+    },
+    "Forward 10 seconds": {
+      "comment": "Accessibility label of the skip-forward button",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forward 10 seconds"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avanti di 10 secondi"
+          }
+        }
+      }
+    },
+    "Mark this moment": {
+      "comment": "Accessibility label of the bookmark button in the player",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mark this moment"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Segna questo momento"
+          }
+        }
+      }
+    },
+    "Pause": {
+      "comment": "Accessibility label of the pause button",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pause"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pausa"
+          }
+        }
+      }
+    },
+    "Paused": {
+      "comment": "Accessibility value of the play/pause button while paused",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paused"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In pausa"
+          }
+        }
+      }
+    },
+    "Play": {
+      "comment": "Accessibility label of the play button",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Play"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riproduci"
+          }
+        }
+      }
+    },
+    "Playback": {
+      "comment": "The player bar, as one accessibility group",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Playback"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riproduzione"
+          }
+        }
+      }
+    },
+    "Playback speed": {
+      "comment": "Accessibility label of the speed menu",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Playback speed"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velocità di riproduzione"
+          }
+        }
+      }
+    },
+    "Playing": {
+      "comment": "Accessibility value of the play/pause button while playing",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Playing"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In riproduzione"
+          }
+        }
+      }
+    },
+    "Position": {
+      "comment": "Accessibility label of the player's position slider",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Position"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Posizione"
+          }
+        }
+      }
+    },
+    "This audio can’t be played": {
+      "comment": "Banner on the Note screen when the player cannot open the note's audio",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This audio can’t be played"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questo audio non si può riprodurre"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

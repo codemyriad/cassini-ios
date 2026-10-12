@@ -3,145 +3,119 @@ import Observation
 import CassiniEngine
 import CassiniNotebook
 
-/// One player for the whole app: which note is loaded, where it is, and saving that position.
+/// The app's one player, by note: finds each note's audio file and hands it to `PlaybackController`, which owns the
+/// position, the saves and the samples.
 @MainActor @Observable final class PlaybackStore {
-    private(set) var state = PlaybackState()
-
-    @ObservationIgnored private let playback: any AudioPlayback
+    @ObservationIgnored let controller: PlaybackController
     @ObservationIgnored private let library: LibraryStore
-    @ObservationIgnored private let errors: ErrorPresenter
-    @ObservationIgnored private let clock: any AppClock
-    @ObservationIgnored private var ticker: Timer?
-    @ObservationIgnored private var sample: Task<Void, Never>?
-    @ObservationIgnored private var events: Task<Void, Never>?
-    /// While a recording runs nothing plays.
-    @ObservationIgnored private var isBlocked = false
 
-    init(playback: any AudioPlayback, library: LibraryStore, errors: ErrorPresenter, clock: any AppClock) {
-        self.playback = playback; self.library = library; self.errors = errors; self.clock = clock
-        let stream = playback.events
-        events = Task { [weak self] in
-            for await event in stream { self?.handle(event) }
-        }
+    init(controller: PlaybackController, library: LibraryStore) {
+        self.controller = controller; self.library = library
     }
+
+    convenience init(playback: any AudioPlayback, library: LibraryStore, preview: NotePreview? = nil) {
+        let positions = LibraryPlaybackPositions(library: library, preview: preview)
+        self.init(controller: PlaybackController(parts: .init(player: playback, positions: positions)), library: library)
+    }
+
+    var state: PlaybackState { controller.state }
 
     var rate: Float {
-        get { state.rate }
-        set { playback.rate = newValue; state.rate = newValue }
+        get { controller.rate }
+        set { controller.rate = newValue }
     }
 
-    /// Loads the note at its saved position, unless it is loaded already.
-    func load(_ note: Note) {
-        guard !isBlocked, state.noteID != note.id, note.audio.isPlayable, let url = library.audioURL(note) else { return }
-        stop()
-        do {
-            try playback.load(url: url, at: note.playbackPosition, title: note.title)
-            state = PlaybackState(noteID: note.id, status: .paused, position: playback.position, duration: playback.duration, rate: state.rate)
-        } catch {
-            errors.present(error.localizedDescription)
+    /// Whether `noteID` holds the player and it can play.
+    func owns(_ noteID: UUID) -> Bool { state.noteID == noteID && state.status != .failed }
+
+    /// Whether the player of `noteID` could not open its file.
+    func failed(_ noteID: UUID) -> Bool { state.noteID == noteID && state.status == .failed }
+
+    /// The Note screen `owner` shows `note`'s player: opens its file at the saved position, or, when the note's audio
+    /// changed since it was opened (the compressed copy replaced the capture), opens the new file where it was.
+    func show(_ note: Note, owner: PlaybackOwner) {
+        guard note.audio.isPlayable, let source = source(for: note) else {
+            controller.leave(owner)
+            return
         }
-    }
-
-    func togglePlayback() {
-        if state.isPlaying { pause() } else { play() }
-    }
-
-    func play() {
-        guard state.noteID != nil else { return }
-        if state.position >= state.duration - 0.1 { seek(0) }
-        do {
-            try playback.play()
-            state.status = .playing
-            startTicker()
-        } catch {
-            errors.present(error.localizedDescription)
+        if let open = controller.openSource, open.noteID == note.id, open.url != source.url || open.signature != source.signature,
+           controller.reload(source, owner: owner) || failed(note.id) {
+            return
         }
+        controller.open(source, at: note.playbackPosition, owner: owner)
     }
 
-    /// Pauses and saves the position.
-    func pause() {
-        cancelSample()
-        playback.pause()
-        stopTicker()
-        if state.noteID != nil { state.status = .paused }
-        savePosition()
-    }
+    /// The screen `owner` is gone, or its note lost its player (a transcription started).
+    func leave(_ owner: PlaybackOwner) { controller.leave(owner) }
 
-    func seek(_ position: TimeInterval) {
-        state.position = max(0, min(position, state.duration))
-        playback.seek(state.position)
-    }
+    func togglePlayback() { controller.toggle() }
+    func play() { controller.play() }
+    func pause() { controller.pause() }
+    func seek(_ position: TimeInterval) { controller.seek(to: position) }
+    func skip(_ seconds: TimeInterval) { controller.skip(by: seconds) }
 
-    func skip(_ seconds: TimeInterval) { seek(state.position + seconds) }
-
-    /// Opens `note` at `time` and plays from there.
+    /// Plays `note` from `time`, when its player is open.
     func play(_ note: Note, from time: TimeInterval) {
-        load(note)
-        guard state.noteID == note.id else { return }
-        seek(time)
-        if !state.isPlaying { play() }
+        guard owns(note.id) else { return }
+        controller.seek(to: time)
+        controller.play()
     }
 
-    /// Plays `duration` seconds of `note` from `start`, then pauses.
-    func playSample(_ note: Note, from start: TimeInterval, duration: TimeInterval) {
-        cancelSample()
-        play(note, from: start)
-        guard state.isPlaying else { return }
-        let clock = clock
-        sample = Task { [weak self] in
-            try? await clock.sleep(for: .seconds(duration))
-            guard !Task.isCancelled else { return }
-            self?.pause()
+    /// Plays `start..<end` of `note` (a speaker sample), then goes back to where it was.
+    @discardableResult
+    func playSample(_ note: Note, from start: TimeInterval, to end: TimeInterval) -> Bool {
+        controller.playRange(note.id, from: start, to: end)
+    }
+
+    /// Ends a speaker sample early: the position from before returns and playback stays paused.
+    func stopSample() {
+        if state.sample != nil { controller.pause() }
+    }
+
+    /// Closes the player (its note is moving to Recently Deleted), saving the position first.
+    func stop() { controller.leave() }
+
+    /// Closes the player while a recording runs, and keeps it closed until it ends.
+    func setBlocked(_ blocked: Bool) { controller.setBlocked(blocked) }
+
+    /// Saves the position (final) without pausing: the app goes to the background.
+    func savePosition() { controller.savePosition() }
+
+    /// Waits until every position save asked for so far has been handed to the Library.
+    func settle() async { await controller.settle() }
+
+    private func source(for note: Note) -> PlaybackSource? {
+        guard let url = library.audioURL(note) else { return nil }
+        return PlaybackSource(noteID: note.id, url: url, title: note.title, signature: Self.signature(of: url))
+    }
+
+    /// The size and modification date of the file: a file written again under the same name gets a new one.
+    private static func signature(of url: URL) -> String? {
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path) else { return nil }
+        let size = (attributes[.size] as? NSNumber)?.int64Value ?? 0
+        let modified = (attributes[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
+        return "\(size)-\(modified)"
+    }
+}
+
+/// The Library preview of a note at a playback position; nil keeps the stored preview.
+typealias NotePreview = @Sendable (Note, TimeInterval) -> String?
+
+/// Playback positions saved to the note through the Library, so the screens show them at once and they are written in
+/// order with the note's other edits. A final save also stores the Library preview at that position.
+@MainActor final class LibraryPlaybackPositions: PlaybackPositions {
+    private let library: LibraryStore
+    private let preview: NotePreview?
+
+    init(library: LibraryStore, preview: NotePreview?) {
+        self.library = library; self.preview = preview
+    }
+
+    func save(_ noteID: UUID, position: TimeInterval, final: Bool) async {
+        let preview = final ? preview : nil
+        await library.commit(noteID) { note in
+            note.playbackPosition = position
+            if let preview, let text = preview(note, position) { note.previewText = text }
         }
-    }
-
-    func cancelSample() {
-        sample?.cancel(); sample = nil
-    }
-
-    /// Stops and unloads, saving the position first.
-    func stop() {
-        pause()
-        playback.unload()
-        state = PlaybackState(rate: state.rate)
-    }
-
-    /// Stops playback while a recording runs, and keeps it stopped until it ends.
-    func setBlocked(_ blocked: Bool) {
-        if blocked { stop() }
-        isBlocked = blocked
-    }
-
-    func savePosition() {
-        guard let id = state.noteID else { return }
-        let position = state.position
-        library.update(id) { $0.playbackPosition = position }
-    }
-
-    private func handle(_ event: PlaybackEvent) {
-        switch event {
-        case .interrupted, .routeLost, .remotePause: pause()
-        case .remotePlay: play()
-        case .remoteSkip(let seconds): skip(seconds)
-        case .remoteSeek(let position): seek(position)
-        }
-    }
-
-    private func startTicker() {
-        stopTicker()
-        let timer = Timer(timeInterval: 0.1, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.tick() }
-        }
-        ticker = timer
-        RunLoop.main.add(timer, forMode: .common)
-    }
-
-    private func stopTicker() {
-        ticker?.invalidate(); ticker = nil
-    }
-
-    private func tick() {
-        state.position = playback.position
-        if !playback.isPlaying { pause() }
     }
 }

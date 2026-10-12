@@ -2,38 +2,52 @@ import AVFoundation
 import MediaPlayer
 import CassiniAudio
 import CassiniEngine
+import CassiniNotebook
 
-/// Playback through `AVAudioPlayer`, with Now Playing metadata and the lock-screen controls.
+/// Playback through `AVAudioPlayer`, with Now Playing metadata and the lock-screen controls (iOS extras).
+///
+/// - The audio session is taken on `play()` and given back on pause and unload with `.notifyOthersOnDeactivation`, so
+///   the audio another app was playing resumes.
+/// - Only the start of an interruption pauses (never its end), and so does losing the output in use (unplugged
+///   headphones). The player pauses inside the observer; the controller hears about it from `events` afterwards.
+/// - At the end of the file the position stays at the end, so the controller saves the duration.
 @MainActor final class AVPlaybackAdapter: AudioPlayback {
-    static let skipInterval: TimeInterval = 15
-
     let events: AsyncStream<PlaybackEvent>
     private let continuation: AsyncStream<PlaybackEvent>.Continuation
     private var player: AVAudioPlayer?
+    private let ending = PlayerEnding()
     private var title = ""
     private var observers: [NSObjectProtocol] = []
+    /// Whether this adapter activated the audio session and has not given it back.
+    private var holdsSession = false
+    /// The player reached the end of the file by itself.
+    private var finished = false
 
     var rate: Float = 1 { didSet { player?.rate = rate; updateNowPlaying() } }
-    var position: TimeInterval { player?.currentTime ?? 0 }
+    var position: TimeInterval {
+        guard let player else { return 0 }
+        return finished ? player.duration : player.currentTime
+    }
     var duration: TimeInterval { player?.duration ?? 0 }
     var isPlaying: Bool { player?.isPlaying ?? false }
 
     init() {
         (events, continuation) = AsyncStream.makeStream(of: PlaybackEvent.self)
         let continuation = continuation
+        let skip = NSNumber(value: PlaybackSkip.interval)
         let commands = MPRemoteCommandCenter.shared()
         commands.playCommand.addTarget { _ in continuation.yield(.remotePlay); return .success }
         commands.pauseCommand.addTarget { _ in continuation.yield(.remotePause); return .success }
-        commands.skipForwardCommand.preferredIntervals = [NSNumber(value: Self.skipInterval)]
-        commands.skipBackwardCommand.preferredIntervals = [NSNumber(value: Self.skipInterval)]
-        commands.skipForwardCommand.addTarget { _ in continuation.yield(.remoteSkip(Self.skipInterval)); return .success }
-        commands.skipBackwardCommand.addTarget { _ in continuation.yield(.remoteSkip(-Self.skipInterval)); return .success }
+        commands.skipForwardCommand.preferredIntervals = [skip]
+        commands.skipBackwardCommand.preferredIntervals = [skip]
+        commands.skipForwardCommand.addTarget { _ in continuation.yield(.remoteSkip(PlaybackSkip.interval)); return .success }
+        commands.skipBackwardCommand.addTarget { _ in continuation.yield(.remoteSkip(-PlaybackSkip.interval)); return .success }
         commands.changePlaybackPositionCommand.addTarget { event in
             guard let event = event as? MPChangePlaybackPositionCommandEvent else { return .commandFailed }
             continuation.yield(.remoteSeek(event.positionTime)); return .success
         }
+        ending.onFinish = { [weak self] in self?.reachedEnd() }
         let center = NotificationCenter.default
-        // The player pauses here, before the observer returns; the store hears about it from `events` afterwards.
         observers.append(center.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: .main) { [weak self] notification in
             let type = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
             guard type == AVAudioSession.InterruptionType.began.rawValue else { return }
@@ -49,13 +63,16 @@ import CassiniEngine
     func load(url: URL, at position: TimeInterval, title: String) throws {
         unload()
         let audio = try AVAudioPlayer(contentsOf: url)
-        audio.enableRate = true; audio.rate = rate; audio.prepareToPlay()
+        guard audio.duration > 0, audio.prepareToPlay() else { throw AudioError.unreadable }
+        audio.enableRate = true; audio.rate = rate; audio.delegate = ending
         player = audio; self.title = title
         seek(position)
     }
 
     func unload() {
         player?.stop(); player = nil
+        finished = false
+        releaseSession()
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
     }
 
@@ -64,17 +81,25 @@ import CassiniEngine
         let session = AVAudioSession.sharedInstance()
         try session.setCategory(.playback, mode: .spokenAudio)
         try session.setActive(true)
-        guard player.play() else { throw AudioError.unreadable }
+        holdsSession = true
+        if finished { player.currentTime = 0; finished = false }
+        guard player.play() else {
+            releaseSession()
+            throw AudioError.unreadable
+        }
         updateNowPlaying()
     }
 
     func pause() {
         player?.pause()
+        releaseSession()
         updateNowPlaying()
     }
 
     func seek(_ position: TimeInterval) {
-        player?.currentTime = max(0, min(position, duration))
+        guard let player else { return }
+        finished = false
+        player.currentTime = max(0, min(position, player.duration))
         updateNowPlaying()
     }
 
@@ -84,10 +109,36 @@ import CassiniEngine
         continuation.yield(event)
     }
 
+    private func reachedEnd() {
+        finished = true
+        releaseSession()
+        updateNowPlaying()
+    }
+
+    /// Gives the audio back to other apps.
+    private func releaseSession() {
+        guard holdsSession else { return }
+        holdsSession = false
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+    }
+
     private func updateNowPlaying() {
         guard player != nil else { return }
         MPNowPlayingInfoCenter.default().nowPlayingInfo = [MPMediaItemPropertyTitle: title,
             MPMediaItemPropertyArtist: "Cassini", MPMediaItemPropertyPlaybackDuration: duration,
             MPNowPlayingInfoPropertyElapsedPlaybackTime: position, MPNowPlayingInfoPropertyPlaybackRate: isPlaying ? rate : 0]
+    }
+}
+
+/// The player's delegate: `AVAudioPlayer` tells it, on the main thread, when a file plays to its end.
+@MainActor private final class PlayerEnding: NSObject, AVAudioPlayerDelegate {
+    var onFinish: (@MainActor () -> Void)?
+
+    nonisolated func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+        if Thread.isMainThread {
+            MainActor.assumeIsolated { onFinish?() }
+        } else {
+            Task { @MainActor in self.onFinish?() }
+        }
     }
 }

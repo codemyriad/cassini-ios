@@ -127,7 +127,7 @@ final class AudioPipelineTests: XCTestCase {
         XCTAssertEqual(imported.duration, 2, accuracy: 0.01)
         XCTAssertEqual(try Data(contentsOf: XCTUnwrap(store.originalAudioURL(imported))), original)
         XCTAssertEqual(try Data(contentsOf: portable), original)
-        test.graph.playback.load(imported)
+        test.graph.playback.show(imported, owner: PlaybackOwner())
         XCTAssertEqual(test.graph.playback.state.noteID, imported.id)
         XCTAssertEqual(test.playback.loadedURL, store.audioURL(imported))
     }
