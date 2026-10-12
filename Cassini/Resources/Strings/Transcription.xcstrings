@@ -35,40 +35,6 @@
         }
       }
     },
-    "Continue": {
-      "comment": "Held queue banner action: start the queue again",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Continue"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Continua"
-          }
-        }
-      }
-    },
-    "Continue when you’re ready.": {
-      "comment": "Held queue banner body",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Continue when you’re ready."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Continua quando vuoi."
-          }
-        }
-      }
-    },
     "Download": {
       "comment": "Model download button without a note",
       "localizations": {
@@ -303,47 +269,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Trascrizione di “%@”"
-          }
-        }
-      }
-    },
-    "Transcription paused · %lld waiting": {
-      "comment": "Held queue banner title with the notes waiting",
-      "localizations": {
-        "en": {
-          "variations": {
-            "plural": {
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Transcription paused · %lld waiting"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Transcription paused · %lld waiting"
-                }
-              }
-            }
-          }
-        },
-        "it": {
-          "variations": {
-            "plural": {
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Trascrizione in pausa · %lld in attesa"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Trascrizione in pausa · %lld in attesa"
-                }
-              }
-            }
           }
         }
       }
