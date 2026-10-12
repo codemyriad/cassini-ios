@@ -1,0 +1,107 @@
+import Foundation
+import CassiniNotebook
+
+/// What the launch repair did; every list holds note ids in a stable order.
+public struct ReconcileReport: Hashable, Sendable {
+    /// A running job became queued again at its place.
+    public var requeued: [UUID] = []
+    /// A running job passed its automatic attempts and waits for Resume.
+    public var interrupted: [UUID] = []
+    /// A paused job without saved progress starts again from the beginning.
+    public var restarted: [UUID] = []
+    /// Saved progress no longer matches: the job failed with `CHECKPOINT_MISMATCH`.
+    public var mismatched: [UUID] = []
+    /// A `work/` directory that no job owns was deleted.
+    public var deletedWork: [UUID] = []
+
+    public init() {}
+
+    public var isEmpty: Bool { self == ReconcileReport() }
+}
+
+/// The launch repair of the queue, as a pure function: the jobs Cassini closed with, what each note's `work/` holds,
+/// and the notes, give the jobs to write and the `work/` directories to delete. Running it again on its own result
+/// changes nothing.
+public enum Reconcile {
+    /// Automatic restarts after Cassini closed during a job, before it waits for Resume. It also stops a job that
+    /// crashes before its first checkpoint from restarting forever.
+    public static let maxAutomaticAttempts = 2
+
+    public struct Plan: Hashable, Sendable {
+        /// Changed jobs, each with its `seq` kept.
+        public var jobs: [Job] = []
+        public var deleteWork: [UUID] = []
+        public var report = ReconcileReport()
+        public init() {}
+    }
+
+    /// - Parameters:
+    ///   - jobs: the stored queue.
+    ///   - checkpoints: what each note with a job or a `work/` directory has saved.
+    ///   - work: notes that have a `work/` directory.
+    ///   - trashed: notes in Recently Deleted. Trash deletes the row of a queued job; its `work/` stays for Restore.
+    ///   - existing: every note Cassini read; a `work/` directory of a note it could not read is left alone.
+    ///   - activeNoteID: the note being recorded now, which is never touched.
+    public static func plan(jobs: [Job], checkpoints: [UUID: CheckpointStatus], work: Set<UUID>, trashed: Set<UUID>,
+                            existing: Set<UUID>, activeNoteID: UUID?, now: Date) -> Plan {
+        var plan = Plan()
+        let owned = Set(jobs.map(\.noteID))
+        for job in jobs.sorted(by: { $0.seq < $1.seq }) where job.noteID != activeNoteID {
+            let checkpoint = checkpoints[job.noteID] ?? .missing
+            switch job.state {
+            case .running: running(job, checkpoint, now, &plan)
+            case .paused: paused(job, checkpoint, now, &plan)
+            case .queued, .failed, .needsConsent: break
+            }
+        }
+        let orphans = work.subtracting(owned).subtracting(trashed).intersection(existing)
+        plan.deleteWork = orphans.filter { $0 != activeNoteID }.sorted { $0.uuidString < $1.uuidString }
+        plan.report.deletedWork = plan.deleteWork
+        return plan
+    }
+
+    private static func running(_ job: Job, _ checkpoint: CheckpointStatus, _ now: Date, _ plan: inout Plan) {
+        var changed = job
+        changed.updatedAt = now
+        if checkpoint == .mismatch {
+            plan.jobs.append(mismatch(changed))
+            plan.report.mismatched.append(job.noteID)
+            return
+        }
+        changed.attempts = job.attempts + 1
+        if changed.attempts > maxAutomaticAttempts {
+            changed.state = .paused
+            changed.pauseReason = .interrupted
+            plan.report.interrupted.append(job.noteID)
+        } else {
+            changed.state = .queued
+            plan.report.requeued.append(job.noteID)
+        }
+        plan.jobs.append(changed.withNumbers(of: checkpoint))
+    }
+
+    private static func paused(_ job: Job, _ checkpoint: CheckpointStatus, _ now: Date, _ plan: inout Plan) {
+        switch checkpoint {
+        case .mismatch:
+            var changed = mismatch(job)
+            changed.updatedAt = now
+            plan.jobs.append(changed)
+            plan.report.mismatched.append(job.noteID)
+        case .missing where job.doneMs != 0 || job.words != 0:
+            var changed = job.withNumbers(of: .missing)
+            changed.updatedAt = now
+            plan.jobs.append(changed)
+            plan.report.restarted.append(job.noteID)
+        case .missing, .saved:
+            break
+        }
+    }
+
+    private static func mismatch(_ job: Job) -> Job {
+        var job = job
+        job.state = .failed
+        job.failure = .checkpointMismatch
+        job.pauseReason = nil
+        return job
+    }
+}
