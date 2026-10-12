@@ -230,11 +230,10 @@ public enum LibraryMapping {
     /// long title) is shown plain, without ranges.
     public static func results(_ hits: [LibraryIndex.Hit], context: RowContext, now: Date, calendar: Calendar) -> [LibraryRow] {
         hits.map { found in
-            let title = Highlighted(marked: found.titleSnippet)
+            let title = found.markedTitle
             let shownTitle = title.text.isEmpty || title.leadingEllipsis || title.trailingEllipsis ? nil : title
-            let snippet = found.snippet.contains(Highlighted.matchStart) ? Highlighted(marked: found.snippet) : nil
             let hit = Hit(day: DayGroups.key(found.entry.note.createdAt, now: now, calendar: calendar),
-                          title: shownTitle?.text, titleRanges: shownTitle?.ranges ?? [], snippet: snippet)
+                          title: shownTitle?.text, titleRanges: shownTitle?.ranges ?? [], snippet: found.markedSnippet)
             return row(found.entry, context: context, hit: hit)
         }
     }

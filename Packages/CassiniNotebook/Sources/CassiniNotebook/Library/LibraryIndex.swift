@@ -30,6 +30,27 @@ public struct LibraryIndex: Sendable {
         /// The transcript around the match, marked; no marks when only the title or a bookmark matched.
         public let snippet: String
         public let titleSnippet: String
+        /// `snippet` read, when it has a match; nil when only the title or a bookmark matched.
+        public let markedSnippet: Highlighted?
+        /// `titleSnippet` read.
+        public let markedTitle: Highlighted
+
+        /// Reads the snippets here, where the search runs (off the main actor), so building the rows only copies them.
+        init(entry: Entry, snippet: String, titleSnippet: String) {
+            self.entry = entry; self.snippet = snippet; self.titleSnippet = titleSnippet
+            markedSnippet = snippet.contains(Highlighted.matchStart) ? Highlighted(marked: snippet) : nil
+            markedTitle = Highlighted(marked: titleSnippet)
+        }
+
+        /// The same hit for the note's entry now (it did not change since).
+        func with(_ entry: Entry) -> Hit {
+            Hit(entry: entry, snippet: snippet, titleSnippet: titleSnippet, markedSnippet: markedSnippet, markedTitle: markedTitle)
+        }
+
+        private init(entry: Entry, snippet: String, titleSnippet: String, markedSnippet: Highlighted?, markedTitle: Highlighted) {
+            self.entry = entry; self.snippet = snippet; self.titleSnippet = titleSnippet
+            self.markedSnippet = markedSnippet; self.markedTitle = markedTitle
+        }
     }
 
     /// The notes outside Recently Deleted, newest first.
@@ -77,7 +98,7 @@ public struct LibraryIndex: Sendable {
     public func current(_ hits: [Hit], query: SearchQuery?) -> [Hit] {
         hits.compactMap { hit in
             guard let entry = cache[hit.entry.note.id] else { return nil }
-            if entry.note == hit.entry.note { return Hit(entry: entry, snippet: hit.snippet, titleSnippet: hit.titleSnippet) }
+            if entry.note == hit.entry.note { return hit.with(entry) }
             guard let query else { return Hit(entry: entry, snippet: "", titleSnippet: entry.note.title) }
             let fields = entry.fields ?? SearchFields(entry.note)
             guard fields.matches(query) else { return nil }
