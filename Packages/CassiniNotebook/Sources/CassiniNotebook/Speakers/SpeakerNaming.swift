@@ -122,6 +122,8 @@ public enum NamingEvent: Hashable, Sendable {
     case mergeTarget(String)
     /// The confirmation's Cancel: back to the list.
     case cancelMerge
+    /// Back from the Merge list to the Name sheet.
+    case closeMerge
     case confirmMerge
     case save
     case cancel
@@ -244,6 +246,7 @@ public enum SpeakerNaming {
         case .mergeTarget(let id):
             if state.merge != nil, state.input.mergeTargets.contains(where: { $0.speakerID == id }) { next.merge = MergeStep(target: id) }
         case .cancelMerge: if state.merge != nil { next.merge = MergeStep() }
+        case .closeMerge: next.merge = nil
         case .confirmMerge: return confirmMerge(state)
         case .save: return save(state)
         case .cancel: return NamingResult(nil, [.close])

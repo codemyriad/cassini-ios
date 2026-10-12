@@ -24,7 +24,7 @@ import CassiniNotebook
         settings = SettingsStore(defaults: environment.defaults, clock: environment.clock,
                                  defaultLanguage: environment.locale.identifier(.bcp47))
         library = LibraryStore(root: environment.root, errors: errors)
-        voices = VoicesStore(library: library, settings: settings, errors: errors)
+        voices = VoicesStore(library: library, settings: settings, errors: errors, clock: environment.clock)
         playback = PlaybackStore(playback: environment.playback, library: library, errors: errors, clock: environment.clock)
         processing = Self.processing(environment: environment, library: library, voices: voices, settings: settings,
                                      notices: notices)
@@ -111,7 +111,7 @@ import CassiniNotebook
             if library.unreadableCount > 0 {
                 notices.post("\(library.unreadableCount) recording documents could not be read. Their files have been preserved.")
             }
-            if library.loadFailure == nil, !voices.load() {
+            if library.loadFailure == nil, !(await voices.load()) {
                 notices.post("Saved voices could not be read. Their files have been preserved. Recordings remain available.")
             }
         }
@@ -119,6 +119,7 @@ import CassiniNotebook
         startup.register(.reconcile) { [processing, recording] in
             try await processing.reconcileOnStart(activeNoteID: recording.state.noteID)
         }
+        startup.register(.voiceLinks) { [voices] in try await voices.sweepOrphans() }
         startup.register(.purge) { [trash] in await trash.purgeExpired() }
     }
 }

@@ -189,6 +189,7 @@ import Testing
         let confirm = try on(list, .mergeTarget("s1"))
         #expect(SpeakerNaming.mergeUI(confirm)?.confirm?.speakerID == "s1")
         #expect(SpeakerNaming.mergeUI(try on(confirm, .cancelMerge))?.confirm == nil)
+        #expect(SpeakerNaming.mergeUI(try on(confirm, .closeMerge)) == nil, "back to the Name sheet")
         #expect(effects(confirm, .confirmMerge) == [.merge(source: "s3", target: "s1"), .close])
         #expect(!SpeakerNaming.ui(SpeakerNaming.open(input(targets: []))).canMerge)
     }

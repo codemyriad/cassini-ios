@@ -60,7 +60,7 @@ import CassiniNotebook
         guard library.note(id)?.trashedAt != nil else { return }
         await processing.stopForDelete(id)
         do {
-            try voices.removeEvidence(noteID: id)
+            try await voices.removeEvidence(noteID: id)
             try await library.delete(id)
             await processing.forget(id)
         } catch let error as VoicesStore.Unavailable {
