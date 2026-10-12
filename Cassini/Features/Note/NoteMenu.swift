@@ -1,4 +1,5 @@
 import SwiftUI
+import CassiniEngine
 import CassiniNotebook
 
 /// The "…" menu of a note.
@@ -26,8 +27,8 @@ struct NoteMenu: View {
             Button("Transcript versions", systemImage: "clock.arrow.circlepath") { showingVersions = true }
             Button("Rename", systemImage: "pencil") { renaming = true }
             Menu("Export transcript", systemImage: "square.and.arrow.up") {
-                ForEach(TranscriptFormat.allCases) { format in Button(format.title) { export(format) } }
-            }.disabled(note.transcript.isEmpty)
+                ForEach(TranscriptFormat.allCases) { format in Button(ExportCopy.title(format)) { export(format) } }
+            }.disabled(TranscriptExports.availability(of: note) != .available)
             Button(exportingDocument ? "Preparing Cassini document…" : "Export Cassini document", systemImage: "doc.badge.arrow.up") { exportDocument() }
                 .disabled(exportingDocument || note.transcript.isEmpty || note.status == .transcribing || finishing)
             Button("Share original audio", systemImage: "waveform") {
@@ -43,14 +44,21 @@ struct NoteMenu: View {
     }
 
     private func export(_ format: TranscriptFormat) {
-        do { shareItem = ShareItem(url: try exports.exportTranscript(note, format: format)) }
-        catch { errors.present(error.localizedDescription) }
+        Task {
+            do throws(ExportError) { share(try await exports.exportTranscript(note.id, format: format)) }
+            catch { errors.present(ExportCopy.message(error)) }
+        }
+    }
+
+    /// Offers an export, removing it once the share sheet is done.
+    private func share(_ url: URL) {
+        shareItem = ShareItem(url: url) { [exports] in exports.discard(url) }
     }
 
     private func exportDocument() {
         exportingDocument = true
         Task {
-            do { shareItem = ShareItem(url: try await exports.exportPortable(note.id)) }
+            do { share(try await exports.exportPortable(note.id)) }
             catch { errors.present(error.localizedDescription) }
             exportingDocument = false
         }

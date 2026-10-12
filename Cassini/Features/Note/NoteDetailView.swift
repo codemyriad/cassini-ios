@@ -84,7 +84,7 @@ struct NoteDetailView: View {
         }
         .sheet(isPresented: $showingSpeakers) { SpeakersView(noteID: noteID) }
         .sheet(isPresented: $showingVersions) { TranscriptVersionsView(noteID: noteID) }
-        .sheet(item: $shareItem) { item in ShareSheet(url: item.url) }
+        .sheet(item: $shareItem) { item in ShareSheet(item: item) }
     }
 
     @ViewBuilder private func notices(_ note: Note) -> some View {

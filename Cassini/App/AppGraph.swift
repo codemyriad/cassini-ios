@@ -40,7 +40,9 @@ import CassiniNotebook
         trash = TrashStore(library: library, voices: voices, processing: processing, playback: playback,
                            recording: recording, settings: settings, router: router, errors: errors,
                            clock: environment.clock, calendar: environment.calendar)
-        exports = ExportStore(library: library, portable: PortableExportService(audio: environment.audio))
+        exports = ExportStore(library: library, portable: PortableExportService(audio: environment.audio),
+                              folder: environment.exports,
+                              locale: environment.locale, timeZone: environment.timeZone)
         processing.modelDownload = ModelDownloadAdapter(
             settings: settings, processing: processing, transcriber: environment.transcriber,
             analyzer: environment.analyzer, storage: environment.storage, notifier: environment.notifier,
@@ -120,6 +122,7 @@ import CassiniNotebook
             try await processing.reconcileOnStart(activeNoteID: recording.state.noteID)
         }
         startup.register(.purge) { [trash] in await trash.purgeExpired() }
+        startup.register(.sweep) { [exports, clock = environment.clock] in await exports.sweep(now: clock.now) }
     }
 }
 

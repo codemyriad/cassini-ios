@@ -22,12 +22,13 @@ import CassiniEngineTesting
         self.root = root ?? FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         self.suite = suite ?? "cassini.tests.\(UUID().uuidString)"
         self.clock = clock
-        let environment = AppEnvironment(
+        var environment = AppEnvironment(
             root: self.root, defaults: UserDefaults(suiteName: self.suite)!, clock: clock,
             locale: Locale(identifier: "en_US"), timeZone: TimeZone(identifier: "UTC")!,
             transcriber: transcriber, analyzer: analyzer, capture: capture, microphone: microphone,
             liveActivity: liveActivity, playback: playback,
             audio: LocalAudioProcessing(), storage: FakeStorage(), background: background, notifier: notifier)
+        environment.exports = self.root.appendingPathComponent("tmp/Exports", isDirectory: true)
         graph = AppGraph(environment: environment)
     }
 
