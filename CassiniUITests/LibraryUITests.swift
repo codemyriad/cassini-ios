@@ -259,6 +259,11 @@ final class LibraryUITests: XCTestCase {
         app.buttons["Subtitles · .vtt"].tap()
         XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(timeout: 5))
         XCTAssertEqual(app.staticTexts["noteTitle"].label, "A quieter kind of productivity")
+        // The note runs the export it was opened for: the share sheet offers the subtitles.
+        let shareSheet = app.otherElements["ActivityListView"]
+        XCTAssertTrue(shareSheet.waitForExistence(timeout: 10), "the note shares the exported subtitles")
+        shareSheet.buttons["Close"].tap()
+        XCTAssertTrue(shareSheet.waitForNonExistence(timeout: 5))
         app.navigationBars.buttons.element(boundBy: 0).tap()
 
         XCTAssertTrue(note.waitForExistence(timeout: 5))

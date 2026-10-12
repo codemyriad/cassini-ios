@@ -43,6 +43,17 @@ import CassiniNotebook
         window.layoutIfNeeded()
     }
 
+    /// The lazy stack finishes its work (rows it makes ahead of the scroll) over a few run loop passes, later on a
+    /// busy machine; waits until a pass draws nothing.
+    private func settleUntilIdle(_ window: UIWindow, passes: Int = 20) {
+        for _ in 0..<passes {
+            RenderProbe.reset()
+            settle(window)
+            if RenderProbe.renders.isEmpty { return }
+        }
+        XCTFail("the transcript kept drawing on its own: \(RenderProbe.renders)")
+    }
+
     func testANewActiveWordRedrawsOnlyTheParagraphsThatHoldTheOldAndTheNewWord() {
         let transcript = NoteTranscripts.sealed(longNote())
         XCTAssertEqual(transcript.turns.count, 180)
@@ -54,6 +65,7 @@ import CassiniNotebook
         let first = transcript.turns[0].id, second = transcript.turns[1].id
         XCTAssertFalse(RenderProbe.renders.isEmpty, "the paragraphs on screen were drawn")
         XCTAssertNil(RenderProbe.renders[transcript.turns[179].id], "paragraphs far off screen are not made")
+        settleUntilIdle(window)
 
         RenderProbe.reset()
         model.active = WordRef(turnID: first, index: 3)
