@@ -1,3 +1,4 @@
+#if DEBUG
 import Foundation
 import CassiniEngine
 
@@ -39,3 +40,4 @@ import CassiniEngine
 
     public func send(_ event: PlaybackEvent) { continuation.yield(event) }
 }
+#endif

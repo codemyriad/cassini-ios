@@ -1,3 +1,4 @@
+#if DEBUG
 import Foundation
 import Synchronization
 import CassiniEngine
@@ -27,3 +28,4 @@ public final class CountingNotePersistence: NotePersisting {
 
     public func delete(_ id: UUID) throws { try base.delete(id) }
 }
+#endif

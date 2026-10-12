@@ -14,7 +14,7 @@ public enum JobState: String, Codable, CaseIterable, Hashable, Sendable {
 
 /// Why a job is paused. Persisted by raw value: never rename one.
 public enum PauseReason: String, Codable, CaseIterable, Hashable, Sendable {
-    case user, system, interrupted
+    case user, system, memory, interrupted
 }
 
 /// Why the queue does not start its next job. Persisted by raw value: never rename one.
@@ -33,11 +33,24 @@ public enum DownloadError: String, Codable, CaseIterable, Hashable, Sendable {
     case fileCheckFailed = "FILE_CHECK_FAILED"
     case install = "INSTALL"
     case hostNotAllowed = "HOST_NOT_ALLOWED"
+    /// iOS ended the background time the download ran in.
+    case stoppedBySystem = "STOPPED_BY_SYSTEM"
 }
 
 /// Why a job or a step of it failed, as a stable code. The app maps each code to its copy; the code is what is stored.
+/// The plain codes are Android's core `Failure` names, plus the iOS-only `INTERRUPTED`, `UNSUPPORTED_LANGUAGE` and
+/// `RESERVATION_LIMIT`.
 public enum JobFailure: Hashable, Sendable {
-    case open, save, space, long, short, empty, audio, model, speakers, interrupted, unknown
+    case open, large, long, short, audio, wav, stalled, empty, timings, model, space
+    /// A model download failed outside a job's own install (Android's core `DOWNLOAD`); see also `download(_:)`.
+    case modelDownload
+    /// A downloaded model failed its check (`VERIFY`).
+    case modelVerify
+    /// A verified model could not be put in place (`INSTALL`).
+    case modelInstall
+    case save, speakers, memory, cancelled, unknown, playback, opusEncoder
+    /// The app was closed while the job ran.
+    case interrupted
     case unsupportedLanguage
     case reservationLimit
     case download(DownloadError)
@@ -47,8 +60,11 @@ public enum JobFailure: Hashable, Sendable {
     public static let downloadPrefix = "DOWNLOAD_"
     public static let documentPrefix = "DOCUMENT_"
 
-    private static let plain: [JobFailure] = [.open, .save, .space, .long, .short, .empty, .audio, .model, .speakers,
-                                              .interrupted, .unknown, .unsupportedLanguage, .reservationLimit, .checkpointMismatch]
+    private static let plain: [JobFailure] = [
+        .open, .large, .long, .short, .audio, .wav, .stalled, .empty, .timings, .model, .space, .modelDownload,
+        .modelVerify, .modelInstall, .save, .speakers, .memory, .cancelled, .unknown, .playback, .opusEncoder,
+        .interrupted, .unsupportedLanguage, .reservationLimit, .checkpointMismatch,
+    ]
 
     /// Every failure, one per stored code.
     public static var allCases: [JobFailure] {
@@ -58,16 +74,27 @@ public enum JobFailure: Hashable, Sendable {
     public var code: String {
         switch self {
         case .open: "OPEN"
-        case .save: "SAVE"
-        case .space: "SPACE"
+        case .large: "LARGE"
         case .long: "LONG"
         case .short: "SHORT"
-        case .empty: "EMPTY"
         case .audio: "AUDIO"
+        case .wav: "WAV"
+        case .stalled: "STALLED"
+        case .empty: "EMPTY"
+        case .timings: "TIMINGS"
         case .model: "MODEL"
+        case .space: "SPACE"
+        case .modelDownload: "DOWNLOAD"
+        case .modelVerify: "VERIFY"
+        case .modelInstall: "INSTALL"
+        case .save: "SAVE"
         case .speakers: "SPEAKERS"
-        case .interrupted: "INTERRUPTED"
+        case .memory: "MEMORY"
+        case .cancelled: "CANCELLED"
         case .unknown: "UNKNOWN"
+        case .playback: "PLAYBACK"
+        case .opusEncoder: "OPUS_ENCODER"
+        case .interrupted: "INTERRUPTED"
         case .unsupportedLanguage: "UNSUPPORTED_LANGUAGE"
         case .reservationLimit: "RESERVATION_LIMIT"
         case .checkpointMismatch: "CHECKPOINT_MISMATCH"

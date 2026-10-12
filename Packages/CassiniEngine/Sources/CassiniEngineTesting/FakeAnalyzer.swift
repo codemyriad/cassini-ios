@@ -1,3 +1,4 @@
+#if DEBUG
 import Foundation
 import Synchronization
 import CassiniEngine
@@ -46,3 +47,4 @@ public final class FakeAnalyzer: SpeakerAnalyzing {
     public var modelIdentity: String? { get async { identity } }
     public func modelStatus() async -> ModelPartStatus { identity == nil ? .notDownloaded : .ready }
 }
+#endif

@@ -1,3 +1,4 @@
+#if DEBUG
 import Foundation
 import CassiniEngine
 import CassiniNotebook
@@ -36,3 +37,4 @@ public struct FakeTranscriber: Transcribing {
 
     public func assetStatus(locale: Locale) async -> ModelPartStatus { status }
 }
+#endif

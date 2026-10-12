@@ -1,3 +1,4 @@
+#if DEBUG
 import Foundation
 import Synchronization
 import CassiniEngine
@@ -28,3 +29,4 @@ public struct FixedClock: AppClock {
     public init(now: Date) { self.now = now }
     public func sleep(for duration: Duration) async throws { try await Task.sleep(for: duration) }
 }
+#endif

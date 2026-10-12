@@ -1,3 +1,4 @@
+#if DEBUG
 import AVFoundation
 import CassiniEngine
 import CassiniNotebook
@@ -85,3 +86,4 @@ import CassiniNotebook
         for _ in 0..<Int(seconds) { try file.write(from: buffer) }
     }
 }
+#endif

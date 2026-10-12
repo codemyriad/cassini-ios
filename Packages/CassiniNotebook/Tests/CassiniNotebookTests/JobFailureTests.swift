@@ -15,6 +15,16 @@ import CassiniNotebook
         #expect(JobFailure.downloadError("DOWNLOAD_INSTALL") == .install)
         #expect(JobFailure.downloadError(JobFailure.save.code) == nil)
         #expect(JobFailure.documentRefused(.unknownFormat).code == "DOCUMENT_UNKNOWN_FORMAT")
+        #expect(JobFailure(code: "INSTALL") == .modelInstall)
+        #expect(JobFailure(code: "DOWNLOAD") == .modelDownload)
+    }
+
+    @Test func everyAndroidCoreFailureNameIsAStoredCode() {
+        let android = ["OPEN", "LARGE", "LONG", "SHORT", "AUDIO", "WAV", "STALLED", "EMPTY", "TIMINGS", "MODEL", "SPACE",
+                       "DOWNLOAD", "VERIFY", "INSTALL", "SAVE", "SPEAKERS", "MEMORY", "CANCELLED", "UNKNOWN", "PLAYBACK",
+                       "OPUS_ENCODER"]
+        for code in android { #expect(JobFailure(code: code)?.code == code, "\(code)") }
+        #expect(DownloadError(rawValue: "STOPPED_BY_SYSTEM") == .stoppedBySystem)
     }
 
     // ports: JobFailureTest#everyDownloadCodeReadsBack

@@ -8,7 +8,7 @@ let package = Package(
         .library(name: "CassiniCore", targets: ["CassiniCore"]),
         .library(name: "CassiniNotebook", targets: ["CassiniNotebook"]),
         .library(name: "CassiniEngine", targets: ["CassiniEngine"]),
-        // Fakes for tests and UI-test launches; the app imports it only in Debug builds.
+        // Fakes for tests and UI-test launches. Every source is under `#if DEBUG`, so a Release build links an empty module.
         .library(name: "CassiniEngineTesting", targets: ["CassiniEngineTesting"]),
         .library(name: "CassiniInference", targets: ["CassiniInference"]),
         .library(name: "CassiniAudio", targets: ["CassiniAudio"])

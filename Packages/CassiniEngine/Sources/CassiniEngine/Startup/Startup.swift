@@ -35,7 +35,7 @@ public final class Startup {
     public typealias Hook = @MainActor () async throws -> Void
 
     @ObservationIgnored private var hooks: [StartupStep: [Hook]] = [:]
-    @ObservationIgnored private var waiters: [CheckedContinuation<StartupReport, Never>] = []
+    @ObservationIgnored private(set) var waiters: [CheckedContinuation<StartupReport, Never>] = []
     @ObservationIgnored private var isRunning = false
     public private(set) var report: StartupReport?
 

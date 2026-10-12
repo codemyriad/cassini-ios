@@ -1,3 +1,4 @@
+#if DEBUG
 import Foundation
 import CassiniEngine
 
@@ -27,3 +28,4 @@ import CassiniEngine
         }
     }
 }
+#endif

@@ -1,3 +1,4 @@
+#if DEBUG
 import Foundation
 import Synchronization
 import CassiniEngine
@@ -8,3 +9,4 @@ public final class FakeStorage: StorageProbe {
     public func availableBytes(at url: URL) -> Int64 { bytes.withLock { $0 } }
     public func set(availableBytes: Int64) { bytes.withLock { $0 = availableBytes } }
 }
+#endif

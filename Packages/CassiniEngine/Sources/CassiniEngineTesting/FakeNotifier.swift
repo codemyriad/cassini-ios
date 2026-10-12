@@ -1,3 +1,4 @@
+#if DEBUG
 import Foundation
 import Synchronization
 import CassiniEngine
@@ -21,3 +22,4 @@ public final class FakeNotifier: Notifier {
     }
     public func remove(noteID: UUID) async { state.withLock { $0.posted.removeAll { $0.noteID == noteID } } }
 }
+#endif

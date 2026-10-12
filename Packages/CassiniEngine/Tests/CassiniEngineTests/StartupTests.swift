@@ -1,5 +1,5 @@
 import Testing
-import CassiniEngine
+@testable import CassiniEngine
 
 @MainActor @Suite struct StartupTests {
     struct Failure: Error {}
@@ -36,9 +36,21 @@ import CassiniEngine
 
     @Test func waitersResumeWhenEveryStepHasRun() async {
         let startup = Startup()
-        async let waited = startup.ready()
-        let report = await startup.run()
-        #expect(await waited == report)
+        var release: CheckedContinuation<Void, Never>?
+        startup.register(.load) { await withCheckedContinuation { release = $0 } }
+        let running = Task { await startup.run() }
+        while release == nil { await Task.yield() }
+
+        let waiter = Task { await startup.ready() }
+        let second = Task { await startup.run() }
+        while startup.waiters.count < 2 { await Task.yield() }
+        #expect(!startup.isReady)
+
+        release?.resume()
+        let report = await running.value
+        #expect(await waiter.value == report)
+        #expect(await second.value == report, "a run while one runs waits for it")
+        #expect(startup.waiters.isEmpty)
         #expect(await startup.run() == report, "a second run does nothing")
     }
 }
