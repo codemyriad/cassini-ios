@@ -16,24 +16,27 @@ public final class ArraySource: ByteSource {
     public init(_ bytes: [UInt8]) { self.bytes = bytes }
     public func read(into buffer: UnsafeMutablePointer<UInt8>, count: Int) throws -> Int {
         let n = min(count, bytes.count - position)
-        bytes.withUnsafeBufferPointer { buffer.assign(from: $0.baseAddress! + position, count: n) }
+        bytes.withUnsafeBufferPointer { buffer.update(from: $0.baseAddress! + position, count: n) }
         position += n
         return n
     }
 }
 
+/** Reads a file. Opening and reading fail with I/O errors, never [CassiniError], so callers can tell them apart. */
 public final class FileSource: ByteSource {
     private let stream: InputStream
+    private let url: URL
     public init(_ url: URL) throws {
-        guard let stream = InputStream(url: url) else { throw CassiniError("Cannot open \(url.path)") }
+        guard let stream = InputStream(url: url) else { throw CocoaError(.fileReadUnknown, userInfo: [NSURLErrorKey: url]) }
         stream.open()
         if let error = stream.streamError { throw error }
         self.stream = stream
+        self.url = url
     }
     deinit { stream.close() }
     public func read(into buffer: UnsafeMutablePointer<UInt8>, count: Int) throws -> Int {
         let n = stream.read(buffer, maxLength: count)
-        if n < 0 { throw stream.streamError ?? CassiniError("Read failed") }
+        if n < 0 { throw stream.streamError ?? CocoaError(.fileReadUnknown, userInfo: [NSURLErrorKey: url]) }
         return n
     }
 }
@@ -56,8 +59,23 @@ public final class FileSink: ByteSink {
         buffer += bytes
         if buffer.count >= 1 << 16 { try flush() }
     }
-    public func flush() throws { if !buffer.isEmpty { handle.write(Data(buffer)); buffer.removeAll(keepingCapacity: true) } }
-    public func close() throws { try flush(); try handle.synchronize(); try handle.close() }
+    /** Throws on a full disk or an I/O error; the deprecated non-throwing write would raise an uncatchable exception. */
+    public func flush() throws {
+        guard !buffer.isEmpty else { return }
+        try handle.write(contentsOf: buffer)
+        buffer.removeAll(keepingCapacity: true)
+    }
+    /** Flushes, syncs and closes; the handle is closed even when the flush fails, and that failure is thrown. */
+    public func close() throws {
+        do {
+            try flush()
+            try handle.synchronize()
+        } catch {
+            try? handle.close()
+            throw error
+        }
+        try handle.close()
+    }
 }
 
 /** Streaming Ogg packet reader/muxer with bounded packets. Metadata and page layout never enter the audio digest. */
@@ -66,11 +84,16 @@ public enum OggOpus {
     public static let headBytes = 36
     public static let maxHeaderBytes = 8 * 1024 * 1024
 
+    /** An OpusHead or OpusTags packet over [maxHeaderBytes]: legal Ogg that this reader declines, never plain audio. */
+    public struct HeaderTooLarge: Error, CustomStringConvertible {
+        public var description: String { "comment-header-too-large" }
+    }
+
     public static func looksLikeOpus(_ head: [UInt8]) -> Bool {
         head.count >= headBytes && startsWith(head, "OggS") && head[26] == 1 && startsWith(Array(head[28...]), "OpusHead")
     }
 
-    public struct Stream {
+    public struct Stream: Sendable {
         public let head: [UInt8], tags: [UInt8], audio: [[UInt8]]
         public let finalGranule: Int64, validFraming: Bool
         public init(head: [UInt8], tags: [UInt8], audio: [[UInt8]], finalGranule: Int64, validFraming: Bool) {
@@ -89,7 +112,7 @@ public enum OggOpus {
     }
 
     /** What a streaming pass learns: headers, shape, and the audio digest when framing and packets are sound. */
-    public struct Info {
+    public struct Info: Sendable {
         public let head: [UInt8], tags: [UInt8], finalGranule: Int64, validFraming: Bool, sampleCount: Int64
         let audioDigest: String?
         public var channels: Int { Int(head[9]) }
@@ -180,7 +203,11 @@ public enum OggOpus {
             var cursor = 27 + count
             for i in 0..<count {
                 let length = Int(page[27 + i])
-                try check(partial.count + length <= (packets < 2 ? maxHeaderBytes : 65536), "Ogg packet too large")
+                if packets < 2 {
+                    guard partial.count + length <= maxHeaderBytes else { throw HeaderTooLarge() }
+                } else {
+                    try check(partial.count + length <= 65536, "Ogg packet too large")
+                }
                 partial += page[cursor..<(cursor + length)]; cursor += length
                 if length < 255 {
                     ready.append(partial); partial = []; packets += 1
@@ -367,7 +394,13 @@ public enum OggOpus {
     @discardableResult
     public static func rewrite(_ source: URL, tags: [UInt8], to target: URL, serial: Int32 = randomSerial()) throws -> Info {
         let sink = try FileSink(target)
-        let info = try rewrite(FileSource(source), tags: tags, to: sink, serial: serial)
+        let info: Info
+        do {
+            info = try rewrite(FileSource(source), tags: tags, to: sink, serial: serial)
+        } catch {
+            try? sink.close()
+            throw error
+        }
         try sink.close()
         return info
     }
@@ -426,3 +459,12 @@ public enum OggOpus {
         return b.count >= v.count && Array(b[0..<v.count]) == v
     }
 }
+
+// Readers, writers and muxers hold a position in a stream: confine each one to a single task.
+@available(*, unavailable) extension ArraySource: Sendable {}
+@available(*, unavailable) extension FileSource: Sendable {}
+@available(*, unavailable) extension ArraySink: Sendable {}
+@available(*, unavailable) extension FileSink: Sendable {}
+@available(*, unavailable) extension OggOpus.Reader: Sendable {}
+@available(*, unavailable) extension OggOpus.Muxer: Sendable {}
+@available(*, unavailable) extension OggOpus.LiveMuxer: Sendable {}

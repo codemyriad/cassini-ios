@@ -135,7 +135,7 @@ final class AudioPipelineTests: XCTestCase {
         }
         let portable = try await store.exportPortable(id)
         defer { try? FileManager.default.removeItem(at: portable.deletingLastPathComponent()) }
-        XCTAssertEqual(CassiniDocument.read(portable).state, "ok")
+        XCTAssertEqual(CassiniDocument.read(portable).state, .ok)
         let original = try Data(contentsOf: portable)
         await store.importAudio(portable)
         XCTAssertNil(store.errorMessage)

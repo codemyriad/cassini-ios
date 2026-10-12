@@ -19,8 +19,8 @@ let package = Package(
         .testTarget(name: "CassiniInferenceTests", dependencies: ["CassiniInference"], path: "Packages/CassiniInference/Tests/CassiniInferenceTests"),
         .target(name: "CassiniInference", dependencies: ["CassiniNotebook", .product(name: "FluidAudio", package: "FluidAudio")], path: "Packages/CassiniInference/Sources/CassiniInference"),
         .target(name: "CZlib", path: "Sources/CZlib", publicHeadersPath: ".", linkerSettings: [.linkedLibrary("z")]),
-        .target(name: "CassiniCore", dependencies: ["CZlib"], swiftSettings: [.swiftLanguageMode(.v5)]),
-        .testTarget(name: "CassiniCoreTests", dependencies: ["CassiniCore"], swiftSettings: [.swiftLanguageMode(.v5)]),
+        .target(name: "CassiniCore", dependencies: ["CZlib"]),
+        .testTarget(name: "CassiniCoreTests", dependencies: ["CassiniCore"]),
         .target(name: "CassiniNotebook", dependencies: ["CassiniCore"], path: "Packages/CassiniNotebook/Sources/CassiniNotebook"),
         .testTarget(name: "CassiniNotebookTests", dependencies: ["CassiniNotebook", "CassiniCore"], path: "Packages/CassiniNotebook/Tests/CassiniNotebookTests")
     ]

@@ -1,7 +1,7 @@
 import Foundation
 
 /** A failed format check. Readers turn these into document states; they are never shown raw to people. */
-public struct CassiniError: Error, CustomStringConvertible {
+public struct CassiniError: Error, CustomStringConvertible, Sendable {
     public let message: String
     public init(_ message: String) { self.message = message }
     public var description: String { message }
@@ -15,6 +15,22 @@ func fullMatch(_ text: String, _ pattern: String) -> Bool {
     guard let regex = try? NSRegularExpression(pattern: "^(?:" + pattern + ")$") else { return false }
     return regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) != nil
 }
+
+/** Format strings compare by their UTF-8 bytes; Swift's `==` would equate canonically equivalent spellings. */
+func sameBytes(_ a: String?, _ b: String?) -> Bool {
+    switch (a, b) {
+    case (nil, nil): return true
+    case let (a?, b?): return a.utf8.elementsEqual(b.utf8)
+    default: return false
+    }
+}
+
+/** Tag names fold ASCII case only; `uppercased()` would also turn letters such as "ſ" into "S". */
+func asciiUppercased<Bytes: Sequence>(_ bytes: Bytes) -> String where Bytes.Element == UInt8 {
+    String(decoding: bytes.map { (0x61...0x7A).contains($0) ? $0 - 0x20 : $0 }, as: UTF8.self)
+}
+
+func asciiUppercased(_ text: String) -> String { asciiUppercased(text.utf8) }
 
 /** Strict UTF-8: no repair, and unlike Foundation's decoder a leading BOM is kept. */
 func utf8(_ bytes: [UInt8]) throws -> String {
@@ -34,7 +50,7 @@ func utf8(_ bytes: [UInt8]) throws -> String {
  * JSON that keeps member order and number lexemes, so unknown members survive a rewrite.
  * Equality is structural and order-insensitive, as the Android reader's `same`.
  */
-public enum JSON: Equatable {
+public enum JSON: Equatable, Sendable {
     case null
     case bool(Bool)
     case number(String)
@@ -63,7 +79,7 @@ public enum JSON: Equatable {
         case (.null, .null): return true
         case (.bool(let x), .bool(let y)): return x == y
         case (.number(let x), .number(let y)): return x == y || Double(x) == Double(y)
-        case (.string(let x), .string(let y)): return x == y
+        case (.string(let x), .string(let y)): return sameBytes(x, y)
         case (.array(let x), .array(let y)): return x == y
         case (.object(let x), .object(let y)): return x == y
         default: return false
@@ -235,17 +251,21 @@ public enum JSON: Equatable {
     }
 }
 
-/** An ordered JSON object. Assigning an existing key replaces it in place; nil removes it. */
-public struct JSONObject: Equatable {
+/** An ordered JSON object with byte-exact keys. Assigning an existing key replaces it in place; nil removes it. */
+public struct JSONObject: Equatable, Sendable {
     public private(set) var pairs: [(key: String, value: JSON)] = []
     public init() {}
     public init(_ pairs: [(String, JSON)]) { for (k, v) in pairs { self[k] = v } }
     public var keys: [String] { pairs.map { $0.key } }
-    public func has(_ key: String) -> Bool { pairs.contains { $0.key == key } }
+    public func has(_ key: String) -> Bool { pairs.contains { sameBytes($0.key, key) } }
+    /** Whether the keys are exactly [expected], compared byte for byte. */
+    func hasExactly(_ expected: Set<String>) -> Bool {
+        pairs.count == expected.count && pairs.allSatisfy { pair in expected.contains { sameBytes($0, pair.key) } }
+    }
     public subscript(key: String) -> JSON? {
-        get { pairs.first { $0.key == key }?.value }
+        get { pairs.first { sameBytes($0.key, key) }?.value }
         set {
-            let index = pairs.firstIndex { $0.key == key }
+            let index = pairs.firstIndex { sameBytes($0.key, key) }
             switch (index, newValue) {
             case (let i?, let v?): pairs[i].value = v
             case (let i?, nil): pairs.remove(at: i)
@@ -274,7 +294,8 @@ public struct JSONObject: Equatable {
     }
     public func serialized(indent: Int? = nil) -> String { JSON.object(self).serialized(indent: indent) }
 
+    /** Keys are unique, so equal counts and every member of [a] found in [b] means the same members. */
     public static func == (a: JSONObject, b: JSONObject) -> Bool {
-        Set(a.keys) == Set(b.keys) && a.pairs.allSatisfy { b[$0.key] == $0.value }
+        a.pairs.count == b.pairs.count && a.pairs.allSatisfy { b[$0.key] == $0.value }
     }
 }

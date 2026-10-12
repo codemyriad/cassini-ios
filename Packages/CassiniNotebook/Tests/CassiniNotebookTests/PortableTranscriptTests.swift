@@ -28,7 +28,7 @@ import CassiniCore
     defer { try? FileManager.default.removeItem(at: output) }
     try PortableTranscript.export(note: note, opus: url, destination: output)
     let document = CassiniDocument.read(output)
-    #expect(document.state == "ok")
+    #expect(document.state == .ok)
     #expect(document.title == note.title)
     #expect(document.variants.count == 2)
     #expect(document.variants.first?.transcript == transcript)

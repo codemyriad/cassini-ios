@@ -1,6 +1,6 @@
 import Foundation
 
-public struct Word: Equatable {
+public struct Word: Hashable, Sendable {
     public let speaker: String, startMs: Int64, endMs: Int64, text: String
     public init(_ speaker: String, _ startMs: Int64, _ endMs: Int64, _ text: String) {
         self.speaker = speaker; self.startMs = startMs; self.endMs = endMs; self.text = text
@@ -12,31 +12,38 @@ public struct Word: Equatable {
  * the word to over its speaker's continuing audio, the end of its last piece INCLUDING trailing
  * punctuation. A cap not above the word's end permits no extension.
  */
-struct TimedWord: Equatable {
+struct TimedWord: Equatable, Sendable {
     let word: Word
     var capMs: Int64 = 0
     var extentCapMs: Int64 { capMs > word.endMs ? capMs : word.endMs }
 }
 
-/** Word order is canonical; never sort a Cassini transcript by time. */
-public struct Transcript: Equatable {
+/**
+ * Word order is canonical; never sort a Cassini transcript by time. [language] is empty unless something identified
+ * it: the format reads an absent language as "nobody said", never as a default.
+ */
+public struct Transcript: Hashable, Sendable {
+    public static let format = "cassini.words.v1"
+
     public var words: [Word]
     public var language: String
-    public init(_ words: [Word], language: String = "it") { self.words = words; self.language = language }
+    public init(_ words: [Word], language: String = "") { self.words = words; self.language = language }
 
+    /** The word body as the seal writes it: compact JSON, with `language` only when it is known. */
     public func json() -> String {
-        JSONObject([
-            ("format", .string("cassini.words.v1")), ("language", .string(language)), ("wordCount", .int(words.count)),
-            ("items", .array(words.map { w in
-                .object(JSONObject([("speaker", .string(w.speaker)), ("startMs", .int(w.startMs)),
-                                    ("endMs", .int(w.endMs)), ("text", .string(w.text))]))
-            })),
-        ]).serialized(indent: 2)
+        var body = JSONObject([("format", .string(Self.format))])
+        if !language.isEmpty { body["language"] = .string(language) }
+        body["wordCount"] = .int(words.count)
+        body["items"] = .array(words.map { w in
+            .object(JSONObject([("speaker", .string(w.speaker)), ("startMs", .int(w.startMs)),
+                                ("endMs", .int(w.endMs)), ("text", .string(w.text))]))
+        })
+        return body.serialized()
     }
 
     public static func fromJSON(_ json: String) throws -> Transcript {
         let body = try JSON.parseObject(json)
-        try check(body["format"] == .string("cassini.words.v1"), "Unsupported transcript format")
+        try check(body["format"] == .string(format), "Unsupported transcript format")
         let items: [JSON]
         switch body["items"] {
         case nil, .null?: items = []
