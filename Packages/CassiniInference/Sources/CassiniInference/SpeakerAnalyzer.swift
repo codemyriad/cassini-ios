@@ -14,8 +14,12 @@ public actor SpeakerAnalyzer: SpeakerAnalyzing {
     public static let modelID = "pyannote-community-1-wespeaker-coreml-v1"
     public static let manifest = SpeakerModelManifest.diarizer
 
+    /// Loads the installed models from the models directory and analyses one local file with them.
+    public typealias Analysis = @Sendable (_ url: URL, _ models: URL,
+                                           _ progress: @escaping @Sendable (SpeakerAnalysisEvent) -> Void) async throws -> SpeakerAnalysis
+
     public nonisolated let installer: SpeakerModelInstaller
-    private let network: ModelNetworkGate
+    private let analysis: Analysis
     private var identity: String?
     private var analyzing = false
     private var queue: [CheckedContinuation<Void, Never>] = []
@@ -24,15 +28,24 @@ public actor SpeakerAnalyzer: SpeakerAnalyzing {
     /// free space there before a download.
     public init(directory: URL = SpeakerAnalyzer.defaultDirectory, storage: any StorageProbe,
                 network: ModelNetworkGate = .fluidAudio) {
-        self.network = network
-        installer = SpeakerModelInstaller(manifest: Self.manifest, directory: directory, storage: storage,
-                                          network: network, fetch: Self.fetchFromHub)
+        self.init(installer: SpeakerModelInstaller(manifest: Self.manifest, directory: directory, storage: storage,
+                                                   network: network, fetch: Self.fetchFromHub),
+                  network: network, analysis: Self.fluidAudioAnalysis(network: network))
+    }
+
+    /// An analyzer over `installer` whose `analysis` does the work; tests pass a fake one.
+    public init(installer: SpeakerModelInstaller, network: ModelNetworkGate, analysis: @escaping Analysis) {
+        self.installer = installer
+        self.analysis = analysis
         network.close()
     }
 
     public static var defaultDirectory: URL {
         URL.applicationSupportDirectory.appendingPathComponent("CassiniModels", isDirectory: true)
     }
+
+    /// The free space an install of the models asks for, as the installer checks it.
+    public nonisolated var modelInstallBytes: Int64 { installer.manifest.requiredFreeBytes }
 
     public var modelIdentity: String? {
         get async {
@@ -64,36 +77,39 @@ public actor SpeakerAnalyzer: SpeakerAnalyzing {
         await takeTurn()
         defer { endTurn() }
         try Task.checkCancellation()
-        return try await run(url: url, progress: progress)
+        let result = try await analysis(url, try Self.prepare(installer.directory), progress)
+        if let model = result.prints.first?.model { identity = model }
+        return result
     }
 
-    private func run(url: URL, progress: @escaping @Sendable (SpeakerAnalysisEvent) -> Void) async throws -> SpeakerAnalysis {
-        let directory = try Self.prepare(installer.directory)
-        var config = OfflineDiarizerConfig.default
-        config.embedding.batchSize = 4
-        let manager = OfflineDiarizerManager(config: config)
-        // Installed and checked: the load reads the files only. With the network closed a damaged file fails the
-        // load instead of being fetched again behind the user's back.
-        network.close()
-        let models = try await OfflineDiarizerModels.load(from: directory)
-        try Task.checkCancellation()
-        let fingerprint = try Self.fingerprint(directory)
-        identity = Self.modelID + ":" + fingerprint
-        manager.initialize(models: models)
-        let result = try await manager.process(url, progressCallback: { count, total in
-            progress(.analyzing(Double(count) / Double(max(1, total))))
-        })
-        try Task.checkCancellation()
-        let turns = result.segments.map { SpeakerTurn(speakerID: $0.speakerId, start: Double($0.startTimeSeconds), end: Double($0.endTimeSeconds)) }
-        let database: [String: [Float]] = result.speakerDatabase ?? [:]
-        var prints: [SpeakerPrint] = []
-        for (id, vector) in database {
-            guard let normalized = VoiceMatcher.normalized(vector) else { continue }
-            // Only isolated speech counts toward eligibility for remembering a voice.
-            let seconds = SpeakerAttribution.isolatedSeconds(speakerID: id, turns: turns)
-            prints.append(SpeakerPrint(speakerID: id, model: Self.modelID + ":" + fingerprint, vector: normalized, speechSeconds: seconds))
+    /// FluidAudio's offline diarizer over the installed models.
+    private static func fluidAudioAnalysis(network: ModelNetworkGate) -> Analysis {
+        { url, directory, progress in
+            var config = OfflineDiarizerConfig.default
+            config.embedding.batchSize = 4
+            let manager = OfflineDiarizerManager(config: config)
+            // Installed and checked: the load reads the files only. With the network closed a damaged file fails the
+            // load instead of being fetched again behind the user's back.
+            network.close()
+            let models = try await OfflineDiarizerModels.load(from: directory)
+            try Task.checkCancellation()
+            let fingerprint = try Self.fingerprint(directory)
+            manager.initialize(models: models)
+            let result = try await manager.process(url, progressCallback: { count, total in
+                progress(.analyzing(Double(count) / Double(max(1, total))))
+            })
+            try Task.checkCancellation()
+            let turns = result.segments.map { SpeakerTurn(speakerID: $0.speakerId, start: Double($0.startTimeSeconds), end: Double($0.endTimeSeconds)) }
+            let database: [String: [Float]] = result.speakerDatabase ?? [:]
+            var prints: [SpeakerPrint] = []
+            for (id, vector) in database {
+                guard let normalized = VoiceMatcher.normalized(vector) else { continue }
+                // Only isolated speech counts toward eligibility for remembering a voice.
+                let seconds = SpeakerAttribution.isolatedSeconds(speakerID: id, turns: turns)
+                prints.append(SpeakerPrint(speakerID: id, model: Self.modelID + ":" + fingerprint, vector: normalized, speechSeconds: seconds))
+            }
+            return SpeakerAnalysis(turns: turns, prints: prints)
         }
-        return SpeakerAnalysis(turns: turns, prints: prints)
     }
 
     /// One analysis at a time, in the order they arrived.

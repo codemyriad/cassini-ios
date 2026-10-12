@@ -38,4 +38,7 @@ public protocol SpeakerAnalyzing: Sendable {
     /// that runs, reporting the fraction done (nil while unknown). Does nothing when they are installed; a failed
     /// install throws `SpeakerAnalysisError.download`.
     func installModels(progress: @escaping @Sendable (Double?) -> Void) async throws
+    /// The free space an install of the models asks for before its first byte; the model download screen asks for the
+    /// same.
+    var modelInstallBytes: Int64 { get }
 }

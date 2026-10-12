@@ -6,16 +6,26 @@ import CassiniNotebook
 ///
 /// - One install runs at a time. A request while one runs joins it: it gets the same progress and outcome, and every
 ///   file is fetched once.
-/// - A caller that is cancelled stops waiting at once; when nobody waits any more, the install is cancelled. The
-///   partial files FluidAudio keeps let the next install resume.
+/// - A caller that is cancelled stops waiting at once; when nobody waits any more, the install is cancelled. A request
+///   that arrives before that cancelled fetch has ended never joins it: it waits for its end, then starts its own
+///   install, so only one fetch is ever in flight.
+/// - An interrupted install keeps its complete files and FluidAudio's partial files, and the next install resumes
+///   them. Only files with the wrong size or hash go first, or the whole folder when it holds another revision.
 /// - Before the first byte the free space is checked (the files plus 32 MiB); short, the install fails with
 ///   `NOT_ENOUGH_STORAGE` and the bytes it asked for.
 /// - After the fetch every file is checked against the manifest; a mismatch is `FILE_CHECK_FAILED` and the folder is
 ///   removed so the next install fetches it again.
 /// - The status is stored: the last check or install, refreshed by `refresh()`; a failure stays until the next install.
+///   A request while the stored status is ready checks only the marker and the sizes; `refresh()` hashes every file.
 public actor SpeakerModelInstaller {
     /// Fetches the manifest's files into `directory/<folder>`, reporting the fraction done (nil while unknown).
     public typealias Fetch = @Sendable (_ directory: URL, _ progress: @escaping @Sendable (Double?) -> Void) async throws -> Void
+
+    /// What the fetch reports, in order.
+    private enum Report: Sendable {
+        case fraction(Double?)
+        case checking
+    }
 
     /// The install that runs: its task, the callers waiting on it and their progress callbacks.
     private struct Install {
@@ -23,6 +33,10 @@ public actor SpeakerModelInstaller {
         let task: Task<Void, Error>
         var waiters: [UUID: CheckedContinuation<Void, Error>] = [:]
         var listeners: [UUID: @Sendable (Double?) -> Void] = [:]
+        /// Nobody waits any more and the task is cancelled, but its fetch has not ended: new requests wait for its end.
+        var stopping = false
+        /// The requests that wait for this stopping install to end.
+        var successors: [UUID: CheckedContinuation<Void, Never>] = [:]
     }
 
     public nonisolated let manifest: SpeakerModelManifest
@@ -64,7 +78,12 @@ public actor SpeakerModelInstaller {
 
     /// Installs the models, or joins the install that runs. Does nothing when they are ready.
     public func install(allowDownload: Bool, progress: @escaping @Sendable (Double?) -> Void = { _ in }) async throws {
-        if let current { return try await wait(on: current.number, progress: progress) }
+        while let current {
+            guard current.stopping else { return try await wait(on: current.number, progress: progress) }
+            await waitForEnd(of: current.number)
+            try Task.checkCancellation()
+        }
+        if stored == .ready, manifest.looksReady(in: directory) { return }
         let check = manifest.check(in: directory)
         if check == .ready {
             stored = .ready
@@ -77,23 +96,26 @@ public actor SpeakerModelInstaller {
             stored = .failed(.notEnoughStorage)
             throw SpeakerAnalysisError.download(.notEnoughStorage, requiredFreeBytes: required)
         }
-        let number = start(removingFirst: check == .mismatch)
+        let number = start(removingDamaged: check == .mismatch)
         try await wait(on: number, progress: progress)
     }
 
-    private func start(removingFirst stale: Bool) -> Int {
+    private func start(removingDamaged damaged: Bool) -> Int {
         stored = .downloading(nil)
         fetches += 1
         let number = fetches
         let directory = directory, manifest = manifest, network = network, fetch = fetch
+        // One stream keeps the reports in the order the fetch sent them.
+        let (reports, reporter) = AsyncStream.makeStream(of: Report.self)
         let task = Task.detached {
-            try await Self.run(fetch, into: directory, manifest: manifest, network: network, removingFirst: stale) { fraction in
-                Task { await self.report(fraction, for: number) }
-            } checking: {
-                await self.reportChecking(for: number)
-            }
+            defer { reporter.finish() }
+            try await Self.run(fetch, into: directory, manifest: manifest, network: network, removingDamaged: damaged,
+                               progress: { reporter.yield(.fraction($0)) }, checking: { reporter.yield(.checking) })
         }
         current = Install(number: number, task: task)
+        Task {
+            for await report in reports { self.apply(report, for: number) }
+        }
         Task {
             let result = await task.result
             self.finish(number, result)
@@ -103,17 +125,16 @@ public actor SpeakerModelInstaller {
 
     /// The fetch and the check of one install, off the actor; every failure is a `SpeakerAnalysisError` or a cancel.
     private static func run(_ fetch: Fetch, into directory: URL, manifest: SpeakerModelManifest, network: ModelNetworkGate,
-                            removingFirst stale: Bool, progress: @escaping @Sendable (Double?) -> Void,
-                            checking: @Sendable () async -> Void) async throws {
-        let folder = directory.appendingPathComponent(manifest.folder, isDirectory: true)
+                            removingDamaged damaged: Bool, progress: @escaping @Sendable (Double?) -> Void,
+                            checking: @Sendable () -> Void) async throws {
         do {
-            if stale { try? FileManager.default.removeItem(at: folder) }
+            if damaged { manifest.removeDamaged(in: directory) }
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             try await network.allowingDownloads { try await fetch(directory, progress) }
             try Task.checkCancellation()
-            await checking()
+            checking()
             guard manifest.check(in: directory) == .ready else {
-                try? FileManager.default.removeItem(at: folder)
+                try? FileManager.default.removeItem(at: directory.appendingPathComponent(manifest.folder, isDirectory: true))
                 throw SpeakerAnalysisError.download(.fileCheckFailed, requiredFreeBytes: 0)
             }
         } catch let error as SpeakerAnalysisError {
@@ -143,6 +164,24 @@ public actor SpeakerModelInstaller {
         }
     }
 
+    /// Waits until the stopping install `number` has ended; a cancelled caller stops waiting at once.
+    private func waitForEnd(of number: Int) async {
+        let id = UUID()
+        await withTaskCancellationHandler {
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                guard current?.number == number, !Task.isCancelled else { return continuation.resume() }
+                current?.successors[id] = continuation
+            }
+        } onCancel: {
+            Task { await self.stopWaitingForEnd(of: number, id) }
+        }
+    }
+
+    private func stopWaitingForEnd(of number: Int, _ id: UUID) {
+        guard current?.number == number else { return }
+        current?.successors.removeValue(forKey: id)?.resume()
+    }
+
     /// A cancelled caller stops waiting at once; the install stops when nobody waits any more.
     private func leave(_ number: Int, _ id: UUID) {
         guard current?.number == number else { return }
@@ -153,20 +192,21 @@ public actor SpeakerModelInstaller {
     }
 
     private func stopIfNobodyWaits(_ number: Int) {
-        guard let current, current.number == number, current.waiters.isEmpty else { return }
-        current.task.cancel()
+        guard let install = current, install.number == number, install.waiters.isEmpty, !install.stopping else { return }
+        current?.stopping = true
+        install.task.cancel()
     }
 
-    private func report(_ fraction: Double?, for number: Int) {
+    private func apply(_ report: Report, for number: Int) {
         guard let current, current.number == number else { return }
-        if case .checking = stored { return }
-        stored = .downloading(fraction.map { min(max($0, 0), 1) })
-        for listener in current.listeners.values { listener(fraction) }
-    }
-
-    private func reportChecking(for number: Int) {
-        guard current?.number == number else { return }
-        stored = .checking
+        switch report {
+        case .checking:
+            stored = .checking
+        case .fraction(let fraction):
+            if case .checking = stored { return }
+            stored = .downloading(fraction.map { min(max($0, 0), 1) })
+            for listener in current.listeners.values { listener(fraction) }
+        }
     }
 
     private func finish(_ number: Int, _ result: Result<Void, Error>) {
@@ -181,6 +221,7 @@ public actor SpeakerModelInstaller {
             stored = Self.status(of: manifest.check(in: directory))
         }
         for waiter in install.waiters.values { waiter.resume(with: result) }
+        for successor in install.successors.values { successor.resume() }
     }
 
     private static func status(of check: SpeakerModelManifest.Check) -> ModelPartStatus {

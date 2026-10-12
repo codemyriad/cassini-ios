@@ -37,7 +37,7 @@ import CassiniNotebook
     }
 
     // ports: ModelInstallOwnerTest#cancelEndsEveryWaitAndKeepsThePartFiles
-    @Test func theInstallStopsWhenItsLastWaiterLeavesAndKeepsThePartFiles() async throws {
+    @Test func theInstallStopsWhenItsLastWaiterLeavesAndTheNextOneResumesItsFiles() async throws {
         let fetch = GatedFetch(writes: Fixture.files, partial: true)
         let installer = makeInstaller(fetch)
         let first = Task { try await installer.install(allowDownload: true) }
@@ -51,10 +51,73 @@ import CassiniNotebook
         second.cancel()
         await #expect(throws: CancellationError.self) { try await second.value }
         try await until { fetch.cancelled }
-        try await until { await installer.waiting == 0 } 
+        try await until { await installer.waiting == 0 }
         try await until { await installer.status() == .notDownloaded }
-        let partial = directory.appendingPathComponent("models/a.bin.partial")
-        #expect(FileManager.default.fileExists(atPath: partial.path), "FluidAudio's partial file stays for a resume")
+        #expect(Fixture.manifest.check(in: directory) == .incomplete)
+
+        // The next install keeps the finished file and FluidAudio's partial one for the fetch to resume.
+        try await installer.install(allowDownload: true)
+        #expect(fetch.calls == 2)
+        #expect(fetch.found.last?.isSuperset(of: ["a.bin", "b.json.partial", ".fluidaudio-revision"]) == true)
+        #expect(await installer.status() == .ready)
+        try? FileManager.default.removeItem(at: directory)
+    }
+
+    // ports: ModelInstallOwnerTest#aRequestRightAfterACancelWaitsForTheCancelledFetchToEnd
+    @Test func aRequestRightAfterACancelWaitsForTheCancelledFetchToEnd() async throws {
+        let fetch = GatedFetch(writes: Fixture.files, stubborn: true)
+        let installer = makeInstaller(fetch)
+        let first = Task { try await installer.install(allowDownload: true) }
+        await fetch.started.wait()
+        try await until { await installer.waiting == 1 }
+
+        first.cancel()
+        await #expect(throws: CancellationError.self) { try await first.value }
+        try await until { fetch.cancelled }
+        let again = Task { try await installer.install(allowDownload: true) }
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(fetch.calls == 1, "no second fetch while the first one runs")
+        #expect(await installer.waiting == 0, "the request does not join the cancelled install")
+
+        fetch.release()
+        try await again.value
+        #expect(fetch.calls == 2)
+        #expect(fetch.mostInFlight == 1, "one fetch at a time")
+        #expect(await installer.status() == .ready)
+        try? FileManager.default.removeItem(at: directory)
+    }
+
+    @Test func aFileWithTheWrongHashGoesBeforeTheFetchAndTheMatchingOnesStay() async throws {
+        let folder = directory.appendingPathComponent("models", isDirectory: true)
+        var damaged = Fixture.files
+        damaged["a.bin"] = Data(repeating: 8, count: 1000)
+        try GatedFetch.write(damaged, marker: Fixture.manifest.revision, into: folder)
+        #expect(Fixture.manifest.check(in: directory) == .mismatch)
+        let fetch = GatedFetch(writes: Fixture.files, gated: false)
+        try await makeInstaller(fetch).install(allowDownload: true)
+        #expect(fetch.found == [["b.json", ".fluidaudio-revision"]])
+        #expect(Fixture.manifest.check(in: directory) == .ready)
+        try? FileManager.default.removeItem(at: directory)
+    }
+
+    @Test func filesOfAnotherRevisionGoBeforeTheFetch() async throws {
+        let folder = directory.appendingPathComponent("models", isDirectory: true)
+        try GatedFetch.write(Fixture.files, marker: "another", into: folder)
+        let fetch = GatedFetch(writes: Fixture.files, gated: false)
+        try await makeInstaller(fetch).install(allowDownload: true)
+        #expect(fetch.found == [[]])
+        #expect(Fixture.manifest.check(in: directory) == .ready)
+        try? FileManager.default.removeItem(at: directory)
+    }
+
+    @Test func theProgressReachesEveryCallerInTheOrderTheFetchSentIt() async throws {
+        let fractions = (1...200).map { Double($0) / 200 }
+        let fetch = GatedFetch(writes: Fixture.files, gated: false, fractions: fractions)
+        let seen = Mutex<[Double]>([])
+        try await makeInstaller(fetch).install(allowDownload: true) { fraction in
+            if let fraction { seen.withLock { $0.append(fraction) } }
+        }
+        #expect(seen.withLock { $0 } == fractions + [1])
         try? FileManager.default.removeItem(at: directory)
     }
 
@@ -87,17 +150,24 @@ import CassiniNotebook
     @Test func aFileThatDoesNotMatchTheManifestFailsTheCheckAndIsRemoved() async throws {
         var damaged = Fixture.files
         damaged["b.json"] = Data("tampered".utf8)
-        let installer = makeInstaller(GatedFetch(writes: damaged, gated: false))
+        let fetch = GatedFetch(writes: damaged, holdFrom: 2)
+        let installer = makeInstaller(fetch)
         await #expect(throws: SpeakerAnalysisError.download(.fileCheckFailed, requiredFreeBytes: 0)) {
             try await installer.install(allowDownload: true)
         }
         #expect(await installer.status() == .failed(.fileCheckFailed))
         #expect(!FileManager.default.fileExists(atPath: directory.appendingPathComponent("models").path))
-        // The failure stays until the next install, which fetches again and succeeds.
-        #expect(await installer.refresh() == .failed(.fileCheckFailed))
-        let retry = makeInstaller(GatedFetch(writes: Fixture.files, gated: false))
-        try await retry.install(allowDownload: true)
-        #expect(await retry.refresh() == .ready)
+        #expect(await installer.refresh() == .failed(.fileCheckFailed), "the failure stays until the next install")
+
+        // The next install on the same installer clears it, fetches again and succeeds.
+        fetch.writes(Fixture.files)
+        let retry = Task { try await installer.install(allowDownload: true) }
+        try await until { fetch.calls == 2 }
+        try await until { await installer.status() == .downloading(0.5) }
+        fetch.release()
+        try await retry.value
+        #expect(await installer.status() == .ready)
+        #expect(await installer.refresh() == .ready)
         try? FileManager.default.removeItem(at: directory)
     }
 
@@ -106,6 +176,11 @@ import CassiniNotebook
         #expect(Fixture.manifest.check(in: directory) == .missing)
         try GatedFetch.write(Fixture.files, marker: Fixture.manifest.revision, into: folder)
         #expect(Fixture.manifest.check(in: directory) == .ready)
+        #expect(Fixture.manifest.looksReady(in: directory))
+        try FileManager.default.removeItem(at: folder.appendingPathComponent("b.json"))
+        #expect(Fixture.manifest.check(in: directory) == .incomplete, "an interrupted install is resumed, not removed")
+        #expect(!Fixture.manifest.looksReady(in: directory))
+        try GatedFetch.write(Fixture.files, marker: Fixture.manifest.revision, into: folder)
         try Data("other".utf8).write(to: folder.appendingPathComponent(".fluidaudio-revision"))
         #expect(Fixture.manifest.check(in: directory) == .mismatch, "files of another revision are not used")
         try? FileManager.default.removeItem(at: directory)
@@ -143,6 +218,38 @@ import CassiniNotebook
     private func makeInstaller(_ fetch: GatedFetch, freeBytes: Int64 = .max) -> SpeakerModelInstaller {
         SpeakerModelInstaller(manifest: Fixture.manifest, directory: directory, storage: FixedStorage(bytes: freeBytes),
                               network: ModelNetworkGate { _ in }, fetch: fetch.fetch)
+    }
+}
+
+/// The analyses over installed models, with a fake analysis in place of FluidAudio's.
+@Suite struct SpeakerAnalyzerQueueTests {
+    let directory = URL.temporaryDirectory.appendingPathComponent("analyzer-\(UUID().uuidString)", isDirectory: true)
+
+    @Test func aSecondAnalysisWaitsForTheFirstAndBothSucceed() async throws {
+        let first = Latch()
+        let state = Mutex((running: 0, most: 0, order: [String]()))
+        let installer = SpeakerModelInstaller(manifest: Fixture.manifest, directory: directory,
+                                              storage: FixedStorage(bytes: .max), network: ModelNetworkGate { _ in },
+                                              fetch: GatedFetch(writes: Fixture.files, gated: false).fetch)
+        let analyzer = SpeakerAnalyzer(installer: installer, network: ModelNetworkGate { _ in }) { url, _, _ in
+            let name = url.lastPathComponent
+            state.withLock { $0.running += 1; $0.most = max($0.most, $0.running); $0.order.append(name) }
+            defer { state.withLock { $0.running -= 1 } }
+            if name == "one.m4a" { await first.wait() }
+            return SpeakerAnalysis(turns: [SpeakerTurn(speakerID: name, start: 0, end: 1)], prints: [])
+        }
+        let one = Task { try await analyzer.analyze(url: URL(filePath: "/tmp/one.m4a"), allowDownload: true) { _ in } }
+        try await until { state.withLock { $0.order } == ["one.m4a"] }
+        let two = Task { try await analyzer.analyze(url: URL(filePath: "/tmp/two.m4a"), allowDownload: true) { _ in } }
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(state.withLock { $0.order } == ["one.m4a"], "the second analysis waits its turn")
+
+        first.open()
+        #expect(try await one.value.turns.map(\.speakerID) == ["one.m4a"])
+        #expect(try await two.value.turns.map(\.speakerID) == ["two.m4a"])
+        #expect(state.withLock { $0.most } == 1)
+        #expect(await installer.fetches == 1, "the models are installed once")
+        try? FileManager.default.removeItem(at: directory)
     }
 }
 
@@ -209,40 +316,76 @@ private enum Fixture {
         })
 }
 
-/// A fetch that reports half the download, then waits for `release()` before it writes the files.
+/// A fetch that reports half the download, then waits for `release()` before it writes the files. Calls from
+/// `holdFrom` on wait (all of them by default); a stubborn fetch keeps waiting for `release()` when it is cancelled.
 private final class GatedFetch: Sendable {
+    private struct State {
+        var calls = 0
+        var cancelled = false
+        var inFlight = 0
+        var mostInFlight = 0
+        var files: [String: Data]
+        /// The model folder's files when each call began.
+        var found: [Set<String>] = []
+    }
+
     let started = Latch()
     private let gate = Latch()
-    private let state = Mutex((calls: 0, cancelled: false))
-    private let files: [String: Data]
+    private let state: Mutex<State>
+    private let held: Bool
+    private let holdFrom: Int
     private let partial: Bool
+    private let stubborn: Bool
+    private let fractions: [Double]
 
-    init(writes files: [String: Data], gated: Bool = true, partial: Bool = false) {
-        self.files = files
+    init(writes files: [String: Data], gated: Bool = true, holdFrom: Int = 1, partial: Bool = false,
+         stubborn: Bool = false, fractions: [Double] = [0.5]) {
+        state = Mutex(State(files: files))
+        held = gated
+        self.holdFrom = holdFrom
         self.partial = partial
-        if !gated { gate.open() }
+        self.stubborn = stubborn
+        self.fractions = fractions
     }
 
     var calls: Int { state.withLock { $0.calls } }
     var cancelled: Bool { state.withLock { $0.cancelled } }
+    var mostInFlight: Int { state.withLock { $0.mostInFlight } }
+    var found: [Set<String>] { state.withLock { $0.found } }
     func release() { gate.open() }
+    func writes(_ files: [String: Data]) { state.withLock { $0.files = files } }
 
     var fetch: SpeakerModelInstaller.Fetch {
         { [self] directory, progress in
-            state.withLock { $0.calls += 1 }
             let folder = directory.appendingPathComponent("models", isDirectory: true)
+            let present = Set((try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? [])
+            let call = state.withLock { state in
+                state.calls += 1
+                state.inFlight += 1
+                state.mostInFlight = max(state.mostInFlight, state.inFlight)
+                state.found.append(present)
+                return state.calls
+            }
+            defer { state.withLock { $0.inFlight -= 1 } }
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-            if partial { try Data([1]).write(to: folder.appendingPathComponent("a.bin.partial")) }
-            progress(0.5)
+            if partial {
+                // As FluidAudio leaves an interrupted download: the marker, one finished file and a partial one.
+                try Self.write(["a.bin": Fixture.files["a.bin"]!], marker: Fixture.manifest.revision, into: folder)
+                try Data([1]).write(to: folder.appendingPathComponent("b.json.partial"))
+            }
+            for fraction in fractions { progress(fraction) }
             started.open()
-            await withTaskCancellationHandler {
-                await gate.wait()
-            } onCancel: {
-                self.state.withLock { $0.cancelled = true }
-                self.gate.open()
+            if held, call >= holdFrom {
+                await withTaskCancellationHandler {
+                    await gate.wait()
+                } onCancel: {
+                    self.state.withLock { $0.cancelled = true }
+                    if !self.stubborn { self.gate.open() }
+                }
             }
             try Task.checkCancellation()
-            try Self.write(files, marker: Fixture.manifest.revision, into: folder)
+            try Self.write(state.withLock { $0.files }, marker: Fixture.manifest.revision, into: folder)
+            try? FileManager.default.removeItem(at: folder.appendingPathComponent("b.json.partial"))
             progress(1)
         }
     }

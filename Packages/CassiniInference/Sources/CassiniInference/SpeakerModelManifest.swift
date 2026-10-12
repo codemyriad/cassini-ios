@@ -20,7 +20,11 @@ public struct SpeakerModelManifest: Hashable, Sendable {
         case ready
         /// No file of the manifest is there.
         case missing
-        /// Some files are there, but not all of them, or not as pinned: an interrupted or changed install.
+        /// Some files are there and match, but not all of them (or the marker is not written yet): an interrupted
+        /// install, which the next fetch resumes.
+        case incomplete
+        /// The marker names another revision, or a file is there with the wrong size or hash: a changed or damaged
+        /// install, whose wrong files must go before the next fetch (FluidAudio keeps any file it finds).
         case mismatch
     }
 
@@ -41,7 +45,9 @@ public struct SpeakerModelManifest: Hashable, Sendable {
     /// place.
     public static let installHeadroom: Int64 = 32 * 1024 * 1024
 
-    /// The hosts a download may reach: Hugging Face, and the storage its redirects go to.
+    /// The hosts the downloads normally use: Hugging Face, and the storage its redirects go to. FluidAudio owns its
+    /// URLSessions, so no redirect policy holds them to these hosts; integrity rests on the pinned revision and the
+    /// per-file SHA-256 check.
     public static let downloadHosts = ["huggingface.co", "*.huggingface.co", "*.hf.co"]
 
     public var totalBytes: Int64 { files.reduce(0) { $0 + $1.bytes } }
@@ -57,26 +63,54 @@ public struct SpeakerModelManifest: Hashable, Sendable {
     }
 
     /// Checks the files under `directory/folder` against the manifest: the marker names the revision, and each file
-    /// has its size and hash.
+    /// has its size and hash. Hashes every file that is there.
     public func check(in directory: URL) -> Check {
         let root = directory.appendingPathComponent(folder, isDirectory: true)
-        let manager = FileManager.default
-        let present = files.filter { manager.fileExists(atPath: root.appendingPathComponent($0.path).path) }
+        let present = files.filter { FileManager.default.fileExists(atPath: root.appendingPathComponent($0.path).path) }
         if present.isEmpty { return .missing }
-        guard present.count == files.count, markerMatches(in: root) else { return .mismatch }
-        for file in files where !Self.matches(file, at: root.appendingPathComponent(file.path)) { return .mismatch }
-        return .ready
+        if markedWithOtherRevision(root) { return .mismatch }
+        for file in present where !Self.matches(file, at: root.appendingPathComponent(file.path)) { return .mismatch }
+        return present.count == files.count && markerMatches(in: root) ? .ready : .incomplete
     }
 
-    private func markerMatches(in root: URL) -> Bool {
+    /// The cheap check of an install already found ready: the marker and every file's size, no hashes.
+    public func looksReady(in directory: URL) -> Bool {
+        let root = directory.appendingPathComponent(folder, isDirectory: true)
+        return markerMatches(in: root) && files.allSatisfy { Self.size(at: root.appendingPathComponent($0.path)) == $0.bytes }
+    }
+
+    /// Removes what a fetch must not keep: the whole folder when its marker names another revision, else each file
+    /// whose size or hash is wrong. Missing files and FluidAudio's `.partial` files stay, so the fetch resumes.
+    public func removeDamaged(in directory: URL) {
+        let root = directory.appendingPathComponent(folder, isDirectory: true)
+        if markedWithOtherRevision(root) {
+            try? FileManager.default.removeItem(at: root)
+            return
+        }
+        for file in files {
+            let url = root.appendingPathComponent(file.path)
+            if FileManager.default.fileExists(atPath: url.path), !Self.matches(file, at: url) {
+                try? FileManager.default.removeItem(at: url)
+            }
+        }
+    }
+
+    private func marker(in root: URL) -> String? {
         guard let data = try? Data(contentsOf: root.appendingPathComponent(marker)),
-              let text = String(data: data, encoding: .utf8) else { return false }
-        return text.trimmingCharacters(in: .whitespacesAndNewlines) == revision
+              let text = String(data: data, encoding: .utf8) else { return nil }
+        return text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func markerMatches(in root: URL) -> Bool { marker(in: root) == revision }
+
+    private func markedWithOtherRevision(_ root: URL) -> Bool { marker(in: root).map { $0 != revision } ?? false }
+
+    private static func size(at url: URL) -> Int64? {
+        (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize.map(Int64.init)
     }
 
     private static func matches(_ file: File, at url: URL) -> Bool {
-        let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize
-        guard let size, Int64(size) == file.bytes, let handle = try? FileHandle(forReadingFrom: url) else { return false }
+        guard size(at: url) == file.bytes, let handle = try? FileHandle(forReadingFrom: url) else { return false }
         defer { try? handle.close() }
         var digest = SHA256()
         while let data = try? handle.read(upToCount: 1 << 20), !data.isEmpty { digest.update(data: data) }

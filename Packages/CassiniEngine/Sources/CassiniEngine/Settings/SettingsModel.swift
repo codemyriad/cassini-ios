@@ -13,6 +13,8 @@ import CassiniNotebook
     func size(of part: ModelPart) -> ModelSize
     /// Reads the installed models again.
     func refreshModels() async
+    /// The languages of speech on offer, each marked when its assets are installed.
+    func speechLanguages() async -> [SpeechLanguage]
     /// Saved voices.
     var voices: Int { get }
     /// Notes in Recently Deleted.
@@ -45,6 +47,9 @@ import CassiniNotebook
         public init(notes: Int, duration: TimeInterval) { self.notes = notes; self.duration = duration }
     }
 
+    /// The languages of speech on offer, as last read; empty until the screen appears.
+    public private(set) var speechLanguages: [SpeechLanguage] = []
+
     @ObservationIgnored private let ports: any SettingsPorts
     @ObservationIgnored public var onEffect: (Effect) -> Void = { _ in }
 
@@ -63,14 +68,33 @@ import CassiniNotebook
     public var notificationsOff: Bool { ports.notificationsOff }
     public var library: LibraryTotals { Self.totals(of: ports.notes) }
 
-    /// The screen is shown: the models and the notification permission are read again.
+    /// The screen is shown: the models, the languages and the notification permission are read again.
     public func appeared() async {
         await ports.refreshNotices()
         await ports.refreshModels()
+        speechLanguages = await ports.speechLanguages()
     }
 
-    /// Cassini is back on the screen: the notification permission may have changed in the Settings app.
-    public func resumed() async { await ports.refreshNotices() }
+    /// Cassini is back on the screen: the notification permission may have changed in the Settings app, and models
+    /// may have been installed or removed meanwhile.
+    public func resumed() async {
+        await ports.refreshNotices()
+        await ports.refreshModels()
+        speechLanguages = await ports.speechLanguages()
+    }
+
+    /// The Speech language picker's entries: the languages on offer sorted by `name`, preceded by the chosen one when
+    /// it is not on offer (the picker never drops it). An entry whose assets are on the device shows "· Installed".
+    public func languageOptions(chosen: String, name: (String) -> String) -> [SpeechLanguage] {
+        Self.languageOptions(speechLanguages, chosen: chosen, name: name)
+    }
+
+    public nonisolated static func languageOptions(_ languages: [SpeechLanguage], chosen: String,
+                                                   name: (String) -> String) -> [SpeechLanguage] {
+        let offered = languages.sorted { name($0.id) < name($1.id) }
+        guard !offered.contains(where: { $0.id == chosen }) else { return offered }
+        return [SpeechLanguage(id: chosen, installed: false)] + offered
+    }
 
     /// A Not downloaded row opens the model download screen with no note; so does a Failed row, whose Download
     /// starts the download again. Other rows do nothing.

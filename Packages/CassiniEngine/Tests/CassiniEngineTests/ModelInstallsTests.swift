@@ -74,6 +74,96 @@ import CassiniNotebook
         #expect(installs.stored.keys.count == 3, "the install ends with a refresh")
     }
 
+    // ports: ModelInstallOwnerTest#aRequestForOtherPartsWaitsAndFetchesNothingTwice
+    @Test func aRequestForOtherPartsWhileOneRunsInstallsThemAfterIt() async throws {
+        let analyzer = ScriptedAnalyzer(status: .notDownloaded, gated: true)
+        let transcriber = LanguageTranscriber(["en-US": .notDownloaded], gated: true)
+        let installs = ModelInstalls(transcriber: transcriber, analyzer: analyzer, clock: FakeClock()) { "en-US" }
+        installs.install([.speech])
+        try await until { transcriber.installs == 1 }
+        installs.install([.speech, .speakers])
+        #expect(analyzer.installs == 0, "the second request waits for the first")
+        transcriber.finish(status: .ready)
+        try await until { analyzer.installs == 1 }
+        #expect(installs.status(of: .speakers) == .downloading(nil))
+        analyzer.finish(with: nil, status: .ready)
+        try await until { !installs.isInstalling }
+        #expect(transcriber.installs == 1, "nothing is fetched twice")
+        #expect(analyzer.installs == 1)
+        #expect(installs.status(of: .speech) == .ready)
+        #expect(installs.status(of: .speakers) == .ready)
+    }
+
+    @Test func aRefreshAskedForDuringAnotherReadsAgainOnceItEnds() async throws {
+        let analyzer = ScriptedAnalyzer(status: .notDownloaded)
+        let transcriber = LanguageTranscriber(["en-US": .notDownloaded], gatedStatus: true)
+        let installs = ModelInstalls(transcriber: transcriber, analyzer: analyzer, clock: FakeClock()) { "en-US" }
+        let early = Task { await installs.refresh() }
+        try await until { transcriber.waitingReads == 1 }
+        // The models change while the first read runs, before the second refresh is asked for.
+        transcriber.set("en-US", .ready)
+        analyzer.finish(with: nil, status: .ready)
+        let late = Task { await installs.refresh() }
+        transcriber.releaseReads()
+        try await until { transcriber.waitingReads == 1 }
+        transcriber.releaseReads()
+        await early.value
+        await late.value
+        #expect(installs.status(of: .speech) == .ready, "the late refresh read again")
+        #expect(installs.status(of: .speakers) == .ready)
+    }
+
+    @Test func aNewSpeechLanguageIsReadAgainAndDropsTheOldLanguagesFailure() async throws {
+        let language = Language("en-US")
+        let transcriber = LanguageTranscriber(["en-US": .ready, "it-IT": .notDownloaded], failsInstall: true)
+        let installs = ModelInstalls(transcriber: transcriber, analyzer: ScriptedAnalyzer(status: .ready),
+                                     clock: FakeClock()) { language.value }
+        await installs.refresh()
+        #expect(installs.status(of: .speech) == .ready)
+
+        language.value = "it-IT"
+        try await until { installs.status(of: .speech) == .notDownloaded }
+        installs.install([.speech])
+        try await until { !installs.isInstalling }
+        #expect(installs.status(of: .speech) == .failed(.noConnection))
+
+        language.value = "en-US"
+        try await until { installs.status(of: .speech) == .ready }
+        transcriber.set("en-US", .notDownloaded)
+        await installs.refresh()
+        #expect(installs.status(of: .speech) == .notDownloaded, "Italian's failure is not English's")
+        #expect(installs.failures[.speech] == nil)
+    }
+
+    @Test func theRowsShowTheRunningJobsDownloadAndReadAgainWhenItEnds() async throws {
+        let analyzer = ScriptedAnalyzer(status: .notDownloaded)
+        let job = JobProgress()
+        let installs = ModelInstalls(transcriber: FakeTranscriber(.returns([], total: 0)), analyzer: analyzer,
+                                     clock: FakeClock(), job: job) { "en-US" }
+        await installs.refresh()
+        #expect(installs.statuses == [.speech: .ready, .speakers: .notDownloaded, .voices: .notDownloaded])
+
+        job.begin(UUID(), finalizationMs: nil)
+        job.apply(.downloading(DownloadProgress(part: .speakers, doneBytes: 30, totalBytes: 100, verifying: false)))
+        #expect(installs.statuses == [.speech: .ready, .speakers: .downloading(0.3), .voices: .downloading(0.3)],
+                "recognising saved voices follows the speaker models' download")
+        // Give the follower a turn to see the download before it ends.
+        try await Task.sleep(for: .milliseconds(50))
+        analyzer.finish(with: nil, status: .ready)
+        job.end()
+        try await until { installs.status(of: .speakers) == .ready }
+        #expect(installs.statuses == [.speech: .ready, .speakers: .ready, .voices: .ready])
+    }
+
+    @Test func aJobsDownloadShowsOnlyOnRowsThatWereRead() {
+        let speech = DownloadProgress(part: .speech, doneBytes: 1, totalBytes: 2, verifying: false)
+        #expect(ModelInstalls.statuses([.speech: .notDownloaded], during: speech) == [.speech: .downloading(0.5)])
+        let speakers = DownloadProgress(part: .speakers, doneBytes: 1, totalBytes: 2, verifying: true)
+        #expect(ModelInstalls.statuses([.speech: .ready, .speakers: .failed(.interrupted), .voices: .failed(.interrupted)],
+                                       during: speakers) == [.speech: .ready, .speakers: .checking, .voices: .checking])
+        #expect(ModelInstalls.statuses([:], during: speakers).isEmpty)
+    }
+
     @Test func failuresMapToTheDownloadError() {
         #expect(ModelInstalls.failure(TranscriptionError.failed(.download(.noConnection))) == (.noConnection, 0))
         #expect(ModelInstalls.failure(SpeakerAnalysisError.download(.notEnoughStorage, requiredFreeBytes: 9)) == (.notEnoughStorage, 9))
@@ -121,11 +211,79 @@ private final class ScriptedAnalyzer: SpeakerAnalyzing {
     func modelStatus() async -> ModelPartStatus { state.withLock { $0.status } }
     func refreshModelStatus() async -> ModelPartStatus { state.withLock { $0.status } }
 
+    var modelInstallBytes: Int64 { 54_000_000 }
+
     func installModels(progress: @escaping @Sendable (Double?) -> Void) async throws {
         state.withLock { $0.installs += 1; $0.progress = progress }
         guard gated else { return }
         try await withCheckedThrowingContinuation { continuation in state.withLock { $0.finish = continuation } }
     }
+}
+
+/// The speech language the test sets; the installs read it on the main actor.
+@MainActor @Observable private final class Language {
+    var value: String
+    init(_ value: String) { self.value = value }
+}
+
+/// A transcriber whose asset status is per language. Its installs and status reads can be held until the test lets
+/// them go; a failing install throws `NO_CONNECTION`.
+private final class LanguageTranscriber: Transcribing {
+    private struct State {
+        var statuses: [String: ModelPartStatus]
+        var installs = 0
+        var finish: CheckedContinuation<Void, Never>?
+        var reads: [CheckedContinuation<Void, Never>] = []
+    }
+
+    private let state: Mutex<State>
+    private let gated: Bool
+    private let gatedStatus: Bool
+    private let failsInstall: Bool
+
+    init(_ statuses: [String: ModelPartStatus], gated: Bool = false, gatedStatus: Bool = false, failsInstall: Bool = false) {
+        state = Mutex(State(statuses: statuses))
+        self.gated = gated; self.gatedStatus = gatedStatus; self.failsInstall = failsInstall
+    }
+
+    var installs: Int { state.withLock { $0.installs } }
+    var waitingReads: Int { state.withLock { $0.reads.count } }
+
+    func set(_ language: String, _ status: ModelPartStatus) { state.withLock { $0.statuses[language] = status } }
+
+    func finish(status: ModelPartStatus) {
+        let waiter = state.withLock { state in
+            for key in state.statuses.keys { state.statuses[key] = status }
+            defer { state.finish = nil }
+            return state.finish
+        }
+        waiter?.resume()
+    }
+
+    func releaseReads() {
+        let reads = state.withLock { state in defer { state.reads = [] }; return state.reads }
+        for read in reads { read.resume() }
+    }
+
+    func transcribe(_ request: TranscriptionRequest,
+                    events: @escaping @Sendable (TranscriptionEvent) -> Void) async throws -> TranscriptionResult {
+        TranscriptionResult(segments: [])
+    }
+
+    func assetStatus(locale: Locale) async -> ModelPartStatus {
+        let status = state.withLock { $0.statuses[locale.identifier(.bcp47)] ?? .unsupported }
+        if gatedStatus { await withCheckedContinuation { continuation in state.withLock { $0.reads.append(continuation) } } }
+        return status
+    }
+
+    func installAssets(locale: Locale, progress: @escaping @Sendable (Double) -> Void) async throws {
+        state.withLock { $0.installs += 1 }
+        if failsInstall { throw TranscriptionError.failed(.download(.noConnection)) }
+        guard gated else { return }
+        await withCheckedContinuation { continuation in state.withLock { $0.finish = continuation } }
+    }
+
+    func speechLanguages() async -> [SpeechLanguage] { [] }
 }
 
 /// Polls `condition` on the main actor until it holds, for at most five seconds.

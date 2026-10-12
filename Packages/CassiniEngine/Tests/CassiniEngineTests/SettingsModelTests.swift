@@ -26,6 +26,8 @@ import CassiniNotebook
         }
         func refreshModels() async { refreshed += 1 }
         func refreshNotices() async { noticeRefreshes += 1 }
+        var languages: [SpeechLanguage] = []
+        func speechLanguages() async -> [SpeechLanguage] { languages }
     }
 
     @MainActor private final class Effects { var list: [SettingsModel.Effect] = [] }
@@ -106,6 +108,20 @@ import CassiniNotebook
         await model.resumed()
         #expect(effects.list == [.open(.savedVoices), .open(.trash), .open(.licenses), .openNotificationSettings])
         #expect(ports.noticeRefreshes == 2)
+        #expect(ports.refreshed == 2, "models may have changed while Cassini was away")
+    }
+
+    @Test func theLanguagePickerListsTheOfferedLanguagesByNameAndKeepsTheChosenOne() async {
+        ports.languages = [SpeechLanguage(id: "it-IT", installed: false), SpeechLanguage(id: "en-US", installed: true),
+                           SpeechLanguage(id: "de-DE", installed: false)]
+        let names = ["it-IT": "Italian", "en-US": "English", "de-DE": "German", "xx-XX": "Zz"]
+        let model = await model()
+        let name: (String) -> String = { names[$0] ?? $0 }
+        #expect(model.languageOptions(chosen: "en-US", name: name)
+                == [SpeechLanguage(id: "en-US", installed: true), SpeechLanguage(id: "de-DE", installed: false),
+                    SpeechLanguage(id: "it-IT", installed: false)])
+        #expect(model.languageOptions(chosen: "xx-XX", name: name).map(\.id) == ["xx-XX", "en-US", "de-DE", "it-IT"],
+                "a chosen language that is not on offer stays in the picker")
     }
 
     // ports: SettingsViewModelTest#theLanguageGoesToAppCompatAndPhoneIsTheEmptyList (iOS sets the app language in the

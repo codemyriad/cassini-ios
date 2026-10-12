@@ -6,11 +6,15 @@ import CassiniNotebook
 /// download screen's Download (without a note) starts.
 ///
 /// - `refresh()` reads each part's status again: Apple's speech assets for the chosen language, and the speaker
-///   models' checked files. It runs at launch, when Settings opens and after every install.
-/// - `install(_:)` installs the parts one after another; a request while one runs joins it. Its progress, then the
-///   failure of the first part that failed, is `download`, which the download notice and the Settings rows show.
-///   A failed part shows as failed until the next install of it.
-/// - Recognising saved voices uses the speaker models' install, so it always has their status.
+///   models' checked files. It runs at launch, when Settings opens or comes back, after every install, when the
+///   speech language changes and when the running job's model download ends. A refresh asked for while one runs
+///   reads again once that one ends, so it never returns what was read before it was asked for.
+/// - `install(_:)` installs the parts one after another; a request while one runs adds the parts it does not cover,
+///   which install after it, so nothing is fetched twice. Its progress, then the failure of the first part that
+///   failed, is `download`, which the download notice and the Settings rows show. A failed part shows as failed until
+///   the next install of it; a failed speech install counts only for the language it was for.
+/// - `statuses` is what the Settings rows show: the running job's model download over the standalone install and the
+///   stored status. Recognising saved voices uses the speaker models' install, so it always has their status.
 @MainActor @Observable public final class ModelInstalls {
     /// The status of each part as last read; empty until the first refresh.
     public private(set) var stored: [ModelPart: ModelPartStatus] = [:]
@@ -23,16 +27,32 @@ import CassiniNotebook
     @ObservationIgnored private let analyzer: any SpeakerAnalyzing
     @ObservationIgnored private let language: @MainActor () -> String
     @ObservationIgnored private let clock: any AppClock
+    @ObservationIgnored private let job: JobProgress?
     @ObservationIgnored private var installing: Task<Void, Never>?
+    /// The parts the running standalone install still has to do, in order.
+    @ObservationIgnored private var queued: [ModelPart] = []
     @ObservationIgnored private var refreshing: Task<Void, Never>?
+    /// Refreshes asked for, and the last one whose read has ended.
+    @ObservationIgnored private var refreshesAsked = 0
+    @ObservationIgnored private var refreshesRead = 0
+    /// The language `failures[.speech]` is for.
+    @ObservationIgnored private var speechFailureLanguage: String?
+    @ObservationIgnored private var followers: [Task<Void, Never>] = []
 
-    /// `language` is the BCP-47 speech language whose assets count.
+    /// `language` is the BCP-47 speech language whose assets count; `job` is the running job's progress, whose model
+    /// download the rows show.
     public init(transcriber: any Transcribing, analyzer: any SpeakerAnalyzing, clock: any AppClock,
-                language: @escaping @MainActor () -> String) {
+                job: JobProgress? = nil, language: @escaping @MainActor () -> String) {
         self.transcriber = transcriber
         self.analyzer = analyzer
         self.clock = clock
+        self.job = job
         self.language = language
+        follow()
+    }
+
+    isolated deinit {
+        for follower in followers { follower.cancel() }
     }
 
     /// Whether a standalone install runs.
@@ -45,35 +65,74 @@ import CassiniNotebook
         if let download, download.failure == nil, download.part == part {
             return .downloading(download.fraction)
         }
-        if let failure = failures[part], stored[part] != .ready { return .failed(failure) }
+        if let failure = failures[part], stored[part] != .ready, part != .speech || speechFailureLanguage == language() {
+            return .failed(failure)
+        }
         return stored[part]
     }
 
-    /// Reads every part's status again; a refresh that runs is joined.
-    public func refresh() async {
-        if let refreshing { return await refreshing.value }
-        let task = Task { [transcriber, analyzer, language] in
-            let speech = await transcriber.assetStatus(locale: Locale(identifier: language()))
-            let speakers = await analyzer.refreshModelStatus()
-            self.stored = [.speech: speech, .speakers: speakers, .voices: speakers]
-            if speech == .ready { self.failures[.speech] = nil }
-            if speakers == .ready { self.failures[.speakers] = nil }
-        }
-        refreshing = task
-        await task.value
-        refreshing = nil
+    /// Every row's status, with the running job's model download over it; a part not read yet is missing.
+    public var statuses: [ModelPart: ModelPartStatus] {
+        Self.statuses(ModelPart.allCases.reduce(into: [:]) { $0[$1] = status(of: $1) }, during: job?.modelDownload)
     }
 
-    /// Installs `parts` now, in `ModelPart` order, unless a standalone install runs (the request joins it).
+    /// `standalone` with the running job's model download over it: a speech download shows on the speech row, a
+    /// speaker models download on both the speakers and the voices rows. A part not read yet stays missing.
+    public nonisolated static func statuses(_ standalone: [ModelPart: ModelPartStatus],
+                                            during job: DownloadProgress?) -> [ModelPart: ModelPartStatus] {
+        guard let job else { return standalone }
+        var statuses = standalone
+        let parts: [ModelPart] = job.part == .speech ? [.speech] : [.speakers, .voices]
+        for part in parts where statuses[part] != nil { statuses[part] = ModelRows.status(of: job) }
+        return statuses
+    }
+
+    /// Reads every part's status again. While a read runs, waits for it and then reads again, unless a read that
+    /// started after this call has already ended.
+    public func refresh() async {
+        refreshesAsked += 1
+        let asked = refreshesAsked
+        while refreshesRead < asked {
+            if let refreshing {
+                await refreshing.value
+                continue
+            }
+            let number = refreshesAsked
+            let task = Task {
+                await self.read()
+                self.refreshesRead = max(self.refreshesRead, number)
+                self.refreshing = nil
+            }
+            refreshing = task
+            await task.value
+        }
+    }
+
+    private func read() async {
+        let language = language()
+        let speech = await transcriber.assetStatus(locale: Locale(identifier: language))
+        let speakers = await analyzer.refreshModelStatus()
+        if speechFailureLanguage != language { failures[.speech] = nil }
+        stored = [.speech: speech, .speakers: speakers, .voices: speakers]
+        if speech == .ready { failures[.speech] = nil }
+        if speakers == .ready { failures[.speakers] = nil }
+    }
+
+    /// Installs `parts` now, in `ModelPart` order. While a standalone install runs, the parts it does not cover are
+    /// installed after it.
     public func install(_ parts: [ModelPart]) {
         let parts = ModelPart.allCases.filter { $0 != .voices && (parts.contains($0) || ($0 == .speakers && parts.contains(.voices))) }
-        guard installing == nil, !parts.isEmpty else { return }
-        for part in parts { failures[part] = nil }
-        download = DownloadFact(part: parts[0], at: clock.now)
+        let current = download?.failure == nil ? download?.part : nil
+        let added = parts.filter { !queued.contains($0) && !(installing != nil && $0 == current) }
+        guard !added.isEmpty else { return }
+        for part in added { failures[part] = nil }
+        queued.append(contentsOf: added)
+        guard installing == nil else { return }
+        download = DownloadFact(part: queued[0], at: clock.now)
         installing = Task { [weak self] in
             var firstFailure: DownloadFact?
-            for part in parts {
-                guard let self, !Task.isCancelled else { return }
+            while let self, !Task.isCancelled, !self.queued.isEmpty {
+                let part = self.queued.removeFirst()
                 self.download = DownloadFact(part: part, at: self.clock.now)
                 if let failure = await self.install(part), firstFailure == nil { firstFailure = failure }
             }
@@ -89,10 +148,11 @@ import CassiniNotebook
         let report: @Sendable (Double?) -> Void = { [weak self] fraction in
             Task { @MainActor in self?.report(part, fraction) }
         }
+        let language = language()
         do {
             switch part {
             case .speech:
-                try await transcriber.installAssets(locale: Locale(identifier: language())) { report($0) }
+                try await transcriber.installAssets(locale: Locale(identifier: language)) { report($0) }
             case .speakers, .voices:
                 try await analyzer.installModels(progress: report)
             }
@@ -102,6 +162,7 @@ import CassiniNotebook
         } catch {
             let (failure, bytes) = Self.failure(error)
             failures[part] = failure
+            if part == .speech { speechFailureLanguage = language }
             return DownloadFact(part: part, failure: failure, requiredFreeBytes: bytes, at: clock.now)
         }
     }
@@ -109,6 +170,30 @@ import CassiniNotebook
     private func report(_ part: ModelPart, _ fraction: Double?) {
         guard installing != nil, download?.part == part, download?.failure == nil else { return }
         download = DownloadFact(part: part, fraction: fraction, at: clock.now)
+    }
+
+    /// Reads the models again when the speech language changes, and when the running job's model download ends.
+    private func follow() {
+        let language = language
+        followers.append(Task { [weak self] in
+            var last: String?
+            for await value in Observations({ language() }) {
+                defer { last = value }
+                guard let last, last != value else { continue }
+                guard let self else { return }
+                await self.refresh()
+            }
+        })
+        guard let job else { return }
+        followers.append(Task { [weak self] in
+            var downloading = false
+            for await now in Observations({ job.modelDownload != nil }) {
+                defer { downloading = now }
+                guard downloading, !now else { continue }
+                guard let self else { return }
+                await self.refresh()
+            }
+        })
     }
 
     /// The download error a failed install stands for, and the bytes its space check asked for.

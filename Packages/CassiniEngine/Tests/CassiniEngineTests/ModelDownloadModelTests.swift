@@ -6,7 +6,7 @@ import CassiniNotebook
 /// The model download screen over fake ports.
 @MainActor @Suite struct ModelDownloadModelTests {
     private static let note = UUID()
-    private static let fresh = ModelPlan(missing: [.speech, .speakers])
+    private static let fresh = ModelPlan(missing: [.speech, .speakers], speakersInstallBytes: 54_000_000)
 
     @MainActor private final class FakePorts: ModelDownloadPorts {
         var plan = ModelDownloadModelTests.fresh
@@ -18,7 +18,7 @@ import CassiniNotebook
         var transcribed: [UUID] = []
         var downloads: [[ModelPart]] = []
 
-        func plan() async -> ModelPlan { plan }
+        func plan(for noteID: UUID?) async -> ModelPlan { plan }
         func usableBytes() async -> Int64 { usable }
         func recordConsent(for parts: [ModelPart]) { consents.append(parts) }
         func recordDeclined() { declines += 1 }
@@ -44,7 +44,7 @@ import CassiniNotebook
         let effects = Effects()
         let model = await model(effects: effects)
         #expect(model.plan?.missing == [.speech, .speakers])
-        #expect(model.plan?.requiredFreeBytes == ModelPlan.installBytes(.speech) + ModelPlan.installBytes(.speakers))
+        #expect(model.plan?.requiredFreeBytes == ModelPlan.speechInstallBytes + 54_000_000)
         #expect(model.withNote)
         #expect(model.noSpaceBytes == nil)
         #expect(await self.model(noteID: nil, effects: effects).withNote == false)
@@ -53,7 +53,7 @@ import CassiniNotebook
 
     // ports: ModelDownloadViewModelTest#aStaleEntryQueuesItsNoteAndPopsItself
     @Test func aStaleEntryQueuesItsNoteAndClosesItself() async {
-        ports.plan = ModelPlan(missing: [])
+        ports.plan = ModelPlan(missing: [], requiredFreeBytes: 0)
         let effects = Effects()
         let model = await model(effects: effects)
         #expect(model.plan == nil)
@@ -64,7 +64,7 @@ import CassiniNotebook
 
     // ports: ModelDownloadViewModelTest#aStaleEntryWithoutANoteOnlyPops
     @Test func aStaleEntryWithoutANoteOnlyCloses() async {
-        ports.plan = ModelPlan(missing: [])
+        ports.plan = ModelPlan(missing: [], requiredFreeBytes: 0)
         let effects = Effects()
         _ = await model(noteID: nil, effects: effects)
         #expect(ports.transcribed.isEmpty)
@@ -86,7 +86,7 @@ import CassiniNotebook
 
     // ports: ModelDownloadViewModelTest#downloadWithoutANoteStartsTheStandaloneDownloadOfTheMissingParts
     @Test func downloadWithoutANoteStartsTheStandaloneDownloadOfTheMissingParts() async {
-        ports.plan = ModelPlan(missing: [.speakers])
+        ports.plan = ModelPlan(missing: [.speakers], speakersInstallBytes: 54_000_000)
         let effects = Effects()
         let model = await model(noteID: nil, effects: effects)
         await model.download()
@@ -156,8 +156,26 @@ import CassiniNotebook
         #expect(ports.consents.isEmpty)
     }
 
+    @Test func theStandaloneDownloadPlansTheSpeakerModelsEvenWithIdentifySpeakersOff() {
+        func plan(speech: ModelPartStatus, speakers: ModelPartStatus, forNote: Bool, identify: Bool) -> [ModelPart] {
+            ModelPlan.plan(speech: speech, speakers: speakers, forNote: forNote, identifySpeakers: identify,
+                           speakersInstallBytes: 54_000_000).missing
+        }
+        // The Speakers row of Settings, tapped with Identify speakers off.
+        #expect(plan(speech: .ready, speakers: .notDownloaded, forNote: false, identify: false) == [.speakers])
+        #expect(plan(speech: .notDownloaded, speakers: .failed(.interrupted), forNote: false, identify: false)
+                == [.speech, .speakers])
+        // A note's job needs the speaker models only when it tells speakers apart.
+        #expect(plan(speech: .ready, speakers: .notDownloaded, forNote: true, identify: false).isEmpty)
+        #expect(plan(speech: .ready, speakers: .notDownloaded, forNote: true, identify: true) == [.speakers])
+        #expect(plan(speech: .unsupported, speakers: .ready, forNote: false, identify: true).isEmpty,
+                "a language the device cannot transcribe has nothing to download")
+    }
+
     @Test func thePlanKeepsThePartOrderAndNeedsNoSpaceWhenComplete() {
-        #expect(ModelPlan(missing: [.speakers, .speech]).missing == [.speech, .speakers])
-        #expect(ModelPlan(missing: []).requiredFreeBytes == 0)
+        #expect(ModelPlan(missing: [.speakers, .speech], speakersInstallBytes: 1).missing == [.speech, .speakers])
+        #expect(ModelPlan(missing: [], speakersInstallBytes: 1).requiredFreeBytes == 0)
+        #expect(ModelPlan(missing: [.speakers], speakersInstallBytes: 54_000_000).requiredFreeBytes == 54_000_000,
+                "the screen asks for what the installer checks")
     }
 }

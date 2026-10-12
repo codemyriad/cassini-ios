@@ -84,6 +84,14 @@ public actor AppleSpeechTranscriber: Transcribing {
         }
     }
 
+    public func speechLanguages() async -> [SpeechLanguage] {
+        let installed = Set(await SpeechTranscriber.installedLocales.map { $0.identifier(.bcp47) })
+        return await SpeechTranscriber.supportedLocales.map { locale in
+            let id = locale.identifier(.bcp47)
+            return SpeechLanguage(id: id, installed: installed.contains(id))
+        }
+    }
+
     // MARK: - Assets
 
     /// Downloads Apple's assets for `locale` when they are missing and downloading is allowed.

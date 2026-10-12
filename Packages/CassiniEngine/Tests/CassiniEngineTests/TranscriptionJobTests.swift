@@ -651,6 +651,8 @@ private final class ScriptedTranscriber: Transcribing, @unchecked Sendable {
     func assetStatus(locale: Locale) async -> ModelPartStatus { status }
 
     func installAssets(locale: Locale, progress: @escaping @Sendable (Double) -> Void) async throws { progress(1) }
+
+    func speechLanguages() async -> [SpeechLanguage] { [] }
 }
 
 /// The real files, recording each checkpoint saved.
@@ -705,6 +707,7 @@ private struct InstallFailingAnalyzer: SpeakerAnalyzing {
     func modelStatus() async -> ModelPartStatus { .notDownloaded }
     func refreshModelStatus() async -> ModelPartStatus { .notDownloaded }
     func installModels(progress: @escaping @Sendable (Double?) -> Void) async throws { throw failure }
+    var modelInstallBytes: Int64 { 0 }
 }
 
 private struct FailingAnalyzer: SpeakerAnalyzing {
@@ -717,6 +720,7 @@ private struct FailingAnalyzer: SpeakerAnalyzing {
     func modelStatus() async -> ModelPartStatus { .ready }
     func refreshModelStatus() async -> ModelPartStatus { .ready }
     func installModels(progress: @escaping @Sendable (Double?) -> Void) async throws {}
+    var modelInstallBytes: Int64 { 0 }
 }
 
 private extension JobEvent {
