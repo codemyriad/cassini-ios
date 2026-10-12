@@ -16,7 +16,7 @@ struct ActiveRecordingCard: View {
                 }
                 Spacer(); Text(TimeText.clock(recording.state.activeRecording?.elapsed ?? 0)).font(.body.monospacedDigit())
             }.padding(18).cardBackground(outlined: false)
-        }.buttonStyle(.plain)
+        }.buttonStyle(.plain).accessibilityIdentifier("activeRecordingCard")
     }
 }
 

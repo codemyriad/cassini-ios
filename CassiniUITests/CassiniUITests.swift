@@ -172,7 +172,14 @@ final class CassiniUITests: XCTestCase {
         let returnButton = app.buttons["recordButton"]
         XCTAssertTrue(returnButton.waitForExistence(timeout: 5))
         XCTAssertEqual(returnButton.label, "Return to recording", "the recording continues in the Library")
-        returnButton.tap()
+        // Back through the Library's card, which only shows the screen: it still minimises and finishes.
+        let card = app.buttons["activeRecordingCard"]
+        XCTAssertTrue(card.waitForExistence(timeout: 5))
+        card.tap()
+        XCTAssertTrue(app.buttons["finishRecording"].waitForExistence(timeout: 5))
+        app.buttons["Library"].tap()
+        XCTAssertTrue(card.waitForExistence(timeout: 5), "minimised again")
+        card.tap()
         XCTAssertTrue(app.buttons["finishRecording"].waitForExistence(timeout: 5))
         app.buttons["finishRecording"].tap()
         XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(timeout: 10))

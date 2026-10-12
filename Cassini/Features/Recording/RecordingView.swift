@@ -31,7 +31,7 @@ struct RecordingView: View {
                     }
                     Spacer(minLength: 24)
                     Button {
-                        recording.addBookmark(at: screen.elapsed); bookmarkFeedback += 1
+                        recording.addBookmark(); bookmarkFeedback += 1
                     } label: {
                         Label { Text("Mark a moment", tableName: "Recording") } icon: { Image(systemName: "bookmark") }
                             .font(.subheadline).padding(.horizontal, 20).padding(.vertical, 12)
@@ -50,6 +50,7 @@ struct RecordingView: View {
         .background(Color.recordingBackground.ignoresSafeArea())
         .foregroundStyle(.white)
         .preferredColorScheme(.dark)
+        .onAppear { screen.appeared() }
         .onChange(of: screen.phase) { old, new in
             guard old != new, new == .recording || new == .paused else { return }
             AccessibilityNotification.Announcement(new == .paused ? RecordingCopy.status(paused: true) : RecordingCopy.status(paused: false)).post()

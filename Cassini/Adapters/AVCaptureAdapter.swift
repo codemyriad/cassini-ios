@@ -36,7 +36,7 @@ import CassiniNotebook
         })
         // The app is being closed: stopping writes the CAF header now, so recovery finds a clean file at next launch.
         observers.append(center.addObserver(forName: UIApplication.willTerminateNotification, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.recorder?.stop() }
+            MainActor.assumeIsolated { self?.stopForTermination() }
         })
     }
 
@@ -91,6 +91,14 @@ import CassiniNotebook
         recorder?.stop(); timer?.invalidate(); timer = nil; recorder = nil; isPaused = false
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         return CaptureResult(duration: duration)
+    }
+
+    /// Stops at once without reporting a failure: the delegate's finish callback is not for the recorder in use.
+    private func stopForTermination() {
+        guard let capture = recorder else { return }
+        recorder = nil
+        timer?.invalidate(); timer = nil
+        capture.stop()
     }
 
     private func tick() {

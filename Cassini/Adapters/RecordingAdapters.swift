@@ -11,6 +11,7 @@ struct LibraryRecordingNotes: RecordingNotes {
     func captureURL(for note: Note) async -> URL? { await library.audioURL(note) }
     func update(_ id: UUID, _ change: @escaping @Sendable (inout Note) -> Void) async throws -> Note? { await library.commit(id, change) }
     func discard(_ id: UUID) async throws { try await library.delete(id) }
+    func showUnsaved(_ id: UUID, _ change: @escaping @Sendable (inout Note) -> Void) async { await library.showUnsaved(id, change) }
 }
 
 /// A finished recording is queued like any other note.

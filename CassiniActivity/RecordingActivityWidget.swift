@@ -9,7 +9,7 @@ import CassiniNotebook
 struct RecordingActivityWidget: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: RecordingActivityAttributes.self) { context in
-            LockScreenRecording(state: context.state)
+            LockScreenRecording(state: context.state, noteID: context.attributes.noteID)
                 .activityBackgroundTint(RecordingActivityColors.background)
                 .activitySystemActionForegroundColor(.white)
                 .widgetURL(RecordingLink.url)
@@ -27,7 +27,7 @@ struct RecordingActivityWidget: Widget {
                 DynamicIslandExpandedRegion(.bottom) {
                     VStack(spacing: 8) {
                         if let warning = context.state.warning { WarningText(warning: warning) }
-                        RecordingButtons(isPaused: context.state.isPaused)
+                        RecordingButtons(isPaused: context.state.isPaused, noteID: context.attributes.noteID)
                     }
                 }
             } compactLeading: {
@@ -51,6 +51,7 @@ enum RecordingActivityColors {
 
 private struct LockScreenRecording: View {
     let state: RecordingActivityState
+    let noteID: UUID
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -65,7 +66,7 @@ private struct LockScreenRecording: View {
                 RecordingTime(state: state).font(.title2.monospacedDigit()).foregroundStyle(.white)
             }
             if let warning = state.warning { WarningText(warning: warning) }
-            RecordingButtons(isPaused: state.isPaused)
+            RecordingButtons(isPaused: state.isPaused, noteID: noteID)
         }
         .padding(16)
     }
@@ -112,20 +113,21 @@ private struct WarningText: View {
 
 private struct RecordingButtons: View {
     let isPaused: Bool
+    let noteID: UUID
     var body: some View {
         HStack(spacing: 12) {
             if isPaused {
-                Button(intent: ResumeRecordingIntent()) {
+                Button(intent: ResumeRecordingIntent(noteID: noteID)) {
                     Label { Text("Resume", tableName: "Recording") } icon: { Image(systemName: "play.fill") }
                         .frame(maxWidth: .infinity)
                 }
             } else {
-                Button(intent: PauseRecordingIntent()) {
+                Button(intent: PauseRecordingIntent(noteID: noteID)) {
                     Label { Text("Pause", tableName: "Recording") } icon: { Image(systemName: "pause.fill") }
                         .frame(maxWidth: .infinity)
                 }
             }
-            Button(intent: FinishRecordingIntent()) {
+            Button(intent: FinishRecordingIntent(noteID: noteID)) {
                 Label { Text("Finish", tableName: "Recording") } icon: { Image(systemName: "stop.fill") }
                     .frame(maxWidth: .infinity)
             }

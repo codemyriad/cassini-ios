@@ -55,6 +55,7 @@ import CassiniEngineTesting
         XCTAssertEqual(note.origin, .recovered)
         XCTAssertEqual(note.duration, 2, accuracy: 0.01)
         XCTAssertEqual(test.graph.library.unreadableCount, 0)
+        XCTAssertEqual(test.graph.recording.recovered.map(\.noteID), [id], "reported as a recovered recording")
     }
 
     func testFinishingARecordingOpensItsNoteCompressesAndQueuesIt() async throws {
@@ -91,15 +92,18 @@ import CassiniEngineTesting
         await graph.start()
         await graph.recording.start()
         await waitUntil { graph.recording.state.isActive }
-        RecordingIntentRouter.perform(.pause)
+        let id = try XCTUnwrap(graph.recording.state.noteID)
+        RecordingIntentRouter.perform(.pause, noteID: UUID().uuidString)
+        XCTAssertNil(graph.recording.state.activeRecording?.pause, "an activity of another recording does nothing")
+        RecordingIntentRouter.perform(.pause, noteID: id.uuidString)
         XCTAssertEqual(graph.recording.state.activeRecording?.pause, .user)
         XCTAssertEqual(test.liveActivity.updates.last?.isPaused, true)
-        RecordingIntentRouter.perform(.resume)
+        RecordingIntentRouter.perform(.resume, noteID: id.uuidString)
         XCTAssertNil(graph.recording.state.activeRecording?.pause)
         graph.router.dismissRecording()
         graph.recording.returnToRecording()
         XCTAssertEqual(graph.router.fullScreen, .recording)
-        RecordingIntentRouter.perform(.finish)
+        RecordingIntentRouter.perform(.finish, noteID: id.uuidString)
         await waitUntil { if case .note = graph.router.path.last { true } else { false } }
         XCTAssertFalse(test.liveActivity.isRunning)
     }

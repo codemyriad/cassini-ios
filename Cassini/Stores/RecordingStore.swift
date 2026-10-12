@@ -12,6 +12,8 @@ import CassiniNotebook
     private(set) var recovered: [RecoveredRecording] = []
 
     @ObservationIgnored private let recovery: CaptureRecovery
+    /// Notes rebuilt from bare audio at this launch, until they are reported with the repaired ones.
+    @ObservationIgnored private var rebuilt: [RecoveredRecording] = []
     @ObservationIgnored private let library: LibraryStore
     @ObservationIgnored private let playback: PlaybackStore
     @ObservationIgnored private let router: Router
@@ -47,7 +49,7 @@ import CassiniNotebook
         screen.onEffect = { [weak self] in self?.perform($0) }
         controller.onCompressionFailed = { [weak self] _ in self?.notices.post(RecordingCopy.compressionFailed) }
         controller.observe { [weak self] state in self?.playback.setBlocked(state.inProgress) }
-        RecordingIntentRouter.handler = { [weak self] action in self?.perform(action) }
+        RecordingIntentRouter.handler = { [weak self] action, noteID in self?.perform(action, for: noteID) }
     }
 
     var state: RecordingState { controller.state }
@@ -76,9 +78,10 @@ import CassiniNotebook
         if state.inProgress || screen.ended != nil { router.presentRecording() }
     }
 
-    func addBookmark(at time: TimeInterval) {
+    /// "Mark a moment": a bookmark at the time captured now.
+    func addBookmark() {
         guard let id = state.activeRecording?.noteID else { return }
-        let bookmark = UUID()
+        let time = controller.currentElapsed, bookmark = UUID()
         library.update(id) { $0.addBookmark(at: time, id: bookmark) }
     }
 
@@ -94,13 +97,16 @@ import CassiniNotebook
     /// Before the notes are read: notes for directories that kept their audio but lost `note.json`.
     func rebuildBareDirectories() async {
         guard let root = library.root, let repository = try? NoteRepository(root: root) else { return }
-        await recovery.rebuild(in: repository)
+        rebuilt = await recovery.rebuild(in: repository)
     }
 
-    /// After: repairs the captures that were live when Cassini closed.
+    /// After: repairs the captures that were live when Cassini closed, and reports them with the rebuilt notes.
     func recoverInterrupted() async {
         guard let store = library.noteStore else { return }
-        recovered = await recovery.recover(in: store, activeNoteID: state.noteID)
+        let repaired = await recovery.recover(in: store, activeNoteID: state.noteID)
+        let created = { [library] (recording: RecoveredRecording) in library.note(recording.noteID)?.createdAt ?? .distantPast }
+        recovered = (rebuilt + repaired).sorted { created($0) < created($1) }
+        rebuilt = []
         guard !recovered.isEmpty else { return }
         let captured = recovered.reduce(0) { $0 + $1.duration }
         notices.post(RecordingCopy.recovered(count: recovered.count, captured: captured))
@@ -123,7 +129,9 @@ import CassiniNotebook
         }
     }
 
-    private func perform(_ action: RecordingIntentAction) {
+    /// A Live Activity button; one left by an earlier recording does nothing.
+    private func perform(_ action: RecordingIntentAction, for noteID: UUID) {
+        guard state.activeRecording?.noteID == noteID else { return }
         switch action {
         case .pause: controller.pause()
         case .resume: controller.resume()

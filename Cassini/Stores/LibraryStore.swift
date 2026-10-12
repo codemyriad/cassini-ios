@@ -79,6 +79,10 @@ import CassiniNotebook
         return await enqueue { await self.write(edit, in: noteStore) }.value
     }
 
+    /// Changes the note on screen only: a change that could not be written. It lasts until the note is saved again or
+    /// the app relaunches.
+    func showUnsaved(_ id: UUID, _ change: @escaping @Sendable (inout Note) -> Void) { _ = applyLocally(id, change) }
+
     /// Applies `change` to every note, writing only the notes it changed.
     func updateAll(_ change: @escaping @Sendable (inout Note) -> Void) {
         guard let noteStore else { return }
