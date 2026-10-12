@@ -230,8 +230,8 @@ private struct NotificationsOffBanner: View {
                 Text("Progress shows only in the app.", tableName: "Settings").font(.subheadline).foregroundStyle(Color.muted)
             }
             Spacer(minLength: 0)
-            Button(action: turnOn) { Text("Turn on", tableName: "Settings") }
-                .font(.subheadline.weight(.semibold)).tint(.ember).frame(minHeight: HitTarget.minimum)
+            Button(action: turnOn) { Text("Turn on", tableName: "Settings").foregroundStyle(Color.ember) }
+                .font(.subheadline.weight(.semibold)).frame(minHeight: HitTarget.minimum)
                 .buttonStyle(.borderless)
         }
         .foregroundStyle(Color.ink)

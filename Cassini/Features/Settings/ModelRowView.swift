@@ -7,6 +7,7 @@ import CassiniNotebook
 struct ModelRowView: View {
     let row: ModelRow
     let open: () -> Void
+    @Environment(\.locale) private var locale
 
     var body: some View {
         if row.status.opensModelDownload {
@@ -21,7 +22,7 @@ struct ModelRowView: View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(row.part.settingsLabel).foregroundStyle(Color.ink)
-                Text(row.size.label).font(.subheadline).foregroundStyle(Color.muted)
+                Text(row.size.label(locale: locale)).font(.subheadline).foregroundStyle(Color.muted)
             }
             Spacer(minLength: 8)
             Text(row.status.label).font(.subheadline.weight(.medium)).foregroundStyle(row.status.tone.color)
@@ -47,10 +48,10 @@ extension ModelPart {
 }
 
 extension ModelSize {
-    var label: String {
+    func label(locale: Locale) -> String {
         switch self {
         case .managedBySystem: String(localized: "Managed by iOS", table: "Settings")
-        case .bytes(let bytes): bytes.formatted(.byteCount(style: .file))
+        case .bytes(let bytes): bytes.formatted(.byteCount(style: .file).locale(locale))
         case .includedWith: String(localized: "Comes with telling speakers apart", table: "Settings")
         }
     }
