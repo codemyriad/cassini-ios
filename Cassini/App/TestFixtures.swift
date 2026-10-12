@@ -8,6 +8,11 @@ enum TestFixtures {
     static let fixtureID = UUID(uuidString: "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA")!
     static let walkID = UUID(uuidString: "BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB")!
     static let processingID = UUID(uuidString: "CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC")!
+    static let queuedID = UUID(uuidString: "DDDDDDDD-DDDD-DDDD-DDDD-DDDDDDDDDDDD")!
+    static let pausedID = UUID(uuidString: "EEEEEEEE-EEEE-EEEE-EEEE-EEEEEEEEEEEE")!
+    static let failedID = UUID(uuidString: "FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF")!
+    /// Where the paused note of the statuses seed stopped: "Paused at 00:12".
+    static let pausedDoneMs: Int64 = 12_000
     static let fixtureDuration: TimeInterval = 24
     static let processingDuration: TimeInterval = 48 * 60 + 13
 
@@ -48,9 +53,9 @@ enum TestFixtures {
             yesterday.trashedAt = now.addingTimeInterval(-86_400)
             notes += [week, yesterday]
         case .processing:
-            var call = Note(id: processingID, title: "Weekly planning call", createdAt: now.addingTimeInterval(-20 * 60), audioFilename: "audio.wav")
-            call.duration = processingDuration; call.language = "en-US"; call.waveform = waveform
-            notes.append(call)
+            notes.append(processingCall(now: now))
+        case .statuses:
+            notes += statusNotes(now: now)
         }
         let audio = store.directory(for: fixtureID).appendingPathComponent("audio.wav")
         for note in notes {
@@ -58,14 +63,64 @@ enum TestFixtures {
             let url = store.audioURL(for: note)
             if note.id == fixtureID { try writeSilence(to: url) } else { try FileManager.default.copyItem(at: audio, to: url) }
         }
+        if seed == .statuses { try await seedStatusJobs(into: store, now: now) }
     }
 
     /// What a seed needs once the app is ready: consent and a running job for `processing`.
     @MainActor static func prepare(_ seed: AppEnvironment.Seed, settings: SettingsStore, processing: ProcessingStore) {
-        guard seed == .processing else { return }
+        guard seed == .processing || seed == .statuses else { return }
         settings.recordConsent()
         settings.identifySpeakers = false
-        processing.request(processingID, origin: .screen)
+        Task {
+            await processing.transcribe(processingID, origin: .screen)
+            // The frozen job never ends, so this one stays queued behind it.
+            if seed == .statuses { await processing.transcribe(queuedID, origin: .screen) }
+        }
+    }
+
+    private static func processingCall(now: Date) -> Note {
+        var call = Note(id: processingID, title: "Weekly planning call", createdAt: now.addingTimeInterval(-20 * 60), audioFilename: "audio.wav")
+        call.duration = processingDuration; call.language = "en-US"; call.waveform = waveform
+        return call
+    }
+
+    /// A note for each Library row status but Recording: transcribing and queued (from `prepare`), paused, failed,
+    /// can't play, can't read transcript, newer format, no speech, plus the transcribed and audio-only notes of the
+    /// library seed.
+    private static func statusNotes(now: Date) -> [Note] {
+        func audio(_ id: UUID = UUID(), _ title: String, hoursAgo: Double) -> Note {
+            var note = Note(id: id, title: title, createdAt: now.addingTimeInterval(-hoursAgo * 3600), audioFilename: "audio.wav")
+            note.duration = fixtureDuration; note.language = "en-US"; note.waveform = waveform
+            return note
+        }
+        var queued = audio(queuedID, "Interview with the printer", hoursAgo: 0.5)
+        queued.status = .audioOnly
+        var paused = audio(pausedID, "Paused standup", hoursAgo: 3)
+        paused.status = .audioOnly
+        var failed = audio(failedID, "Hallway conversation", hoursAgo: 4)
+        failed.status = .failed; failed.failure = .audio
+        var unplayable = audio(UUID(), "Interrupted capture", hoursAgo: 5)
+        unplayable.audio = .unplayable(.interrupted)
+        var unreadable = transcribed("Damaged document", at: now.addingTimeInterval(-6 * 3600), "Some words that were read.")
+        unreadable.origin = .importedDocument; unreadable.document = DocumentInfo(state: .unreadable)
+        var newer = transcribed("Document from a newer Cassini", at: now.addingTimeInterval(-7 * 3600), "Words from the future.")
+        newer.origin = .importedDocument; newer.document = DocumentInfo(state: .unknownFormat)
+        var silent = audio(UUID(), "Quiet room", hoursAgo: 8)
+        silent.status = .ready
+        return [processingCall(now: now), queued, paused, failed, unplayable, unreadable, newer, silent]
+    }
+
+    /// The paused job (with the saved progress it resumes from) and the failed one of the statuses seed.
+    private static func seedStatusJobs(into store: NoteStore, now: Date) async throws {
+        let audio = store.directory(for: pausedID).appendingPathComponent("audio.wav")
+        try CheckpointFiles(notes: store).save(CheckpointState(
+            source: "audio.wav", signature: CheckpointState.signature(of: audio), language: "en-US", segments: [],
+            doneMs: pausedDoneMs, totalMs: Int64(fixtureDuration * 1000), elapsedMs: 1_000), for: pausedID)
+        try JobRepository(root: store.root).save([
+            Job(noteID: pausedID, seq: 1, kind: .transcribe, state: .paused, pauseReason: .user, doneMs: pausedDoneMs,
+                totalMs: Int64(fixtureDuration * 1000), language: "en-US", enqueuedAt: now),
+            Job(noteID: failedID, seq: 2, kind: .transcribe, state: .failed, failure: .audio, language: "en-US", enqueuedAt: now),
+        ])
     }
 
     private static func fixture(now: Date) -> Note {

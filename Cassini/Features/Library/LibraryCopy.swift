@@ -74,8 +74,7 @@ enum LibraryCopy {
         case .recording: String(localized: "Recording", table: "Library", comment: "Row status")
         case .transcribing: String(localized: "Transcribing", table: "Library", comment: "Row status")
         case .queued: String(localized: "Queued", table: "Library", comment: "Row status")
-        case .paused(let atMs):
-            String(localized: "Paused at \(TimeText.clock(Double(atMs) / 1000))", table: "Library", comment: "Row status: where it stopped")
+        case .paused(let atMs): pausedAt(TimeText.clock(Double(atMs) / 1000))
         case .failed: String(localized: "Couldn’t transcribe", table: "Library", comment: "Row status")
         case .unplayable: String(localized: "Can’t play", table: "Library", comment: "Row status")
         case .unreadable: String(localized: "Can’t read transcript", table: "Library", comment: "Row status")
@@ -83,6 +82,10 @@ enum LibraryCopy {
         case .transcribed: String(localized: "Transcribed", table: "Library", comment: "Row status")
         case .audioOnly: String(localized: "Audio only", table: "Library", comment: "Row status")
         }
+    }
+
+    private static func pausedAt(_ clock: String) -> String {
+        String(localized: "Paused at \(clock)", table: "Library", comment: "Row status: where it stopped")
     }
 
     /// "· Resume", "· Try again", "· No speech", "· 3 speakers"; nil without a suffix.
