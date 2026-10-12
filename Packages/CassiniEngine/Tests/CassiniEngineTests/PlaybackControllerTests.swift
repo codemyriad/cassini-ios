@@ -12,7 +12,7 @@ import CassiniNotebook
 @MainActor @Suite struct PlaybackControllerTests {
     typealias Save = FakePlaybackPositions.Save
 
-    let player = FakePlayback(fileDuration: 60)
+    let player = SessionPlayback(fileDuration: 60)
     let positions = FakePlaybackPositions()
     let ticker = ManualTicker()
     let controller: PlaybackController
@@ -172,9 +172,12 @@ import CassiniNotebook
         advance(3_000)
 
         let compressed = URL(fileURLWithPath: "/notes/audio.m4a")
+        let releases = player.sessionReleases
         #expect(controller.reload(source(note, compressed)))
         #expect(player.loads == [audio, compressed])
-        #expect(player.unloads == 1)
+        #expect(player.unloads == 0, "the new file replaces the old one")
+        #expect(player.sessionReleases == releases, "playing on, the audio session is never given back")
+        #expect(player.holdsSession)
         #expect(Int((player.position * 1000).rounded()) == 3_000)
         #expect(controller.state.isPlaying, "still playing")
         #expect(controller.openSource?.url == compressed)
@@ -267,7 +270,7 @@ import CassiniNotebook
         #expect(controller.open(source(other), at: 0))
 
         #expect(player.loads.count == 3)
-        #expect(player.unloads == 2)
+        #expect(player.unloads == 1)
         #expect(controller.state.noteID == other)
         #expect(!player.holdsSession, "the first note's audio session is given back")
         #expect(await saves().last == Save(note, 3, final: true), "the position of the first note is saved")
@@ -392,6 +395,107 @@ import CassiniNotebook
         player.send(.remotePause)
         try await waitFor("pause") { !controller.state.isPlaying }
         #expect(await saves().last == Save(note, 42, final: true))
+    }
+
+    @Test func aReloadThatDoesNotPlayOnGivesTheSessionBack() {
+        controller.open(source(note), at: 10)
+        // A sample of a paused note holds the session; the reload returns to the paused position.
+        controller.playRange(note, from: 30, to: 35)
+        #expect(player.holdsSession)
+        #expect(controller.reload(source(note, URL(fileURLWithPath: "/notes/audio.m4a"))))
+        #expect(!controller.state.isPlaying)
+        #expect(controller.state.position == 10)
+        #expect(!player.holdsSession)
+    }
+
+    @Test func anInterruptionTheSystemPausedForIsStillHeard() async throws {
+        controller.open(source(note), at: 0)
+        controller.play()
+        advance(2_000)
+        // AVAudioPlayer is already paused when the interruption begins; no tick runs before the event.
+        player.systemInterrupt(.interrupted)
+        try await waitFor("the interruption") { !controller.state.isPlaying }
+        #expect(await saves().last == Save(note, 2, final: true))
+        #expect(!player.holdsSession, "the audio session is given back")
+
+        // While paused, an interruption changes nothing.
+        let count = positions.saves.count
+        player.systemInterrupt(.interrupted)
+        // Events arrive in order: once the seek after it is heard, so was the interruption.
+        player.send(.remoteSeek(1))
+        try await waitFor("the seek after it") { controller.state.position == 1 }
+        #expect(await saves().count == count)
+    }
+
+    @Test func aScreenShowingTheChangedAudioOfItsNoteGetsThePlayerWhereItWas() async {
+        let first = PlaybackOwner(), second = PlaybackOwner()
+        #expect(controller.show(source(note), at: 0, owner: first))
+        controller.play()
+        advance(3_000)
+
+        // A second screen of the same note shows the compressed copy before the first screen does.
+        let compressed = URL(fileURLWithPath: "/notes/audio.m4a")
+        #expect(controller.show(source(note, compressed), at: 0, owner: second))
+        #expect(player.loads == [audio, compressed])
+        #expect(controller.state.isPlaying, "still playing")
+        #expect(Int((player.position * 1000).rounded()) == 3_000, "not at the stored position")
+        controller.leave(first)
+        #expect(player.loadedURL == compressed, "the player moved to the second screen")
+
+        // The first screen showing the same file again only takes the player back.
+        #expect(controller.show(source(note, compressed), at: 0, owner: first))
+        #expect(player.loads.count == 2)
+    }
+
+    @Test func aChangedFileThatCannotBePlayedFailsWithoutAnotherOpen() {
+        #expect(controller.show(source(note), at: 4, owner: PlaybackOwner()))
+        let broken = URL(fileURLWithPath: "/notes/broken.m4a")
+        player.unplayable = [broken]
+        let owner = PlaybackOwner()
+        #expect(!controller.show(source(note, broken), at: 4, owner: owner))
+        #expect(controller.state.status == .failed)
+        #expect(player.loads == [audio], "the broken file is not tried twice")
+
+        // The same file written again (a new signature) is tried again.
+        player.unplayable = []
+        var rewritten = source(note, broken)
+        rewritten.signature = "2-1"
+        #expect(controller.show(rewritten, at: 4, owner: owner))
+        #expect(controller.state.status == .paused)
+    }
+
+    @Test func aNoteShownAgainBeforeItsLeaveIsSavedOpensWhereItWasLeft() async {
+        let first = PlaybackOwner(), second = PlaybackOwner()
+        controller.show(source(note), at: 0, owner: first)
+        controller.play()
+        positions.hold()
+        advance(6_000)
+        controller.leave(first)
+        // The next screen reads the note before the saves land: its stored position is still 0.
+        #expect(controller.show(source(note), at: 0, owner: second))
+        #expect(milliseconds == 6_000)
+        positions.release()
+        await controller.settle()
+
+        // Once saved, the stored position is what counts.
+        controller.leave(second)
+        await controller.settle()
+        #expect(controller.show(source(note), at: 2, owner: first))
+        #expect(milliseconds == 2_000)
+    }
+
+    @Test func theFiveSecondSavesCountFromTheEndOfASampleThatPlaysOn() async {
+        controller.open(source(note), at: 0)
+        controller.play()
+        advance(4_500)
+        controller.playRange(note, from: 30, to: 32)
+        // The sample ends on the tick at 6.6 s; the ticks after it are not due for a save yet.
+        advance(2_250)
+        #expect(controller.state.sample == nil)
+        #expect(controller.state.isPlaying)
+        #expect(await saves().isEmpty, "no save right after the sample")
+        advance(5_100)
+        #expect(await saves().count == 1)
     }
 
     @Test func theSpeedStaysForTheNextFile() {

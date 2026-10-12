@@ -3,14 +3,12 @@ import Testing
 import CassiniNotebook
 
 struct PlaybackSkipTests {
-    // ports: TranscriptSemanticsTest#theSliderIsPositionWithTenSecondSteps (the steps; the view's label and value are
-    // checked by CassiniUITests)
+    // ports: TranscriptSemanticsTest#theSliderIsPositionWithTenSecondSteps (the 10 s step; the view's label and value
+    // are checked by CassiniUITests)
     @Test func theSliderMovesInTenSecondSteps() {
         #expect(PlaybackSkip.interval == 10)
-        #expect(PlaybackSkip.steps(duration: 1_430) == 142)
         #expect(PlaybackSkip.step(from: 704, forward: true, duration: 1_430) == 714)
         #expect(PlaybackSkip.step(from: 704, forward: false, duration: 1_430) == 694)
-        #expect(PlaybackSkip.steps(duration: 5) == 0)
     }
 
     @Test func aSkipStaysInsideTheFile() {

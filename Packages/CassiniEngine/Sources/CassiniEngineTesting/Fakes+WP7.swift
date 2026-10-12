@@ -83,4 +83,86 @@ import CassiniEngine
         gate?.resume(); gate = nil
     }
 }
+/// A `FakePlayback` with the audio session of the real adapter: taken on `play()`, kept when `load` swaps the file,
+/// and given back on pause, unload and the end of the file. It counts loads, unloads and session releases, and can
+/// refuse files.
+@MainActor public final class SessionPlayback: AudioPlayback {
+    public let base: FakePlayback
+    /// Files that cannot be played: loading one throws.
+    public var unplayable: Set<URL> = []
+    /// Every file loaded, in order.
+    public private(set) var loads: [URL] = []
+    /// How often a loaded file was let go of.
+    public private(set) var unloads = 0
+    /// Whether the audio session is held.
+    public private(set) var holdsSession = false
+    /// How often the session was given back to other apps.
+    public private(set) var sessionReleases = 0
+
+    public init(fileDuration: TimeInterval = 60) { base = FakePlayback(fileDuration: fileDuration) }
+
+    public var events: AsyncStream<PlaybackEvent> { base.events }
+    public var loadedURL: URL? { base.loadedURL }
+    public var position: TimeInterval { base.position }
+    public var duration: TimeInterval { base.duration }
+    public var isPlaying: Bool { base.isPlaying }
+    public var rate: Float {
+        get { base.rate }
+        set { base.rate = newValue }
+    }
+
+    /// Replaces the open file, paused; the session stays as it was.
+    public func load(url: URL, at position: TimeInterval, title: String) throws {
+        if unplayable.contains(url) { throw CocoaError(.fileReadCorruptFile) }
+        try base.load(url: url, at: position, title: title)
+        loads.append(url)
+    }
+
+    public func unload() {
+        if base.loadedURL != nil { unloads += 1 }
+        base.unload()
+        releaseSession()
+    }
+
+    public func play() throws {
+        guard base.loadedURL != nil else { return }
+        try base.play()
+        holdsSession = true
+    }
+
+    public func pause() {
+        base.pause()
+        releaseSession()
+    }
+
+    public func seek(_ position: TimeInterval) { base.seek(position) }
+
+    /// Plays on by `seconds`; at the end of the file the session is given back.
+    public func advance(by seconds: TimeInterval) {
+        base.advance(by: seconds)
+        if !base.isPlaying, base.loadedURL != nil, base.position >= base.duration { releaseSession() }
+    }
+
+    public func send(_ event: PlaybackEvent) { base.send(event) }
+
+    /// The headphones go or the app pauses for an interruption: the player pauses at once and the event follows.
+    public func interrupt(_ event: PlaybackEvent = .interrupted) {
+        guard isPlaying else { return }
+        pause()
+        send(event)
+    }
+
+    /// The system paused the player itself (another app took the audio): the player stops with the session still
+    /// counted as held, and only then does the event arrive, as `AVAudioPlayer` does.
+    public func systemInterrupt(_ event: PlaybackEvent = .interrupted) {
+        base.pause()
+        send(event)
+    }
+
+    private func releaseSession() {
+        guard holdsSession else { return }
+        holdsSession = false
+        sessionReleases += 1
+    }
+}
 #endif

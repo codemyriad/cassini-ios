@@ -14,9 +14,4 @@ public enum PlaybackSkip {
     public static func step(from position: TimeInterval, forward: Bool, duration: TimeInterval) -> TimeInterval {
         target(from: position, by: forward ? interval : -interval, duration: duration)
     }
-
-    /// How many steps the slider has between its ends (Android's `ProgressBarRangeInfo.steps`).
-    public static func steps(duration: TimeInterval) -> Int {
-        max(0, Int((max(0, duration) / interval).rounded(.down)) - 1)
-    }
 }

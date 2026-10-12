@@ -11,8 +11,11 @@ import CassiniNotebook
 /// - `open` is called by the screen that shows the player, with its `PlaybackOwner`. The same note and file again
 ///   only gives the player to that screen; another note leaves the open one first. `leave(owner)` does nothing while
 ///   another screen owns the player, so a screen that is gone cannot close a newer screen's player.
-/// - `reload` opens the note's file again when its audio changed (the recording's compressed copy replaced the
-///   capture), at the same position and play state.
+/// - `show` is what a Note screen calls: it opens the note's file, gives an open one to that screen, or reloads it
+///   when the note's audio changed (the recording's compressed copy replaced the capture). `reload` opens the new file
+///   at the same position and play state, keeping the audio session when it plays on.
+/// - A note shown again before the final save of its leave has landed opens where it was left, not at the older
+///   position stored on the note.
 /// - A file that cannot be opened leaves `state.status` `.failed` for its note, with no player.
 /// - Another app taking the audio and a lost output (unplugged headphones) pause.
 /// - `playRange` plays a speaker sample, stops at its end and returns to the position and play state from before.
@@ -61,6 +64,13 @@ public final class PlaybackController {
     /// The last save asked for; each one waits for the one before.
     @ObservationIgnored private var saves: Task<Void, Never>?
     @ObservationIgnored private var events: Task<Void, Never>?
+    /// The position of each note whose last save asked for has not landed yet, so the note's stored position is old.
+    @ObservationIgnored private var unsaved: [UUID: PendingSave] = [:]
+
+    private struct PendingSave {
+        let token = UUID()
+        let position: TimeInterval
+    }
 
     public init(parts: Parts) {
         self.parts = parts
@@ -68,6 +78,10 @@ public final class PlaybackController {
         events = Task { [weak self] in
             for await event in stream { self?.handle(event) }
         }
+    }
+
+    isolated deinit {
+        events?.cancel()
     }
 
     /// The file that is open, if any.
@@ -96,6 +110,22 @@ public final class PlaybackController {
         return true
     }
 
+    /// The screen `owner` shows `source`'s note, which opens at `stored`, the position saved on the note, unless its
+    /// player is open already. A save of the note that has not landed yet (its leave a moment ago) wins over `stored`,
+    /// so the note opens where it was left. When the note's file is open, the screen gets the player; when the note's audio changed since (another file, or the same
+    /// one written again), the new file is reloaded at the same position and play state, and the screen gets the
+    /// player too. False when the file cannot be played (the note is then `.failed`) or a recording runs.
+    @discardableResult
+    public func show(_ source: PlaybackSource, at stored: TimeInterval, owner: PlaybackOwner) -> Bool {
+        if let open = self.source, open.noteID == source.noteID, !open.isSameFile(as: source), !isBlocked {
+            // Another screen of the same note may own it: the player moves to this one, as an open of the same file
+            // does, and keeps its position and play state.
+            self.owner = owner
+            return reload(source, owner: owner)
+        }
+        return open(source, at: unsaved[source.noteID]?.position ?? stored, owner: owner)
+    }
+
     /// The note's audio changed (`source` is its new file): opens it again at the same position and play state, or
     /// at the position from before a sample. With an `owner`, only while that screen owns the player. False when no
     /// file of that note is open, or the new file cannot be played (the note is then `.failed`).
@@ -107,12 +137,17 @@ public final class PlaybackController {
         let resume = state.sample?.restorePlaying ?? player.isPlaying
         stopTicker()
         state.sample = nil
-        player.pause()
-        player.unload()
+        // `load` swaps the file and keeps the audio session, so playing on gives nothing back to other apps.
         self.source = nil
         guard prepare(source) else { return false }
         player.seek(clamped(position))
-        if resume { play() } else { publish() }
+        if resume {
+            play()
+        } else {
+            // A sample may have held the session.
+            player.pause()
+            publish()
+        }
         return true
     }
 
@@ -304,7 +339,13 @@ public final class PlaybackController {
         state.sample = nil
         player.seek(ended.restorePosition)
         if !interrupted, ended.restorePlaying {
-            if player.isPlaying { publish() } else { play() }
+            if player.isPlaying {
+                // The 5 s saves count from here, as they do from a play.
+                lastSaved = parts.uptime()
+                publish()
+            } else {
+                play()
+            }
             return
         }
         player.pause()
@@ -336,13 +377,16 @@ public final class PlaybackController {
         save(position, of: id, final: final)
     }
 
-    /// Queues the save behind the ones asked for before it.
+    /// Queues the save behind the ones asked for before it; until it lands, an open of the note starts there.
     private func save(_ position: TimeInterval, of noteID: UUID, final: Bool) {
         let previous = saves
         let positions = parts.positions
-        saves = Task {
+        let pending = PendingSave(position: position)
+        unsaved[noteID] = pending
+        saves = Task { [weak self] in
             await previous?.value
             await positions.save(noteID, position: position, final: final)
+            if self?.unsaved[noteID]?.token == pending.token { self?.unsaved[noteID] = nil }
         }
     }
 }
