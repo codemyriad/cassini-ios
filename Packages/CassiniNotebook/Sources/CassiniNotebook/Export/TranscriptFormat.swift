@@ -54,15 +54,11 @@ public enum TranscriptExports {
         case .subtitles: text = SrtWriter.write(transcript)
         case .webVTT: text = VttWriter.write(transcript)
         case .text:
-            let subtitle = texts.subtitle(note.createdAt, transcript.durationMs, speakerCount(note, version: version))
+            // Android counts the selected variant's distinct word speakers, the count that also labels the turns.
+            let subtitle = texts.subtitle(note.createdAt, transcript.durationMs, transcript.speakerCount)
             text = TextExport.write(transcript, subtitle: subtitle, emptyText: texts.emptyText)
         }
         return Data(text.utf8)
     }
 
-    /// The TXT subtitle line's number of speakers: the speakers of the exported transcript, as Android counts the
-    /// selected variant's, so passages without a speaker add none and a speaker without words still counts.
-    static func speakerCount(_ note: Note, version: TranscriptVersion?) -> Int {
-        Set((version?.speakers ?? note.speakers ?? []).map(\.id)).count
-    }
 }

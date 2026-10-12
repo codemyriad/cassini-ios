@@ -68,7 +68,15 @@ struct TranscriptExportsTests {
         ]
         let text = String(decoding: try TranscriptExports.data(note(segments, speakers: [.init(id: "S1", name: "Giulia")]),
                                                                 format: .text, texts: texts), as: UTF8.self)
-        #expect(text == "Consegna: giovedì?\nsub 12500 1\n\n[00:00] Giulia\nCiao\n\n[00:03] Unknown speaker\nChi parla?\n")
+        #expect(text == "Consegna: giovedì?\nsub 12500 2\n\n[00:00] Giulia\nCiao\n\n[00:03] Unknown speaker\nChi parla?\n")
+    }
+
+    @Test func aListedSpeakerWithoutWordsIsNotCounted() throws {
+        let segments = [TranscriptSegment(text: "Ciao", start: 0, end: 1, speakerID: "S1", words: [.init(text: "Ciao", start: 0, end: 1)])]
+        let speakers: [NoteSpeaker] = [.init(id: "S1", name: "Giulia"), .init(id: "S2", name: "Marco")]
+        let text = String(decoding: try TranscriptExports.data(note(segments, speakers: speakers), format: .text, texts: texts),
+                          as: UTF8.self)
+        #expect(text == "Consegna: giovedì?\nsub 12500 1\n\n[00:00]\nCiao\n")
     }
 
     @Test func aVersionExportsItsOwnWordsAndNames() throws {
