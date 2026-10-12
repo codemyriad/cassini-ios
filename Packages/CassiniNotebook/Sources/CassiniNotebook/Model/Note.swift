@@ -104,6 +104,7 @@ extension Note: Codable {
         failure = try c.decodeIfPresent(String.self, forKey: .failureMessage).map(Self.legacyFailure)
         speakerAnalysisFailure = try c.decodeIfPresent(String.self, forKey: .speakerAnalysisMessage)
             .map { $0.hasPrefix("No speakers were detected") ? .empty : .speakers }
+        migrateSpeakers()
     }
 
     public func encode(to encoder: any Encoder) throws {

@@ -1,10 +1,10 @@
 import AVFoundation
 import Foundation
 
-struct AudioInspection: Sendable {
-    let duration: Double
-    let waveform: [Float]
-    static func inspect(_ url: URL) async throws -> AudioInspection {
+public struct AudioInspection: Sendable {
+    public let duration: Double
+    public let waveform: [Float]
+    public static func inspect(_ url: URL) async throws -> AudioInspection {
         try await Task.detached(priority: .utility) {
             let file = try AVAudioFile(forReading: url)
             guard file.length > 0, file.processingFormat.sampleRate > 0 else { throw AudioError.empty }
@@ -28,8 +28,8 @@ struct AudioInspection: Sendable {
     }
 }
 
-enum AudioArchive {
-    static func compress(source: URL, destination: URL) async throws {
+public enum AudioArchive {
+    public static func compress(source: URL, destination: URL) async throws {
         let asset = AVURLAsset(url: source)
         guard let export = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetAppleM4A) else {
             throw AudioError.unreadable
@@ -38,9 +38,9 @@ enum AudioArchive {
     }
 }
 
-enum AudioError: LocalizedError {
+public enum AudioError: LocalizedError {
     case empty, unreadable, microphoneDenied, noInput, startFailed, storageLow, busy
-    var errorDescription: String? {
+    public var errorDescription: String? {
         switch self {
         case .empty: "This audio file is empty. Choose a recording with audio."
         case .unreadable: "This audio format could not be opened. Try M4A, WAV, MP3, AIFF, or CAF."

@@ -16,12 +16,22 @@ targets:
   Cassini:
     type: application
     platform: iOS
-    sources: [Cassini]
+    # CassiniShared is also compiled into the CassiniActivity widget extension.
+    sources: [Cassini, CassiniShared]
     dependencies:
       - package: Cassini
-        product: CassiniInference
+        product: CassiniCore
+      - package: Cassini
+        product: CassiniNotebook
+      - package: Cassini
+        product: CassiniEngine
       - package: Cassini
         product: CassiniAudio
+      - package: Cassini
+        product: CassiniInference
+      # Imported only in Debug builds, for UI-test launches.
+      - package: Cassini
+        product: CassiniEngineTesting
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.codemyriad.cassini
@@ -47,11 +57,17 @@ targets:
     dependencies:
       - target: Cassini
       - package: Cassini
+        product: CassiniCore
+      - package: Cassini
         product: CassiniNotebook
+      - package: Cassini
+        product: CassiniEngine
+      - package: Cassini
+        product: CassiniEngineTesting
       - package: Cassini
         product: CassiniAudio
       - package: Cassini
-        product: CassiniCore
+        product: CassiniInference
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES

@@ -1,40 +1,33 @@
 import AVFoundation
 import Speech
+import CassiniEngine
 import CassiniNotebook
 
-actor SpeechService {
-    enum Failure: LocalizedError {
-        case unavailable, unsupportedLanguage, downloadConsent, reservationLimit
-        var errorDescription: String? {
-            switch self {
-            case .unavailable: "On-device transcription is unavailable on this device. Your audio is saved and can still be played or exported."
-            case .unsupportedLanguage: "Apple’s on-device speech model does not support this language. Choose another language in Settings."
-            case .downloadConsent: "A speech model is needed. Allow model downloads in Settings, then try again. Audio stays on this device."
-            case .reservationLimit: "The system cannot reserve another speech language. Try a language already installed on this device."
-            }
-        }
-    }
-    func transcribe(url: URL, locale identifier: String, allowDownload: Bool,
-                    progress: @escaping @MainActor @Sendable (String, Double?) -> Void) async throws -> [TranscriptSegment] {
-        guard SpeechTranscriber.isAvailable else { throw Failure.unavailable }
-        guard let locale = await SpeechTranscriber.supportedLocale(equivalentTo: Locale(identifier: identifier)) else {
-            throw Failure.unsupportedLanguage
+/// Apple's on-device `SpeechTranscriber` over a whole file.
+public actor AppleSpeechTranscriber: Transcribing {
+    public init() {}
+
+    public func transcribe(_ request: TranscriptionRequest,
+                           events: @escaping @Sendable (TranscriptionEvent) -> Void) async throws -> TranscriptionResult {
+        guard SpeechTranscriber.isAvailable else { throw TranscriptionError.failed(.model) }
+        guard let locale = await SpeechTranscriber.supportedLocale(equivalentTo: Locale(identifier: request.language)) else {
+            throw TranscriptionError.failed(.unsupportedLanguage)
         }
         let transcriber = SpeechTranscriber(locale: locale, transcriptionOptions: [], reportingOptions: [], attributeOptions: [.audioTimeRange])
         let status = await AssetInventory.status(forModules: [transcriber])
         if status != .installed {
-            guard allowDownload else { throw Failure.downloadConsent }
-            await progress("Preparing speech model…", nil)
-            guard try await AssetInventory.reserve(locale: locale) else { throw Failure.reservationLimit }
-            if let request = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
-                try await request.downloadAndInstall()
+            guard request.allowDownload else { throw TranscriptionError.needsConsent }
+            events(.preparingModel(nil))
+            guard try await AssetInventory.reserve(locale: locale) else { throw TranscriptionError.failed(.reservationLimit) }
+            if let installation = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
+                try await installation.downloadAndInstall()
             }
         }
         try Task.checkCancellation()
-        let file = try AVAudioFile(forReading: url)
+        let file = try AVAudioFile(forReading: request.url)
         let duration = Double(file.length) / file.processingFormat.sampleRate
         let analyzer = SpeechAnalyzer(modules: [transcriber])
-        await progress("Transcribing on this device…", 0)
+        events(.progress(done: 0, total: duration))
         return try await withTaskCancellationHandler {
             do {
                 return try await withThrowingTaskGroup(of: [TranscriptSegment].self) { group in
@@ -58,14 +51,16 @@ actor SpeechService {
                                     start: range?.start.seconds ?? (words.last?.end ?? start),
                                     end: range?.end.seconds ?? (words.last?.end ?? start)))
                             }
-                            segments.append(TranscriptSegment(text: text, start: start, end: end, words: words))
-                            await progress("Transcribing on this device…", min(0.99, end / max(1, duration)))
+                            let segment = TranscriptSegment(text: text, start: start, end: end, words: words)
+                            segments.append(segment)
+                            events(.finalized(segment))
+                            events(.progress(done: end, total: duration))
                         }
                         return segments
                     }
                     var transcript: [TranscriptSegment] = []
                     for try await result in group { if !result.isEmpty { transcript = result } }
-                    return transcript.sorted { $0.start < $1.start }
+                    return TranscriptionResult(segments: transcript.sorted { $0.start < $1.start })
                 }
             } catch {
                 await analyzer.cancelAndFinishNow()
@@ -73,6 +68,18 @@ actor SpeechService {
             }
         } onCancel: {
             Task { await analyzer.cancelAndFinishNow() }
+        }
+    }
+
+    public func assetStatus(locale: Locale) async -> ModelPartStatus {
+        guard SpeechTranscriber.isAvailable,
+              let supported = await SpeechTranscriber.supportedLocale(equivalentTo: locale) else { return .unsupported }
+        let transcriber = SpeechTranscriber(locale: supported, transcriptionOptions: [], reportingOptions: [], attributeOptions: [])
+        switch await AssetInventory.status(forModules: [transcriber]) {
+        case .installed: return .ready
+        case .downloading: return .downloading(nil)
+        case .supported: return .notDownloaded
+        default: return .unsupported
         }
     }
 }

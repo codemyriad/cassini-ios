@@ -18,6 +18,17 @@ public enum VoiceMatchState: Codable, Hashable, Sendable {
         case .auto(let voice, _), .suggested(let voice, _), .confirmed(let voice, _), .rejected(let voice, _): voice
         }
     }
+
+    public var score: Float? {
+        switch self {
+        case .unmatched: nil
+        case .auto(_, let score), .suggested(_, let score), .confirmed(_, let score), .rejected(_, let score): score
+        }
+    }
+
+    public var isRejection: Bool {
+        if case .rejected = self { true } else { false }
+    }
 }
 
 public struct NoteSpeaker: Identifiable, Hashable, Sendable {

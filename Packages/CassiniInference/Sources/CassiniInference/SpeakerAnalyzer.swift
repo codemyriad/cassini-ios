@@ -1,16 +1,11 @@
 import Foundation
 import CryptoKit
 import FluidAudio
+import CassiniEngine
 import CassiniNotebook
 
-public struct SpeakerAnalysis: Sendable {
-    public var turns: [SpeakerTurn]
-    public var prints: [SpeakerPrint]
-    public init(turns: [SpeakerTurn], prints: [SpeakerPrint]) { self.turns = turns; self.prints = prints }
-}
-
 /// One inference job at a time, off the UI actor. FluidAudio receives only local file URLs.
-public actor SpeakerAnalyzer {
+public actor SpeakerAnalyzer: SpeakerAnalyzing {
     public static let modelID = "pyannote-community-1-wespeaker-coreml-v1"
     public static var modelsAvailable: Bool {
         guard let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return false }
@@ -21,26 +16,38 @@ public actor SpeakerAnalyzer {
     }
     private var busy = false
     public init() {}
-    public func analyze(_ url: URL, allowDownload: Bool, progress: @escaping @Sendable (String, Double?) -> Void) async throws -> SpeakerAnalysis {
+
+    private var identity: String?
+
+    public var modelIdentity: String? {
+        get async {
+            if let identity { return identity }
+            guard Self.modelsAvailable, let cache = try? Self.cacheDirectory(), let fingerprint = try? Self.fingerprint(cache) else { return nil }
+            identity = Self.modelID + ":" + fingerprint
+            return identity
+        }
+    }
+
+    public func modelStatus() async -> ModelPartStatus { Self.modelsAvailable ? .ready : .notDownloaded }
+
+    public func analyze(url: URL, allowDownload: Bool, progress: @escaping @Sendable (SpeakerAnalysisEvent) -> Void) async throws -> SpeakerAnalysis {
         guard !busy else { throw AnalyzerError.busy }
         busy = true; defer { busy = false; ModelHub.offlineMode = true }
         ModelHub.offlineMode = !allowDownload
         var config = OfflineDiarizerConfig.default
         config.embedding.batchSize = 4
         let manager = OfflineDiarizerManager(config: config)
-        let support = try FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
-        var cache = support.appendingPathComponent("CassiniModels", isDirectory: true)
-        try FileManager.default.createDirectory(at: cache, withIntermediateDirectories: true)
-        var values = URLResourceValues(); values.isExcludedFromBackup = true; try cache.setResourceValues(values)
-        progress(allowDownload ? "Preparing speaker models…" : "Loading speaker models…", nil)
+        let cache = try Self.cacheDirectory()
+        progress(.preparingModels(nil))
         let models = try await OfflineDiarizerModels.load(from: cache, progressHandler: { update in
-            progress("Preparing speaker models…", update.fractionCompleted)
+            progress(.preparingModels(update.fractionCompleted))
         })
         try Task.checkCancellation()
         let fingerprint = try Self.fingerprint(cache)
+        identity = Self.modelID + ":" + fingerprint
         manager.initialize(models: models)
         let result = try await manager.process(url, progressCallback: { count, total in
-            progress("Identifying speakers on this device…", Double(count) / Double(max(1, total)))
+            progress(.analyzing(Double(count) / Double(max(1, total))))
         })
         try Task.checkCancellation()
         let turns = result.segments.map { SpeakerTurn(speakerID: $0.speakerId, start: Double($0.startTimeSeconds), end: Double($0.endTimeSeconds)) }
@@ -54,6 +61,14 @@ public actor SpeakerAnalyzer {
         }
         return SpeakerAnalysis(turns: turns, prints: prints)
     }
+    private static func cacheDirectory() throws -> URL {
+        let support = try FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+        var cache = support.appendingPathComponent("CassiniModels", isDirectory: true)
+        try FileManager.default.createDirectory(at: cache, withIntermediateDirectories: true)
+        var values = URLResourceValues(); values.isExcludedFromBackup = true; try cache.setResourceValues(values)
+        return cache
+    }
+
     private static func fingerprint(_ cache: URL) throws -> String {
         var digest = SHA256()
         for model in ["Embedding", "FBank", "PldaRho"] {
