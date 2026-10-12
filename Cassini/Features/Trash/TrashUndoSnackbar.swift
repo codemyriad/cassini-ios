@@ -22,16 +22,22 @@ private struct TrashUndoSnackbar: ViewModifier {
                         .frame(maxWidth: ReadableWidth.library).frame(maxWidth: .infinity)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                         .task(id: snackbar.id) {
-                            AccessibilityNotification.Announcement(TrashCopy.moved(snackbar.note.title)).post()
-                            try? await Task.sleep(for: snackbar.duration)
+                            // A task cancelled as the screen changes starts again; only a full wait ends the snackbar.
+                            guard (try? await Task.sleep(for: snackbar.duration)) != nil else { return }
                             undo.timedOut(snackbar.id)
                         }
                         .accessibilityIdentifier("trashUndoSnackbar")
                 }
             }
             .animation(.snappy, value: undo.snackbar)
-            .onChange(of: undo.pending, initial: true) { _, pending in
-                if pending != nil { undo.showPending(duration: TrashPolicy.undoDuration(voiceOverRunning: voiceOver)) }
-            }
+            // A move from the Note screen offers the note while the Library is still covered: it shows on arrival.
+            .onAppear(perform: showPending)
+            .onChange(of: undo.pending) { showPending() }
+    }
+
+    private func showPending() {
+        guard undo.pending != nil else { return }
+        undo.showPending(duration: TrashPolicy.undoDuration(voiceOverRunning: voiceOver))
+        if let snackbar = undo.snackbar { AccessibilityNotification.Announcement(TrashCopy.moved(snackbar.note.title)).post() }
     }
 }

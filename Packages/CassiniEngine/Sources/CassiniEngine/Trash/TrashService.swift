@@ -91,8 +91,8 @@ import CassiniNotebook
         }
         guard moved else { return false }
         if stopConfirmation?.noteID == id { stopConfirmation = nil }
-        host.didTrash(id)
         parts.undo.offer(TrashedNote(noteID: id, title: notes.note(id)?.title ?? note.title))
+        host.didTrash(id)
         return true
     }
 
