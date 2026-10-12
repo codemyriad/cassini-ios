@@ -1,28 +1,69 @@
 import SwiftUI
+import CassiniNotebook
 
-struct LibraryEmptyState: View {
-    let query: String
-    let favoritesOnly: Bool
+/// What the Library says instead of rows: an empty library with Record and Import, a search that found nothing, a
+/// library that could not be opened, or a Starred filter with nothing (iOS extra).
+struct LibraryEmptyStateView: View {
+    let state: LibraryEmptyState
+    let record: () -> Void
+    let importAudio: () -> Void
+
     var body: some View {
-        VStack(spacing: 22) {
-            ZStack {
-                Circle().fill(Color.ember.opacity(0.06)).frame(width: 148, height: 148)
-                Circle().stroke(Color.ember.opacity(0.1), lineWidth: 1).frame(width: 180, height: 180)
-                OrbitMark(size: 88)
-            }.padding(.top, 24)
-            VStack(spacing: 10) {
-                Text(query.isEmpty ? (favoritesOnly ? "Keep your favorites close." : "Good conversations\ndeserve to be kept.") : "No matching recordings.")
-                    .font(.system(.title2, design: .serif)).multilineTextAlignment(.center).foregroundStyle(Color.ink)
-                Text(query.isEmpty ? (favoritesOnly ? "Star a recording to find it here." : "Record a thought, an interview, or a meeting.\nTurn it into words you can come back to.") : "Try a different word or recording title.")
-                    .font(.subheadline).foregroundStyle(Color.muted).multilineTextAlignment(.center)
+        switch state {
+        case .empty:
+            VStack(spacing: 22) {
+                illustration
+                message(LibraryCopy.emptyTitle, LibraryCopy.emptyBody)
+                HStack(spacing: 12) {
+                    Button(LibraryCopy.record, systemImage: "mic.fill", action: record).buttonStyle(.borderedProminent)
+                    Button(LibraryCopy.importAudio, systemImage: "square.and.arrow.down", action: importAudio).buttonStyle(.bordered)
+                }
+                .controlSize(.large).tint(.ember)
             }
-            if query.isEmpty && !favoritesOnly {
-                HStack(spacing: 20) {
-                    Label("Record", systemImage: "waveform")
-                    Label("Transcribe", systemImage: "text.alignleft")
-                    Label("Revisit", systemImage: "bookmark")
-                }.font(.caption).foregroundStyle(Color.ember).padding(.top, 6)
+            .frame(maxWidth: .infinity).padding(.bottom, 22)
+            .accessibilityIdentifier("libraryEmpty")
+        case .noMatch(let query):
+            banner(LibraryCopy.noMatchTitle(query), LibraryCopy.noMatchBody, tone: .plain, symbol: "magnifyingglass")
+                .accessibilityIdentifier("libraryNoMatch")
+        case .unavailable:
+            banner(LibraryCopy.unavailableTitle, LibraryCopy.unavailableBody, tone: .error, symbol: "exclamationmark.triangle")
+                .accessibilityIdentifier("libraryUnavailable")
+        case .noStarred:
+            VStack(spacing: 18) {
+                illustration
+                message(LibraryCopy.noStarredTitle, LibraryCopy.noStarredBody)
+            }.frame(maxWidth: .infinity).padding(.bottom, 22)
+        }
+    }
+
+    private var illustration: some View {
+        ZStack {
+            Circle().fill(Color.ember.opacity(0.06)).frame(width: 148, height: 148)
+            Circle().stroke(Color.ember.opacity(0.1), lineWidth: 1).frame(width: 180, height: 180)
+            OrbitMark(size: 88)
+        }
+        .padding(.top, 24).accessibilityHidden(true)
+    }
+
+    private func message(_ title: String, _ body: String) -> some View {
+        VStack(spacing: 10) {
+            Text(title).font(.system(.title2, design: .serif)).foregroundStyle(Color.ink).accessibilityAddTraits(.isHeader)
+            Text(body).font(.subheadline).foregroundStyle(Color.muted)
+        }
+        .multilineTextAlignment(.center)
+    }
+
+    private func banner(_ title: String, _ body: String, tone: Tone, symbol: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Image(systemName: symbol).foregroundStyle(tone.color).accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title).font(.subheadline.weight(.semibold))
+                Text(body).font(.subheadline).foregroundStyle(Color.muted)
             }
-        }.frame(maxWidth: .infinity).padding(.bottom, 22)
+            Spacer(minLength: 0)
+        }
+        .foregroundStyle(Color.ink).padding(16)
+        .background(tone.background, in: RoundedRectangle(cornerRadius: Radius.control))
+        .accessibilityElement(children: .combine)
     }
 }

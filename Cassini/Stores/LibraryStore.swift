@@ -12,6 +12,8 @@ import CassiniNotebook
     private(set) var notes: [Note] = []
     /// Why the library could not be opened; nil when it is open.
     private(set) var loadFailure: String?
+    /// The notes have been read.
+    private(set) var isLoaded = false
     private(set) var unreadableCount = 0
 
     @ObservationIgnored let noteStore: NoteStore?
@@ -59,6 +61,7 @@ import CassiniNotebook
             notes = report.notes
             for note in placedMeanwhile where self.note(note.id) == nil { place(note) }
             unreadableCount = report.unreadableCount
+            isLoaded = true
         } catch {
             loadFailure = error.localizedDescription
             errors.present("Could not open your library: \(error.localizedDescription)")

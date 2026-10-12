@@ -123,9 +123,11 @@ import CassiniNotebook
     func stopAll() { coordinator?.stopAll() }
     func continueQueue() { coordinator?.continueQueue() }
 
-    func startOver(_ id: UUID) {
-        guard let coordinator else { return }
-        Task { await coordinator.startOver(id) }
+    /// Start over: the saved progress goes and the note is queued from the beginning.
+    @discardableResult
+    func startOver(_ id: UUID) async -> TranscribeOutcome {
+        guard let coordinator else { return .refused(.noNote) }
+        return await coordinator.startOver(id)
     }
 
     func clearFailed(_ id: UUID) {

@@ -104,6 +104,9 @@ public final class LibraryScreenModel {
                               emptyState: LibraryMapping.emptyState(facts, favoritesOnly: favoritesOnly))
     }
 
+    /// The note of a row, as the rows were last built.
+    public func note(_ id: UUID) -> Note? { index.entry(id)?.note }
+
     /// The recording card, while a capture is active.
     public var recordingCard: LibraryMapping.RecordingCard? { LibraryMapping.recordingCard(ports.recording()) }
 
