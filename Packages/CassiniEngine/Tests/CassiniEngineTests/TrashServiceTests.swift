@@ -77,14 +77,16 @@ import CassiniNotebook
     }
 
     // ports: LibraryViewModelTest#trashOfARunningNoteAsksFirst
-    @Test func trashOfARunningNoteAsksFirst() async {
+    @Test func trashOfARunningNoteAsksFirst() async throws {
         let id = note("Running", job: .running)
 
         #expect(await trash.requestTrash(id) == false)
-        #expect(trash.stopConfirmation == TrashedNote(noteID: id, title: "Running"))
+        let confirmation = try #require(trash.stopConfirmation)
+        #expect(confirmation == TrashedNote(noteID: id, title: "Running"))
         #expect(log.events.isEmpty)
 
-        #expect(await trash.confirmStop())
+        trash.cancelStop() // The alert closes before its action runs.
+        #expect(await trash.confirmStop(confirmation))
         #expect(trash.stopConfirmation == nil)
         #expect(log.events == ["trash Running"])
         #expect(notes.note(id)?.trashedJob == TrashedJob(state: .paused, kind: .transcribe),
@@ -245,7 +247,7 @@ import CassiniNotebook
         clock.advance(by: .seconds(31 * Self.day))
         voices.errorAfterRemoving = Crash()
 
-        await #expect(throws: Crash.self) { try await trash.purgeExpired() }
+        await #expect(throws: TrashError.deleteFailed(noteID: purged)) { try await trash.purgeExpired() }
         #expect(notes.note(purged)?.trashedAt != nil, "the note is still in Recently Deleted")
 
         voices.errorAfterRemoving = nil
@@ -260,7 +262,7 @@ import CassiniNotebook
         clock.advance(by: .seconds(31 * Self.day))
         notes.deleteError = Crash()
 
-        await #expect(throws: Crash.self) { try await trash.purgeExpired() }
+        await #expect(throws: TrashError.deleteFailed(noteID: purged)) { try await trash.purgeExpired() }
         #expect(notes.note(purged)?.trashedAt != nil)
 
         notes.deleteError = nil
@@ -319,7 +321,7 @@ import CassiniNotebook
         let purged = note("purged", deleted: clock.now)
         voices.prints = [purged]
         voices.errorAfterRemoving = Crash()
-        await #expect(throws: Crash.self) { try await trash.deleteNow(purged) }
+        await #expect(throws: TrashError.deleteFailed(noteID: purged)) { try await trash.deleteNow(purged) }
 
         #expect(trash.restore(purged), "the failed delete gave the note back")
         #expect(notes.note(purged)?.trashedAt == nil)
@@ -338,6 +340,9 @@ import CassiniNotebook
         await #expect(throws: TrashError.voicesUnavailable) { try await trash.emptyTrash() }
 
         #expect(trash.voicesUnavailable)
+        var facts = NoticeFacts()
+        trash.contribute(to: &facts)
+        #expect(facts.voicesUnavailable, "one lasting fact for the notices")
         #expect(notes.note(expired) != nil, "nothing is deleted")
         #expect(log.events.isEmpty, "not even its job")
         #expect(host.purges.isEmpty)

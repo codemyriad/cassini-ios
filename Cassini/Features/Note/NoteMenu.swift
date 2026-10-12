@@ -1,4 +1,5 @@
 import SwiftUI
+import CassiniEngine
 import CassiniNotebook
 
 /// The "…" menu of a note.
@@ -10,7 +11,7 @@ struct NoteMenu: View {
     @Binding var shareItem: ShareItem?
     let requestTranscription: () -> Void
     @Environment(LibraryStore.self) private var library
-    @Environment(TrashStore.self) private var trash
+    @Environment(TrashService.self) private var trash
     @Environment(ExportStore.self) private var exports
     @Environment(RecordingStore.self) private var recording
     @Environment(ErrorPresenter.self) private var errors
@@ -36,8 +37,8 @@ struct NoteMenu: View {
             Button("Transcribe again", systemImage: "arrow.clockwise", action: requestTranscription)
                 .disabled(note.status == .transcribing || note.status == .queued || finishing || !note.audio.isPlayable)
             Divider()
-            Button("Move to Recently Deleted", systemImage: "trash", role: .destructive) {
-                Task { await trash.moveToTrash(note.id) }
+            Button(TrashCopy.moveToTrash, systemImage: "trash", role: .destructive) {
+                Task { await trash.requestTrash(note.id) }
             }
         } label: { Image(systemName: "ellipsis").frame(minWidth: 32, minHeight: 32) }.accessibilityLabel("Recording actions")
     }

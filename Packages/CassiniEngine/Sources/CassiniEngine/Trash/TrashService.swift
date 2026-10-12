@@ -48,6 +48,11 @@ import CassiniNotebook
     /// The cards of Recently Deleted, oldest deletion first.
     public var items: [TrashItem] { TrashLabels.items(parts.notes.notes, now: parts.clock.now, calendar: parts.calendar) }
 
+    /// Adds what Recently Deleted knows to the facts the banners are built from.
+    public func contribute(to facts: inout NoticeFacts) {
+        if voicesUnavailable { facts.voicesUnavailable = true }
+    }
+
     // MARK: Moving
 
     /// Move to Recently Deleted from a row, a menu or a note: a note whose transcription runs asks first
@@ -62,12 +67,11 @@ import CassiniNotebook
         return await moveToTrash(id)
     }
 
-    /// "Move to Recently Deleted" in the confirmation: the transcription stops and keeps its progress, then the note
-    /// moves.
+    /// "Move to Recently Deleted" in the confirmation for `note`: the transcription stops and keeps its progress,
+    /// then the note moves. The confirmation may already be closed.
     @discardableResult
-    public func confirmStop() async -> Bool {
-        guard let note = stopConfirmation else { return false }
-        stopConfirmation = nil
+    public func confirmStop(_ note: TrashedNote) async -> Bool {
+        if stopConfirmation == note { stopConfirmation = nil }
         return await moveToTrash(note.noteID)
     }
 
@@ -107,7 +111,7 @@ import CassiniNotebook
 
     /// "Delete now" for one note in Recently Deleted. False for a note that is not there.
     @discardableResult
-    public func deleteNow(_ id: UUID) async throws -> Bool {
+    public func deleteNow(_ id: UUID) async throws(TrashError) -> Bool {
         try checkVoices()
         return try await purge(id) { _ in true }
     }
@@ -115,7 +119,7 @@ import CassiniNotebook
     /// "Empty": deletes every note that was in Recently Deleted when it started. A note restored meanwhile stays, and
     /// so does one moved there again since (it has a new deletion time). Returns how many went.
     @discardableResult
-    public func emptyTrash() async throws -> Int {
+    public func emptyTrash() async throws(TrashError) -> Int {
         try checkVoices()
         var deleted = 0
         for (id, deletedAt) in trashed() {
@@ -127,7 +131,7 @@ import CassiniNotebook
     /// Deletes the notes whose 30 days are over. Runs at launch after the queue's repair, when Cassini comes back to
     /// the screen, and when Recently Deleted opens. Returns how many went.
     @discardableResult
-    public func purgeExpired() async throws -> Int {
+    public func purgeExpired() async throws(TrashError) -> Int {
         try checkVoices()
         let now = parts.clock.now
         let cutoff = TrashPolicy.purgeCutoff(now: now, calendar: parts.calendar)
@@ -152,7 +156,7 @@ import CassiniNotebook
 
     /// Claims the note when it is still in Recently Deleted and `eligible` accepts its deletion time, then deletes it
     /// step by step. False when it was not claimed.
-    private func purge(_ id: UUID, eligible: (Date) -> Bool) async throws -> Bool {
+    private func purge(_ id: UUID, eligible: (Date) -> Bool) async throws(TrashError) -> Bool {
         guard let deletedAt = parts.notes.note(id)?.trashedAt, eligible(deletedAt), purging.insert(id).inserted else {
             return false
         }
@@ -162,8 +166,12 @@ import CassiniNotebook
             voicesUnavailable = true
             throw TrashError.voicesUnavailable
         }
-        try await parts.voices.removeEvidence(noteID: id)
-        try await parts.notes.delete(id)
+        do {
+            try await parts.voices.removeEvidence(noteID: id)
+            try await parts.notes.delete(id)
+        } catch {
+            throw TrashError.deleteFailed(noteID: id)
+        }
         return true
     }
 }
