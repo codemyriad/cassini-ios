@@ -34,20 +34,25 @@ import CassiniNotebook
 
     /// Closes the note wherever it is open. False while the note is being recorded.
     @discardableResult func moveToTrash(_ id: UUID) -> Bool {
-        guard recording.state.noteID != id, let note = library.note(id) else { return false }
-        if note.status == .queued || processing.state.isRunning(id) { processing.cancel(id) }
+        guard recording.state.noteID != id, library.note(id) != nil else { return false }
+        let job = processing.moveToTrash(id)
         if playback.state.noteID == id { playback.stop() }
         let now = clock.now
-        guard library.update(id, { $0.trashedAt = now }) else { return false }
+        guard library.update(id, { $0.trashedAt = now; $0.trashedJob = job }) else { return false }
         router.close(noteID: id)
         return true
     }
 
-    func restore(_ id: UUID) { library.update(id) { $0.trashedAt = nil } }
+    func restore(_ id: UUID) {
+        let job = library.note(id)?.trashedJob
+        guard library.update(id, { $0.trashedAt = nil; $0.trashedJob = nil }) else { return }
+        processing.restore(id, trashedJob: job)
+    }
 
     /// Removes the note's voice samples, then its files. Needs the saved voices to be readable.
     func deletePermanently(_ id: UUID) async {
         guard library.note(id)?.trashedAt != nil else { return }
+        await processing.forget(id)
         do {
             try voices.removeEvidence(noteID: id)
             try await library.delete(id)

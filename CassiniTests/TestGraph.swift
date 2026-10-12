@@ -10,6 +10,7 @@ import CassiniEngineTesting
     let suite: String
     let clock: FakeClock
     let background = FakeBackgroundRunner()
+    let notifier = FakeNotifier()
     let playback = FakePlayback(fileDuration: 2)
     let capture = FakeCapture()
     let graph: AppGraph
@@ -23,7 +24,7 @@ import CassiniEngineTesting
             root: self.root, defaults: UserDefaults(suiteName: self.suite)!, clock: clock,
             locale: Locale(identifier: "en_US"), timeZone: TimeZone(identifier: "UTC")!,
             transcriber: transcriber, analyzer: analyzer, capture: capture, playback: playback,
-            audio: LocalAudioProcessing(), storage: FakeStorage(), background: background)
+            audio: LocalAudioProcessing(), storage: FakeStorage(), background: background, notifier: notifier)
         graph = AppGraph(environment: environment)
     }
 

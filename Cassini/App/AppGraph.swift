@@ -26,9 +26,9 @@ import CassiniNotebook
         library = LibraryStore(root: environment.root, errors: errors)
         voices = VoicesStore(library: library, settings: settings, errors: errors)
         playback = PlaybackStore(playback: environment.playback, library: library, errors: errors, clock: environment.clock)
-        processing = ProcessingStore(transcriber: environment.transcriber, analyzer: environment.analyzer,
-                                     background: environment.background, library: library, voices: voices,
-                                     settings: settings, notices: notices)
+        processing = ProcessingStore(
+            coordinator: Self.queue(environment, library: library, voices: voices, settings: settings),
+            analyzer: environment.analyzer)
         recording = RecordingStore(capture: environment.capture, audio: environment.audio, storage: environment.storage,
                                    library: library, processing: processing, playback: playback, settings: settings,
                                    router: router, errors: errors, notices: notices, clock: environment.clock,
@@ -39,7 +39,34 @@ import CassiniNotebook
                            recording: recording, settings: settings, router: router, errors: errors,
                            clock: environment.clock, calendar: environment.calendar)
         exports = ExportStore(library: library)
+        processing.modelDownload = ModelDownloadAdapter(
+            settings: settings, processing: processing, transcriber: environment.transcriber,
+            analyzer: environment.analyzer, storage: environment.storage, notifier: environment.notifier,
+            root: environment.root)
         registerStartup()
+    }
+
+    /// The transcription queue over the library's notes; none when the library could not be opened.
+    private static func queue(_ environment: AppEnvironment, library: LibraryStore, voices: VoicesStore,
+                              settings: SettingsStore) -> TranscriptionCoordinator? {
+        guard let notes = library.noteStore else { return nil }
+        let job = WholeFileTranscriptionJob(
+            notes: notes, transcriber: environment.transcriber, analyzer: environment.analyzer,
+            options: {
+                .init(allowSpeechDownload: settings.downloadsAllowed, identifySpeakers: settings.identifySpeakers,
+                      allowSpeakerDownload: settings.speakerDownloadsAllowed, voicesGeneration: settings.voicesGeneration)
+            },
+            applySpeakers: { analysis, id, generation in
+                try await voices.applySpeakerAnalysis(analysis, to: id, generation: generation)
+            })
+        let parts = TranscriptionCoordinator.Parts(
+            jobs: JobStore(repository: JobRepository(root: environment.root)), notes: notes, runner: job,
+            checkpoints: WorkDirectories(root: environment.root),
+            consent: .recorded(settings: settings, speech: environment.transcriber, speakers: environment.analyzer),
+            notifier: environment.notifier, background: environment.background, clock: environment.clock,
+            backgroundTitle: { String(localized: "Transcribing “\($0)”", table: "Transcription",
+                                      comment: "The system's progress while a note is transcribed") })
+        return TranscriptionCoordinator(parts, settings: settings)
     }
 
     /// Runs the launch steps once; the app is ready when it returns.
@@ -84,7 +111,9 @@ import CassiniNotebook
             }
         }
         startup.register(.recover) { [recording] in await recording.recoverInterrupted() }
-        startup.register(.reconcile) { [processing] in processing.reconcileOnStart() }
+        startup.register(.reconcile) { [processing, recording] in
+            try await processing.reconcileOnStart(activeNoteID: recording.state.noteID)
+        }
         startup.register(.purge) { [trash] in await trash.purgeExpired() }
     }
 }

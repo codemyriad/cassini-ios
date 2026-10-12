@@ -3,185 +3,91 @@ import Observation
 import CassiniEngine
 import CassiniNotebook
 
-/// The transcription queue: one job at a time, in order, each a transcript and then, when wanted, the speakers.
-/// The queue lives in memory; a relaunch makes interrupted notes ready to transcribe again.
+/// The transcription queue as the screens use it: a thin layer over `TranscriptionCoordinator`, which owns the
+/// queue, its holds and the background time. Without a library there is no queue, and every action does nothing.
 @MainActor @Observable final class ProcessingStore {
-    private(set) var state = ProcessingState()
-
-    @ObservationIgnored private let transcriber: any Transcribing
+    @ObservationIgnored let coordinator: TranscriptionCoordinator?
+    /// What the model download screen works with; set once the graph is built.
+    @ObservationIgnored var modelDownload: (any ModelDownloadPorts)?
     @ObservationIgnored private let analyzer: any SpeakerAnalyzing
-    @ObservationIgnored private let background: any BackgroundRunner
-    @ObservationIgnored private let library: LibraryStore
-    @ObservationIgnored private let voices: VoicesStore
-    @ObservationIgnored private let settings: SettingsStore
-    @ObservationIgnored private let notices: NoticesStore
-    @ObservationIgnored private var speakersOnly: Set<UUID> = []
     /// Notes whose audio is still being written; they cannot be queued yet.
     @ObservationIgnored private var finalizing: Set<UUID> = []
-    @ObservationIgnored private var task: Task<Void, Never>?
-    @ObservationIgnored private var backgroundToken: BackgroundToken?
 
-    init(transcriber: any Transcribing, analyzer: any SpeakerAnalyzing, background: any BackgroundRunner,
-         library: LibraryStore, voices: VoicesStore, settings: SettingsStore, notices: NoticesStore) {
-        self.transcriber = transcriber; self.analyzer = analyzer; self.background = background
-        self.library = library; self.voices = voices; self.settings = settings; self.notices = notices
+    init(coordinator: TranscriptionCoordinator?, analyzer: any SpeakerAnalyzing) {
+        self.coordinator = coordinator
+        self.analyzer = analyzer
     }
+
+    var state: ProcessingState { coordinator?.state ?? ProcessingState() }
 
     func speakerModelsReady() async -> Bool { await analyzer.modelStatus() == .ready }
 
     func beginFinalizing(_ id: UUID) { finalizing.insert(id) }
     func endFinalizing(_ id: UUID) { finalizing.remove(id) }
 
-    func enqueue(_ id: UUID, speakersOnly onlySpeakers: Bool = false) {
-        guard let note = library.note(id), note.trashedAt == nil, !note.isRecording, note.audio.isPlayable,
-              !state.isRunning(id), !finalizing.contains(id), !state.isQueued(id), library.audioURL(note) != nil else { return }
-        let language = settings.speechLanguage
-        guard library.update(id, { $0.status = .queued; $0.failure = nil; $0.language = language }) else { return }
-        if onlySpeakers { speakersOnly.insert(id) }
-        state.queue.append(id)
-        processNext()
+    /// Transcribe, Transcribe again, Resume and Try again; see `TranscriptionCoordinator.transcribe`.
+    @discardableResult
+    func transcribe(_ id: UUID, kind: JobKind = .transcribe, origin: StartOrigin = .screen) async -> TranscribeOutcome {
+        guard let coordinator else { return .refused(.noNote) }
+        if finalizing.contains(id) { return .refused(.recording) }
+        return await coordinator.transcribe(id, kind: kind, origin: origin)
     }
 
-    /// Takes the note out of the queue or stops its job; its earlier transcript stays.
-    func cancel(_ id: UUID, failure: JobFailure? = nil) {
-        state.queue.removeAll { $0 == id }
-        speakersOnly.remove(id)
-        if state.isRunning(id) { task?.cancel() }
-        library.update(id) { $0.status = $0.transcript.isEmpty ? .audioOnly : .ready; $0.failure = failure }
+    /// `transcribe` without waiting for its outcome, for the app's own requests after a recording or an import.
+    func request(_ id: UUID, kind: JobKind = .transcribe, origin: StartOrigin = .automatic) {
+        Task { await transcribe(id, kind: kind, origin: origin) }
     }
 
-    /// At launch: jobs that were queued or running when Cassini closed are not resumed; their notes can be
-    /// transcribed again.
-    func reconcileOnStart() {
-        for note in library.notes where note.status == .transcribing || note.status == .queued {
-            library.update(note.id) { $0.status = $0.transcript.isEmpty ? .audioOnly : .ready; $0.failure = .interrupted }
-        }
+    /// The Cancel of the processing card: a running note stops and keeps its progress, a queued one leaves the queue.
+    func cancel(_ id: UUID) {
+        guard let coordinator else { return }
+        if coordinator.stop(id) { return }
+        Task { await coordinator.dequeue(id) }
     }
 
-    private func processNext() {
-        guard task == nil, !state.queue.isEmpty else { return }
-        let id = state.queue.removeFirst()
-        guard let note = library.note(id), let url = library.audioURL(note), note.trashedAt == nil,
-              library.update(id, { $0.status = .transcribing }) else { processNext(); return }
-        state.running = RunningJob(noteID: id, title: note.title)
-        let onlySpeakers = speakersOnly.remove(id) != nil
-        let request = TranscriptionRequest(url: url, language: note.language, allowDownload: settings.downloadsAllowed)
-        let generation = settings.voicesGeneration
-        backgroundToken = background.begin(title: "Finish transcription", progress: Progress()) { [weak self] in
-            self?.suspendAll()
-        }
-        task = Task { [weak self] in
-            await self?.run(id, request: request, onlySpeakers: onlySpeakers, generation: generation)
-            self?.finishRun()
-        }
+    func stopAll() { coordinator?.stopAll() }
+    func continueQueue() { coordinator?.continueQueue() }
+
+    func startOver(_ id: UUID) {
+        guard let coordinator else { return }
+        Task { await coordinator.startOver(id) }
     }
 
-    private func run(_ id: UUID, request: TranscriptionRequest, onlySpeakers: Bool, generation: Int) async {
-        do {
-            if !onlySpeakers { try await transcribe(id, request) }
-            if try await shouldAnalyzeSpeakers(onlySpeakers) {
-                try await analyzeSpeakers(id, url: request.url, generation: generation)
-            }
-            try Task.checkCancellation()
-            library.update(id) { $0.status = .ready; $0.failure = nil }
-        } catch is CancellationError {
-            // The note was already set back by whoever cancelled.
-        } catch TranscriptionError.needsConsent {
-            cancel(id)
-            notices.post("A speech model is needed. Allow model downloads in Settings, then try again. Audio stays on this device.")
-        } catch {
-            guard !Task.isCancelled else { return }
-            let failure = if case TranscriptionError.failed(let code) = error { code } else { JobFailure.unknown }
-            library.update(id) { $0.status = .failed; $0.failure = failure }
-        }
+    func clearFailed(_ id: UUID) {
+        guard let coordinator else { return }
+        Task { await coordinator.clearFailed(id) }
     }
 
-    private func transcribe(_ id: UUID, _ request: TranscriptionRequest) async throws {
-        let result = try await withOrderedEvents({ [weak self] in self?.report($0, for: id) }) { events in
-            try await transcriber.transcribe(request, events: events)
-        }
-        try Task.checkCancellation()
-        let saved = await library.commit(id) { note in
-            note.saveCurrentVersion(name: "Previous transcript")
-            note.transcript = result.segments; note.speakers = []; note.selectedVersionID = nil
-            note.saveCurrentVersion(name: "On-device transcription")
-            note.failure = nil
-        }
-        guard saved != nil else { throw TranscriptionError.failed(.save) }
+    /// Cassini is on the screen, or no longer.
+    func setVisible(_ visible: Bool) { coordinator?.setVisible(visible) }
+
+    /// The launch repair; `activeNoteID` is the note being recorded.
+    func reconcileOnStart(activeNoteID: UUID?) async throws {
+        try await coordinator?.reconcileOnStart(activeNoteID: activeNoteID)
     }
 
-    private func shouldAnalyzeSpeakers(_ onlySpeakers: Bool) async throws -> Bool {
-        if onlySpeakers { return true }
-        guard settings.identifySpeakers else { return false }
-        if settings.speakerDownloadsAllowed { return true }
-        return await speakerModelsReady()
+    // MARK: Recently Deleted
+
+    /// Before the note goes to Recently Deleted; returns the job the note keeps for Restore.
+    func moveToTrash(_ id: UUID) -> TrashedJob? { coordinator?.moveToTrash(id) }
+
+    func restore(_ id: UUID, trashedJob: TrashedJob?) {
+        guard let coordinator else { return }
+        Task { await coordinator.restore(id, trashedJob: trashedJob) }
     }
 
-    private func analyzeSpeakers(_ id: UUID, url: URL, generation: Int) async throws {
-        do {
-            let allowDownload = settings.speakerDownloadsAllowed
-            let analysis = try await withOrderedEvents({ [weak self] in self?.report($0, for: id) }) { events in
-                try await analyzer.analyze(url: url, allowDownload: allowDownload, progress: events)
-            }
-            try Task.checkCancellation()
-            try await voices.applySpeakerAnalysis(analysis, to: id, generation: generation)
-        } catch is CancellationError {
-            throw CancellationError()
-        } catch {
-            library.update(id) { $0.speakerAnalysisFailure = .speakers }
-        }
-    }
+    /// Before a permanent delete: the job stops and goes.
+    func forget(_ id: UUID) async { await coordinator?.forget(id) }
 
-    /// Runs `body` with a callback that may be called from any thread; `apply` gets the events here, in the order
-    /// they were sent, and has had every one of them when this returns.
-    private func withOrderedEvents<Event: Sendable, Value>(
-        _ apply: @escaping @MainActor (Event) -> Void,
-        _ body: (@escaping @Sendable (Event) -> Void) async throws -> Value
-    ) async throws -> Value {
-        let (stream, sink) = AsyncStream.makeStream(of: Event.self)
-        let consumer = Task { @MainActor in
-            for await event in stream { apply(event) }
-        }
-        let result: Result<Value, any Error>
-        do { result = .success(try await body { sink.yield($0) }) } catch { result = .failure(error) }
-        sink.finish()
-        await consumer.value
-        return try result.get()
-    }
+    // MARK: Notices
 
-    private func report(_ event: TranscriptionEvent, for id: UUID) {
-        guard state.isRunning(id) else { return }
-        switch event {
-        case .preparingModel(let fraction):
-            state.running?.phase = .downloading(fraction); state.running?.fraction = fraction
-        case .progress(let done, let total):
-            state.running?.phase = .transcribing; state.running?.fraction = min(0.99, done / max(1, total))
-        case .finalized:
-            break
-        }
-    }
-
-    private func report(_ event: SpeakerAnalysisEvent, for id: UUID) {
-        guard state.isRunning(id) else { return }
-        switch event {
-        case .preparingModels(let fraction):
-            state.running?.phase = .preparingSpeakers(fraction); state.running?.fraction = fraction
-        case .analyzing(let fraction):
-            state.running?.phase = .identifyingSpeakers; state.running?.fraction = fraction
-        }
-    }
-
-    private func finishRun() {
-        if let backgroundToken { background.end(backgroundToken) }
-        backgroundToken = nil
-        state.running = nil
-        task = nil
-        processNext()
-    }
-
-    /// iOS takes the background time back: every job stops now, before the expiration handler returns.
-    private func suspendAll() {
-        for id in state.queue { cancel(id, failure: .interrupted) }
-        if let running = state.running?.noteID { cancel(running, failure: .interrupted) }
+    /// Adds what the queue knows to the facts the banners are built from.
+    func contribute(to facts: inout NoticeFacts) {
+        let state = state
+        facts.queueHold = state.hold
+        facts.waitingJobs = state.queue.count
+        facts.jobRunning = state.running != nil
+        facts.failedJobs = state.jobs.values.filter { $0.state == .failed }
+            .reduce(into: [:]) { $0[$1.noteID] = $1.failure ?? .unknown }
     }
 }

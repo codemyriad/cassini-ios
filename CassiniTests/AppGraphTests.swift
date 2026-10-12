@@ -19,26 +19,31 @@ import CassiniEngineTesting
         XCTAssertEqual(UserDefaults.standard.string(forKey: SettingsKeys.speakerModelIdentity), standardIdentity, "preferences never leak into the standard suite")
     }
 
-    func testBackgroundExpiryStopsTheJobAndEndsTheTaskBeforeReturning() async throws {
+    func testBackgroundExpiryPausesTheJobHoldsTheQueueAndEndsTheTaskBeforeReturning() async throws {
         let test = TestGraph(transcriber: FakeTranscriber(.frozen(done: 5, total: 10)))
         defer { test.tearDown() }
         let note = try await seedPlainNote(in: test)
         let graph = test.graph
         graph.settings.downloadsAllowed = true
         graph.settings.identifySpeakers = false
-        graph.processing.enqueue(note.id)
-        XCTAssertTrue(graph.processing.state.isRunning(note.id))
-        XCTAssertEqual(test.background.activeCount, 1)
+        XCTAssertEqual(await graph.processing.transcribe(note.id), .queued(changed: true))
         await waitUntil { graph.processing.state.running?.fraction == 0.5 }
+        XCTAssertEqual(test.background.activeCount, 1)
 
         test.background.expireAll()
 
         XCTAssertEqual(test.background.activeCount, 0)
         XCTAssertEqual(test.background.endedCount, 1)
-        XCTAssertEqual(graph.library.note(note.id)?.status, .audioOnly)
-        XCTAssertEqual(graph.library.note(note.id)?.failure, .interrupted)
+        XCTAssertEqual(graph.settings.queueHold, .system, "the queue waits for Continue or Resume")
         await waitUntil { graph.processing.state.running == nil }
-        XCTAssertEqual(test.background.endedCount, 1, "the finished job does not end its task twice")
+        let job = try XCTUnwrap(graph.processing.state.jobs[note.id])
+        XCTAssertEqual(job.state, .paused)
+        XCTAssertEqual(job.pauseReason, .system)
+        await graph.library.settle()
+        XCTAssertEqual(graph.library.note(note.id)?.status, .audioOnly)
+        XCTAssertEqual(test.background.endedCount, 1, "the stopped job does not end its task twice")
+        let stored = try JobRepository(root: test.root).load()
+        XCTAssertEqual(stored.map(\.state), [.paused], "the paused job survives a relaunch")
     }
 
     func testAFinishedJobSavesTheTranscriptAndEndsItsBackgroundTask() async throws {
@@ -49,14 +54,51 @@ import CassiniEngineTesting
         let graph = test.graph
         graph.settings.downloadsAllowed = true
         graph.settings.identifySpeakers = false
-        graph.processing.enqueue(note.id)
-        await waitUntil { graph.processing.state.running == nil }
+        await graph.processing.transcribe(note.id)
+        await graph.processing.coordinator?.awaitIdle()
         await graph.library.settle()
-        XCTAssertEqual(graph.library.note(note.id)?.status, .ready)
+        await waitUntil { graph.library.note(note.id)?.status == .ready }
         XCTAssertEqual(graph.library.note(note.id)?.text, "Hello there.")
         XCTAssertEqual(test.background.endedCount, 1)
+        XCTAssertTrue(graph.processing.state.jobs.isEmpty)
         let stored = try NoteRepository(root: test.root).load().notes.first { $0.id == note.id }
         XCTAssertEqual(stored?.transcript.map(\.text), ["Hello there."])
+        XCTAssertEqual(stored?.status, .ready)
+    }
+
+    func testWithoutConsentTranscribeOpensNothingAndWaitsAsReadyToTranscribe() async throws {
+        let test = TestGraph(transcriber: FakeTranscriber(.returns([], total: 1), status: .notDownloaded))
+        defer { test.tearDown() }
+        let note = try await seedPlainNote(in: test)
+        XCTAssertEqual(await test.graph.processing.transcribe(note.id), .needsConsent)
+        XCTAssertEqual(test.graph.processing.state.jobs[note.id]?.state, .needsConsent)
+        XCTAssertNil(test.graph.processing.state.running)
+    }
+
+    /// An analysis that began before Forget everyone keeps no voiceprints, even though it finishes after it.
+    func testASpeakerAnalysisThatStartedBeforeForgetEveryoneKeepsNoVoiceprints() async throws {
+        let late = SpeakerAnalysis(turns: [.init(speakerID: "late", start: 0, end: 12)],
+                                   prints: [.init(speakerID: "late", model: "test", vector: [1, 0], speechSeconds: 12)])
+        let analyzer = FakeAnalyzer(analysis: late, suspends: true)
+        let test = TestGraph(analyzer: analyzer); defer { test.tearDown() }
+        var note = Note(title: "Conversation", audioFilename: "audio.caf")
+        note.status = .ready
+        note.transcript = [.init(text: "Hello", start: 0, end: 12)]
+        try NoteRepository(root: test.root).save(note)
+        try Data().write(to: test.root.appendingPathComponent(note.id.uuidString).appendingPathComponent("audio.caf"))
+        await test.graph.start()
+        let graph = test.graph
+        graph.settings.speakerDownloadsAllowed = true
+
+        XCTAssertEqual(await graph.processing.transcribe(note.id, kind: .speakersOnly), .queued(changed: true))
+        await waitUntil { analyzer.analyzeCount == 1 }
+        graph.voices.forgetAllVoices()
+        analyzer.resume()
+        await graph.processing.coordinator?.awaitIdle()
+        await graph.library.settle()
+
+        XCTAssertEqual(graph.library.note(note.id)?.speakers?.count, 1, "the speakers are still told apart")
+        XCTAssertTrue(try graph.voices.voiceLibrary?.prints(noteID: note.id).isEmpty == true)
     }
 
     func testVoiceNamingPersistenceForgetAndTrashExpiry() async throws {
@@ -84,9 +126,7 @@ import CassiniEngineTesting
         let generation = second.graph.settings.voicesGeneration
         voices.forgetAllVoices()
         XCTAssertGreaterThan(second.graph.settings.voicesGeneration, generation)
-        let late = SpeakerAnalysis(turns: [.init(speakerID: "late", start: 0, end: 12)], prints: [.init(speakerID: "late", model: "test", vector: [1, 0], speechSeconds: 12)])
-        try await voices.applySpeakerAnalysis(late, to: note.id, generation: generation)
-        XCTAssertTrue(try voices.voiceLibrary?.prints(noteID: note.id).isEmpty == true, "an analysis from before Forget everyone keeps no voiceprints")
+        XCTAssertTrue(try voices.voiceLibrary?.prints(noteID: note.id).isEmpty == true)
 
         let trash = second.graph.trash
         XCTAssertTrue(trash.moveToTrash(note.id))

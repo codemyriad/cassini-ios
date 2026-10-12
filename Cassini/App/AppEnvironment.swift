@@ -20,6 +20,7 @@ import CassiniEngineTesting
     var audio: any AudioProcessing
     var storage: any StorageProbe
     var background: any BackgroundRunner
+    var notifier: any Notifier
     var launch = LaunchOptions()
 
     /// What a UI-test launch asks for.
@@ -54,7 +55,7 @@ import CassiniEngineTesting
             defaults: .standard, clock: SystemClock(), locale: .autoupdatingCurrent, timeZone: .autoupdatingCurrent,
             transcriber: AppleSpeechTranscriber(), analyzer: SpeakerAnalyzer(), capture: AVCaptureAdapter(),
             playback: AVPlaybackAdapter(), audio: LocalAudioProcessing(), storage: FileSystemStorageProbe(),
-            background: UIKitBackgroundRunner())
+            background: UIKitBackgroundRunner(), notifier: UNNotifier())
     }
 
     /// The environment the process arguments ask for.
@@ -62,7 +63,7 @@ import CassiniEngineTesting
         #if DEBUG
         if arguments.contains("--ui-testing") {
             return uiTesting(reset: arguments.contains("--reset-test-data"), seed: seed(in: arguments),
-                             openFixture: fixture(in: arguments))
+                             openFixture: fixture(in: arguments), modelsMissing: arguments.contains("--models-missing"))
         }
         #endif
         return live()
@@ -76,24 +77,29 @@ extension AppEnvironment {
     static let uiTestingNow = Date(timeIntervalSince1970: 1_791_452_460)
 
     /// A separate library and preferences, a fixed clock and en_US formatting. Transcription is faked; the
-    /// recording seed also fakes the microphone.
-    static func uiTesting(reset: Bool, seed: Seed?, openFixture: OpenFixture? = nil) -> AppEnvironment {
+    /// recording seed also fakes the microphone. With `modelsMissing` the speech and speaker models are not
+    /// installed, so a Transcribe asks for the download first. Speaker models are never installed. Notifications are
+    /// never asked for.
+    static func uiTesting(reset: Bool, seed: Seed?, openFixture: OpenFixture? = nil,
+                          modelsMissing: Bool = false) -> AppEnvironment {
         let root = URL.applicationSupportDirectory.appendingPathComponent("CassiniUITests", isDirectory: true)
         let defaults = UserDefaults(suiteName: uiTestingSuite) ?? .standard
         if reset {
             try? FileManager.default.removeItem(at: root)
             defaults.removePersistentDomain(forName: uiTestingSuite)
         }
+        let status: ModelPartStatus = modelsMissing ? .notDownloaded : .ready
         let transcriber = seed == .processing
-            ? FakeTranscriber(.frozen(done: 0.62 * TestFixtures.processingDuration, total: TestFixtures.processingDuration))
-            : FakeTranscriber(.returns(TestFixtures.transcribedSegments, total: TestFixtures.fixtureDuration))
+            ? FakeTranscriber(.frozen(done: 0.62 * TestFixtures.processingDuration, total: TestFixtures.processingDuration),
+                              status: status)
+            : FakeTranscriber(.returns(TestFixtures.transcribedSegments, total: TestFixtures.fixtureDuration), status: status)
         return AppEnvironment(
             root: root, defaults: defaults, clock: FixedClock(now: uiTestingNow),
             locale: Locale(identifier: "en_US"), timeZone: TimeZone(identifier: "UTC") ?? .gmt,
             transcriber: transcriber, analyzer: FakeAnalyzer(modelIdentity: nil),
             capture: seed == .recording ? FakeCapture() : AVCaptureAdapter(),
             playback: AVPlaybackAdapter(), audio: LocalAudioProcessing(), storage: FileSystemStorageProbe(),
-            background: UIKitBackgroundRunner(),
+            background: UIKitBackgroundRunner(), notifier: FakeNotifier(auth: .denied),
             launch: LaunchOptions(seed: seed, openFixture: openFixture, restoresNavigation: false))
     }
 

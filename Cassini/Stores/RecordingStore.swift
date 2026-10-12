@@ -149,7 +149,7 @@ import CassiniNotebook
             notices.post("Your recording is saved in its original quality. Compression could not finish.")
         }
         processing.endFinalizing(id)
-        if settings.autoTranscribe && settings.downloadsAllowed { processing.enqueue(id) }
+        if settings.autoTranscribe && settings.downloadsAllowed { processing.request(id) }
     }
 
     /// At launch: a note that was still recording when Cassini closed gets the duration of what was written.

@@ -60,7 +60,7 @@ enum TestFixtures {
         guard seed == .processing else { return }
         settings.recordConsent()
         settings.identifySpeakers = false
-        processing.enqueue(processingID)
+        processing.request(processingID, origin: .screen)
     }
 
     private static func fixture(now: Date) -> Note {

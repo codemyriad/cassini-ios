@@ -41,6 +41,7 @@ struct LibraryView: View {
                             .accessibilityLabel("Dismiss notice")
                     }
                 }
+                QueueHeldBanner()
                 if recording.state.isActive { ActiveRecordingCard() }
                 if imports.isImporting { Label("Importing audio…", systemImage: "arrow.down.doc").font(.subheadline).foregroundStyle(Color.muted) }
                 if visible.isEmpty { LibraryEmptyState(query: query, favoritesOnly: favoritesOnly) }

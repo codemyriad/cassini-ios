@@ -8,7 +8,7 @@ struct NoteDetailView: View {
     @Environment(PlaybackStore.self) private var playback
     @Environment(ProcessingStore.self) private var processing
     @Environment(RecordingStore.self) private var recording
-    @Environment(SettingsStore.self) private var settings
+    @Environment(Router.self) private var router
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var query = ""
     @State private var showSearch = false
@@ -16,7 +16,6 @@ struct NoteDetailView: View {
     @State private var showBookmarks = false
     @State private var renaming = false
     @State private var editing: TranscriptSegment?
-    @State private var consent = false
     @State private var showingSpeakers = false
     @State private var showingVersions = false
     @State private var shareItem: ShareItem?
@@ -74,10 +73,6 @@ struct NoteDetailView: View {
         .task(id: noteID) { if let note, !recording.state.isActive { playback.load(note) } }
         .onDisappear { if ownsPlayer { playback.pause() } }
         .sheet(isPresented: $renaming) { RenameNoteSheet(noteID: noteID) }
-        .alert("Transcribe on this device", isPresented: $consent) {
-            Button("Allow & Transcribe") { settings.downloadsAllowed = true; processing.enqueue(noteID) }
-            Button("Not now", role: .cancel) {}
-        } message: { Text("Cassini uses Apple’s on-device speech model. If needed, iOS will download a language model, which may use several hundred MB. Your audio is never sent for transcription. You can change this in Settings.") }
         .sheet(item: $editing) { segment in
             SegmentEditor(segment: segment, speakers: note?.speakers ?? []) { revised in
                 library.update(noteID) { note in
@@ -100,8 +95,11 @@ struct NoteDetailView: View {
         if let problem = note.playbackProblem { NoticeCard(title: problem, symbol: "waveform.slash") }
     }
 
+    /// Transcribe; without consent for the speech model, the model download screen asks first.
     private func requestTranscription() {
-        if settings.downloadsAllowed { processing.enqueue(noteID) } else { consent = true }
+        Task {
+            if await processing.transcribe(noteID) == .needsConsent { router.push(.modelDownload(noteID: noteID)) }
+        }
     }
 
     private func seek(_ time: TimeInterval) {
