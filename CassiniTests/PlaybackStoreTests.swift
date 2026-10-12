@@ -116,9 +116,7 @@ import CassiniEngineTesting
         XCTAssertNotNil(test.graph.errors.current)
     }
 
-    /// WP1's `PreviewText` is not in this branch, so the app passes no preview yet: see the merge task in
-    /// docs/differences/WP7.md. The expected failure turns into a failure once the preview is wired, so this marker
-    /// must go then and the assertion keeps guarding it.
+    /// A final save stores the Library preview at the position (`PreviewText` through the app's `NotePreview`).
     func testAFinalSaveThroughTheAppRefreshesTheLibraryPreview() async throws {
         let test = TestGraph(); defer { test.tearDown() }
         var note = Note(title: "Spoken", audioFilename: "audio.caf")
@@ -135,8 +133,7 @@ import CassiniEngineTesting
         playback.pause()
         await playback.settle()
         await test.graph.library.settle()
-        XCTExpectFailure("Waiting on WP1's PreviewText (merge task in docs/differences/WP7.md)")
-        XCTAssertNotNil(test.graph.library.note(note.id)?.previewText)
+        XCTAssertEqual(test.graph.library.note(note.id)?.previewText, "…words.", "from the word playing at 1.5 s")
     }
 
     func testAFileThatCannotBePlayedShowsAsFailedForItsNote() async throws {

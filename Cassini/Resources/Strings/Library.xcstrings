@@ -1,0 +1,1506 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "%@ %@": {
+      "comment": "A row's day and time for VoiceOver",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ %@"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ alle %@"
+          }
+        }
+      }
+    },
+    "%@, %@": {
+      "comment": "A search result's day and time",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, %@"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, %@"
+          }
+        }
+      }
+    },
+    "%lld more in queue": {
+      "comment": "Library banner: notes waiting",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld more in queue"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld more in queue"
+                }
+              }
+            }
+          }
+        },
+        "it": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld altra in coda"
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "altre %lld in coda"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "altre %lld in coda"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "A little more present.": {
+      "comment": "Library headline",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A little more present."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un po’ più presenti."
+          }
+        }
+      }
+    },
+    "Adds version %lld.": {
+      "comment": "Under Transcribe again",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adds version %lld."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiunge la versione %lld."
+          }
+        }
+      }
+    },
+    "All": {
+      "comment": "Library filter: every note",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tutte"
+          }
+        }
+      }
+    },
+    "Audio only": {
+      "comment": "Row status",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio only"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Solo audio"
+          }
+        }
+      }
+    },
+    "Cancel": {
+      "comment": "Dialog button",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancel"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Annulla"
+          }
+        }
+      }
+    },
+    "Can’t play": {
+      "comment": "Row status",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Can’t play"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non riproducibile"
+          }
+        }
+      }
+    },
+    "Can’t read transcript": {
+      "comment": "Row status",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Can’t read transcript"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascrizione illeggibile"
+          }
+        }
+      }
+    },
+    "Checking files — %lld%%": {
+      "comment": "Library banner: downloaded models are checked",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Checking files — %lld%%"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verifica dei file — %lld%%"
+          }
+        }
+      }
+    },
+    "Clear search": {
+      "comment": "Library search field clear button",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear search"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancella la ricerca"
+          }
+        }
+      }
+    },
+    "Couldn’t transcribe": {
+      "comment": "Row status",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn’t transcribe"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascrizione non riuscita"
+          }
+        }
+      }
+    },
+    "Dismiss notice": {
+      "comment": "VoiceOver label of a notice's close button",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dismiss notice"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chiudi l’avviso"
+          }
+        }
+      }
+    },
+    "Document info": {
+      "comment": "Note action",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Document info"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Informazioni sul documento"
+          }
+        }
+      }
+    },
+    "Downloading models": {
+      "comment": "Library banner of a model download on its own",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Downloading models"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download dei modelli"
+          }
+        }
+      }
+    },
+    "Downloading speaker separation — %lld%%": {
+      "comment": "Library banner",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Downloading speaker separation — %lld%%"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download della distinzione delle voci — %lld%%"
+          }
+        }
+      }
+    },
+    "Downloading speech recognition — %lld%%": {
+      "comment": "Library banner",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Downloading speech recognition — %lld%%"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download del riconoscimento vocale — %lld%%"
+          }
+        }
+      }
+    },
+    "Downloading voice recognition — %lld%%": {
+      "comment": "Library banner",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Downloading voice recognition — %lld%%"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download del riconoscimento delle voci — %lld%%"
+          }
+        }
+      }
+    },
+    "Earlier versions can’t be kept because the audio changed.": {
+      "comment": "Confirmation before a Transcribe again that replaces the versions",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Earlier versions can’t be kept because the audio changed."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le versioni precedenti non si possono conservare perché l’audio è cambiato."
+          }
+        }
+      }
+    },
+    "Enter a title.": {
+      "comment": "Rename dialog error",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enter a title."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inserisci un titolo."
+          }
+        }
+      }
+    },
+    "Export": {
+      "comment": "Note actions submenu",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esporta"
+          }
+        }
+      }
+    },
+    "Getting ready to transcribe %@": {
+      "comment": "Library banner while models download for a note",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Getting ready to transcribe %@"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preparazione per trascrivere %@"
+          }
+        }
+      }
+    },
+    "Import audio": {
+      "comment": "Library bottom bar button",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Import audio"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Importa audio"
+          }
+        }
+      }
+    },
+    "Keep the conversation. Find the important parts.": {
+      "comment": "Library line under the headline",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep the conversation. Find the important parts."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Conserva la conversazione. Ritrova i punti importanti."
+          }
+        }
+      }
+    },
+    "Keep your favorites close.": {
+      "comment": "Starred filter with nothing (iOS extra)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep your favorites close."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tieni vicine le tue preferite."
+          }
+        }
+      }
+    },
+    "Newer format": {
+      "comment": "Row status",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Newer format"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Formato più recente"
+          }
+        }
+      }
+    },
+    "No notes yet": {
+      "comment": "Empty library",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No notes yet"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ancora nessuna nota"
+          }
+        }
+      }
+    },
+    "Notes": {
+      "comment": "Library headline at accessibility text sizes",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notes"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Note"
+          }
+        }
+      }
+    },
+    "Nothing matches “%@”": {
+      "comment": "A search found nothing",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing matches “%@”"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nessun risultato per “%@”"
+          }
+        }
+      }
+    },
+    "Open note": {
+      "comment": "VoiceOver hint of a row and the banner",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open note"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apri la nota"
+          }
+        }
+      }
+    },
+    "Open settings": {
+      "comment": "VoiceOver hint of the download banner",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open settings"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apri le impostazioni"
+          }
+        }
+      }
+    },
+    "Paused at %@": {
+      "comment": "Row status: where it stopped",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paused at %@"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In pausa a %@"
+          }
+        }
+      }
+    },
+    "Queued": {
+      "comment": "Row status",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Queued"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In coda"
+          }
+        }
+      }
+    },
+    "Record": {
+      "comment": "Library bottom bar button",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Record"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registra"
+          }
+        }
+      }
+    },
+    "Record a new note": {
+      "comment": "VoiceOver label of Record",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Record a new note"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registra una nuova nota"
+          }
+        }
+      }
+    },
+    "Record something, or import an audio file.": {
+      "comment": "Empty library",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Record something, or import an audio file."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registra qualcosa o importa un file audio."
+          }
+        }
+      }
+    },
+    "Recording": {
+      "comment": "Row status",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recording"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registrazione in corso"
+          }
+        }
+      }
+    },
+    "Recording paused · %@": {
+      "comment": "Library card of a paused recording",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recording paused · %@"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registrazione in pausa · %@"
+          }
+        }
+      }
+    },
+    "Recording · %@": {
+      "comment": "Library card of the recording in progress",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recording · %@"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registrazione · %@"
+          }
+        }
+      }
+    },
+    "Remove from queue": {
+      "comment": "Note action while queued",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove from queue"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Togli dalla coda"
+          }
+        }
+      }
+    },
+    "Remove star": {
+      "comment": "Note action (iOS extra)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove star"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Togli dai preferiti"
+          }
+        }
+      }
+    },
+    "Rename": {
+      "comment": "Note action and its dialog title",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rename"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rinomina"
+          }
+        }
+      }
+    },
+    "Resume": {
+      "comment": "Note action",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Resume"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riprendi"
+          }
+        }
+      }
+    },
+    "Resume transcribing %@": {
+      "comment": "VoiceOver label of the inline Resume",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Resume transcribing %@"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riprendi la trascrizione di %@"
+          }
+        }
+      }
+    },
+    "Return to recording": {
+      "comment": "VoiceOver label of the Record button and the card while recording",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Return to recording"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Torna alla registrazione"
+          }
+        }
+      }
+    },
+    "Save": {
+      "comment": "Rename dialog button",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Salva"
+          }
+        }
+      }
+    },
+    "Search titles and what was said": {
+      "comment": "Library search field placeholder",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search titles and what was said"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cerca nei titoli e in ciò che è stato detto"
+          }
+        }
+      }
+    },
+    "Settings": {
+      "comment": "Library toolbar button",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Settings"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impostazioni"
+          }
+        }
+      }
+    },
+    "Speaker names carry over.": {
+      "comment": "Under Transcribe again",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Speaker names carry over."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I nomi delle voci vengono mantenuti."
+          }
+        }
+      }
+    },
+    "Star": {
+      "comment": "Note action (iOS extra)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Star"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiungi ai preferiti"
+          }
+        }
+      }
+    },
+    "Star a note to find it here.": {
+      "comment": "Starred filter with nothing (iOS extra)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Star a note to find it here."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiungi una nota ai preferiti per trovarla qui."
+          }
+        }
+      }
+    },
+    "Starred": {
+      "comment": "Library filter: starred notes only",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Starred"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preferite"
+          }
+        }
+      }
+    },
+    "Start over": {
+      "comment": "Note action of a paused transcription",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start over"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ricomincia"
+          }
+        }
+      }
+    },
+    "Start over?": {
+      "comment": "Start over confirmation title",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start over?"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ricominciare?"
+          }
+        }
+      }
+    },
+    "Stop and keep progress": {
+      "comment": "Note action while it transcribes",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop and keep progress"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Interrompi e conserva i progressi"
+          }
+        }
+      }
+    },
+    "Tap to return": {
+      "comment": "Library recording card, second line",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tap to return"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tocca per tornare"
+          }
+        }
+      }
+    },
+    "The draft so far is discarded. Your recording is kept.": {
+      "comment": "Start over confirmation body",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The draft so far is discarded. Your recording is kept."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La bozza fin qui viene scartata. La registrazione resta."
+          }
+        }
+      }
+    },
+    "This file can’t take a new version here.": {
+      "comment": "Under a Transcribe again that cannot run",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This file can’t take a new version here."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questo file non può avere una nuova versione qui."
+          }
+        }
+      }
+    },
+    "Title": {
+      "comment": "Rename dialog field",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Title"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Titolo"
+          }
+        }
+      }
+    },
+    "Today": {
+      "comment": "Day header",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Today"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oggi"
+          }
+        }
+      }
+    },
+    "Transcribe": {
+      "comment": "Note action",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcribe"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascrivi"
+          }
+        }
+      }
+    },
+    "Transcribe again": {
+      "comment": "Note action",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcribe again"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascrivi di nuovo"
+          }
+        }
+      }
+    },
+    "Transcribe again?": {
+      "comment": "Confirmation title",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcribe again?"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascrivere di nuovo?"
+          }
+        }
+      }
+    },
+    "Transcribed": {
+      "comment": "Row status",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcribed"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascritta"
+          }
+        }
+      }
+    },
+    "Transcribed on this device. Audio never leaves it.": {
+      "comment": "Library line under the search field",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcribed on this device. Audio never leaves it."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascritto su questo dispositivo. L’audio non lo lascia mai."
+          }
+        }
+      }
+    },
+    "Transcribing": {
+      "comment": "Row status",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcribing"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In trascrizione"
+          }
+        }
+      }
+    },
+    "Transcribing %@": {
+      "comment": "Library banner while a note is transcribed",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcribing %@"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascrizione di %@"
+          }
+        }
+      }
+    },
+    "Try again": {
+      "comment": "Note action",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try again"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riprova"
+          }
+        }
+      }
+    },
+    "Try another word or title.": {
+      "comment": "A search found nothing",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try another word or title."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prova un’altra parola o un titolo."
+          }
+        }
+      }
+    },
+    "Try transcribing %@ again": {
+      "comment": "VoiceOver label of the inline Try again",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try transcribing %@ again"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riprova a trascrivere %@"
+          }
+        }
+      }
+    },
+    "Yesterday": {
+      "comment": "Day header",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yesterday"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ieri"
+          }
+        }
+      }
+    },
+    "Your files are kept. Free some storage, then open Cassini again.": {
+      "comment": "The library could not be read",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your files are kept. Free some storage, then open Cassini again."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I file sono al sicuro. Libera spazio, poi apri di nuovo Cassini."
+          }
+        }
+      }
+    },
+    "Your notes can’t be opened": {
+      "comment": "The library could not be read",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your notes can’t be opened"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossibile aprire le note"
+          }
+        }
+      }
+    },
+    "today": {
+      "comment": "Day inside a sentence, for VoiceOver",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "today"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "oggi"
+          }
+        }
+      }
+    },
+    "yesterday": {
+      "comment": "Day inside a sentence, for VoiceOver",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "yesterday"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ieri"
+          }
+        }
+      }
+    },
+    "· %lld speakers": {
+      "comment": "Row suffix: the number of speakers",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "· %lld speaker"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "· %lld speakers"
+                }
+              }
+            }
+          }
+        },
+        "it": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "· %lld voce"
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "· %lld voci"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "· %lld voci"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "· No speech": {
+      "comment": "Row suffix: transcribed without words",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "· No speech"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "· Nessun parlato"
+          }
+        }
+      }
+    },
+    "· Resume": {
+      "comment": "Row suffix: an inline button",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "· Resume"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "· Riprendi"
+          }
+        }
+      }
+    },
+    "· Try again": {
+      "comment": "Row suffix: an inline button",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "· Try again"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "· Riprova"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

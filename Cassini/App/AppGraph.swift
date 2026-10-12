@@ -20,6 +20,7 @@ import CassiniNotebook
     let exports: ExportStore
     /// What the Settings screen reads.
     let settingsPorts: SettingsAdapter
+    let libraryScreen: LibraryScreenModel
 
     init(environment: AppEnvironment) {
         self.environment = environment
@@ -27,7 +28,11 @@ import CassiniNotebook
                                  defaultLanguage: environment.locale.identifier(.bcp47))
         library = LibraryStore(root: environment.root, errors: errors)
         voices = VoicesStore(library: library, settings: settings, errors: errors, clock: environment.clock)
-        playback = PlaybackStore(playback: environment.playback, library: library)
+        playback = PlaybackStore(playback: environment.playback, library: library, preview: { note, position in
+            var note = note
+            note.playbackPosition = position
+            return note.transcriptPreview?.display
+        })
         processing = Self.processing(environment: environment, library: library, voices: voices, settings: settings,
                                      notices: notices)
         recording = RecordingStore(.init(environment: environment, library: library, processing: processing,
@@ -46,6 +51,9 @@ import CassiniNotebook
         exports = ExportStore(library: library, portable: PortableExportService(audio: environment.audio),
                               folder: environment.exports,
                               locale: environment.locale, timeZone: environment.timeZone) { [startup] in _ = await startup.ready() }
+        libraryScreen = Self.libraryScreen(environment: environment, library: library, processing: processing,
+                                           recording: recording, trash: trash)
+        libraryScreen.connect(router: router, errors: errors)
         processing.modelDownload = ModelDownloadAdapter(
             settings: settings, processing: processing, transcriber: environment.transcriber,
             analyzer: environment.analyzer, storage: environment.storage, notifier: environment.notifier,
@@ -78,6 +86,22 @@ import CassiniNotebook
                                    clock: environment.clock, job: progress) { [settings] in settings.speechLanguage }
         return ProcessingStore(coordinator: coordinator, progress: progress, checkpoints: checkpoints, models: models,
                                analyzer: environment.analyzer, library: library, notices: notices)
+    }
+
+    /// The Library over the notes, the queue and the recorder.
+    private static func libraryScreen(environment: AppEnvironment, library: LibraryStore, processing: ProcessingStore,
+                                      recording: RecordingStore, trash: TrashService) -> LibraryScreenModel {
+        LibraryScreenModel(ports: .init(
+            notes: { library.notes }, loading: { !library.isLoaded && library.loadFailure == nil },
+            unavailable: { library.loadFailure != nil }, processing: { processing.state },
+            phase: { processing.progress.phase(for: $0) }, install: { processing.models.download },
+            recording: { recording.state }, finishing: { recording.finishingNoteID },
+            transcribe: { await processing.transcribe($0, kind: $1, origin: .screen) },
+            startOver: { await processing.startOver($0) },
+            stop: { processing.stop($0) }, dequeue: { processing.dequeue($0) },
+            update: { _ = library.update($0, $1) }, trash: { _ = await trash.requestTrash($0) },
+            speakerModelsReady: { await processing.speakerModelsReady() },
+            clock: environment.clock, calendar: environment.calendar))
     }
 
     /// Runs the launch steps once; the app is ready when it returns.
@@ -154,6 +178,7 @@ extension View {
             .environment(graph.recording)
             .environment(graph.imports).environment(graph.trash).environment(graph.trash.undo).environment(graph.exports)
             .environment(graph.settingsPorts)
+            .environment(graph.libraryScreen)
             .environment(\.clock, graph.environment.clock)
             .environment(\.locale, graph.environment.locale)
             .environment(\.timeZone, graph.environment.timeZone)

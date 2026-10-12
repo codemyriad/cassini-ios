@@ -42,9 +42,10 @@ import CassiniEngineTesting
         case note(UUID)
     }
 
-    /// Named sets of notes for UI tests and screenshots.
+    /// Named sets of notes for UI tests and screenshots. `statuses` has a note for each Library row status but
+    /// Recording (the recording seed shows that one).
     enum Seed: String, CaseIterable {
-        case library, search, speakers, trash, voices, processing, recording
+        case library, search, speakers, trash, voices, processing, recording, statuses
     }
 
     var calendar: Calendar {
@@ -94,7 +95,7 @@ extension AppEnvironment {
             defaults.removePersistentDomain(forName: uiTestingSuite)
         }
         let status: ModelPartStatus = modelsMissing ? .notDownloaded : .ready
-        let transcriber = seed == .processing
+        let transcriber = seed == .processing || seed == .statuses
             ? FakeTranscriber(.frozen(done: 0.62 * TestFixtures.processingDuration, total: TestFixtures.processingDuration),
                               status: status)
             : FakeTranscriber(.returns(TestFixtures.transcribedSegments, total: TestFixtures.fixtureDuration), status: status)

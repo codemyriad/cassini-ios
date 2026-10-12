@@ -5,10 +5,11 @@ import Testing
 @Test func searchMatchesEveryTermAcrossTitleAndTranscript() {
     var note = Note(title: "Café planning")
     note.transcript = [.init(text: "Delivery on Thursday", start: 0, end: 2)]
-    #expect(note.matches("CAFE thurs"))
-    #expect(!note.matches("cafe friday"))
-    #expect(note.matches("  "))
-    #expect(!note.matches("OR *"))
+    let fields = SearchFields(note)
+    #expect(fields.matches(SearchQuery("CAFE thurs")!))
+    #expect(!fields.matches(SearchQuery("cafe friday")!))
+    #expect(SearchQuery("  ") == nil, "nothing searchable: every note shows")
+    #expect(!fields.matches(SearchQuery("OR *")!))
 }
 
 @Test func timestampBoundaries() {
