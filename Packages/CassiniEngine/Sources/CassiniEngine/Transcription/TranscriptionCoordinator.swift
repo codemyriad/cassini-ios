@@ -276,16 +276,20 @@ public final class TranscriptionCoordinator {
 
     /// iOS takes the background time back, or the person pressed Stop in the system's progress: the running job
     /// learns of it before this returns, the queue is held, and its job shows as paused by the system at once.
-    public func systemStop() {
+    /// Returns the steps that must land before the background time ends: the job stored as paused by the system and,
+    /// while Cassini is hidden, the notification that tells it.
+    @discardableResult
+    public func systemStop() -> Task<Void, Never>? {
         let current = active
         current?.stop.stop(.pause(.system))
         setHold(.system)
-        guard let current else { return }
-        Task {
+        guard let current else { return nil }
+        return Task {
             await lock.run {
                 // Only while it still runs: an outcome written meanwhile stays.
                 if active === current, await parts.jobs.job(current.noteID)?.state == .running {
                     await markPaused(current.noteID, .system)
+                    await mirror(current.noteID)
                     await refresh()
                 }
             }
@@ -382,12 +386,12 @@ public final class TranscriptionCoordinator {
 
     /// Claims and runs queued jobs one at a time until the queue is empty or held. One background time covers the
     /// whole loop: it begins with the first claim, while Cassini is on the screen, and each next job only gives it its
-    /// title, so iOS keeps the queue going after Cassini leaves the screen.
+    /// title, so iOS keeps the queue going after Cassini leaves the screen. A job starts only once its background time
+    /// is held and has its title.
     private func drainLoop() async {
         repeat {
             rerun = false
             while settings.queueHold == nil, let next = await lock.run({ await claim() }) {
-                holdBackgroundTime(for: next)
                 await runOne(next)
             }
         } while rerun
@@ -406,9 +410,11 @@ public final class TranscriptionCoordinator {
         // A new progress each time: a progress joins the system's task only once.
         backgroundProgress = Progress(totalUnitCount: 100)
         background = parts.background.begin(title: title, progress: backgroundProgress) { [weak self] in
-            // The runner ends the token right after this; an ended token never expires, so this is the drain's.
-            self?.background = nil
-            self?.systemStop()
+            // The runner ends the token once the returned steps have landed; an ended token never expires, so this
+            // is the drain's.
+            guard let self else { return nil }
+            background = nil
+            return systemStop()
         }
     }
 
@@ -428,6 +434,7 @@ public final class TranscriptionCoordinator {
                 continue
             }
             let current = Active(job: job, title: note.title)
+            holdBackgroundTime(for: current)
             start(current)
             await mirror(job.noteID)
             await refresh()

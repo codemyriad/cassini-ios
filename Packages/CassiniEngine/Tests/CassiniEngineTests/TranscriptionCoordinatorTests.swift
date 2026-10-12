@@ -637,7 +637,7 @@ import CassiniNotebook
         #expect(h.background.activeCount == 1)
 
         h.coordinator.setVisible(false)
-        h.background.expireAll()
+        await h.background.expireAll()
         #expect(first.stopRequest == .pause(.system), "the job learns of it before the handler returns")
         #expect(h.settings.queueHold == .system)
         #expect(h.background.activeCount == 0)
@@ -700,6 +700,30 @@ import CassiniNotebook
         #expect(h.background.endedCount == 1, "it ends with the queue")
     }
 
+    @Test func theBackgroundTimeLastsUntilThePauseIsStoredAndTold() async throws {
+        let h = try QueueHarness(); defer { h.tearDown() }
+        try await h.start(visible: false)
+        let a = try await h.note("A")
+        await h.coordinator.transcribe(a)
+        let first = try await h.run(0)
+        first.pauseOnStop = false // the step that runs goes on after the stop, as on a device
+
+        await h.background.expireAll()
+
+        // iOS suspends Cassini as soon as its time ends: by then the pause is on disk and the person is told, so a
+        // kill while suspended keeps the job paused by the system instead of requeueing it.
+        #expect(h.background.activeCount == 0)
+        let stored = try JobRepository(root: h.root).load()
+        #expect(stored.map(\.noteID) == [a])
+        #expect(stored.first?.state == .paused && stored.first?.pauseReason == .system)
+        #expect(h.notifier.posted.map(\.kind) == [.pausedBySystem])
+        #expect(await h.notes.note(a)?.status == .audioOnly)
+
+        first.finish(.paused(.system))
+        await h.coordinator.awaitIdle()
+        #expect(h.notifier.posted.count == 1, "the job's own end tells nothing more")
+    }
+
     @Test func afterIOSTookTheTimeBackTheNextDrainAsksForNewTime() async throws {
         let h = try QueueHarness(); defer { h.tearDown() }
         try await h.start()
@@ -707,7 +731,7 @@ import CassiniNotebook
         await h.coordinator.transcribe(a)
         await h.coordinator.transcribe(b)
         _ = try await h.run(0)
-        h.background.expireAll()
+        await h.background.expireAll()
         try await h.waitUntil("A is paused") { await h.job(a)?.state == .paused }
         await h.coordinator.awaitIdle()
 
@@ -752,7 +776,9 @@ import CassiniNotebook
 
         try await h.run(0).finish(.failed(.checkpointMismatch))
         try await h.run(1).finish(.needsConsent(missingBytes: 1))
-        try await h.waitUntil("the second job waits for consent") { await h.job(consentless)?.state == .needsConsent }
+        // The outcome is written before it is told: Cassini comes back only once both were told.
+        try await h.waitUntil("the second job's outcome is told") { h.notifier.posted.count == 2 }
+        #expect(await h.job(consentless)?.state == .needsConsent)
         h.coordinator.setVisible(true)
         try await h.run(2).finish(.failed(.checkpointMismatch))
         await h.coordinator.awaitIdle()

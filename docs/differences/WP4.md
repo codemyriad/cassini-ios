@@ -26,7 +26,10 @@
   Android's `onTimeout` does: the job's stop is signalled before iOS's expiration handler returns (on the main thread
   at once, or with a synchronous hop to it), the queue is held (`system`), the job shows as paused by the system at
   once, and while Cassini is hidden the notification "Transcription paused by iOS · iOS needed the time back. Open
-  Cassini to resume." is posted. The paused job takes the numbers of the last saved progress when it ends, but the
+  Cassini to resume." is posted. iOS suspends Cassini as soon as the time ends, so the runner keeps it until the
+  paused job is written to `jobs.json` and `note.json` and the notification is handed to iOS, for at most two seconds
+  (`UIKitBackgroundRunner.expiryGrace`); a kill while suspended then keeps the job paused by the system. A job starts
+  only once the drain's background time is held and carries its title. The paused job takes the numbers of the last saved progress when it ends, but the
   notification carries no "Paused at" numbers (`aSystemStopReachesTheJobAtOnceAndThePausedNoticeGetsTheLastCheckpoint`
   is ported without its notification part). The old behaviour (expiry cancelled every queued job) is gone.
 - **On the screen.** Cassini counts as hidden only in `.background`; `.inactive` (Control Center, the app switcher, a
@@ -98,7 +101,10 @@
   `needsConsent` in the same write. New: `requeueAtBack(_:kind:language:checkpoint:now:)` (Restore),
   `replace(_:removing:)` (the launch repair's one write), `assume(_:removing:)` (the repair in memory when it cannot be
   written), `load(now:)` with `JobStore.Failure` and `isWritable`. `JobRepository.moveAside(at:)`.
-- Ports: `BackgroundRunner.update(_:title:)` (the next job of a drain in the same background time) and
+- Ports: `BackgroundRunner.update(_:title:)` (the next job of a drain in the same background time);
+  `BackgroundRunner.begin`'s `onExpire` now returns `Task<Void, Never>?`, the steps that must land before the time
+  ends (callers with nothing to finish return nil), and `FakeBackgroundRunner.expireAll()` is async and ends each
+  token once those steps landed; `TranscriptionCoordinator.systemStop()` returns its steps; and
   `Transcribing.installAssets(locale:progress:)` (the standalone speech model install). Their fakes implement them;
   `FakeTranscriber` now asks for consent like Apple's when its model is not downloaded and the request may not
   download it, and `FakeCheckpoints` can hold a note's status read.
