@@ -19,7 +19,9 @@ extension Note {
             switch change {
             case .rename(let id, let name): renameSpeaker(id, name: name)
             case .match(let id, let match):
-                if let index = speakers?.firstIndex(where: { $0.id == id }) { speakers?[index].match = match }
+                if let index = speakers?.firstIndex(where: { $0.id == id }) {
+                    changeShownSpeakers { $0.speakers?[index].match = match }
+                }
             case .reject(let id, let voice, let restore): rejectVoice(voice, for: id, restorePlaceholder: restore)
             case .merge(let source, let target, let stamp): mergeSpeaker(source, into: target, stamp: stamp)
             case .unlinkVoice(let voice): unlinkVoice(voice)
@@ -30,10 +32,12 @@ extension Note {
     /// "Not <name>": the speaker is never matched to `voiceID` again.
     public mutating func rejectVoice(_ voiceID: UUID, for speakerID: String, restorePlaceholder: Bool) {
         guard let index = speakers?.firstIndex(where: { $0.id == speakerID }), let speaker = speakers?[index] else { return }
-        if !speaker.excludedVoiceIDs.contains(voiceID) { speakers?[index].excludedVoiceIDs.append(voiceID) }
-        speakers?[index].match = .rejected(voice: voiceID, score: speaker.match.score ?? 0)
-        if restorePlaceholder { speakers?[index].name = DefaultLabels.placeholder(index + 1) }
-        refreshSpeakerLabels()
+        changeShownSpeakers { note in
+            if !speaker.excludedVoiceIDs.contains(voiceID) { note.speakers?[index].excludedVoiceIDs.append(voiceID) }
+            note.speakers?[index].match = .rejected(voice: voiceID, score: speaker.match.score ?? 0)
+            if restorePlaceholder { note.speakers?[index].name = DefaultLabels.placeholder(index + 1) }
+            note.refreshSpeakerLabels()
+        }
     }
 
     /// Drops every link and offer to `voiceID`, in the shown transcript and in every version. Rejections stay, and

@@ -64,11 +64,10 @@ extension Note {
         return .saved
     }
 
-    /// The index of the shown version when it is a run of passage edits that holds the transcript as it is.
+    /// The index of the shown version when it is a run of passage edits that holds the transcript as it is. Naming
+    /// and matching speakers keep it holding the transcript (see `changeShownSpeakers`), so they do not end the run.
     private var shownEditedVersionIndex: Int? {
-        guard let id = selectedVersionID, let index = versions?.firstIndex(where: { $0.id == id }),
-              let version = versions?[index], version.name == Self.editedVersionName,
-              version.segments == transcript, version.speakers == speakers ?? [] else { return nil }
+        guard let index = shownVersionIndex, versions?[index].name == Self.editedVersionName else { return nil }
         return index
     }
 }

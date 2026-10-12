@@ -406,6 +406,54 @@ import Testing
         #expect(DocumentInfoFacts.of(note, provenance: nil, fileBytes: nil).versions == 2)
     }
 
+    /// A transcript with its speakers analysed: "Before speaker analysis" and "Speaker analysis", the second shown.
+    func analysed() -> Note {
+        var note = Note(title: "Conversation")
+        note.transcript = [TranscriptSegment(text: "First", start: 0, end: 4), TranscriptSegment(text: "Second", start: 5, end: 9)]
+        note.applySpeakerAnalysis(turns: [.init(speakerID: "a", start: 0, end: 4.5), .init(speakerID: "b", start: 5, end: 9)],
+                                  matches: [:], voiceNames: [:], autoName: false, stamp: VersionStamp(date: Date()))
+        return note
+    }
+
+    /// Naming, matching or rejecting a speaker adds no version: the chip and Document info stay at the versions kept,
+    /// and the shown one keeps its number and kind (Android counts variants, which naming never changes).
+    @Test func namingASpeakerKeepsTheVersionCount() {
+        var note = analysed()
+        #expect(NoteChips.of(note)?.version == VersionChip(index: 2, count: 2, kind: .transcribedAgain))
+        note.renameSpeaker("a", name: "Giulia")
+        note.apply([.match(speakerID: "b", .suggested(voice: UUID(), score: 0.7))])
+        note.addSpeaker(id: "c", name: "Paolo")
+        #expect(note.versions?.map(\.name) == ["Before speaker analysis", "Speaker analysis"])
+        #expect(note.versions?[1].speakers == note.speakers && note.versions?[1].segments == note.transcript,
+                "the shown version takes the names")
+        #expect(note.versions?[0].segments.allSatisfy { $0.speaker == nil } == true, "the version before stays as it was")
+        #expect(NoteChips.of(note)?.version == VersionChip(index: 2, count: 2, kind: .transcribedAgain))
+        #expect(DocumentInfoFacts.of(note, provenance: nil, fileBytes: nil).versions == 2)
+        #expect(note.mergeVersionNumbers == (2, 3))
+    }
+
+    /// Naming a speaker between passage edits does not end the run: it still keeps one "Edited passages" version.
+    @Test func namingBetweenEditsKeepsOneEditedVersion() {
+        var note = analysed()
+        let first = note.transcript[0]
+        note.revisePassage(first, to: first.revised(text: "Primo.", speakerID: first.speakerID, speakers: note.speakers!),
+                           stamp: VersionStamp(date: Date()))
+        note.renameSpeaker("a", name: "Giulia")
+        #expect(NoteChips.of(note)?.version == VersionChip(index: 3, count: 3, kind: .edited))
+        let second = note.transcript[1]
+        note.revisePassage(second, to: second.revised(text: "Secondo.", speakerID: second.speakerID, speakers: note.speakers!),
+                           stamp: VersionStamp(date: Date()))
+        note.rejectVoice(UUID(), for: "b", restorePlaceholder: false)
+        let again = note.transcript[1]
+        note.revisePassage(again, to: again.revised(text: "Terzo.", speakerID: again.speakerID, speakers: note.speakers!),
+                           stamp: VersionStamp(date: Date()))
+        #expect(note.versions?.map(\.name) == ["Before speaker analysis", "Speaker analysis", Note.editedVersionName])
+        #expect(note.versions?[2].segments == note.transcript && note.versions?[2].speakers == note.speakers)
+        #expect(note.transcript.map(\.speaker) == ["Giulia", "Speaker 2"])
+        #expect(NoteChips.of(note)?.version == VersionChip(index: 3, count: 3, kind: .edited))
+        #expect(DocumentInfoFacts.of(note, provenance: nil, fileBytes: nil).versions == 3)
+    }
+
     /// Editing an older version keeps it and adds the edits after the kept versions.
     @Test func editingAnOlderVersionAddsTheEditsAfterTheKeptOnes() {
         var note = F.weeklySync

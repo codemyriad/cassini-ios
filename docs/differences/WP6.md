@@ -22,7 +22,9 @@
   and reads the saved progress off the main actor; `NoteMenu` sends `NoteMenuAction`s to the screen instead of acting
   itself; the Library passes its search query when it opens a note (Android `LibraryViewModel.open`), which it did not
   before. `NoteMode.sections` orders the card, the chips and the banners. `Note.versionCount` counts versions for the
-  chip and Document info alike. The `long` UI-test seed adds a three-hour note and a note transcribed to no words.
+  chip and Document info alike. Naming, matching, rejecting and adding a speaker change the selected kept version
+  along with the shown transcript (`Note.changeShownSpeakers`), so they add no version and do not end a run of
+  passage edits; Android keeps speaker labels document-wide, so naming never changes its variant count either. The `long` UI-test seed adds a three-hour note and a note transcribed to no words.
 
 ## Differences from Android
 
@@ -80,7 +82,8 @@
   passage changed while you were editing." A changed text drops the passage's word times. A run of edits keeps one
   version: the first edit keeps the transcript before it ("Before passage edit", unless a kept version holds it
   already, as the transcription's does) and adds an "Edited passages" version that is then shown; later edits change
-  that version in place while it is shown, so many typo fixes add one copy of the transcript, not one each. Editing
+  that version in place while it is shown, so many typo fixes add one copy of the transcript, not one each, even
+  when speakers are named between edits. Editing
   another version adds a new "Edited passages" version after the kept ones. While a job runs, the editor is locked and
   says why.
 - **Document info** has no meeting id, and the model row names Apple's speech model ("Apple SpeechTranscriber") from
