@@ -24,13 +24,21 @@
   (`ProcessingStore.transcribe(id, kind:, origin: .screen)`); without consent they open the model download; a final
   failure (`LONG`, a refused document, or a new version a document cannot take) opens the note instead.
 - **Rename** trims, refuses a blank title ("Enter a title."), stops the field at 200 characters and saves only a
-  changed title.
+  changed title (`LibraryScreenModel.rename`).
+- **The actions and their confirmations** go through `LibraryScreenModel` as Android's go through `LibraryViewModel`
+  (`perform(_:on:)` for `sheetAction`, `confirm(_:)` for `confirmDialog`, `dialog` for its dialog state): Rename and
+  Start over open their dialog, Transcribe again on a stale or unreadable document asks "Transcribe again?" first and
+  does nothing on a file that cannot take a new version, Stop and Remove from queue go to the queue, Resume queues the
+  job's own kind, Export and Document info open the note with their `start`. Start over's outcome is handled as
+  Transcribe's: the model download without consent, the reason on a refusal (it was dropped before).
 - **Activity area**: "Recording · <title>" (or "Recording paused · …") with the elapsed time and "Tap to return"; the
   Record button reads "Recording · 24:07" with the VoiceOver label "Return to recording"; the banner "Transcribing
   <title>" (or "Getting ready to transcribe …", "Downloading models") with the percent, a 4 pt bar and line 2 (WP5's
   time-left line, "Finishing the previous note…", "Downloading speech recognition — 46%", "Checking files — 80%") plus
   "· N more in queue". The banner opens the running note, or Settings for a download on its own. VoiceOver hears it
-  when its title changes and at each 5 % step.
+  at each change of its title or stage (time left, finishing, waiting for the previous note, downloading each part,
+  checking files) and at each 5 % step, the download's and the check's own percent included
+  (`ProgressBanner.announcement`).
 - **Empty states**: "No notes yet" with real Record and Import audio buttons (only once the notes were read, so it never
   flashes), "Nothing matches “q”", and "Your notes can’t be opened" when the library could not be opened, with Record
   and Import audio off and their hint saying why.
@@ -40,18 +48,26 @@
 - **No FTS4.** iOS keeps the notes in `note.json` files, not SQLite. `LibraryIndex` holds each note's tokens (folded
   for case and accents, compared as bytes), worked out at the first search and kept until the note changes, and
   `SearchText.snippet` follows SQLite's `snippet()` window choice (the start, then the windows ending at each hit; the
-  most phrases win; then centred). The search runs off the main actor; the main actor only builds the rows from its
-  results (a hosted test checks that this part fits in a frame for a thousand notes). The tests that probe SQLite
+  most phrases win; then centred). The index follows the notes through Observation (reading `content` has no side
+  effects), and the search runs off the main actor. A search over notes that changed meanwhile still publishes, over
+  the notes as they are now (a note that went is dropped, a changed one is matched again on its own), then runs
+  again; only a new query cancels it, and the cancellation reaches the detached scan. A hosted test checks that the
+  main actor's part of a keystroke (indexing a thousand notes after one changed, then building the results or, with
+  the query cleared, the day sections) fits in a frame. The tests that probe SQLite
   (`sqliteHasFts4WithUnicode61AndRemoveDiacritics`, `replacingTheCacheKeepsTheFtsDocid`) have nothing to test.
-- **Bookmark labels are searched too** (an iOS extra; bookmarks are iOS-only).
+- **Bookmark labels are searched too** (an iOS extra; bookmarks are iOS-only), each its own text, so a phrase never
+  runs from one label into the next.
 - **Highlight ranges are character offsets**, not UTF-16 indices, so they map onto `AttributedString` directly.
 - **A transcribed note is a "document".** Android transcribes into a Cassini document; iOS keeps the transcript in
   `note.json`. So a note with a transcript (or transcribed with no words) counts as a readable document for the status
   table, unless it was imported from a document Cassini could not read or that is newer.
-- **The preview without a stored one.** `Note.previewText` is stored at each final playback save (WP7's
-  `NotePreview`, now wired in `AppGraph`). A note without one shows `PreviewText` at its saved position, computed from
-  only the passages it can show; an older stored preview without ellipses that fills 160 characters is cut at a word,
-  as Android cuts its `substr(body, 1, 160)` fallback.
+- **The row preview is computed, not read.** Android stores `preview` and rewrites it with the body
+  (`NoteDao.selectVariant`, `DocumentDerivation`). iOS has the transcript and `playbackPosition` in memory and
+  `LibraryIndex` keeps each entry per version of the note, so the row shows `PreviewText` at the saved position from
+  the transcript shown, computed from only the passages it can show; a new version, a picked version or an edit
+  shows at once. `Note.previewText` (stored at each final playback save, WP7's `NotePreview`, now wired in `AppGraph`)
+  is read only for a note without a transcript; such an older stored preview without ellipses that fills 160
+  characters is cut at a word, as Android cuts its `substr(body, 1, 160)` fallback.
 - **Speaker count and "No speech"** come from the transcript's distinct speaker ids and whether it has any word.
   "Adds version N" counts the note's saved versions (at least one when it has a transcript).
 - **The actions sheet is a context menu** (long press): Star (iOS extra), Rename, the transcribe item for the job's
@@ -66,6 +82,8 @@
   The spoken duration uses the system's unit formatter ("48 minutes, 13 seconds"). The inline Resume and Try again are
   their own 44 pt buttons ("Resume transcribing <title>", "Try transcribing <title> again"), as Android keeps them
   clickable inside the merged row. Day headers are headers. iOS has no system Back, so Back-to-clear does not apply.
+- **Rename is a sheet**, not Android's alert, so "Enter a title." can sit under the field as Android shows it; an
+  iOS alert's text field takes no inline error.
 - **Header.** The iOS wordmark and the serif headline stay (the headline reads "Notes" at accessibility text sizes);
   "Trash" is "Recently Deleted". The privacy line says "Transcribed on this device" because the app also runs on iPad,
   as WP4 words "Transcribe on this device".
@@ -82,6 +100,9 @@
 
 - `ProcessingStore.startOver(_:)` is now `async` and returns the `TranscribeOutcome` (it had no callers), so Start over
   can open the model download when consent is missing.
+- `LibraryScreenModel.Ports` takes `finishing`, `startOver`, `stop`, `dequeue`, `update`, `trash` and
+  `speakerModelsReady` besides the reads; `LibraryDialog`, `NoteAction` and `LibraryRowMenu` live in CassiniEngine
+  `Library/`. `settle()` (tests) waits for the index and the search.
 - `LibraryStore.isLoaded` (the notes were read), so the empty state waits for the first read.
 - `AppGraph.libraryScreen` (`LibraryScreenModel`, CassiniEngine `Library/`) is put into the environment; its effects
   go to the router and the error presenter (`LibraryNavigation.swift`).
@@ -98,12 +119,19 @@
 ## Tests
 
 - Swift Testing: `Packages/CassiniNotebook/Tests/CassiniNotebookTests/Library/*` and
-  `Packages/CassiniEngine/Tests/CassiniEngineTests/LibraryScreenModelTests.swift`.
+  `Packages/CassiniEngine/Tests/CassiniEngineTests/LibraryScreenModelTests.swift` (with `LibraryViewModelTest`'s
+  `longPressOpensTheActionsSheetAndItsRows`, `exportRowsOpenTheNoteScreenWithTheRowToStart` and
+  `transcribeAgainOnAChangedDocumentConfirmsAFreshOne`, Start over's consent and refusal, and searches over changing
+  notes).
 - Hosted: `CassiniTests/LibraryScreenTests.swift` (picker types, the rows after launch, an unopenable library, a
   thousand notes).
 - UI: `CassiniUITests/LibraryUITests.swift` (`LibraryBehaviourTest`: every row status, inline Resume and Try again, the
   controls and the banner, the recording card and button, search, the empty library, Rename and its limit, the last
-  row clear of a tall bottom bar) and `CassiniUITests/TextLimitTests.swift` (`TextLimitBehaviourTest`'s voice rename,
+  row clear of a tall bottom bar, and the long-press menu: `theConfirmationsOfTheSheetRows` for Start over and
+  Transcribe again, `theSubtitleChooserExportsTheNote` and `documentInfoOpensAsADialog` up to the note opening with
+  its `start`, which the Note screen acts on; plus `LibraryFlowTest#importSearchActionsTrashAndUndo` from the search
+  on, the import half being WP12's) and `CassiniUITests/TextLimitTests.swift` (`TextLimitBehaviourTest`'s voice rename,
   name field and recording title). `LibraryBehaviourTest`'s back-handling, snackbar, banner-duplicate and Android
-  sheet/dialog-window tests have no iOS counterpart beyond what WP2 and these tests cover; VoiceOver's named actions
+  window-placement tests (`theActionsSheetOpensInItsWindowAndSendsItsRows` is the menu test above) have no iOS
+  counterpart beyond what WP2 and these tests cover; VoiceOver's named actions
   cannot be read by XCUITest and are left to the manual accessibility pass (WP14).

@@ -141,6 +141,28 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(row(app, "Notes from the design review").exists)
     }
 
+    /// Search finds a spoken word of a note, a long press on the result opens its actions over the search, Move to
+    /// Recently Deleted takes it out of the results, and Undo brings it back. The import half of Android's flow
+    /// (ACTION_VIEW of a file) is the import flow's (WP12).
+    // ports: LibraryFlowTest#importSearchActionsTrashAndUndo
+    @MainActor func testSearchActionsTrashAndUndo() {
+        let app = launch(["--seed", "search"])
+        let search = app.textFields["librarySearch"]
+        search.tap()
+        search.typeText("tomatoe")
+        let garden = row(app, "Garden plans for the spring")
+        XCTAssertTrue(garden.waitForExistence(timeout: 5))
+        XCTAssertFalse(row(app, "Notes from the design review").exists)
+        garden.press(forDuration: 1)
+        app.buttons["Move to Recently Deleted"].tap()
+        XCTAssertTrue(app.buttons["Undo"].waitForExistence(timeout: 5))
+        XCTAssertFalse(garden.exists, "a note in Recently Deleted is not a result")
+        XCTAssertTrue(app.staticTexts["Nothing matches “tomatoe”"].waitForExistence(timeout: 5))
+        app.buttons["Undo"].tap()
+        XCTAssertTrue(garden.waitForExistence(timeout: 5), "Undo brings the result back")
+        XCTAssertEqual(search.value as? String, "tomatoe", "the search stays open")
+    }
+
     @MainActor func testAnEmptyLibraryOffersRecordAndImport() {
         let app = launch([])
         XCTAssertTrue(app.staticTexts["No notes yet"].waitForExistence(timeout: 5))
