@@ -25,6 +25,19 @@ import CassiniEngine
         XCTAssertEqual(router.path, [])
     }
 
+    // ports: NoteViewModelTest#aRowStartedFromTheLibraryRunsOnceOnly
+    /// A note's start action runs when the Library opens it; the stack kept with the scene carries none, so a restored
+    /// screen does not ask again. Its search is kept.
+    func testARestoredStackCarriesNoStartAction() {
+        let router = Router()
+        let a = UUID()
+        router.push(.note(a, query: "word", start: .export(.subtitles)))
+        XCTAssertEqual(router.path, [.note(a, query: "word", start: .export(.subtitles))], "the live screen keeps it")
+        let restored = Router()
+        restored.restore(router.encodedPath)
+        XCTAssertEqual(restored.path, [.note(a, query: "word")])
+    }
+
     func testOpeningANoteThatIsOpenPopsToIt() {
         let router = Router()
         let a = UUID()
