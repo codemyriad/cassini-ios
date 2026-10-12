@@ -7,6 +7,7 @@ struct SpeakersView: View {
     @Environment(LibraryStore.self) private var library
     @Environment(VoicesStore.self) private var voices
     @Environment(ProcessingStore.self) private var processing
+    @Environment(JobProgress.self) private var progress
     @Environment(SettingsStore.self) private var settings
     @Environment(\.dismiss) private var dismiss
     @State private var editing: NoteSpeaker?
@@ -35,7 +36,7 @@ struct SpeakersView: View {
                             if !(note.speakers ?? []).isEmpty { rerun = true } else { Task { await requestAnalysis() } }
                         }.disabled(note.transcript.isEmpty || busy || !note.audio.isPlayable)
                         if busy {
-                            ProgressView(processing.state.isRunning(noteID) ? processing.state.running?.phase.message ?? "" : "")
+                            ProgressView(progress.processingPhase(for: noteID)?.message ?? "")
                             Button("Cancel analysis", role: .cancel) { processing.cancel(noteID) }
                         }
                     } footer: {

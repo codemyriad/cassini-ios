@@ -1,0 +1,545 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "%lld h": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld h"
+          }
+        }
+      }
+    },
+    "%lld h %lld min": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld h %2$lld min"
+          }
+        }
+      }
+    },
+    "%lld min": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld min"
+          }
+        }
+      }
+    },
+    "%lld%%": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld%%"
+          }
+        }
+      }
+    },
+    "%lld%% → about %lld%%": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld%% → circa %2$lld%%"
+          }
+        }
+      }
+    },
+    "%lld–%lld min": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld–%2$lld min"
+          }
+        }
+      }
+    },
+    "A speech model is needed. Allow model downloads in Settings, then try again. Audio stays on this device.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Serve un modello vocale. Consenti il download dei modelli nelle Impostazioni, poi riprova. L’audio resta su questo dispositivo."
+          }
+        }
+      }
+    },
+    "About %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Circa %@"
+          }
+        }
+      }
+    },
+    "About %@ left": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Circa %@ rimanenti"
+          }
+        }
+      }
+    },
+    "Battery at finish": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Batteria alla fine"
+          }
+        }
+      }
+    },
+    "Calculating time left…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Calcolo del tempo rimanente…"
+          }
+        }
+      }
+    },
+    "Calculating…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Calcolo…"
+          }
+        }
+      }
+    },
+    "Downloading models": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download dei modelli"
+          }
+        }
+      }
+    },
+    "Downloading models — %lld%%": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download dei modelli — %lld%%"
+          }
+        }
+      }
+    },
+    "Finding speakers": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ricerca delle voci"
+          }
+        }
+      }
+    },
+    "Finding words": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ricerca delle parole"
+          }
+        }
+      }
+    },
+    "Finishing the previous note…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Completamento della nota precedente…"
+          }
+        }
+      }
+    },
+    "Finishing…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Completamento…"
+          }
+        }
+      }
+    },
+    "Matching saved voices": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abbinamento delle voci salvate"
+          }
+        }
+      }
+    },
+    "Measuring…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Misurazione…"
+          }
+        }
+      }
+    },
+    "Paused at %@ of %@. Pick up where you left off. The draft so far is kept.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In pausa a %1$@ di %2$@. Riprendi da dove avevi lasciato. La bozza fin qui è conservata."
+          }
+        }
+      }
+    },
+    "Paused at %@ of %@. iOS ended the time Cassini had in the background. Resume to continue where it stopped.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In pausa a %1$@ di %2$@. iOS ha chiuso il tempo in background di Cassini. Riprendi per continuare da dove si è fermata."
+          }
+        }
+      }
+    },
+    "Paused before any words were found. Resume to start transcribing.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In pausa prima di trovare parole. Riprendi per iniziare la trascrizione."
+          }
+        }
+      }
+    },
+    "Plugged in": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In carica"
+          }
+        }
+      }
+    },
+    "Preparing": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preparazione"
+          }
+        }
+      }
+    },
+    "Processed": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elaborato"
+          }
+        }
+      }
+    },
+    "Queued": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In coda"
+          }
+        }
+      }
+    },
+    "Reading": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lettura"
+          }
+        }
+      }
+    },
+    "Reading the audio": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lettura dell’audio"
+          }
+        }
+      }
+    },
+    "Remove from queue": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Togli dalla coda"
+          }
+        }
+      }
+    },
+    "Saving": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Salvataggio"
+          }
+        }
+      }
+    },
+    "Speakers & matching": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voci e abbinamento"
+          }
+        }
+      }
+    },
+    "Stages": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fasi"
+          }
+        }
+      }
+    },
+    "Starting…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avvio…"
+          }
+        }
+      }
+    },
+    "Starts after the current transcription.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parte dopo la trascrizione in corso."
+          }
+        }
+      }
+    },
+    "Step %lld of %lld: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Passo %1$lld di %2$lld: %3$@"
+          }
+        }
+      }
+    },
+    "Stop and keep progress": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ferma e conserva i progressi"
+          }
+        }
+      }
+    },
+    "Stopping and keeping progress…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Interruzione, i progressi restano salvati…"
+          }
+        }
+      }
+    },
+    "This phone is low on memory. Close other apps if transcription stops.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il telefono ha poca memoria. Chiudi altre app se la trascrizione si ferma."
+          }
+        }
+      }
+    },
+    "Time left": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tempo rimasto"
+          }
+        }
+      }
+    },
+    "Transcription runs on this device. If iOS stops it in the background, your progress is kept.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La trascrizione avviene su questo dispositivo. Se iOS la ferma in background, i progressi restano salvati."
+          }
+        }
+      }
+    },
+    "Under 1 min": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Meno di 1 min"
+          }
+        }
+      }
+    },
+    "Under 1 min left": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Meno di 1 min rimanente"
+          }
+        }
+      }
+    },
+    "Words": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parole"
+          }
+        }
+      }
+    },
+    "Words so far": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parole finora"
+          }
+        }
+      }
+    },
+    "done": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "completato"
+          }
+        }
+      }
+    },
+    "in progress": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "in corso"
+          }
+        }
+      }
+    },
+    "not started": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "non iniziato"
+          }
+        }
+      }
+    },
+    "skipped": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "saltato"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

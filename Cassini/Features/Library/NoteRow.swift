@@ -1,8 +1,9 @@
 import SwiftUI
+import CassiniEngine
 import CassiniNotebook
 
 struct NoteRow: View {
-    @Environment(ProcessingStore.self) private var processing
+    @Environment(JobProgress.self) private var progress
     @Environment(\.dynamicTypeSize) private var dynamicType
     let note: Note
     var query = ""
@@ -27,7 +28,7 @@ struct NoteRow: View {
                 Image(systemName: "chevron.right").font(.caption2.weight(.semibold)).foregroundStyle(Color.muted)
             }
             if note.status == .transcribing {
-                ProgressView(value: processing.state.isRunning(note.id) ? processing.state.running?.fraction : nil).tint(.ember)
+                ProgressView(value: progress.fraction(for: note.id)).tint(.ember)
             }
         }
         .padding(19).frame(maxWidth: .infinity, alignment: .leading).cardBackground()

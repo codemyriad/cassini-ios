@@ -26,9 +26,8 @@ import CassiniNotebook
         library = LibraryStore(root: environment.root, errors: errors)
         voices = VoicesStore(library: library, settings: settings, errors: errors)
         playback = PlaybackStore(playback: environment.playback, library: library, errors: errors, clock: environment.clock)
-        processing = ProcessingStore(transcriber: environment.transcriber, analyzer: environment.analyzer,
-                                     background: environment.background, library: library, voices: voices,
-                                     settings: settings, notices: notices)
+        processing = Self.processing(environment: environment, library: library, voices: voices, settings: settings,
+                                     notices: notices)
         recording = RecordingStore(capture: environment.capture, audio: environment.audio, storage: environment.storage,
                                    library: library, processing: processing, playback: playback, settings: settings,
                                    router: router, errors: errors, notices: notices, clock: environment.clock,
@@ -44,6 +43,21 @@ import CassiniNotebook
                            clock: environment.clock, calendar: environment.calendar)
         exports = ExportStore(library: library, portable: PortableExportService(audio: environment.audio))
         registerStartup()
+    }
+
+    /// The queue and the job it runs. Without a library there is nothing to transcribe, so the job finds no note.
+    private static func processing(environment: AppEnvironment, library: LibraryStore, voices: VoicesStore,
+                                   settings: SettingsStore, notices: NoticesStore) -> ProcessingStore {
+        let progress = JobProgress(battery: UIDeviceBattery(), onFinalization: { [settings] in settings.recordFinalization($0) })
+        let checkpoints: any CheckpointStoring = library.noteStore.map { CheckpointFiles(notes: $0) } ?? NoLibraryWork()
+        let job: any TranscriptionJobRunning = library.noteStore.map {
+            TranscriptionJob(notes: $0, transcriber: environment.transcriber, analyzer: environment.analyzer,
+                             checkpoints: checkpoints, provenance: ProvenanceFiles(notes: $0),
+                             host: AppJobHost(settings: settings, voices: voices), clock: environment.clock)
+        } ?? NoLibraryJob()
+        return ProcessingStore(job: job, progress: progress, checkpoints: checkpoints, analyzer: environment.analyzer,
+                               background: environment.background, library: library, settings: settings,
+                               notices: notices, clock: environment.clock)
     }
 
     /// Runs the launch steps once; the app is ready when it returns.
@@ -93,13 +107,30 @@ import CassiniNotebook
     }
 }
 
+/// The work of the notes when the library could not be opened: there are none.
+private struct NoLibraryWork: CheckpointStoring {
+    func load(_ noteID: UUID) throws -> CheckpointState? { nil }
+    func save(_ state: CheckpointState, for noteID: UUID) throws { throw CocoaError(.fileWriteUnknown) }
+    func discard(_ noteID: UUID) throws {}
+    func exists(_ noteID: UUID) -> Bool { false }
+}
+
+/// The job when the library could not be opened: there is no note to transcribe.
+private struct NoLibraryJob: TranscriptionJobRunning {
+    func run(_ job: Job, stop: StopSignal, events: @escaping @Sendable (JobEvent) -> Void) async -> JobOutcome {
+        events(.ended(.failed(.open)))
+        return .failed(.open)
+    }
+}
+
 extension View {
     /// Puts every store of `graph` into the environment.
     func environment(_ graph: AppGraph) -> some View {
         self
             .environment(graph.router).environment(graph.errors).environment(graph.notices)
             .environment(graph.settings).environment(graph.library).environment(graph.voices)
-            .environment(graph.playback).environment(graph.processing).environment(graph.recording)
+            .environment(graph.playback).environment(graph.processing).environment(graph.processing.progress)
+            .environment(graph.recording)
             .environment(graph.imports).environment(graph.trash).environment(graph.exports)
             .environment(\.clock, graph.environment.clock)
             .environment(\.locale, graph.environment.locale)

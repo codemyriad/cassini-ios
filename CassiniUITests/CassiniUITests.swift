@@ -164,7 +164,12 @@ final class CassiniUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed", "processing", "--open-fixture", "CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC"]
         app.launch()
-        XCTAssertTrue(app.staticTexts["Transcribing on this device…"].waitForExistence(timeout: 15))
+        let headline = app.descendants(matching: .any)["progressHeadline"]
+        XCTAssertTrue(headline.waitForExistence(timeout: 15))
+        let frozen = NSPredicate(format: "label == %@", "Finding words, 60%")
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: frozen, object: headline)], timeout: 10), .completed,
+                       headline.label)
+        XCTAssertTrue(app.buttons["Stop and keep progress"].exists)
         capture("Processing")
     }
     @MainActor func testIPadShowsTheLibraryBesideTheNote() throws {
