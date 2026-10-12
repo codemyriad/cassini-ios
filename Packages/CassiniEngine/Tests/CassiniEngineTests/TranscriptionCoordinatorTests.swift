@@ -186,7 +186,6 @@ import CassiniNotebook
         #expect(!h.checkpoints.hasWork(long), "too long: no new try can use the saved progress")
     }
 
-    // ports: ProcessingCoordinatorTest#aFailureAroundTheJobEndsItAndTheQueueGoesOn
     @Test func aClaimThatCannotBeSavedLeavesTheJobQueuedForTheNextDrain() async throws {
         let h = try QueueHarness(); defer { h.tearDown() }
         try await h.start()
@@ -206,6 +205,151 @@ import CassiniNotebook
 
         h.coordinator.continueQueue()
         #expect(try await h.run(0).noteID == a)
+    }
+
+    // ports: ProcessingCoordinatorTest#aFailureAroundTheJobEndsItAndTheQueueGoesOn
+    @Test func aNoteWriteThatFailsAroundTheJobEndsItAndTheQueueGoesOn() async throws {
+        let h = try QueueHarness(); defer { h.tearDown() }
+        try await h.start()
+        let a = try await h.note("A"), b = try await h.note("B")
+        await h.coordinator.transcribe(a)
+        await h.coordinator.transcribe(b)
+        let first = try await h.run(0)
+
+        // The note's status cannot be saved when the job ends.
+        let folder = h.notes.directory(for: a)
+        let manager = FileManager.default
+        try manager.setAttributes([.posixPermissions: 0o555], ofItemAtPath: folder.path)
+        defer { try? manager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: folder.path) }
+        first.finish(.failed(.unknown))
+
+        #expect(try await h.run(1).noteID == b, "the coordinator is not stuck")
+        #expect(await h.job(a)?.state == .failed)
+        try manager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: folder.path)
+        try await h.run(1).finish(.done)
+        await h.coordinator.awaitIdle()
+        #expect(h.coordinator.moveToTrash(a) == TrashedJob(state: .failed, kind: .transcribe))
+    }
+
+    // ports: ProcessingCoordinatorTest#startOverAfterTheRunEndedButBeforeItsOutcomeIsWrittenStillDiscards
+    @Test func startOverAfterTheRunEndedButBeforeItsOutcomeIsWrittenStillDiscards() async throws {
+        let h = try QueueHarness(); defer { h.tearDown() }
+        try await h.start()
+        let a = try await h.note("A"), other = try await h.note("Other")
+        await h.coordinator.transcribe(a)
+        let first = try await h.run(0)
+        first.pauseOnStop = false
+        h.checkpoints.save(a, .saved(doneMs: 28_000, totalMs: 60_000, words: 40))
+        h.settings.queueHold = .user
+        await h.coordinator.transcribe(other, origin: .automatic)
+
+        // Another queue action keeps the serial section busy, so the outcome cannot be written yet.
+        h.checkpoints.hold(other)
+        let busy = Task { await h.coordinator.dequeue(other) }
+        try await h.settle()
+        #expect(h.coordinator.stop(a))
+        let over = Task { await h.coordinator.startOver(a) }
+        try await h.settle()
+        first.finish(.paused(.user))
+        try await h.waitUntil("the run ended") { first.hasEnded }
+        h.checkpoints.release(other)
+        _ = await busy.value
+
+        #expect(await over.value == .queued(changed: true))
+        #expect(!h.checkpoints.hasWork(a), "the saved progress is discarded")
+        let again = try await h.run(1)
+        #expect(again.noteID == a)
+        #expect(again.job.doneMs == 0)
+    }
+
+    // ports: ProcessingCoordinatorTest#aRestartRequeuesRunningRowsAndPausesOnesPastTheirAttempts
+    @Test func aKillWithThreeQueuedAndOneRunningJobRunsTheRunningOneFirstThenTheRestInOrder() async throws {
+        let first = try QueueHarness(); defer { first.tearDown() }
+        try await first.start()
+        let ids = [try await first.note("Uno"), try await first.note("Due"), try await first.note("Tre"),
+                   try await first.note("Quattro")]
+        for id in ids { await first.coordinator.transcribe(id) }
+        _ = try await first.run(0)
+        try await first.waitUntil("one runs, three wait") { first.coordinator.state.queue == Array(ids.dropFirst()) }
+        #expect(try JobRepository(root: first.root).load().map(\.state) == [.running, .queued, .queued, .queued])
+
+        // Killed: nothing more is written. A new launch over the same files.
+        let h = try first.reopened()
+        try await h.start()
+        #expect(h.coordinator.state.queue.count + (h.coordinator.state.running == nil ? 0 : 1) == 4)
+        for (index, id) in ids.enumerated() {
+            let run = try await h.run(index)
+            #expect(run.noteID == id)
+            run.finish(.done)
+        }
+        await h.coordinator.awaitIdle()
+        #expect(h.runner.runs.map(\.noteID) == ids)
+        #expect(await h.jobs.all().isEmpty)
+    }
+
+    // MARK: A queue file that cannot be read
+
+    @Test func anUnreadableQueueFileIsKeptAsideAndTheQueueStartsEmpty() async throws {
+        let h = try QueueHarness(); defer { h.tearDown() }
+        var note = Note(title: "Was queued", audioFilename: "audio.m4a")
+        note.status = .queued
+        try await h.notes.save(note)
+        h.checkpoints.save(note.id, .saved(doneMs: 28_000, totalMs: 60_000, words: 40))
+        let broken = Data("{\"version\":1,\"jobs\":[{".utf8)
+        try broken.write(to: h.root.appendingPathComponent(JobRepository.filename))
+
+        await #expect(throws: JobStore.Failure.self) { try await h.start() }
+        guard case .unreadable(let aside?) = h.coordinator.loadFailure else {
+            Issue.record("the file was not moved aside")
+            return
+        }
+        #expect(try Data(contentsOf: aside) == broken)
+        #expect(h.checkpoints.hasWork(note.id), "no saved progress is deleted without the queue")
+        #expect(await h.notes.note(note.id)?.status == .audioOnly, "the note no longer says it is queued")
+
+        #expect(await h.coordinator.transcribe(note.id) == .queued(changed: true))
+        #expect(try await h.run(0).noteID == note.id)
+        #expect(try Data(contentsOf: aside) == broken)
+    }
+
+    @Test func aQueueFileFromANewerCassiniIsNeverOverwritten() async throws {
+        let h = try QueueHarness(); defer { h.tearDown() }
+        try FileManager.default.createDirectory(at: h.root, withIntermediateDirectories: true)
+        let file = h.root.appendingPathComponent(JobRepository.filename)
+        let newer = Data(#"{"version":2,"jobs":[]}"#.utf8)
+        try newer.write(to: file)
+        let a = try await h.note("A")
+        h.checkpoints.addWork(a)
+
+        await #expect(throws: JobStore.Failure.newerVersion(2)) { try await h.start() }
+        #expect(h.coordinator.loadFailure == .newerVersion(2))
+        #expect(await h.coordinator.transcribe(a) == .refused(.queueUnavailable))
+        await h.coordinator.restore(a, trashedJob: TrashedJob(state: .queued, kind: .transcribe))
+        try await h.settle()
+        #expect(h.runner.runs.isEmpty)
+        #expect(try Data(contentsOf: file) == newer)
+        #expect(h.checkpoints.hasWork(a))
+    }
+
+    @Test func aRepairThatCannotBeSavedLetsTheInterruptedJobRunAgain() async throws {
+        let first = try QueueHarness(); defer { first.tearDown() }
+        try await first.start()
+        let a = try await first.note("A")
+        try JobRepository(root: first.root).save([
+            Job(noteID: a, seq: 1, kind: .transcribe, state: .running, enqueuedAt: first.clock.now),
+        ])
+
+        let h = try first.reopened()
+        let manager = FileManager.default
+        try manager.setAttributes([.posixPermissions: 0o555], ofItemAtPath: h.root.path)
+        defer { try? manager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: h.root.path) }
+        try await h.start(visible: false)
+        try manager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: h.root.path)
+        #expect(h.coordinator.state.queue == [a], "the job is queued again in memory")
+
+        h.coordinator.setVisible(true)
+        #expect(try await h.run(0).noteID == a, "the queue is not stuck on a job that no longer runs")
+        #expect(try JobRepository(root: h.root).load().map(\.state) == [.running])
     }
 
     // MARK: Recently Deleted
@@ -279,6 +423,49 @@ import CassiniNotebook
         #expect(h.coordinator.moveToTrash(a) == TrashedJob(state: .paused, kind: .transcribe))
         try await h.settle()
         #expect(await h.job(a)?.state == .paused)
+    }
+
+    @Test func anUndoRightAfterTrashKeepsTheQueuedJob() async throws {
+        let h = try QueueHarness(); defer { h.tearDown() }
+        try await h.start()
+        let running = try await h.note("Running"), queued = try await h.note("Queued")
+        await h.coordinator.transcribe(running)
+        await h.coordinator.transcribe(queued)
+        let first = try await h.run(0)
+
+        let trashed = h.coordinator.moveToTrash(queued)
+        await h.coordinator.restore(queued, trashedJob: trashed)
+        try await h.settle()
+        #expect(await h.job(queued)?.state == .queued)
+        #expect(h.coordinator.state.queue == [queued])
+        first.finish(.done)
+        #expect(try await h.run(1).noteID == queued)
+    }
+
+    @Test func aQueuedJobOfANoteInRecentlyDeletedNeitherWaitsNorRunsAfterARelaunch() async throws {
+        let first = try QueueHarness(); defer { first.tearDown() }
+        try await first.start()
+        let gone = try await first.note("Gone"), live = try await first.note("Live")
+        try await first.notes.mutate(gone) { $0.trashedAt = first.clock.now }
+        first.checkpoints.save(gone, .saved(doneMs: 28_000, totalMs: 60_000, words: 40))
+        // Cassini closed before Trash removed the queued job.
+        try JobRepository(root: first.root).save([
+            Job(noteID: gone, seq: 1, kind: .transcribe, enqueuedAt: first.clock.now),
+            Job(noteID: live, seq: 2, kind: .transcribe, state: .paused, pauseReason: .user, enqueuedAt: first.clock.now),
+        ])
+
+        let h = try first.reopened()
+        h.settings.queueHold = .user
+        let report = try await h.start()
+        #expect(report.trashed == [gone])
+        #expect(h.coordinator.state.queue.isEmpty)
+        #expect(h.coordinator.state.heldWaiting == nil, "nothing waits behind the hold")
+        #expect(await h.job(gone) == nil)
+        #expect(h.checkpoints.hasWork(gone), "Restore needs the saved progress")
+        h.settings.queueHold = nil
+        h.coordinator.setVisible(true)
+        try await h.settle()
+        #expect(h.runner.runs.isEmpty)
     }
 
     @Test func aPermanentDeleteStopsTheJobAndRemovesIt() async throws {
@@ -386,6 +573,38 @@ import CassiniNotebook
         #expect(try await h.run(0).noteID == a)
     }
 
+    @Test func withoutConsentAQueuedJobWaitsAsReadyToTranscribeInOneWrite() async throws {
+        let h = try QueueHarness(); defer { h.tearDown() }
+        try await h.start()
+        let a = try await h.note("A")
+        h.settings.queueHold = .user
+        await h.coordinator.transcribe(a, origin: .automatic)
+        h.consented = false
+        #expect(await h.coordinator.transcribe(a, origin: .automatic) == .needsConsent)
+        #expect(try JobRepository(root: h.root).load().map(\.state) == [.needsConsent])
+        #expect(h.coordinator.state.queue.isEmpty)
+    }
+
+    // ports: RecordingControllerTest#withoutConsentTheDownloadIsAskedOrTheNoteStaysAudioOnly
+    @Test func aSavedRecordingIsQueuedOrTheDownloadIsOfferedUnlessItWasDeclined() async throws {
+        let h = try QueueHarness(); defer { h.tearDown() }
+        try await h.start()
+        let consented = try await h.note("Consented"), asked = try await h.note("Asked")
+        let declined = try await h.note("Declined"), long = try await h.note("Long")
+        try await h.notes.mutate(long) { $0.duration = Limits.maxTranscribeDuration + 1 }
+
+        #expect(await h.coordinator.handOff(consented) == .queued)
+        #expect(try await h.run(0).noteID == consented)
+        #expect(await h.coordinator.handOff(long) == .audioOnly, "too long for one transcription")
+        h.consented = false
+        #expect(await h.coordinator.handOff(asked) == .askConsent)
+        #expect(await h.job(asked) == nil, "asking queues nothing")
+        h.settings.recordDeclined()
+        #expect(await h.coordinator.handOff(declined) == .audioOnly)
+        #expect(await h.job(declined) == nil)
+        #expect(await h.job(long) == nil)
+    }
+
     @Test func speakersOnlyNeverChangesTheLanguage() async throws {
         let h = try QueueHarness(); defer { h.tearDown() }
         try await h.start()
@@ -462,20 +681,64 @@ import CassiniNotebook
         #expect(try await h.run(1).noteID == a)
     }
 
-    @Test func eachJobHasItsOwnBackgroundTimeHandedOverWithoutAGap() async throws {
+    @Test func oneBackgroundTimeCoversTheWholeQueueAndTakesEachJobsTitle() async throws {
         let h = try QueueHarness(); defer { h.tearDown() }
         try await h.start()
         let a = try await h.note("A"), b = try await h.note("B")
         await h.coordinator.transcribe(a)
         await h.coordinator.transcribe(b)
+        _ = try await h.run(0)
+        #expect(Array(h.background.titles.values) == ["Transcribing “A”"])
         try await h.run(0).finish(.done)
         _ = try await h.run(1)
-        #expect(h.background.activeCount == 1)
-        #expect(h.background.endedCount == 1)
+        #expect(h.background.begunCount == 1, "the next job runs in the same background time")
+        #expect(h.background.endedCount == 0)
+        #expect(Array(h.background.titles.values) == ["Transcribing “B”"])
         try await h.run(1).finish(.done)
         await h.coordinator.awaitIdle()
         #expect(h.background.activeCount == 0)
-        #expect(h.background.endedCount == 2)
+        #expect(h.background.endedCount == 1, "it ends with the queue")
+    }
+
+    @Test func afterIOSTookTheTimeBackTheNextDrainAsksForNewTime() async throws {
+        let h = try QueueHarness(); defer { h.tearDown() }
+        try await h.start()
+        let a = try await h.note("A"), b = try await h.note("B")
+        await h.coordinator.transcribe(a)
+        await h.coordinator.transcribe(b)
+        _ = try await h.run(0)
+        h.background.expireAll()
+        try await h.waitUntil("A is paused") { await h.job(a)?.state == .paused }
+        await h.coordinator.awaitIdle()
+
+        h.coordinator.continueQueue()
+        _ = try await h.run(1)
+        #expect(h.background.begunCount == 2)
+        #expect(h.background.activeCount == 1)
+    }
+
+    // ports: ProcessingCoordinatorTest#aSystemStopReachesTheJobAtOnceAndThePausedNoticeGetsTheLastCheckpoint
+    @Test func aSystemStopReachesTheJobAtOnceAndThePausedJobGetsTheLastCheckpoint() async throws {
+        let h = try QueueHarness(); defer { h.tearDown() }
+        try await h.start()
+        let a = try await h.note("A")
+        await h.coordinator.transcribe(a)
+        let first = try await h.run(0)
+        first.pauseOnStop = false
+        h.checkpoints.save(a, .saved(doneMs: 288_000, totalMs: 600_000, words: 400))
+
+        h.coordinator.systemStop()
+        #expect(first.stopRequest == .pause(.system), "the job is stopped at once")
+        try await h.waitUntil("A is paused") { await h.job(a)?.state == .paused }
+        #expect(await h.job(a)?.doneMs == 288_000)
+
+        // The step that was running at the stop ends and saves its progress, then the job ends.
+        h.checkpoints.save(a, .saved(doneMs: 314_000, totalMs: 600_000, words: 430))
+        first.finish(.paused(.system))
+        await h.coordinator.awaitIdle()
+        let job = try #require(await h.job(a))
+        #expect(job.state == .paused && job.pauseReason == .system)
+        #expect(job.doneMs == 314_000)
     }
 
     // MARK: Outcomes

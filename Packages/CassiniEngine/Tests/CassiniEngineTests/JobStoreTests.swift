@@ -180,10 +180,57 @@ import CassiniNotebook
         #expect(try await store().load() == [first, try #require(await jobs.job(ids[1]))])
     }
 
-    @Test func aNewerQueueFileIsRefused() async throws {
+    @Test func aNewerQueueFileIsKeptAndTakesNoWrites() async throws {
         defer { try? FileManager.default.removeItem(at: root) }
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        try Data(#"{"version":2,"jobs":[]}"#.utf8).write(to: root.appendingPathComponent(JobRepository.filename))
-        await #expect(throws: JobRepository.Failure.unsupportedVersion(2)) { try await store().load() }
+        let file = root.appendingPathComponent(JobRepository.filename)
+        let newer = Data(#"{"version":2,"jobs":[{"from":"a newer Cassini"}]}"#.utf8)
+        try newer.write(to: file)
+        #expect(throws: JobRepository.Failure.unsupportedVersion(2)) { try JobRepository(root: root).load() }
+
+        let jobs = store()
+        await #expect(throws: JobStore.Failure.newerVersion(2)) { try await jobs.load(now: now) }
+        #expect(await jobs.isWritable == false)
+        await #expect(throws: JobStore.Failure.readOnly) {
+            try await jobs.enqueue(UUID(), kind: .transcribe, language: "", now: now)
+        }
+        #expect(try Data(contentsOf: file) == newer, "the newer file is never overwritten")
+    }
+
+    @Test func anUnreadableQueueFileIsMovedAsideAndTheQueueStartsEmpty() async throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let file = root.appendingPathComponent(JobRepository.filename)
+        let broken = Data("{\"version\":1,\"jobs\":[{".utf8)
+        try broken.write(to: file)
+
+        let jobs = store()
+        let failure = await #expect(throws: JobStore.Failure.self) { try await jobs.load(now: now) }
+        guard case .unreadable(let movedTo?) = failure else {
+            Issue.record("expected the file to be moved aside, got \(String(describing: failure))")
+            return
+        }
+        #expect(movedTo.lastPathComponent.hasPrefix("jobs.json.unreadable-"))
+        #expect(try Data(contentsOf: movedTo) == broken)
+        #expect(await jobs.isWritable)
+        let id = UUID()
+        try await jobs.enqueue(id, kind: .transcribe, language: "", now: now)
+        #expect(try JobRepository(root: root).load().map(\.noteID) == [id])
+        #expect(try Data(contentsOf: movedTo) == broken, "the new queue never touches the unreadable one")
+    }
+
+    @Test func aRepairThatCannotBeWrittenStillChangesTheQueueInMemory() async throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        let jobs = store()
+        let (a, b) = { let ids = ids(2); return (ids[0], ids[1]) }()
+        try await jobs.enqueue(a, kind: .transcribe, language: "", now: now)
+        try await jobs.enqueue(b, kind: .transcribe, language: "", now: now)
+        var running = try #require(try await jobs.claimNext(now: now))
+        running.state = .queued
+        await jobs.assume([running], removing: [b])
+        #expect(await jobs.all().map(\.noteID) == [a])
+        #expect(try JobRepository(root: root).load().map(\.state) == [.running, .queued], "nothing was written")
+        #expect(try await jobs.claimNext(now: now)?.noteID == a, "the queue goes on")
+        #expect(try JobRepository(root: root).load().map(\.noteID) == [a], "the next write saves the repair")
     }
 }

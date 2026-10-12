@@ -9,6 +9,7 @@ public final class FakeCheckpoints: JobCheckpoints {
         var statuses: [UUID: CheckpointStatus] = [:]
         var work: Set<UUID> = []
         var discarded: [UUID] = []
+        var held: Set<UUID> = []
     }
     private let state = Mutex(State())
 
@@ -25,8 +26,13 @@ public final class FakeCheckpoints: JobCheckpoints {
     public func hasWork(_ noteID: UUID) -> Bool { state.withLock { $0.work.contains(noteID) } }
     public var discarded: [UUID] { state.withLock { $0.discarded } }
 
+    /// Reads of the note's status wait until `release`, so a test can keep the queue's serial section busy.
+    public func hold(_ noteID: UUID) { state.withLock { _ = $0.held.insert(noteID) } }
+    public func release(_ noteID: UUID) { state.withLock { _ = $0.held.remove(noteID) } }
+
     public func status(of noteID: UUID) async -> CheckpointStatus {
-        state.withLock { $0.statuses[noteID] ?? .missing }
+        while state.withLock({ $0.held.contains(noteID) }) { try? await Task.sleep(for: .milliseconds(2)) }
+        return state.withLock { $0.statuses[noteID] ?? .missing }
     }
 
     public func discard(_ noteID: UUID) async throws {

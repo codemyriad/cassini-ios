@@ -58,6 +58,7 @@ import CassiniNotebook
     private func applied(_ plan: Reconcile.Plan, to tree: Tree) -> Tree {
         var tree = tree
         for job in plan.jobs { tree.jobs[tree.jobs.firstIndex { $0.noteID == job.noteID }!] = job }
+        for id in plan.removeJobs { tree.jobs.removeAll { $0.noteID == id } }
         for id in plan.deleteWork { tree.work.remove(id); tree.checkpoints[id] = nil }
         return tree
     }
@@ -145,6 +146,27 @@ import CassiniNotebook
         #expect(plan.report.isEmpty)
     }
 
+    @Test func aJobThatTrashDidNotFinishWithEndsAsTrashWouldHaveEndedIt() {
+        let queued = UUID(), running = UUID(), paused = UUID()
+        let saved = CheckpointStatus.saved(doneMs: 28_000, totalMs: 60_000, words: 3)
+        let jobs = [
+            Job(noteID: queued, seq: 1, kind: .transcribe, state: .queued, enqueuedAt: then),
+            Job(noteID: running, seq: 2, kind: .transcribeAgain, state: .running, enqueuedAt: then),
+            Job(noteID: paused, seq: 3, kind: .transcribe, state: .paused, pauseReason: .user, enqueuedAt: then),
+        ]
+        let all: Set<UUID> = [queued, running, paused]
+        let plan = Reconcile.plan(jobs: jobs, checkpoints: [queued: saved, running: saved], work: [queued, running],
+                                  trashed: all, existing: all, activeNoteID: nil, now: now)
+        #expect(plan.removeJobs == [queued], "a queued job leaves the queue")
+        let stopped = try? #require(plan.jobs.first { $0.noteID == running })
+        #expect(stopped?.state == .paused && stopped?.pauseReason == .user, "a running job is paused with its progress")
+        #expect(stopped?.doneMs == 28_000)
+        #expect(stopped?.attempts == 0, "it was stopped, not interrupted")
+        #expect(!plan.jobs.contains { $0.noteID == paused }, "a paused job stays as it is")
+        #expect(plan.deleteWork.isEmpty, "Restore needs the saved progress")
+        #expect(plan.report.trashed == [queued, running])
+    }
+
     @Test func workOfANoteThatCouldNotBeReadStays() {
         let id = UUID()
         let plan = Reconcile.plan(jobs: [], checkpoints: [:], work: [id], trashed: [], existing: [], activeNoteID: nil,
@@ -154,6 +176,16 @@ import CassiniNotebook
 }
 
 @Suite struct EnqueueRulesTests {
+    @Test func theHeldQueueNoticeShowsOnlyWhileAHoldKeepsWaitingNotesFromStarting() {
+        let a = UUID(), b = UUID()
+        #expect(ProcessingState(queue: [a, b], hold: .user).heldWaiting == 2)
+        #expect(ProcessingState(queue: [a], hold: .system).heldWaiting == 1)
+        #expect(ProcessingState(queue: [a, b]).heldWaiting == nil, "nothing holds the queue")
+        #expect(ProcessingState(queue: [], hold: .user).heldWaiting == nil, "nothing waits")
+        #expect(ProcessingState(running: RunningJob(noteID: b, title: "B"), queue: [a], hold: .user).heldWaiting == nil,
+                "the running job shows its own Stop")
+    }
+
     // ports: JobRepositoryTest#enqueueRefusesNotesThatCannotBeTranscribed
     @Test func notesThatCannotBeTranscribedAreRefused() {
         var trashed = Note(title: "Trashed"); trashed.trashedAt = Date()
