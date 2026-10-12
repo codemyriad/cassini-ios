@@ -65,21 +65,29 @@ struct ConformanceTests {
         if let wanted = expect["formatId"]?.string {
             #expect(comments(document) { $0 == "CASSINI_FORMAT" } == ["CASSINI_FORMAT=\(wanted)"])
         }
-        switch expect["payloadTrust"]?.string {
-        case "verified": #expect(document.manifest != nil)
-        case "unverified", "mismatched": #expect(document.manifest == nil)
-        default: break
-        }
-        if let warnings = expect["warnings"]?.array {
-            let wanted = try warnings.compactMap { $0.object }.map { warning in
-                let code = try warning.string("code")
-                return warning["tag"]?.string.map { "\(code): \($0)" } ?? code
-            }
-            for warning in wanted { #expect(document.warnings.contains(warning), "missing warning \(warning) in \(document.warnings)") }
-            let codes = Set(wanted.map(code))
-            #expect(document.warnings.allSatisfy { codes.contains(code($0)) }, "unexpected warnings in \(document.warnings)")
-        }
         let reported = document.warnings + document.variants.compactMap { $0.error }
+        let observed = Observation(document, reported: reported)
+        if let wanted = expect["classification"]?.string { #expect(observed.classification == wanted) }
+        if let wanted = expect["payloadTrust"]?.string { #expect(observed.payloadTrust == wanted) }
+        if let wanted = expect["audioTrust"]?.string { #expect(observed.audioTrust == wanted) }
+        if let reference = expect["sameContentAs"]?.string {
+            let same = try #require(ConformanceVector.all.first { $0.id == reference })
+            let other = CassiniDocument.read(try bytes(Conformance.directory.appendingPathComponent(same.file)))
+            // As the runner reads it: the same speech and speakers, though the manifest may carry more (021 pads it).
+            #expect(document.manifest?["version"] == other.manifest?["version"])
+            #expect(document.manifest?["speakers"] == other.manifest?["speakers"], "speakers differ from \(reference)")
+            #expect(document.variants.map { $0.id } == other.variants.map { $0.id })
+            #expect(document.variants.map { $0.body } == other.variants.map { $0.body }, "transcript bodies differ from \(reference)")
+        }
+        // A vector without `warnings` expects none; a warning may only repeat a code the vector names as an error.
+        let warnings = try (expect["warnings"]?.array ?? []).compactMap { $0.object }.map { warning in
+            let code = try warning.string("code")
+            return warning["tag"]?.string.map { "\(code): \($0)" } ?? code
+        }
+        for warning in warnings { #expect(document.warnings.contains(warning), "missing warning \(warning) in \(document.warnings)") }
+        let errorCodes = try (expect["errors"]?.array ?? []).compactMap { $0.object }.map { try $0.string("code") }
+        let allowed = Set(warnings.map(code) + errorCodes)
+        #expect(document.warnings.allSatisfy { allowed.contains(code($0)) }, "unexpected warnings in \(document.warnings)")
         for error in (expect["errors"]?.array ?? []).compactMap({ $0.object }) {
             let code = try error.string("code")
             if let tag = error["tag"]?.string {
@@ -95,6 +103,28 @@ struct ConformanceTests {
         if mustNot.contains("fail") { #expect(document.state != .invalidMetadata) }
         if mustNot.contains("present-as-current") { #expect(document.manifest == nil && transcripts.isEmpty) }
         if document.manifest == nil { #expect(document.variants.isEmpty) }
+    }
+
+    /**
+     * What the suite's runner observes of a full reader, in the index's vocabulary: the classification and trust
+     * triple that adapters/adapter-go.py derives from the state.
+     */
+    struct Observation {
+        let classification: String, payloadTrust: String, audioTrust: String
+
+        init(_ document: CassiniDocument, reported: [String]) {
+            switch document.state {
+            case .plainAudio: (classification, payloadTrust, audioTrust) = ("plain-audio", "not-applicable", "not-applicable")
+            case .unknownFormat: (classification, payloadTrust, audioTrust) = ("unsupported-version", "unverified", "unverified")
+            case .invalidMetadata:
+                let mismatched = reported.contains { $0.hasPrefix("payload-sha256-mismatch") }
+                (classification, payloadTrust, audioTrust) = ("damaged-metadata", mismatched ? "mismatched" : "unverified", "unverified")
+            case .unreadable: (classification, payloadTrust, audioTrust) = ("crash", "unverified", "unverified")
+            case .unverified: (classification, payloadTrust, audioTrust) = ("cassini", "verified", "unverified")
+            case .staleAudio: (classification, payloadTrust, audioTrust) = ("cassini", "verified", "mismatched")
+            case .ok: (classification, payloadTrust, audioTrust) = ("cassini", "verified", "verified")
+            }
+        }
     }
 
     /** The code of a reported warning or error: the text before `: TAG`, if any. */
