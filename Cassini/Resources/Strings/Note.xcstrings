@@ -246,6 +246,23 @@
         }
       }
     },
+    "Back to library": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Back to library"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Torna alla libreria"
+          }
+        }
+      }
+    },
     "Cancel": {
       "extractionState": "manual",
       "localizations": {
@@ -1029,6 +1046,23 @@
         }
       }
     },
+    "Recording unavailable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recording unavailable"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registrazione non disponibile"
+          }
+        }
+      }
+    },
     "Remove from queue": {
       "extractionState": "manual",
       "localizations": {
@@ -1127,6 +1161,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ripresa da %@"
+          }
+        }
+      }
+    },
+    "Return to your library to choose a recording.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Return to your library to choose a recording."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Torna alla libreria per scegliere una registrazione."
           }
         }
       }
@@ -1840,6 +1891,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "iOS ha chiuso il tempo che Cassini aveva in background. Riprendi per continuare da dove si è fermata."
+          }
+        }
+      }
+    },
+    "· edited": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "· edited"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "· modificata"
           }
         }
       }

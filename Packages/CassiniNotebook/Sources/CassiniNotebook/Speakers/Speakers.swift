@@ -71,6 +71,13 @@ extension Note {
         return (history.count + 1, history.count + 2)
     }
 
+    /// How many versions the note has: the kept ones, and the transcript shown when no kept version holds it. The
+    /// version chip and Document info both count this way.
+    public var versionCount: Int {
+        guard !transcript.isEmpty || !(versions ?? []).isEmpty else { return 0 }
+        return max(versions?.count ?? 0, mergeVersionNumbers.shown)
+    }
+
     /// Names a speaker, trimmed and cut to `Limits.nameMaxLength`; a blank name changes nothing.
     public mutating func renameSpeaker(_ id: String, name: String) {
         guard let index = speakers?.firstIndex(where: { $0.id == id }) else { return }
@@ -93,7 +100,7 @@ extension Note {
         speakers?.removeAll { $0.id == source }
         refreshSpeakerLabels()
         selectedVersionID = nil
-        saveCurrentVersion(name: "Merged speakers", id: stamp.after, date: stamp.date)
+        saveCurrentVersion(name: Self.mergedVersionName, id: stamp.after, date: stamp.date)
     }
 
     public mutating func addSpeaker(id: String, name: String) {

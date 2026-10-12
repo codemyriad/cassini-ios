@@ -38,7 +38,7 @@ public struct DocumentInfoFacts: Hashable, Sendable {
         }
         return DocumentInfoFacts(
             trust: DocumentTrust.of(note), title: note.title, createdAt: note.createdAt, duration: note.duration,
-            versions: max(note.versions?.count ?? 0, note.transcript.isEmpty ? 0 : 1), speakers: speakers.count,
+            versions: note.versionCount, speakers: speakers.count,
             language: (provenance?.language).flatMap { $0.isEmpty ? nil : $0 } ?? (note.language.isEmpty ? nil : note.language),
             processingMs: processing,
             realtimeFactor: processing.map { note.duration * 1000 / Double($0) },

@@ -108,6 +108,7 @@ enum NoteCopy {
         switch chip.kind {
         case .original: return base
         case .merged: return base + " " + String(localized: "· speakers merged", table: "Note")
+        case .edited: return base + " " + String(localized: "· edited", table: "Note")
         case .transcribedAgain: return base + " " + String(localized: "· transcribed again", table: "Note")
         }
     }
@@ -130,6 +131,14 @@ enum NoteCopy {
     static let unassigned = String(localized: "Unassigned", table: "Note")
     static let speakerFooter = String(localized: "Assign this passage to a speaker. Rename or merge people from Speakers.", table: "Note")
     static let save = String(localized: "Save", table: "Note")
+
+    // MARK: Rename and the missing note
+
+    static let renameTitle = String(localized: "Rename", table: "Note")
+    static let titleField = String(localized: "Title", table: "Note")
+    static let unavailableTitle = String(localized: "Recording unavailable", table: "Note")
+    static let unavailableBody = String(localized: "Return to your library to choose a recording.", table: "Note")
+    static let backToLibrary = String(localized: "Back to library", table: "Note")
     static let passageChanged = String(localized: "This passage changed while you were editing.", table: "Note")
     static let passageLocked = String(localized: "Wait until transcription finishes", table: "Note")
 }

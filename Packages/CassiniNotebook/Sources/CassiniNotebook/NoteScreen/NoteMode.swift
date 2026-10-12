@@ -96,7 +96,7 @@ public enum ReadOnlyReason: Hashable, Sendable {
 
 /// The version chip: "Version `index` of `count`" plus the suffix of `kind`.
 public struct VersionChip: Hashable, Sendable {
-    public enum Kind: Hashable, Sendable { case original, merged, transcribedAgain }
+    public enum Kind: Hashable, Sendable { case original, merged, edited, transcribedAgain }
     public var index: Int
     public var count: Int
     public var kind: Kind
@@ -120,13 +120,12 @@ public struct NoteChips: Hashable, Sendable {
     static func versionChip(_ note: Note) -> VersionChip? {
         let versions = note.versions ?? []
         let shown = note.mergeVersionNumbers.shown
-        let count = max(versions.count, shown)
+        let count = note.versionCount
         guard count >= 2 else { return nil }
-        let kind: VersionChip.Kind
-        if versions.indices.contains(shown - 1), versions[shown - 1].name == Note.mergedVersionName {
-            kind = .merged
-        } else {
-            kind = shown > 1 ? .transcribedAgain : .original
+        let kind: VersionChip.Kind = switch versions.indices.contains(shown - 1) ? versions[shown - 1].name : nil {
+        case Note.mergedVersionName?: .merged
+        case Note.editedVersionName?: .edited
+        default: shown > 1 ? .transcribedAgain : .original
         }
         return VersionChip(index: shown, count: count, kind: kind)
     }

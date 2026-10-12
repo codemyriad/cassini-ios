@@ -59,8 +59,8 @@ struct NoteDetailView: View {
             if let note {
                 content(note, mode: NoteMode.of(note, job: job, ahead: processing.state.ahead(of: noteID) ?? 0))
             } else {
-                ContentUnavailableView("Recording unavailable", systemImage: "waveform.slash",
-                                       description: Text("Return to your library to choose a recording."))
+                ContentUnavailableView(NoteCopy.unavailableTitle, systemImage: "waveform.slash",
+                                       description: Text(NoteCopy.unavailableBody))
             }
         }
         .background(Color.paper)
