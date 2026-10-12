@@ -39,15 +39,18 @@
 - **The hand-off waits for the audio**, where Android hands off inside `end()`. To keep the user's consent through a
   kill during the compression, a note to transcribe is sealed with status `queued`; the next launch's reconcile then
   shows it as interrupted (ready to transcribe again) instead of silently audio only. A hand-off that is refused, or a
-  capture that cannot be read, sets it back to audio only. The Finish outcome (`saved(transcribe)`) is reported before
+  capture that cannot be read, sets it back to audio only. While the audio compresses the note shows "Waiting to
+  transcribe" with Cancel; a cancel then stands, since the hand-off happens only if the note is still `queued`. The Finish outcome (`saved(transcribe)`) is reported before
   the hand-off, so a refused hand-off is not reflected in it, where Android reports `AUDIO_ONLY`; on iOS both
   outcomes open the note the same way, and the note's status shows the result.
 - A recording longer than 36 h is saved with `failure = LONG` and never queued.
 - **Automatic transcription off** (an iOS setting Android does not have) makes every finish audio only.
-- **A seal that cannot be written** leaves the note live on disk, and the next launch's recovery makes it plain. For
-  the rest of the session the note is shown sealed (plain, audio only, its title and duration) through
-  `RecordingNotes.showUnsaved` (`LibraryStore.showUnsaved`), so it opens as a note and not as a recording; the Library
-  reports the failed write, nothing is compressed or queued, and the outcome is `saved(audioOnly)`.
+- **A seal that cannot be written** leaves the note live on disk. It is shown sealed (plain, audio only, its title and
+  duration) through `RecordingNotes.showUnsaved` (`LibraryStore.showUnsaved`), so it opens as a note and not as a
+  recording. The Library keeps that change over the stored note, also over what other writers save, and writes it with
+  the note's next write (a rename, the playback position, a favourite); once one succeeds it is on disk. If none does,
+  the next launch's recovery makes the note plain. The Library reports the failed write, nothing is compressed or
+  queued, and the outcome is `saved(audioOnly)`.
 - **A title typed while the microphone starts** is kept (`RecordingController.startingTitle`) and written once the
   capture runs, as Android's `Starting(title)`; the frozen `RecordingState.starting` carries no title.
 
@@ -58,7 +61,11 @@
 - **One model for every showing.** Android's view model belongs to one navigation entry, so its "leaving" latch starts
   fresh each time. The iOS `RecordingScreenModel` lives as long as `RecordingStore`, and the cover is shown from the
   Record button, the Library's card and row, the Live Activity and an automatic stop; the view calls `appeared()` on
-  each showing (and an automatic stop resets the latch before `.show`), so each showing leads away once.
+  each showing (and an automatic stop resets the latch before `.show`), so each showing leads away once. For the same
+  reason leading away drops a start that was waiting for microphone access (Android tears it down with the entry), so
+  coming back from Settings after leaving never starts a recording off screen. The end of a recording is handled in the
+  turn the controller tells it; only the speech-model lookup after a finish without consent waits, and it leads away
+  only if no newer showing or recording began meanwhile.
 - "Mark a moment" bookmarks the capture's current time (`RecordingController.currentElapsed`), not the displayed time,
   which is refreshed once a second.
 - **Permissions.** iOS asks for the microphone with the system question when access is undetermined; a denial shows
@@ -113,7 +120,8 @@
 - `RecordingActivityState.warning` is a `RecordingWarning?` (worded by the widget), and `RecordingWarning` is
   `Codable`.
 - `LiveActivityPort.start` takes the recording's `noteID`.
-- `RecordingNotes` gained `showUnsaved(_:_:)`; `LibraryStore` gained `showUnsaved(_:_:)` (screen-only change).
+- `RecordingNotes` gained `note(_:)` and `showUnsaved(_:_:)`; `LibraryStore` gained `showUnsaved(_:_:)` (shown at
+  once, written with the note's next write) and `init(noteStore:errors:)` for tests.
 - `CaptureRecovery.rebuild(in:)` returns `[RecoveredRecording]` (oldest first) instead of `[UUID]`.
 - `RecordingIntentRouter.handler` takes the action and the activity's note id; the intents take `noteID`.
 - `RecordingState.inProgress` was added.
