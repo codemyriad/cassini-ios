@@ -32,6 +32,8 @@ public struct Note: Identifiable, Hashable, Sendable {
     public var speakers: [NoteSpeaker]?
     public var versions: [TranscriptVersion]?
     public var selectedVersionID: UUID?
+    /// How the latest on-device transcription of this note was made; nil for imported or older transcripts.
+    public var provenance: TranscriptProvenance?
 
     public init(id: UUID = UUID(), title: String, createdAt: Date = Date(), audioFilename: String = "audio.m4a") {
         self.id = id; self.title = title; self.createdAt = createdAt; self.audioFilename = audioFilename
@@ -51,6 +53,7 @@ extension Note: Codable {
         case schemaVersion, id, title, createdAt, audioFilename, duration, status, transcript, bookmarks, waveform
         case isFavorite, trashedAt, playbackPosition, language, audio, origin, document, sourceSha256, trashedJob
         case previewText, failure, speakerAnalysisFailure, originalAudioFilename, speakers, versions, selectedVersionID
+        case provenance
         // Schema 1 only.
         case failureMessage, playbackUnavailable, speakerAnalysisMessage
     }
@@ -80,6 +83,7 @@ extension Note: Codable {
         sourceSha256 = try c.decodeIfPresent(String.self, forKey: .sourceSha256)
         trashedJob = try c.decodeIfPresent(TrashedJob.self, forKey: .trashedJob)
         previewText = try c.decodeIfPresent(String.self, forKey: .previewText)
+        provenance = try? c.decodeIfPresent(TranscriptProvenance.self, forKey: .provenance)
         if schema == 1 {
             try decodeSchemaOne(c)
         } else {
@@ -135,6 +139,7 @@ extension Note: Codable {
         try c.encodeIfPresent(speakers, forKey: .speakers)
         try c.encodeIfPresent(versions, forKey: .versions)
         try c.encodeIfPresent(selectedVersionID, forKey: .selectedVersionID)
+        try c.encodeIfPresent(provenance, forKey: .provenance)
     }
 
     /// Schema 1 stored `Locale.identifier` (`en_US`); schema 2 stores BCP-47 (`en-US`).
