@@ -162,7 +162,7 @@ final class CassiniUITests: XCTestCase {
             capture("Microphone unavailable")
             app.buttons["Library"].tap()
             XCTAssertTrue(app.buttons["recordButton"].waitForExistence(timeout: 5))
-            XCTAssertTrue(app.buttons["Import"].isEnabled)
+            XCTAssertTrue(app.buttons["importButton"].isEnabled)
             return
         }
         capture("Recording")

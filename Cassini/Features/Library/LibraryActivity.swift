@@ -30,6 +30,7 @@ struct CaptureBar: View {
         let active = recording.state.isActive
         layout {
             Button { importing = true } label: { Label("Import", systemImage: "square.and.arrow.down").font(.subheadline.weight(.semibold)).frame(minWidth: 88, minHeight: 52) }
+                .accessibilityIdentifier("importButton")
             Button { Task { await recording.start() } } label: {
                 Label(active ? "Return to recording" : "Record", systemImage: active ? "waveform" : "mic.fill")
             }.buttonStyle(PrimaryButtonStyle()).disabled(recording.isBusy).accessibilityIdentifier("recordButton")
