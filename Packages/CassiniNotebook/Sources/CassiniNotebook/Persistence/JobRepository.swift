@@ -29,6 +29,18 @@ public struct JobRepository: Sendable {
         return file.jobs.sorted { $0.seq < $1.seq }
     }
 
+    /// Moves an unreadable `jobs.json` to `jobs.json.unreadable-<stamp>` beside it, so a new queue never overwrites
+    /// it. Returns where it went.
+    @discardableResult
+    public func moveAside(at stamp: Date) throws -> URL {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withYear, .withMonth, .withDay, .withTime]
+        let name = "\(Self.filename).unreadable-\(formatter.string(from: stamp))"
+        let target = url.deletingLastPathComponent().appendingPathComponent(name)
+        try FileManager.default.moveItem(at: url, to: target)
+        return target
+    }
+
     public func save(_ jobs: [Job]) throws {
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]

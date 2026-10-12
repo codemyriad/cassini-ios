@@ -9,6 +9,8 @@ public struct BackgroundToken: Hashable, Sendable {
 @MainActor public protocol BackgroundRunner: AnyObject {
     /// `onExpire` runs synchronously when iOS takes the time back; the runner ends the token right after it.
     func begin(title: String, progress: Progress, onExpire: @escaping @MainActor () -> Void) -> BackgroundToken
+    /// Gives the work of a token that has not ended a new title, as when the next job of a queue starts in it.
+    func update(_ token: BackgroundToken, title: String)
     /// Ends the token; ending one twice, or after it expired, does nothing.
     func end(_ token: BackgroundToken)
 }

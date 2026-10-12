@@ -40,6 +40,8 @@ public final class TranscriptionCoordinator {
     public private(set) var isReady = false
     /// A drain loop runs: a job runs or is about to be claimed.
     public var isDraining: Bool { drainTask != nil }
+    /// Why the stored queue could not be read at launch, for the notice that tells it; nil when it was read.
+    public private(set) var loadFailure: JobStore.Failure?
 
     @ObservationIgnored private let parts: Parts
     @ObservationIgnored private let settings: SettingsStore
@@ -49,8 +51,14 @@ public final class TranscriptionCoordinator {
     @ObservationIgnored private var drainTask: Task<Void, Never>?
     @ObservationIgnored private var rerun = false
     @ObservationIgnored private var visible = false
-    /// Notes moved to Recently Deleted in this run; their jobs never start, even before the note write lands.
-    @ObservationIgnored private var trashing: Set<UUID> = []
+    /// The background time of the drain loop, held from its first claim until the queue is empty or held; nil once
+    /// iOS took it back.
+    @ObservationIgnored private var background: BackgroundToken?
+    /// The progress the system shows while the drain runs; each job reports into it from 0.
+    @ObservationIgnored private var backgroundProgress = Progress(totalUnitCount: 100)
+    /// Notes in Recently Deleted (read at launch, then kept in step by Trash and Restore). Their jobs never start or
+    /// count as waiting, even before the note write lands.
+    @ObservationIgnored private var trashed: Set<UUID> = []
     @ObservationIgnored private let log = Logger(subsystem: "app.codemyriad.cassini", category: "queue")
 
     /// How an interrupted job ends: `discard` (Start over) drops its work, `keep` pauses it with its progress.
@@ -62,8 +70,6 @@ public final class TranscriptionCoordinator {
         let title: String
         let stop = StopSignal()
         let finished = OneShot()
-        /// Bound to the system's progress UI while the job runs in the background.
-        let progress = Progress(totalUnitCount: 100)
         var cancel: CancelMode?
         var run: Task<JobOutcome, Never>?
         var events: Task<Void, Never>?
@@ -95,6 +101,7 @@ public final class TranscriptionCoordinator {
         }
         guard let note = await parts.notes.note(noteID) else { return .refused(.noNote) }
         if let refusal = EnqueueRules.refusal(for: note) { return .refused(refusal) }
+        guard await parts.jobs.isWritable else { return .refused(.queueUnavailable) }
         let spoken = EnqueueRules.language(for: kind, speechLanguage: settings.speechLanguage)
         let language = Language(job: spoken ?? note.language, setsNote: spoken != nil)
         guard await parts.consent.allows(kind, language.job) else {
@@ -105,6 +112,23 @@ public final class TranscriptionCoordinator {
         let outcome = await lock.run { await enqueue(noteID, kind: kind, language: language) }
         if case .queued = outcome, settings.queueHold == nil { drain() }
         return outcome
+    }
+
+    /// After a recording or an import is saved, with Transcribe automatically on: the note is queued when the models
+    /// may be used, the model download screen should ask when the person has not declined it, and otherwise the note
+    /// stays audio only. Audio longer than one transcription takes stays audio only too. The automatic request never
+    /// clears a hold.
+    public func handOff(_ noteID: UUID) async -> HandOff {
+        await readiness.wait()
+        guard let note = await parts.notes.note(noteID), note.duration <= Limits.maxTranscribeDuration else {
+            return .audioOnly
+        }
+        let language = EnqueueRules.language(for: .transcribe, speechLanguage: settings.speechLanguage) ?? note.language
+        guard await parts.consent.allows(.transcribe, language) else {
+            return settings.modelsDeclinedAt == nil ? .askConsent : .audioOnly
+        }
+        if case .queued = await transcribe(noteID, origin: .automatic) { return .queued }
+        return .audioOnly
     }
 
     /// "Stop and keep progress" on the note that runs now. False when it does not run.
@@ -197,7 +221,7 @@ public final class TranscriptionCoordinator {
     /// Before a note goes to Recently Deleted: a running job stops and keeps its progress, a queued job leaves the
     /// queue (its `work/` stays for Restore), any other job stays. Returns what the note should remember for Restore.
     public func moveToTrash(_ noteID: UUID) -> TrashedJob? {
-        trashing.insert(noteID)
+        trashed.insert(noteID)
         state.queue.removeAll { $0 == noteID }
         if let current = active, current.noteID == noteID {
             current.stop.stop(.pause(.user))
@@ -207,7 +231,10 @@ public final class TranscriptionCoordinator {
         if job.state == .queued {
             Task {
                 await lock.run {
-                    if await parts.jobs.job(noteID)?.state == .queued { await write { try await $0.remove(noteID) } }
+                    // An Undo that ran first queued the note again: that job stays.
+                    if trashed.contains(noteID), await parts.jobs.job(noteID)?.state == .queued {
+                        await write { try await $0.remove(noteID) }
+                    }
                     await refresh()
                 }
             }
@@ -218,7 +245,7 @@ public final class TranscriptionCoordinator {
     /// Undo and Restore: a job that was queued when the note was trashed is queued again at the back, and the queue
     /// starts as after a Transcribe.
     public func restore(_ noteID: UUID, trashedJob: TrashedJob?) async {
-        trashing.remove(noteID)
+        trashed.remove(noteID)
         await readiness.wait()
         guard let trashedJob, trashedJob.state == .queued, let note = await parts.notes.note(noteID) else {
             await refresh()
@@ -244,7 +271,7 @@ public final class TranscriptionCoordinator {
             await write { try await $0.remove(noteID) }
             await refresh()
         }
-        trashing.remove(noteID)
+        trashed.remove(noteID)
     }
 
     /// iOS takes the background time back, or the person pressed Stop in the system's progress: the running job
@@ -279,20 +306,36 @@ public final class TranscriptionCoordinator {
     /// Repairs the queue after Cassini closed: reads `jobs.json`, applies `Reconcile`, deletes `work/` that no job
     /// owns, brings each note's status in line, and then lets the queue be read. `activeNoteID` is the note being
     /// recorded, which is left alone.
+    ///
+    /// A `jobs.json` that cannot be read is never overwritten (see `JobStore.load`): the queue opens empty, or takes no
+    /// writes when the file is kept, no `work/` is deleted, notes that say they were queued are set back, and the
+    /// failure is thrown once the queue is open.
     @discardableResult
     public func reconcileOnStart(activeNoteID: UUID? = nil) async throws -> ReconcileReport {
         defer { markReady() }
-        let jobs = try await parts.jobs.load()
+        let jobs: [Job]
+        do {
+            jobs = try await parts.jobs.load(now: parts.clock.now)
+        } catch {
+            log.error("Cannot read the queue: \(String(describing: error))")
+            loadFailure = error as? JobStore.Failure ?? .readOnly
+            jobs = []
+        }
         let notes = await parts.notes.all()
+        trashed = Set(notes.filter { $0.trashedAt != nil }.map(\.id))
         let work = await parts.checkpoints.notesWithWork()
         var checkpoints: [UUID: CheckpointStatus] = [:]
         for id in Set(jobs.map(\.noteID)).union(work) { checkpoints[id] = await parts.checkpoints.status(of: id) }
         let plan = Reconcile.plan(
-            jobs: jobs, checkpoints: checkpoints, work: work,
-            trashed: Set(notes.filter { $0.trashedAt != nil }.map(\.id)), existing: Set(notes.map(\.id)),
+            jobs: jobs, checkpoints: checkpoints, work: work, trashed: trashed, existing: Set(notes.map(\.id)),
             activeNoteID: activeNoteID, now: parts.clock.now)
-        try await parts.jobs.replace(plan.jobs)
-        for id in plan.deleteWork {
+        do { try await parts.jobs.replace(plan.jobs, removing: plan.removeJobs) } catch {
+            // The repair goes on in memory, so no job stays running without a run; the next write saves it.
+            log.error("Cannot save the repaired queue: \(String(describing: error))")
+            await parts.jobs.assume(plan.jobs, removing: plan.removeJobs)
+        }
+        // Without the stored queue every `work/` would look orphaned: none is deleted.
+        for id in plan.deleteWork where loadFailure == nil {
             do { try await parts.checkpoints.discard(id) } catch { log.error("Cannot delete the work of \(id): \(String(describing: error))") }
         }
         let stored = Dictionary(uniqueKeysWithValues: await parts.jobs.all().map { ($0.noteID, $0) })
@@ -304,6 +347,7 @@ public final class TranscriptionCoordinator {
         for id in plan.report.interrupted {
             if let note = await parts.notes.note(id) { await notifyHidden(id, note.title, .transcriptionStopped) }
         }
+        if let loadFailure { throw loadFailure }
         return plan.report
     }
 
@@ -317,7 +361,7 @@ public final class TranscriptionCoordinator {
     private func startWaitingQueue() async {
         await readiness.wait()
         guard visible, active == nil, drainTask == nil, settings.queueHold == nil,
-              let head = await parts.jobs.all().first(where: { $0.state == .queued && !trashing.contains($0.noteID) }),
+              let head = await parts.jobs.all().first(where: { $0.state == .queued && !trashed.contains($0.noteID) }),
               await parts.consent.allows(head.kind, head.language) else { return }
         drain()
     }
@@ -336,38 +380,45 @@ public final class TranscriptionCoordinator {
         while let task = drainTask { await task.value }
     }
 
+    /// Claims and runs queued jobs one at a time until the queue is empty or held. One background time covers the
+    /// whole loop: it begins with the first claim, while Cassini is on the screen, and each next job only gives it its
+    /// title, so iOS keeps the queue going after Cassini leaves the screen.
     private func drainLoop() async {
-        var token: BackgroundToken?
         repeat {
             rerun = false
-            token = await runQueue(handingOver: token)
+            while settings.queueHold == nil, let next = await lock.run({ await claim() }) {
+                holdBackgroundTime(for: next)
+                await runOne(next)
+            }
         } while rerun
-        if let token { parts.background.end(token) }
+        if let background { parts.background.end(background) }
+        background = nil
         drainTask = nil
     }
 
-    /// Claims and runs queued jobs one at a time until the queue is empty or held. Each job has its own background
-    /// time; the next job's begins before the previous one's ends, so iOS never sees a gap. Returns the last token.
-    private func runQueue(handingOver previous: BackgroundToken?) async -> BackgroundToken? {
-        var token = previous
-        while settings.queueHold == nil, let next = await lock.run({ await claim() }) {
-            let started = parts.background.begin(title: parts.backgroundTitle(next.title), progress: next.progress) { [weak self] in
-                self?.systemStop()
-            }
-            if let token { parts.background.end(token) }
-            token = started
-            await runOne(next)
+    private func holdBackgroundTime(for current: Active) {
+        let title = parts.backgroundTitle(current.title)
+        backgroundProgress.completedUnitCount = 0
+        if let background {
+            parts.background.update(background, title: title)
+            return
         }
-        return token
+        // A new progress each time: a progress joins the system's task only once.
+        backgroundProgress = Progress(totalUnitCount: 100)
+        background = parts.background.begin(title: title, progress: backgroundProgress) { [weak self] in
+            // The runner ends the token right after this; an ended token never expires, so this is the drain's.
+            self?.background = nil
+            self?.systemStop()
+        }
     }
 
     /// The next queued job of a live note becomes running and `active`; nil when there is none or the queue cannot be
     /// written now (the job then stays queued for the next drain).
     private func claim() async -> Active? {
-        let trashed = Set(await parts.notes.all().filter { $0.trashedAt != nil }.map(\.id)).union(trashing)
+        let skipped = Set(await parts.notes.all().filter { $0.trashedAt != nil }.map(\.id)).union(trashed)
         while true {
             let claimed: Job?
-            do { claimed = try await parts.jobs.claimNext(now: parts.clock.now, skipping: trashed) } catch {
+            do { claimed = try await parts.jobs.claimNext(now: parts.clock.now, skipping: skipped) } catch {
                 log.error("Cannot claim the next job: \(String(describing: error))")
                 return nil
             }
@@ -418,7 +469,7 @@ public final class TranscriptionCoordinator {
         guard active === current, let running = state.running else { return }
         let updated = running.applying(event)
         if updated != running { state.running = updated }
-        current.progress.completedUnitCount = Int64(((updated.fraction ?? 0) * 100).rounded())
+        backgroundProgress.completedUnitCount = Int64(((updated.fraction ?? 0) * 100).rounded())
         if case .checkpointed(let doneMs) = event {
             Task {
                 await lock.run {
@@ -490,16 +541,22 @@ public final class TranscriptionCoordinator {
         guard await write({ try await $0.enqueue(noteID, kind: kind, language: language.job, now: self.parts.clock.now) }) != nil else {
             return .queued(changed: false)
         }
-        trashing.remove(noteID)
+        trashed.remove(noteID)
         await mirror(noteID, language: language.forNote)
         await refresh()
         return .queued(changed: true)
     }
 
     private func needConsent(_ noteID: UUID, kind: JobKind, language: Language) async -> TranscribeOutcome {
-        if await parts.jobs.job(noteID)?.state == .running { return .queued(changed: false) }
-        await write { try await $0.enqueue(noteID, kind: kind, language: language.job, now: self.parts.clock.now) }
-        await write { try await $0.transition(noteID, now: self.parts.clock.now) { $0.state = .needsConsent } }
+        let now = parts.clock.now
+        switch await parts.jobs.job(noteID)?.state {
+        case .running:
+            return .queued(changed: false)
+        case .queued:
+            await write { try await $0.transition(noteID, now: now) { $0.state = .needsConsent } }
+        default:
+            await write { try await $0.enqueue(noteID, kind: kind, language: language.job, now: now, waitingForConsent: true) }
+        }
         await mirror(noteID, language: language.forNote)
         await refresh()
         return .needsConsent
@@ -558,7 +615,7 @@ public final class TranscriptionCoordinator {
         let all = await parts.jobs.all()
         var next = state
         next.jobs = Dictionary(uniqueKeysWithValues: all.map { ($0.noteID, $0) })
-        next.queue = all.filter { $0.state == .queued && !trashing.contains($0.noteID) }.map(\.noteID)
+        next.queue = all.filter { $0.state == .queued && !trashed.contains($0.noteID) }.map(\.noteID)
         next.hold = settings.queueHold
         if next != state { state = next }
     }

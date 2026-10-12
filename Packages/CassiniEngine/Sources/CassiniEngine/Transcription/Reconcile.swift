@@ -13,6 +13,9 @@ public struct ReconcileReport: Hashable, Sendable {
     public var mismatched: [UUID] = []
     /// A `work/` directory that no job owns was deleted.
     public var deletedWork: [UUID] = []
+    /// The job of a note in Recently Deleted left the queue (queued) or was paused (running), as Trash would have
+    /// done had Cassini not closed first; its `work/` stays for Restore.
+    public var trashed: [UUID] = []
 
     public init() {}
 
@@ -30,6 +33,8 @@ public enum Reconcile {
     public struct Plan: Hashable, Sendable {
         /// Changed jobs, each with its `seq` kept.
         public var jobs: [Job] = []
+        /// Jobs to remove, in the same write as `jobs`.
+        public var removeJobs: [UUID] = []
         public var deleteWork: [UUID] = []
         public var report = ReconcileReport()
         public init() {}
@@ -39,7 +44,8 @@ public enum Reconcile {
     ///   - jobs: the stored queue.
     ///   - checkpoints: what each note with a job or a `work/` directory has saved.
     ///   - work: notes that have a `work/` directory.
-    ///   - trashed: notes in Recently Deleted. Trash deletes the row of a queued job; its `work/` stays for Restore.
+    ///   - trashed: notes in Recently Deleted. Trash deletes the row of a queued job and pauses a running one; its
+    ///     `work/` stays for Restore. A job Cassini closed before Trash had finished with is ended the same way here.
     ///   - existing: every note Cassini read; a `work/` directory of a note it could not read is left alone.
     ///   - activeNoteID: the note being recorded now, which is never touched.
     public static func plan(jobs: [Job], checkpoints: [UUID: CheckpointStatus], work: Set<UUID>, trashed: Set<UUID>,
@@ -48,6 +54,10 @@ public enum Reconcile {
         let owned = Set(jobs.map(\.noteID))
         for job in jobs.sorted(by: { $0.seq < $1.seq }) where job.noteID != activeNoteID {
             let checkpoint = checkpoints[job.noteID] ?? .missing
+            if trashed.contains(job.noteID), job.state == .queued || job.state == .running {
+                inTrash(job, checkpoint, now, &plan)
+                continue
+            }
             switch job.state {
             case .running: running(job, checkpoint, now, &plan)
             case .paused: paused(job, checkpoint, now, &plan)
@@ -78,6 +88,19 @@ public enum Reconcile {
             plan.report.requeued.append(job.noteID)
         }
         plan.jobs.append(changed.withNumbers(of: checkpoint))
+    }
+
+    private static func inTrash(_ job: Job, _ checkpoint: CheckpointStatus, _ now: Date, _ plan: inout Plan) {
+        plan.report.trashed.append(job.noteID)
+        guard job.state == .running else {
+            plan.removeJobs.append(job.noteID)
+            return
+        }
+        var changed = job.withNumbers(of: checkpoint)
+        changed.state = .paused
+        changed.pauseReason = .user
+        changed.updatedAt = now
+        plan.jobs.append(changed)
     }
 
     private static func paused(_ job: Job, _ checkpoint: CheckpointStatus, _ now: Date, _ plan: inout Plan) {

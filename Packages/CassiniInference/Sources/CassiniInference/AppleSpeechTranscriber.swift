@@ -18,10 +18,7 @@ public actor AppleSpeechTranscriber: Transcribing {
         if status != .installed {
             guard request.allowDownload else { throw TranscriptionError.needsConsent }
             events(.preparingModel(nil))
-            guard try await AssetInventory.reserve(locale: locale) else { throw TranscriptionError.failed(.reservationLimit) }
-            if let installation = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
-                try await installation.downloadAndInstall()
-            }
+            try await Self.install(transcriber, locale: locale) { events(.preparingModel($0)) }
         }
         try Task.checkCancellation()
         let file = try AVAudioFile(forReading: request.url)
@@ -69,6 +66,26 @@ public actor AppleSpeechTranscriber: Transcribing {
         } onCancel: {
             Task { await analyzer.cancelAndFinishNow() }
         }
+    }
+
+    public func installAssets(locale requested: Locale, progress: @escaping @Sendable (Double) -> Void) async throws {
+        guard SpeechTranscriber.isAvailable,
+              let locale = await SpeechTranscriber.supportedLocale(equivalentTo: requested) else { return }
+        let module = SpeechTranscriber(locale: locale, transcriptionOptions: [], reportingOptions: [], attributeOptions: [])
+        guard await AssetInventory.status(forModules: [module]) != .installed else { return }
+        try await Self.install(module, locale: locale, progress: progress)
+    }
+
+    /// Reserves `locale` and installs the assets `module` needs, reporting the fraction done.
+    private static func install(_ module: SpeechTranscriber, locale: Locale,
+                                progress: @escaping @Sendable (Double) -> Void) async throws {
+        guard try await AssetInventory.reserve(locale: locale) else { throw TranscriptionError.failed(.reservationLimit) }
+        guard let installation = try await AssetInventory.assetInstallationRequest(supporting: [module]) else { return }
+        let observation = installation.progress.observe(\.fractionCompleted) { reported, _ in
+            progress(reported.fractionCompleted)
+        }
+        defer { observation.invalidate() }
+        try await installation.downloadAndInstall()
     }
 
     public func assetStatus(locale: Locale) async -> ModelPartStatus {

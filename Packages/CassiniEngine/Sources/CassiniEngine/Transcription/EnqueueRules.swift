@@ -22,6 +22,9 @@ public enum EnqueueRefusal: Hashable, Sendable {
     case unknownFormat
     /// iOS cannot decode the note's audio, so there is nothing to transcribe.
     case unplayable
+    /// The stored queue was written by a newer Cassini, or could not be read or moved aside, so it takes no jobs in
+    /// this run (see `JobStore.Failure`).
+    case queueUnavailable
 }
 
 /// The result of a Transcribe, Transcribe again, Resume or Try again.
@@ -32,6 +35,16 @@ public enum TranscribeOutcome: Hashable, Sendable {
     /// the network.
     case needsConsent
     case refused(EnqueueRefusal)
+}
+
+/// What follows a saved recording or import while Transcribe automatically is on, as Android's `AfterFinish`.
+public enum HandOff: Hashable, Sendable {
+    /// The note is in the queue.
+    case queued
+    /// The models may not be downloaded yet and the person has not said no: the model download screen asks.
+    case askConsent
+    /// The note stays audio only: the person declined the download, or the note cannot be queued.
+    case audioOnly
 }
 
 /// The result of "Remove from queue".
@@ -70,6 +83,15 @@ public enum EnqueueRules {
     /// job keeps the one it has) for speakers only, which never change the language of the words.
     public static func language(for kind: JobKind, speechLanguage: String) -> String? {
         kind == .speakersOnly ? nil : speechLanguage
+    }
+}
+
+extension ProcessingState {
+    /// How many notes a hold keeps from starting, for "Transcription paused · N waiting" with Continue; nil when that
+    /// notice does not show: nothing holds the queue, nothing waits, or a job still runs (it shows its own Stop).
+    public var heldWaiting: Int? {
+        guard hold != nil, running == nil, !queue.isEmpty else { return nil }
+        return queue.count
     }
 }
 
