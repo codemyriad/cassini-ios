@@ -324,19 +324,18 @@ import CassiniNotebook
     }
 
     @Test func skipsAreTenSecondsClampedToTheFileAndDropASample() {
-        #expect(PlaybackController.skipInterval == 10)
         controller.open(source(note), at: 5)
-        controller.skip(by: -PlaybackController.skipInterval)
+        controller.skip(by: -PlaybackSkip.interval)
         #expect(controller.state.position == 0)
-        controller.skip(by: PlaybackController.skipInterval)
+        controller.skip(by: PlaybackSkip.interval)
         #expect(controller.state.position == 10)
         controller.seek(to: 55)
-        controller.skip(by: PlaybackController.skipInterval)
+        controller.skip(by: PlaybackSkip.interval)
         #expect(controller.state.position == 60)
 
         controller.seek(to: 10)
         controller.playRange(note, from: 30, to: 40)
-        controller.skip(by: PlaybackController.skipInterval)
+        controller.skip(by: PlaybackSkip.interval)
         #expect(controller.state.sample == nil, "a skip is a seek: the sample is dropped")
         #expect(controller.state.position == 40)
         advance(2_000)
@@ -386,7 +385,7 @@ import CassiniNotebook
         controller.open(source(note), at: 20)
         player.send(.remotePlay)
         try await waitFor("play") { controller.state.isPlaying }
-        player.send(.remoteSkip(-PlaybackController.skipInterval))
+        player.send(.remoteSkip(-PlaybackSkip.interval))
         try await waitFor("skip") { controller.state.position == 10 }
         player.send(.remoteSeek(42))
         try await waitFor("seek") { controller.state.position == 42 }

@@ -46,9 +46,6 @@ public final class PlaybackController {
         }
     }
 
-    /// Back and forward skips, in seconds; also the lock screen's interval and the slider's accessibility step.
-    nonisolated public static let skipInterval: TimeInterval = 10
-
     public private(set) var state = PlaybackState()
     /// While a recording runs nothing opens.
     public private(set) var isBlocked = false
@@ -174,10 +171,10 @@ public final class PlaybackController {
         publish()
     }
 
-    /// Back or forward by `seconds` (± `skipInterval` from the controls).
+    /// Back or forward by `seconds` (± `PlaybackSkip.interval` from the controls).
     public func skip(by seconds: TimeInterval) {
         guard source != nil else { return }
-        seek(to: player.position + seconds)
+        seek(to: PlaybackSkip.target(from: player.position, by: seconds, duration: player.duration))
     }
 
     /// Plays `start..<end` of the open note (a speaker sample), then returns to the position and play state from
