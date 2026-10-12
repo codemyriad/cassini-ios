@@ -32,6 +32,11 @@ public struct SpeakerModelManifest: Hashable, Sendable {
     public var marker: String
     public var files: [File]
 
+    public init(repository: String, revision: String, folder: String, marker: String, files: [File]) {
+        self.repository = repository; self.revision = revision; self.folder = folder; self.marker = marker
+        self.files = files
+    }
+
     /// Free space an install asks for beyond the files themselves, for FluidAudio's partial files and the move into
     /// place.
     public static let installHeadroom: Int64 = 32 * 1024 * 1024

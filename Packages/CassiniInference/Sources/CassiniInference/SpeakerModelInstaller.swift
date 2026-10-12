@@ -135,6 +135,8 @@ public actor SpeakerModelInstaller {
                 }
                 current?.waiters[id] = continuation
                 current?.listeners[id] = progress
+                // A caller that joins sees where the shared install stands.
+                if case .downloading(let fraction) = stored { progress(fraction) }
             }
         } onCancel: {
             Task { await self.leave(number, id) }
