@@ -46,7 +46,11 @@ import CassiniNotebook
         let report = await startup.run()
         #if DEBUG
         if let seed = environment.launch.seed { TestFixtures.prepare(seed, settings: settings, processing: processing) }
-        if let fixture = environment.launch.openFixture, let id = fixture ?? library.notes.first?.id { router.openNote(id) }
+        switch environment.launch.openFixture {
+        case .note(let id): router.openNote(id)
+        case .newest: if let id = library.notes.first?.id { router.openNote(id) }
+        case nil: break
+        }
         #endif
         return report
     }

@@ -25,10 +25,15 @@ import CassiniEngineTesting
     /// What a UI-test launch asks for.
     struct LaunchOptions {
         var seed: Seed?
-        /// Opens a note once the library is ready: the given one, or the newest when nil.
-        var openFixture: UUID??
+        /// A note to open once the library is ready.
+        var openFixture: OpenFixture?
         /// Restores the navigation stack saved with the scene.
         var restoresNavigation = true
+    }
+
+    enum OpenFixture: Equatable {
+        case newest
+        case note(UUID)
     }
 
     /// Named sets of notes for UI tests and screenshots.
@@ -72,7 +77,7 @@ extension AppEnvironment {
 
     /// A separate library and preferences, a fixed clock and en_US formatting. Transcription is faked; the
     /// recording seed also fakes the microphone.
-    static func uiTesting(reset: Bool, seed: Seed?, openFixture: UUID?? = nil) -> AppEnvironment {
+    static func uiTesting(reset: Bool, seed: Seed?, openFixture: OpenFixture? = nil) -> AppEnvironment {
         let root = URL.applicationSupportDirectory.appendingPathComponent("CassiniUITests", isDirectory: true)
         let defaults = UserDefaults(suiteName: uiTestingSuite) ?? .standard
         if reset {
@@ -100,10 +105,11 @@ extension AppEnvironment {
         return arguments.contains("--seed-test-data") ? .library : nil
     }
 
-    /// `--open-fixture [note id]`.
-    private static func fixture(in arguments: [String]) -> UUID?? {
+    /// `--open-fixture [note id]`: the given note, or the newest.
+    private static func fixture(in arguments: [String]) -> OpenFixture? {
         guard let index = arguments.firstIndex(of: "--open-fixture") else { return nil }
-        return .some(arguments.indices.contains(index + 1) ? UUID(uuidString: arguments[index + 1]) : nil)
+        let id = arguments.indices.contains(index + 1) ? UUID(uuidString: arguments[index + 1]) : nil
+        return id.map(OpenFixture.note) ?? .newest
     }
 }
 #endif
