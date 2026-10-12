@@ -20,8 +20,16 @@ struct LibraryView: View {
     @State private var favoritesOnly = false
     @State private var importing = false
 
+    private var live: [Note] { library.notes.filter { $0.trashedAt == nil } }
     private var visible: [Note] {
-        library.notes.filter { $0.trashedAt == nil && (!favoritesOnly || $0.isFavorite) && $0.matches(query) }
+        live.filter { (!favoritesOnly || $0.isFavorite) && $0.matches(query) }
+    }
+    /// What only the Library knows, for its banners.
+    private var libraryFacts: LibraryFacts {
+        let live = live
+        return LibraryFacts(loading: !library.isLoaded, liveNotes: live.count, query: query,
+                            results: query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : visible.count,
+                            audioOnly: live.contains { $0.status == .audioOnly && $0.transcript.isEmpty })
     }
     private var grouped: [(Date, [Note])] {
         Dictionary(grouping: visible, by: { calendar.startOfDay(for: $0.createdAt) })
@@ -34,18 +42,14 @@ struct LibraryView: View {
                 header
                 SearchField(query: $query)
                 filters
-                ForEach(notices.notices) { notice in
-                    HStack(alignment: .top) {
-                        NoticeCard(title: notice.text)
-                        Button { notices.dismiss(notice.id) } label: { Image(systemName: "xmark").frame(width: 32, height: HitTarget.minimum) }
-                            .accessibilityLabel("Dismiss notice")
-                    }
-                }
-                QueueHeldBanner()
+                BannerList(specs: notices.library(libraryFacts),
+                           onAction: { spec, action in notices.perform(action, on: spec) { importing = true } },
+                           onDismiss: notices.dismiss)
                 if recording.state.isActive { ActiveRecordingCard() }
-                ImportActivity()
-                if visible.isEmpty { LibraryEmptyState(query: query, favoritesOnly: favoritesOnly) }
-                else {
+                if visible.isEmpty {
+                    // The banners say when there are no notes or no matches; the starred filter has its own state.
+                    if favoritesOnly, query.isEmpty, !live.isEmpty { LibraryEmptyState(query: query, favoritesOnly: true) }
+                } else {
                     ForEach(grouped, id: \.0) { date, notes in
                         VStack(alignment: .leading, spacing: Spacing.row) {
                             Text(dayLabel(date).uppercased()).font(.caption.weight(.semibold)).tracking(1.6).foregroundStyle(Color.muted)

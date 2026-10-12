@@ -74,3 +74,18 @@ import CassiniNotebook
         return name.isEmpty || name == "/" ? String(localized: "Imported audio", table: "Import") : name
     }
 }
+
+// MARK: Notices
+
+extension ImportStore {
+    /// Adds the running imports and the last failure to the facts the banners are built from.
+    func contribute(to facts: inout NoticeFacts) {
+        facts.importing = tracker.running
+        facts.importFailure = tracker.failure
+    }
+
+    /// The user closed an import error: it stays closed until the next import fails.
+    func dismissNotice(_ kind: BannerKind) {
+        if kind.isImportFailure { tracker.dismissFailure() }
+    }
+}

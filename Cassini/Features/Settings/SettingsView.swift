@@ -8,6 +8,7 @@ struct SettingsView: View {
     @Environment(LibraryStore.self) private var library
     @Environment(Router.self) private var router
     @Environment(ProcessingStore.self) private var processing
+    @Environment(NoticesStore.self) private var notices
     @Environment(\.locale) private var locale
     @State private var locales: [Locale] = []
     @State private var installed: Set<String> = []
@@ -23,6 +24,14 @@ struct SettingsView: View {
                     Text("Audio and transcripts stay on this device.\nNo account. No ads. No analytics.").font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
                 }.frame(maxWidth: .infinity).padding(.vertical, 18)
             }.listRowBackground(Color.clear)
+            let banners = notices.settingsBanners
+            if !banners.isEmpty {
+                Section {
+                    BannerList(specs: banners, onAction: { spec, action in notices.perform(action, on: spec) },
+                               onDismiss: notices.dismiss)
+                }
+                .listRowBackground(Color.clear).listRowInsets(EdgeInsets())
+            }
             Section {
                 Picker("Language", selection: $settings.speechLanguage) {
                     if !locales.contains(where: { $0.identifier(.bcp47) == settings.speechLanguage }) {

@@ -19,6 +19,8 @@ import CassiniNotebook
     }
 
     private(set) var snapshot = VoiceSnapshot()
+    /// The private voice files could not be opened at launch.
+    private(set) var loadFailed = false
     @ObservationIgnored private(set) var store: VoiceStore?
     @ObservationIgnored private let library: LibraryStore
     @ObservationIgnored private let settings: SettingsStore
@@ -33,6 +35,9 @@ import CassiniNotebook
     /// The saved voices cannot be changed: newer, damaged or unreadable, or the private folder could not be opened.
     var isReadOnly: Bool { store == nil || snapshot.isReadOnly }
     var hasEvidence: Bool { snapshot.hasEvidence }
+    /// "Saved voices can't be read": the files could not be opened, were written by a newer Cassini or cannot be read
+    /// now. A damaged list is not: Saved voices offers to start it again.
+    var isUnavailable: Bool { loadFailed || snapshot.problem == .newer || snapshot.problem == .unreadable }
     /// Whether Saved voices offers Forget all voice data with no person listed: there are prints to delete, or the list
     /// is damaged and only Forget everyone starts it again.
     var offersForgetAllData: Bool { snapshot.canForgetEveryone && (hasEvidence || snapshot.problem == .damaged) }
@@ -54,6 +59,7 @@ import CassiniNotebook
         do {
             store = try await Task.detached { try VoiceStore(root: root, now: { clock.now }) }.value
         } catch {
+            loadFailed = true
             return false
         }
         await refresh()

@@ -23,6 +23,9 @@ struct NoteDetailView: View {
     @State private var naming: SpeakerRef?
     @State private var shareItem: ShareItem?
     @State private var trustToggled = false
+    /// Job banners closed on this screen.
+    @State private var closedBanners: Set<String> = []
+    @State private var confirmingStartOver = false
     /// This screen, as the owner of the player.
     @State private var playerOwner = PlaybackOwner()
 
@@ -49,7 +52,7 @@ struct NoteDetailView: View {
                             if showSearch { InNoteSearchBar(query: $query) { showSearch = false; query = "" } }
                             if !note.bookmarks.isEmpty { BookmarksSection(note: note, isExpanded: $showBookmarks, seek: seek) }
                             if note.transcript.isEmpty {
-                                TranscriptEmptyState(note: note, requestTranscription: requestTranscription)
+                                TranscriptEmptyState(note: note, requestTranscription: { requestTranscription() })
                             } else {
                                 TranscriptList(note: note, query: query, activeSegment: activeSegment, followPlayback: $followPlayback,
                                                showSpeakers: { showingSpeakers = true }, edit: { editing = $0 }, seek: seek,
@@ -73,7 +76,7 @@ struct NoteDetailView: View {
                     ToolbarItemGroup(placement: .topBarTrailing) {
                         Button("Find in transcript", systemImage: "magnifyingglass") { showSearch.toggle() }
                         NoteMenu(note: note, renaming: $renaming, showingSpeakers: $showingSpeakers, showingVersions: $showingVersions,
-                                 shareItem: $shareItem, requestTranscription: requestTranscription)
+                                 shareItem: $shareItem, requestTranscription: { requestTranscription() })
                     }
                 }
             } else {
@@ -98,6 +101,11 @@ struct NoteDetailView: View {
         .sheet(isPresented: $showingVersions) { TranscriptVersionsView(noteID: noteID) }
         .sheet(item: $naming) { NameSpeakerSheet(noteID: noteID, speakerID: $0.id) }
         .shareSheet(item: $shareItem)
+        .confirmationDialog(Text("Start over?", tableName: "Notices"), isPresented: $confirmingStartOver, titleVisibility: .visible) {
+            Button(String(localized: "Start over", table: "Notices"), role: .destructive) { processing.startOver(noteID) }
+        } message: {
+            Text("The draft so far is discarded. Your recording is kept.", tableName: "Notices")
+        }
     }
 
     @ViewBuilder private func notices(_ note: Note) -> some View {
@@ -109,11 +117,38 @@ struct NoteDetailView: View {
             DocumentTrustNotice(info: document, toggled: trustToggled,
                                 playAnyway: note.audio.isPlayable && !recording.state.isActive ? { playAnyway(note) } : nil)
         }
-        if let failure = note.failure { NoticeCard(title: failure.transcriptionMessage, symbol: "exclamationmark.circle") }
-        if let failure = note.speakerAnalysisFailure { NoticeCard(title: failure.speakerAnalysisMessage, symbol: "person.2") }
+        let job = processing.state.jobs[noteID]
+        if job == nil, let failure = note.failure { NoticeCard(title: failure.transcriptionMessage, symbol: "exclamationmark.circle") }
+        BannerList(specs: jobBanners(note, job: job), onAction: { _, action in perform(action, job: job) },
+                   onDismiss: { dismiss($0, job: job) })
         if let problem = note.playbackProblem { NoticeCard(title: problem, symbol: "waveform.slash") }
         if playback.failed(noteID) {
             NoticeCard(title: String(localized: "This audio can’t be played", table: "Playback"), symbol: "waveform.slash")
+        }
+    }
+
+    /// The note's transcription banners (paused, failed, one voice) less the ones closed here.
+    private func jobBanners(_ note: Note, job: Job?) -> [BannerSpec] {
+        let oneVoice = !note.transcript.isEmpty && note.speakerAnalysisFailure != nil
+        return Notices.job(job, oneVoice: oneVoice, failureText: job?.failure?.transcriptionMessage)
+            .filter { !closedBanners.contains($0.id) }
+    }
+
+    private func perform(_ action: BannerAction, job: Job?) {
+        switch action {
+        case .resume, .tryAgain, .retry, .downloadAgain: requestTranscription(kind: job?.kind ?? .transcribe)
+        case .transcribeAgain: requestTranscription(kind: .transcribeAgain)
+        case .startOver: confirmingStartOver = true
+        default: break
+        }
+    }
+
+    /// A final failure goes with its job, so the note shows as it was; any other banner is closed on this screen.
+    private func dismiss(_ spec: BannerSpec, job: Job?) {
+        if spec.kind == .txFailed, let job, Notices.finalFailure(job, noNewVersion: false) {
+            processing.clearFailed(noteID)
+        } else {
+            closedBanners.insert(spec.id)
         }
     }
 
@@ -136,9 +171,9 @@ struct NoteDetailView: View {
     }
 
     /// Transcribe; without consent for the speech model, the model download screen asks first, and a refusal says why.
-    private func requestTranscription() {
+    private func requestTranscription(kind: JobKind = .transcribe) {
         Task {
-            switch await processing.transcribe(noteID) {
+            switch await processing.transcribe(noteID, kind: kind) {
             case .needsConsent: router.push(.modelDownload(noteID: noteID))
             case .refused(let refusal): errors.present(refusal.message)
             case .queued: break

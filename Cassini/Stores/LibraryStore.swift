@@ -13,6 +13,8 @@ import CassiniNotebook
     /// Why the library could not be opened; nil when it is open.
     private(set) var loadFailure: String?
     private(set) var unreadableCount = 0
+    /// The first read of the notes has ended, read or failed.
+    private(set) var isLoaded = false
 
     @ObservationIgnored let noteStore: NoteStore?
     @ObservationIgnored private let errors: ErrorPresenter
@@ -46,10 +48,9 @@ import CassiniNotebook
     /// Reads every note, then follows the changes others write. It subscribes before reading, so a change saved
     /// while the notes are read is applied after them rather than lost; a note placed meanwhile is kept.
     func load() async {
-        guard let noteStore else {
-            errors.present("Could not open your library: \(loadFailure ?? "")")
-            return
-        }
+        defer { isLoaded = true }
+        // A library that cannot be opened is the Library's "Your notes can't be opened" banner (`loadFailure`).
+        guard let noteStore else { return }
         let stream = await noteStore.changes()
         do {
             try FileManager.default.setAttributes([.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
@@ -61,7 +62,6 @@ import CassiniNotebook
             unreadableCount = report.unreadableCount
         } catch {
             loadFailure = error.localizedDescription
-            errors.present("Could not open your library: \(error.localizedDescription)")
             return
         }
         changes = Task { [weak self] in

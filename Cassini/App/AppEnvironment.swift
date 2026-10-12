@@ -22,7 +22,7 @@ import CassiniEngineTesting
     var audio: any AudioProcessing
     var storage: any StorageProbe
     var background: any BackgroundRunner
-    /// Result notifications; `SilentNotifier` stands in until the notification adapter lands.
+    /// Result notifications, posted while Cassini is hidden.
     var notifier: any Notifier
     var launch = LaunchOptions()
     /// Where exports wait for the share sheet; the launch sweep empties it.
@@ -60,7 +60,7 @@ import CassiniEngineTesting
             defaults: .standard, clock: SystemClock(), locale: .autoupdatingCurrent, timeZone: .autoupdatingCurrent,
             transcriber: AppleSpeechTranscriber(), analyzer: SpeakerAnalyzer(), capture: AVCaptureAdapter(),
             microphone: AVMicrophonePermission(), liveActivity: ActivityKitAdapter(), playback: AVPlaybackAdapter(), audio: LocalAudioProcessing(), storage: FileSystemStorageProbe(),
-            background: UIKitBackgroundRunner(), notifier: SilentNotifier())
+            background: UIKitBackgroundRunner(), notifier: UNNotifier())
     }
 
     /// The environment the process arguments ask for.
@@ -84,7 +84,7 @@ extension AppEnvironment {
     /// A separate library and preferences, a fixed clock and en_US formatting. Transcription is faked; the
     /// recording seed also fakes the microphone and its permission. With `modelsMissing` the speech and speaker models
     /// are not installed, so a Transcribe asks for the download first. Speaker models are never installed.
-    /// Notifications are never asked for.
+    /// Notifications are never asked for and count as allowed, so no banner says they are off.
     static func uiTesting(reset: Bool, seed: Seed?, openFixture: OpenFixture? = nil,
                           modelsMissing: Bool = false) -> AppEnvironment {
         let root = URL.applicationSupportDirectory.appendingPathComponent("CassiniUITests", isDirectory: true)
@@ -105,7 +105,7 @@ extension AppEnvironment {
             capture: seed == .recording ? FakeCapture() : AVCaptureAdapter(),
             microphone: seed == .recording ? FakeMicrophonePermission() : AVMicrophonePermission(),
             liveActivity: ActivityKitAdapter(), playback: AVPlaybackAdapter(), audio: LocalAudioProcessing(), storage: FileSystemStorageProbe(),
-            background: UIKitBackgroundRunner(), notifier: FakeNotifier(auth: .denied),
+            background: UIKitBackgroundRunner(), notifier: FakeNotifier(auth: .authorized),
             launch: LaunchOptions(seed: seed, openFixture: openFixture, restoresNavigation: false))
     }
 

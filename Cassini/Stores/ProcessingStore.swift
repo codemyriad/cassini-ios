@@ -22,7 +22,7 @@ import CassiniNotebook
     @ObservationIgnored private let transcriber: any Transcribing
     @ObservationIgnored private let analyzer: any SpeakerAnalyzing
     @ObservationIgnored private let library: LibraryStore
-    @ObservationIgnored private let notices: NoticesStore
+    @ObservationIgnored private let notices: NoticeCenter
     @ObservationIgnored private let clock: any AppClock
     @ObservationIgnored private var installing: Task<Void, Never>?
     /// Notes whose audio is still being written; they cannot be queued yet.
@@ -31,7 +31,7 @@ import CassiniNotebook
     @ObservationIgnored private var trashing: Set<UUID> = []
 
     init(coordinator: TranscriptionCoordinator?, progress: JobProgress, checkpoints: any CheckpointStoring,
-         transcriber: any Transcribing, analyzer: any SpeakerAnalyzing, library: LibraryStore, notices: NoticesStore,
+         transcriber: any Transcribing, analyzer: any SpeakerAnalyzing, library: LibraryStore, notices: NoticeCenter,
          clock: any AppClock) {
         self.coordinator = coordinator
         self.progress = progress
@@ -41,7 +41,6 @@ import CassiniNotebook
         self.library = library
         self.notices = notices
         self.clock = clock
-        coordinator?.onPause = { [weak self] id, reason in self?.postPaused(id, reason: reason) }
     }
 
     var state: ProcessingState { coordinator?.state ?? ProcessingState() }
@@ -57,7 +56,10 @@ import CassiniNotebook
         guard let coordinator else { return .refused(.noNote) }
         if finalizing.contains(id) { return .refused(.recording) }
         if trashing.contains(id) { return .refused(.trashed) }
-        return await coordinator.transcribe(id, kind: kind, origin: origin)
+        let outcome = await coordinator.transcribe(id, kind: kind, origin: origin)
+        // The first Transcribe from the screen asks to notify the results; the queue does not wait for the answer.
+        if origin == .screen { Task { [notices] in await notices.askNotificationsOnce() } }
+        return outcome
     }
 
     /// `transcribe` without waiting for its outcome.
@@ -101,6 +103,11 @@ import CassiniNotebook
     private func finishInstall(_ failure: DownloadError?) {
         installing = nil
         speechInstall = failure.map { DownloadFact(part: .speech, failure: $0, at: clock.now) }
+    }
+
+    /// The user closed the failure of the last install; the next install may fail again.
+    func dismissInstallFailure() {
+        if speechInstall?.failure != nil { speechInstall = nil }
     }
 
     /// Whether the note has a stopped transcription to resume.
@@ -171,28 +178,13 @@ import CassiniNotebook
 
     // MARK: Notices
 
-    /// Says where a stopped transcription stands: how far its saved progress goes, or that it found no words yet.
-    private func postPaused(_ id: UUID, reason: PauseReason) {
-        guard let checkpoint = try? checkpoints.load(id), checkpoint.doneMs > 0 else {
-            notices.post(String(localized: "Paused before any words were found. Resume to start transcribing.",
-                                table: "Processing"))
-            return
-        }
-        let done = TimeText.clock(Double(checkpoint.doneMs) / 1000)
-        let total = TimeText.clock(Double(max(checkpoint.totalMs, checkpoint.doneMs)) / 1000)
-        notices.post(reason == .system
-            ? String(localized: "Paused at \(done) of \(total). iOS ended the time Cassini had in the background. Resume to continue where it stopped.",
-                     table: "Processing")
-            : String(localized: "Paused at \(done) of \(total). Pick up where you left off. The draft so far is kept.",
-                     table: "Processing"))
-    }
-
     /// Adds what the queue knows to the facts the banners are built from.
     func contribute(to facts: inout NoticeFacts) {
         let state = state
         facts.queueHold = state.hold
         facts.waitingJobs = state.queue.count
-        facts.jobRunning = state.running != nil
+        // A job runs, or the speech model installs on its own.
+        facts.jobRunning = state.running != nil || (speechInstall != nil && speechInstall?.failure == nil)
         facts.failedJobs = state.jobs.values.filter { $0.state == .failed }
             .reduce(into: [:]) { $0[$1.noteID] = $1.failure ?? .unknown }
         if let speechInstall { facts.download = speechInstall }

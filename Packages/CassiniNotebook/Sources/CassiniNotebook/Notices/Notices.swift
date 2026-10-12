@@ -74,20 +74,21 @@ public enum Notices {
     /// The Recording screen's banners for the recorder `state`. `microphoneOff` is true while microphone access is
     /// denied; `ended` is the outcome the screen still shows after the capture ended (the recorder may be idle again).
     public static func recording(_ state: RecordingState, microphoneOff: Bool, ended: RecordingOutcome? = nil) -> [BannerSpec] {
-        let notices = RecordingBanner.banners(state: state, microphoneOff: microphoneOff, ended: ended).map { banner in
-            let spec: BannerSpec = switch banner {
-            case .microphoneOff: BannerSpec(.recMicOff)
-            case .couldNotStart: BannerSpec(.recCouldNotStart, announce: true)
-            case .microphoneFailed: BannerSpec(.recMicFailed, announce: true)
-            case .stoppedForSpace:
-                BannerSpec(.recStoppedStorage, BannerArgs(bytes: Limits.minRecordingFreeBytes), announce: true)
-            case .pausedByOtherApp: BannerSpec(.recPausedOtherApp, announce: true)
-            case .inputLost: BannerSpec(.recInputLost, announce: true)
-            case .storageLow(let minutes): BannerSpec(.recStorageLow, BannerArgs(ms1: Int64(minutes) * 60_000), announce: true)
-            }
-            return Notice(spec: spec)
+        let banners = RecordingBanner.banners(state: state, microphoneOff: microphoneOff, ended: ended)
+        return ordered(banners.map { Notice(spec: spec($0)) })
+    }
+
+    /// The catalogue banner of a Recording screen banner.
+    public static func spec(_ banner: RecordingBanner) -> BannerSpec {
+        switch banner {
+        case .microphoneOff: BannerSpec(.recMicOff)
+        case .couldNotStart: BannerSpec(.recCouldNotStart, announce: true)
+        case .microphoneFailed: BannerSpec(.recMicFailed, announce: true)
+        case .stoppedForSpace: BannerSpec(.recStoppedStorage, BannerArgs(bytes: Limits.minRecordingFreeBytes), announce: true)
+        case .pausedByOtherApp: BannerSpec(.recPausedOtherApp, announce: true)
+        case .inputLost: BannerSpec(.recInputLost, announce: true)
+        case .storageLow(let minutes): BannerSpec(.recStorageLow, BannerArgs(ms1: Int64(minutes) * 60_000), announce: true)
         }
-        return ordered(notices)
     }
 
     // MARK: Transcription and download of one note

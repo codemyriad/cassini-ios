@@ -1,19 +1,61 @@
-import Foundation
+import UIKit
 import Observation
+import CassiniEngine
+import CassiniNotebook
 
-/// Messages shown at the top of the Library until dismissed. Each new one is added; none replaces another.
+/// The banners of the Library and Settings, as the screens use them: the lists come from `NoticeCenter`, and the
+/// actions on them are carried out here (Android `LibraryViewModel.bannerAction`).
 @MainActor @Observable final class NoticesStore {
-    struct Notice: Identifiable, Equatable {
-        let id = UUID()
-        let text: String
+    let center: NoticeCenter
+    @ObservationIgnored private let router: Router
+    @ObservationIgnored private let processing: ProcessingStore
+    @ObservationIgnored private let recording: RecordingStore
+    @ObservationIgnored private let settings: SettingsStore
+
+    init(center: NoticeCenter, router: Router, processing: ProcessingStore, recording: RecordingStore,
+         settings: SettingsStore) {
+        self.center = center; self.router = router; self.processing = processing; self.recording = recording
+        self.settings = settings
     }
 
-    private(set) var notices: [Notice] = []
+    func library(_ facts: LibraryFacts) -> [BannerSpec] { center.library(facts) }
+    var settingsBanners: [BannerSpec] { center.settingsBanners }
 
-    func post(_ text: String) {
-        guard !notices.contains(where: { $0.text == text }) else { return }
-        notices.append(Notice(text: text))
+    func dismiss(_ spec: BannerSpec) { center.dismiss(spec.kind) }
+
+    /// A banner button of the Library or Settings. `chooseFile` opens the file picker.
+    func perform(_ action: BannerAction, on spec: BannerSpec, chooseFile: () -> Void = {}) {
+        let kind = spec.kind
+        switch action {
+        case .continue:
+            processing.continueQueue()
+        case .open:
+            guard let latest = center.latestRecovered else { return }
+            center.dismiss(.recovered)
+            router.openNote(latest.noteID)
+        case .download:
+            router.show(.modelDownload(noteID: nil))
+        case .retry, .downloadAgain:
+            center.dismiss(kind)
+            processing.installSpeechModel(language: settings.speechLanguage)
+        case .tryAgain where kind.group == .download:
+            center.dismiss(kind)
+            processing.installSpeechModel(language: settings.speechLanguage)
+        case .tryAgain, .chooseAnother, .import:
+            center.dismiss(kind)
+            chooseFile()
+        case .turnOn:
+            Self.openNotificationSettings()
+        case .record:
+            Task { await recording.start() }
+        case .resume, .startOver, .transcribe, .transcribeAgain, .playAnyway, .openNote, .openSettings, .cancel:
+            // The Note and Recording screens' own actions; never on a Library or Settings banner.
+            break
+        }
     }
 
-    func dismiss(_ id: Notice.ID) { notices.removeAll { $0.id == id } }
+    /// Cassini's notification settings in the Settings app.
+    static func openNotificationSettings() {
+        if let url = URL(string: UIApplication.openNotificationSettingsURLString) { UIApplication.shared.open(url) }
+    }
 }

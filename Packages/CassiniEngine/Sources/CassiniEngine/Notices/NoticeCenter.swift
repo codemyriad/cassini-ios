@@ -61,6 +61,14 @@ import CassiniNotebook
         speechReady = await speechModelReady()
     }
 
+    /// Asks for permission to notify the first time the user records, transcribes or downloads, and only then.
+    public func askNotificationsOnce() async {
+        guard !settings.notificationsAsked else { return }
+        settings.markNotificationsAsked()
+        await notifier.requestOnce()
+        notificationsOff = await notifier.authorizationStatus() == .denied
+    }
+
     /// The user closed the banner of `kind`, or acted on it in a way that ends it.
     public func dismiss(_ kind: BannerKind) {
         switch kind {
