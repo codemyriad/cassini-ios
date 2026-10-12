@@ -94,6 +94,78 @@ import CassiniNotebook
         #expect(installs.status(of: .speakers) == .ready)
     }
 
+    @Test func aFailedPartAskedForDuringTheClosingRefreshIsInstalledAgain() async throws {
+        let analyzer = ScriptedAnalyzer(status: .notDownloaded)
+        let transcriber = LanguageTranscriber(["en-US": .notDownloaded], gatedStatus: true, failsInstall: true)
+        let installs = ModelInstalls(transcriber: transcriber, analyzer: analyzer, clock: FakeClock()) { "en-US" }
+        installs.install([.speech, .speakers])
+        try await until { transcriber.waitingReads == 1 }
+        #expect(analyzer.installs == 1, "the closing refresh runs")
+        #expect(installs.status(of: .speech) == .failed(.noConnection), "the failed row can be tapped")
+
+        installs.install([.speech])
+        try await until { transcriber.releaseReads(); return !installs.isInstalling }
+        #expect(transcriber.installs == 2, "the request was not lost")
+        installs.install([.speech])
+        try await until { transcriber.releaseReads(); return !installs.isInstalling }
+        #expect(transcriber.installs == 3, "nor is any later one")
+    }
+
+    @Test func anotherPartAskedForDuringTheClosingRefreshIsInstalled() async throws {
+        let analyzer = ScriptedAnalyzer(status: .notDownloaded)
+        let transcriber = LanguageTranscriber(["en-US": .notDownloaded], gatedStatus: true)
+        let installs = ModelInstalls(transcriber: transcriber, analyzer: analyzer, clock: FakeClock()) { "en-US" }
+        installs.install([.speech])
+        try await until { transcriber.waitingReads == 1 }
+        #expect(transcriber.installs == 1)
+
+        installs.install([.speakers])
+        #expect(installs.isInstalling)
+        try await until { transcriber.releaseReads(); return analyzer.installs == 1 }
+        try await until { transcriber.releaseReads(); return !installs.isInstalling }
+        #expect(analyzer.installs == 1)
+        #expect(transcriber.installs == 1)
+    }
+
+    @Test func cancelStopsTheSpeakerModelsForEveryCallerAndIsNoFailure() async throws {
+        let analyzer = ScriptedAnalyzer(status: .notDownloaded, gated: true)
+        let installs = ModelInstalls(transcriber: FakeTranscriber(.returns([], total: 0), status: .notDownloaded),
+                                     analyzer: analyzer, clock: FakeClock()) { "en-US" }
+        await installs.refresh()
+        installs.install([.speakers, .speech])
+        try await until { analyzer.installs == 1 }
+        installs.cancel()
+        #expect(!installs.isInstalling)
+        #expect(installs.download == nil)
+        try await until { analyzer.cancels == 1 }
+        // Let the cancelled install end and read the models again.
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(installs.failures.isEmpty)
+        #expect(installs.status(of: .speakers) == .notDownloaded)
+        #expect(installs.download == nil, "the cancelled install's end shows nothing")
+
+        installs.install([.speakers])
+        try await until { analyzer.installs == 2 }
+        analyzer.finish(with: nil, status: .ready)
+        try await until { !installs.isInstalling }
+        #expect(installs.status(of: .speakers) == .ready)
+    }
+
+    @Test func cancelStopsTheSpeechInstallAndDropsTheParts() async throws {
+        let analyzer = ScriptedAnalyzer(status: .notDownloaded)
+        let transcriber = LanguageTranscriber(["en-US": .notDownloaded], gated: true)
+        let installs = ModelInstalls(transcriber: transcriber, analyzer: analyzer, clock: FakeClock()) { "en-US" }
+        installs.install([.speech, .speakers])
+        try await until { transcriber.installs == 1 }
+        installs.cancel()
+        try await until { transcriber.cancelled }
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(analyzer.installs == 0, "the parts after the cancelled one are dropped")
+        #expect(analyzer.cancels == 0, "the speaker models' install was not running")
+        #expect(installs.failures.isEmpty)
+        #expect(installs.status(of: .speech) == .notDownloaded)
+    }
+
     @Test func aRefreshAskedForDuringAnotherReadsAgainOnceItEnds() async throws {
         let analyzer = ScriptedAnalyzer(status: .notDownloaded)
         let transcriber = LanguageTranscriber(["en-US": .notDownloaded], gatedStatus: true)
@@ -179,6 +251,7 @@ private final class ScriptedAnalyzer: SpeakerAnalyzing {
         var installs = 0
         var progress: (@Sendable (Double?) -> Void)?
         var finish: CheckedContinuation<Void, Error>?
+        var cancels = 0
     }
 
     private let state: Mutex<State>
@@ -190,6 +263,7 @@ private final class ScriptedAnalyzer: SpeakerAnalyzing {
     }
 
     var installs: Int { state.withLock { $0.installs } }
+    var cancels: Int { state.withLock { $0.cancels } }
 
     func report(_ fraction: Double) { state.withLock { $0.progress }?(fraction) }
 
@@ -218,6 +292,16 @@ private final class ScriptedAnalyzer: SpeakerAnalyzing {
         guard gated else { return }
         try await withCheckedThrowingContinuation { continuation in state.withLock { $0.finish = continuation } }
     }
+
+    /// Ends the gated install for its caller with `CancellationError`, as the real install does for every caller.
+    func cancelModelInstall() async {
+        let waiter = state.withLock { state in
+            state.cancels += 1
+            defer { state.finish = nil }
+            return state.finish
+        }
+        waiter?.resume(throwing: CancellationError())
+    }
 }
 
 /// The speech language the test sets; the installs read it on the main actor.
@@ -227,11 +311,12 @@ private final class ScriptedAnalyzer: SpeakerAnalyzing {
 }
 
 /// A transcriber whose asset status is per language. Its installs and status reads can be held until the test lets
-/// them go; a failing install throws `NO_CONNECTION`.
+/// them go; a failing install throws `NO_CONNECTION`, and a cancelled one `CancellationError`.
 private final class LanguageTranscriber: Transcribing {
     private struct State {
         var statuses: [String: ModelPartStatus]
         var installs = 0
+        var cancelled = false
         var finish: CheckedContinuation<Void, Never>?
         var reads: [CheckedContinuation<Void, Never>] = []
     }
@@ -248,6 +333,7 @@ private final class LanguageTranscriber: Transcribing {
 
     var installs: Int { state.withLock { $0.installs } }
     var waitingReads: Int { state.withLock { $0.reads.count } }
+    var cancelled: Bool { state.withLock { $0.cancelled } }
 
     func set(_ language: String, _ status: ModelPartStatus) { state.withLock { $0.statuses[language] = status } }
 
@@ -280,7 +366,23 @@ private final class LanguageTranscriber: Transcribing {
         state.withLock { $0.installs += 1 }
         if failsInstall { throw TranscriptionError.failed(.download(.noConnection)) }
         guard gated else { return }
-        await withCheckedContinuation { continuation in state.withLock { $0.finish = continuation } }
+        await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                let cancelled = state.withLock { state in
+                    if !state.cancelled { state.finish = continuation }
+                    return state.cancelled
+                }
+                if cancelled { continuation.resume() }
+            }
+        } onCancel: {
+            let waiter = state.withLock { state in
+                state.cancelled = true
+                defer { state.finish = nil }
+                return state.finish
+            }
+            waiter?.resume()
+        }
+        try Task.checkCancellation()
     }
 
     func speechLanguages() async -> [SpeechLanguage] { [] }

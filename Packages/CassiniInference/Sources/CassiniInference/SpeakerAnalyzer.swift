@@ -70,6 +70,10 @@ public actor SpeakerAnalyzer: SpeakerAnalyzing {
         try await installer.install(allowDownload: true, progress: progress)
     }
 
+    public func cancelModelInstall() async {
+        await installer.cancel()
+    }
+
     public func analyze(url: URL, allowDownload: Bool,
                         progress: @escaping @Sendable (SpeakerAnalysisEvent) -> Void) async throws -> SpeakerAnalysis {
         progress(.preparingModels(nil))

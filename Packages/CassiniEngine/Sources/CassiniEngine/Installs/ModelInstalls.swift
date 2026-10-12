@@ -10,7 +10,7 @@ import CassiniNotebook
 ///   speech language changes and when the running job's model download ends. A refresh asked for while one runs
 ///   reads again once that one ends, so it never returns what was read before it was asked for.
 /// - `install(_:)` installs the parts one after another; a request while one runs adds the parts it does not cover,
-///   which install after it, so nothing is fetched twice. Its progress, then the failure of the first part that
+///   which install after it, so nothing is fetched twice. `cancel()` stops it, and a cancel is no failure. Its progress, then the failure of the first part that
 ///   failed, is `download`, which the download notice and the Settings rows show. A failed part shows as failed until
 ///   the next install of it; a failed speech install counts only for the language it was for.
 /// - `statuses` is what the Settings rows show: the running job's model download over the standalone install and the
@@ -29,8 +29,12 @@ import CassiniNotebook
     @ObservationIgnored private let clock: any AppClock
     @ObservationIgnored private let job: JobProgress?
     @ObservationIgnored private var installing: Task<Void, Never>?
+    /// Counts the standalone installs started and cancelled; an install whose number is no longer this one has ended.
+    @ObservationIgnored private var installNumber = 0
     /// The parts the running standalone install still has to do, in order.
     @ObservationIgnored private var queued: [ModelPart] = []
+    /// The part the running standalone install fetches now; nil during its closing refresh.
+    @ObservationIgnored private var inFlight: ModelPart?
     @ObservationIgnored private var refreshing: Task<Void, Never>?
     /// Refreshes asked for, and the last one whose read has ended.
     @ObservationIgnored private var refreshesAsked = 0
@@ -119,34 +123,67 @@ import CassiniNotebook
     }
 
     /// Installs `parts` now, in `ModelPart` order. While a standalone install runs, the parts it does not cover are
-    /// installed after it.
+    /// installed after it, even when they are asked for during its closing refresh.
     public func install(_ parts: [ModelPart]) {
         let parts = ModelPart.allCases.filter { $0 != .voices && (parts.contains($0) || ($0 == .speakers && parts.contains(.voices))) }
-        let current = download?.failure == nil ? download?.part : nil
-        let added = parts.filter { !queued.contains($0) && !(installing != nil && $0 == current) }
+        let added = parts.filter { !queued.contains($0) && $0 != inFlight }
         guard !added.isEmpty else { return }
         for part in added { failures[part] = nil }
         queued.append(contentsOf: added)
         guard installing == nil else { return }
+        installNumber += 1
+        let number = installNumber
         download = DownloadFact(part: queued[0], at: clock.now)
-        installing = Task { [weak self] in
-            var firstFailure: DownloadFact?
-            while let self, !Task.isCancelled, !self.queued.isEmpty {
-                let part = self.queued.removeFirst()
-                self.download = DownloadFact(part: part, at: self.clock.now)
-                if let failure = await self.install(part), firstFailure == nil { firstFailure = failure }
-            }
-            guard let self else { return }
-            await self.refresh()
-            self.installing = nil
-            self.download = firstFailure
+        installing = Task { [weak self] in await self?.drain(number) }
+    }
+
+    /// Cancels the standalone install: the part in flight stops (the speaker models' install ends for every caller
+    /// that waits on it, a job's analysis too) and the parts after it are dropped. A cancel is no failure: the rows
+    /// show what a refresh finds, and the files fetched so far stay for the next install.
+    public func cancel() {
+        guard let installing else { return }
+        let part = inFlight
+        installNumber += 1
+        self.installing = nil
+        inFlight = nil
+        queued = []
+        download = nil
+        installing.cancel()
+        if part == .speakers {
+            let analyzer = analyzer
+            Task { await analyzer.cancelModelInstall() }
         }
     }
 
-    /// Installs one part; its failure, or nil.
-    private func install(_ part: ModelPart) async -> DownloadFact? {
+    /// Installs the queued parts one after another, then reads every part again; parts asked for during that read are
+    /// installed before the install ends. Install `number` stops at once when it is cancelled, after its refresh.
+    private func drain(_ number: Int) async {
+        var firstFailure: DownloadFact?
+        repeat {
+            while installNumber == number, !queued.isEmpty {
+                let part = queued.removeFirst()
+                inFlight = part
+                download = DownloadFact(part: part, at: clock.now)
+                let failure = await install(part, number)
+                guard installNumber == number else { break }
+                inFlight = nil
+                if let failure {
+                    download = failure
+                    if firstFailure == nil { firstFailure = failure }
+                }
+            }
+            await refresh()
+        } while installNumber == number && !queued.isEmpty
+        // No await between the last look at `queued` and the end, so no request is left behind.
+        guard installNumber == number else { return }
+        installing = nil
+        download = firstFailure
+    }
+
+    /// Installs one part for install `number`; its failure, or nil. A cancel is no failure.
+    private func install(_ part: ModelPart, _ number: Int) async -> DownloadFact? {
         let report: @Sendable (Double?) -> Void = { [weak self] fraction in
-            Task { @MainActor in self?.report(part, fraction) }
+            Task { @MainActor in self?.report(part, fraction, number) }
         }
         let language = language()
         do {
@@ -157,9 +194,8 @@ import CassiniNotebook
                 try await analyzer.installModels(progress: report)
             }
             return nil
-        } catch is CancellationError {
-            return nil
         } catch {
+            if error is CancellationError || Task.isCancelled || installNumber != number { return nil }
             let (failure, bytes) = Self.failure(error)
             failures[part] = failure
             if part == .speech { speechFailureLanguage = language }
@@ -167,8 +203,8 @@ import CassiniNotebook
         }
     }
 
-    private func report(_ part: ModelPart, _ fraction: Double?) {
-        guard installing != nil, download?.part == part, download?.failure == nil else { return }
+    private func report(_ part: ModelPart, _ fraction: Double?, _ number: Int) {
+        guard installNumber == number, inFlight == part, download?.part == part, download?.failure == nil else { return }
         download = DownloadFact(part: part, fraction: fraction, at: clock.now)
     }
 

@@ -6,9 +6,10 @@ import CassiniNotebook
 ///
 /// - One install runs at a time. A request while one runs joins it: it gets the same progress and outcome, and every
 ///   file is fetched once.
-/// - A caller that is cancelled stops waiting at once; when nobody waits any more, the install is cancelled. A request
-///   that arrives before that cancelled fetch has ended never joins it: it waits for its end, then starts its own
-///   install, so only one fetch is ever in flight.
+/// - A caller that is cancelled stops waiting at once; when nobody waits any more, the install is cancelled. `cancel()`
+///   cancels it at once: every caller stops waiting with `CancellationError`. A request that arrives before a cancelled
+///   fetch has ended never joins it: it waits for its end, then starts its own install, so only one fetch is ever in
+///   flight.
 /// - An interrupted install keeps its complete files and FluidAudio's partial files, and the next install resumes
 ///   them. Only files with the wrong size or hash go first, or the whole folder when it holds another revision.
 /// - Before the first byte the free space is checked (the files plus 32 MiB); short, the install fails with
@@ -191,6 +192,17 @@ public actor SpeakerModelInstaller {
         guard let continuation = current?.waiters.removeValue(forKey: id) else { return }
         continuation.resume(throwing: CancellationError())
         stopIfNobodyWaits(number)
+    }
+
+    /// Cancels the install that runs, if any: every caller stops waiting with `CancellationError`, and the fetch is
+    /// interrupted. Its complete and partial files stay for the next install, and the status becomes what they are.
+    public func cancel() {
+        guard let install = current, !install.stopping else { return }
+        current?.waiters = [:]
+        current?.listeners = [:]
+        current?.stopping = true
+        install.task.cancel()
+        for waiter in install.waiters.values { waiter.resume(throwing: CancellationError()) }
     }
 
     private func stopIfNobodyWaits(_ number: Int) {

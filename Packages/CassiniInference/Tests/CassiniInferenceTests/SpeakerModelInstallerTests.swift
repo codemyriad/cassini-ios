@@ -3,6 +3,7 @@ import CryptoKit
 import Synchronization
 import Testing
 import CassiniEngine
+import CassiniEngineTesting
 import CassiniInference
 import CassiniNotebook
 
@@ -37,6 +38,36 @@ import CassiniNotebook
     }
 
     // ports: ModelInstallOwnerTest#cancelEndsEveryWaitAndKeepsThePartFiles
+    @MainActor @Test func cancelEndsEveryWaitAndKeepsThePartFiles() async throws {
+        let fetch = GatedFetch(writes: Fixture.files, partial: true)
+        let installer = makeInstaller(fetch)
+        let analyzer = SpeakerAnalyzer(installer: installer, network: ModelNetworkGate { _ in }) { _, _, _ in
+            SpeakerAnalysis(turns: [], prints: [])
+        }
+        let installs = ModelInstalls(transcriber: FakeTranscriber(.returns([], total: 0)), analyzer: analyzer,
+                                     clock: FakeClock()) { "en-US" }
+        installs.install([.speakers])
+        await fetch.started.wait()
+        let job = Task { try await analyzer.analyze(url: URL(filePath: "/tmp/note.m4a"), allowDownload: true) { _ in } }
+        try await until { await installer.waiting == 2 }
+
+        installs.cancel()
+        await #expect(throws: CancellationError.self) { try await job.value }
+        #expect(!installs.isInstalling, "the standalone download ended too")
+        try await until { fetch.cancelled }
+        try await until { await installer.status() == .notDownloaded }
+        #expect(await installer.waiting == 0)
+        #expect(Fixture.manifest.check(in: directory) == .incomplete)
+        let folder = directory.appendingPathComponent("models", isDirectory: true)
+        #expect(FileManager.default.fileExists(atPath: folder.appendingPathComponent("b.json.partial").path))
+        await installs.refresh()
+        #expect(installs.status(of: .speakers) == .notDownloaded, "a cancel is no failure")
+        #expect(installs.download == nil)
+        #expect(installs.failures.isEmpty)
+        try? FileManager.default.removeItem(at: directory)
+    }
+
+    // ports: ModelInstallOwnerTest#theInstallStopsWhenItsLastWaiterLeaves
     @Test func theInstallStopsWhenItsLastWaiterLeavesAndTheNextOneResumesItsFiles() async throws {
         let fetch = GatedFetch(writes: Fixture.files, partial: true)
         let installer = makeInstaller(fetch)
@@ -71,7 +102,7 @@ import CassiniNotebook
         await fetch.started.wait()
         try await until { await installer.waiting == 1 }
 
-        first.cancel()
+        await installer.cancel()
         await #expect(throws: CancellationError.self) { try await first.value }
         try await until { fetch.cancelled }
         let again = Task { try await installer.install(allowDownload: true) }
