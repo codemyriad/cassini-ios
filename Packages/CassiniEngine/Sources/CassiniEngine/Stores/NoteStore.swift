@@ -11,8 +11,11 @@ public protocol NotePersisting: Sendable {
 
 extension NoteRepository: NotePersisting {}
 
-/// A change made to a copy of a note, kept so the store can run it again on a newer note. Ids and dates the change
-/// stamps on the note should be made before the change, so that running it again gives the same values.
+/// A change made to a copy of a note, kept so the store can run it again on a newer note.
+///
+/// The change must only set what its operation owns, working from the note it is given: never assign the whole note
+/// (`$0 = snapshot`), which on a rerun would put the snapshot back over what another writer saved. Ids and dates the
+/// change stamps on the note should be made before the change, so that running it again gives the same values.
 public struct NoteEdit: Sendable {
     /// The note the change was made to.
     public let before: Note

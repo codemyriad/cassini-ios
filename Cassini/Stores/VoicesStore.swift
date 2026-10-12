@@ -49,49 +49,59 @@ import CassiniNotebook
     /// Puts a finished analysis into the note: fresh speaker ids, attributed passages, and matches to saved voices.
     /// Voiceprints are kept only while `generation` is still current.
     func applySpeakerAnalysis(_ analysis: SpeakerAnalysis, to id: UUID, generation: Int) async throws {
-        guard var note = library.note(id), note.trashedAt == nil else { return }
+        guard library.note(id)?.trashedAt == nil else { return }
         let keepsEvidence = generation == settings.voicesGeneration
-        note.saveCurrentVersion(name: "Before speaker analysis")
         if let model = analysis.prints.first?.model { settings.speakerModelIdentity = model }
         // A new analysis gets a fresh namespace: old versions keep their original identities.
         let prefix = UUID().uuidString + "_"
         let turns = analysis.turns.map { SpeakerTurn(speakerID: prefix + $0.speakerID, start: $0.start, end: $0.end) }
         let prints = analysis.prints.map { value in var copy = value; copy.speakerID = prefix + value.speakerID; return copy }
+        let speakers = analyzedSpeakers(turns: turns, prints: prints, in: id, matching: keepsEvidence)
+        if keepsEvidence, let voiceLibrary {
+            let existing = try voiceLibrary.prints(noteID: id)
+            try voiceLibrary.savePrints(existing + prints, noteID: id)
+        }
+        let before = UUID(), after = UUID(), date = Date()
+        let saved = await library.commit(id) { note in
+            guard note.trashedAt == nil else { return }
+            note.saveCurrentVersion(name: "Before speaker analysis", id: before, date: date)
+            note.speakers = speakers
+            note.transcript = SpeakerAttribution.assign(note.transcript, turns: turns)
+            note.refreshSpeakerLabels(); note.selectedVersionID = nil
+            note.saveCurrentVersion(name: "Speaker analysis", id: after, date: date)
+            note.speakerAnalysisFailure = speakers.isEmpty ? .empty : nil
+        }
+        guard saved != nil else { throw CocoaError(.fileWriteUnknown) }
+    }
+
+    /// The speakers in order of first turn, each matched to a saved voice when `matching`. Automatic naming is opt-in,
+    /// uses a high threshold and a rival margin, and never enrols evidence by itself.
+    private func analyzedSpeakers(turns: [SpeakerTurn], prints: [SpeakerPrint], in id: UUID, matching: Bool) -> [NoteSpeaker] {
         var seen: Set<String> = []
         let ids = turns.sorted { $0.start < $1.start }.compactMap { seen.insert($0.speakerID).inserted ? $0.speakerID : nil }
-        note.speakers = ids.enumerated().map { NoteSpeaker(id: $0.element, name: "Speaker \($0.offset + 1)") }
-        note.transcript = SpeakerAttribution.assign(note.transcript, turns: turns)
         let activeVoices = savedVoices.map { voice in
             var copy = voice
             copy.samples.removeAll { sample in library.note(sample.noteID)?.trashedAt != nil || sample.noteID == id }
             return copy
         }
-        let matches = keepsEvidence ? VoiceMatcher.match(prints: prints, voices: activeVoices) : [:]
-        for index in (note.speakers ?? []).indices {
-            guard let speaker = note.speakers?[index], let match = matches[speaker.id], let voice = voice(match.voiceID) else { continue }
-            // Automatic naming is opt-in, uses a high threshold and a rival margin, and never enrols evidence by itself.
+        let matches = matching ? VoiceMatcher.match(prints: prints, voices: activeVoices) : [:]
+        return ids.enumerated().map { offset, speakerID in
+            var speaker = NoteSpeaker(id: speakerID, name: "Speaker \(offset + 1)")
+            guard let match = matches[speakerID], let voice = voice(match.voiceID) else { return speaker }
             if settings.automaticallyNameVoices && match.automatic {
-                note.speakers?[index].name = voice.name
-                note.speakers?[index].match = .auto(voice: voice.id, score: match.score)
+                speaker.name = voice.name
+                speaker.match = .auto(voice: voice.id, score: match.score)
             } else {
-                note.speakers?[index].match = .suggested(voice: voice.id, score: match.score)
+                speaker.match = .suggested(voice: voice.id, score: match.score)
             }
+            return speaker
         }
-        note.refreshSpeakerLabels(); note.selectedVersionID = nil
-        note.saveCurrentVersion(name: "Speaker analysis")
-        note.speakerAnalysisFailure = ids.isEmpty ? .empty : nil
-        if keepsEvidence, let voiceLibrary {
-            let existing = try voiceLibrary.prints(noteID: id)
-            try voiceLibrary.savePrints(existing + prints, noteID: id)
-        }
-        let analyzed = note
-        guard await library.commit(id, { $0 = analyzed }) != nil else { throw CocoaError(.fileWriteUnknown) }
     }
 
     /// Names a speaker, optionally linking or remembering its voice.
     func saveSpeaker(noteID: UUID, speakerID: String, name: String, voiceID: UUID?, remember: Bool, renameSaved: Bool) throws(SaveFailure) {
         guard let voiceLibrary else { throw SaveFailure(message: "Saved voice storage is unavailable. Your voice files have been preserved.") }
-        guard var note = library.note(noteID), let index = note.speakers?.firstIndex(where: { $0.id == speakerID }) else { return }
+        guard let note = library.note(noteID), note.speakers?.contains(where: { $0.id == speakerID }) == true else { return }
         let clean = String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(100))
         guard !clean.isEmpty else { return }
         if let voiceID, let other = note.speakers?.first(where: { $0.id != speakerID && $0.linkedVoiceID == voiceID }) {
@@ -112,16 +122,18 @@ import CassiniNotebook
             }
         }
         if renameSaved, let link, let voiceIndex = voices.firstIndex(where: { $0.id == link }) { voices[voiceIndex].name = clean }
-        note.renameSpeaker(speakerID, name: clean)
-        let previous = note.speakers?[index].match
-        note.speakers?[index].match = link.map { .confirmed(voice: $0, score: previous?.voiceID == $0 ? previous?.score ?? 0 : 0) } ?? .unmatched
         do {
             try voiceLibrary.save(voices); savedVoices = voices
         } catch {
             throw SaveFailure(message: "Could not save voice: \(error.localizedDescription)")
         }
-        let named = note
-        library.update(noteID) { $0 = named }
+        let linked = link
+        library.update(noteID) { note in
+            guard let index = note.speakers?.firstIndex(where: { $0.id == speakerID }) else { return }
+            note.renameSpeaker(speakerID, name: clean)
+            let previous = note.speakers?[index].match
+            note.speakers?[index].match = linked.map { .confirmed(voice: $0, score: previous?.voiceID == $0 ? previous?.score ?? 0 : 0) } ?? .unmatched
+        }
         if renameSaved, let link { renameVoice(link, name: clean) }
     }
 

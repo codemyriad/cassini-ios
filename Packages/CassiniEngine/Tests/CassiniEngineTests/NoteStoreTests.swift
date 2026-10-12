@@ -132,6 +132,30 @@ import CassiniNotebook
         #expect(stored.transcript.map(\.text) == ["Hello"])
     }
 
+    @Test func aSpeakerEditRunAgainKeepsTheOtherWriterAndMakesTheSameVersion() async throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        let (store, _) = try store()
+        var note = Note(title: "Interview")
+        note.speakers = [NoteSpeaker(id: "a", name: "Speaker 1")]
+        note.transcript = [TranscriptSegment(text: "Hello", start: 0, end: 1, speaker: "Speaker 1", speakerID: "a")]
+        try await store.save(note)
+        let version = UUID(), date = Date(timeIntervalSince1970: 1_000)
+        let named = NoteEdit(note) {
+            $0.renameSpeaker("a", name: "Alex")
+            $0.saveCurrentVersion(name: "Named", id: version, date: date)
+        }
+        try await store.mutate(note.id) { $0.status = .ready; $0.failure = nil }
+
+        let stored = try #require(try await store.apply(named))
+
+        #expect(stored.status == .ready)
+        #expect(stored.speakers?.map(\.name) == ["Alex"])
+        #expect(stored.transcript.map(\.speaker) == ["Alex"])
+        #expect(stored.versions?.map(\.id) == [version])
+        #expect(stored.versions?.first?.createdAt == date)
+        #expect(stored.selectedVersionID == named.after.selectedVersionID)
+    }
+
     @Test func anEditOfANoteDeletedSinceWritesNothing() async throws {
         defer { try? FileManager.default.removeItem(at: root) }
         let (store, persistence) = try store()

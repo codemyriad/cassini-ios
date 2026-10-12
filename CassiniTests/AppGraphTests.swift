@@ -193,6 +193,59 @@ import CassiniEngineTesting
         XCTAssertNil(test.graph.errors.current)
     }
 
+    func testNamingASpeakerKeepsWhatAnEngineWriterSavedBeforeTheNameLanded() async throws {
+        let test = TestGraph(); defer { test.tearDown() }
+        var note = Note(title: "Speaker session")
+        note.speakers = [NoteSpeaker(id: "a", name: "Speaker 1")]
+        note.transcript = [.init(text: "Hello", start: 0, end: 8, speaker: "Speaker 1", speakerID: "a")]
+        try NoteRepository(root: test.root).save(note)
+        await test.graph.start()
+        let library = test.graph.library
+        let noteStore = try XCTUnwrap(library.noteStore)
+
+        try test.graph.voices.saveSpeaker(noteID: note.id, speakerID: "a", name: "Alex", voiceID: nil, remember: false, renameSaved: false)
+        // A transcription job saves the note before the name reaches the store.
+        try await noteStore.mutate(note.id) { $0.status = .ready; $0.title = "Retitled by a job" }
+        await library.settle()
+
+        let stored = try XCTUnwrap(NoteRepository(root: test.root).load().notes.first { $0.id == note.id })
+        XCTAssertEqual(stored.title, "Retitled by a job")
+        XCTAssertEqual(stored.status, .ready)
+        XCTAssertEqual(stored.speakers?.map(\.name), ["Alex"])
+        XCTAssertEqual(stored.transcript.map(\.speaker), ["Alex"])
+        XCTAssertEqual(library.note(note.id), stored)
+        XCTAssertNil(test.graph.errors.current)
+    }
+
+    func testASpeakerAnalysisKeepsWhatAnEngineWriterSavedBeforeItLanded() async throws {
+        let test = TestGraph(); defer { test.tearDown() }
+        var note = Note(title: "Conversation")
+        note.status = .ready
+        note.transcript = [.init(text: "First", start: 0, end: 4), .init(text: "Second", start: 5, end: 9)]
+        try NoteRepository(root: test.root).save(note)
+        await test.graph.start()
+        let library = test.graph.library, voices = test.graph.voices
+        let noteStore = try XCTUnwrap(library.noteStore)
+        let analysis = SpeakerAnalysis(
+            turns: [.init(speakerID: "x", start: 0, end: 4.5), .init(speakerID: "y", start: 4.5, end: 9)], prints: [])
+
+        let analyzing = Task { try await voices.applySpeakerAnalysis(analysis, to: note.id, generation: test.graph.settings.voicesGeneration) }
+        // An engine writer saves the note while the analysis is on its way to the store.
+        try await noteStore.mutate(note.id) { $0.isFavorite = true; $0.title = "Retitled by a job" }
+        try await analyzing.value
+        await library.settle()
+
+        let stored = try XCTUnwrap(NoteRepository(root: test.root).load().notes.first { $0.id == note.id })
+        XCTAssertEqual(stored.title, "Retitled by a job")
+        XCTAssertTrue(stored.isFavorite)
+        XCTAssertEqual(stored.speakers?.map(\.name), ["Speaker 1", "Speaker 2"])
+        XCTAssertEqual(stored.transcript.map(\.speaker), ["Speaker 1", "Speaker 2"])
+        XCTAssertEqual(stored.versions?.map(\.name), ["Before speaker analysis", "Speaker analysis"])
+        XCTAssertEqual(stored.selectedVersionID, stored.versions?.last?.id)
+        XCTAssertEqual(library.note(note.id), stored)
+        XCTAssertNil(test.graph.errors.current)
+    }
+
     func testTrashingANoteOpenInTheDetailColumnClosesIt() async throws {
         let test = TestGraph(); defer { test.tearDown() }
         let note = try await seedPlainNote(in: test)

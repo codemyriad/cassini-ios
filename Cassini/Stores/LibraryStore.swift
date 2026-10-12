@@ -59,8 +59,8 @@ import CassiniNotebook
 
     /// Changes the note now and writes the change in the background. False when there is no such note.
     ///
-    /// `change` may run again on the stored note when another writer saved it in between, so ids and dates it stamps
-    /// on the note should be made before it.
+    /// `change` may run again on the stored note when another writer saved it in between, so it must only set the
+    /// fields it owns, never assign the whole note, and ids and dates it stamps on the note should be made before it.
     @discardableResult
     func update(_ id: UUID, _ change: @escaping @Sendable (inout Note) -> Void) -> Bool {
         guard let noteStore, let edit = applyLocally(id, change) else { return false }
@@ -70,7 +70,8 @@ import CassiniNotebook
         return true
     }
 
-    /// Changes the note now and waits for the write. Nil when there is no such note or the write failed.
+    /// Changes the note now and waits for the write; `change` follows the rules of `update(_:_:)`. Nil when there is no
+    /// such note or the write failed.
     @discardableResult
     func commit(_ id: UUID, _ change: @escaping @Sendable (inout Note) -> Void) async -> Note? {
         guard let noteStore, let edit = applyLocally(id, change) else { return nil }

@@ -76,12 +76,15 @@ extension Note {
             if let id = transcript[index].speakerID { transcript[index].speaker = speakers?.first { $0.id == id }?.name }
         }
     }
-    public mutating func saveCurrentVersion(name: String) {
+    /// Keeps the transcript and speakers as a version, unless the selected version already holds them. A caller whose
+    /// change may run again passes the version's `id` and `date`, so that the rerun makes the same version.
+    public mutating func saveCurrentVersion(name: String, id versionID: UUID = UUID(), date: Date = Date()) {
         guard !transcript.isEmpty else { return }
         var history = versions ?? []
         if let id = selectedVersionID, let current = history.first(where: { $0.id == id }),
            current.segments == transcript, current.speakers == speakers ?? [] { return }
-        let version = TranscriptVersion(name: name, segments: transcript, speakers: speakers ?? [])
+        var version = TranscriptVersion(name: name, segments: transcript, speakers: speakers ?? [])
+        version.id = versionID; version.createdAt = date
         history.append(version); selectedVersionID = version.id
         versions = history
     }
