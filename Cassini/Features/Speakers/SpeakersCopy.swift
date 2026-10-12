@@ -46,6 +46,7 @@ enum SpeakersCopy {
         switch reason {
         case .tooLittleSpeech: tooLittleSpeech
         case .noModel: String(localized: "Recognising saved voices isn’t installed yet.", table: "Speakers")
+        case .readOnly: String(localized: "Saved voices can’t be changed now, so this voice can’t be remembered.", table: "Speakers")
         }
     }
     static let tooLittleSpeech = String(localized: "Too little speech to remember this voice.", table: "Speakers")

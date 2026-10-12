@@ -107,6 +107,23 @@ import Testing
         #expect(other.speakers?[0].match == .unmatched)
     }
 
+    /// A voice write that failed: the links go back as they were, in the shown speakers and every version; names stay.
+    @Test func restoringTheVoiceLinksPutsBackMatchesAndExclusionsEverywhere() {
+        var note = conversation()
+        let anna = F.id("anna"), luca = F.id("luca")
+        note.speakers = [NoteSpeaker(id: "a", name: "Anna", match: .confirmed(voice: anna, score: 0.8))]
+        note.saveCurrentVersion(name: "Named", id: stamp.before, date: stamp.date)
+        let before = note
+        note.renameSpeaker("a", name: "Annie")
+        note.rejectVoice(luca, for: "a", restorePlaceholder: false)
+        note.unlinkVoice(anna)
+        note.restoreVoiceLinks(from: before)
+        #expect(note.speakers?[0].match == .confirmed(voice: anna, score: 0.8))
+        #expect(note.speakers?[0].excludedVoiceIDs == [])
+        #expect(note.versions?[0].speakers[0].match == .confirmed(voice: anna, score: 0.8))
+        #expect(note.speakers?[0].name == "Annie")
+    }
+
     // MARK: - NamingCommit
 
     @Test func rememberingEnrolsTheSampleAndConfirmsTheSpeaker() {
@@ -129,7 +146,8 @@ import Testing
                                        noteID: noteID, speaker: speaker, print: nil, voices: [anna], voicesReadOnly: false)
         #expect(commit.voices.isEmpty)
         #expect(commit.forgotten == [anna.id])
-        #expect(commit.changes == [.reject(speakerID: "s3", voiceID: anna.id, restorePlaceholder: true), .unlinkVoice(anna.id)])
+        #expect(commit.changes == [.reject(speakerID: "s3", voiceID: anna.id, restorePlaceholder: true)],
+                "the links go once the voices are written")
     }
 
     @Test func voiceChangesAreRefusedWhileTheVoicesCannotBeChangedOrWithoutAPrint() {

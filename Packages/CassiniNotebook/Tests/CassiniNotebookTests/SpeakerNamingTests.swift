@@ -225,13 +225,14 @@ import Testing
         #expect(SpeakerNaming.samePerson(state)?.id == anna.id)
     }
 
-    /// Saved voices that cannot be changed: Remember is off and disabled, and no question is asked.
+    /// Saved voices that cannot be changed: Remember is off and disabled, says why, and no question is asked.
     @Test func readOnlyVoicesTurnRememberOff() throws {
         var readOnly = input()
         readOnly.voicesReadOnly = true
         let state = try on(SpeakerNaming.open(readOnly), .nameChanged("Anna"))
         let ui = SpeakerNaming.ui(state)
         #expect(!ui.remember && !ui.rememberEnabled)
+        #expect(ui.rememberReason == .readOnly)
         #expect(ui.samePerson == nil)
         #expect(effects(state, .save) == [.relabel(speakerID: "s3", name: "Anna"), .close])
     }

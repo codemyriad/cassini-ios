@@ -4,7 +4,9 @@ import CassiniEngine
 import CassiniNotebook
 
 /// Saved voices and the speakers of each note: the app's side of `VoiceStore`. Naming effects are worked out by
-/// `NamingCommit` and written note first, voices after; a voice write that fails puts the note's links back.
+/// `NamingCommit` and written note first, voices after; the voice side is worked out again on the `VoiceStore` actor
+/// against the voices as they are then, so overlapping edits keep each other. A voice write that fails puts the note's
+/// links back.
 @MainActor @Observable final class VoicesStore {
     /// The saved voices could not be read; their files are kept.
     struct Unavailable: Error {
@@ -42,12 +44,12 @@ import CassiniNotebook
     /// The "Is this Luca?" cards of a note.
     func suggestions(for note: Note) -> [SpeakerSuggestion] { SpeakerSuggestions.of(note, voices: savedVoices) }
 
-    /// Opens the private voice files. False when they cannot be used as they are; they are kept.
+    /// Opens the private voice files, off the main actor. False when they cannot be used as they are; they are kept.
     @discardableResult func load() async -> Bool {
         guard let root = library.root else { return false }
         let clock = clock
         do {
-            store = try VoiceStore(root: root, now: { clock.now })
+            store = try await Task.detached { try VoiceStore(root: root, now: { clock.now }) }.value
         } catch {
             return false
         }
@@ -60,7 +62,13 @@ import CassiniNotebook
         snapshot = await store.snapshot()
     }
 
-    /// Drops the voiceprints of notes that no longer exist, at launch.
+    /// Reads the saved voices again when the last read failed for a passing reason, before they are used.
+    private func retryUnreadable() async {
+        if snapshot.problem == .unreadable { await refresh() }
+    }
+
+    /// Drops the voiceprints of notes that no longer exist, at launch. A note folder that could not be read keeps its
+    /// prints (`VoiceLibrary.sweepOrphans`).
     func sweepOrphans() async throws {
         guard let store, library.loadFailure == nil else { return }
         try await store.sweepOrphans(keeping: Set(library.notes.map(\.id)))
@@ -73,6 +81,7 @@ import CassiniNotebook
     /// Voiceprints are kept, and voices matched, only while `generation` is still current: an analysis that began
     /// before Forget everyone keeps nothing. Rejected voices stay rejected for the speakers that overlap the old ones.
     func applySpeakerAnalysis(_ analysis: SpeakerAnalysis, to id: UUID, generation: Int) async throws {
+        await retryUnreadable()
         guard let note = library.note(id), note.trashedAt == nil else { return }
         if let model = analysis.prints.first?.model { settings.speakerModelIdentity = model }
         let (turns, prints) = SpeakerAttribution.namespaced(turns: analysis.turns, prints: analysis.prints,
@@ -108,6 +117,7 @@ import CassiniNotebook
 
     /// What the Name a speaker sheet needs about the speaker; nil when the note or the speaker is gone.
     func namingInput(noteID: UUID, speakerID: String) async -> NamingInput? {
+        await retryUnreadable()
         guard let note = library.note(noteID), let index = note.speakers?.firstIndex(where: { $0.id == speakerID }),
               let speaker = note.speakers?[index] else { return nil }
         let print = await print(noteID: noteID, speakerID: speakerID)
@@ -129,14 +139,19 @@ import CassiniNotebook
 
     /// Carries out the sheet's effects for one speaker: the note first, then the saved voices.
     func perform(_ effects: [NamingEffect], noteID: UUID, speakerID: String) async throws(SaveFailure) {
+        await retryUnreadable()
         guard let note = library.note(noteID), let speaker = note.speaker(speakerID) else { return }
         let print = await print(noteID: noteID, speakerID: speakerID)
-        let commit = NamingCommit.plan(effects, noteID: noteID, speaker: speaker, print: print, voices: savedVoices,
-                                       voicesReadOnly: isReadOnly, stamp: VersionStamp(date: clock.now))
+        let newVoiceID = UUID(), stamp = VersionStamp(date: clock.now)
+        let plan: @Sendable ([SavedVoice], Bool) -> NamingCommit = { voices, readOnly in
+            NamingCommit.plan(effects, noteID: noteID, speaker: speaker, print: print, voices: voices, voicesReadOnly: readOnly,
+                              newVoiceID: newVoiceID, stamp: stamp)
+        }
+        let commit = plan(savedVoices, isReadOnly)
         switch commit.refused {
         case .readOnly?: throw SaveFailure(message: SpeakersCopy.voicesReadOnly)
         case .noPrint?: throw SaveFailure(message: SpeakersCopy.tooLittleSpeech)
-        case nil: try await write(commit, noteID: noteID, before: note)
+        case nil: try await write(commit, plan: plan, noteID: noteID, before: note)
         }
     }
 
@@ -154,27 +169,29 @@ import CassiniNotebook
                           noteID: noteID, speakerID: suggestion.speakerID)
     }
 
-    private func write(_ commit: NamingCommit, noteID: UUID, before: Note) async throws(SaveFailure) {
+    /// Writes the note's side of `commit`, then the voices: `plan` runs again on the `VoiceStore` actor against the
+    /// voices as they are then. When that gives the note other changes (a voice forgotten meanwhile), they follow; the
+    /// notes drop their links to forgotten voices only once the voices are written.
+    private func write(_ commit: NamingCommit, plan: @escaping @Sendable ([SavedVoice], Bool) -> NamingCommit,
+                       noteID: UUID, before: Note) async throws(SaveFailure) {
         let changes = commit.changes
         guard await library.commit(noteID, { $0.apply(changes) }) != nil else { throw SaveFailure(message: SpeakersCopy.noteNotSaved) }
-        guard commit.changesVoices, let store else { return }
+        guard let store else { return }
+        let written: NamingCommit
         do {
-            try await store.save(commit.voices)
+            written = try await store.commit(plan)
         } catch {
             // The voices stay as they were, so the note's links go back too; the names typed stay.
-            let links = Dictionary((before.speakers ?? []).map { ($0.id, ($0.match, $0.excludedVoiceIDs)) }, uniquingKeysWith: { a, _ in a })
-            await library.commit(noteID) { note in
-                for index in (note.speakers ?? []).indices {
-                    guard let id = note.speakers?[index].id, let link = links[id] else { continue }
-                    note.speakers?[index].match = link.0
-                    note.speakers?[index].excludedVoiceIDs = link.1
-                }
-            }
+            await library.commit(noteID) { $0.restoreVoiceLinks(from: before) }
             await refresh()
             throw SaveFailure(message: SpeakersCopy.voiceNotSaved(error.localizedDescription))
         }
+        if written.changes != changes {
+            let current = written.changes
+            await library.commit(noteID) { $0.apply(current) }
+        }
         await refresh()
-        for voice in commit.forgotten { library.updateAll { $0.unlinkVoice(voice) } }
+        for voice in written.forgotten { library.updateAll { $0.unlinkVoice(voice) } }
     }
 
     private func print(noteID: UUID, speakerID: String) async -> SpeakerPrint? {
@@ -206,19 +223,21 @@ import CassiniNotebook
         guard let store, snapshot.canForgetEveryone else { return .readOnly }
         settings.advanceVoicesGeneration()
         let outcome = await store.forgetEveryone()
-        library.updateAll { $0.reconcileVoices([]) }
+        // A forget that failed keeps the voices, so the notes keep their links to them.
+        if outcome == .done { library.updateAll { $0.reconcileVoices([]) } }
         await refresh()
         return outcome
     }
 
     // MARK: - Notes
 
-    /// Shows another version of the transcript. Links to voices forgotten meanwhile are dropped; names stay.
+    /// Shows another version of the transcript. Links to voices forgotten meanwhile are dropped; names stay. While the
+    /// saved voices cannot be read the list is not known, so every link stays.
     func selectTranscriptVersion(noteID: UUID, versionID: UUID) {
-        let known = Set(savedVoices.map(\.id))
+        let known: Set<UUID>? = isReadOnly ? nil : Set(savedVoices.map(\.id))
         library.update(noteID) { note in
             note.selectVersion(versionID)
-            note.reconcileVoices(known)
+            if let known { note.reconcileVoices(known) }
         }
     }
 
@@ -227,14 +246,17 @@ import CassiniNotebook
         library.update(noteID) { $0.addSpeaker(id: id, name: name) }
     }
 
-    /// Removes the note's voiceprints and its samples from saved voices, before the note is deleted for good.
+    /// Removes the note's voiceprints and its samples from saved voices, before the note is deleted for good. A voice
+    /// left without samples is forgotten, and every note drops its links to it.
     func removeEvidence(noteID: UUID) async throws {
         guard let store else { throw Unavailable(message: SpeakersCopy.evidenceUnavailable) }
+        let forgotten: [UUID]
         do {
-            try await store.removeEvidence(noteID: noteID)
+            forgotten = try await store.removeEvidence(noteID: noteID)
         } catch is VoiceLibraryError {
             throw Unavailable(message: SpeakersCopy.evidenceUnavailable)
         }
         await refresh()
+        for voice in forgotten { library.updateAll { $0.unlinkVoice(voice) } }
     }
 }

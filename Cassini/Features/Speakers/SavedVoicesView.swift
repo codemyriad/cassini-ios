@@ -54,7 +54,8 @@ struct SavedVoicesView: View {
                         .disabled(readOnly)
                         .accessibilityIdentifier("forgetEveryone")
                 }
-            } else if voices.hasEvidence, voices.snapshot.canForgetEveryone {
+            } else if voices.snapshot.canForgetEveryone, voices.hasEvidence || voices.snapshot.problem == .damaged {
+                // A damaged list is empty and read-only: this is the way back to a list that can be used.
                 Section {
                     Button(SpeakersCopy.forgetAllData, role: .destructive) { forgettingAllData = true }
                 } footer: { Text(SpeakersCopy.forgetAllDataBody) }

@@ -60,6 +60,17 @@ public actor VoiceStore {
         return voices
     }
 
+    /// Works out the voice side of a naming commit against the saved voices as they are now, and writes it, in one step:
+    /// a change made meanwhile by another commit, a rename, Forget or a permanent delete is kept rather than written
+    /// over. Returns the commit; throws `VoiceLibraryError.readOnly` when the voices cannot be changed now.
+    @discardableResult
+    public func commit(_ plan: @Sendable (_ voices: [SavedVoice], _ readOnly: Bool) -> NamingCommit) throws -> NamingCommit {
+        library.refreshed()
+        let commit = plan(library.voices, library.problem != nil)
+        if commit.changesVoices { try library.save(commit.voices) }
+        return commit
+    }
+
     /// Renames a saved voice. Names already in notes stay as they are.
     public func rename(_ id: UUID, name: String) -> VoiceEdit {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -97,8 +108,9 @@ public actor VoiceStore {
     /// Whether any note has voiceprints on disk.
     public func hasEvidence() -> Bool { library.hasEvidence }
 
-    /// Removes the note's voiceprints and its samples from every saved voice.
-    public func removeEvidence(noteID: UUID) throws { try library.removeEvidence(noteID: noteID) }
+    /// Removes the note's voiceprints and its samples from every saved voice. Returns the voices left without samples,
+    /// which are forgotten.
+    @discardableResult public func removeEvidence(noteID: UUID) throws -> [UUID] { try library.removeEvidence(noteID: noteID) }
 
     /// Forgets every saved voice and every voiceprint.
     public func forgetAll() throws { try library.forgetAll() }

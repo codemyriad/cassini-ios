@@ -64,6 +64,8 @@ public enum RememberReason: Hashable, Sendable {
     case noModel
     /// "Too little speech to remember this voice."
     case tooLittleSpeech
+    /// The saved voices are newer, damaged or unreadable, so nothing can be remembered now.
+    case readOnly
 }
 
 /// The Save name button.
@@ -224,7 +226,7 @@ public enum SpeakerNaming {
             if case .confirmed = input.match { return voice.id }
             return NameMatch.same(voice.name, name) ? voice.id : nil
         }
-        let remember = rememberReason(input) == nil && !input.voicesReadOnly
+        let remember = rememberReason(input) == nil
         return NamingState(input: input, name: name, boundVoiceID: bound, remember: remember, initialName: name,
                            initialBound: bound, initialRemember: remember)
     }
@@ -267,7 +269,7 @@ public enum SpeakerNaming {
             voices: shown.map { NameSheetUI.VoiceRow(id: $0.voice.id, name: $0.voice.name, likely: $0.likely) },
             showAll: !state.showAll && ranked.count > visibleVoices, ranked: input.print != nil,
             samePerson: samePerson(state)?.name, renameSaved: renameQuestion(state)?.name, notName: notName(input)?.name,
-            remember: state.remember && reason == nil, rememberEnabled: reason == nil && !input.voicesReadOnly,
+            remember: state.remember && reason == nil, rememberEnabled: reason == nil,
             rememberReason: reason, canMerge: canMerge(state), save: saveState(state))
     }
 
@@ -322,6 +324,7 @@ public enum SpeakerNaming {
 
     /// Why Remember is off, or nil when it can be on.
     public static func rememberReason(_ input: NamingInput) -> RememberReason? {
+        if input.voicesReadOnly { return .readOnly }
         if !input.voiceModelReady { return .noModel }
         guard let print = input.print, print.speechSeconds >= minimumRememberSeconds else { return .tooLittleSpeech }
         return nil
@@ -421,9 +424,7 @@ public enum SpeakerNaming {
 
     private static func canMerge(_ state: NamingState) -> Bool { !state.input.mergeTargets.isEmpty }
 
-    private static func rememberable(_ state: NamingState) -> Bool {
-        rememberReason(state.input) == nil && !state.input.voicesReadOnly
-    }
+    private static func rememberable(_ state: NamingState) -> Bool { rememberReason(state.input) == nil }
 
     private static func effectiveRemember(_ state: NamingState) -> Bool { state.remember && rememberable(state) }
 

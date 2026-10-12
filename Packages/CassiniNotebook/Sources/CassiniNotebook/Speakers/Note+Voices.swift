@@ -47,6 +47,27 @@ extension Note {
         dropMatches { !known.contains($0) }
     }
 
+    /// Puts back the voice links (`match`, `excludedVoiceIDs`) that `before` had, in the shown speakers and in every
+    /// version it had, after the saved voices could not be written. Names and anything else stay as they are now.
+    public mutating func restoreVoiceLinks(from before: Note) {
+        func restore(_ list: inout [NoteSpeaker], from old: [NoteSpeaker]) {
+            let links = Dictionary(old.map { ($0.id, ($0.match, $0.excludedVoiceIDs)) }, uniquingKeysWith: { first, _ in first })
+            for index in list.indices {
+                guard let link = links[list[index].id] else { continue }
+                list[index].match = link.0
+                list[index].excludedVoiceIDs = link.1
+            }
+        }
+        if var list = speakers { restore(&list, from: before.speakers ?? []); speakers = list }
+        if var history = versions {
+            let old = Dictionary((before.versions ?? []).map { ($0.id, $0.speakers) }, uniquingKeysWith: { first, _ in first })
+            for index in history.indices {
+                if let speakers = old[history[index].id] { restore(&history[index].speakers, from: speakers) }
+            }
+            versions = history
+        }
+    }
+
     private mutating func dropMatches(_ dropped: (UUID) -> Bool) {
         func clean(_ list: inout [NoteSpeaker]) {
             for index in list.indices {

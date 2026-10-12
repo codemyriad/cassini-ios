@@ -1064,6 +1064,23 @@
         }
       }
     },
+    "Saved voices can’t be changed now, so this voice can’t be remembered.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saved voices can’t be changed now, so this voice can’t be remembered."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le voci salvate non si possono modificare ora, quindi questa voce non può essere ricordata."
+          }
+        }
+      }
+    },
     "Saved voices can’t be changed now. Nothing was changed.": {
       "extractionState": "manual",
       "localizations": {

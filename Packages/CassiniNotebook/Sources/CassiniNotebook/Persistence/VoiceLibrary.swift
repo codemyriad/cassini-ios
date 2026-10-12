@@ -102,22 +102,33 @@ public final class VoiceLibrary {
         problem = nil
     }
 
-    /// Removes the note's prints and its samples from every saved voice, before the note is deleted for good. Refused
-    /// while `voices.json` is newer or unreadable, since it may hold samples of the note; a damaged list has none.
-    public func removeEvidence(noteID: UUID) throws {
+    /// Removes the note's prints and its samples from every saved voice, before the note is deleted for good. A voice
+    /// left without samples is forgotten; those voices are returned so the notes can drop their links. Refused while
+    /// `voices.json` is newer or unreadable, since it may hold samples of the note; a damaged list has none.
+    @discardableResult public func removeEvidence(noteID: UUID) throws -> [UUID] {
         refreshed()
         if let problem, problem != .damaged { throw VoiceLibraryError.readOnly(problem) }
-        var copy = voices
-        for index in copy.indices { copy[index].samples.removeAll { $0.noteID == noteID } }
+        var copy: [SavedVoice] = []
+        var forgotten: [UUID] = []
+        for var voice in voices {
+            let before = voice.samples.count
+            voice.samples.removeAll { $0.noteID == noteID }
+            if voice.samples.isEmpty && before > 0 { forgotten.append(voice.id) } else { copy.append(voice) }
+        }
         if copy != voices { try save(copy) }
         for url in noteFiles() where self.noteID(of: url) == noteID { try FileManager.default.removeItem(at: url) }
+        return forgotten
     }
 
-    /// Deletes the print files of notes not in `notes`. Returns those notes.
+    /// Deletes the print files of notes that are gone: not in `notes`, and with no folder at `<root>/<id>`. A note
+    /// folder whose `note.json` could not be read is kept with its prints, as on Android. Returns the notes swept.
     @discardableResult public func sweepOrphans(keeping notes: Set<UUID>) throws -> [UUID] {
+        let root = folder.deletingLastPathComponent()
         var deleted: Set<UUID> = []
         for url in noteFiles() {
-            guard let id = noteID(of: url), !notes.contains(id) else { continue }
+            guard let id = noteID(of: url), !notes.contains(id),
+                  !FileManager.default.fileExists(atPath: root.appendingPathComponent(id.uuidString, isDirectory: true).path)
+            else { continue }
             try FileManager.default.removeItem(at: url)
             deleted.insert(id)
         }

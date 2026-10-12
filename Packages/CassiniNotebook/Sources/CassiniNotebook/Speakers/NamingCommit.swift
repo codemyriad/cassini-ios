@@ -8,7 +8,8 @@ public struct NamingCommit: Hashable, Sendable {
     public var voices: [SavedVoice]
     /// The changes to the note's speakers.
     public var changes: [SpeakerChange]
-    /// Voices left without a sample: they are forgotten, so every note drops its links to them.
+    /// Voices left without a sample: they are forgotten, so every note drops its links to them once the voices are
+    /// written (`Note.unlinkVoice`). They are not in `changes`, so a voice write that fails leaves the links alone.
     public var forgotten: [UUID]
     /// The voice changes need a print the note no longer has, or voices that cannot be changed now.
     public var refused: Refusal?
@@ -62,7 +63,6 @@ public struct NamingCommit: Hashable, Sendable {
             }
         }
         commit.voicesChanged = commit.voices != voices
-        commit.changes += commit.forgotten.map(SpeakerChange.unlinkVoice)
         if commit.changesVoices && voicesReadOnly { commit.refused = .readOnly }
         return commit
     }

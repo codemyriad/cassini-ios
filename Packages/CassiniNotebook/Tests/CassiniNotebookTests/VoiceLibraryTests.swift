@@ -151,15 +151,17 @@ import Testing
         let gone = UUID(), kept = UUID()
         var luca = F.voice("luca", "Luca", note: kept)
         luca.samples += F.voice("x", note: gone).samples
-        try library.save([luca])
+        let anna = F.voice("anna", "Anna", note: gone)
+        try library.save([luca, anna])
         try library.savePrints([F.print("s", F.axis(0))], noteID: gone)
         try write("{", to: file(NoteVoiceCodec.fileName(gone) + ".corrupt-3"))
 
-        try library.removeEvidence(noteID: gone)
+        #expect(try library.removeEvidence(noteID: gone) == [anna.id], "Anna had only samples of the note and is forgotten")
 
         #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path) == ["voices.json"])
+        #expect(try self.library().voices.map(\.id) == [luca.id])
         #expect(try self.library().voices.first?.samples.map(\.noteID) == [kept])
-        try library.removeEvidence(noteID: gone)
+        #expect(try library.removeEvidence(noteID: gone).isEmpty)
     }
 
     // ports: VoiceRepositoryTest#syncLinksDropsTheFilesOfNotesWithoutARow
@@ -175,5 +177,18 @@ import Testing
         #expect(!FileManager.default.fileExists(atPath: file(NoteVoiceCodec.fileName(gone)).path))
         #expect(try library.prints(noteID: kept).count == 2)
         #expect(try library.sweepOrphans(keeping: [kept]).isEmpty)
+    }
+
+    /// A note whose `note.json` could not be read is not in the list, but its folder is kept, and so are its prints.
+    @Test func theSweepKeepsThePrintsOfNoteFoldersThatCouldNotBeRead() throws {
+        defer { cleanUp() }
+        let library = try library()
+        let unreadable = UUID()
+        try write(#"{"schemaVersion":3}"#, to: root.appendingPathComponent(unreadable.uuidString).appendingPathComponent("note.json"))
+        try library.savePrints([F.print("s", F.axis(0))], noteID: unreadable)
+
+        #expect(try library.sweepOrphans(keeping: []).isEmpty)
+
+        #expect(try library.prints(noteID: unreadable).count == 1)
     }
 }
