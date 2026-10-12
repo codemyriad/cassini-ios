@@ -181,7 +181,8 @@ final class AudioPipelineTests: XCTestCase {
         try writeSignal(to: url)
         await first.graph.start()
         first.graph.settings.autoTranscribe = false
-        let created = try XCTUnwrap(await first.graph.imports.importFile(url, opensNote: false).value?.noteID)
+        let firstOutcome = await first.graph.imports.importFile(url, opensNote: false).value
+        let created = try XCTUnwrap(firstOutcome?.noteID)
         await first.graph.library.settle()
 
         // A cold launch from Files: the open arrives before the launch work has read the notes.
