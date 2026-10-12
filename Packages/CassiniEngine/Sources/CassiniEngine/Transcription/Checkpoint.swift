@@ -12,21 +12,39 @@ public protocol CheckpointStoring: Sendable {
     func exists(_ noteID: UUID) -> Bool
 }
 
-/// `<root>/<note id>/work/checkpoint.json`, with the previous checkpoint kept as `checkpoint.json.bak`. A save writes a
+/// A checkpoint could not be written because the volume is (nearly) full: the job fails with `SPACE`, not `SAVE`.
+public struct CheckpointSpaceError: Error, Hashable, Sendable {
+    public init() {}
+}
+
+/// `<note folder>/work/checkpoint.json`, with the previous checkpoint kept as `checkpoint.json.bak`. A save writes a
 /// temporary file, flushes it to disk, moves the current checkpoint to the backup and renames the new one into place;
-/// a load falls back to the backup when the current file is missing or damaged.
+/// a load falls back to the backup when the current file is missing or damaged. The note folder is `NoteStore`'s, so the
+/// work goes with the note.
 public struct CheckpointFiles: CheckpointStoring {
     public static let directoryName = "work"
     public static let filename = "checkpoint.json"
     public static let backupFilename = "checkpoint.json.bak"
+    /// A failed write with less free space than this is a full volume (Android's `Limits.MIN_FREE_BYTES`).
+    public static let minFreeBytes: Int64 = 64 << 20
 
-    public let root: URL
+    private let noteDirectory: @Sendable (UUID) -> URL
+    private let availableBytes: @Sendable (URL) -> Int64
 
-    public init(root: URL) { self.root = root }
+    /// `noteDirectory` gives a note's folder; `availableBytes` the free space of the volume a folder is on.
+    public init(noteDirectory: @escaping @Sendable (UUID) -> URL,
+                availableBytes: @escaping @Sendable (URL) -> Int64 = CheckpointFiles.availableBytes) {
+        self.noteDirectory = noteDirectory
+        self.availableBytes = availableBytes
+    }
+
+    /// The work folders of `notes`' notes.
+    public init(notes: NoteStore) {
+        self.init(noteDirectory: { notes.directory(for: $0) })
+    }
 
     public func directory(for noteID: UUID) -> URL {
-        root.appendingPathComponent(noteID.uuidString, isDirectory: true)
-            .appendingPathComponent(Self.directoryName, isDirectory: true)
+        noteDirectory(noteID).appendingPathComponent(Self.directoryName, isDirectory: true)
     }
 
     public func load(_ noteID: UUID) throws -> CheckpointState? {
@@ -41,16 +59,24 @@ public struct CheckpointFiles: CheckpointStoring {
         return nil
     }
 
+    /// Throws `CheckpointSpaceError` when the write failed on a full volume.
     public func save(_ state: CheckpointState, for noteID: UUID) throws {
         let folder = directory(for: noteID)
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let main = folder.appendingPathComponent(Self.filename)
-        let backup = folder.appendingPathComponent(Self.backupFilename)
-        let temporary = folder.appendingPathComponent(Self.filename + ".tmp")
-        try Self.writeSynced(state.encoded(), to: temporary)
-        if FileManager.default.fileExists(atPath: main.path) { try Self.rename(main, to: backup) }
-        try Self.rename(temporary, to: main)
-        Self.syncDirectory(folder)
+        do {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            let main = folder.appendingPathComponent(Self.filename)
+            let backup = folder.appendingPathComponent(Self.backupFilename)
+            let temporary = folder.appendingPathComponent(Self.filename + ".tmp")
+            try Self.writeSynced(state.encoded(), to: temporary)
+            if FileManager.default.fileExists(atPath: main.path) { try Self.rename(main, to: backup) }
+            try Self.rename(temporary, to: main)
+            Self.syncDirectory(folder)
+        } catch {
+            if Self.isOutOfSpace(error) || availableBytes(noteDirectory(noteID)) < Self.minFreeBytes {
+                throw CheckpointSpaceError()
+            }
+            throw error
+        }
     }
 
     public func discard(_ noteID: UUID) throws {
@@ -64,6 +90,26 @@ public struct CheckpointFiles: CheckpointStoring {
         return [Self.filename, Self.backupFilename].contains {
             FileManager.default.fileExists(atPath: folder.appendingPathComponent($0).path)
         }
+    }
+
+    /// Free bytes for important use on the volume of `url`, or of its nearest existing parent; `Int64.max` when unknown.
+    @Sendable public static func availableBytes(_ url: URL) -> Int64 {
+        var candidate = url
+        while !FileManager.default.fileExists(atPath: candidate.path), candidate.pathComponents.count > 1 {
+            candidate.deleteLastPathComponent()
+        }
+        let values = try? candidate.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey,
+                                                             .volumeAvailableCapacityKey])
+        // Some volumes (a Mac's temporary folder, say) report 0 for important use; the plain figure is then the answer.
+        if let important = values?.volumeAvailableCapacityForImportantUsage, important > 0 { return important }
+        return values?.volumeAvailableCapacity.map(Int64.init) ?? .max
+    }
+
+    static func isOutOfSpace(_ error: any Error) -> Bool {
+        if let cocoa = error as? CocoaError, cocoa.code == .fileWriteOutOfSpace { return true }
+        if let posix = error as? POSIXError, posix.code == .ENOSPC || posix.code == .EDQUOT { return true }
+        let underlying = (error as NSError).userInfo[NSUnderlyingErrorKey] as? any Error
+        return underlying.map(isOutOfSpace) ?? false
     }
 
     /// Writes `data` and flushes it to the disk before returning.

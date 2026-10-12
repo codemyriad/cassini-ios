@@ -5,13 +5,23 @@ import CassiniNotebook
 /// The words step of one run: gathers the transcriber's results, saves checkpoints, applies the limits and turns a
 /// stop into a saved checkpoint. The transcriber calls `handle` in order from its own thread; the job calls `attach`,
 /// `stopRequested` from its stop watch, and `finish` once the transcriber returned.
+///
+/// The state is behind one lock. Job events are queued under it and sent once it is released, in order, so an event
+/// sink may call back into the decode (a stop, say) without deadlocking; one that does has its own events sent after
+/// the ones before. A checkpoint is written under the lock, so the next result waits for the `fsync`: that keeps every
+/// decision about the next checkpoint on what is on disk.
 final class WordsDecode: Sendable {
     enum Ending: Sendable {
         case complete(CheckpointState)
         case stopped(StopRequest)
         case failed(JobFailure)
+        case downloadFailed(DownloadFailure)
         case needsConsent
     }
+
+    /// A transcriber that returns with the audio this much short of the total ended early: it is a read failure, not
+    /// the end of the words.
+    static let endToleranceMs: Int64 = 2_000
 
     /// Draft events go out at most this often, and less often for long drafts: each one carries every word.
     static let minimumEmitIntervalMs: Int64 = 1_000
@@ -33,6 +43,10 @@ final class WordsDecode: Sendable {
         var stopping = false
         var task: Task<TranscriptionResult, any Error>?
         var cancelPending = false
+        /// When the analyzer first reported: the inference clock leaves the model download out.
+        var analyzerStartedAt: Int64?
+        var outbox: [JobEvent] = []
+        var delivering = false
     }
 
     private let state: Mutex<State>
@@ -43,7 +57,6 @@ final class WordsDecode: Sendable {
     private let stop: StopSignal
     private let events: @Sendable (JobEvent) -> Void
     private let uptimeMs: @Sendable () -> Int64
-    private let startedAt: Int64
     private let base: CheckpointState
 
     init(base: CheckpointState, noteID: UUID, resumeDoneMs: Int64, limits: TranscriptionJob.Limits,
@@ -54,25 +67,25 @@ final class WordsDecode: Sendable {
         self.base = base
         self.noteID = noteID; self.resumeDoneMs = resumeDoneMs; self.limits = limits; self.checkpoints = checkpoints
         self.stop = stop; self.events = events; self.uptimeMs = uptimeMs
-        startedAt = uptimeMs()
         state = Mutex(State(checkpoint: resumed, savedMs: base.doneMs, words: base.draftWords, progressMs: base.doneMs,
                             shownMs: base.doneMs))
     }
 
     /// The transcriber's task, cancelled once the step ends early.
     func attach(_ task: Task<TranscriptionResult, any Error>) {
-        state.withLock { s in
+        withState { s in
             s.task = task
             if s.cancelPending { task.cancel() }
         }
     }
 
     func handle(_ event: TranscriptionEvent) {
-        state.withLock { s in
+        withState { s in
             guard s.ended == nil else { return }
+            if case .preparingModel = event {} else if s.analyzerStartedAt == nil { s.analyzerStartedAt = uptimeMs() }
             switch event {
             case .preparingModel(let fraction):
-                events(.downloading(fraction.map(TranscriptionJob.fractionProgress(.speech))))
+                s.outbox.append(.downloading(fraction.map(TranscriptionJob.fractionProgress(.speech))))
             case .progress(let done, let total):
                 guard accept(total: CheckpointState.ms(total), &s) else { return }
                 s.progressMs = max(s.progressMs, CheckpointState.ms(done))
@@ -88,7 +101,7 @@ final class WordsDecode: Sendable {
 
     /// The stop watch saw a stop.
     func stopRequested(_ request: StopRequest) {
-        state.withLock { s in
+        withState { s in
             guard s.ended == nil else { return }
             requestStop(request, &s)
         }
@@ -96,11 +109,13 @@ final class WordsDecode: Sendable {
 
     /// How the step ended, once the transcriber returned with `result`.
     func finish(_ result: Result<TranscriptionResult, any Error>) -> Ending {
-        state.withLock { s in
+        withState { s in
             if let ended = s.ended { return ended }
             switch result {
             case .failure(TranscriptionError.needsConsent):
                 return .needsConsent
+            case .failure(TranscriptionError.failed(.download(let error))):
+                return .downloadFailed(DownloadFailure(error: error, part: .speech))
             case .failure(TranscriptionError.failed(let failure)):
                 return .failed(failure)
             case .failure(let error):
@@ -112,8 +127,10 @@ final class WordsDecode: Sendable {
                     if let ended = s.ended { return ended }
                 }
             }
-            // Every bit of the audio is transcribed.
+            // Every bit of the audio is transcribed, unless the input ended early.
             let lastEnd = s.checkpoint.segments.last.map { CheckpointState.ms($0.end) } ?? 0
+            let reached = max(s.progressMs, lastEnd)
+            if s.checkpoint.totalMs > 0, reached + Self.endToleranceMs < s.checkpoint.totalMs { return .failed(.open) }
             s.checkpoint.doneMs = max(s.checkpoint.doneMs, s.checkpoint.totalMs, lastEnd)
             if s.checkpoint.totalMs == 0 { s.checkpoint.totalMs = s.checkpoint.doneMs }
             s.progressMs = s.checkpoint.doneMs
@@ -124,7 +141,7 @@ final class WordsDecode: Sendable {
                 requestStop(request, &s, complete: true)
                 return s.ended ?? .stopped(request)
             }
-            guard save(&s, complete: true) else { return .failed(.save) }
+            if let failure = save(&s, complete: true) { return .failed(failure) }
             emit(&s, force: true)
             return .complete(s.checkpoint)
         }
@@ -148,7 +165,7 @@ final class WordsDecode: Sendable {
         let now = uptimeMs()
         if SpeechWindows.checkpointDue(doneMs: s.checkpoint.doneMs, savedMs: s.savedMs, nowMs: now, savedAt: s.savedAt) {
             guard fits(s) else { end(.failed(.long), &s); return }
-            guard save(&s, complete: false) else { end(.failed(.save), &s); return }
+            if let failure = save(&s, complete: false) { end(.failed(failure), &s); return }
         }
         emit(&s, force: false)
     }
@@ -163,7 +180,7 @@ final class WordsDecode: Sendable {
     private func requestStop(_ request: StopRequest, _ s: inout State, complete: Bool = false) {
         guard !s.stopping else { return }
         s.stopping = true
-        events(.stopping)
+        s.outbox.append(.stopping)
         if case .pause = request, s.checkpoint.doneMs > s.savedMs || complete, s.checkpoint.doneMs > 0, fits(s) {
             // A failed save keeps the checkpoint before it.
             _ = save(&s, complete: complete)
@@ -180,19 +197,31 @@ final class WordsDecode: Sendable {
         TranscriptBudget.fits(s.checkpoint.segments, language: s.checkpoint.language, maxBytes: limits.maxBodyBytes)
     }
 
-    /// Writes the checkpoint; `checkpointed` follows only once it is on disk.
-    private func save(_ s: inout State, complete: Bool) -> Bool {
+    /// Writes the checkpoint; `checkpointed` follows only once it is on disk. Nil when saved, else the failure:
+    /// `SPACE` on a full volume, `SAVE` otherwise.
+    private func save(_ s: inout State, complete: Bool) -> JobFailure? {
         let now = uptimeMs()
+        // The analyzer's time this run: from its first report, so a model download counts in neither the provenance's
+        // inference time nor the pace a resumed run starts from.
+        let analyzed = s.analyzerStartedAt.map { now - $0 } ?? 0
         var checkpoint = s.checkpoint
-        checkpoint.elapsedMs = base.elapsedMs + (now - startedAt)
-        checkpoint.inferenceMs = base.inferenceMs + (now - startedAt)
+        checkpoint.elapsedMs = base.elapsedMs + analyzed
+        checkpoint.inferenceMs = base.inferenceMs + analyzed
         checkpoint.wordsComplete = complete
-        do { try checkpoints.save(checkpoint, for: noteID) } catch { return false }
+        do {
+            try checkpoints.save(checkpoint, for: noteID)
+        } catch {
+            return Self.writeFailure(error)
+        }
         s.checkpoint = checkpoint
         s.savedMs = checkpoint.doneMs
         s.savedAt = now
-        events(.checkpointed(doneMs: checkpoint.doneMs))
-        return true
+        s.outbox.append(.checkpointed(doneMs: checkpoint.doneMs))
+        return nil
+    }
+
+    static func writeFailure(_ error: any Error) -> JobFailure {
+        error is CheckpointSpaceError || CheckpointFiles.isOutOfSpace(error) ? .space : .save
     }
 
     /// The words so far, at most every `minimumEmitIntervalMs` (longer for long drafts) unless `force`.
@@ -203,13 +232,43 @@ final class WordsDecode: Sendable {
         s.emittedAt = now
         if s.progressMs > s.shownMs || !s.wordsShown {
             // The headline shows the audio transcribed since the last update.
-            events(.stageChanged(.words, startMs: s.shownMs, endMs: s.progressMs))
+            s.outbox.append(.stageChanged(.words, startMs: s.shownMs, endMs: s.progressMs))
             s.shownMs = s.progressMs
             s.wordsShown = true
         }
-        events(.windowDone(doneMs: s.progressMs, totalMs: s.checkpoint.totalMs, words: s.words))
+        s.outbox.append(.windowDone(doneMs: s.progressMs, totalMs: s.checkpoint.totalMs, words: s.words))
         if !s.volatile.isEmpty {
-            events(.draft(words: s.words + s.volatile, tentativeFromMs: s.checkpoint.doneMs - ProgressTracker.settleMs))
+            s.outbox.append(.draft(words: s.words + s.volatile,
+                                   tentativeFromMs: s.checkpoint.doneMs - ProgressTracker.settleMs))
+        }
+    }
+
+    // MARK: - Delivery
+
+    /// Runs `body` under the lock, then sends the events it queued with the lock released.
+    @discardableResult
+    private func withState<Value: Sendable>(_ body: (inout State) -> Value) -> Value {
+        let (value, delivers) = state.withLock { s -> (Value, Bool) in
+            let value = body(&s)
+            guard !s.delivering, !s.outbox.isEmpty else { return (value, false) }
+            s.delivering = true
+            return (value, true)
+        }
+        if delivers { deliver() }
+        return value
+    }
+
+    /// Sends the queued events in order until none is left; only one caller sends at a time.
+    private func deliver() {
+        while true {
+            let batch = state.withLock { s -> [JobEvent] in
+                let batch = s.outbox
+                s.outbox = []
+                if batch.isEmpty { s.delivering = false }
+                return batch
+            }
+            guard !batch.isEmpty else { return }
+            batch.forEach(events)
         }
     }
 }

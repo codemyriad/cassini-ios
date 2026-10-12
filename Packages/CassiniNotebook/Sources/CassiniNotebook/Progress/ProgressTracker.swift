@@ -12,7 +12,8 @@ import Foundation
 /// - The step is monotonic, starting at Reading on every run; a stage below it is dropped, and the headline never shows
 ///   a step below the stepper. Within a step a stage shorter than 400 ms is not shown.
 /// - The percent never goes back and is at most 99 until `JobOutcome.done`. When the speaker step will run, the words
-///   fill 0–85 % and the speakers 85–99 %; otherwise the words fill the bar.
+///   fill 0–85 % and the speakers 85–99 %; otherwise the words fill the bar. A run without a words step (Identify
+///   speakers) fills the bar with the speaker step alone, and its Processed stat is the analysed audio.
 /// - Time left is Calculating until 3 results since this run began and while the total is unknown, then the rounded
 ///   range plus `finalizationMs`. In the speaker step it is measured from that step's own progress. Finishing when only
 ///   saving is left.
@@ -93,6 +94,7 @@ public struct ProgressTracker: Sendable {
         state.lowMemory = start.lowMemory
         state.speakers = start.speakers
         state.words = start.restored?.words ?? []
+        state.wordsRan = start.restored != nil
         state.tentativeFromMs = (start.restored?.doneMs ?? 0) - Self.settleMs
         run = state
         publish(at: nowMs, done: false)
@@ -119,6 +121,7 @@ public struct ProgressTracker: Sendable {
             self.stage(&run, .reading, 0, readMs, elapsed)
         case .windowDone(let doneMs, let totalMs, let words):
             run.download = nil
+            run.wordsRan = true
             run.progress.complete(done: doneMs, total: totalMs, words: words.count, at: elapsed)
             run.words = words
             run.tentativeFromMs = doneMs - Self.settleMs
@@ -140,6 +143,7 @@ public struct ProgressTracker: Sendable {
     private func stage(_ run: inout Run, _ stage: TranscriptionStage, _ startMs: Int64, _ endMs: Int64, _ elapsed: Int64) {
         let step = JobStep.of(stage)
         if step == .speakers { run.speakersEntered = true }
+        if step < .speakers { run.wordsRan = true }
         guard step >= run.step else { return }
         run.progress.stage(stage, at: elapsed, startMs: startMs, endMs: endMs)
         run.step = step
@@ -171,7 +175,8 @@ public struct ProgressTracker: Sendable {
             step: done ? .saving : run.step,
             speakersSkipped: !run.speakersEntered && (run.step == .saving || done || !run.speakers),
             timeLeft: done ? .finishing : timeLeft(run, snapshot, elapsed: elapsed, speakersAhead: speakersAhead),
-            doneMs: snapshot.doneMs, totalMs: snapshot.totalMs,
+            doneMs: run.speakersOnly ? min(max(run.speakersEndMs, 0), snapshot.totalMs) : snapshot.doneMs,
+            totalMs: snapshot.totalMs,
             battery: batteryLine(&run, snapshot, elapsed: elapsed, speakersAhead: speakersAhead),
             words: snapshot.words, download: run.download, lowMemory: run.lowMemory)
     }
@@ -183,7 +188,8 @@ public struct ProgressTracker: Sendable {
         let wordsPart = words * Self.wordsShare / 100
         guard run.step >= .speakers, snapshot.totalMs > 0 else { return wordsPart }
         let analysed = min(max(run.speakersEndMs, 0), snapshot.totalMs)
-        return Self.wordsShare + Int(analysed * Int64(Self.cap - Self.wordsShare) / snapshot.totalMs)
+        let start = run.speakersOnly ? 0 : Self.wordsShare
+        return start + Int(analysed * Int64(Self.cap - start) / snapshot.totalMs)
     }
 
     private func timeLeft(_ run: Run, _ snapshot: TranscriptionProgress.Snapshot, elapsed: Int64,
@@ -260,6 +266,8 @@ public struct ProgressTracker: Sendable {
         var speakers = false
         /// The speaker step began.
         var speakersEntered = false
+        /// The run has a words step, or resumed from words a checkpoint holds.
+        var wordsRan = false
         var speakersStartedAt: Int64?
         var speakersEndMs: Int64 = 0
         var words: [DraftWord] = []
@@ -279,5 +287,8 @@ public struct ProgressTracker: Sendable {
         }
 
         func elapsed(at nowMs: Int64) -> Int64 { checkpointElapsedMs + (nowMs - startedAt) }
+
+        /// Identify speakers: the speaker step is the whole job.
+        var speakersOnly: Bool { speakersEntered && !wordsRan }
     }
 }

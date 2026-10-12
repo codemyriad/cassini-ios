@@ -39,6 +39,10 @@ public protocol TranscriptionJobHost: Sendable {
 ///   nothing new and the coordinator discards the work. A stop is noticed at the next result, or within 50 ms.
 /// - **Speakers.** After the words are in the note, the speaker step analyses the whole file. A failure leaves every
 ///   word one voice (`speakerAnalysisFailure = SPEAKERS`) and the job still succeeds.
+/// - **Provenance.** The run's record goes to the `ProvenanceStoring` with the words it describes (`ProvenanceRecord`),
+///   not into the note. A speakers-only job adds its speaker record when the note still holds the run's words.
+/// - **Work.** A transcribing job removes `work/` once the note is saved; a speakers-only job never touches it, so a
+///   paused transcription keeps its checkpoint.
 public struct TranscriptionJob: TranscriptionJobRunning {
     public struct Limits: Hashable, Sendable {
         public var maxDurationMs: Int64
@@ -59,16 +63,19 @@ public struct TranscriptionJob: TranscriptionJobRunning {
     private let transcriber: any Transcribing
     private let analyzer: any SpeakerAnalyzing
     private let checkpoints: any CheckpointStoring
+    private let provenance: any ProvenanceStoring
     private let host: any TranscriptionJobHost
     private let clock: any AppClock
     private let limits: Limits
     private let uptimeMs: @Sendable () -> Int64
 
     public init(notes: NoteStore, transcriber: any Transcribing, analyzer: any SpeakerAnalyzing,
-                checkpoints: any CheckpointStoring, host: any TranscriptionJobHost, clock: any AppClock,
-                limits: Limits = Limits(), uptimeMs: @escaping @Sendable () -> Int64 = TranscriptionJob.uptimeMs) {
+                checkpoints: any CheckpointStoring, provenance: any ProvenanceStoring, host: any TranscriptionJobHost,
+                clock: any AppClock, limits: Limits = Limits(),
+                uptimeMs: @escaping @Sendable () -> Int64 = TranscriptionJob.uptimeMs) {
         self.notes = notes; self.transcriber = transcriber; self.analyzer = analyzer; self.checkpoints = checkpoints
-        self.host = host; self.clock = clock; self.limits = limits; self.uptimeMs = uptimeMs
+        self.provenance = provenance; self.host = host; self.clock = clock; self.limits = limits
+        self.uptimeMs = uptimeMs
     }
 
     /// Monotonic milliseconds.
@@ -139,14 +146,16 @@ public struct TranscriptionJob: TranscriptionJobRunning {
                 }
             }
             events(.namingClosed(matching: speakers))
-            guard let words, await saveTranscript(words, context) else { return .failed(.save) }
+            guard let words, await saveTranscript(words, resumed: checkpoint?.wordsComplete == true, context) else {
+                return .failed(.save)
+            }
             context.totalMs = words.totalMs
         } else {
             events(.namingClosed(matching: speakers))
         }
         if speakers, let outcome = await identifySpeakers(context) { return outcome }
         events(.stageChanged(.saving))
-        try? checkpoints.discard(job.noteID)
+        if transcribes { try? checkpoints.discard(job.noteID) }
         return .done
     }
 
@@ -194,19 +203,24 @@ public struct TranscriptionJob: TranscriptionJobRunning {
         case .complete(let state): return .complete(state)
         case .stopped(let request): return .ended(Self.outcome(of: request))
         case .failed(let failure): return .ended(.failed(failure))
+        case .downloadFailed(let failure): return .ended(.downloadFailed(failure))
         case .needsConsent: return .ended(.needsConsent(missingBytes: 0))
         }
     }
 
-    private func saveTranscript(_ words: CheckpointState, _ context: Context) async -> Bool {
+    /// Puts the words into the note as a new version and records their provenance. A run that resumed for its speaker
+    /// step finds them saved already (the record describes them) and leaves the note as it is, edits and all.
+    private func saveTranscript(_ words: CheckpointState, resumed: Bool, _ context: Context) async -> Bool {
         let segments = words.segments
-        let provenance = TranscriptProvenance(language: words.language, inferenceMs: words.inferenceMs,
-                                              resumedFromMs: words.resumedFromMs)
+        if resumed, provenance.load(context.noteID)?.describes(segments) == true { return true }
+        let record = ProvenanceRecord(
+            provenance: TranscriptProvenance(language: words.language, inferenceMs: words.inferenceMs,
+                                             resumedFromMs: words.resumedFromMs),
+            transcript: segments)
         let date = clock.now, before = UUID(), after = UUID()
         do {
             let saved = try await notes.mutate(context.noteID) { note in
-                // A run that resumed for its speaker step finds the words in the note already.
-                guard note.transcript != segments || note.provenance == nil else { return }
+                guard note.transcript != segments else { return }
                 note.saveCurrentVersion(name: Self.previousVersionName, id: before, date: date)
                 note.transcript = segments
                 note.speakers = []
@@ -214,9 +228,10 @@ public struct TranscriptionJob: TranscriptionJobRunning {
                 note.saveCurrentVersion(name: Self.transcriptVersionName, id: after, date: date)
                 note.failure = nil
                 note.speakerAnalysisFailure = nil
-                note.provenance = provenance
             }
-            return saved != nil
+            guard saved != nil else { return false }
+            try provenance.save(record, for: context.noteID)
+            return true
         } catch {
             return false
         }
@@ -256,15 +271,21 @@ public struct TranscriptionJob: TranscriptionJobRunning {
         } catch {
             return await speakersFailed(context)
         }
+        await recordSpeakers(analysis, context)
+        return nil
+    }
+
+    /// Adds the speaker record to the provenance of the words the analysis was given.
+    private func recordSpeakers(_ analysis: SpeakerAnalysis, _ context: Context) async {
+        guard let note = await notes.note(context.noteID), var record = provenance.load(context.noteID),
+              record.describes(note.transcript) else { return }
         var identity = analysis.prints.first?.model
         if identity == nil { identity = await analyzer.modelIdentity }
-        if let identity {
-            let diarization = TranscriptProvenance.SpeakerDiarization(
-                identity: identity, turnCount: analysis.turns.count,
-                speakerCount: Set(analysis.turns.map(\.speakerID)).count)
-            _ = try? await notes.mutate(context.noteID) { $0.provenance?.speakerDiarization = diarization }
-        }
-        return nil
+        guard let identity else { return }
+        record.addSpeakers(TranscriptProvenance.SpeakerDiarization(
+            identity: identity, turnCount: analysis.turns.count,
+            speakerCount: Set(analysis.turns.map(\.speakerID)).count), transcript: note.transcript)
+        try? provenance.save(record, for: context.noteID)
     }
 
     /// Every word stays one voice; the job still succeeds.

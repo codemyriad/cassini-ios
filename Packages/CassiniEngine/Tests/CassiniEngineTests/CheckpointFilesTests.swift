@@ -14,8 +14,26 @@ import CassiniNotebook
                         doneMs: doneMs, totalMs: 90_000, elapsedMs: 10)
     }
 
+    private func files(availableBytes: @escaping @Sendable (URL) -> Int64 = CheckpointFiles.availableBytes) -> CheckpointFiles {
+        let root = root
+        return CheckpointFiles(noteDirectory: { root.appendingPathComponent($0.uuidString, isDirectory: true) },
+                               availableBytes: availableBytes)
+    }
+
+    @Test func aFailedWriteOnAFullVolumeIsASpaceError() throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        // A file where the work folder goes makes every write fail.
+        try FileManager.default.createDirectory(at: root.appendingPathComponent(id.uuidString), withIntermediateDirectories: true)
+        try Data().write(to: root.appendingPathComponent(id.uuidString).appendingPathComponent(CheckpointFiles.directoryName))
+        #expect(throws: CheckpointSpaceError.self) { try files(availableBytes: { _ in 1 << 20 }).save(state(30_000), for: id) }
+        #expect {
+            try files(availableBytes: { _ in 1 << 40 }).save(state(30_000), for: id)
+        } throws: { !($0 is CheckpointSpaceError) }
+        #expect(CheckpointFiles.availableBytes(root.appendingPathComponent("missing/deeper")) > 0)
+    }
+
     @Test func aSavedCheckpointReadsBackAndKeepsThePreviousOneAsTheBackup() throws {
-        let files = CheckpointFiles(root: root)
+        let files = self.files()
         defer { try? FileManager.default.removeItem(at: root) }
         #expect(try files.load(id) == nil)
         #expect(!files.exists(id))
@@ -30,7 +48,7 @@ import CassiniNotebook
     }
 
     @Test func aDamagedCheckpointFallsBackToTheBackup() throws {
-        let files = CheckpointFiles(root: root)
+        let files = self.files()
         defer { try? FileManager.default.removeItem(at: root) }
         try files.save(state(30_000), for: id)
         try files.save(state(60_000), for: id)
@@ -43,7 +61,7 @@ import CassiniNotebook
     }
 
     @Test func bothFilesDamagedIsAnError() throws {
-        let files = CheckpointFiles(root: root)
+        let files = self.files()
         defer { try? FileManager.default.removeItem(at: root) }
         let folder = files.directory(for: id)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -52,7 +70,7 @@ import CassiniNotebook
     }
 
     @Test func discardRemovesTheWorkFolderOnly() throws {
-        let files = CheckpointFiles(root: root)
+        let files = self.files()
         defer { try? FileManager.default.removeItem(at: root) }
         try files.save(state(30_000), for: id)
         let note = root.appendingPathComponent(id.uuidString).appendingPathComponent("note.json")

@@ -424,6 +424,29 @@ import CassiniNotebook
         #expect(t.progress?.words == 28)
     }
 
+    @Test func identifySpeakersFillsTheBarWithTheSpeakerStepAlone() {
+        var t = Tracked()
+        t.send(started(totalMs: 70_000))
+        t.send(.namingClosed(matching: true))
+        t.send(.stageChanged(.speakers, startMs: 0, endMs: 0))
+        t.tick()
+        #expect(t.progress?.percent == 0)
+        t.send(.stageChanged(.speakers, startMs: 0, endMs: 35_000))
+        t.tick()
+        #expect(t.progress?.percent == 49)
+        #expect(t.progress?.doneMs == 35_000, "Processed is the analysed audio")
+        #expect(t.progress?.step == .speakers)
+
+        // A run that resumes in the speaker step keeps the words' share.
+        var resumed = Tracked()
+        resumed.send(started(totalMs: 70_000, restored: restored(70_000, 70_000, words(0, 70), elapsed: 60_000)))
+        resumed.send(.namingClosed(matching: true))
+        resumed.send(.stageChanged(.speakers, startMs: 0, endMs: 35_000))
+        resumed.tick()
+        #expect(resumed.progress?.percent == 92)
+        #expect(resumed.progress?.doneMs == 70_000)
+    }
+
     // MARK: Helpers
 
     private func started(totalMs: Int64 = 70_000, restored: RestoredCheckpoint? = nil, speakers: Bool = true) -> JobEvent {
