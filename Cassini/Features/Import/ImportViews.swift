@@ -50,22 +50,30 @@ struct ImportActivity: View {
     }
 }
 
-/// The trust chip of a note imported from a Cassini document (Android `trustChip`).
-struct DocumentTrustChip: View {
-    let trust: DocumentTrust
-
-    var body: some View {
-        Text(Self.label(trust)).font(.caption.weight(.medium)).foregroundStyle(tone.color)
-            .padding(.horizontal, 8).padding(.vertical, 4).background(tone.background, in: Capsule())
-            .accessibilityIdentifier("documentTrust")
-    }
-
-    private var tone: Tone {
-        switch trust {
+extension DocumentTrust {
+    /// The tone of the chip and of the banner (Android `TrustUi` and the TRUST_* banner tones).
+    var tone: Tone {
+        switch self {
         case .verified: .ok
         case .notVerified, .audioChanged: .warn
         case .unreadable, .newerFormat: .error
         }
+    }
+}
+
+/// The trust chip of a note imported from a Cassini document (Android `trustChip`); tapping it shows or hides the
+/// trust banner.
+struct DocumentTrustChip: View {
+    let trust: DocumentTrust
+    let toggle: () -> Void
+
+    var body: some View {
+        Button(action: toggle) {
+            Text(Self.label(trust)).font(.caption.weight(.medium)).foregroundStyle(trust.tone.color)
+                .padding(.horizontal, 8).padding(.vertical, 4).background(trust.tone.background, in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("documentTrust")
     }
 
     static func label(_ trust: DocumentTrust) -> String {
@@ -79,20 +87,33 @@ struct DocumentTrustChip: View {
     }
 }
 
-/// The trust banner of a note from a Cassini document that is not verified (Android TRUST_* banners).
+/// The trust banner of a note from a Cassini document (Android TRUST_* banners): shown by default unless verified
+/// (not verified until "Play anyway"), and the other way round once the chip is tapped.
 struct DocumentTrustNotice: View {
     let info: DocumentInfo
+    let toggled: Bool
+    /// "Play anyway"; nil when the note cannot play.
+    let playAnyway: (() -> Void)?
 
     var body: some View {
-        if DocumentTrust.showsBanner(info) {
-            let (title, body) = Self.copy(DocumentTrust(info.state))
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title).font(.subheadline.weight(.semibold))
-                Text(body).font(.subheadline)
+        if DocumentTrust.showsBanner(info, toggled: toggled) {
+            let trust = DocumentTrust(info.state)
+            let (title, body) = Self.copy(trust)
+            VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title).font(.subheadline.weight(.semibold))
+                    Text(body).font(.subheadline)
+                }
+                .accessibilityElement(children: .combine)
+                if trust.offersPlayAnyway, let playAnyway {
+                    Button(String(localized: "Play anyway", table: "Import"), action: playAnyway)
+                        .font(.subheadline.weight(.semibold)).frame(minHeight: HitTarget.minimum)
+                        .accessibilityIdentifier("playAnyway")
+                }
             }
             .foregroundStyle(Color.ink).frame(maxWidth: .infinity, alignment: .leading).padding(16)
-            .background(Color.ember.opacity(0.08), in: RoundedRectangle(cornerRadius: Radius.control))
-            .accessibilityElement(children: .combine)
+            .background(trust.tone.background, in: RoundedRectangle(cornerRadius: Radius.control))
+            .accessibilityIdentifier("documentTrustBanner")
         }
     }
 

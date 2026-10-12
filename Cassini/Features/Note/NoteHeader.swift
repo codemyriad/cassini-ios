@@ -3,12 +3,14 @@ import CassiniNotebook
 
 struct NoteHeader: View {
     let note: Note
+    /// Shows or hides the trust banner of a note from a Cassini document.
+    var toggleTrust: () -> Void = {}
     @Environment(\.locale) private var locale
     var body: some View {
         VStack(alignment: .leading, spacing: 15) {
             HStack {
                 StatusPill(status: note.status)
-                if let trust = DocumentTrust.of(note) { DocumentTrustChip(trust: trust) }
+                if let trust = DocumentTrust.of(note) { DocumentTrustChip(trust: trust, toggle: toggleTrust) }
                 Spacer()
                 Text(note.createdAt, format: Date.FormatStyle(date: .abbreviated, time: .shortened)).font(.caption).foregroundStyle(Color.muted)
             }

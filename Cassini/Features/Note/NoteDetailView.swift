@@ -20,6 +20,7 @@ struct NoteDetailView: View {
     @State private var showingSpeakers = false
     @State private var showingVersions = false
     @State private var shareItem: ShareItem?
+    @State private var trustToggled = false
 
     private var note: Note? { library.note(noteID) }
     private var ownsPlayer: Bool { playback.state.noteID == noteID }
@@ -35,7 +36,7 @@ struct NoteDetailView: View {
                 ScrollViewReader { proxy in
                     ScrollView {
                         VStack(alignment: .leading, spacing: Spacing.section) {
-                            NoteHeader(note: note)
+                            NoteHeader(note: note) { trustToggled.toggle() }
                             notices(note)
                             if note.status == .transcribing || note.status == .queued { ProcessingCard(note: note) }
                             if showSearch { InNoteSearchBar(query: $query) { showSearch = false; query = "" } }
@@ -95,10 +96,19 @@ struct NoteDetailView: View {
             HStack(spacing: 12) { ProgressView(); Text("Saving a compact copy. Your original audio is safe.").font(.subheadline).foregroundStyle(Color.muted) }
         }
         if recording.state.isActive { NoticeCard(title: "Finish recording to listen to this note.", symbol: "mic") }
-        if let document = note.document { DocumentTrustNotice(info: document) }
+        if let document = note.document {
+            DocumentTrustNotice(info: document, toggled: trustToggled,
+                                playAnyway: note.audio.isPlayable && !recording.state.isActive ? { playAnyway(note) } : nil)
+        }
         if let failure = note.failure { NoticeCard(title: failure.transcriptionMessage, symbol: "exclamationmark.circle") }
         if let failure = note.speakerAnalysisFailure { NoticeCard(title: failure.speakerAnalysisMessage, symbol: "person.2") }
         if let problem = note.playbackProblem { NoticeCard(title: problem, symbol: "waveform.slash") }
+    }
+
+    /// Android `BannerAction.PLAY_ANYWAY`: the note stops showing its not-verified banner, and plays.
+    private func playAnyway(_ note: Note) {
+        library.update(noteID) { $0.document?.trustAcknowledged = true }
+        if ownsPlayer { playback.play() } else { playback.play(note, from: 0) }
     }
 
     private func requestTranscription() {

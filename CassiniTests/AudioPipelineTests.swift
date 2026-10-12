@@ -173,4 +173,28 @@ final class AudioPipelineTests: XCTestCase {
         XCTAssertTrue(test.graph.library.notes.isEmpty)
         XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: test.root.path).filter { UUID(uuidString: $0) != nil }, [])
     }
+
+    @MainActor func testAFileOpenedDuringLaunchWaitsForTheLibraryAndOpensTheNoteItAlreadyHas() async throws {
+        let sources = try makeRoot(); defer { try? FileManager.default.removeItem(at: sources) }
+        let first = TestGraph(); defer { first.tearDown() }
+        let url = sources.appendingPathComponent("Riunione.caf")
+        try writeSignal(to: url)
+        await first.graph.start()
+        first.graph.settings.autoTranscribe = false
+        let created = try XCTUnwrap(await first.graph.imports.importFile(url, opensNote: false).value?.noteID)
+        await first.graph.library.settle()
+
+        // A cold launch from Files: the open arrives before the launch work has read the notes.
+        let relaunch = first.reopened()
+        let opening = relaunch.graph.imports.importFile(url, opensNote: true)
+        XCTAssertEqual(relaunch.graph.imports.tracker.running, ["Riunione.caf"])
+        await relaunch.graph.start()
+        let outcome = await opening.value
+
+        XCTAssertEqual(outcome, .existing(created))
+        XCTAssertEqual(relaunch.graph.library.notes.map(\.id), [created])
+        XCTAssertEqual(relaunch.graph.router.path, [.note(created)])
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: relaunch.root.path).filter { UUID(uuidString: $0) != nil },
+                       [created.uuidString])
+    }
 }

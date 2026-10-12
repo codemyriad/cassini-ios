@@ -18,11 +18,15 @@ import CassiniNotebook
     @ObservationIgnored private let processing: ProcessingStore
     @ObservationIgnored private let settings: SettingsStore
     @ObservationIgnored private let router: Router
+    @ObservationIgnored private let ready: @MainActor () async -> Void
 
+    /// `ready` returns once the launch work has run: an import checks for a note with the same bytes, adds its note
+    /// and queues it only against the loaded library and transcription queue. A file opened from another app on a cold
+    /// launch arrives before that.
     init(service: ImportService?, library: LibraryStore, processing: ProcessingStore, settings: SettingsStore,
-         router: Router, clock: any AppClock) {
+         router: Router, clock: any AppClock, ready: @escaping @MainActor () async -> Void) {
         self.service = service; self.library = library; self.processing = processing; self.settings = settings
-        self.router = router
+        self.router = router; self.ready = ready
         tracker = ImportTracker(clock: clock)
     }
 
@@ -40,8 +44,10 @@ import CassiniNotebook
     func importFile(_ url: URL, opensNote: Bool) -> Task<ImportOutcome?, Never> {
         let language = settings.speechLanguage
         let fallbackTitle = String(localized: "Imported audio", table: "Import")
-        let running = tracker.start(displayName: Self.displayName(of: url)) { [service] in
-            guard let service else { return .rejected(.cannotSave) }
+        let running = tracker.start(displayName: Self.displayName(of: url)) { [service, library, ready] in
+            await ready()
+            try Task.checkCancellation()
+            guard let service, await library.loadFailure == nil else { return .rejected(.cannotSave) }
             return try await service.importFile(url, language: language, fallbackTitle: fallbackTitle)
         }
         return Task {

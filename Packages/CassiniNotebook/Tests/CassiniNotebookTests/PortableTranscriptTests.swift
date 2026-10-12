@@ -291,5 +291,26 @@ struct PortableConformanceImportTests {
         #expect(DocumentTrust.showsBanner(DocumentInfo(state: .unverified)))
         #expect(!DocumentTrust.showsBanner(DocumentInfo(state: .unverified, trustAcknowledged: true)))
         #expect(DocumentTrust.showsBanner(DocumentInfo(state: .staleAudio, trustAcknowledged: true)))
+        for state in [DocumentState.staleAudio, .unreadable, .invalidMetadata, .unknownFormat] {
+            #expect(DocumentTrust.showsBanner(DocumentInfo(state: state)))
+        }
+        #expect(DocumentTrust.allCases.filter(\.offersPlayAnyway) == [.notVerified])
+    }
+
+    // ports: NoteViewModelTest#theTrustChipTogglesTheBannerAndPlayAnywayAcknowledges
+    @Test func theTrustChipTogglesTheBannerAndPlayAnywayAcknowledges() {
+        // The chip shows a verified note's banner and hides it again.
+        let verified = DocumentInfo(state: .ok)
+        #expect(!DocumentTrust.showsBanner(verified, toggled: false))
+        #expect(DocumentTrust.showsBanner(verified, toggled: true))
+        // Not verified shows the banner, with Play anyway, which acknowledges it; the chip brings it back.
+        var unverified = DocumentInfo(state: .unverified)
+        #expect(DocumentTrust.showsBanner(unverified))
+        #expect(DocumentTrust(unverified.state).offersPlayAnyway)
+        unverified.trustAcknowledged = true
+        #expect(!DocumentTrust.showsBanner(unverified))
+        #expect(DocumentTrust.showsBanner(unverified, toggled: true))
+        // The chip hides a banner shown by default.
+        #expect(!DocumentTrust.showsBanner(DocumentInfo(state: .staleAudio), toggled: true))
     }
 }

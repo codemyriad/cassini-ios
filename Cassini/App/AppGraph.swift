@@ -38,7 +38,7 @@ import CassiniNotebook
                           storage: environment.storage, clock: environment.clock)
         }
         imports = ImportStore(service: importService, library: library, processing: processing, settings: settings,
-                              router: router, clock: environment.clock)
+                              router: router, clock: environment.clock) { [startup] in _ = await startup.ready() }
         trash = TrashStore(library: library, voices: voices, processing: processing, playback: playback,
                            recording: recording, settings: settings, router: router, errors: errors,
                            clock: environment.clock, calendar: environment.calendar)

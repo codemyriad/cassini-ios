@@ -256,6 +256,23 @@
         }
       }
     },
+    "Play anyway": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Play anyway"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riproduci comunque"
+          }
+        }
+      }
+    },
     "The audio could not be checked, so word timing may be off.": {
       "extractionState": "manual",
       "localizations": {
