@@ -31,7 +31,7 @@ public struct CassiniDocument: Equatable, Sendable {
     }
     public func speakerLabel(_ id: String) -> String? {
         guard let speakers = manifest?["speakers"]?.array else { return nil }
-        for s in speakers where s.object?["id"]?.string == id { return s.object?["label"]?.string ?? "" }
+        for s in speakers where sameBytes(s.object?["id"]?.string, id) { return s.object?["label"]?.string ?? "" }
         return nil
     }
 
@@ -44,13 +44,26 @@ public struct CassiniDocument: Equatable, Sendable {
     private static let refKeys: Set<String> = ["prefix", "mime", "encoding", "chunkCount", "sha256", "rawBytes", "gzipBytes"]
     private static let fields: [(key: String, suffix: String)] = [("mime", "MIME"), ("encoding", "ENCODING"), ("chunkCount", "CHUNK_COUNT"),
                                                                   ("sha256", "SHA256"), ("rawBytes", "RAW_BYTES"), ("gzipBytes", "GZIP_BYTES")]
-    /** The copies a new seal writes afresh; every other CASSINI_ tag of a verified source is kept. */
-    private static let resealed: Set<String> = [
-        "CASSINI_FORMAT", "CASSINI_PROFILE", "CASSINI_PAYLOAD_SCHEMA", "CASSINI_TRANSCRIPT_IDS", "CASSINI_TRANSCRIPT_DEFAULT",
-        "CASSINI_DECODE_HINT", "CASSINI_SPEAKER_COUNT", "CASSINI_MEETING_ID", "CASSINI_CREATED_AT", "CASSINI_AUDIO_SAMPLE_RATE",
-        "CASSINI_AUDIO_CHANNELS", "CASSINI_AUDIO_SAMPLE_COUNT", "CASSINI_AUDIO_DURATION_MS", "CASSINI_AUDIO_MATCH_POLICY",
-        "CASSINI_AUDIO_OPUS_SHA256",
+    private static let decodeHint = "Concatenate CASSINI_PAYLOAD_000..N for the manifest; for a transcript body concatenate " +
+        "CASSINI_TX_<ID>_PAYLOAD_000..N. Each chunk set: base64url decode, gzip decompress, parse UTF-8 JSON."
+    /** The `CASSINI_AUDIO_*` tags and the `integrity` member each one copies. */
+    private static let audioMirrors: [(suffix: String, field: String)] = [
+        ("SAMPLE_RATE", "sampleRate"), ("CHANNELS", "channels"), ("SAMPLE_COUNT", "sampleCount"), ("DURATION_MS", "durationMs"),
+        ("MATCH_POLICY", "matchPolicy"), ("OPUS_SHA256", "opusAudioSha256"),
     ]
+    /** The optional origin tags and the `meeting` member each one copies; written only when the member is there. */
+    private static let meetingMirrors: [(tag: String, field: String)] = [
+        ("CASSINI_ROOM_ID", "roomId"), ("CASSINI_JOB_ID", "jobId"), ("CASSINI_ATTEMPT_NUMBER", "attemptNumber"),
+        ("CASSINI_PROCESSED_AT", "processedAtUtc"), ("CASSINI_RECORDED_AT_LOCAL", "recordedAtLocal"),
+    ]
+    /**
+     * The non-chunk tags every write derives from the manifest it embeds. A source's own spelling of them may be
+     * stale (SPEC.md "When a tag and the manifest disagree"), so a writer drops it rather than carrying it forward.
+     */
+    private static let derivedNames: Set<String> = Set([
+        "CASSINI_FORMAT", "CASSINI_PROFILE", "CASSINI_PAYLOAD_SCHEMA", "CASSINI_TRANSCRIPT_IDS", "CASSINI_TRANSCRIPT_DEFAULT",
+        "CASSINI_DECODE_HINT", "CASSINI_SPEAKER_COUNT", "CASSINI_MEETING_ID", "CASSINI_CREATED_AT",
+    ] + audioMirrors.map { "CASSINI_AUDIO_\($0.suffix)" } + meetingMirrors.map { $0.tag })
 
     /** The name of a comment, ASCII upper case: the bytes before the first `=`. */
     static func tagName(_ comment: String) -> String { tagName(Array(comment.utf8)) }
@@ -85,15 +98,22 @@ public struct CassiniDocument: Equatable, Sendable {
             return CassiniDocument(state: .invalidMetadata, warnings: ["\(error)"])
         }
         var document = CassiniDocument(state: .plainAudio, comments: parsed.text, opaqueComments: parsed.opaque, warnings: parsed.warnings)
-        var tags: [String: String] = [:]
+        var tags = TagValues()
         var duplicates: [String] = []
         for comment in parsed.text {
             let utf8 = comment.utf8
             guard let equals = utf8.firstIndex(of: UInt8(ascii: "=")), equals != utf8.startIndex else { continue }
             let name = asciiUppercased(utf8[..<equals])
             let value = String(decoding: utf8[utf8.index(after: equals)...], as: UTF8.self)
-            if tags.updateValue(value, forKey: name) != nil &&
+            if tags.set(name, value) &&
                 (name == "CASSINI_FORMAT" || name.hasPrefix(manifestPrefix) || name.hasPrefix("CASSINI_TX_")) { duplicates.append(name) }
+        }
+        // Only a file that names itself Cassini can have invalid Cassini metadata; anything else is plain audio.
+        guard tags["CASSINI_FORMAT"] != nil || parsed.undecodableCassiniNames.contains("CASSINI_FORMAT") else { return document }
+        if !parsed.undecodableCassiniNames.isEmpty {
+            document.state = .invalidMetadata
+            document.warnings += parsed.undecodableCassiniNames.map { "invalid-utf8-tag: \($0)" }
+            return document
         }
         guard let format = tags["CASSINI_FORMAT"] else { return document }
         if !duplicates.isEmpty {
@@ -142,9 +162,7 @@ public struct CassiniDocument: Equatable, Sendable {
         if !sameBytes(tags["CASSINI_TRANSCRIPT_DEFAULT"], defaultVariant) { warnings.append("tag-manifest-disagreement: CASSINI_TRANSCRIPT_DEFAULT") }
         let integrity = (try? manifest.object("integrity")) ?? JSONObject()
         let audio = (try? manifest.object("audio")) ?? JSONObject()
-        let mirrors = [("SAMPLE_RATE", "sampleRate"), ("CHANNELS", "channels"), ("SAMPLE_COUNT", "sampleCount"),
-                       ("DURATION_MS", "durationMs"), ("MATCH_POLICY", "matchPolicy"), ("OPUS_SHA256", "opusAudioSha256")]
-        for (suffix, field) in mirrors where !sameBytes(tags["CASSINI_AUDIO_\(suffix)"], integrity[field]?.text) {
+        for (suffix, field) in audioMirrors where !sameBytes(tags["CASSINI_AUDIO_\(suffix)"], integrity[field]?.text) {
             warnings.append("tag-manifest-disagreement: CASSINI_AUDIO_\(suffix)")
         }
         // The manifest is the record and other copies only warn, but audio cannot be verified against two
@@ -185,11 +203,11 @@ public struct CassiniDocument: Equatable, Sendable {
         try nonempty(integrity, "matchPolicy")
         try check(fullMatch(integrity.string("opusAudioSha256"), "[0-9a-f]{64}"), "Invalid audio digest")
         for key in ["sampleRate", "channels", "sampleCount", "durationMs"] { _ = try integrity.number(key) }
-        var speakerIds = Set<String>()
+        var speakerIds = Set<[UInt8]>()
         for s in try m.array("speakers") {
             guard let s = s.object else { throw CassiniError("Malformed speaker") }
             try nonempty(s, "id"); try nonempty(s, "label")
-            try check(speakerIds.insert(try s.string("id")).inserted, "Duplicate speaker")
+            try check(speakerIds.insert(Array(try s.string("id").utf8)).inserted, "Duplicate speaker")
         }
         let entries = try m.array("transcripts")
         try check((1...128).contains(entries.count), "Transcript count out of range")
@@ -229,7 +247,17 @@ public struct CassiniDocument: Equatable, Sendable {
         return n
     }
 
-    private static func manifestRef(_ tags: [String: String]) throws -> JSONObject {
+    /** Comment values by tag name. Names are ASCII upper case already and compare by their bytes, as values do. */
+    private struct TagValues {
+        private var values: [[UInt8]: String] = [:]
+
+        subscript(name: String) -> String? { values[Array(name.utf8)] }
+
+        /** Records [value] under [name] and says whether the name was already there. */
+        mutating func set(_ name: String, _ value: String) -> Bool { values.updateValue(value, forKey: Array(name.utf8)) != nil }
+    }
+
+    private static func manifestRef(_ tags: TagValues) throws -> JSONObject {
         var ref = JSONObject([("prefix", .string(manifestPrefix))])
         for (key, suffix) in fields {
             guard let tag = tags[manifestPrefix + suffix] else { throw CassiniError("Missing manifest descriptor") }
@@ -238,7 +266,7 @@ public struct CassiniDocument: Equatable, Sendable {
         return ref
     }
 
-    private static func payload(_ tags: [String: String], _ ref: JSONObject) throws -> String {
+    private static func payload(_ tags: TagValues, _ ref: JSONObject) throws -> String {
         try check(ref["encoding"] == .string(CassiniPayload.encoding), "Unsupported payload encoding")
         let prefix = asciiUppercased(try ref.string("prefix"))
         let count = try ref.number("chunkCount")
@@ -248,7 +276,13 @@ public struct CassiniDocument: Equatable, Sendable {
             guard let chunk = tags[name] else { throw CassiniError("chunk-missing: \(name)") }
             return chunk
         }
-        return try CassiniPayload.decode(chunks, rawBytes: ref.number("rawBytes"), gzipBytes: ref.number("gzipBytes"), sha256: ref.string("sha256"))
+        do {
+            return try CassiniPayload.decode(chunks, rawBytes: ref.number("rawBytes"), gzipBytes: ref.number("gzipBytes"), sha256: ref.string("sha256"))
+        } catch let error as CassiniError where error.message == "payload-sha256-mismatch" {
+            throw CassiniError("\(error.message): \(prefix)SHA256")
+        } catch let error as CassiniError where error.message == "payload-size-mismatch" {
+            throw CassiniError("\(error.message): \(prefix)RAW_BYTES")
+        }
     }
 
     // MARK: Comment packets
@@ -272,13 +306,15 @@ public struct CassiniDocument: Equatable, Sendable {
     }
 
     /**
-     * A comment list decoded one comment at a time. A foreign comment that is not UTF-8 (say a Latin-1 ARTIST from an
-     * old tagger) is kept as bytes with a warning; a CASSINI_ comment that is not UTF-8 makes the metadata invalid.
+     * A comment list decoded one comment at a time. A comment that is not UTF-8 (say a Latin-1 ARTIST from an old
+     * tagger) is kept as bytes with a warning. One named CASSINI_ is also listed in [undecodableCassiniNames]: it makes
+     * the metadata invalid, but only in a file that turns out to be Cassini at all.
      */
     struct TagComments {
         var text: [String] = []
         var opaque: [[UInt8]] = []
         var warnings: [String] = []
+        var undecodableCassiniNames: [String] = []
 
         init(packet: [UInt8]) throws {
             for entry in try rawComments(packet) {
@@ -287,7 +323,7 @@ public struct CassiniDocument: Equatable, Sendable {
                     continue
                 }
                 let name = tagName(entry)
-                try check(!name.hasPrefix("CASSINI_"), "invalid-utf8-tag: \(name)")
+                if name.hasPrefix("CASSINI_") { undecodableCassiniNames.append(name) }
                 opaque.append(entry)
                 warnings.append("non-utf8-comment: \(name)")
             }
@@ -317,6 +353,54 @@ public struct CassiniDocument: Equatable, Sendable {
         fields.contains { manifestPrefix + $0.suffix == name } || fullMatch(name, "CASSINI_PAYLOAD_[0-9]+")
     }
 
+    /**
+     * Whether a write replaces the comment named [name] with one derived from its manifest: the manifest chunk set,
+     * a summary or mirror copy, or the descriptor copy of any transcript chunk set. Transcript chunks are not derived.
+     */
+    private static func isDerived(_ name: String) -> Bool {
+        derivedNames.contains(name) || isManifestTag(name) ||
+            fullMatch(name, "CASSINI_TX_[A-Z0-9_]+_PAYLOAD_(MIME|ENCODING|CHUNK_COUNT|SHA256|RAW_BYTES|GZIP_BYTES)")
+    }
+
+    /** Every copy of a [manifest] value, so that the tags of a written file agree with its manifest by construction. */
+    private static func copies(of manifest: JSONObject) throws -> [String] {
+        let meeting = try manifest.object("meeting"), integrity = try manifest.object("integrity")
+        let descriptors = try manifest.array("transcripts").compactMap { $0.object }
+        let ids = descriptors.compactMap { $0["id"]?.string }
+        let defaultId = (descriptors.first { $0["default"] == .bool(true) } ?? descriptors.first)?["id"]?.string ?? ""
+        var tags = ["CASSINI_FORMAT=\(format)", "CASSINI_PROFILE=ogg-opus", "CASSINI_PAYLOAD_SCHEMA=\(schema)",
+                    "CASSINI_TRANSCRIPT_IDS=\(ids.sorted().joined(separator: ","))", "CASSINI_TRANSCRIPT_DEFAULT=\(defaultId)",
+                    "CASSINI_SPEAKER_COUNT=\(try manifest.array("speakers").count)", "CASSINI_MEETING_ID=\(try meeting.string("id"))",
+                    "CASSINI_CREATED_AT=\(try meeting.string("createdAtUtc"))"]
+        for (tag, field) in meetingMirrors {
+            switch meeting[field] {
+            case .string(let value) where !value.isEmpty: tags.append("\(tag)=\(value)")
+            case .number(let value): tags.append("\(tag)=\(value)")
+            default: break
+            }
+        }
+        tags.append("CASSINI_DECODE_HINT=\(decodeHint)")
+        for (suffix, field) in audioMirrors {
+            guard let value = integrity[field] else { throw CassiniError("Missing integrity \(field)") }
+            tags.append("CASSINI_AUDIO_\(suffix)=\(value.text)")
+        }
+        for descriptor in descriptors {
+            guard let ref = descriptor["payloadRef"]?.object, let prefix = ref["prefix"]?.string.map(asciiUppercased) else { continue }
+            for (field, suffix) in fields { if let value = ref[field] { tags.append("\(prefix)\(suffix)=\(value.text)") } }
+        }
+        return tags
+    }
+
+    /** The manifest's own chunk set, which is the record for [manifest] itself. */
+    private static func manifestTags(_ manifest: JSONObject) throws -> [String] {
+        try CassiniPayload.encode(prefix: manifestPrefix, mime: CassiniPayload.mime, text: manifest.serialized()).tags
+    }
+
+    /** Whether no copy of [document] disagrees with its manifest. A writer must never ship one that does. */
+    private static func agreesWithManifest(_ document: CassiniDocument) -> Bool {
+        !document.warnings.contains { $0.hasPrefix("tag-manifest-disagreement") }
+    }
+
     /** Text comments and opaque ones, in the order they are written. */
     private struct Comments {
         var text: [String]
@@ -326,6 +410,23 @@ public struct CassiniDocument: Equatable, Sendable {
         /** These comments with one TITLE of [title]: an undecodable TITLE cannot stay beside it. */
         func titled(_ title: String) -> Comments {
             Comments(text: withTitle(text, title), opaque: opaque.filter { tagName($0) != "TITLE" })
+        }
+
+        /**
+         * These comments with every derived tag (see [isDerived]) replaced by its spelling in [fresh]: where the first
+         * one of a name stands, so a rewrite moves nothing it keeps. Derived tags [fresh] has no value for are dropped,
+         * and the rest of [fresh] follows in its own order.
+         */
+        func deriving(_ fresh: [String]) -> Comments {
+            var pending = Dictionary(fresh.map { (tagName($0), $0) }, uniquingKeysWith: { first, _ in first })
+            var out: [String] = []
+            for comment in text {
+                let name = tagName(comment)
+                guard isDerived(name) else { out.append(comment); continue }
+                if let replacement = pending.removeValue(forKey: name) { out.append(replacement) }
+            }
+            out += fresh.filter { pending[tagName($0)] != nil }
+            return Comments(text: out, opaque: opaque)
         }
     }
 
@@ -364,7 +465,8 @@ public struct CassiniDocument: Equatable, Sendable {
 
     /**
      * Renames speakers only: bodies, variants, unknown members and unrelated tags stay as they are, and the
-     * manifest tags are re-encoded. The written file must read back identical apart from those labels.
+     * manifest and every copy of it are written afresh. The written file must read back identical apart from those
+     * labels.
      */
     @discardableResult
     public static func relabel(_ source: URL, existing: CassiniDocument, labels: [String: String], target: URL) throws -> CassiniDocument {
@@ -373,22 +475,21 @@ public struct CassiniDocument: Equatable, Sendable {
         for (id, label) in labels {
             let trimmed = label.trimmingCharacters(in: .whitespacesAndNewlines)
             try check(!trimmed.isEmpty, "Blank label")
-            guard let i = speakers.firstIndex(where: { $0.object?["id"]?.string == id }), var speaker = speakers[i].object else {
+            guard let i = speakers.firstIndex(where: { sameBytes($0.object?["id"]?.string, id) }), var speaker = speakers[i].object else {
                 throw CassiniError("Unknown speaker \(id)")
             }
             speaker["label"] = .string(trimmed)
             speakers[i] = .object(speaker)
         }
         manifest["speakers"] = .array(speakers)
-        let foreign = Comments(text: existing.comments.filter { !isManifestTag(tagName($0)) }, opaque: existing.opaqueComments)
-        return try rewriteManifest(source, existing: existing, manifest: manifest, comments: foreign, target: target)
+        return try rewriteManifest(source, existing: existing, manifest: manifest, target: target)
     }
 
     /**
      * Renames the meeting only: sets `meeting.title` and the TITLE tag to the trimmed [title]. The first TITLE tag is
      * replaced where it stands, further ones are dropped, and one is added when there is none. Bodies, variants,
-     * unknown members, other tags and the audio stay as they are. The written file must read back identical apart
-     * from the title.
+     * unknown members, unrelated tags and the audio stay as they are; the manifest and its copies are written afresh.
+     * The written file must read back identical apart from the title.
      */
     @discardableResult
     public static func retitle(_ source: URL, existing: CassiniDocument, title: String, target: URL) throws -> CassiniDocument {
@@ -398,28 +499,28 @@ public struct CassiniDocument: Equatable, Sendable {
         var meeting = try manifest.object("meeting")
         meeting["title"] = .string(clean)
         manifest["meeting"] = .object(meeting)
-        let titled = Comments(text: existing.comments.filter { !isManifestTag(tagName($0)) }, opaque: existing.opaqueComments)
-            .titled(clean)
-        return try rewriteManifest(source, existing: existing, manifest: manifest, comments: titled, target: target)
+        return try rewriteManifest(source, existing: existing, manifest: manifest, title: clean, target: target)
     }
 
     /**
-     * Writes [source]'s audio behind [comments] and the re-encoded [manifest], then reads the file back: it must
-     * verify and carry exactly that manifest, those comments and every variant body of [existing]. Nothing is left at
-     * [target] on failure.
+     * Writes [source]'s audio behind the comments of [existing] with every derived tag rebuilt from [manifest] (and
+     * TITLE set to [title], when given), then reads the file back: it must verify, agree with its own tags and carry
+     * exactly that manifest, those other comments and every variant body of [existing]. Nothing is left at [target] on
+     * failure.
      */
-    private static func rewriteManifest(_ source: URL, existing: CassiniDocument, manifest: JSONObject, comments: Comments,
+    private static func rewriteManifest(_ source: URL, existing: CassiniDocument, manifest: JSONObject, title: String? = nil,
                                         target: URL) throws -> CassiniDocument {
         let digest = try manifest.object("integrity").string("opusAudioSha256")
-        let manifestTags = try CassiniPayload.encode(prefix: manifestPrefix, mime: CassiniPayload.mime, text: manifest.serialized()).tags
+        var kept = Comments(text: existing.comments, opaque: existing.opaqueComments)
+        if let title { kept = kept.titled(title) }
+        let comments = kept.deriving(try copies(of: manifest) + manifestTags(manifest))
         do {
-            try writeWithTags(source, Comments(text: comments.text + manifestTags, opaque: comments.opaque), digest, target)
+            try writeWithTags(source, comments, digest, target)
             let written = read(target)
-            try check(written.state == .ok && written.manifest == manifest, "Rewritten manifest does not read back")
+            try check(written.state == .ok && agreesWithManifest(written) && written.manifest == manifest, "Rewritten manifest does not read back")
             try check(written.variants.map { $0.id } == existing.variants.map { $0.id } &&
                       written.variants.map { $0.body } == existing.variants.map { $0.body }, "Rewritten transcripts do not read back")
-            try check(written.comments.filter { !isManifestTag(tagName($0)) } == comments.text &&
-                      written.opaqueComments == comments.opaque, "Rewritten tags do not read back")
+            try check(written.comments == comments.text && written.opaqueComments == comments.opaque, "Rewritten tags do not read back")
             return written
         } catch {
             try? FileManager.default.removeItem(at: target)
@@ -428,14 +529,15 @@ public struct CassiniDocument: Equatable, Sendable {
     }
 
     private static func verify(_ sealed: CassiniDocument, _ transcript: Transcript) throws {
-        try check(sealed.state == .ok && sealed.selected()?.transcript == transcript, "Sealed document does not read back")
+        try check(sealed.state == .ok && agreesWithManifest(sealed) && sealed.selected()?.transcript == transcript,
+                  "Sealed document does not read back")
     }
 
     /**
      * The comments and audio digest of [stream] with [transcript] added as the new default variant. Beside a verified
-     * [existing] document only the copies it rewrites are replaced. Without one no CASSINI_ tag of the source can be
-     * trusted to match the new manifest, so all of them are dropped; foreign comments always survive. TITLE follows
-     * `meeting.title`.
+     * [existing] document its transcript chunks and foreign comments are kept and every tag derived from the manifest
+     * is written afresh, so no stale copy survives. Without one no CASSINI_ tag of the source can be trusted to match
+     * the new manifest, so all of them are dropped; foreign comments always survive. TITLE follows `meeting.title`.
      */
     private static func seal(_ stream: OggOpus.Info, _ transcript: Transcript, _ title: String, _ processing: JSONObject,
                              _ existing: CassiniDocument?, _ speakerLabels: [String: String]) throws -> (comments: Comments, digest: String) {
@@ -473,9 +575,10 @@ public struct CassiniDocument: Equatable, Sendable {
         descriptors.append(.object(descriptor))
         manifest["transcripts"] = .array(descriptors)
         var speakers = try manifest.array("speakers")
-        var known = Set(speakers.compactMap { $0.object?["id"]?.string })
-        for word in transcript.words where known.insert(word.speaker).inserted {
-            speakers.append(.object(JSONObject([("id", .string(word.speaker)), ("label", .string(speakerLabels[word.speaker] ?? word.speaker))])))
+        var known = Set(speakers.compactMap { $0.object?["id"]?.string.map { Array($0.utf8) } })
+        for word in transcript.words where known.insert(Array(word.speaker.utf8)).inserted {
+            let label = speakerLabels.first { sameBytes($0.key, word.speaker) }?.value ?? word.speaker
+            speakers.append(.object(JSONObject([("id", .string(word.speaker)), ("label", .string(label))])))
         }
         manifest["speakers"] = .array(speakers)
         var provenance = manifest["provenance"]?.object ?? JSONObject()
@@ -492,25 +595,14 @@ public struct CassiniDocument: Equatable, Sendable {
         manifest["provenance"] = .object(provenance)
         var comments: Comments
         if let existing {
-            comments = Comments(text: existing.comments.filter { !resealed.contains(tagName($0)) && !isManifestTag(tagName($0)) },
-                                opaque: existing.opaqueComments)
+            // A verified document's transcript chunks stay; every copy of its manifest is rebuilt from the new one.
+            comments = Comments(text: existing.comments.filter { !tagName($0).hasPrefix(prefix) }, opaque: existing.opaqueComments)
         } else {
             let foreign = try rawComments(stream.tags).filter { !tagName($0).hasPrefix("CASSINI_") }
             comments = Comments(text: foreign.compactMap { try? utf8($0) }, opaque: foreign.filter { (try? utf8($0)) == nil })
         }
-        let meeting = try manifest.object("meeting")
-        comments = comments.titled(try meeting.string("title"))
-        let ids = descriptors.compactMap { $0.object?["id"]?.string }.sorted().joined(separator: ",")
-        comments.text += ["CASSINI_FORMAT=\(format)", "CASSINI_PROFILE=ogg-opus", "CASSINI_PAYLOAD_SCHEMA=\(schema)",
-                          "CASSINI_TRANSCRIPT_IDS=\(ids)", "CASSINI_TRANSCRIPT_DEFAULT=\(id)", "CASSINI_SPEAKER_COUNT=\(speakers.count)",
-                          "CASSINI_MEETING_ID=\(try meeting.string("id"))", "CASSINI_CREATED_AT=\(try meeting.string("createdAtUtc"))",
-                          "CASSINI_DECODE_HINT=Concatenate CASSINI_PAYLOAD_000..N for the manifest; for a transcript body concatenate CASSINI_TX_<ID>_PAYLOAD_000..N. Each chunk set: base64url decode, gzip decompress, parse UTF-8 JSON."]
-        for (key, value) in [("SAMPLE_RATE", "48000"), ("CHANNELS", String(stream.channels)), ("SAMPLE_COUNT", String(stream.sampleCount)),
-                             ("DURATION_MS", String(stream.durationMs)), ("MATCH_POLICY", matchPolicy), ("OPUS_SHA256", digest)] {
-            comments.text.append("CASSINI_AUDIO_\(key)=\(value)")
-        }
-        comments.text += bodyTags
-        comments.text += try CassiniPayload.encode(prefix: manifestPrefix, mime: CassiniPayload.mime, text: manifest.serialized()).tags
+        comments = comments.titled(try manifest.object("meeting").string("title"))
+        comments = comments.deriving(try copies(of: manifest) + bodyTags.filter { !isDerived(tagName($0)) } + manifestTags(manifest))
         return (comments, digest)
     }
 }
