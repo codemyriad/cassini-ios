@@ -6,7 +6,8 @@ import XCTest
 /// to run: contrast to `ContrastTests`, which checks every token pair exactly in both appearances (the audit samples
 /// rendered pixels, Liquid Glass buttons and anti-aliased text included), and Dynamic Type at the default size, which
 /// flags standard text styles such as `.subheadline` (one different text each run) — the largest-size run below shows
-/// that text grows without being cut.
+/// that text grows without being cut. The six screens are audited on the iPad too, where the Library is the split
+/// view's sidebar (`testIPadScreensPassTheAudit`, which `scripts/test.sh` runs on its iPad clone).
 // ports: ScreenAccessibilityTest#library
 // ports: ScreenAccessibilityTest#noteReading
 // ports: ScreenAccessibilityTest#recording
@@ -71,7 +72,10 @@ final class AccessibilityAuditTests: XCTestCase {
     }
 
     /// The audit, failing on every issue but those the system owns (`AuditFilter`), each with the element it is about.
+    /// `transcript` is for a screen that draws a transcript, whose active word may yield one unattributed text issue
+    /// (`AuditFilter.isActiveWord`).
     @MainActor private func audit(_ app: XCUIApplication, _ types: XCUIAccessibilityAuditType = .all.subtracting([.contrast, .dynamicType]),
+                                  transcript: Bool = false, window: Bool = false,
                                   file: StaticString = #filePath, line: UInt = #line) {
         var issues: [String] = []
         var titleClipped = false
@@ -79,6 +83,10 @@ final class AccessibilityAuditTests: XCTestCase {
             try app.performAccessibilityAudit(for: types) { issue in
                 if AuditFilter.isNavigationTitle(issue, in: app, alreadySeen: titleClipped) {
                     titleClipped = true
+                } else if transcript, AuditFilter.isActiveWord(issue) {
+                    // Passes: see `isActiveWord`.
+                } else if window, AuditFilter.isWindowControl(issue) {
+                    // Passes: see `isWindowControl`.
                 } else if !AuditFilter.isSystemOwned(issue) {
                     issues.append(AuditFilter.describe(issue))
                 }
@@ -95,11 +103,26 @@ final class AccessibilityAuditTests: XCTestCase {
     }
 
     @MainActor func testTheLibraryPassesTheAudit() { audit(library()) }
-    @MainActor func testTheNoteScreenPassesTheAudit() { audit(note()) }
+    @MainActor func testTheNoteScreenPassesTheAudit() { audit(note(), transcript: true) }
     @MainActor func testTheRecordingScreenPassesTheAudit() { audit(recording()) }
     @MainActor func testSettingsPassesTheAudit() { audit(settings()) }
     @MainActor func testRecentlyDeletedPassesTheAudit() { audit(trash()) }
     @MainActor func testSavedVoicesPassesTheAudit() { audit(savedVoices()) }
+
+    // MARK: iPad
+
+    /// The same screens on the iPad, beside the Library's sidebar (an iOS-only layout).
+    @MainActor func testIPadScreensPassTheAudit() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad, "the split view")
+        let screens: [(String, @MainActor ([String]) -> XCUIApplication)] = [
+            ("library", library), ("note", note), ("recording", recording), ("settings", settings),
+            ("trash", trash), ("savedVoices", savedVoices)]
+        for (name, open) in screens {
+            let app = open([])
+            XCTContext.runActivity(named: name) { _ in audit(app, transcript: name == "note", window: true) }
+            app.terminate()
+        }
+    }
 
     // MARK: Largest text
 
@@ -133,8 +156,9 @@ enum AuditFilter {
         if [.statusBar, .key, .keyboard].contains(element.elementType) { return true }
         // The UI-test launch marker, an invisible 1 pt text that only DEBUG builds draw.
         if element.identifier == "launchFinished" { return true }
-        // A Library row's preview is an excerpt of two lines by design (Android maxLines = 2).
-        if issue.auditType == .textClipped, element.identifier == "rowPreview" { return true }
+        // A Library row's title and preview stop at two lines by design (Android maxLines = 2); in the iPad's sidebar a
+        // long title reaches them.
+        if issue.auditType == .textClipped, ["rowPreview", "rowTitle"].contains(element.identifier) { return true }
         return false
     }
 
@@ -144,6 +168,21 @@ enum AuditFilter {
     @MainActor static func isNavigationTitle(_ issue: XCUIAccessibilityAuditIssue, in app: XCUIApplication,
                                              alreadySeen: Bool) -> Bool {
         issue.element == nil && issue.auditType == .textClipped && !alreadySeen && app.navigationBars.firstMatch.exists
+    }
+
+    /// "Potentially inaccessible text" with no element, on a screen that draws a transcript. The element detection reads
+    /// text off the rendered pixels; the active word is drawn inverted inside its paragraph (the whole passage, for the
+    /// fixture's passages without word timing), and the detection can take it for text of its own while the paragraph,
+    /// one element that VoiceOver reads whole, holds it. Its verdict on that word changes from run to run, as the
+    /// contrast check's does. An issue that names an element still fails.
+    @MainActor static func isActiveWord(_ issue: XCUIAccessibilityAuditIssue) -> Bool {
+        issue.element == nil && issue.auditType == .elementDetection
+    }
+
+    /// A hit region too small with no element, on the iPad: the window's resize handle in its corner, which iPadOS
+    /// draws over every app window and the app does not own. Every control of the app's own views comes with its element.
+    @MainActor static func isWindowControl(_ issue: XCUIAccessibilityAuditIssue) -> Bool {
+        issue.element == nil && issue.auditType == .hitRegion
     }
 
     @MainActor static func describe(_ issue: XCUIAccessibilityAuditIssue) -> String {

@@ -55,7 +55,7 @@ struct NoteRow: View {
                 Text(HighlightedText.attributed(Highlighted(row.title, ranges: row.titleRanges), font: titleFont))
                     .font(titleFont).foregroundStyle(Color.ink).lineLimit(dynamicType.isAccessibilitySize ? nil : 2)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .passive()
+                    .accessibilityIdentifier("rowTitle").passive()
                 HStack(spacing: 6) {
                     if row.isFavorite { Image(systemName: "star.fill").font(.caption).foregroundStyle(Color.ember) }
                     Text(TimeText.clock(row.duration)).font(.subheadline.monospacedDigit()).foregroundStyle(Color.muted)

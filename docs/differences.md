@@ -463,7 +463,10 @@ These features exist only on iOS. They were kept by decision.
 - **Accessibility audits.** Android runs the Accessibility Test Framework. iOS runs `performAccessibilityAudit()` on
   the same screens plus Recently Deleted and Saved voices, and checks for clipping at the AX5 text size in place of
   `LargeFontScaleTest`. The audit's pixel contrast check is not used, because its verdict changes from run to run on
-  Liquid Glass. The tokens are checked instead.
+  Liquid Glass. The tokens are checked instead. The six screens are audited on the iPad as well, beside the Library's
+  sidebar. Each issue the audits let pass has its reason in `AuditFilter`: the system's status bar and keyboard, the
+  two-line row title and preview, iPadOS's window resize handle, and element detection's unattributed reading of the
+  transcript's inverted active word.
 - **Capped bars.** The player and the capture bar stop growing at AX1 and offer the Large Content Viewer. When Import
   and Record do not fit side by side, Import becomes a round icon, as on Android.
 - **Transcript paragraphs** are one plain-text element each for VoiceOver and Voice Control. The word links are for
