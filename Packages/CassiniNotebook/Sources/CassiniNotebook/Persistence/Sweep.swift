@@ -8,7 +8,6 @@ import Foundation
 public struct Sweep: Sendable {
     /// A `*.tmp` file this old belongs to no running write.
     public static let staleTmp: TimeInterval = 60 * 60
-    public static let tmpSuffix = ".tmp"
 
     /// What one sweep deleted.
     public struct Report: Equatable, Sendable {
@@ -46,7 +45,7 @@ public struct Sweep: Sendable {
         let keys: [URLResourceKey] = [.isRegularFileKey, .contentModificationDateKey]
         guard let entries = try? files.contentsOfDirectory(at: directory, includingPropertiesForKeys: keys) else { return [] }
         let staleTmp = entries.filter { entry in
-            guard entry.lastPathComponent.hasSuffix(Self.tmpSuffix),
+            guard entry.lastPathComponent.hasSuffix(DurableFile.temporarySuffix),
                   let values = try? entry.resourceValues(forKeys: Set(keys)), values.isRegularFile == true,
                   let modified = values.contentModificationDate else { return false }
             return modified < cutoff

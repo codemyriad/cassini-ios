@@ -1,0 +1,69 @@
+import SwiftUI
+import CassiniEngine
+import CassiniNotebook
+
+/// The Note screen while its job runs (Android `DraftList`): the top (the header and the progress card) stays fixed
+/// above a scrolling list of the banners and the draft while the draft keeps `DraftFollow.minDraftSpace` below it;
+/// otherwise (a short window, a large text size) the top scrolls with the draft. New draft text scrolls the end of the
+/// draft into view while it sticks to the end (`DraftFollow`); only the list scrolls, so a fixed card stays in view.
+struct ProcessingBody<Top: View, Banners: View>: View {
+    let noteID: UUID
+    let cache: TranscriptCache
+    @ViewBuilder let top: () -> Top
+    @ViewBuilder let banners: () -> Banners
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var follow = DraftFollow()
+    @State private var position = ScrollPosition(edge: .top)
+    @State private var atEnd = true
+    @State private var areaHeight: CGFloat = 0
+    @State private var topHeight: CGFloat = 0
+
+    var body: some View {
+        // The fixed top takes its height, the gutter above it and the gap below it.
+        let pinned = DraftFollow.pinsCard(area: areaHeight, card: topHeight + Spacing.gutter + Spacing.tight)
+        VStack(spacing: 0) {
+            if pinned {
+                topContent
+                    .padding(.horizontal, Spacing.gutter).padding(.top, Spacing.gutter).padding(.bottom, Spacing.tight)
+                    .frame(maxWidth: ReadableWidth.note).frame(maxWidth: .infinity)
+            }
+            ScrollView {
+                VStack(alignment: .leading, spacing: Spacing.section) {
+                    if !pinned { topContent }
+                    banners()
+                    RunningDraft(noteID: noteID, cache: cache)
+                }
+                .padding(.horizontal, Spacing.gutter).padding(.top, pinned ? 0 : Spacing.gutter).padding(.bottom, Spacing.gutter)
+                .frame(maxWidth: ReadableWidth.note).frame(maxWidth: .infinity)
+            }
+            .scrollPosition($position)
+            .onScrollGeometryChange(for: Bool.self) { geometry in
+                DraftFollow.isAtEnd(offset: geometry.contentOffset.y + geometry.contentInsets.top,
+                                    visibleHeight: geometry.containerSize.height - geometry.contentInsets.top
+                                        - geometry.contentInsets.bottom,
+                                    contentHeight: geometry.contentSize.height)
+            } action: { _, end in atEnd = end }
+            // Any draft change that makes the list taller (more words, or tentative words settling into longer text).
+            .onScrollGeometryChange(for: CGFloat.self) { $0.contentSize.height } action: { old, new in
+                if new > old { contentGrew() }
+            }
+            .onScrollPhaseChange { old, new in
+                // A scroll the user made has ended; one Cassini made (to the end) leaves following as it was.
+                if new == .idle, old == .interacting || old == .decelerating { follow.scrollEnded(atEnd: atEnd) }
+            }
+        }
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { areaHeight = $0 }
+    }
+
+    /// The header and the card, measured so the fixed layout knows what it leaves for the draft.
+    private var topContent: some View {
+        VStack(alignment: .leading, spacing: Spacing.section) { top() }
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { topHeight = $0 }
+    }
+
+    /// Taller content: to the end, while the draft sticks to it.
+    private func contentGrew() {
+        guard follow.sticks else { return }
+        withAnimation(reduceMotion ? nil : .default) { position.scrollTo(edge: .bottom) }
+    }
+}

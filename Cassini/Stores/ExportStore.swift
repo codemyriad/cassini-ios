@@ -8,17 +8,17 @@ import CassiniNotebook
 @MainActor @Observable final class ExportStore {
     @ObservationIgnored private let library: LibraryStore
     @ObservationIgnored private let service: ExportService?
-    @ObservationIgnored private let portable: PortableExportService
+    @ObservationIgnored private let portable: PortableExportService?
     @ObservationIgnored private let texts: ExportTexts
     @ObservationIgnored private let ready: @MainActor () async -> Void
 
     /// `ready` returns once the launch work has run, so the launch sweep never removes an export being shared.
-    init(library: LibraryStore, portable: PortableExportService, folder: URL, locale: Locale, timeZone: TimeZone,
+    init(library: LibraryStore, audio: any AudioProcessing, folder: URL, locale: Locale, timeZone: TimeZone,
          ready: @escaping @MainActor () async -> Void) {
         self.library = library
-        self.portable = portable
         self.ready = ready
         service = library.noteStore.map { ExportService(notes: $0, folder: folder) }
+        portable = library.noteStore.map { PortableExportService(audio: audio, provenance: ProvenanceFiles(notes: $0)) }
         texts = ExportCopy.texts(locale: locale, timeZone: timeZone)
     }
 
@@ -30,11 +30,18 @@ import CassiniNotebook
         return try await service.exportTranscript(id, format: format, texts: texts)
     }
 
+    /// A copy of the note's original audio named after its title, for "Share original audio".
+    func copyAudio(_ id: UUID) async throws(ExportError) -> URL {
+        guard let service else { throw .cannotSave }
+        await ready()
+        return try await service.copyAudio(id)
+    }
+
     /// A Cassini document of the note's audio with every local transcript version added to it.
     func exportPortable(_ id: UUID) async throws -> URL {
         await ready()
         await library.commit(id) { $0.saveCurrentVersion(name: "Edited transcript") }
-        guard let service, let note = library.note(id), let original = library.originalAudioURL(note),
+        guard let service, let portable, let note = library.note(id), let original = library.originalAudioURL(note),
               let audio = library.audioURL(note) else {
             throw CocoaError(.fileReadNoSuchFile)
         }

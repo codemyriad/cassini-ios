@@ -105,41 +105,18 @@ struct NoteDetailView: View {
         let matches = screen.search.map { cache.matches(transcript, query: $0.query) } ?? []
         let current = screen.search?.current(of: matches.count) ?? 0
         let currentMatch = matches.indices.contains(current) ? matches[current] : nil
-        return ScrollViewReader { proxy in
-            ScrollView {
-                VStack(alignment: .leading, spacing: Spacing.section) {
-                    NoteHeader(note: note, subtitle: NoteSubtitle.of(note, mode: mode, now: clock.now, calendar: calendar))
-                    ForEach(mode.sections, id: \.self) { section($0, note: note, mode: mode) }
-                    if mode.hasPlayer, !note.bookmarks.isEmpty {
-                        BookmarksSection(note: note, isExpanded: $showBookmarks, seek: seek)
-                    }
-                    if case .processing = mode {
-                        RunningDraft(noteID: noteID, cache: cache)
-                    } else if mode.showsDraft, !savedDraft.isEmpty {
-                        DraftSection(transcript: cache.saved(savedDraft), changing: false)
-                    }
-                    if note.saysNoSpeech(in: mode) {
-                        NoSpeechState()
-                    } else if !transcript.isEmpty {
-                        ReadingTranscript(noteID: noteID, transcript: transcript, hits: TranscriptHits(matches, current: current),
-                                          renamable: true, following: screen.follow.following,
-                                          actions: transcriptActions, geometry: geometry, proxy: proxy,
-                                          position: $scrollPosition, suggestion: { suggestionCard($0, in: transcript) })
-                    }
+        let subtitle = NoteSubtitle.of(note, mode: mode, now: clock.now, calendar: calendar)
+        return Group {
+            if case .processing = mode {
+                ProcessingBody(noteID: noteID, cache: cache) {
+                    NoteHeader(note: note, subtitle: subtitle)
+                    section(.card, note: note, mode: mode)
+                } banners: {
+                    section(.banners, note: note, mode: mode)
                 }
-                .padding(Spacing.gutter).frame(maxWidth: ReadableWidth.note).frame(maxWidth: .infinity)
-            }
-            .scrollPosition($scrollPosition)
-            .onScrollGeometryChange(for: ScrollMetrics.self) { ScrollMetrics($0) } action: { _, metrics in
-                geometry.offset = metrics.offset; geometry.top = metrics.top
-                geometry.height = metrics.height; geometry.maxOffset = metrics.maxOffset
-            }
-            .onScrollPhaseChange { _, phase in scrolled(phase) }
-            // Also on the first value: a search the Library opened scrolls to its first match.
-            .task(id: currentMatch) {
-                guard let currentMatch else { return }
-                await Task.yield()
-                reveal(currentMatch, in: transcript, proxy: proxy)
+            } else {
+                readingScroll(note, mode: mode, transcript: transcript, subtitle: subtitle, matches: matches,
+                              current: current, currentMatch: currentMatch)
             }
         }
         .safeAreaInset(edge: .top, spacing: 0) {
@@ -168,6 +145,47 @@ struct NoteDetailView: View {
                 }
                 NoteMenu(note: note, transcribeRow: TranscribeRow.of(note, job: job), exportingDocument: exportingDocument,
                          perform: { perform($0, note: note, readOnly: readOnly) })
+            }
+        }
+    }
+
+    /// Every mode but processing: one scroll view with the header, the sections, the bookmarks, a stopped job's draft
+    /// and the reading transcript, with playback follow and search.
+    private func readingScroll(_ note: Note, mode: NoteMode, transcript: NoteTranscript, subtitle: NoteSubtitle?,
+                               matches: [TranscriptMatch], current: Int, currentMatch: TranscriptMatch?) -> some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: Spacing.section) {
+                    NoteHeader(note: note, subtitle: subtitle)
+                    ForEach(mode.sections, id: \.self) { section($0, note: note, mode: mode) }
+                    if mode.hasPlayer, !note.bookmarks.isEmpty {
+                        BookmarksSection(note: note, isExpanded: $showBookmarks, seek: seek)
+                    }
+                    if mode.showsDraft, !savedDraft.isEmpty {
+                        DraftSection(transcript: cache.saved(savedDraft), changing: false)
+                    }
+                    if note.saysNoSpeech(in: mode) {
+                        NoSpeechState()
+                    } else if !transcript.isEmpty {
+                        ReadingTranscript(noteID: noteID, transcript: transcript, hits: TranscriptHits(matches, current: current),
+                                          renamable: true, following: screen.follow.following,
+                                          actions: transcriptActions, geometry: geometry, proxy: proxy,
+                                          position: $scrollPosition, suggestion: { suggestionCard($0, in: transcript) })
+                    }
+                }
+                .padding(Spacing.gutter).frame(maxWidth: ReadableWidth.note).frame(maxWidth: .infinity)
+            }
+            .scrollPosition($scrollPosition)
+            .onScrollGeometryChange(for: ScrollMetrics.self) { ScrollMetrics($0) } action: { _, metrics in
+                geometry.offset = metrics.offset; geometry.top = metrics.top
+                geometry.height = metrics.height; geometry.maxOffset = metrics.maxOffset
+            }
+            .onScrollPhaseChange { _, phase in scrolled(phase) }
+            // Also on the first value: a search the Library opened scrolls to its first match.
+            .task(id: currentMatch) {
+                guard let currentMatch else { return }
+                await Task.yield()
+                reveal(currentMatch, in: transcript, proxy: proxy)
             }
         }
     }
@@ -300,7 +318,7 @@ struct NoteDetailView: View {
         case .documentInfo: sheet = .documentInfo
         case .exportTranscript(let format): export(format)
         case .exportDocument: exportDocument()
-        case .shareAudio: if let url = library.originalAudioURL(note) { shareItem = ShareItem(url: url) }
+        case .shareAudio: shareAudio()
         case .transcribe: requestTranscription(.transcribe)
         case .transcribeAgain: run(screen.transcribeAgain(note))
         case .stop: processing.stop(noteID)
@@ -333,6 +351,13 @@ struct NoteDetailView: View {
     private func export(_ format: TranscriptFormat) {
         Task {
             do throws(ExportError) { shareItem = exports.shareItem(try await exports.exportTranscript(noteID, format: format)) }
+            catch { errors.present(ExportCopy.message(error)) }
+        }
+    }
+
+    private func shareAudio() {
+        Task {
+            do throws(ExportError) { shareItem = exports.shareItem(try await exports.copyAudio(noteID)) }
             catch { errors.present(ExportCopy.message(error)) }
         }
     }
@@ -372,7 +397,7 @@ struct NoteDetailView: View {
 
     @ViewBuilder private func sheetContent(_ sheet: NoteSheet) -> some View {
         switch sheet {
-        case .rename: RenameNoteSheet(noteID: noteID)
+        case .rename: RenameNoteDialog(noteID: noteID)
         case .speakers: SpeakersView(noteID: noteID)
         case .versions: TranscriptVersionsView(noteID: noteID)
         case .documentInfo: DocumentInfoSheet(noteID: noteID)

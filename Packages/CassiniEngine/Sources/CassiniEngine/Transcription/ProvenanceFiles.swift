@@ -35,6 +35,6 @@ public struct ProvenanceFiles: ProvenanceStoring {
     public func save(_ record: ProvenanceRecord, for noteID: UUID) throws {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
-        try encoder.encode(record).write(to: url(for: noteID), options: .atomic)
+        try DurableFile.write(encoder.encode(record), to: url(for: noteID))
     }
 }

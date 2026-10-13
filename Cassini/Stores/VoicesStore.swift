@@ -86,40 +86,32 @@ import CassiniNotebook
 
     // MARK: - Speaker analysis
 
-    /// Puts a finished analysis into the note: speakers of their own, attributed passages, and matches to saved voices.
-    /// Voiceprints are kept, and voices matched, only while `generation` is still current: an analysis that began
-    /// before Forget everyone keeps nothing. Rejected voices stay rejected for the speakers that overlap the old ones.
+    /// Puts a finished analysis into the note: speakers of their own, attributed passages, and matches to saved voices
+    /// and to the note's own named speakers (`AnalysisMatches`), so their names carry over. Voiceprints are kept, and
+    /// voices matched, only while `generation` is still current: an analysis that began before Forget everyone keeps
+    /// nothing.
     func applySpeakerAnalysis(_ analysis: SpeakerAnalysis, to id: UUID, generation: Int) async throws {
         await retryUnreadable()
         guard let note = library.note(id), note.trashedAt == nil else { return }
         if let model = analysis.prints.first?.model { settings.speakerModelIdentity = model }
         let (turns, prints) = SpeakerAttribution.namespaced(turns: analysis.turns, prints: analysis.prints,
                                                              prefix: UUID().uuidString + "_")
+        var matching = AnalysisMatches()
         if generation == settings.voicesGeneration, let store {
+            let earlier = (try? await store.prints(noteID: id)) ?? []
             // A note's prints are kept even if the saved voices can't be changed now; the note keeps working without.
             try? await store.appendPrints(prints, noteID: id)
+            matching = AnalysisMatches.of(note, turns: turns, prints: prints, savedVoices: savedVoices, earlierPrints: earlier,
+                                          trashed: Set(library.notes.filter { $0.trashedAt != nil }.map(\.id)))
         }
-        let matches = generation == settings.voicesGeneration
-            ? VoiceMatcher.match(prints: prints, voices: activeVoices(excluding: id), excluded: note.carriedExclusions(for: turns))
-            : [:]
-        let names = Dictionary(savedVoices.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
         let autoName = settings.automaticallyNameVoices
         let stamp = VersionStamp(date: clock.now)
-        let saved = await library.commit(id) { note in
+        let saved = await library.commit(id) { [matching] note in
             guard note.trashedAt == nil else { return }
-            note.applySpeakerAnalysis(turns: turns, matches: matches, voiceNames: names, autoName: autoName, stamp: stamp)
+            matching.apply(to: &note, turns: turns, autoName: autoName, stamp: stamp)
         }
         guard saved != nil else { throw CocoaError(.fileWriteUnknown) }
         await refresh()
-    }
-
-    /// The saved voices with the samples of `noteID` and of notes in Recently Deleted left out.
-    private func activeVoices(excluding noteID: UUID) -> [SavedVoice] {
-        savedVoices.map { voice in
-            var copy = voice
-            copy.samples.removeAll { $0.noteID == noteID || library.note($0.noteID)?.trashedAt != nil }
-            return copy
-        }
     }
 
     // MARK: - Naming

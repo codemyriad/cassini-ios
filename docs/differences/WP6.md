@@ -70,8 +70,9 @@
   gives no line metrics for `Text`), then scrolled to 30 % once it leaves the top 70 %; a paragraph that is not laid
   out is scrolled to with its top at 30 %. A drag during playback pauses following and shows "Follow playback"
   16 pt above the player; 4 s after the scrolling stops, following resumes. A drag while paused leaves it on. The
-  draft does not auto-scroll to new text (Android scrolls the end of the draft into view while the card stays), so the
-  card always stays in view.
+  draft follows its end as on Android (Phase C, `DraftFollow`, `ProcessingBody`): the header and the progress card stay
+  fixed above it while 160 pt are left for the draft, new text scrolls the end into view, a scroll that ends above the
+  end stops that and one back at the end starts it again; opening the screen does not scroll.
 - **Search** opens prefilled from `Route.note(query:)` (the Library's query) and scrolls to its first match, as on
   every later match, unless that match's line is in view already; without animation under Reduce Motion. It is kept
   with the navigation entry, as Android keeps it in the screen's `SavedStateHandle`: the router remembers the search
@@ -102,8 +103,8 @@
   offline, after the words), the word-cache and fast-opening cases of `NoteViewModelTest` (iOS reads the transcript
   with the note; there is no paged word cache or `RecentWords`), the export and naming cases (WP13 and WP8 own them).
   Of the Compose behaviour tests, the cases with an iOS counterpart are UI tests (below); the rest are not ported:
-  `ModeBehaviourTest`'s layout cases (the card staying fixed above the draft, the 160 dp draft space, the header lift;
-  iOS scrolls card and draft together, and the order is the pure `NoteMode.sections`), `NoteOverlaysBehaviourTest`'s
+  `ModeBehaviourTest`'s header lift (the fixed card and the 160 dp draft space are `DraftFollowTests` and the UI test
+  `testTheDraftFollowsItsEndBelowTheFixedCard`; the order is the pure `NoteMode.sections`), `NoteOverlaysBehaviourTest`'s
   sheet and dialog plumbing (event emission from Compose dialogs; iOS uses system alerts and menus, and the Name,
   Merge, Versions and stop-and-trash sheets are WP8's and WP12's), `SheetBehaviourTest`'s busy "Saving…" row (iOS has
   no draft naming) and `aNoteBeingRecordedCannotMoveToTrash` (a note being recorded opens the Recording screen, not

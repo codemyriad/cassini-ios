@@ -41,7 +41,12 @@ enum BannerCopy {
         case .txFailed: String(localized: "Couldn’t transcribe", table: "Notices")
 
         case .dlDownloading: downloading(args.part ?? .speech, percent: args.downloadPercent)
-        case .dlChecking: String(localized: "Checking files — \(args.percent ?? 0)%", table: "Notices")
+        case .dlChecking:
+            if let percent = args.percent {
+                String(localized: "Checking files — \(percent)%", table: "Notices")
+            } else {
+                String(localized: "Checking files", table: "Notices", comment: "A model install checks its files; no count yet")
+            }
         case .dlNoConnection: String(localized: "No connection", table: "Notices")
         case .dlStopped: String(localized: "Download stopped", table: "Notices")
         case .dlNoSpace: String(localized: "Not enough storage", table: "Notices")

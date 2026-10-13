@@ -28,6 +28,17 @@ import CassiniNotebook
         #expect(!h.files.exists(h.noteID), "the work is removed once the note is saved")
     }
 
+    // ports: InstalledEnginesTest#aLongClipThatDoesNotFitTheHeapGivesTheLowMemoryHint
+    @Test func theStartSaysWhetherTheRecordingFitsTheMemoryLeft() async throws {
+        let h = try await Harness()
+        // 70 s of 16 kHz float samples and 30 % headroom is about 5.8 MB.
+        #expect(await h.run(availableMemory: 4 << 20).events.compactMap(\.started).first?.lowMemory == true)
+        let roomy = try await Harness()
+        #expect(await roomy.run(availableMemory: 64 << 20).events.compactMap(\.started).first?.lowMemory == false)
+        let unknown = try await Harness()
+        #expect(await unknown.run().events.compactMap(\.started).first?.lowMemory == false)
+    }
+
     // ports: TranscriptionJobTest#checkpointsOnlyCountWhatWasFsynced
     @Test func checkpointsOnlyCountWhatIsOnDisk() async throws {
         let h = try await Harness()
@@ -554,12 +565,12 @@ private struct Harness {
     func provenance(of note: Note?) -> TranscriptProvenance? { note.flatMap(provenanceFiles.provenance(for:)) }
 
     func run(kind: JobKind = .transcribe, language: String = "it-IT", stop: StopSignal = StopSignal(),
-             uptime: (@Sendable () -> Int64)? = nil,
+             uptime: (@Sendable () -> Int64)? = nil, availableMemory: Int64? = nil,
              observe: @escaping @Sendable (JobEvent) -> Void = { _ in }) async -> (outcome: JobOutcome, events: [JobEvent]) {
         let ticking = FakeUptime()
         let job = TranscriptionJob(notes: notes, transcriber: transcriber, analyzer: analyzer, checkpoints: checkpoints,
                                    provenance: provenanceFiles, host: host, clock: FakeClock(), limits: limits,
-                                   uptimeMs: uptime ?? { ticking.next() })
+                                   uptimeMs: uptime ?? { ticking.next() }, availableMemory: { availableMemory })
         let record = Job(noteID: noteID, seq: 1, kind: kind, state: .running, language: language, enqueuedAt: Date())
         let events = Mutex<[JobEvent]>([])
         let outcome = await job.run(record, stop: stop) { event in
@@ -706,7 +717,7 @@ private struct InstallFailingAnalyzer: SpeakerAnalyzing {
     var modelIdentity: String? { get async { nil } }
     func modelStatus() async -> ModelPartStatus { .notDownloaded }
     func refreshModelStatus() async -> ModelPartStatus { .notDownloaded }
-    func installModels(progress: @escaping @Sendable (Double?) -> Void) async throws { throw failure }
+    func installModels(progress: @escaping @Sendable (InstallProgress) -> Void) async throws { throw failure }
     func cancelModelInstall() async {}
     var modelInstallBytes: Int64 { 0 }
 }
@@ -720,7 +731,7 @@ private struct FailingAnalyzer: SpeakerAnalyzing {
     var modelIdentity: String? { get async { "m:1" } }
     func modelStatus() async -> ModelPartStatus { .ready }
     func refreshModelStatus() async -> ModelPartStatus { .ready }
-    func installModels(progress: @escaping @Sendable (Double?) -> Void) async throws {}
+    func installModels(progress: @escaping @Sendable (InstallProgress) -> Void) async throws {}
     func cancelModelInstall() async {}
     var modelInstallBytes: Int64 { 0 }
 }

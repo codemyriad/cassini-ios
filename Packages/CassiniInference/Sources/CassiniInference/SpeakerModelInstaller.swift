@@ -33,7 +33,7 @@ public actor SpeakerModelInstaller {
         let number: Int
         let task: Task<Void, Error>
         var waiters: [UUID: CheckedContinuation<Void, Error>] = [:]
-        var listeners: [UUID: @Sendable (Double?) -> Void] = [:]
+        var listeners: [UUID: @Sendable (InstallProgress) -> Void] = [:]
         /// Nobody waits any more and the task is cancelled, but its fetch has not ended: new requests wait for its end.
         var stopping = false
         /// The requests that wait for this stopping install to end.
@@ -78,7 +78,7 @@ public actor SpeakerModelInstaller {
     public var waiting: Int { current?.waiters.count ?? 0 }
 
     /// Installs the models, or joins the install that runs. Does nothing when they are ready.
-    public func install(allowDownload: Bool, progress: @escaping @Sendable (Double?) -> Void = { _ in }) async throws {
+    public func install(allowDownload: Bool, progress: @escaping @Sendable (InstallProgress) -> Void = { _ in }) async throws {
         while let current {
             guard current.stopping else { return try await wait(on: current.number, progress: progress) }
             await waitForEnd(of: current.number)
@@ -148,7 +148,7 @@ public actor SpeakerModelInstaller {
         }
     }
 
-    private func wait(on number: Int, progress: @escaping @Sendable (Double?) -> Void) async throws {
+    private func wait(on number: Int, progress: @escaping @Sendable (InstallProgress) -> Void) async throws {
         let id = UUID()
         try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
@@ -160,7 +160,11 @@ public actor SpeakerModelInstaller {
                 current?.waiters[id] = continuation
                 current?.listeners[id] = progress
                 // A caller that joins sees where the shared install stands.
-                if case .downloading(let fraction) = stored { progress(fraction) }
+                switch stored {
+                case .downloading(let fraction): progress(.downloading(fraction))
+                case .checking: progress(.checking)
+                default: break
+                }
             }
         } onCancel: {
             Task { await self.leave(number, id) }
@@ -216,10 +220,11 @@ public actor SpeakerModelInstaller {
         switch report {
         case .checking:
             stored = .checking
+            for listener in current.listeners.values { listener(.checking) }
         case .fraction(let fraction):
             if case .checking = stored { return }
             stored = .downloading(fraction.map { min(max($0, 0), 1) })
-            for listener in current.listeners.values { listener(fraction) }
+            for listener in current.listeners.values { listener(.downloading(fraction)) }
         }
     }
 

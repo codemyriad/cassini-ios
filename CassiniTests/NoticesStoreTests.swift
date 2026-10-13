@@ -83,7 +83,7 @@ import CassiniNotebook
             notes.append(note)
         }
         let graph = test.graph
-        graph.settings.downloadsAllowed = true
+        graph.settings.recordConsent()
         graph.settings.identifySpeakers = false
         graph.settings.queueHold = .user
         await graph.start()
@@ -111,6 +111,36 @@ import CassiniNotebook
         #expect(banner.args.bytes == ModelPlan.speechInstallBytes)
         #expect(BannerCopy.body(banner, locale: Locale(identifier: "en_US")) == "Free about 512 MB and try again.")
     }
+
+    @Test func theSettingsCancelStopsTheStandaloneInstallAndNotTheJobThatDownloads() async throws {
+        let test = TestGraph(transcriber: HangingDownloads())
+        defer { test.tearDown() }
+        let repository = try NoteRepository(root: test.root)
+        var note = Note(title: "A", audioFilename: "audio.caf")
+        note.duration = 2
+        try repository.save(note)
+        try Data().write(to: repository.audioURL(for: note))
+        let graph = test.graph
+        graph.settings.recordConsent()
+        graph.settings.identifySpeakers = false
+        await graph.start()
+        await graph.processing.transcribe(note.id, origin: .automatic)
+        await waitUntil {
+            if case .downloading = graph.processing.state.running?.phase { true } else { false }
+        }
+        graph.processing.models.install([.speech])
+        await waitUntil { graph.notices.settingsBanners.contains { $0.kind == .dlDownloading } }
+        let banner = try #require(graph.notices.settingsBanners.first { $0.kind == .dlDownloading })
+
+        graph.notices.perform(.cancel, on: banner)
+        #expect(!graph.processing.models.isInstalling, "the install the banner names stops")
+        #expect(!graph.notices.settingsBanners.contains { $0.kind == .dlDownloading })
+        guard case .downloading = graph.processing.state.running?.phase else {
+            Issue.record("the job's download goes on")
+            return
+        }
+        graph.processing.stopAll()
+    }
 }
 
 /// Apple's speech assets that cannot be installed for want of space.
@@ -122,6 +152,21 @@ private struct NoSpaceTranscriber: Transcribing {
     func assetStatus(locale: Locale) async -> ModelPartStatus { .notDownloaded }
     func installAssets(locale: Locale, progress: @escaping @Sendable (Double) -> Void) async throws {
         throw TranscriptionError.failed(.download(.notEnoughStorage))
+    }
+    func speechLanguages() async -> [SpeechLanguage] { [] }
+}
+
+/// Apple's speech assets downloading for a job and for a standalone install, neither of which ends until cancelled.
+private struct HangingDownloads: Transcribing {
+    func transcribe(_ request: TranscriptionRequest,
+                    events: @escaping @Sendable (TranscriptionEvent) -> Void) async throws -> TranscriptionResult {
+        events(.preparingModel(0.3))
+        while true { try await Task.sleep(for: .seconds(3600)) }
+    }
+    func assetStatus(locale: Locale) async -> ModelPartStatus { .notDownloaded }
+    func installAssets(locale: Locale, progress: @escaping @Sendable (Double) -> Void) async throws {
+        progress(0.2)
+        while true { try await Task.sleep(for: .seconds(3600)) }
     }
     func speechLanguages() async -> [SpeechLanguage] { [] }
 }

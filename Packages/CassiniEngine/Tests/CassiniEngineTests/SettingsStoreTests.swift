@@ -22,7 +22,7 @@ import CassiniNotebook
         #expect(settings.speakerModelIdentity == nil)
         #expect(settings.modelsConsentAt == nil && settings.modelsDeclinedAt == nil && settings.speakerModelsConsentAt == nil)
         #expect(settings.queueHold == nil)
-        #expect(settings.recoveredAck == nil && settings.importFailureAck == nil && settings.downloadFailureAck == nil)
+        #expect(settings.recoveredAck == nil)
         #expect(!settings.notificationsAsked)
         #expect(settings.finalizationMs == nil && settings.trashLastPurgeAt == nil)
         #expect(settings.voicesGeneration == 0)
@@ -39,11 +39,9 @@ import CassiniNotebook
         settings.speakerModelIdentity = "model:abc"
         settings.recordConsent()
         clock.advance(by: .seconds(1)); settings.recordDeclined()
-        settings.speakerDownloadsAllowed = true
+        settings.recordSpeakerConsent()
         settings.queueHold = .system
         settings.acknowledgeRecovered(upTo: Date(timeIntervalSince1970: 5))
-        settings.acknowledgeImportFailure(at: Date(timeIntervalSince1970: 6))
-        settings.acknowledgeDownloadFailure(at: Date(timeIntervalSince1970: 7))
         settings.markNotificationsAsked()
         settings.recordFinalization(8_000)
         settings.recordPurge()
@@ -58,8 +56,6 @@ import CassiniNotebook
         #expect(reopened.speakerModelsConsentAt == Date(timeIntervalSince1970: 1_001))
         #expect(reopened.queueHold == .system)
         #expect(reopened.recoveredAck == Date(timeIntervalSince1970: 5))
-        #expect(reopened.importFailureAck == Date(timeIntervalSince1970: 6))
-        #expect(reopened.downloadFailureAck == Date(timeIntervalSince1970: 7))
         #expect(reopened.notificationsAsked)
         #expect(reopened.finalizationMs == 8_000)
         #expect(reopened.trashLastPurgeAt == Date(timeIntervalSince1970: 1_001))
@@ -110,7 +106,7 @@ import CassiniNotebook
         #expect(settings.speakerModelsConsentAt == nil)
         #expect(settings.speechLanguage == "pt-BR")
         #expect(defaults().object(forKey: SettingsKeys.legacyModelDownloadsAllowed) == nil)
-        settings.downloadsAllowed = false
+        settings.modelsConsentAt = nil
         #expect(store().modelsConsentAt == nil, "a withdrawn consent is not migrated again")
     }
 }

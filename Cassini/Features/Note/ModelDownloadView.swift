@@ -87,8 +87,7 @@ private struct ModelDownloadActions: View {
             }
             Button { Task { await model.download() } } label: {
                 ZStack {
-                    Text(model.withNote ? "Download and transcribe" : "Download", tableName: "Transcription")
-                        .opacity(model.busy ? 0 : 1)
+                    primaryLabel.opacity(model.busy ? 0 : 1)
                     if model.busy { ProgressView().tint(.white) }
                 }
             }
@@ -99,6 +98,12 @@ private struct ModelDownloadActions: View {
                 .frame(maxWidth: .infinity, minHeight: HitTarget.minimum)
                 .disabled(model.busy)
         }
+    }
+
+    private var primaryLabel: Text {
+        if model.identifiesSpeakers { Text("Download and identify speakers", tableName: "Transcription") }
+        else if model.withNote { Text("Download and transcribe", tableName: "Transcription") }
+        else { Text("Download", tableName: "Transcription") }
     }
 }
 

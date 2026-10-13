@@ -4,16 +4,6 @@ import Foundation
 /// job, the audio and the document instead.
 public enum NoteStatus: String, Codable, Sendable {
     case recording, audioOnly, queued, transcribing, ready, failed
-    public var label: String {
-        switch self {
-        case .recording: "Recording"
-        case .audioOnly: "Audio only"
-        case .queued: "Queued"
-        case .transcribing: "Transcribing"
-        case .ready: "Transcribed"
-        case .failed: "Needs attention"
-        }
-    }
 }
 
 /// Whether the note's audio file can be played. Persisted with its case names: never rename one.

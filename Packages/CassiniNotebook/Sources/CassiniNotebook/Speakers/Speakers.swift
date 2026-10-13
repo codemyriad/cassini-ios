@@ -42,13 +42,24 @@ extension Note {
     public func speaker(_ id: String) -> NoteSpeaker? { speakers?.first { $0.id == id } }
 
     /// Keeps the transcript and speakers as a version, unless the selected version already holds them. A caller whose
-    /// change may run again passes the version's `id` and `date`, so that the rerun makes the same version.
+    /// change may run again passes the version's `id` and `date`, so that the rerun makes the same version. The
+    /// transcript counts as an edited copy of the selected version, so the new version keeps that version's merge
+    /// (`speakerMerges`, `derivedFrom`) for the export's provenance.
     public mutating func saveCurrentVersion(name: String, id versionID: UUID = UUID(), date: Date = Date()) {
+        saveCurrentVersion(name: name, id: versionID, date: date, editedFrom: selectedVersionID)
+    }
+
+    /// `saveCurrentVersion(name:id:date:)` for a transcript that is an edited copy of version `base`.
+    mutating func saveCurrentVersion(name: String, id versionID: UUID, date: Date, editedFrom base: UUID?) {
         guard !transcript.isEmpty else { return }
         guard shownVersionIndex == nil else { return }
         var history = versions ?? []
         var version = TranscriptVersion(name: name, segments: transcript, speakers: speakers ?? [])
         version.id = versionID; version.createdAt = date
+        if let source = base.flatMap({ id in history.first { $0.id == id } }) {
+            version.speakerMerges = source.speakerMerges
+            version.derivedFrom = source.derivedFrom
+        }
         history.append(version); selectedVersionID = version.id
         versions = history
     }
@@ -106,10 +117,12 @@ extension Note {
 
     /// Shows everything `source` said as `target`, keeping the transcript before the merge as a version. The merged
     /// version links `target` to its voice only as an automatic match: a confirmed sample belongs to the version it
-    /// was confirmed in, so taking it back later never takes it back twice.
+    /// was confirmed in, so taking it back later never takes it back twice. The merged version records the alias and
+    /// the version it was made from, for the export's provenance.
     public mutating func mergeSpeaker(_ source: String, into target: String, stamp: VersionStamp = VersionStamp(date: Date())) {
         guard source != target, speaker(source) != nil, let targetIndex = speakers?.firstIndex(where: { $0.id == target })
         else { return }
+        let mergedFrom = shownVersionIndex.flatMap { versions?[$0].id } ?? stamp.before
         saveCurrentVersion(name: "Before speaker merge", id: stamp.before, date: stamp.date)
         for index in transcript.indices where transcript[index].speakerID == source { transcript[index].speakerID = target }
         if case .confirmed(let voice, let score) = speakers?[targetIndex].match {
@@ -119,6 +132,10 @@ extension Note {
         refreshSpeakerLabels()
         selectedVersionID = nil
         saveCurrentVersion(name: Self.mergedVersionName, id: stamp.after, date: stamp.date)
+        if let merged = versions?.firstIndex(where: { $0.id == stamp.after }) {
+            versions?[merged].speakerMerges = [source: target]
+            versions?[merged].derivedFrom = mergedFrom
+        }
     }
 
     public mutating func addSpeaker(id: String, name: String) {

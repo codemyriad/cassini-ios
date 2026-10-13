@@ -2,9 +2,10 @@ import SwiftUI
 import CassiniEngine
 import CassiniNotebook
 
-/// Rename from the Library (Android's Rename dialog): the field stops at the 200-character limit, a blank title says
-/// "Enter a title.", and Save, which stores the trimmed title (`LibraryScreenModel.rename`), is on only when the title
-/// changed. A sheet rather than Android's alert, so the blank-title error can sit under the field.
+/// Rename, from the Library and from the note screen alike (Android uses one Rename dialog for both): the field stops
+/// at the 200-character limit, a blank title says "Enter a title.", and Save, which stores the trimmed title
+/// (`LibraryScreenModel.rename`), is on only when the title changed. A sheet rather than Android's alert, so the
+/// blank-title error can sit under the field.
 struct RenameNoteDialog: View {
     let noteID: UUID
     @Environment(LibraryStore.self) private var library

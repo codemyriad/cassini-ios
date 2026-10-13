@@ -66,7 +66,7 @@ public actor SpeakerAnalyzer: SpeakerAnalyzing {
         return status
     }
 
-    public func installModels(progress: @escaping @Sendable (Double?) -> Void) async throws {
+    public func installModels(progress: @escaping @Sendable (InstallProgress) -> Void) async throws {
         try await installer.install(allowDownload: true, progress: progress)
     }
 
@@ -76,7 +76,7 @@ public actor SpeakerAnalyzer: SpeakerAnalyzing {
 
     public func analyze(url: URL, allowDownload: Bool,
                         progress: @escaping @Sendable (SpeakerAnalysisEvent) -> Void) async throws -> SpeakerAnalysis {
-        progress(.preparingModels(nil))
+        progress(.preparingModels(.downloading(nil)))
         try await installer.install(allowDownload: allowDownload) { progress(.preparingModels($0)) }
         await takeTurn()
         defer { endTurn() }

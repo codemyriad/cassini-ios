@@ -105,7 +105,7 @@ private actor Gate {
         earlier.portableID = nil
         note.versions = [earlier]
 
-        let output = try await PortableExportService(audio: FakeAudioProcessing(duration: 2))
+        let output = try await PortableExportService(audio: FakeAudioProcessing(duration: 2), provenance: FakeProvenance())
             .export(note, original: playable, playable: playable, into: folder, filename: "encoded")
 
         #expect(output.lastPathComponent == "encoded.opus")
@@ -126,15 +126,127 @@ private actor Gate {
         let opus = try ImportFixtures.opus(packets: 100)
         try Data(opus).write(to: original)
 
-        let output = try await PortableExportService(audio: FakeAudioProcessing())
+        let output = try await PortableExportService(audio: FakeAudioProcessing(), provenance: FakeProvenance())
             .export(transcribed("Talk"), original: original, playable: original, into: folder, filename: "Talk")
         #expect(try OggOpus.scan(output).digest() == OggOpus.scan(original).digest())
         #expect(try Data(contentsOf: original) == Data(opus))
 
         await #expect(throws: PortableExportError.noTranscript) {
-            try await PortableExportService(audio: FakeAudioProcessing())
+            try await PortableExportService(audio: FakeAudioProcessing(), provenance: FakeProvenance())
                 .export(Note(title: "Empty"), original: original, playable: original, into: folder, filename: "Empty")
         }
         #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path).sorted() == ["Talk.opus", "source.opus"])
+    }
+
+    /// The record an export wrote for `variant`: `provenance.speechToText.<variant>`.
+    private func processing(_ document: CassiniDocument, _ variant: String?) -> JSONObject? {
+        variant.flatMap { document.manifest?["provenance"]?.object?["speechToText"]?.object?[$0]?.object }
+    }
+
+    private func twoSpeakers() -> Note {
+        var note = Note(title: "Two")
+        note.language = "en-US"
+        note.transcript = [
+            TranscriptSegment(text: "Hello", start: 0, end: 1, speaker: "Alex", speakerID: "a",
+                              words: [TimedWord(text: "Hello", start: 0, end: 1)]),
+            TranscriptSegment(text: "there", start: 1.2, end: 2, speaker: "Sam", speakerID: "b",
+                              words: [TimedWord(text: "there", start: 1.2, end: 2)]),
+        ]
+        note.speakers = [NoteSpeaker(id: "a", name: "Alex"), NoteSpeaker(id: "b", name: "Sam")]
+        return note
+    }
+
+    private func runRecord(_ note: Note) -> ProvenanceRecord {
+        var record = ProvenanceRecord(provenance: TranscriptProvenance(language: "en-US", inferenceMs: 1_500, resumedFromMs: 600),
+                                      transcript: note.transcript)
+        record.addSpeakers(.init(model: "diarizer", sha: "abc", turnCount: 2, speakerCount: 2), transcript: note.transcript)
+        return record
+    }
+
+    @Test func theRunsProvenanceGoesIntoTheExportWithAndroidsKeys() async throws {
+        let folder = try folder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let original = folder.appendingPathComponent("source.opus")
+        try Data(ImportFixtures.opus(packets: 100)).write(to: original)
+        let note = twoSpeakers()
+
+        let output = try await PortableExportService(audio: FakeAudioProcessing(), provenance: FakeProvenance([note.id: runRecord(note)]))
+            .export(note, original: original, playable: original, into: folder, filename: "Two")
+
+        let document = CassiniDocument.read(output)
+        let record = try #require(processing(document, document.defaultId))
+        #expect(record["engine"] == .string(TranscriptProvenance.appleSpeech))
+        #expect(record["x-inferenceMs"] == .int(1_500))
+        #expect(record["x-resumedFromMs"] == .int(600))
+        let diarization = try #require(record["x-speakerDiarization"]?.object)
+        #expect(diarization["model"] == .string("diarizer"))
+        #expect(diarization["turnCount"] == .int(2))
+        #expect(record["x-speakerMerges"] == nil)
+    }
+
+    @Test func wordsThatAreNotTheRunsAreRecordedAsEditedByHand() async throws {
+        let folder = try folder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let original = folder.appendingPathComponent("source.opus")
+        try Data(ImportFixtures.opus(packets: 100)).write(to: original)
+        var note = twoSpeakers()
+        let record = runRecord(note)
+        note.transcript[1].text = "everyone"
+        note.transcript[1].words = []
+
+        let output = try await PortableExportService(audio: FakeAudioProcessing(), provenance: FakeProvenance([note.id: record]))
+            .export(note, original: original, playable: original, into: folder, filename: "Two")
+
+        let document = CassiniDocument.read(output)
+        #expect(processing(document, document.defaultId) == ExportProvenance.userEdited)
+    }
+
+    // ports: DocumentRepositoryTest#aMergeCreatesVersionNPlusOneAndSelectsIt
+    @Test func aMergedVersionRecordsItsAliasesAndTheVariantItCameFrom() async throws {
+        let folder = try folder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let original = folder.appendingPathComponent("source.opus")
+        try Data(ImportFixtures.opus(packets: 100)).write(to: original)
+        var note = twoSpeakers()
+        let record = runRecord(note)
+        note.mergeSpeaker("b", into: "a")
+
+        let output = try await PortableExportService(audio: FakeAudioProcessing(), provenance: FakeProvenance([note.id: record]))
+            .export(note, original: original, playable: original, into: folder, filename: "Two")
+
+        let document = CassiniDocument.read(output)
+        #expect(document.variants.count == 2)
+        let before = try #require(document.variants.first?.id)
+        #expect(processing(document, before)?["x-speakerMerges"] == nil)
+        let merged = try #require(processing(document, document.defaultId))
+        #expect(merged["x-speakerMerges"] == .object(JSONObject([("b", .string("a"))])))
+        #expect(merged["x-speakerAssignmentEditedBy"] == .string("user"))
+        #expect(merged["x-derivedFromTranscript"] == .string(before))
+        #expect(merged["x-inferenceMs"] == .int(1_500), "a merge keeps the run's words")
+        #expect(merged["x-speakerDiarization"] != nil, "a merge only removes speaker ids")
+        #expect(Set(document.selected()?.transcript?.words.map(\.speaker) ?? []) == ["a"])
+    }
+    @Test func aMergedVersionEditedAfterwardsKeepsTheMergeAliases() async throws {
+        let folder = try folder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let original = folder.appendingPathComponent("source.opus")
+        try Data(ImportFixtures.opus(packets: 100)).write(to: original)
+        var note = twoSpeakers()
+        let record = runRecord(note)
+        note.mergeSpeaker("b", into: "a")
+        let passage = try #require(note.transcript.last)
+        note.revisePassage(passage, to: passage.revised(text: "everyone", speakerID: "a", speakers: note.speakers ?? []),
+                           stamp: VersionStamp(date: Date()))
+
+        let output = try await PortableExportService(audio: FakeAudioProcessing(), provenance: FakeProvenance([note.id: record]))
+            .export(note, original: original, playable: original, into: folder, filename: "Two")
+
+        let document = CassiniDocument.read(output)
+        #expect(document.variants.count == 3)
+        let before = try #require(document.variants.first?.id)
+        let edited = try #require(processing(document, document.defaultId))
+        #expect(edited["kind"] == .string("user-edited"), "the edit changed the run's words")
+        #expect(edited["x-speakerMerges"] == .object(JSONObject([("b", .string("a"))])))
+        #expect(edited["x-derivedFromTranscript"] == .string(before))
     }
 }

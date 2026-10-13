@@ -9,7 +9,7 @@ public struct LoadReport: Sendable, Equatable {
     public var unreadableCount: Int { unreadable.count }
 }
 
-/// One atomic metadata document per note, at `<root>/<id>/note.json`. A damaged document never hides other notes.
+/// One durable metadata document per note, at `<root>/<id>/note.json`. A damaged document never hides other notes.
 public struct NoteRepository: Sendable {
     public static let metadataFilename = "note.json"
 
@@ -30,7 +30,7 @@ public struct NoteRepository: Sendable {
         let folder = directory(for: note.id)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
-        try encoder.encode(note).write(to: folder.appendingPathComponent(Self.metadataFilename), options: .atomic)
+        try DurableFile.write(encoder.encode(note), to: folder.appendingPathComponent(Self.metadataFilename))
     }
 
     /// Reads every note, after finishing the deletes Cassini closed in the middle of.

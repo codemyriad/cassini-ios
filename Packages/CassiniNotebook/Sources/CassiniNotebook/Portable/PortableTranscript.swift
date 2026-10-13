@@ -142,8 +142,11 @@ public enum PortableExportError: Error, Equatable, Sendable {
 extension PortableTranscript {
     /// Writes `opus` to `destination` with the note's transcript added as the new default variant. A verified source
     /// keeps every earlier variant and gets the note's title and speaker names; any other source is sealed afresh,
-    /// keeping only its foreign tags. The source is never changed.
-    public static func export(note: Note, opus: URL, destination: URL) throws {
+    /// keeping only its foreign tags. `processing` is the variant's provenance record (`ExportProvenance`). Returns the
+    /// new variant's id. The source is never changed.
+    @discardableResult
+    public static func export(note: Note, opus: URL, destination: URL,
+                              processing: JSONObject = ExportProvenance.userEdited) throws -> String? {
         let source = CassiniDocument.read(opus)
         let transcript = Transcript(words(of: note), language: Note.bcp47(note.language))
         guard !transcript.words.isEmpty else { throw PortableExportError.noTranscript }
@@ -169,9 +172,8 @@ extension PortableTranscript {
         let fits = try existing.map { try WordBodyBudget.fitsHeader(transcript, beside: $0) }
             ?? WordBodyBudget.fitsHeader(transcript, sealing: FileSource(opus))
         guard fits else { throw PortableExportError.tooLong }
-        try CassiniDocument.create(opus, transcript: transcript, title: note.title,
-                                   processing: JSONObject([("engine", .string("cassini-ios")), ("kind", .string("user-edited"))]),
-                                   existing: existing, speakerLabels: labels, target: destination)
+        return try CassiniDocument.create(opus, transcript: transcript, title: note.title, processing: processing,
+                                          existing: existing, speakerLabels: labels, target: destination).defaultId
     }
 
     /// The note's words; a passage without word timing becomes words that each span the whole passage.

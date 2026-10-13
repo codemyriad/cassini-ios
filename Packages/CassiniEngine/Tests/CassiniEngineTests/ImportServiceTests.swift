@@ -501,7 +501,7 @@ private func sha256(_ url: URL) throws -> String {
         let folder = h.inputs.appendingPathComponent("export")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
 
-        let output = try await PortableExportService(audio: h.audio)
+        let output = try await PortableExportService(audio: h.audio, provenance: FakeProvenance())
             .export(note, original: h.store.originalAudioURL(for: note), playable: h.store.audioURL(for: note),
                     into: folder, filename: "Due")
 

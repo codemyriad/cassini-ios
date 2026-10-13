@@ -145,8 +145,27 @@ public enum Notices {
 
     // MARK: Model download
 
-    /// The failure banner of a model download's `error`. Apple installs its speech assets and reports only a fraction,
-    /// so no screen shows DL_DOWNLOADING or DL_CHECKING: the processing card shows a job's install.
+    /// DL_DOWNLOADING (with Cancel) or, while the files are checked, DL_CHECKING: the download row of the processing
+    /// card (Android `Notices.downloading`). Apple's speech assets report a fraction, so their bytes are left out; a
+    /// check without a count of the files checked has no percentage.
+    public static func downloading(_ progress: DownloadProgress) -> BannerSpec {
+        if progress.verifying {
+            return BannerSpec(.dlChecking, BannerArgs(percent: progress.totalBytes > 0 ? progress.percent : nil))
+        }
+        return BannerSpec(.dlDownloading, BannerArgs(bytes: progress.doneBytes, bytes2: progress.totalBytes,
+                                                     percent: progress.percent, part: progress.part))
+    }
+
+    /// The Settings banner of a standalone install that runs, with Cancel (iOS only: the model download screen closes
+    /// once the download starts); nil once it failed. The Library shows only its failure, as Android.
+    public static func downloading(_ download: DownloadFact) -> BannerSpec? {
+        guard download.failure == nil else { return nil }
+        if download.checking { return BannerSpec(.dlChecking) }
+        let percent = Int((min(max(download.fraction ?? 0, 0), 1) * 100).rounded(.down))
+        return BannerSpec(.dlDownloading, BannerArgs(percent: percent, part: download.part))
+    }
+
+    /// The failure banner of a model download's `error`.
     public static func download(_ error: DownloadError, requiredFreeBytes: Int64 = 0, announce: Bool = false) -> BannerSpec {
         switch error {
         case .noConnection: BannerSpec(.dlNoConnection, announce: announce)
@@ -160,11 +179,13 @@ public enum Notices {
 
     // MARK: Settings
 
-    /// Settings: "Notifications are off" whenever they are; "Saved voices can't be read" for an unreadable file.
+    /// Settings: "Notifications are off" whenever they are; "Saved voices can't be read" for an unreadable file; the
+    /// standalone install that runs.
     public static func settings(_ facts: NoticeFacts) -> [BannerSpec] {
         var notices: [Notice] = []
         if facts.notificationsOff { notices.append(Notice(spec: BannerSpec(.notificationsOff))) }
         if facts.voicesUnavailable { notices.append(Notice(spec: BannerSpec(.voicesUnreadable))) }
+        if let download = facts.download.flatMap(downloading) { notices.append(Notice(spec: download)) }
         return ordered(notices)
     }
 

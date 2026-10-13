@@ -35,6 +35,11 @@ struct ExportServiceTests {
         defer { try? FileManager.default.removeItem(at: base) }
         let note = transcribedNote()
         try await notes.save(note)
+        try Data([7, 8, 9]).write(to: notes.originalAudioURL(for: note))
+        let copy = try await service.copyAudio(note.id)
+        #expect(copy.lastPathComponent == "Consegna_ giovedì_.m4a")
+        #expect(try Data(contentsOf: copy) == Data([7, 8, 9]))
+        service.discard(copy)
         let words = [Word("S1", 0, 300, "Allora,"), Word("S1", 400, 700, "la"), Word("S1", 800, 1100, "consegna"),
                      Word("S1", 1200, 1500, "slitta?"), Word("S2", 1800, 2100, "Sì,"), Word("S2", 2200, 2500, "a"),
                      Word("S2", 2600, 2900, "giovedì.")]
@@ -62,6 +67,12 @@ struct ExportServiceTests {
         try await notes.save(note)
         let audio = notes.originalAudioURL(for: note)
         try Data([1, 2, 3]).write(to: audio)
+        let copy = try await service.copyAudio(note.id)
+        #expect(copy.lastPathComponent == "Solo audio.mp3")
+        #expect(try Data(contentsOf: copy) == Data([1, 2, 3]))
+        #expect(copy != audio, "the note's own file is never shared in place")
+        service.discard(copy)
+        #expect(FileManager.default.fileExists(atPath: audio.path))
 
         await #expect(throws: ExportError.notAvailable(.afterTranscription)) {
             try await service.exportTranscript(note.id, format: .text, texts: texts)

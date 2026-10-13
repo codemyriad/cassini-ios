@@ -7,9 +7,17 @@ public struct SpeakerAnalysis: Hashable, Sendable {
     public init(turns: [SpeakerTurn], prints: [SpeakerPrint]) { self.turns = turns; self.prints = prints }
 }
 
+/// How far a model install has got.
+public enum InstallProgress: Hashable, Sendable {
+    /// The files are being fetched: the fraction done, nil while unknown.
+    case downloading(Double?)
+    /// Every file is checked before it is used ("Checking files").
+    case checking
+}
+
 public enum SpeakerAnalysisEvent: Hashable, Sendable {
-    /// Speaker models are being loaded or downloaded; the fraction is nil while unknown.
-    case preparingModels(Double?)
+    /// Speaker models are being loaded, downloaded or checked.
+    case preparingModels(InstallProgress)
     case analyzing(Double)
 }
 
@@ -35,9 +43,9 @@ public protocol SpeakerAnalyzing: Sendable {
     /// Checks the installed files again (at launch, and when Settings opens) and returns the new status.
     func refreshModelStatus() async -> ModelPartStatus
     /// Downloads and installs the models now (the model download screen's standalone Download), or joins the install
-    /// that runs, reporting the fraction done (nil while unknown). Does nothing when they are installed; a failed
-    /// install throws `SpeakerAnalysisError.download`.
-    func installModels(progress: @escaping @Sendable (Double?) -> Void) async throws
+    /// that runs, reporting how far it has got. Does nothing when they are installed; a failed install throws
+    /// `SpeakerAnalysisError.download`.
+    func installModels(progress: @escaping @Sendable (InstallProgress) -> Void) async throws
     /// Cancels the models' install that runs, if any: every caller waiting on it, an analysis or the standalone
     /// download, stops with `CancellationError`. The files fetched so far, partial ones too, stay for the next install.
     func cancelModelInstall() async

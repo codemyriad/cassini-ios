@@ -24,7 +24,7 @@ import CassiniEngineTesting
         defer { test.tearDown() }
         let note = try await seedPlainNote(in: test)
         let graph = test.graph
-        graph.settings.downloadsAllowed = true
+        graph.settings.recordConsent()
         graph.settings.identifySpeakers = false
         let outcome = await graph.processing.transcribe(note.id)
         XCTAssertEqual(outcome, .queued(changed: true))
@@ -54,7 +54,7 @@ import CassiniEngineTesting
         let seeded = try await seedPlainNotes(2, in: test)
         let running = seeded[0], paused = seeded[1]
         let graph = test.graph
-        graph.settings.downloadsAllowed = true
+        graph.settings.recordConsent()
         graph.settings.identifySpeakers = false
         let checkpoints = CheckpointFiles(notes: try XCTUnwrap(graph.library.noteStore))
         try checkpoints.save(checkpoint(of: paused, in: test, language: graph.settings.speechLanguage), for: paused.id)
@@ -90,7 +90,7 @@ import CassiniEngineTesting
         let seeded = try await seedPlainNotes(2, in: test)
         let running = seeded[0], queued = seeded[1]
         let graph = test.graph
-        graph.settings.downloadsAllowed = true
+        graph.settings.recordConsent()
         graph.settings.identifySpeakers = false
         let checkpoints = CheckpointFiles(notes: try XCTUnwrap(graph.library.noteStore))
         try checkpoints.save(pausedCheckpoint(of: queued, in: test, language: graph.settings.speechLanguage), for: queued.id)
@@ -116,7 +116,7 @@ import CassiniEngineTesting
         defer { test.tearDown() }
         let note = try await seedPlainNote(in: test)
         let graph = test.graph
-        graph.settings.downloadsAllowed = true
+        graph.settings.recordConsent()
         graph.settings.identifySpeakers = false
         let checkpoints = CheckpointFiles(notes: try XCTUnwrap(graph.library.noteStore))
         try checkpoints.save(pausedCheckpoint(of: note, in: test, language: graph.settings.speechLanguage), for: note.id)
@@ -149,7 +149,7 @@ import CassiniEngineTesting
         defer { test.tearDown() }
         let note = try await seedPlainNote(in: test)
         let graph = test.graph
-        graph.settings.downloadsAllowed = true
+        graph.settings.recordConsent()
         graph.settings.identifySpeakers = false
         let folder = try XCTUnwrap(graph.library.directory(for: note.id))
         await graph.processing.transcribe(note.id)
@@ -170,7 +170,7 @@ import CassiniEngineTesting
         defer { test.tearDown() }
         let note = try await seedPlainNote(in: test)
         let graph = test.graph
-        graph.settings.downloadsAllowed = true
+        graph.settings.recordConsent()
         graph.settings.identifySpeakers = false
         await graph.processing.transcribe(note.id)
         await waitUntil { graph.processing.progress.fraction(for: note.id) ?? 0 > 0 }
@@ -192,7 +192,7 @@ import CassiniEngineTesting
         defer { test.tearDown() }
         let note = try await seedPlainNote(in: test)
         let graph = test.graph
-        graph.settings.downloadsAllowed = true
+        graph.settings.recordConsent()
         graph.settings.identifySpeakers = false
         let checkpoints = CheckpointFiles(notes: try XCTUnwrap(graph.library.noteStore))
         var stale = checkpoint(of: note, in: test, language: graph.settings.speechLanguage)
@@ -219,7 +219,7 @@ import CassiniEngineTesting
         defer { test.tearDown() }
         let note = try await seedPlainNote(in: test)
         let graph = test.graph
-        graph.settings.downloadsAllowed = true
+        graph.settings.recordConsent()
         graph.settings.identifySpeakers = false
         graph.library.update(note.id) { $0.language = "it-IT" }
         await graph.library.settle() // The queue reads the stored note.
@@ -243,7 +243,7 @@ import CassiniEngineTesting
         defer { test.tearDown() }
         let note = try await seedPlainNote(in: test)
         let graph = test.graph
-        graph.settings.downloadsAllowed = true
+        graph.settings.recordConsent()
         graph.settings.identifySpeakers = false
         await graph.processing.transcribe(note.id)
         await waitUntil { graph.processing.progress.phase(for: note.id).map { if case .transcribing = $0 { true } else { false } } == true }
@@ -264,7 +264,7 @@ import CassiniEngineTesting
         defer { test.tearDown() }
         let note = try await seedPlainNote(in: test)
         let graph = test.graph
-        graph.settings.downloadsAllowed = true
+        graph.settings.recordConsent()
         graph.settings.identifySpeakers = false
         await graph.processing.transcribe(note.id)
         await graph.processing.coordinator?.awaitIdle()

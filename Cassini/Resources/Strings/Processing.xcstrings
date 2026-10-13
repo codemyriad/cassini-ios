@@ -375,6 +375,18 @@
         }
       }
     },
+    "This iPad is low on memory. Close other apps if transcription stops.": {
+      "comment": "The memory hint on the processing card of an iPad",
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’iPad ha poca memoria. Chiudi altre app se la trascrizione si ferma."
+          }
+        }
+      }
+    },
     "This phone is low on memory. Close other apps if transcription stops.": {
       "extractionState": "manual",
       "localizations": {

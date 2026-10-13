@@ -27,7 +27,7 @@ public enum BannerArg: String, CaseIterable, Hashable, Sendable {
 ///
 /// Not on iOS: `NO_ENCODER` (Cassini always has its Opus encoder), `TX_MEMORY` (iOS ends an app out of memory without
 /// a catchable error), `IMPORT_WAV` (AVFoundation reads every WAV) and `REC_STOPPED_FILE_LIMIT` (the capture is a CAF
-/// file without M4A's 1 GiB end). DL_DOWNLOADING and DL_CHECKING are catalogue-only (`appEmitted`). iOS only:
+/// file without M4A's 1 GiB end). iOS only:
 /// `REC_INPUT_LOST`, `REC_COMPRESSION_FAILED` and `NOTES_UNREADABLE`.
 public enum BannerKind: String, CaseIterable, Hashable, Sendable {
     // Document trust.
@@ -95,9 +95,7 @@ public enum BannerKind: String, CaseIterable, Hashable, Sendable {
     public var uses: Set<BannerArg> { entry.uses }
     /// The catalogue actions, the default of `BannerSpec.actions`; never more than two.
     public var actions: [BannerAction] { entry.actions }
-    /// False for the catalogue-only kinds the app never shows. On iOS that includes DL_DOWNLOADING and DL_CHECKING:
-    /// Apple installs its speech assets without a size or a file check of Cassini's, and the processing card shows a
-    /// job's install.
+    /// False for the catalogue-only kinds the app never shows.
     public var appEmitted: Bool { entry.appEmitted }
     /// The user can close it.
     public var dismissible: Bool { entry.dismissible }
@@ -144,10 +142,8 @@ public enum BannerKind: String, CaseIterable, Hashable, Sendable {
         case .txCheckpointMismatch: Entry(tone: .error, group: .transcription, actions: [.startOver])
         case .txFailed: Entry(tone: .error, group: .transcription, uses: [.text], actions: [.tryAgain])
 
-        case .dlDownloading:
-            Entry(tone: .info, group: .download, uses: [.part, .percent, .bytes, .bytes2], actions: [.cancel],
-                  appEmitted: false)
-        case .dlChecking: Entry(tone: .info, group: .download, uses: [.percent], appEmitted: false)
+        case .dlDownloading: Entry(tone: .info, group: .download, uses: [.part, .percent, .bytes, .bytes2], actions: [.cancel])
+        case .dlChecking: Entry(tone: .info, group: .download, uses: [.percent])
         case .dlNoConnection: Entry(tone: .error, group: .download, actions: [.retry])
         case .dlStopped: Entry(tone: .error, group: .download, uses: [.bySystem], actions: [.retry])
         case .dlNoSpace: Entry(tone: .error, group: .download, uses: [.bytes], actions: [.retry])

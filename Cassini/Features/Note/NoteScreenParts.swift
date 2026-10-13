@@ -87,14 +87,20 @@ struct FollowChipHost: View {
     }
 }
 
-/// The draft of the running job, as it grows; "Words may still change" while it does.
+/// The draft of the running job, as it grows; "Words may still change" while it does. `ProcessingBody` follows its
+/// end as the list grows.
 struct RunningDraft: View {
     let noteID: UUID
     let cache: TranscriptCache
     @Environment(JobProgress.self) private var progress
 
+    private var draft: DraftState? {
+        guard case .transcribing(_, let draft)? = progress.phase(for: noteID) else { return nil }
+        return draft
+    }
+
     var body: some View {
-        if case .transcribing(_, let draft)? = progress.phase(for: noteID), !draft.words.isEmpty {
+        if let draft, !draft.words.isEmpty {
             DraftSection(transcript: cache.draft(draft), changing: true)
         }
     }

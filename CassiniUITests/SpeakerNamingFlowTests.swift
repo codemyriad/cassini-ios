@@ -61,4 +61,23 @@ final class SpeakerNamingFlowTests: XCTestCase {
         XCTAssertTrue(app.textFields["speakerNameField"].waitForNonExistence(within: 5), "Save closes the sheet")
         XCTAssertTrue(element(app, containing: "Sam Rivera").waitForExistence(within: 5))
     }
+
+    /// Without consent for the speaker models, Identify speakers opens the model download screen, which asks for those
+    /// models alone; the Speakers sheet records no consent of its own.
+    @MainActor func testIdentifySpeakersWithoutConsentOpensTheModelDownload() {
+        let app = launchSpeakersSeed()
+        app.buttons["speakersButton"].tap()
+        let identify = app.buttons["Identify speakers"]
+        XCTAssertTrue(identify.waitForExistence(within: 5))
+        identify.tap()
+        let again = app.buttons["Analyze again"]
+        XCTAssertTrue(again.waitForExistence(within: 5))
+        again.tap()
+        XCTAssertTrue(app.staticTexts["Transcribe on this device"].waitForExistence(within: 10))
+        XCTAssertTrue(app.staticTexts["Telling speakers apart"].exists)
+        XCTAssertFalse(app.staticTexts["Speech recognition"].exists, "Identify speakers needs no speech model")
+        XCTAssertTrue(app.buttons["Download and identify speakers"].exists)
+        app.buttons["Not now — keep the audio"].tap()
+        XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 5))
+    }
 }

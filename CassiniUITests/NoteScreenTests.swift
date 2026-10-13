@@ -177,12 +177,67 @@ final class NoteScreenTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Queued"].waitForExistence(within: 10))
         app.buttons["More actions"].tap()
         app.collectionViews.buttons["Rename"].tap()
-        let field = app.textFields["recordingTitleField"]
+        let field = app.textFields["renameField"]
         XCTAssertTrue(field.waitForExistence(within: 5))
         field.tap()
         field.clearAndType("Supplier call")
         app.buttons["Save"].tap()
         XCTAssertTrue(wait("label == 'Supplier call'", app.staticTexts["noteTitle"]))
+    }
+
+    // ports: ModelDownloadFlowTest (Cancel in the processing card's download banner)
+    /// The job's model download shows its part in the card, and Cancel stops the job: the note is audio only again.
+    @MainActor func testCancelInTheCardsDownloadStopsTheJob() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed", "processing", "--model-downloading",
+                               "--open-fixture", "CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC"]
+        app.launchAndWait()
+        let banner = app.descendants(matching: .any)["banner.DL_DOWNLOADING"]
+        XCTAssertTrue(banner.waitForExistence(within: 15))
+        XCTAssertTrue(app.staticTexts["Downloading speech recognition — 46%"].exists)
+        banner.buttons["Cancel"].tap()
+        XCTAssertTrue(banner.waitForNonExistence(within: 10))
+        XCTAssertTrue(app.buttons["Transcribe"].waitForExistence(within: 10), "the note is audio only again")
+    }
+
+    // ports: ScreenBehaviourTest#newDraftTextKeepsTheProgressCardInView
+    /// New draft text scrolls the end of the draft into view below the fixed card; a scroll up stops that, and a
+    /// scroll back to the end starts it again.
+    @MainActor func testTheDraftFollowsItsEndBelowTheFixedCard() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed", "processing", "--draft-growing",
+                               "--open-fixture", "CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC"]
+        app.launchAndWait()
+        // The draft's header, its tag and its paragraphs all carry the section's identifier; the last one ends it.
+        let parts = app.descendants(matching: .any).matching(identifier: "draftTranscript")
+        XCTAssertTrue(parts.firstMatch.waitForExistence(within: 15))
+        var draft: XCUIElement { parts.element(boundBy: parts.count - 1) }
+        let window = app.windows.firstMatch.frame
+        let stop = app.buttons["Stop and keep progress"]
+        // The draft outgrows the screen; its end stays in view and so does the card.
+        XCTAssertTrue(poll(within: 30) { draft.frame.height > window.height / 2 && draft.frame.maxY <= window.maxY + 1 },
+                      "the end of the draft follows the new text")
+        XCTAssertTrue(stop.isHittable, "the card stays fixed above the draft")
+
+        draft.swipeDown()
+        XCTAssertTrue(poll(within: 10) { draft.frame.maxY > window.maxY + 100 })
+        RunLoop.current.run(until: Date().addingTimeInterval(2))
+        XCTAssertGreaterThan(draft.frame.maxY, window.maxY + 100, "after a scroll up, new text does not scroll")
+        XCTAssertTrue(stop.isHittable)
+    }
+
+    /// The note screen's Rename is the Library's dialog: Save waits for a change, and a blank title says why.
+    @MainActor func testRenameFollowsTheLibrarysRule() {
+        let app = open()
+        app.buttons["More actions"].tap()
+        app.collectionViews.buttons["Rename"].tap()
+        let field = app.textFields["renameField"]
+        XCTAssertTrue(field.waitForExistence(within: 5))
+        XCTAssertFalse(app.buttons["Save"].isEnabled, "an unchanged title is not saved")
+        field.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
+        field.clearAndType(" ")
+        XCTAssertTrue(app.staticTexts["Enter a title."].waitForExistence(within: 3))
+        XCTAssertFalse(app.buttons["Save"].isEnabled)
     }
 
     // ports: SheetBehaviourTest#aPlainNoteDisablesTextExportAndHasNoDocumentInfo

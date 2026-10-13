@@ -39,6 +39,26 @@ public struct ExportService: Sendable {
         return try write(data, named: ExportNames.file(note.title, ext: format.fileExtension))
     }
 
+    /// "Share original audio": the note's original audio byte for byte, at `<folder>/<uuid>/<ExportNames.file(title)>`
+    /// with the original's extension, as Android's Save a copy names it. The note's own file is never shared in place.
+    public func copyAudio(_ id: UUID) async throws(ExportError) -> URL {
+        guard let note = await notes.note(id) else { throw .noNote }
+        let source = notes.originalAudioURL(for: note)
+        guard FileManager.default.fileExists(atPath: source.path) else { throw .noNote }
+        let ext = source.pathExtension
+        let name = ext.isEmpty ? ExportNames.stem(note.title) : ExportNames.file(note.title, ext: ext)
+        let target = try newFolder()
+        let url = target.appendingPathComponent(name)
+        do {
+            // A clone on APFS: no second copy of a long recording's bytes.
+            try FileManager.default.copyItem(at: source, to: url)
+        } catch {
+            discardFolder(target)
+            throw .cannotSave
+        }
+        return url
+    }
+
     /// A new empty folder for one export.
     public func newFolder() throws(ExportError) -> URL {
         let url = folder.appendingPathComponent(UUID().uuidString, isDirectory: true)

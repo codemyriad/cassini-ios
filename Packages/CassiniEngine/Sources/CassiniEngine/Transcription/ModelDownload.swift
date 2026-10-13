@@ -8,31 +8,36 @@ public struct ModelPlan: Hashable, Sendable {
     public var missing: [ModelPart]
     /// Free space to have before the first byte; 0 when nothing is missing.
     public var requiredFreeBytes: Int64
+    /// The plan of a note's speakers-only job (Identify speakers): it installs the speaker models and transcribes
+    /// nothing.
+    public var speakersOnly: Bool
 
-    public init(missing: [ModelPart], requiredFreeBytes: Int64) {
+    public init(missing: [ModelPart], requiredFreeBytes: Int64, speakersOnly: Bool = false) {
         self.missing = ModelPart.allCases.filter(missing.contains)
         self.requiredFreeBytes = requiredFreeBytes
+        self.speakersOnly = speakersOnly
     }
 
     /// The plan for `missing`, asking for `speechInstallBytes` for the speech model and `speakersInstallBytes` (what
     /// the speaker models' installer checks, `SpeakerAnalyzing.modelInstallBytes`) for the speaker models, which serve
     /// telling speakers apart and recognising saved voices.
-    public init(missing: [ModelPart], speakersInstallBytes: Int64) {
+    public init(missing: [ModelPart], speakersInstallBytes: Int64, speakersOnly: Bool = false) {
         let speakers = missing.contains(.speakers) || missing.contains(.voices)
         self.init(missing: missing, requiredFreeBytes: (missing.contains(.speech) ? Self.speechInstallBytes : 0)
-                  + (speakers ? speakersInstallBytes : 0))
+                  + (speakers ? speakersInstallBytes : 0), speakersOnly: speakersOnly)
     }
 
     /// What the model download screen installs. Apple's speech model counts unless it is ready or cannot be used for
     /// the language. The speaker models count when they are not ready and either a note's job tells speakers apart
     /// (`identifySpeakers`) or there is no note: the standalone download from a Settings row installs every part that
-    /// is not ready, whatever the Speakers switch says.
+    /// is not ready, whatever the Speakers switch says. A note's speakers-only job (Identify speakers) needs the speaker
+    /// models alone.
     public static func plan(speech: ModelPartStatus, speakers: ModelPartStatus, forNote: Bool, identifySpeakers: Bool,
-                            speakersInstallBytes: Int64) -> ModelPlan {
+                            speakersOnly: Bool = false, speakersInstallBytes: Int64) -> ModelPlan {
         var missing: [ModelPart] = []
-        if speech != .ready, speech != .unsupported { missing.append(.speech) }
-        if speakers != .ready, !forNote || identifySpeakers { missing.append(.speakers) }
-        return ModelPlan(missing: missing, speakersInstallBytes: speakersInstallBytes)
+        if speech != .ready, speech != .unsupported, !speakersOnly { missing.append(.speech) }
+        if speakers != .ready, !forNote || identifySpeakers || speakersOnly { missing.append(.speakers) }
+        return ModelPlan(missing: missing, speakersInstallBytes: speakersInstallBytes, speakersOnly: speakersOnly)
     }
 
     public var isEmpty: Bool { missing.isEmpty }
@@ -51,7 +56,7 @@ public struct ModelPlan: Hashable, Sendable {
     func usableBytes() async -> Int64
     /// Agrees to downloading `parts`.
     func recordConsent(for parts: [ModelPart])
-    /// "Not now — keep the audio".
+    /// "Not now — keep the audio" for a plan with the speech model: no automatic transcription asks again.
     func recordDeclined()
     /// Puts the note in the queue again with its job's kind.
     @discardableResult func transcribe(_ noteID: UUID) async -> TranscribeOutcome
@@ -63,15 +68,16 @@ public struct ModelPlan: Hashable, Sendable {
     func askNotifications() async
 }
 
-/// The model download screen ("Transcribe on this device"). With a note it offers "Download and transcribe", without
-/// one a standalone "Download".
+/// The model download screen ("Transcribe on this device"). With a note it offers "Download and transcribe" (for a
+/// speakers-only job "Download and identify speakers"), without one a standalone "Download".
 ///
 /// - The plan is read when the screen opens. When nothing is missing (a stale entry) the screen closes itself, putting
 ///   its note in the queue first.
 /// - Download checks the free space first; when it is short the screen shows "Not enough storage" with Retry and
 ///   records no consent. Then notifications are asked for once, the consent is recorded, the note is queued (or the
 ///   standalone download starts), and the screen closes.
-/// - "Not now — keep the audio" records the refusal and closes. Close only closes.
+/// - "Not now — keep the audio" records the refusal of the speech model when the plan has it, and closes; declining
+///   the speaker models alone refuses nothing for later transcriptions. Close only closes.
 @MainActor @Observable
 public final class ModelDownloadModel {
     public enum Effect: Hashable, Sendable {
@@ -100,6 +106,9 @@ public final class ModelDownloadModel {
     /// "Download and transcribe" with a note, else "Download".
     public var withNote: Bool { noteID != nil }
 
+    /// "Download and identify speakers": the note's job is speakers-only.
+    public var identifiesSpeakers: Bool { withNote && plan?.speakersOnly == true }
+
     /// Reads the plan once the screen is shown.
     public func load() async {
         let plan = await ports.plan(for: noteID)
@@ -127,7 +136,7 @@ public final class ModelDownloadModel {
 
     public func notNow() {
         guard !closing else { return }
-        ports.recordDeclined()
+        if plan?.missing.contains(.speech) == true { ports.recordDeclined() }
         close()
     }
 
