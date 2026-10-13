@@ -10,11 +10,11 @@
 #
 # It builds through `scripts/test.sh build` and runs the tests on simulator clones of its own (<prefix>-shots-iphone and
 # <prefix>-shots-ipad, which `scripts/test.sh clean` deletes). The device gets the appearance and the region (en_US or
-# it_IT), and its status bar is pinned: 9:41, a full battery that is not charging, full Wi-Fi and cellular bars. The
-# tests launch the app with the UI-test clock, named seeds and the same language and region, and attach each shot under
-# the name it is saved as. The attachments are exported from the result bundle with `xcrun xcresulttool export
-# attachments`, mapped by name, scaled to at most 1200 px (sips) and quantised with pngquant when it is installed. A
-# full run removes the PNGs of the set that it no longer makes.
+# it_IT), and its status bar is pinned: Thursday 8 October, 9:41, a full battery that is not charging, full Wi-Fi and
+# cellular bars. The tests launch the app with the UI-test clock, named seeds and the same language and region, and
+# attach each shot under the name it is saved as. The attachments are exported from the result bundle with
+# `xcrun xcresulttool export attachments`, mapped by name, scaled to at most 1200 px (sips) and quantised with pngquant
+# when it is installed. A full run removes the PNGs of the set that it no longer makes.
 #
 #   docs/screenshots/{light,dark}/NN-name.png        iPhone
 #   docs/screenshots/ipad/{light,dark}/NN-name.png   iPad, the split view in landscape and portrait
@@ -113,7 +113,10 @@ for device in $devices; do
         xcrun simctl shutdown "$udid"
         xcrun simctl bootstatus "$udid" -b > /dev/null
     fi
-    xcrun simctl status_bar "$udid" override --time 9:41 --dataNetwork wifi --wifiMode active --wifiBars 3 \
+    # An ISO date also sets the iPad's date: the UI-test clock's Thursday 8 October 2026, 9:41 in the Mac's time zone,
+    # which the simulator shares.
+    now=$(date -u -r "$(date -j -f "%Y-%m-%dT%H:%M:%S" "2026-10-08T09:41:00" "+%s")" "+%Y-%m-%dT%H:%M:%S.000Z")
+    xcrun simctl status_bar "$udid" override --time "$now" --dataNetwork wifi --wifiMode active --wifiBars 3 \
         --cellularMode active --cellularBars 4 --operatorName "" --batteryState discharging --batteryLevel 100
     for appearance in $appearances; do
         echo "  $appearance"

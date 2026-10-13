@@ -104,9 +104,9 @@ enum TestFixtures {
         }
         notes = [main, walk(now: now)] + notes
         switch seed {
-        case .library, .recording, .voices, .speakers, .reading:
+        case .library, .recording, .voices, .speakers:
             break
-        case .search:
+        case .search, .reading:
             notes += [transcribed("Garden plans for the spring", at: now.addingTimeInterval(-3 * 86_400),
                                   "We could move the tomatoes to the sunny corner and leave Thursday free for planting."),
                       transcribed("Notes from the design review", at: now.addingTimeInterval(-9 * 86_400),
