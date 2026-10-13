@@ -48,7 +48,9 @@ struct ProcessingBody<Top: View, Banners: View>: View {
                 if new > old { contentGrew() }
             }
             .onScrollPhaseChange { old, new in
-                // A scroll the user made has ended; one Cassini made (to the end) leaves following as it was.
+                // A scroll the user made starts and ends; one Cassini made (to the end) leaves following as it was.
+                // While the user's scroll runs, new text does not scroll, so it never turns into Cassini's scroll.
+                if new == .interacting { follow.scrollBegan() }
                 if new == .idle, old == .interacting || old == .decelerating { follow.scrollEnded(atEnd: atEnd) }
             }
         }
@@ -61,9 +63,9 @@ struct ProcessingBody<Top: View, Banners: View>: View {
             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { topHeight = $0 }
     }
 
-    /// Taller content: to the end, while the draft sticks to it.
+    /// Taller content: to the end, while the draft sticks to it and the user is not scrolling.
     private func contentGrew() {
-        guard follow.sticks else { return }
+        guard follow.followsNewText else { return }
         withAnimation(reduceMotion ? nil : .default) { position.scrollTo(edge: .bottom) }
     }
 }

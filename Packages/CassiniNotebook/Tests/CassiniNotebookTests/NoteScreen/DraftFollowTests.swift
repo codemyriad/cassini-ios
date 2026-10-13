@@ -12,6 +12,18 @@ import CassiniNotebook
         #expect(follow.sticks)
     }
 
+    @Test func newTextDuringAScrollByTheUserDoesNotScroll() {
+        var follow = DraftFollow()
+        #expect(follow.followsNewText)
+        follow.scrollBegan()
+        #expect(!follow.followsNewText, "a drag or its deceleration is not interrupted")
+        follow.scrollEnded(atEnd: false)
+        #expect(!follow.followsNewText)
+        follow.scrollBegan()
+        follow.scrollEnded(atEnd: true)
+        #expect(follow.followsNewText)
+    }
+
     // ports: ScreenBehaviourTest#newDraftTextKeepsTheProgressCardInViewOnA16By9Phone (the 160 dp draft space)
     @Test func theCardStaysFixedWhileTheDraftKeeps160Points() {
         #expect(DraftFollow.pinsCard(area: 0, card: 400), "fixed before the first measurement")

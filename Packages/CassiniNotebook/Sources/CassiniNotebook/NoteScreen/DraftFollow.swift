@@ -1,5 +1,6 @@
 /// Auto-follow of the running job's draft (Android `DraftList`): new text scrolls the end of the draft into view while
-/// it sticks to the end. A scroll that ends above the end stops it, and a scroll back to the end starts it again.
+/// it sticks to the end and no scroll by the user is under way. A scroll that ends above the end stops it, and a scroll
+/// back to the end starts it again.
 /// Opening the screen does not scroll. The progress card stays fixed above the draft while at least `minDraftSpace`
 /// is left for the draft below it (about six draft lines); otherwise card and draft scroll together.
 public struct DraftFollow: Hashable, Sendable {
@@ -9,10 +10,22 @@ public struct DraftFollow: Hashable, Sendable {
     /// New text scrolls to the end.
     public private(set) var sticks = true
 
+    /// A scroll by the user is under way (dragging or decelerating): new text leaves it alone.
+    public private(set) var userScrolling = false
+
     public init(sticks: Bool = true) { self.sticks = sticks }
 
+    /// Whether new text scrolls to the end now.
+    public var followsNewText: Bool { sticks && !userScrolling }
+
+    /// A scroll by the user started.
+    public mutating func scrollBegan() { userScrolling = true }
+
     /// A scroll by the user ended, at the end of the draft or above it.
-    public mutating func scrollEnded(atEnd: Bool) { sticks = atEnd }
+    public mutating func scrollEnded(atEnd: Bool) {
+        sticks = atEnd
+        userScrolling = false
+    }
 
     /// Whether the card stays fixed above the draft, in an `area` that tall with a card `card` tall (margins included).
     /// Before the first measurement (`area` 0) it is fixed.
