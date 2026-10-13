@@ -19,10 +19,14 @@ final class TextLimitTests: XCTestCase {
         field.coordinate(withNormalizedOffset: CGVector(dx: 0.98, dy: 0.5)).tap()
         let count = (field.value as? String)?.count ?? 0
         field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: count + 2))
-        field.typeText(String(repeating: "a", count: limit + 1))
-        XCTAssertEqual(field.value as? String, String(repeating: "a", count: limit), file: file, line: line)
+        let full = String(repeating: "a", count: limit)
+        field.typeText(full + "a")
+        // The field cuts what goes past the limit as it changes, a moment after the typing on a busy machine.
+        _ = field.wait(until: NSPredicate(format: "value == %@", full), within: 3)
+        XCTAssertEqual(field.value as? String, full, file: file, line: line)
         field.typeText("x")
-        XCTAssertEqual(field.value as? String, String(repeating: "a", count: limit), file: file, line: line)
+        _ = field.wait(until: NSPredicate(format: "value == %@", full), within: 3)
+        XCTAssertEqual(field.value as? String, full, file: file, line: line)
     }
 
     // ports: TextLimitBehaviourTest#theVoiceRenameStopsAtTheNameLimit

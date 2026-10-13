@@ -199,10 +199,14 @@ final class LibraryUITests: XCTestCase {
         let app = launch()
         let field = openRename(app, "Thoughts from the morning walk")
         clear(field)
-        field.typeText(String(repeating: "a", count: 201))
-        XCTAssertEqual(field.value as? String, String(repeating: "a", count: 200))
+        let full = String(repeating: "a", count: 200)
+        field.typeText(full + "a")
+        // The field cuts what goes past the limit as it changes, a moment after the typing on a busy machine.
+        _ = field.wait(until: NSPredicate(format: "value == %@", full), within: 3)
+        XCTAssertEqual(field.value as? String, full)
         field.typeText("x")
-        XCTAssertEqual(field.value as? String, String(repeating: "a", count: 200))
+        _ = field.wait(until: NSPredicate(format: "value == %@", full), within: 3)
+        XCTAssertEqual(field.value as? String, full)
         app.buttons["Save"].tap()
         XCTAssertTrue(row(app, String(repeating: "a", count: 200) + ",").waitForExistence(within: 5))
     }

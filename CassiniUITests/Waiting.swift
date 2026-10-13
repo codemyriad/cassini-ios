@@ -37,7 +37,25 @@ extension XCUIApplication {
     /// Launches and waits until the app's launch work is done: the seed written, the library read and any fixture note
     /// opened. A step taken before that, on a busy machine, could find an empty screen.
     @MainActor func launchAndWait(file: StaticString = #filePath, line: UInt = #line) {
+        Self.settleInstall()
         launch()
         XCTAssertTrue(staticTexts["launchFinished"].waitForExistence(within: 30), "the launch did not finish", file: file, line: line)
+    }
+
+    @MainActor private static var installSettled = false
+
+    /// xcodebuild installs the app while the test runner starts, so the runner's first launch can meet that install:
+    /// the launch fails, or the app it reaches is ended under it. Once per runner, before the first test's own launch,
+    /// a launch whose problems are expected lets the install finish.
+    @MainActor private static func settleInstall() {
+        guard !installSettled else { return }
+        installSettled = true
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing", "--reset-test-data"]
+        XCTExpectFailure("the first launch can meet xcodebuild's install of the app", options: .nonStrict()) {
+            app.launch()
+            _ = app.staticTexts["launchFinished"].waitForExistence(within: 15)
+            app.terminate()
+        }
     }
 }
