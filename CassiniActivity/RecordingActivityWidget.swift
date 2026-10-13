@@ -43,12 +43,6 @@ struct RecordingActivityWidget: Widget {
     }
 }
 
-enum RecordingActivityColors {
-    static let background = Color(red: 0.075, green: 0.12, blue: 0.14)
-    static let live = Color(red: 0.98, green: 0.49, blue: 0.30)
-    static let finish = Color(red: 0.78, green: 0.24, blue: 0.12)
-}
-
 private struct LockScreenRecording: View {
     let state: RecordingActivityState
     let noteID: UUID
@@ -59,7 +53,7 @@ private struct LockScreenRecording: View {
                 StatusDot(isPaused: state.isPaused)
                 VStack(alignment: .leading, spacing: 2) {
                     (state.isPaused ? Text("Recording paused", tableName: "Recording") : Text("Recording", tableName: "Recording"))
-                        .font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.7))
+                        .font(.caption.weight(.semibold)).foregroundStyle(RecordingActivityColors.secondary)
                     Text(state.title).font(.headline).lineLimit(1).foregroundStyle(.white)
                 }
                 Spacer(minLength: 8)
@@ -90,7 +84,7 @@ private struct StatusDot: View {
     var body: some View {
         Group {
             if isPaused {
-                Circle().strokeBorder(.white.opacity(0.7), lineWidth: 1.5)
+                Circle().strokeBorder(RecordingActivityColors.secondary, lineWidth: 1.5)
             } else {
                 Circle().fill(RecordingActivityColors.live)
             }
@@ -134,7 +128,7 @@ private struct RecordingButtons: View {
             .tint(RecordingActivityColors.finish)
         }
         .buttonStyle(.borderedProminent)
-        .tint(.white.opacity(0.18))
+        .tint(RecordingActivityColors.button)
         .font(.subheadline.weight(.semibold))
         .foregroundStyle(.white)
     }

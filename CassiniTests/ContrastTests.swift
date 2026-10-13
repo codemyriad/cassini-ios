@@ -29,6 +29,8 @@ import Testing
         Pair(label: label, minimum: nonText, foreground: foreground, background: background)
     }
 
+    static let groupedRow = Color(uiColor: .secondarySystemGroupedBackground)
+
     static let tones: [(String, Tone)] = [("ok", .ok), ("info", .info), ("warn", .warn), ("error", .error), ("plain", .plain)]
     static let surfaces: [(String, Color)] = [("paper", .paper), ("card", .card)]
 
@@ -61,7 +63,20 @@ import Testing
             text("white on recording finish", .white, on: .recordingFinish),
             nonText("recording live dot on recording background", .recordingLive, on: .recordingBackground),
             nonText("info bar on its track", Tone.info.color, on: .paper, Tone.info.background, Tone.info.color.opacity(0.18)),
+            text("ink on Name this speaker's question at its pulse (warn 30 % on paper)", .ink, on: .paper, Color.toneWarn.opacity(0.3)),
+            text("ink on Name this speaker's question (warn 10 % on paper)", .ink, on: .paper, Color.toneWarn.opacity(0.1)),
+            text("Live Activity caption on its card", RecordingActivityColors.secondary, on: RecordingActivityColors.background),
+            text("Live Activity title on its card", .white, on: RecordingActivityColors.background),
+            text("Live Activity warning on its card", RecordingActivityColors.live, on: RecordingActivityColors.background),
+            text("Live Activity Pause on its card", .white, on: RecordingActivityColors.background, RecordingActivityColors.button),
+            text("Live Activity Finish", .white, on: RecordingActivityColors.finish),
+            nonText("Live Activity live dot on its card", RecordingActivityColors.live, on: RecordingActivityColors.background),
+            nonText("Live Activity paused ring on its card", RecordingActivityColors.secondary, on: RecordingActivityColors.background),
         ]
+        // The rows of the grouped lists (Settings, the sheets) keep the system's row background.
+        for (name, color) in [("ink", Color.ink), ("muted", .muted), ("ember", .ember), ("error", .toneError)] {
+            pairs.append(text("\(name) on a grouped list row", color, on: Self.groupedRow))
+        }
         for (name, tone) in tones {
             for (surface, color) in surfaces {
                 pairs.append(text("\(name) on \(name) tint over \(surface)", tone.color, on: color, tone.background))
@@ -94,6 +109,7 @@ import Testing
         let paper = Self.rgb(.paper, .dark)
         #expect(abs(paper.red - 0.075) < 0.002 && abs(paper.blue - 0.095) < 0.002)
         #expect(Self.rgb(.ink, .light) != Self.rgb(.ink, .dark))
+        #expect(Self.rgb(Self.groupedRow, .light) != Self.rgb(Self.groupedRow, .dark), "a system colour follows the appearance")
     }
 
     // MARK: WCAG

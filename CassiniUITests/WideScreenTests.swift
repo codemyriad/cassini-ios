@@ -1,8 +1,12 @@
 import XCTest
 
 /// On a window wider than 560 pt (iPad, here in landscape beside the Library), each screen caps its content at 560 pt
-/// and centres it in its column, while its background fills the column.
+/// and centres it in its column, while its background fills the column. The Library itself is the iPad's sidebar,
+/// narrower than the cap, and Transcribing is the Note screen's processing mode, whose layout the note test covers.
 // ports: WideScreenTest#readAndListen
+// ports: WideScreenTest#recording
+// ports: WideScreenTest#modelDownload
+// ports: WideScreenTest#savedVoices
 // ports: WideScreenTest#settings
 // ports: WideScreenTest#trash
 // ports: DialogLandscapeTest#theScrimCoversAWideWindow (the Rename form stays within its 560 pt band in landscape)
@@ -56,6 +60,41 @@ final class WideScreenTests: XCTestCase {
         app.buttons["Settings"].tap()
         let language = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "App language")).firstMatch
         assertCentred([language], in: detailColumn(app))
+    }
+
+    /// Recording covers the whole window.
+    @MainActor func testIPadRecordingIsCappedAndCentred() throws {
+        let app = try launch(["--seed", "recording"])
+        XCTAssertTrue(app.buttons["recordButton"].waitForExistence(within: 10))
+        app.buttons["recordButton"].tap()
+        XCTAssertTrue(app.buttons["Pause recording"].waitForEnabled(within: 8))
+        assertCentred([app.descendants(matching: .any)["recordingTitle"], app.buttons["pauseResumeRecording"], app.buttons["finishRecording"]],
+                      in: app.windows.firstMatch.frame)
+    }
+
+    @MainActor func testIPadModelDownloadIsCappedAndCentred() throws {
+        let app = try launch(["--seed", "library", "--models-missing"])
+        let row = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Thoughts from the morning walk")).firstMatch
+        XCTAssertTrue(row.waitForExistence(within: 5))
+        for _ in 0..<3 where !row.isHittable { app.swipeUp() }
+        row.tap()
+        XCTAssertTrue(app.buttons["Transcribe"].waitForExistence(within: 5))
+        app.buttons["Transcribe"].tap()
+        let title = app.staticTexts["Transcribe on this device"]
+        XCTAssertTrue(title.waitForExistence(within: 5))
+        assertCentred([title, app.staticTexts["Speech recognition"], app.buttons["Download and transcribe"]], in: detailColumn(app))
+    }
+
+    @MainActor func testIPadSavedVoicesAreCappedAndCentred() throws {
+        let app = try launch(["--seed", "voices"])
+        app.buttons["Settings"].tap()
+        let row = app.buttons["savedVoicesRow"]
+        XCTAssertTrue(row.waitForExistence(within: 5))
+        for _ in 0..<6 where !row.isHittable { app.swipeUp() }
+        row.tap()
+        let person = app.buttons["Options for Alex Moreau"]
+        XCTAssertTrue(person.waitForExistence(within: 5))
+        assertCentred([person, app.buttons["forgetEveryone"]], in: detailColumn(app))
     }
 
     @MainActor func testIPadRenameStaysInItsBandInLandscape() throws {

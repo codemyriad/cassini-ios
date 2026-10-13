@@ -74,9 +74,14 @@ final class AccessibilityAuditTests: XCTestCase {
     @MainActor private func audit(_ app: XCUIApplication, _ types: XCUIAccessibilityAuditType = .all.subtracting([.contrast, .dynamicType]),
                                   file: StaticString = #filePath, line: UInt = #line) {
         var issues: [String] = []
+        var titleClipped = false
         do {
             try app.performAccessibilityAudit(for: types) { issue in
-                if !AuditFilter.isSystemOwned(issue, in: app) { issues.append(AuditFilter.describe(issue)) }
+                if AuditFilter.isNavigationTitle(issue, in: app, alreadySeen: titleClipped) {
+                    titleClipped = true
+                } else if !AuditFilter.isSystemOwned(issue) {
+                    issues.append(AuditFilter.describe(issue))
+                }
                 return true
             }
         } catch {
@@ -122,28 +127,23 @@ final class AccessibilityAuditTests: XCTestCase {
 
 /// Issues the audit reports that the app cannot or should not change, each for a stated reason.
 enum AuditFilter {
-    /// The bars that stop growing at AX1 by design and show the Large Content Viewer instead: the player and the
-    /// capture bar (five or two buttons in a row that would not fit past it).
-    static let cappedBars = ["playbackBar", "captureBar"]
-
-    @MainActor static func isSystemOwned(_ issue: XCUIAccessibilityAuditIssue, in app: XCUIApplication) -> Bool {
-        // Text clipping reported without an element is the system's own (the navigation bar title at AX5, which iOS
-        // shrinks to fit beside the bar buttons); every text of the app's views comes with its element.
-        guard let element = issue.element else { return issue.auditType == .textClipped }
+    @MainActor static func isSystemOwned(_ issue: XCUIAccessibilityAuditIssue) -> Bool {
+        guard let element = issue.element else { return false }
         // The status bar and the keyboard belong to the system.
         if [.statusBar, .key, .keyboard].contains(element.elementType) { return true }
         // The UI-test launch marker, an invisible 1 pt text that only DEBUG builds draw.
         if element.identifier == "launchFinished" { return true }
         // A Library row's preview is an excerpt of two lines by design (Android maxLines = 2).
         if issue.auditType == .textClipped, element.identifier == "rowPreview" { return true }
-        if issue.auditType == .dynamicType {
-            // Navigation bars keep their size at every text size; their items show the Large Content Viewer.
-            let bars = app.navigationBars.allElementsBoundByIndex.map(\.frame)
-            if bars.contains(where: { $0.contains(element.frame) }) { return true }
-            let capped = cappedBars.map { app.descendants(matching: .any)[$0] }.filter(\.exists).map(\.frame)
-            if capped.contains(where: { $0.contains(element.frame) }) { return true }
-        }
         return false
+    }
+
+    /// The one clipping a screen's navigation bar title may report at AX5: iOS shrinks the title to fit beside the bar
+    /// buttons, and the audit reports that without an element. Every text of the app's own views comes with its
+    /// element, so only the first such issue, on a screen that shows a navigation bar, passes; a second is the app's.
+    @MainActor static func isNavigationTitle(_ issue: XCUIAccessibilityAuditIssue, in app: XCUIApplication,
+                                             alreadySeen: Bool) -> Bool {
+        issue.element == nil && issue.auditType == .textClipped && !alreadySeen && app.navigationBars.firstMatch.exists
     }
 
     @MainActor static func describe(_ issue: XCUIAccessibilityAuditIssue) -> String {
