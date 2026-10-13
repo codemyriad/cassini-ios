@@ -40,6 +40,9 @@ final class ScreenshotTests: XCTestCase {
         let headline = app.descendants(matching: .any)["progressHeadline"]
         XCTAssertTrue(headline.wait(until: NSPredicate(format: "label CONTAINS %@", "%"), within: 15))
         XCTAssertTrue(element(app, containing: "agenda").waitForExistence(within: 10), "the draft so far shows")
+        // The job's paced results give it a time left a few seconds in.
+        let timeLeft = app.descendants(matching: .any).matching(identifier: "timeLeftStat").firstMatch
+        XCTAssertTrue(timeLeft.wait(until: NSPredicate(format: "label CONTAINS %@", "min"), within: 15), timeLeft.label)
         // The draft follows its end as it arrives; back at its start, its header shows under the card.
         let parts = app.descendants(matching: .any).matching(identifier: "draftTranscript")
         let header = parts.element(boundBy: 0), draft = parts.element(boundBy: parts.count - 1)
@@ -181,11 +184,20 @@ final class ScreenshotTests: XCTestCase {
         app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", text)).firstMatch
     }
 
-    /// The whole screen, status bar included, under the name `scripts/screenshots.sh` saves it as.
+    /// The whole screen, status bar included, under the name `scripts/screenshots.sh` saves it as. A landscape
+    /// screenshot comes as portrait pixels with an orientation tag, which is drawn into the pixels here so the saved
+    /// PNG is landscape whatever reads or strips its metadata.
     @MainActor private func capture(_ name: String) {
-        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        let attachment = XCTAttachment(image: upright(XCUIScreen.main.screenshot().image))
         attachment.name = name
         attachment.lifetime = .keepAlways
         add(attachment)
+    }
+
+    private func upright(_ image: UIImage) -> UIImage {
+        guard image.imageOrientation != .up else { return image }
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = image.scale
+        return UIGraphicsImageRenderer(size: image.size, format: format).image { _ in image.draw(at: .zero) }
     }
 }
