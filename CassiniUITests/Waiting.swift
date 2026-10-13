@@ -51,10 +51,11 @@ extension XCUIElement {
         let length = current == placeholder ? 0 : current.count
         if length > 0 { typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: length + 2)) }
         UIPasteboard.general.string = text
-        typeKey("v", modifierFlags: .command)
-        // The field may cut what is pasted to its limit.
-        let pasted = poll(within: 2) { ((value as? String).map { $0.count > 1 && text.hasPrefix($0) }) ?? false }
-        guard !pasted else { return }
+        // The field may cut what is pasted to its limit. The first paste of a runner often does not land.
+        for _ in 0..<2 {
+            typeKey("v", modifierFlags: .command)
+            if poll(within: 1, { ((value as? String).map { $0.count > 1 && text.hasPrefix($0) }) ?? false }) { return }
+        }
         let left = (value as? String).map { $0 == placeholder ? 0 : $0.count } ?? 0
         if left > 0 { typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: left + 2)) }
         typeText(text)
