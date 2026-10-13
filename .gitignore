@@ -1,6 +1,8 @@
 .DS_Store
 .build/
-DerivedData/
+# DerivedData is a link to DerivedData.noindex, which Spotlight skips.
+DerivedData
+DerivedData.noindex/
 *.xcuserstate
 xcuserdata/
 .build-logs/

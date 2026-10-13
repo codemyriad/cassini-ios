@@ -23,9 +23,7 @@ final class LibraryUITests: XCTestCase {
     /// The row titled `title`, scrolled to when the list has not built it yet or it is under the bottom bar.
     @MainActor private func scrolledRow(_ app: XCUIApplication, _ title: String) -> XCUIElement {
         let element = row(app, title), bar = app.buttons["recordButton"]
-        for _ in 0..<8 where !(element.exists && element.isHittable && element.frame.maxY <= bar.frame.minY) {
-            list(app).swipeUp()
-        }
+        list(app).scroll { element.exists && element.isHittable && element.frame.maxY <= bar.frame.minY }
         return element
     }
 
@@ -55,7 +53,17 @@ final class LibraryUITests: XCTestCase {
             ("Thoughts from the morning walk", ", audio only"),
         ]
         capture("Library statuses")
+        // Each row's label as the list shows it, read a screen at a time: a swipe only when a row is still missing.
+        var shown: [String: String] = [:]
+        list(app).scroll {
+            for label in labels(in: app, identifier: "noteRow") {
+                for (title, _) in rows where label.hasPrefix(title) { shown[title] = label }
+            }
+            return shown.count == rows.count
+        }
         for (title, status) in rows {
+            if let label = shown[title], label.contains(status) { continue }
+            // Not read yet with its status (the list was still filling in): the row itself, waited for.
             let element = scrolledRow(app, title)
             XCTAssertTrue(element.waitForExistence(within: 10), title)
             XCTAssertTrue(waitFor(element, label: status), "\(title): \(element.label)")
@@ -66,7 +74,7 @@ final class LibraryUITests: XCTestCase {
     @MainActor func testResumeAndTryAgainQueueTheNote() {
         let app = launch(["--seed", "statuses"])
         let resume = app.buttons["Resume transcribing Paused standup"]
-        for _ in 0..<4 where !resume.isHittable { list(app).swipeUp() }
+        list(app).scroll(attempts: 4) { resume.exists && resume.isHittable }
         XCTAssertTrue(resume.waitForExistence(within: 10))
         XCTAssertGreaterThanOrEqual(resume.frame.height, 44, "a 44 pt target")
         resume.tap()
@@ -207,6 +215,7 @@ final class LibraryUITests: XCTestCase {
         let field = openRename(app, "Thoughts from the morning walk")
         clear(field)
         let full = String(repeating: "a", count: 200)
+        // Typed, not pasted: after a paste here the sheet's Save sometimes did not answer the next tap.
         field.typeText(full + "a")
         // The field cuts what goes past the limit as it changes, a moment after the typing on a busy machine.
         _ = field.wait(until: NSPredicate(format: "value == %@", full), within: 3)
@@ -228,23 +237,19 @@ final class LibraryUITests: XCTestCase {
         let last = row(app, "Thoughts from the morning walk")
         // Up to the end of the list: once the last row is built, until a swipe no longer moves it.
         var previous = CGRect.null
-        for _ in 0..<20 {
-            list(app).swipeUp()
-            guard last.exists else { continue }
-            if last.frame == previous { break }
-            previous = last.frame
+        list(app).scroll(attempts: 20, fast: true) {
+            guard last.exists else { return false }
+            defer { previous = last.frame }
+            return last.frame == previous
         }
         XCTAssertTrue(last.waitForExistence(within: 5))
         let record = app.buttons["recordButton"]
         XCTAssertLessThanOrEqual(last.frame.maxY, record.frame.minY, "row \(last.frame) under the bar \(record.frame)")
     }
 
-    /// The long-press menu: Start over and a Transcribe again that replaces the versions ask first, and Export and
-    /// Document info open the note, which starts them.
+    /// The long-press menu: Start over and a Transcribe again that replaces the versions ask first.
     // ports: LibraryBehaviourTest#theConfirmationsOfTheSheetRows
-    // ports: LibraryBehaviourTest#theSubtitleChooserExportsTheNote
-    // ports: LibraryBehaviourTest#documentInfoOpensAsADialog
-    @MainActor func testTheActionsMenuConfirmsAndOpensTheNoteForItsExports() {
+    @MainActor func testTheActionsMenuAsksBeforeStartingOverOrReplacingTheVersions() {
         let app = launch(["--seed", "statuses"])
         let paused = scrolledRow(app, "Paused standup")
         XCTAssertTrue(paused.waitForExistence(within: 10))
@@ -269,27 +274,34 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(fresh.waitForExistence(within: 5), "a document whose versions can't be kept asks first")
         fresh.buttons["Cancel"].tap()
         XCTAssertTrue(waitFor(row(app, "Damaged document"), label: ", can’t read transcript"))
+    }
 
-        // Back up the list to the note, which is above the damaged one.
-        let note = row(app, "A quieter kind of productivity")
-        for _ in 0..<8 where !(note.exists && note.isHittable) { list(app).swipeDown() }
+    /// Export in the long-press menu opens the note, which runs the export: the share sheet offers the subtitles.
+    // ports: LibraryBehaviourTest#theSubtitleChooserExportsTheNote
+    @MainActor func testTheActionsMenuExportOpensTheNoteWhichSharesTheSubtitles() {
+        let app = launch(["--seed", "statuses"])
+        let note = scrolledRow(app, "A quieter kind of productivity")
         XCTAssertTrue(note.waitForExistence(within: 5))
         note.press(forDuration: 1)
         app.buttons["Export"].tap()
         app.buttons["Subtitles · .vtt"].tap()
         XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 5))
         XCTAssertEqual(app.staticTexts["noteTitle"].label, "A quieter kind of productivity")
-        // The note runs the export it was opened for: the share sheet offers the subtitles.
         let shareSheet = app.otherElements["ActivityListView"]
         XCTAssertTrue(shareSheet.waitForExistence(within: 10), "the note shares the exported subtitles")
         // iOS 27 sometimes draws the sheet's Close in a floating bar outside the activity list, and the sheet's
-        // contents come from another process a moment after the sheet itself.
+        // contents come from another process a moment after the sheet itself: on a clone just booted, many seconds.
         let close = app.buttons["Close"].firstMatch
-        XCTAssertTrue(close.waitForExistence(within: 10))
+        XCTAssertTrue(close.waitForExistence(within: 30))
         close.tap()
         XCTAssertTrue(shareSheet.waitForNonExistence(within: 5))
-        app.navigationBars.buttons.element(boundBy: 0).tap()
+    }
 
+    /// Document info in the long-press menu opens the note, which shows it.
+    // ports: LibraryBehaviourTest#documentInfoOpensAsADialog
+    @MainActor func testTheActionsMenuDocumentInfoOpensTheNote() {
+        let app = launch(["--seed", "statuses"])
+        let note = scrolledRow(app, "A quieter kind of productivity")
         XCTAssertTrue(note.waitForExistence(within: 5))
         note.press(forDuration: 1)
         app.buttons["Document info"].tap()

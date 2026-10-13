@@ -48,14 +48,17 @@ This is a working first iOS implementation, not an App Store release or complete
 ## Verify
 
 ```sh
-scripts/test.sh fast   # the Swift package tests (swift test)
-scripts/test.sh app    # build for testing, then the hosted unit tests (CassiniTests)
-scripts/test.sh ui     # build for testing, then the UI tests across simulator clones
-scripts/test.sh all    # all three; prints the time of each step
-scripts/test.sh clean  # delete this worktree's simulator clones
+scripts/test.sh fast     # the Swift package tests (swift test)
+scripts/test.sh app      # build for testing, then the hosted unit tests (CassiniTests)
+scripts/test.sh ui       # build for testing, then the UI tests across simulator clones
+scripts/test.sh all      # all three (swift test beside the build); prints the time of each step
+scripts/test.sh changed  # only what the changes since main touch (or since a base: changed <ref>)
+scripts/test.sh clean    # delete this worktree's simulator clones
 ```
 
-The script builds once and runs the tests from that build. It keeps its simulator clones (`ts-<worktree>-iphone-N`, and an iPad for the `testIPad*` tests, or for all of them with `CASSINI_UI_IPAD=all`) booted for the next run and splits the UI tests across up to three of them, fewer when memory is short (`CASSINI_UI_WORKERS` sets the number). Builds stay in the worktree's `DerivedData`; package checkouts are shared between worktrees in `.test-cache` beside the main checkout. Arguments after the tier go to xcodebuild, for example `scripts/test.sh ui -only-testing:CassiniUITests/NoteScreenTests`. `scripts/test-remote.sh [tier]` runs a tier on the Mac named by `CASSINI_MAC`.
+The script builds once and runs the tests from that build. It keeps its simulator clones (`ts-<worktree>-iphone-N`, and an iPad for the `testIPad*` tests, or for all of them with `CASSINI_UI_IPAD=all`) booted for the next run and splits the UI tests across up to three of them, fewer when memory is short (`CASSINI_UI_WORKERS` sets the number), balanced by each test's last measured time. Booted clones of other worktrees that no xcodebuild has used for 15 minutes are shut down (not deleted) first. A test run that has not started a test after a minute and a half (hosted) or three minutes (UI), or whose runner failed to launch, is tried once more. Builds stay in the worktree's `DerivedData.noindex` (`DerivedData` links to it), which Spotlight skips; package checkouts are shared between worktrees in `.test-cache` beside the main checkout. Arguments after the tier go to xcodebuild, for example `scripts/test.sh ui -only-testing:CassiniUITests/NoteScreenTests`, which shards that class. `scripts/test-remote.sh [tier]` runs a tier on the Mac named by `CASSINI_MAC`.
+
+On an idle 10-core Mac a warm `scripts/test.sh all` takes about two and a half minutes with three shards and about four and a half with one.
 
 The original `CassiniCore` format library and its conformance tests are preserved. The zlib shim is a normal C target so Xcode can link shared package products into the hosted test bundle. Set `CASSINI_CONFORMANCE` to a cassini-format checkout’s `spec/conformance` directory and `CASSINI_CONFORMANCE_REQUIRED=1` to require those vectors. `CassiniNotebook` adds the app model and verified transcript import. The notebook suite checks metadata persistence and corruption isolation, path safety, search, and subtitle boundaries. The iOS integration suite checks real CAF inspection, AAC/M4A conversion, import integrity, malformed audio rejection, and recovery. UI tests exercise empty/library states, search, playback, renaming and relaunch persistence, download consent, and trash/restore. The capture test exercises pause/resume/save when an input is available, or verifies recovery from a clear missing-input error on headless hosts. Grant microphone access to the test simulator before recording tests if needed:
 
@@ -64,6 +67,8 @@ xcrun simctl privacy booted grant microphone app.codemyriad.cassini
 ```
 
 UI tests use a separate library and explicitly seeded silent audio fixtures. A normal launch starts empty. Test fixtures are compiled only in Debug.
+
+Unlike Android, where each Compose test sets up its own content, a new app process costs XCTest about five seconds, so most UI tests do not start one: `launchAndWait()` opens `cassini://ui-test/relaunch`, and a Debug process launched with `--ui-testing` replaces its app graph with one built from the new arguments over a fresh library and preferences (`UITestRelaunch`). A runner's first test, a test after a failure, a relaunch that keeps the data to check persistence, and a launch with other system arguments (such as the text size) still start a new process.
 
 See [validation](docs/validation.md) for test evidence and remaining device checks, and [architecture](docs/architecture.md) for storage and lifecycle details.
 

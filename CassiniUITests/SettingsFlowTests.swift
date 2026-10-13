@@ -15,7 +15,7 @@ final class SettingsFlowTests: XCTestCase {
 
     /// Scrolls the screen up until `element` is on it.
     @MainActor private func reveal(_ element: XCUIElement, in app: XCUIApplication) {
-        for _ in 0..<8 where !(element.exists && element.isHittable) { app.swipeUp() }
+        app.scroll { element.exists && element.isHittable }
         XCTAssertTrue(element.waitForExistence(within: 2), "\(element) is not on the screen")
     }
 

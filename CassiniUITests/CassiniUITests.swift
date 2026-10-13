@@ -181,7 +181,7 @@ final class CassiniUITests: XCTestCase {
         XCTAssertTrue(pause.waitForEnabled(within: 3))
         app.buttons["finishRecording"].tap()
         XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 10))
-        XCTAssertTrue(app.buttons["playButton"].isEnabled)
+        XCTAssertTrue(app.buttons["playButton"].waitForEnabled(within: 5), "the sealed recording plays")
         app.buttons["playButton"].tap()
         XCTAssertTrue(app.buttons["Pause"].waitForExistence(within: 3))
     }
@@ -276,7 +276,7 @@ final class CassiniUITests: XCTestCase {
         app.buttons["finishRecording"].tap()
         XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 10))
         XCTAssertEqual(app.staticTexts["noteTitle"].label, "Voice note 8 Oct, 09:41")
-        XCTAssertTrue(app.buttons["playButton"].isEnabled)
+        XCTAssertTrue(app.buttons["playButton"].waitForEnabled(within: 5), "the sealed recording plays")
     }
     @MainActor func testTheProcessingSeedShowsAJobInProgress() {
         let app = XCUIApplication()

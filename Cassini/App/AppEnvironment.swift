@@ -37,6 +37,8 @@ import CassiniEngineTesting
         var restoresNavigation = true
         /// Shows the UI tests when the launch work is done (`launchFinished`).
         var marksLaunchFinished = false
+        /// What the `launchFinished` marker carries: the token of the UI-test relaunch that built this environment.
+        var token = ""
     }
 
     enum OpenFixture: Equatable {
@@ -69,13 +71,7 @@ import CassiniEngineTesting
     /// The environment the process arguments ask for.
     static func resolve(arguments: [String] = ProcessInfo.processInfo.arguments) -> AppEnvironment {
         #if DEBUG
-        if arguments.contains("--ui-testing") {
-            return uiTesting(reset: arguments.contains("--reset-test-data"), seed: seed(in: arguments),
-                             openFixture: fixture(in: arguments), modelsMissing: arguments.contains("--models-missing"),
-                             modelDownloading: arguments.contains("--model-downloading"),
-                             draftGrowing: arguments.contains("--draft-growing"),
-                             notificationsDenied: arguments.contains("--notifications-denied"))
-        }
+        if arguments.contains("--ui-testing") { return uiTesting(arguments: arguments) }
         #endif
         return live()
     }
@@ -83,9 +79,22 @@ import CassiniEngineTesting
 
 #if DEBUG
 extension AppEnvironment {
-    static let uiTestingSuite = "app.codemyriad.cassini.ui-tests"
     /// Thursday 8 October 2026, 09:41 UTC: every UI-test launch sees the same "today".
     static let uiTestingNow = Date(timeIntervalSince1970: 1_791_452_460)
+
+    /// One runner for every graph of the process: BGTaskScheduler takes a task identifier's handler once a process,
+    /// and a relaunch inside the app builds a second graph.
+    private static let uiTestingBackground = UIKitBackgroundRunner()
+
+    /// The environment of UI-test launch arguments. A relaunch inside the running app (`UITestRelaunch`) passes
+    /// `inProcess` and its `token`.
+    static func uiTesting(arguments: [String], inProcess: Bool = false, token: String = "") -> AppEnvironment {
+        uiTesting(reset: arguments.contains("--reset-test-data"), seed: seed(in: arguments),
+                  openFixture: fixture(in: arguments), modelsMissing: arguments.contains("--models-missing"),
+                  modelDownloading: arguments.contains("--model-downloading"),
+                  draftGrowing: arguments.contains("--draft-growing"),
+                  notificationsDenied: arguments.contains("--notifications-denied"), inProcess: inProcess, token: token)
+    }
 
     /// A separate library and preferences, a fixed clock and en_US formatting. Transcription is faked; the
     /// recording seed also fakes the microphone and its permission. With `modelsMissing` the speech and speaker models
@@ -96,13 +105,11 @@ extension AppEnvironment {
     /// `notificationsDenied` (`--notifications-denied`) turns them off.
     static func uiTesting(reset: Bool, seed: Seed?, openFixture: OpenFixture? = nil,
                           modelsMissing: Bool = false, modelDownloading: Bool = false, draftGrowing: Bool = false,
-                          notificationsDenied: Bool = false) -> AppEnvironment {
-        let root = URL.applicationSupportDirectory.appendingPathComponent("CassiniUITests", isDirectory: true)
-        let defaults = UserDefaults(suiteName: uiTestingSuite) ?? .standard
-        if reset {
-            try? FileManager.default.removeItem(at: root)
-            defaults.removePersistentDomain(forName: uiTestingSuite)
-        }
+                          notificationsDenied: Bool = false,
+                          inProcess: Bool = false, token: String = "") -> AppEnvironment {
+        let storage = UITestStorage.generation(reset: reset, inProcess: inProcess)
+        let root = storage.root
+        let defaults = UserDefaults(suiteName: storage.suite) ?? .standard
         let status: ModelPartStatus = modelsMissing ? .notDownloaded : .ready
         let transcriber = switch seed {
         case .processing where modelDownloading: FakeTranscriber(.downloading(fraction: 0.46), status: status)
@@ -121,8 +128,9 @@ extension AppEnvironment {
             capture: seed == .recording ? FakeCapture() : AVCaptureAdapter(),
             microphone: seed == .recording ? FakeMicrophonePermission() : AVMicrophonePermission(),
             liveActivity: ActivityKitAdapter(), playback: AVPlaybackAdapter(), audio: LocalAudioProcessing(), storage: FileSystemStorageProbe(),
-            background: UIKitBackgroundRunner(), notifier: FakeNotifier(auth: notificationsDenied ? .denied : .authorized),
-            launch: LaunchOptions(seed: seed, openFixture: openFixture, restoresNavigation: false, marksLaunchFinished: true))
+            background: uiTestingBackground, notifier: FakeNotifier(auth: notificationsDenied ? .denied : .authorized),
+            launch: LaunchOptions(seed: seed, openFixture: openFixture, restoresNavigation: false, marksLaunchFinished: true,
+                                  token: token))
     }
 
     /// `--seed <name>`; `--seed-test-data` is the library seed.
