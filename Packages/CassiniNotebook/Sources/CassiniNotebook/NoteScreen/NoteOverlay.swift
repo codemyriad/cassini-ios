@@ -1,8 +1,8 @@
 import Foundation
 
 /// A sheet over the Note screen. Small and `Codable`, so the screen keeps the open one with the scene and it comes
-/// back after Cassini was closed (Android keeps its sheets with `rememberSaveable`); the name being typed into Name
-/// this speaker is kept beside it.
+/// back after Cassini was closed (Android keeps its sheets with `rememberSaveable`); the text typed into Name this
+/// speaker or Rename is kept beside it.
 public enum NoteOverlay: Codable, Hashable, Sendable {
     case rename
     case speakers
@@ -33,14 +33,23 @@ public enum NoteOverlay: Codable, Hashable, Sendable {
     }
 }
 
-/// The open sheet of a note's screen as the scene keeps it, with the name typed so far into Name this speaker.
+/// What a note's screen keeps with the scene: the open sheet with the text typed so far into it (Name this speaker,
+/// Rename), and the open question (Android `NoteViewModel.saveOverlays`).
 public struct SavedNoteOverlay: Codable, Hashable, Sendable {
     public var noteID: UUID
-    public var overlay: NoteOverlay
+    public var overlay: NoteOverlay?
     public var draft: String?
+    public var dialog: NoteDialog?
 
-    public init(noteID: UUID, overlay: NoteOverlay, draft: String? = nil) {
-        self.noteID = noteID; self.overlay = overlay; self.draft = draft
+    public init(noteID: UUID, overlay: NoteOverlay? = nil, draft: String? = nil, dialog: NoteDialog? = nil) {
+        self.noteID = noteID; self.overlay = overlay; self.draft = draft; self.dialog = dialog
+    }
+
+    /// The screen's open sheet, its draft and its question as the scene keeps them; nil when neither is open.
+    public static func keeping(noteID: UUID, overlay: NoteOverlay?, draft: String?, dialog: NoteDialog?) -> Data? {
+        guard overlay != nil || dialog != nil else { return nil }
+        return SavedNoteOverlay(noteID: noteID, overlay: overlay, draft: overlay?.keepsDraft == true ? draft : nil,
+                                dialog: dialog).encoded
     }
 
     public var encoded: Data? { try? JSONEncoder().encode(self) }
@@ -50,11 +59,41 @@ public struct SavedNoteOverlay: Codable, Hashable, Sendable {
         self = saved
     }
 
-    /// The saved sheet for `note`'s screen, when it is that note's and can open again (`NoteOverlay.restorable`); a
-    /// draft is kept only for Name this speaker.
+    /// What opens again over `note`'s screen: the sheet when it can (`NoteOverlay.restorable`), with its draft, and
+    /// the question when it still applies (`NoteDialog.restorable`); nil when nothing does or it is another note's.
+    ///
+    /// The screen asks once, on its first appearance with its note, and keeps only what this returns: a sheet that
+    /// cannot open now must not open by itself on a later visit to the note (as the Library drops its dialog).
     public func restored(over note: Note, readOnly: ReadOnlyReason?) -> SavedNoteOverlay? {
-        guard noteID == note.id, let overlay = overlay.restorable(over: note, readOnly: readOnly) else { return nil }
-        guard case .naming = overlay else { return SavedNoteOverlay(noteID: noteID, overlay: overlay) }
-        return SavedNoteOverlay(noteID: noteID, overlay: overlay, draft: draft)
+        guard noteID == note.id else { return nil }
+        let overlay = overlay?.restorable(over: note, readOnly: readOnly)
+        let dialog = dialog?.restorable(over: note, readOnly: readOnly)
+        guard overlay != nil || dialog != nil else { return nil }
+        return SavedNoteOverlay(noteID: noteID, overlay: overlay, draft: overlay?.keepsDraft == true ? draft : nil,
+                                dialog: dialog)
+    }
+}
+
+extension NoteOverlay {
+    /// Name this speaker and Rename keep what was typed into them.
+    var keepsDraft: Bool {
+        switch self {
+        case .naming, .rename: true
+        case .speakers, .versions, .documentInfo, .editing: false
+        }
+    }
+}
+
+extension NoteDialog {
+    /// The question to ask again over `note` after Cassini was closed: the read-only explanation while its reason
+    /// holds, Transcribe again? while the document still makes a fresh one, and Start over? (whose note is still
+    /// here, as in the Library).
+    public func restorable(over note: Note, readOnly: ReadOnlyReason?) -> NoteDialog? {
+        switch self {
+        case .readOnly(let reason): reason == readOnly ? self : nil
+        case .transcribeFresh:
+            TranscribeAgainRule.needsFreshConfirmation(note) && !note.refusesNewVersion ? self : nil
+        case .startOver: self
+        }
     }
 }

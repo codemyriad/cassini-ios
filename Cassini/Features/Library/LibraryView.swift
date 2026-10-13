@@ -17,8 +17,9 @@ struct LibraryView: View {
     @Environment(\.restoresSceneState) private var restoresSceneState
     @SceneStorage("library.query") private var savedQuery = ""
     @SceneStorage("library.favoritesOnly") private var savedFavoritesOnly = false
-    /// The open dialog (Rename, Start over?, Transcribe again?), kept with the scene.
+    /// The open dialog (Rename, Start over?, Transcribe again?) and the title typed into Rename, kept with the scene.
     @SceneStorage("library.dialog") private var savedDialog: Data?
+    @State private var renameDraft: String?
     @State private var importing = false
     @State private var restored = false
     @State private var dialogRestored = false
@@ -73,8 +74,10 @@ struct LibraryView: View {
         .onChange(of: model.query) { _, query in if restoresSceneState { savedQuery = query } }
         .onChange(of: model.favoritesOnly) { _, only in if restoresSceneState { savedFavoritesOnly = only } }
         .onChange(of: model.dialog) { _, dialog in
-            if restoresSceneState, dialogRestored { savedDialog = dialog.flatMap { try? JSONEncoder().encode($0) } }
+            if dialog == nil { renameDraft = nil }
+            keepDialog()
         }
+        .onChange(of: renameDraft) { _, _ in keepDialog() }
         // The dialog's note must be read first.
         .task(id: library.isLoaded) { restoreDialog() }
         .task { await model.refreshSpeakerModels() }
@@ -84,7 +87,7 @@ struct LibraryView: View {
             case .failure(let error): errors.present(error.localizedDescription)
             }
         }
-        .sheet(item: renaming) { RenameNoteDialog(noteID: $0.id) }
+        .sheet(item: renaming) { RenameNoteDialog(noteID: $0.id, draft: renameDraft) { renameDraft = $0 } }
         .alert(LibraryCopy.startOverTitle, isPresented: confirming(\.startOver), presenting: model.dialog) { dialog in
             Button(LibraryCopy.startOver, role: .destructive) { confirm(dialog) }
             Button(LibraryCopy.cancel, role: .cancel) {}
@@ -159,10 +162,18 @@ struct LibraryView: View {
     private func restoreDialog() {
         guard restoresSceneState, library.isLoaded, !dialogRestored else { return }
         dialogRestored = true
-        guard model.dialog == nil, let data = savedDialog,
-              let dialog = try? JSONDecoder().decode(LibraryDialog.self, from: data) else { return }
-        model.dialog = dialog.restorable(over: library.notes)
-        if model.dialog == nil { savedDialog = nil }
+        guard model.dialog == nil else { return }
+        guard let kept = SavedLibraryDialog(savedDialog)?.restored(over: library.notes) else {
+            savedDialog = nil
+            return
+        }
+        renameDraft = kept.draft
+        model.dialog = kept.dialog
+    }
+
+    private func keepDialog() {
+        guard restoresSceneState, dialogRestored else { return }
+        savedDialog = model.dialog.flatMap { SavedLibraryDialog($0, draft: renameDraft).encoded }
     }
 
     private struct RenameTarget: Identifiable { let id: UUID }

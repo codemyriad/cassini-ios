@@ -47,11 +47,47 @@ import Testing
         #expect(NoteOverlay.documentInfo.restorable(over: note, readOnly: .trust) == .documentInfo)
     }
 
-    @Test func onlyNameThisSpeakerKeepsADraft() {
+    /// As Android keeps the typed title (RenameDialog `rememberSaveable`) and the name being typed.
+    @Test func nameThisSpeakerAndRenameKeepWhatWasTyped() {
         let note = note()
         let naming = SavedNoteOverlay(noteID: note.id, overlay: .naming(speakerID: "a"), draft: "Giu")
         #expect(naming.restored(over: note, readOnly: nil)?.draft == "Giu")
-        let rename = SavedNoteOverlay(noteID: note.id, overlay: .rename, draft: "stray")
-        #expect(rename.restored(over: note, readOnly: nil) == SavedNoteOverlay(noteID: note.id, overlay: .rename))
+        let rename = SavedNoteOverlay(noteID: note.id, overlay: .rename, draft: "Standup, revised")
+        #expect(rename.restored(over: note, readOnly: nil)?.draft == "Standup, revised")
+        let speakers = SavedNoteOverlay(noteID: note.id, overlay: .speakers, draft: "stray")
+        #expect(speakers.restored(over: note, readOnly: nil) == SavedNoteOverlay(noteID: note.id, overlay: .speakers))
+        let kept = SavedNoteOverlay.keeping(noteID: note.id, overlay: .speakers, draft: "stray", dialog: nil)
+        #expect(SavedNoteOverlay(kept) == SavedNoteOverlay(noteID: note.id, overlay: .speakers))
+    }
+
+    @Test func nothingOpenKeepsNothing() {
+        #expect(SavedNoteOverlay.keeping(noteID: UUID(), overlay: nil, draft: "Giu", dialog: nil) == nil)
+    }
+
+    /// What does not come back is not kept either: the screen drops it, so it never opens by itself on a later visit.
+    @Test func aSavedSheetThatCannotOpenNowLeavesNothingToKeep() {
+        let note = note()
+        let speakers = SavedNoteOverlay(noteID: note.id, overlay: .speakers)
+        #expect(speakers.restored(over: note, readOnly: .jobPending) == nil, "a transcription runs at relaunch")
+        let rename = SavedNoteOverlay(noteID: note.id, overlay: .rename, dialog: .readOnly(.jobPending))
+        #expect(rename.restored(over: note, readOnly: nil) == SavedNoteOverlay(noteID: note.id, overlay: .rename),
+                "the sheet comes back without the question that no longer applies")
+    }
+
+    /// As Android keeps its dialog (NoteViewModel.savedDialog), while it still applies.
+    @Test func theOpenQuestionComesBackWhileItApplies() {
+        let note = note()
+        func restored(_ dialog: NoteDialog, over note: Note, readOnly: ReadOnlyReason?) -> NoteDialog? {
+            SavedNoteOverlay(noteID: note.id, dialog: dialog).restored(over: note, readOnly: readOnly)?.dialog
+        }
+        #expect(SavedNoteOverlay(SavedNoteOverlay.keeping(noteID: note.id, overlay: nil, draft: nil,
+                                                          dialog: .readOnly(.trust)))?.dialog == .readOnly(.trust))
+        #expect(restored(.startOver, over: note, readOnly: .jobPending) == .startOver)
+        #expect(restored(.readOnly(.jobPending), over: note, readOnly: .jobPending) == .readOnly(.jobPending))
+        #expect(restored(.readOnly(.jobPending), over: note, readOnly: nil) == nil, "the transcription finished")
+        #expect(restored(.transcribeFresh, over: note, readOnly: nil) == nil, "a recording keeps its versions")
+        var stale = note
+        stale.document = DocumentInfo(state: .staleAudio)
+        #expect(restored(.transcribeFresh, over: stale, readOnly: .trust) == .transcribeFresh)
     }
 }

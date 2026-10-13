@@ -25,6 +25,30 @@ public enum LibraryDialog: Identifiable, Hashable, Codable, Sendable {
     }
 }
 
+/// The Library's open dialog as the scene keeps it, with the title typed so far into Rename.
+public struct SavedLibraryDialog: Codable, Hashable, Sendable {
+    public var dialog: LibraryDialog
+    public var draft: String?
+
+    public init(_ dialog: LibraryDialog, draft: String? = nil) {
+        self.dialog = dialog
+        if case .rename = dialog { self.draft = draft }
+    }
+
+    public var encoded: Data? { try? JSONEncoder().encode(self) }
+
+    public init?(_ data: Data?) {
+        guard let data, let saved = try? JSONDecoder().decode(Self.self, from: data) else { return nil }
+        self = saved
+    }
+
+    /// What opens again over `notes` (`LibraryDialog.restorable`), with its draft; nil once its note is gone, and
+    /// the screen then drops what it kept.
+    public func restored(over notes: [Note]) -> SavedLibraryDialog? {
+        dialog.restorable(over: notes).map { SavedLibraryDialog($0, draft: draft) }
+    }
+}
+
 /// A row of a note's actions menu (Android `NoteAction`, features.md section 6).
 public enum NoteAction: Hashable, Sendable {
     case toggleStar

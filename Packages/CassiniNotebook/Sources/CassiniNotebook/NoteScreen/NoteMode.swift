@@ -102,7 +102,7 @@ extension Note {
 }
 
 /// Why the shown transcript cannot be renamed, merged, switched or edited now, and the message an attempt shows.
-public enum ReadOnlyReason: Hashable, Sendable {
+public enum ReadOnlyReason: Codable, Hashable, Sendable {
     /// "Wait until transcription finishes": the note has a job.
     case jobPending
     /// "Fix the transcript first: Transcribe again": a document whose trust is not verified.

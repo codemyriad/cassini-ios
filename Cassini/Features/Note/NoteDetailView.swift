@@ -29,8 +29,8 @@ struct NoteDetailView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var screen: NoteScreenState
     @State private var sheet: NoteSheet?
-    /// The name typed so far into Name this speaker, kept with the open sheet.
-    @State private var namingDraft: String?
+    /// The text typed so far into Name this speaker or Rename, kept with the open sheet.
+    @State private var sheetDraft: String?
     @State private var shareItem: ShareItem?
     @State private var exportingDocument = false
     @State private var showBookmarks = false
@@ -86,7 +86,8 @@ struct NoteDetailView: View {
         .onChange(of: screen.search?.query) { _, query in router.keepSearch(query, for: noteID) }
         .backButtonTitle(router.below(noteID: noteID) == .library ? NoteCopy.backToLibrary : nil)
         .sheet(item: $sheet, content: sheetContent)
-        .keepsNoteOverlay(note: note, readOnly: readOnly, sheet: $sheet, draft: $namingDraft)
+        .keepsNoteOverlay(noteID: noteID, note: note, readOnly: readOnly, sheet: $sheet, draft: $sheetDraft,
+                          dialog: $screen.dialog)
         .alert(dialogTitle, isPresented: dialogShown, presenting: screen.dialog, actions: dialogActions,
                message: dialogMessage)
         .shareSheet(item: $shareItem)
@@ -298,7 +299,7 @@ struct NoteDetailView: View {
         case .toggleStar: library.update(noteID) { $0.isFavorite.toggle() }
         case .speakers: run(screen.speakersTapped(readOnly: readOnly))
         case .versions: run(screen.versionsTapped(readOnly: readOnly))
-        case .rename: sheet = .rename
+        case .rename: sheet = .rename(draft: nil)
         case .documentInfo: sheet = .documentInfo
         case .exportTranscript(let format): export(format)
         case .exportDocument: exportDocument()
@@ -366,7 +367,7 @@ struct NoteDetailView: View {
         switch start {
         case .export(let format): export(format)
         case .documentInfo: sheet = .documentInfo
-        case .rename: sheet = .rename
+        case .rename: sheet = .rename(draft: nil)
         }
     }
 
@@ -374,12 +375,12 @@ struct NoteDetailView: View {
 
     @ViewBuilder private func sheetContent(_ sheet: NoteSheet) -> some View {
         switch sheet {
-        case .rename: RenameNoteSheet(noteID: noteID)
+        case .rename(let draft): RenameNoteSheet(noteID: noteID, draft: draft) { sheetDraft = $0 }
         case .speakers: SpeakersView(noteID: noteID)
         case .versions: TranscriptVersionsView(noteID: noteID)
         case .documentInfo: DocumentInfoSheet(noteID: noteID)
         case .naming(let speakerID, let draft):
-            NameSpeakerSheet(noteID: noteID, speakerID: speakerID, draft: draft) { namingDraft = $0 }
+            NameSpeakerSheet(noteID: noteID, speakerID: speakerID, draft: draft) { sheetDraft = $0 }
         case .editing(let segment): SegmentEditor(noteID: noteID, segment: segment)
         }
     }
