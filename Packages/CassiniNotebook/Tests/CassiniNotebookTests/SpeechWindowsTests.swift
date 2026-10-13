@@ -1,7 +1,7 @@
 import Testing
 import CassiniNotebook
 
-/// Android's window, context and padding arithmetic belongs to Parakeet's windows and is not ported (docs/differences/WP5.md).
+/// Android's window, context and padding arithmetic belongs to Parakeet's windows and is not ported (docs/differences.md).
 @Suite struct SpeechWindowsTests {
     @Test func blocksAreOneSecondAtTheFilesRate() {
         #expect(SpeechWindows.samples(SpeechWindows.blockMs, sampleRate: 16_000) == 16_000)

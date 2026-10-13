@@ -3,7 +3,7 @@ import Testing
 @testable import CassiniNotebook
 
 /// The Name a speaker reducer: every question path, the Save rule, "Not X" and merges. Android's draft cases are not
-/// ported: iOS names speakers only after the analysis (see docs/differences/WP8.md).
+/// ported: iOS names speakers only after the analysis (see docs/differences.md).
 @Suite struct SpeakerNamingTests {
     typealias F = VoiceFixtures
     let anna = F.voice("anna", "Anna Ricci", F.axis(0))

@@ -35,8 +35,8 @@ enum TestFixtures {
 
     /// What a second transcription of the same note hears: the last passage ends sooner. The other words work around
     /// an open difference from Android, not an intended rule: iOS's Transcribe again adds no version when the words
-    /// equal the shown transcript (`TranscriptionJob.saveTranscript`), where Android always adds one (README, "Open
-    /// differences from Android").
+    /// equal the shown transcript (`TranscriptionJob.saveTranscript`), where Android always adds one (docs/differences.md,
+    /// "Open differences").
     static let transcribedAgainSegments: [TranscriptSegment] = Array(transcribedSegments.dropLast()) + [
         .init(text: "Let’s protect an hour on Thursday for focused work. Just room to think.", start: 14, end: 24,
               speaker: "Alex", speakerID: "alex"),
