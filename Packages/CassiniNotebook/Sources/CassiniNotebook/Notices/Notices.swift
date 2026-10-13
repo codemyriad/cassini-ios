@@ -192,7 +192,7 @@ public enum Notices {
     // MARK: Order
 
     /// The place of `tone` in a list: failed, attention, info, then the fine and plain tones together.
-    public static func rank(_ tone: BannerTone) -> Int {
+    public static func rank(_ tone: Tone) -> Int {
         switch tone {
         case .error: 0
         case .warn: 1

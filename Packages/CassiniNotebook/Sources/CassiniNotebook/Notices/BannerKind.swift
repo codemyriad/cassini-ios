@@ -1,10 +1,5 @@
 import Foundation
 
-/// The tone of a banner, which picks its colours and its place in a list.
-public enum BannerTone: String, CaseIterable, Hashable, Sendable {
-    case ok, info, warn, error, plain
-}
-
 /// The parts of the banner catalogue (Android `BannerGroup`).
 public enum BannerGroup: String, CaseIterable, Hashable, Sendable {
     case trust, recording, transcription, download, library
@@ -89,7 +84,7 @@ public enum BannerKind: String, CaseIterable, Hashable, Sendable {
     /// Some notes' metadata could not be read; their files are kept. iOS only.
     case notesUnreadable = "NOTES_UNREADABLE"
 
-    public var tone: BannerTone { entry.tone }
+    public var tone: Tone { entry.tone }
     public var group: BannerGroup { entry.group }
     /// The arguments the copy reads.
     public var uses: Set<BannerArg> { entry.uses }
@@ -103,7 +98,7 @@ public enum BannerKind: String, CaseIterable, Hashable, Sendable {
     public var iOSOnly: Bool { [.recInputLost, .recCompressionFailed, .notesUnreadable].contains(self) }
 
     private struct Entry {
-        var tone: BannerTone
+        var tone: Tone
         var group: BannerGroup
         var uses: Set<BannerArg> = []
         var actions: [BannerAction] = []

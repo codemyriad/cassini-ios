@@ -140,4 +140,12 @@ import CassiniNotebook
         let totals = await model().library
         #expect(totals == SettingsModel.LibraryTotals(notes: 2, duration: 120.5))
     }
+
+    @Test func everyModelRowStatusHasItsTone() {
+        let tones: [(ModelRowStatus, Tone)] = [
+            (.ready, .ok), (.downloading(percent: 46), .info), (.checking, .info), (.pending, .warn), (.failed, .error),
+            (.notDownloaded, .plain), (.unavailable, .plain),
+        ]
+        for (status, tone) in tones { #expect(status.tone == tone, "\(status)") }
+    }
 }

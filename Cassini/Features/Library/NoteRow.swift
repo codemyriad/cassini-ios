@@ -113,15 +113,7 @@ struct RowChip: View {
         .background(tone.background, in: Capsule())
     }
 
-    private var tone: Tone {
-        switch status {
-        case .recording, .failed, .unplayable, .unreadable: .error
-        case .transcribing: .info
-        case .paused: .warn
-        case .transcribed: .ok
-        case .queued, .newerFormat, .audioOnly: .plain
-        }
-    }
+    private var tone: Tone { status.tone }
 }
 
 /// Highlighted text as SwiftUI draws it: each match in weight 600 on an accent tint, so it does not rely on colour.

@@ -42,6 +42,18 @@ public struct LibraryRow: Identifiable, Hashable, Sendable {
         case transcribed(speakers: Int, hasWords: Bool)
         case audioOnly
 
+        /// The chip's tone (Android `NoteRow`'s `RowStatus`): red for what needs attention, blue while transcribing,
+        /// amber when paused, teal when transcribed, plain otherwise.
+        public var tone: Tone {
+            switch self {
+            case .recording, .failed, .unplayable, .unreadable: .error
+            case .transcribing: .info
+            case .paused: .warn
+            case .transcribed: .ok
+            case .queued, .newerFormat, .audioOnly: .plain
+            }
+        }
+
         public var suffix: RowStatus.Suffix {
             switch self {
             case .paused: .resume

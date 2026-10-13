@@ -69,14 +69,4 @@ extension ModelRowStatus {
         case .unavailable: String(localized: "Not available", table: "Settings")
         }
     }
-
-    var tone: Tone {
-        switch self {
-        case .ready: .ok
-        case .downloading, .checking: .info
-        case .pending: .warn
-        case .failed: .error
-        case .notDownloaded, .unavailable: .plain
-        }
-    }
 }

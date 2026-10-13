@@ -1,4 +1,5 @@
 import SwiftUI
+import CassiniNotebook
 
 /// The palette: the warm Cassini brand colours plus tone tints for status and notices. Every token has a light and a
 /// dark value, and every pair the screens draw meets WCAG AA in both (`ContrastTests`): 4.5:1 for text, 3:1 for large
@@ -50,9 +51,7 @@ extension Color {
     }
 }
 
-enum Tone {
-    case ok, info, warn, error, plain
-
+extension Tone {
     var color: Color {
         switch self {
         case .ok: .toneOK
