@@ -36,7 +36,10 @@ prefix="${CASSINI_SIM_PREFIX:-ts-$(basename "$root")}"
 iphone_type="${CASSINI_IPHONE:-iPhone 17}"
 ipad_type="${CASSINI_IPAD:-iPad Pro 13-inch (M5)}"
 keep_sims="${CASSINI_KEEP_SIMS:-1}"
-mkdir -p "$cache" "$logs"
+mkdir -p "$cache" "$derived"
+# The previous run's logs stay beside this run's.
+if [ -d "$logs" ]; then rm -rf "$logs.previous"; mv "$logs" "$logs.previous"; fi
+mkdir -p "$logs"
 
 # ---------------------------------------------------------------- timing
 
@@ -191,15 +194,29 @@ build_for_testing() {
         -destination 'generic/platform=iOS Simulator' \
         CODE_SIGNING_ALLOWED=NO COMPILER_INDEX_STORE_ENABLE=NO ONLY_ACTIVE_ARCH=YES ARCHS=arm64
     step_end
-    xctestrun=$(ls -t "$derived"/Build/Products/Cassini_*.xctestrun 2>/dev/null | head -1)
+    xctestrun=$(ls -t "$derived"/Build/Products/Cassini_*.xctestrun 2>/dev/null | grep -v '\.only-' | head -1)
     [ -n "$xctestrun" ] || die "no .xctestrun in $derived/Build/Products"
+    # One test target per run: with both in the .xctestrun, xcodebuild installs the app for the hosted tests too,
+    # and that install can land after the UI test runner has started, ending the app under the first UI test.
+    for target in CassiniTests CassiniUITests; do
+        /usr/bin/python3 - "$xctestrun" "${xctestrun%.xctestrun}.only-$target.xctestrun" "$target" <<'PY'
+import plistlib, sys
+source, destination, target = sys.argv[1:4]
+with open(source, "rb") as f:
+    run = plistlib.load(f)
+with open(destination, "wb") as f:
+    plistlib.dump({key: value for key, value in run.items() if key == target or key.startswith("__")}, f)
+PY
+    done
 }
 
-# xcodebuild test-without-building on one simulator; $1 log, $2 result bundle, $3 udid, the rest test arguments.
+# xcodebuild test-without-building of one test target on one simulator; $1 target, $2 log, $3 result bundle,
+# $4 udid, the rest test arguments.
 test_on() {
-    local log="$1" bundle="$2" udid="$3"; shift 3
+    local target="$1" log="$2" bundle="$3" udid="$4"; shift 4
     rm -rf "$bundle"
-    xcodebuild test-without-building -xctestrun "$xctestrun" -destination "platform=iOS Simulator,id=$udid" \
+    xcodebuild test-without-building -xctestrun "${xctestrun%.xctestrun}.only-$target.xctestrun" \
+        -destination "platform=iOS Simulator,id=$udid" \
         -resultBundlePath "$bundle" -collect-test-diagnostics never -parallel-testing-enabled NO \
         -test-timeouts-enabled YES -maximum-test-execution-time-allowance 300 \
         "$@" ${extra[@]+"${extra[@]}"} > "$log" 2>&1
@@ -220,7 +237,7 @@ wait_first_boot() {
 tier_app() {
     step_start "hosted tests (CassiniTests)"
     wait_first_boot
-    if ! test_on "$logs/hosted.log" "$logs/hosted.xcresult" "$first_iphone" -only-testing:CassiniTests; then
+    if ! test_on CassiniTests "$logs/hosted.log" "$logs/hosted.xcresult" "$first_iphone" -only-testing:CassiniTests; then
         grep -E "error:|failed \(|\*\* TEST" "$logs/hosted.log" | tail -20 >&2; echo "see $logs/hosted.log" >&2
         step_end; return 1
     fi
@@ -270,7 +287,7 @@ tier_ui() {
         step_start "UI tests (selected)"
         wait_first_boot
         local rc=0
-        test_on "$logs/ui-1.log" "$logs/ui-1.xcresult" "$first_iphone" || rc=$?
+        test_on CassiniUITests "$logs/ui-1.log" "$logs/ui-1.xcresult" "$first_iphone" || rc=$?
         record_durations; step_end
         [ $rc = 0 ] || { grep -E "error:|failed \(|\*\* TEST" "$logs/ui-1.log" | tail -20 >&2; return 1; }
         return 0
@@ -305,12 +322,12 @@ tier_ui() {
         while IFS= read -r t; do [ -n "$t" ] && shard_args+=("-only-testing:CassiniUITests/$t"); done \
             < <(printf '%s\n' "$plan" | awk -F'\t' -v k="$k" '$1 == k { print $2 }')
         [ ${#shard_args[@]} -gt 0 ] || continue
-        test_on "$logs/ui-$k.log" "$logs/ui-$k.xcresult" "${udids[$k]}" "${shard_args[@]}" & pids+=("$!:$k")
+        test_on CassiniUITests "$logs/ui-$k.log" "$logs/ui-$k.xcresult" "${udids[$k]}" "${shard_args[@]}" & pids+=("$!:$k")
     done
     if [ -n "$ipad" ]; then
         shard_args=()
         while IFS= read -r t; do shard_args+=("-only-testing:CassiniUITests/$t"); done <<< "$ipad_tests"
-        test_on "$logs/ui-ipad.log" "$logs/ui-ipad.xcresult" "$ipad" "${shard_args[@]}" & pids+=("$!:ipad")
+        test_on CassiniUITests "$logs/ui-ipad.log" "$logs/ui-ipad.xcresult" "$ipad" "${shard_args[@]}" & pids+=("$!:ipad")
     fi
     local failed="" p
     for p in "${pids[@]}"; do wait "${p%%:*}" || failed="$failed ${p##*:}"; done
