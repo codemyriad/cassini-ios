@@ -5,9 +5,18 @@ import XCTest
 /// a word tap seeks there and plays, Transcribe again adds version 2 to Versions, and the transcript and the Cassini
 /// document export through the share sheet.
 ///
-/// iOS differences: the fake returns the fixture's three passages at once, so the progress card is not waited for;
-/// the share sheet is a separate process, so the exported bytes are covered by the export goldens in the packages
-/// (`ExportGoldenTests`, `ExportServiceTests`) rather than read back here.
+/// iOS differences: the fake returns the fixture's three passages at once, so the progress card is not waited for.
+/// Android's `variants = 1` after the first Transcribe is checked as no version chip (the chip shows from version 2).
+/// A note transcribed on iOS is not sealed into a Cassini document until it is exported, so it has no trust chip and
+/// "Verified" is not checked here (an imported document's trust is, in `DocumentTrustTests`). The fixture's
+/// passages carry no word timings, so the tap is on the third passage and the position, which the slider gives in
+/// whole seconds, is checked against that passage's start with Android's slack. The share sheet is a separate
+/// process, so the text, SRT, VTT and document exports are checked to reach it, and their bytes are covered by the
+/// export goldens in the packages (`ExportGoldenTests`, `ExportServiceTests`) rather than read back here.
+///
+/// The fake's second transcription of the note hears other words (`TestFixtures.transcribedAgainSegments`) to work
+/// around an open difference, not an intended rule: iOS's Transcribe again adds no version when the words equal the
+/// shown transcript, where Android always adds one (README, "Open differences from Android").
 final class NoteFlowTests: XCTestCase {
     private static let walk = "BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB"
 
@@ -25,6 +34,7 @@ final class NoteFlowTests: XCTestCase {
         let words = app.descendants(matching: .any)["turn-w2"]
         XCTAssertTrue(words.waitForExistence(within: 15), "the transcript shows")
         XCTAssertFalse(app.buttons["Transcribe"].exists, "the banner is gone")
+        XCTAssertFalse(app.buttons["versionChip"].exists, "the first transcription is the note's only version")
 
         // A word tap seeks there and plays.
         let play = app.buttons["playButton"]
@@ -32,7 +42,8 @@ final class NoteFlowTests: XCTestCase {
         words.tap()
         XCTAssertTrue(play.wait(until: NSPredicate(format: "label == 'Pause'"), within: 5), "a word tap plays")
         let position = app.descendants(matching: .any)["playbackPosition"]
-        XCTAssertTrue((position.value as? String)?.hasPrefix("00:1") == true, "from the word: \(position.value ?? "")")
+        let seconds = Self.seconds(position.value as? String)
+        XCTAssertTrue(seconds.map(Self.playsFromThirdPassage.contains) == true, "from the passage: \(position.value ?? "")")
         play.tap()
         XCTAssertTrue(play.wait(until: NSPredicate(format: "label == 'Play'"), within: 3))
 
@@ -54,10 +65,27 @@ final class NoteFlowTests: XCTestCase {
         app.collectionViews.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Export transcript'")).firstMatch.tap()
         app.collectionViews.buttons["Transcript as text"].tap()
         closeShareSheet(app)
+        for subtitles in ["Subtitles · .srt", "Subtitles · .vtt"] {
+            app.buttons["More actions"].tap()
+            app.collectionViews.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Export transcript'")).firstMatch.tap()
+            app.collectionViews.buttons[subtitles].tap()
+            closeShareSheet(app)
+        }
         app.buttons["More actions"].tap()
         app.collectionViews.buttons["Export Cassini document"].tap()
         closeShareSheet(app)
         XCTAssertTrue(app.staticTexts["noteTitle"].exists, "the exports leave the note open")
+    }
+
+    /// The third passage starts at 14 s: Android's slack of 300 ms before and 3 s after, in the slider's whole seconds.
+    private static let playsFromThirdPassage = 13...17
+
+    /// The position in whole seconds of the slider's "mm:ss of mm:ss".
+    private static func seconds(_ value: String?) -> Int? {
+        guard let clock = value?.split(separator: " ").first else { return nil }
+        let parts = clock.split(separator: ":").compactMap { Int($0) }
+        guard parts.count == 2 else { return nil }
+        return parts[0] * 60 + parts[1]
     }
 }
 

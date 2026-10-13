@@ -13,6 +13,13 @@ import Testing
         for (status, tone) in tones { #expect(status.tone == tone, "\(status)") }
     }
 
+    @Test func everyDocumentTrustHasItsTone() {
+        let tones: [(DocumentTrust, Tone)] = [
+            (.verified, .ok), (.notVerified, .warn), (.audioChanged, .warn), (.unreadable, .error), (.newerFormat, .error),
+        ]
+        for (trust, tone) in tones { #expect(trust.tone == tone, "\(trust)") }
+    }
+
     @Test func everyBannerKindHasACatalogueTone() {
         for kind in BannerKind.allCases { #expect(Tone.allCases.contains(kind.tone)) }
     }

@@ -26,6 +26,9 @@ public enum DocumentTrust: String, CaseIterable, Hashable, Sendable {
     /// The trust of `note`'s document; nil for a note that did not come from one.
     public static func of(_ note: Note) -> DocumentTrust? { note.document.map { DocumentTrust($0.state) } }
 
+    /// The tone of the trust chip: its trust banner's catalogue tone (Android `TrustUi` and the TRUST_* banner tones).
+    public var tone: Tone { BannerKind.trust(self).tone }
+
     /// Whether the note shows its trust banner (Android `NoteViewModel.trustBanner`). By default every state but
     /// verified shows it, and not verified only until "Play anyway"; `toggled`, flipped by the trust chip, inverts that.
     public static func showsBanner(_ info: DocumentInfo, toggled: Bool = false) -> Bool {

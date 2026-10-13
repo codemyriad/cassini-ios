@@ -100,8 +100,8 @@ extension AppEnvironment {
     /// recording seed also fakes the microphone and its permission. With `modelsMissing` the speech and speaker models
     /// are not installed, so a Transcribe asks for the download first; with `modelDownloading` (`--model-downloading`)
     /// the processing seed's job stays in its speech model download at 46 %, and with `draftGrowing` (`--draft-growing`)
-    /// its draft grows by a sentence every half second. A second transcription of a note hears other words. Speaker
-    /// models are installed on the recording seed only.
+    /// its draft grows by a sentence every half second. A second transcription of the same note hears other words
+    /// (`TestFixtures.transcribedAgainSegments`). Speaker models are installed on the recording seed only.
     /// Notifications are never asked for and count as allowed, so no banner says they are off, unless
     /// `notificationsDenied` (`--notifications-denied`) turns them off.
     static func uiTesting(reset: Bool, seed: Seed?, openFixture: OpenFixture? = nil,

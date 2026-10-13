@@ -9,8 +9,9 @@ import CassiniNotebook
 public struct FakeTranscriber: Transcribing {
     public enum Script: Sendable {
         case returns([TranscriptSegment], total: TimeInterval)
-        /// The n-th transcription returns the n-th list, and every one after the last returns the last: a Transcribe
-        /// again that hears other words.
+        /// A note's n-th transcription returns the n-th list, and every one after the last returns the last: a
+        /// Transcribe again that hears other words. Runs are counted per note (the folder of the request's audio,
+        /// which stays the note's while its audio file changes), so one note's transcriptions never change another's.
         case sequence([[TranscriptSegment]], total: TimeInterval)
         /// Reports `done` of `total` seconds and never finishes.
         case frozen(done: TimeInterval, total: TimeInterval)
@@ -34,7 +35,7 @@ public struct FakeTranscriber: Transcribing {
         case .returns(let segments, let total):
             return try finalize(segments, total: total, events: events)
         case .sequence(let lists, let total):
-            let run = runs.next()
+            let run = runs.next(for: request.url.deletingLastPathComponent())
             return try finalize(lists.isEmpty ? [] : lists[min(run, lists.count - 1)], total: total, events: events)
         case .frozen(let done, let total):
             events(.progress(done: done, total: total))
@@ -71,12 +72,18 @@ public struct FakeTranscriber: Transcribing {
         progress(1)
     }
 
-    /// How many transcriptions have started, shared by the copies of one transcriber.
+    /// How many transcriptions of each note have started, by the note's folder, shared by the copies of one
+    /// transcriber.
     private final class Runs: Sendable {
-        private let count = Mutex(0)
+        private let counts = Mutex<[URL: Int]>([:])
 
-        /// The number of this run, from 0.
-        func next() -> Int { count.withLock { defer { $0 += 1 }; return $0 } }
+        /// The number of this run of the note in `folder`, from 0.
+        func next(for folder: URL) -> Int {
+            counts.withLock { counts in
+                defer { counts[folder, default: 0] += 1 }
+                return counts[folder, default: 0]
+            }
+        }
     }
 }
 #endif

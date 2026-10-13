@@ -1,17 +1,6 @@
 import SwiftUI
 import CassiniNotebook
 
-extension DocumentTrust {
-    /// The tone of the chip and of the banner (Android `TrustUi` and the TRUST_* banner tones).
-    var tone: Tone {
-        switch self {
-        case .verified: .ok
-        case .notVerified, .audioChanged: .warn
-        case .unreadable, .newerFormat: .error
-        }
-    }
-}
-
 /// The trust chip of a note imported from a Cassini document (Android `trustChip`); tapping it shows or hides the
 /// trust banner.
 struct DocumentTrustChip: View {
