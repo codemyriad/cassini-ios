@@ -15,10 +15,17 @@ final class LibraryUITests: XCTestCase {
         app.buttons.matching(NSPredicate(format: "identifier == 'noteRow' AND label BEGINSWITH %@", title)).firstMatch
     }
 
-    /// The row titled `title`, scrolled to when the list has not built it yet.
+    /// The library's list. Swipes go to it: on iPad the middle of the screen is the note beside it.
+    @MainActor private func list(_ app: XCUIApplication) -> XCUIElement {
+        app.scrollViews.containing(.button, identifier: "noteRow").firstMatch
+    }
+
+    /// The row titled `title`, scrolled to when the list has not built it yet or it is under the bottom bar.
     @MainActor private func scrolledRow(_ app: XCUIApplication, _ title: String) -> XCUIElement {
-        let element = row(app, title)
-        for _ in 0..<8 where !element.exists || !element.isHittable { app.swipeUp() }
+        let element = row(app, title), bar = app.buttons["recordButton"]
+        for _ in 0..<8 where !(element.exists && element.isHittable && element.frame.maxY <= bar.frame.minY) {
+            list(app).swipeUp()
+        }
         return element
     }
 
@@ -59,7 +66,7 @@ final class LibraryUITests: XCTestCase {
     @MainActor func testResumeAndTryAgainQueueTheNote() {
         let app = launch(["--seed", "statuses"])
         let resume = app.buttons["Resume transcribing Paused standup"]
-        for _ in 0..<4 where !resume.isHittable { app.swipeUp() }
+        for _ in 0..<4 where !resume.isHittable { list(app).swipeUp() }
         XCTAssertTrue(resume.waitForExistence(within: 10))
         XCTAssertGreaterThanOrEqual(resume.frame.height, 44, "a 44 pt target")
         resume.tap()
@@ -222,7 +229,7 @@ final class LibraryUITests: XCTestCase {
         // Up to the end of the list: once the last row is built, until a swipe no longer moves it.
         var previous = CGRect.null
         for _ in 0..<20 {
-            app.swipeUp()
+            list(app).swipeUp()
             guard last.exists else { continue }
             if last.frame == previous { break }
             previous = last.frame
@@ -265,7 +272,7 @@ final class LibraryUITests: XCTestCase {
 
         // Back up the list to the note, which is above the damaged one.
         let note = row(app, "A quieter kind of productivity")
-        for _ in 0..<8 where !(note.exists && note.isHittable) { app.swipeDown() }
+        for _ in 0..<8 where !(note.exists && note.isHittable) { list(app).swipeDown() }
         XCTAssertTrue(note.waitForExistence(within: 5))
         note.press(forDuration: 1)
         app.buttons["Export"].tap()
