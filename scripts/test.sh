@@ -20,7 +20,9 @@
 #   CASSINI_SIM_PREFIX   clone name prefix (default ts-<worktree directory name>)
 #
 # Builds go to <worktree>/DerivedData, which persists between runs so later builds are incremental. Package checkouts
-# are shared between worktrees under the cache, one directory per Package.resolved.
+# are shared between worktrees under the cache, one directory per Package.resolved: Xcode's directly, SwiftPM's as a
+# copy-on-write seed for a worktree without .build/. Logs and result bundles are in DerivedData/test-logs (the run
+# before in DerivedData/test-logs.previous).
 set -euo pipefail
 
 tier="${1:-all}"; [ $# -gt 0 ] && shift
@@ -153,19 +155,58 @@ conformance_env() {
     fi
 }
 
+package_key() { cat "$root/Package.resolved" "$root/Package.swift" | shasum | cut -c1-12; }
+
+# The files of .build/ that hold the resolved dependencies and name this worktree's path: the workspace state and
+# each checkout's link to its repository.
+swiftpm_path_files() {
+    local build="$1" checkout
+    echo "$build/workspace-state.json"
+    for checkout in "$build"/checkouts/*; do
+        [ -f "$checkout/.git/config" ] && echo "$checkout/.git/config"
+        [ -f "$checkout/.git/objects/info/alternates" ] && echo "$checkout/.git/objects/info/alternates"
+    done
+}
+
+# A worktree without .build/ starts from the dependencies another worktree resolved for the same Package.resolved,
+# cloned (APFS copy-on-write) with the paths moved over: SwiftPM otherwise fetches FluidAudio again, minutes over the
+# network.
+seed_swiftpm() {
+    local shared="$cache/swiftpm-$(package_key)" file
+    [ -f "$root/.build/workspace-state.json" ] || [ ! -f "$shared/workspace-state.json" ] && return 0
+    mkdir -p "$root/.build"
+    cp -cR "$shared/repositories" "$shared/checkouts" "$shared/artifacts" "$shared/workspace-state.json" "$root/.build/" 2>/dev/null || {
+        rm -rf "$root/.build"; return 0; }
+    swiftpm_path_files "$root/.build" | while IFS= read -r file; do
+        sed -i '' "s|@WORKTREE@|$root|g" "$file"
+    done
+}
+
+# Keeps this worktree's resolved dependencies for the next fresh worktree, once per Package.resolved.
+save_swiftpm() {
+    local shared="$cache/swiftpm-$(package_key)" tmp file
+    [ -f "$shared/workspace-state.json" ] || [ ! -f "$root/.build/workspace-state.json" ] && return 0
+    tmp="$shared.tmp.$$"
+    rm -rf "$tmp"; mkdir -p "$tmp"
+    cp -cR "$root/.build/repositories" "$root/.build/checkouts" "$root/.build/artifacts" "$root/.build/workspace-state.json" "$tmp/" 2>/dev/null || {
+        rm -rf "$tmp"; return 0; }
+    swiftpm_path_files "$tmp" | while IFS= read -r file; do
+        sed -i '' "s|$root|@WORKTREE@|g" "$file"
+    done
+    mv "$tmp" "$shared" 2>/dev/null || rm -rf "$tmp"
+}
+
 tier_fast() {
     conformance_env
+    seed_swiftpm
     step_start "swift test"
     run_logged "$logs/swift-test.log" swift test
     step_end
+    save_swiftpm
     grep -E "^✔ Test run with|^✘ Test run with" "$logs/swift-test.log" || true
 }
 
-packages_dir() {
-    local key
-    key=$(cat "$root/Package.resolved" "$root/Package.swift" | shasum | cut -c1-12)
-    echo "$cache/SourcePackages-$key"
-}
+packages_dir() { echo "$cache/SourcePackages-$(package_key)"; }
 
 xcode_flags() {
     printf '%s\n' -project "$root/Cassini.xcodeproj" -scheme Cassini -derivedDataPath "$derived" \
@@ -237,7 +278,17 @@ wait_first_boot() {
 tier_app() {
     step_start "hosted tests (CassiniTests)"
     wait_first_boot
-    if ! test_on CassiniTests "$logs/hosted.log" "$logs/hosted.xcresult" "$first_iphone" -only-testing:CassiniTests; then
+    local rc=0
+    test_on CassiniTests "$logs/hosted.log" "$logs/hosted.xcresult" "$first_iphone" -only-testing:CassiniTests || rc=$?
+    # xcodebuild installs the host app while it starts it; when that launch fails before any test ran, once more.
+    if [ $rc != 0 ] && grep -q "failed to launch app.codemyriad.cassini" "$logs/hosted.log" \
+        && ! grep -q "^Test Case " "$logs/hosted.log"; then
+        echo "the host app did not launch; trying once more"
+        mv "$logs/hosted.log" "$logs/hosted-launch-failed.log"
+        rc=0
+        test_on CassiniTests "$logs/hosted.log" "$logs/hosted.xcresult" "$first_iphone" -only-testing:CassiniTests || rc=$?
+    fi
+    if [ $rc != 0 ]; then
         grep -E "error:|failed \(|\*\* TEST" "$logs/hosted.log" | tail -20 >&2; echo "see $logs/hosted.log" >&2
         step_end; return 1
     fi
