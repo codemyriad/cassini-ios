@@ -73,41 +73,56 @@ final class AccessibilityAuditTests: XCTestCase {
 
     /// The audit, failing on every issue but those the system owns (`AuditFilter`), each with the element it is about.
     /// `transcript` is for a screen that draws a transcript, whose active word may yield one unattributed text issue
-    /// (`AuditFilter.isActiveWord`).
-    @MainActor private func audit(_ app: XCUIApplication, _ types: XCUIAccessibilityAuditType = .all.subtracting([.contrast, .dynamicType]),
-                                  transcript: Bool = false, window: Bool = false,
+    /// (`AuditFilter.isActiveWord`). On a failure the screen is attached as "audit-<screen>".
+    ///
+    /// The element detection runs in an audit of its own, before the other checks. The clipping check renders the
+    /// screen again at other text sizes, and an element detection in the same audit can read the pixels while the app
+    /// is still drawing its way back to the screen's own size: text the new layout has not settled, with no element
+    /// yet, reported as "Potentially inaccessible text" without an element. With animations slowed 30 times
+    /// (`-UIAnimationDragCoefficient 30`) Settings, Saved voices and Recently Deleted reported it in most audits that
+    /// ran both checks together, and never in 24 audits of the element detection alone, before or after the others; a
+    /// busy machine (the full run's iPad beside three iPhones) slows the redraw the same way, now and then.
+    @MainActor private func audit(_ app: XCUIApplication, screen: String,
+                                  _ types: XCUIAccessibilityAuditType = .all.subtracting([.contrast, .dynamicType]),
+                                  transcript: Bool = false,
                                   file: StaticString = #filePath, line: UInt = #line) {
         var issues: [String] = []
         var titleClipped = false
+        // An iPad window has a resize handle in its corner (`AuditFilter.isWindowControl`).
+        let window = UIDevice.current.userInterfaceIdiom == .pad
+        let detection = types.intersection(.elementDetection)
+        let passes = [detection, types.subtracting(.elementDetection)].filter { !$0.isEmpty }
         do {
-            try app.performAccessibilityAudit(for: types) { issue in
-                if AuditFilter.isNavigationTitle(issue, in: app, alreadySeen: titleClipped) {
-                    titleClipped = true
-                } else if transcript, AuditFilter.isActiveWord(issue) {
-                    // Passes: see `isActiveWord`.
-                } else if window, AuditFilter.isWindowControl(issue) {
-                    // Passes: see `isWindowControl`.
-                } else if !AuditFilter.isSystemOwned(issue) {
-                    issues.append(AuditFilter.describe(issue))
+            for pass in passes {
+                try app.performAccessibilityAudit(for: pass) { issue in
+                    if AuditFilter.isNavigationTitle(issue, in: app, alreadySeen: titleClipped) {
+                        titleClipped = true
+                    } else if transcript, AuditFilter.isActiveWord(issue) {
+                        // Passes: see `isActiveWord`.
+                    } else if window, AuditFilter.isWindowControl(issue) {
+                        // Passes: see `isWindowControl`.
+                    } else if !AuditFilter.isSystemOwned(issue) {
+                        issues.append(AuditFilter.describe(issue))
+                    }
+                    return true
                 }
-                return true
             }
         } catch {
             XCTFail("the audit could not run: \(error)", file: file, line: line)
         }
         if !issues.isEmpty {
             let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
-            screenshot.name = "audit-\(name)"; screenshot.lifetime = .keepAlways; add(screenshot)
+            screenshot.name = "audit-\(screen)"; screenshot.lifetime = .keepAlways; add(screenshot)
         }
         XCTAssertTrue(issues.isEmpty, issues.joined(separator: "\n"), file: file, line: line)
     }
 
-    @MainActor func testTheLibraryPassesTheAudit() { audit(library()) }
-    @MainActor func testTheNoteScreenPassesTheAudit() { audit(note(), transcript: true) }
-    @MainActor func testTheRecordingScreenPassesTheAudit() { audit(recording()) }
-    @MainActor func testSettingsPassesTheAudit() { audit(settings()) }
-    @MainActor func testRecentlyDeletedPassesTheAudit() { audit(trash()) }
-    @MainActor func testSavedVoicesPassesTheAudit() { audit(savedVoices()) }
+    @MainActor func testTheLibraryPassesTheAudit() { audit(library(), screen: "library") }
+    @MainActor func testTheNoteScreenPassesTheAudit() { audit(note(), screen: "note", transcript: true) }
+    @MainActor func testTheRecordingScreenPassesTheAudit() { audit(recording(), screen: "recording") }
+    @MainActor func testSettingsPassesTheAudit() { audit(settings(), screen: "settings") }
+    @MainActor func testRecentlyDeletedPassesTheAudit() { audit(trash(), screen: "trash") }
+    @MainActor func testSavedVoicesPassesTheAudit() { audit(savedVoices(), screen: "savedVoices") }
 
     // MARK: iPad
 
@@ -119,7 +134,7 @@ final class AccessibilityAuditTests: XCTestCase {
             ("trash", trash), ("savedVoices", savedVoices)]
         for (name, open) in screens {
             let app = open([])
-            XCTContext.runActivity(named: name) { _ in audit(app, transcript: name == "note", window: true) }
+            XCTContext.runActivity(named: name) { _ in audit(app, screen: "ipad-\(name)", transcript: name == "note") }
             app.terminate()
         }
     }
@@ -129,9 +144,11 @@ final class AccessibilityAuditTests: XCTestCase {
     /// At AX5 no text is cut: rows, the player, the cards and the capture bar grow or wrap instead.
     // ports: LargeFontScaleTest#theRowSuffixIsNotCutAtFontScale2 (AX5; every text, through the audit's clipping check)
     @MainActor func testNoTextIsClippedAtTheLargestTextSize() {
-        for open in [library, note, settings, trash, savedVoices] as [@MainActor ([String]) -> XCUIApplication] {
+        let screens: [(String, @MainActor ([String]) -> XCUIApplication)] = [
+            ("library", library), ("note", note), ("settings", settings), ("trash", trash), ("savedVoices", savedVoices)]
+        for (name, open) in screens {
             let app = open(Self.largestText)
-            audit(app, .textClipped)
+            audit(app, screen: "largest-\(name)", .textClipped)
             app.terminate()
         }
     }
@@ -179,7 +196,7 @@ enum AuditFilter {
         issue.element == nil && issue.auditType == .elementDetection
     }
 
-    /// A hit region too small with no element, on the iPad: the window's resize handle in its corner, which iPadOS
+    /// A hit region too small with no element, on an iPad: the window's resize handle in its corner, which iPadOS
     /// draws over every app window and the app does not own. Every control of the app's own views comes with its element.
     @MainActor static func isWindowControl(_ issue: XCUIAccessibilityAuditIssue) -> Bool {
         issue.element == nil && issue.auditType == .hitRegion
