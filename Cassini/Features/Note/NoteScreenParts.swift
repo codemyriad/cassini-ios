@@ -87,16 +87,27 @@ struct FollowChipHost: View {
     }
 }
 
-/// The draft of the running job, as it grows; "Words may still change" while it does.
+/// The draft of the running job, as it grows; "Words may still change" while it does. `grew` is called after new
+/// text, not when the screen opens.
 struct RunningDraft: View {
     let noteID: UUID
     let cache: TranscriptCache
+    var grew: () -> Void = {}
     @Environment(JobProgress.self) private var progress
 
+    private var draft: DraftState? {
+        guard case .transcribing(_, let draft)? = progress.phase(for: noteID) else { return nil }
+        return draft
+    }
+
     var body: some View {
-        if case .transcribing(_, let draft)? = progress.phase(for: noteID), !draft.words.isEmpty {
-            DraftSection(transcript: cache.draft(draft), changing: true)
+        let draft = draft
+        Group {
+            if let draft, !draft.words.isEmpty {
+                DraftSection(transcript: cache.draft(draft), changing: true)
+            }
         }
+        .onChange(of: draft?.words.count ?? 0) { _, _ in grew() }
     }
 }
 

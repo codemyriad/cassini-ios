@@ -200,6 +200,32 @@ final class NoteScreenTests: XCTestCase {
         XCTAssertTrue(app.buttons["Transcribe"].waitForExistence(within: 10), "the note is audio only again")
     }
 
+    // ports: ScreenBehaviourTest#newDraftTextKeepsTheProgressCardInView
+    /// New draft text scrolls the end of the draft into view below the fixed card; a scroll up stops that, and a
+    /// scroll back to the end starts it again.
+    @MainActor func testTheDraftFollowsItsEndBelowTheFixedCard() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed", "processing", "--draft-growing",
+                               "--open-fixture", "CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC"]
+        app.launchAndWait()
+        // The draft's header, its tag and its paragraphs all carry the section's identifier; the last one ends it.
+        let parts = app.descendants(matching: .any).matching(identifier: "draftTranscript")
+        XCTAssertTrue(parts.firstMatch.waitForExistence(within: 15))
+        var draft: XCUIElement { parts.element(boundBy: parts.count - 1) }
+        let window = app.windows.firstMatch.frame
+        let stop = app.buttons["Stop and keep progress"]
+        // The draft outgrows the screen; its end stays in view and so does the card.
+        XCTAssertTrue(poll(within: 30) { draft.frame.height > window.height / 2 && draft.frame.maxY <= window.maxY + 1 },
+                      "the end of the draft follows the new text")
+        XCTAssertTrue(stop.isHittable, "the card stays fixed above the draft")
+
+        draft.swipeDown()
+        XCTAssertTrue(poll(within: 10) { draft.frame.maxY > window.maxY + 100 })
+        RunLoop.current.run(until: Date().addingTimeInterval(2))
+        XCTAssertGreaterThan(draft.frame.maxY, window.maxY + 100, "after a scroll up, new text does not scroll")
+        XCTAssertTrue(stop.isHittable)
+    }
+
     /// The note screen's Rename is the Library's dialog: Save waits for a change, and a blank title says why.
     @MainActor func testRenameFollowsTheLibrarysRule() {
         let app = open()

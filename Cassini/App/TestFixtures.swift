@@ -24,6 +24,17 @@ enum TestFixtures {
         .init(text: "Let’s protect an hour on Thursday for focused work. No notifications, no meetings. Just room to think.", start: 14, end: 24, speaker: "Alex", speakerID: "alex"),
     ]
 
+    /// The draft of `--draft-growing`: 120 sentences of 3 s, each its own words.
+    static let growingDraft: [TranscriptSegment] = (0..<120).map { index in
+        let start = Double(index) * 3
+        let texts = "Sentence \(index + 1) of the running draft keeps arriving.".split(separator: " ").map(String.init)
+        let words = texts.enumerated().map { offset, text in
+            TimedWord(text: (offset == 0 ? "" : " ") + text, start: start + Double(offset) * 0.3,
+                      end: start + Double(offset) * 0.3 + 0.25)
+        }
+        return TranscriptSegment(text: texts.joined(separator: " "), start: start, end: start + 3, words: words)
+    }
+
     private static let waveform = (0..<96).map { Float(0.15 + abs(sin(Double($0) * 0.73)) * 0.55) }
 
     /// Writes the notes of `seed` into an empty library.
