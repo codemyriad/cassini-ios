@@ -71,10 +71,10 @@ public struct CheckpointFiles: CheckpointStoring {
             let main = folder.appendingPathComponent(Self.filename)
             let backup = folder.appendingPathComponent(Self.backupFilename)
             let temporary = folder.appendingPathComponent(Self.filename + ".tmp")
-            try Self.writeSynced(state.encoded(), to: temporary)
-            if FileManager.default.fileExists(atPath: main.path) { try Self.rename(main, to: backup) }
-            try Self.rename(temporary, to: main)
-            Self.syncDirectory(folder)
+            try DurableFile.writeSynced(state.encoded(), to: temporary)
+            if FileManager.default.fileExists(atPath: main.path) { try DurableFile.rename(main, to: backup) }
+            try DurableFile.rename(temporary, to: main)
+            DurableFile.syncDirectory(folder)
         } catch {
             if Self.isOutOfSpace(error) || availableBytes(noteDirectory(noteID)) < Self.minFreeBytes {
                 throw CheckpointSpaceError()
@@ -114,30 +114,5 @@ public struct CheckpointFiles: CheckpointStoring {
         if let posix = error as? POSIXError, posix.code == .ENOSPC || posix.code == .EDQUOT { return true }
         let underlying = (error as NSError).userInfo[NSUnderlyingErrorKey] as? any Error
         return underlying.map(isOutOfSpace) ?? false
-    }
-
-    /// Writes `data` and flushes it to the disk before returning.
-    private static func writeSynced(_ data: Data, to url: URL) throws {
-        if FileManager.default.fileExists(atPath: url.path) { try FileManager.default.removeItem(at: url) }
-        guard FileManager.default.createFile(atPath: url.path, contents: nil) else { throw CocoaError(.fileWriteUnknown) }
-        let handle = try FileHandle(forWritingTo: url)
-        defer { try? handle.close() }
-        try handle.write(contentsOf: data)
-        try handle.synchronize()
-    }
-
-    /// `rename(2)`: replaces `destination` atomically.
-    private static func rename(_ source: URL, to destination: URL) throws {
-        guard Darwin.rename(source.path, destination.path) == 0 else {
-            throw CocoaError(.fileWriteUnknown, userInfo: [NSUnderlyingErrorKey: POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)])
-        }
-    }
-
-    /// Flushes the renames; best effort.
-    private static func syncDirectory(_ folder: URL) {
-        let descriptor = open(folder.path, O_RDONLY)
-        guard descriptor >= 0 else { return }
-        fsync(descriptor)
-        close(descriptor)
     }
 }

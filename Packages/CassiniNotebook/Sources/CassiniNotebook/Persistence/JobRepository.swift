@@ -1,6 +1,6 @@
 import Foundation
 
-/// The transcription queue on disk: `<root>/jobs.json`, every job in `seq` order, written atomically.
+/// The transcription queue on disk: `<root>/jobs.json`, every job in `seq` order, written durably (`DurableFile`).
 public struct JobRepository: Sendable {
     public static let filename = "jobs.json"
     public static let version = 1
@@ -50,6 +50,6 @@ public struct JobRepository: Sendable {
     public func save(_ jobs: [Job]) throws {
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
-        try encoder.encode(File(version: Self.version, jobs: jobs.sorted { $0.seq < $1.seq })).write(to: url, options: .atomic)
+        try DurableFile.write(encoder.encode(File(version: Self.version, jobs: jobs.sorted { $0.seq < $1.seq })), to: url)
     }
 }

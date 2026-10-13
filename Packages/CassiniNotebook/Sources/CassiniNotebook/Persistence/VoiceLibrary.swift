@@ -60,7 +60,7 @@ public final class VoiceLibrary {
     public func save(_ values: [SavedVoice]) throws {
         refreshed()
         if let problem { throw VoiceLibraryError.readOnly(problem) }
-        try VoiceCodec.encode(values).write(to: voicesFile, options: .atomic)
+        try DurableFile.write(VoiceCodec.encode(values), to: voicesFile)
         voices = values
     }
 
@@ -82,7 +82,7 @@ public final class VoiceLibrary {
     public func savePrints(_ prints: [SpeakerPrint], noteID: UUID) throws {
         let url = printsFile(noteID)
         if isNewer(url) { throw VoiceLibraryError.newerPrints(noteID) }
-        try NoteVoiceCodec.encode(prints).write(to: url, options: .atomic)
+        try DurableFile.write(NoteVoiceCodec.encode(prints), to: url)
     }
 
     /// Whether any note has prints on disk.

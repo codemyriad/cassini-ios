@@ -40,7 +40,7 @@
   `resumedFromMs` and `wordsComplete`. Android's encoder, diarizer, voice-clip and word-log members do not exist on iOS,
   so `CheckpointData` (base64 floats) and the word log are not ported. A checkpoint that does not match the audio file,
   its signature or the job's language fails with `CHECKPOINT_MISMATCH`; so does one that cannot be read.
-- **Writes.** A checkpoint is written to a temporary file, flushed with `fsync`, the previous one is kept as
+- **Writes.** A checkpoint is written to a temporary file, flushed with `F_FULLFSYNC` (`DurableFile`), the previous one is kept as
   `checkpoint.json.bak` and the new one renamed into place; a load falls back to the backup. `checkpointed` is sent only
   after that. A failed write is `SPACE` when the volume reports out of space or has under 64 MB free (Android's
   `writeFailure()`), else `SAVE`. The folder is `NoteStore.directory(for:)` + `work/`, so it goes with the note.
