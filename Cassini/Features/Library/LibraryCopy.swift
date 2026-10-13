@@ -10,8 +10,10 @@ enum LibraryCopy {
     static let settings = String(localized: "Settings", table: "Library", comment: "Library toolbar button")
     static let searchPlaceholder = String(localized: "Search titles and what was said", table: "Library",
                                           comment: "Library search field placeholder")
+    static let searchPlaceholderMedium = String(localized: "Search titles and transcripts", table: "Library",
+                                                comment: "Library search field placeholder where the long one does not fit on one line (the iPad sidebar)")
     static let searchPlaceholderShort = String(localized: "Search", table: "Library",
-                                               comment: "Library search field placeholder at accessibility text sizes")
+                                               comment: "Library search field placeholder where no longer one fits on one line")
     static let clearSearch = String(localized: "Clear search", table: "Library", comment: "Library search field clear button")
     static let privacy = String(localized: "Transcribed on this device. Audio never leaves it.", table: "Library",
                                 comment: "Library line under the search field")

@@ -495,14 +495,18 @@ These features exist only on iOS. They were kept by decision.
   pair a screen draws in light and dark (4.5:1 for text, 3:1 for large text and non-text), with tone tints composited
   over the surface under them.
 - **Wide windows.** One `ReadableWidth.content` of 560 pt, Android's `MaxContentWidth`, applies to every screen. On
-  iPad the Library is the split view's sidebar, which is narrower than the cap.
+  iPad the Library is the split view's sidebar, which is narrower than the cap. There the search field's placeholder,
+  Android's "Search titles and what was said", would wrap, so the field shows the longest of it, "Search titles and
+  transcripts" and "Search" that fits on one line (also at large text sizes, where Android keeps the long one).
 - **Accessibility audits.** Android runs the Accessibility Test Framework. iOS runs `performAccessibilityAudit()` on
   the same screens plus Recently Deleted and Saved voices, and checks for clipping at the AX5 text size in place of
   `LargeFontScaleTest`. The audit's pixel contrast check is not used, because its verdict changes from run to run on
   Liquid Glass. The tokens are checked instead. The six screens are audited on the iPad as well, beside the Library's
   sidebar. Each issue the audits let pass has its reason in `AuditFilter`: the system's status bar and keyboard, the
   two-line row title and preview, iPadOS's window resize handle, and element detection's unattributed reading of the
-  transcript's inverted active word.
+  transcript's inverted active word. Element detection runs in an audit of its own, before the other checks: in the
+  same audit it could read the screen while the clipping check's text sizes were still being redrawn, and report
+  text without an element.
 - **Capped bars.** The player and the capture bar stop growing at AX1 and offer the Large Content Viewer. When Import
   and Record do not fit side by side, Import becomes a round icon, as on Android.
 - **Transcript paragraphs** are one plain-text element each for VoiceOver and Voice Control. The word links are for

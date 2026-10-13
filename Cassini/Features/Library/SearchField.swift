@@ -6,14 +6,14 @@ struct SearchField: View {
     @Binding var query: String
     @FocusState private var focused: Bool
     @Environment(\.dynamicTypeSize) private var dynamicType
+    /// The width the field's text has, for the placeholder that fits it on one line.
+    @State private var textWidth: CGFloat = 0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass").foregroundStyle(Color.muted).accessibilityHidden(true)
-                // At accessibility sizes the long placeholder would be cut; "Search" says enough.
-                TextField(dynamicType.isAccessibilitySize ? LibraryCopy.searchPlaceholderShort : LibraryCopy.searchPlaceholder,
-                          text: $query, axis: .vertical)
+                TextField(placeholder, text: $query, axis: .vertical)
                     .lineLimit(1...3)
                     .font(.body).autocorrectionDisabled().textInputAutocapitalization(.never)
                     .submitLabel(.search).focused($focused).onSubmit { focused = false }
@@ -24,6 +24,7 @@ struct SearchField: View {
                         focused = false
                     }
                     .accessibilityIdentifier("librarySearch")
+                    .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { textWidth = $0 }
                 if !query.isEmpty {
                     Button(LibraryCopy.clearSearch, systemImage: "xmark.circle.fill") { query = "" }
                         .labelStyle(.iconOnly).foregroundStyle(Color.muted)
@@ -36,5 +37,16 @@ struct SearchField: View {
             Label(LibraryCopy.privacy, systemImage: "lock.shield")
                 .font(.caption).foregroundStyle(Color.muted).padding(.leading, 4)
         }
+    }
+
+    /// Android's placeholder where it fits on one line (a phone); in the iPad's narrower sidebar, or at large text
+    /// sizes, a shorter one, down to "Search". The field wraps typed text, and a wrapped placeholder would too.
+    private var placeholder: String {
+        let candidates = [LibraryCopy.searchPlaceholder, LibraryCopy.searchPlaceholderMedium, LibraryCopy.searchPlaceholderShort]
+        guard textWidth > 0 else { return candidates[0] }
+        let category = UIContentSizeCategory(dynamicType)
+        let font = UIFont.preferredFont(forTextStyle: .body, compatibleWith: UITraitCollection(preferredContentSizeCategory: category))
+        return candidates.first { ($0 as NSString).size(withAttributes: [.font: font]).width.rounded(.up) <= textWidth }
+            ?? candidates[candidates.count - 1]
     }
 }

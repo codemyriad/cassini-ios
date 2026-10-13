@@ -847,13 +847,25 @@
       }
     },
     "Search": {
-      "comment": "Library search field placeholder at accessibility text sizes",
+      "comment": "Library search field placeholder where no longer one fits on one line",
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Cerca"
+          }
+        }
+      }
+    },
+    "Search titles and transcripts": {
+      "comment": "Library search field placeholder where the long one does not fit on one line (the iPad sidebar)",
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cerca titoli e trascrizioni"
           }
         }
       }
