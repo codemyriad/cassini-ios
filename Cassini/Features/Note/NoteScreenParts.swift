@@ -6,7 +6,8 @@ import CassiniNotebook
 // recording) live in their own views, so that state redraws them and not the screen around them.
 
 /// The banners of the note (the catalogue's, from `NoteBanners`), then the iOS notices: no speakers found, and the
-/// playback failure, the one fact here that moves with the player.
+/// playback failure, the one fact here that moves with the player. Only `PlaybackFailedNotice` reads the player, so a
+/// playback tick does not draw the banners again.
 struct NoteBannersView: View {
     let note: Note
     let job: Job?
@@ -14,37 +15,28 @@ struct NoteBannersView: View {
     let facts: NoteBannerFacts
     let act: (BannerSpec, BannerAction) -> Void
     let dismiss: (BannerSpec) -> Void
-    @Environment(PlaybackStore.self) private var playback
-
-    var body: some View {
-        // The player's state changes on every tick; the banners only when it fails, so a list that compares equal is
-        // not drawn again.
-        NoteBannerList(specs: NoteBanners.banners(note, job: job, mode: mode, facts: facts,
-                                                  failureText: \.transcriptionMessage, unplayableText: \.bannerText),
-                       noSpeakers: NoteBanners.noSpeakers(note, job: job),
-                       playbackFailed: mode.hasPlayer && playback.failed(note.id), act: act, dismiss: dismiss)
-            .equatable()
-    }
-}
-
-private struct NoteBannerList: View, @MainActor Equatable {
-    let specs: [BannerSpec]
-    let noSpeakers: Bool
-    let playbackFailed: Bool
-    let act: (BannerSpec, BannerAction) -> Void
-    let dismiss: (BannerSpec) -> Void
-
-    static func == (a: NoteBannerList, b: NoteBannerList) -> Bool {
-        a.specs == b.specs && a.noSpeakers == b.noSpeakers && a.playbackFailed == b.playbackFailed
-    }
 
     var body: some View {
         #if DEBUG
         let _ = RenderProbe.rendered("banners")
         #endif
-        BannerList(specs: specs, onAction: act, onDismiss: dismiss)
-        if noSpeakers { NoticeCard(title: JobFailure.empty.speakerAnalysisMessage, symbol: "person.2.slash") }
-        if playbackFailed {
+        BannerList(specs: NoteBanners.banners(note, job: job, mode: mode, facts: facts,
+                                              failureText: \.transcriptionMessage, unplayableText: \.bannerText),
+                   onAction: act, onDismiss: dismiss)
+        if NoteBanners.noSpeakers(note, job: job) {
+            NoticeCard(title: JobFailure.empty.speakerAnalysisMessage, symbol: "person.2.slash")
+        }
+        if mode.hasPlayer { PlaybackFailedNotice(noteID: note.id) }
+    }
+}
+
+/// "This audio can’t be played" while the note's own player has failed.
+private struct PlaybackFailedNotice: View {
+    let noteID: UUID
+    @Environment(PlaybackStore.self) private var playback
+
+    var body: some View {
+        if playback.failed(noteID) {
             NoticeCard(title: String(localized: "This audio can’t be played", table: "Playback"), symbol: "waveform.slash")
         }
     }

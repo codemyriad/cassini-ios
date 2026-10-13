@@ -20,7 +20,7 @@ struct TranscriptActions {
 /// VoiceOver reads the paragraph as one element whose default action plays it from its start, with no stop per word.
 /// The view is `Equatable` over what it draws, so a new playback position redraws only the paragraphs that hold the
 /// old and the new active word.
-struct TurnView: View, @MainActor Equatable {
+struct TurnView: View, Equatable {
     enum Style { case reading, draft }
 
     let turn: NoteTurn
@@ -34,7 +34,7 @@ struct TurnView: View, @MainActor Equatable {
     /// Where the paragraph is, for auto-follow.
     var geometry: FollowGeometry?
 
-    static func == (a: TurnView, b: TurnView) -> Bool {
+    nonisolated static func == (a: TurnView, b: TurnView) -> Bool {
         a.turn == b.turn && a.activeIndex == b.activeIndex && a.matches == b.matches && a.currentMatch == b.currentMatch
             && a.style == b.style && a.renamable == b.renamable
     }

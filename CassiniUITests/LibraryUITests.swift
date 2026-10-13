@@ -275,8 +275,9 @@ final class LibraryUITests: XCTestCase {
         // The note runs the export it was opened for: the share sheet offers the subtitles.
         let shareSheet = app.otherElements["ActivityListView"]
         XCTAssertTrue(shareSheet.waitForExistence(within: 10), "the note shares the exported subtitles")
-        // The sheet's contents come from another process, a moment after the sheet itself.
-        let close = shareSheet.buttons["Close"]
+        // iOS 27 sometimes draws the sheet's Close in a floating bar outside the activity list, and the sheet's
+        // contents come from another process a moment after the sheet itself.
+        let close = app.buttons["Close"].firstMatch
         XCTAssertTrue(close.waitForExistence(within: 10))
         close.tap()
         XCTAssertTrue(shareSheet.waitForNonExistence(within: 5))
