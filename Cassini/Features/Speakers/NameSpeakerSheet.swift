@@ -10,7 +10,6 @@ struct NameSpeakerSheet: View {
     var draft: String?
     var nameChanged: (String) -> Void = { _ in }
     @Environment(LibraryStore.self) private var library
-    @Environment(VoicesStore.self) private var voices
     @Environment(PlaybackStore.self) private var playback
     @Environment(SettingsStore.self) private var settings
     @Environment(\.dismiss) private var dismiss
@@ -21,12 +20,13 @@ struct NameSpeakerSheet: View {
     @State private var nameField = ""
     @AccessibilityFocusState private var questionFocused: Bool
 
-    init(noteID: UUID, speakerID: String, draft: String? = nil, nameChanged: @escaping (String) -> Void = { _ in }) {
-        self.noteID = noteID
-        self.speakerID = speakerID
+    init(model: @autoclosure () -> NameSpeakerModel, draft: String? = nil, nameChanged: @escaping (String) -> Void = { _ in }) {
+        let model = model()
+        self.noteID = model.noteID
+        self.speakerID = model.speakerID
         self.draft = draft
         self.nameChanged = nameChanged
-        _model = State(initialValue: NameSpeakerModel(noteID: noteID, speakerID: speakerID))
+        _model = State(initialValue: model)
     }
 
     private var state: NamingState? { model.state }
@@ -54,11 +54,11 @@ struct NameSpeakerSheet: View {
             }
         }
         .tint(.ember)
-        .task { await model.open(voices: voices, draft: draft, sheet: handle) }
+        .task { await model.open(draft: draft, sheet: handle) }
         .onDisappear { playback.stopSample() }
-        .alert(SpeakersCopy.couldNotSave, isPresented: Binding(get: { model.saveError != nil }, set: { if !$0 { model.saveError = nil } })) {
-            Button(SpeakersCopy.ok) { model.saveError = nil }
-        } message: { Text(model.saveError ?? "") }
+        .alert(SpeakersCopy.couldNotSave, isPresented: Binding(get: { model.failure != nil }, set: { if !$0 { model.failure = nil } })) {
+            Button(SpeakersCopy.ok) { model.failure = nil }
+        } message: { Text(model.failure?.message ?? "") }
     }
 
     /// This speaker's label in the reader's language (`NoteCopy.speakerLabel`).
@@ -179,7 +179,7 @@ struct NameSpeakerSheet: View {
 
     // MARK: - Events
 
-    private func send(_ event: NamingEvent) { model.send(event, voices: voices, sheet: handle) }
+    private func send(_ event: NamingEvent) { model.send(event, sheet: handle) }
 
     private func handle(_ action: NameSpeakerModel.SheetAction) {
         switch action {
@@ -209,5 +209,15 @@ struct NameSpeakerSheet: View {
     private func close() {
         playback.stopSample()
         dismiss()
+    }
+}
+
+extension NameSpeakerModel.Failure {
+    /// Why the save did not happen, as the sheet's alert says it.
+    var message: String {
+        switch self {
+        case .save(let failure): failure.message
+        case .readOnly(let reason): NoteCopy.readOnly(reason)
+        }
     }
 }

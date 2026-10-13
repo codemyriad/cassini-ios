@@ -140,7 +140,7 @@ import CassiniNotebook
         case .openNote(let id, let modelDownload):
             router.dismissRecording()
             router.openNote(id)
-            if modelDownload { router.push(.modelDownload(noteID: id)) }
+            if modelDownload { router.offerModelDownload(for: id) }
         }
     }
 

@@ -77,10 +77,11 @@ public struct ScreenStack: Hashable, Sendable {
 
     public mutating func popToLibrary() { path.removeAll() }
 
-    /// The model download screen over the note, when the note is still the screen on top (as after a recording that
-    /// may not be transcribed without the download).
+    /// The model download screen over the note, when the note is still the screen on top, whatever query or start
+    /// action it was opened with: the one rule for every Transcribe asked for over a note (its screen, its sheets, a
+    /// recording or an import that may not be transcribed without the download, a notification's Resume).
     public mutating func offerModelDownload(for noteID: UUID) {
-        guard path.last == .note(noteID) else { return }
+        guard let top = path.last, top.isSameScreen(as: .note(noteID)) else { return }
         push(.modelDownload(noteID: noteID))
     }
 

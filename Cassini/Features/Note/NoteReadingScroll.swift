@@ -14,10 +14,10 @@ struct NoteReadingScroll: View {
     let current: Int
     let savedDraft: [DraftWord]
     let model: NoteScreenModel
-    let stores: NoteScreenStores
     let cache: TranscriptCache
     let actions: TranscriptActions
     let suggestion: (NoteTurn) -> AnyView?
+    @Environment(PlaybackStore.self) private var playback
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var geometry = FollowGeometry()
     @State private var scrollPosition = ScrollPosition()
@@ -34,10 +34,10 @@ struct NoteReadingScroll: View {
                 VStack(alignment: .leading, spacing: Spacing.section) {
                     NoteHeader(note: note, subtitle: subtitle)
                     ForEach(mode.sections, id: \.self) {
-                        NoteSectionView(section: $0, note: note, mode: mode, model: model, stores: stores)
+                        NoteSectionView(section: $0, note: note, mode: mode, model: model)
                     }
                     if mode.hasPlayer, !note.bookmarks.isEmpty {
-                        BookmarksSection(note: note, isExpanded: $model.showBookmarks) { model.seek($0, stores) }
+                        BookmarksSection(note: note, isExpanded: $model.showBookmarks, model: model)
                     }
                     if mode.showsDraft, !savedDraft.isEmpty {
                         DraftSection(transcript: cache.saved(savedDraft), changing: false)
@@ -59,7 +59,6 @@ struct NoteReadingScroll: View {
                 geometry.height = metrics.height; geometry.maxOffset = metrics.maxOffset
             }
             .onScrollPhaseChange { _, phase in
-                let playback = stores.playback
                 model.scrolled(PlaybackFollow.Scrolling(phase), playing: playback.owns(note.id) && playback.state.isPlaying)
             }
             // Also on the first value: a search the Library opened scrolls to its first match.
@@ -97,5 +96,15 @@ private struct ScrollMetrics: Equatable {
         top = insets.top
         height = max(0, geometry.containerSize.height - insets.top - insets.bottom)
         maxOffset = max(-insets.top, geometry.contentSize.height + insets.bottom - geometry.containerSize.height)
+    }
+}
+
+extension PlaybackFollow.Scrolling {
+    init(_ phase: ScrollPhase) {
+        switch phase {
+        case .interacting: self = .dragging
+        case .idle: self = .idle
+        default: self = .moving
+        }
     }
 }

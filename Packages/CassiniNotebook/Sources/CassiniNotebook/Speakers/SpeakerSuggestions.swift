@@ -10,6 +10,12 @@ public struct SpeakerSuggestion: Hashable, Sendable {
     /// The passage the card goes above.
     public var segmentID: UUID
     public var start: Double
+
+    public init(speakerID: String, label: String, voiceID: UUID, voiceName: String, score: Float, segmentID: UUID,
+                start: Double) {
+        self.speakerID = speakerID; self.label = label; self.voiceID = voiceID; self.voiceName = voiceName
+        self.score = score; self.segmentID = segmentID; self.start = start
+    }
 }
 
 public enum SpeakerSuggestions {

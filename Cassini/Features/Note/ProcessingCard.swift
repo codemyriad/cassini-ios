@@ -10,6 +10,7 @@ struct ProcessingCard: View {
     let note: Note
     /// The queued jobs before this note's, the running one not counted.
     var ahead = 0
+    let model: NoteScreenModel
     @Environment(ProcessingStore.self) private var processing
     @Environment(JobProgress.self) private var progress
 
@@ -39,7 +40,7 @@ struct ProcessingCard: View {
             }
             .font(.caption).foregroundStyle(Color.muted)
             .accessibilityIdentifier("queuedAhead")
-            Button { processing.dequeue(note.id) } label: {
+            Button { model.removeFromQueue() } label: {
                 Text("Remove from queue", tableName: "Processing").frame(maxWidth: .infinity, minHeight: HitTarget.minimum)
             }
             .buttonStyle(.bordered)
@@ -49,11 +50,11 @@ struct ProcessingCard: View {
     @ViewBuilder private func running(_ phase: JobPhase) -> some View {
         switch phase {
         case .transcribing(let running, _):
-            ProgressCardContent(progress: running, stop: { processing.stop(note.id) }, cancelDownload: processing.cancelJobDownload)
+            ProgressCardContent(progress: running, stop: model.stopJob, cancelDownload: model.cancelJobDownload)
         case .downloading(let download):
             Header(headline: ProgressText.downloadingModels, range: nil, percent: download?.percent)
             ProgressView(value: download.map { Double($0.percent) / 100 }).tint(.ember)
-            if let download { DownloadRow(download: download, cancel: processing.cancelJobDownload) }
+            if let download { DownloadRow(download: download, cancel: model.cancelJobDownload) }
             stopButton
             footnote
         case .stopping:
@@ -68,7 +69,7 @@ struct ProcessingCard: View {
         }
     }
 
-    private var stopButton: some View { StopButton { processing.stop(note.id) } }
+    private var stopButton: some View { StopButton(action: model.stopJob) }
     private var footnote: some View { Footnote() }
 }
 

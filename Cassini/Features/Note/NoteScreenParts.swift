@@ -64,11 +64,11 @@ struct RecordingNotices: View {
 /// The player bar, usable while this screen's note owns the player.
 struct NotePlayerBar: View {
     let note: Note
-    let addBookmark: () -> Void
+    let markMoment: (TimeInterval) -> Void
     @Environment(PlaybackStore.self) private var playback
 
     var body: some View {
-        PlaybackBar(note: note, addBookmark: addBookmark)
+        PlaybackBar(note: note, markMoment: markMoment)
             .disabled(playback.isBlocked || !playback.owns(note.id))
     }
 }

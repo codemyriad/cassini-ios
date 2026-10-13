@@ -53,6 +53,7 @@ struct RootView: View {
 private struct RouteDestination: View {
     let route: Route
     @Environment(Router.self) private var router
+    @Environment(NoteScreens.self) private var notes
 
     var body: some View {
         screen.navigationBarBackButtonHidden(router.hidesBackButton(route))
@@ -61,7 +62,7 @@ private struct RouteDestination: View {
     @ViewBuilder private var screen: some View {
         switch route {
         case .library: LibraryView()
-        case .note(let id, let query, let start): NoteDetailView(noteID: id, query: query, start: start)
+        case .note(let id, let query, let start): NoteDetailView(model: notes.model(id, query: query), start: start)
         case .settings: SettingsView()
         case .savedVoices: SavedVoicesView()
         case .trash: TrashView()

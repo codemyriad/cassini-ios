@@ -10,10 +10,9 @@ import CassiniNotebook
 /// "Playback".
 struct PlaybackBar: View {
     let note: Note
-    /// Called after a bookmark is added, to show the bookmarks.
-    let addBookmark: () -> Void
+    /// Mark this moment at a position: the bookmark, and the section that lists it open.
+    let markMoment: (TimeInterval) -> Void
     @Environment(PlaybackStore.self) private var playback
-    @Environment(LibraryStore.self) private var library
     /// Where the slider is while it is dragged.
     @State private var dragging: TimeInterval?
 
@@ -99,10 +98,7 @@ struct PlaybackBar: View {
             .accessibilityLabel(Text("Forward 10 seconds", tableName: "Playback"))
             .accessibilityIdentifier("skipForward")
             Spacer()
-            Button {
-                library.markMoment(note.id, at: position)
-                addBookmark()
-            } label: { Image(systemName: "bookmark").font(.title3).frame(width: 48, height: 48) }
+            Button { markMoment(position) } label: { Image(systemName: "bookmark").font(.title3).frame(width: 48, height: 48) }
             .accessibilityLabel(Text("Mark this moment", tableName: "Playback"))
         }
         .foregroundStyle(Color.ink)

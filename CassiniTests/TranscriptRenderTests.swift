@@ -119,7 +119,7 @@ import CassiniNotebook
 
         let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
         window.rootViewController = UIHostingController(
-            rootView: NavigationStack { NoteDetailView(noteID: note.id) }.environment(test.graph))
+            rootView: NavigationStack { NoteDetailView(model: test.graph.noteScreens.model(note.id, query: nil)) }.environment(test.graph))
         window.makeKeyAndVisible()
         defer { window.isHidden = true }
         settle(window)

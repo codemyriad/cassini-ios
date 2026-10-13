@@ -32,7 +32,7 @@ extension Router {
             // Resume from the notification: a paused job goes on from its saved progress, as from the screen. A note
             // that is no longer paused (resumed already, or the notification is old) is left as it is.
             guard let job = processing.state.jobs[id], job.state == .paused else { return }
-            if await processing.transcribe(id, kind: job.kind, origin: .screen) == .needsConsent {
+            if await processing.transcribe(id, kind: job.kind, origin: .screen).followUp == .openModelDownload {
                 router.offerModelDownload(for: id)
             }
         }

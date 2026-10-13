@@ -59,6 +59,9 @@ import CassiniEngine
         screens.path = [.note(a), .settings]
         screens.offerModelDownload(for: a)
         #expect(screens.path == [.note(a), .settings])
+        screens.path = [.note(a, query: "launch", start: .documentInfo)]
+        screens.offerModelDownload(for: a)
+        #expect(screens.path.last == .modelDownload(noteID: a), "a note opened with a query or a start action is the same screen")
     }
 
     // ports: NoteViewModelTest#aRowStartedFromTheLibraryRunsOnceOnly

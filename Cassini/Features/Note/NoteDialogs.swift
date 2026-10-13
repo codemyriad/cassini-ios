@@ -4,14 +4,13 @@ import CassiniNotebook
 
 extension View {
     /// The Note screen's sheets (`NoteScreenModel.sheet`) and its question (`NoteScreenState.dialog`).
-    func noteSheetsAndDialogs(model: NoteScreenModel, stores: NoteScreenStores) -> some View {
-        modifier(NoteSheetsAndDialogs(model: model, stores: stores))
+    func noteSheetsAndDialogs(model: NoteScreenModel) -> some View {
+        modifier(NoteSheetsAndDialogs(model: model))
     }
 }
 
 private struct NoteSheetsAndDialogs: ViewModifier {
     let model: NoteScreenModel
-    let stores: NoteScreenStores
 
     private var noteID: UUID { model.noteID }
 
@@ -25,12 +24,12 @@ private struct NoteSheetsAndDialogs: ViewModifier {
     @ViewBuilder private func sheet(_ sheet: NoteSheet) -> some View {
         switch sheet {
         case .rename(let draft): RenameNoteDialog(noteID: noteID, draft: draft) { model.sheetDraft = $0 }
-        case .speakers: SpeakersView(noteID: noteID)
-        case .versions: TranscriptVersionsView(noteID: noteID)
+        case .speakers: SpeakersView(model: model)
+        case .versions: TranscriptVersionsView(model: model)
         case .documentInfo: DocumentInfoSheet(noteID: noteID)
         case .naming(let speakerID, let draft):
-            NameSpeakerSheet(noteID: noteID, speakerID: speakerID, draft: draft) { model.sheetDraft = $0 }
-        case .editing(let segment): SegmentEditor(noteID: noteID, segment: segment)
+            NameSpeakerSheet(model: model.naming(speakerID), draft: draft) { model.sheetDraft = $0 }
+        case .editing(let segment): SegmentEditor(model: model, segment: segment)
         }
     }
 
@@ -51,10 +50,10 @@ private struct NoteSheetsAndDialogs: ViewModifier {
         switch dialog {
         case .readOnly: Button(NoteCopy.close, role: .cancel) { model.screen.dismissDialog() }
         case .startOver:
-            Button(NoteCopy.startOver, role: .destructive) { model.run(model.screen.confirmDialog(), stores) }
+            Button(NoteCopy.startOver, role: .destructive) { model.confirmDialog() }
             Button(NoteCopy.cancel, role: .cancel) { model.screen.dismissDialog() }
         case .transcribeFresh:
-            Button(NoteCopy.transcribeAgain) { model.run(model.screen.confirmDialog(), stores) }
+            Button(NoteCopy.transcribeAgain) { model.confirmDialog() }
             Button(NoteCopy.cancel, role: .cancel) { model.screen.dismissDialog() }
         }
     }

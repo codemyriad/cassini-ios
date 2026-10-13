@@ -6,17 +6,14 @@ import CassiniNotebook
 /// be. The header opens Name a speaker. Yes names the speaker and remembers its print in the voice; Not rejects the
 /// voice for this speaker for good.
 struct SuggestionCard: View {
-    let noteID: UUID
     let suggestion: SpeakerSuggestion
     let ordinal: Int
-    let nameSpeaker: (String) -> Void
-    @Environment(VoicesStore.self) private var voices
-    @Environment(ErrorPresenter.self) private var errors
+    let model: NoteScreenModel
     @State private var busy = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Button { nameSpeaker(suggestion.speakerID) } label: {
+            Button { model.speakerTapped(suggestion.speakerID) } label: {
                 HStack(spacing: 10) {
                     SpeakerAvatar(speaker: suggestion.label, ordinal: ordinal, size: 28)
                     Text(NoteCopy.speakerLabel(suggestion.label, id: suggestion.speakerID, ordinal: ordinal))
@@ -47,11 +44,7 @@ struct SuggestionCard: View {
     private func answer(yes: Bool) {
         busy = true
         Task {
-            do throws(VoicesStore.SaveFailure) {
-                if yes { try await voices.accept(suggestion, noteID: noteID) } else { try await voices.reject(suggestion, noteID: noteID) }
-            } catch {
-                errors.present(error.message)
-            }
+            await model.answer(suggestion, yes: yes)
             busy = false
         }
     }

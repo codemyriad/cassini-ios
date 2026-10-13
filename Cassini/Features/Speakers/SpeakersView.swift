@@ -4,25 +4,25 @@ import CassiniNotebook
 
 /// The speakers of a note (an iOS screen; Android reaches naming from the transcript only): each speaker opens Name a
 /// speaker, Identify speakers runs the analysis again, and Saved voices is one tap away. Without consent for the speaker
-/// models, Identify speakers opens the model download screen, the only place consent is given.
+/// models, Identify speakers opens the model download screen, the only place consent is given. Its actions go through
+/// the Note screen's model, so the transcript's read-only rule holds here too: while a job is pending (or a document's
+/// trust is not verified) the speakers and Add a speaker are disabled, and Identify speakers waits.
 struct SpeakersView: View {
-    let noteID: UUID
-    @Environment(LibraryStore.self) private var library
-    @Environment(VoicesStore.self) private var voices
-    @Environment(ProcessingStore.self) private var processing
+    let model: NoteScreenModel
     @Environment(JobProgress.self) private var progress
-    @Environment(Router.self) private var router
-    @Environment(ErrorPresenter.self) private var errors
     @Environment(\.dismiss) private var dismiss
     @State private var naming: SpeakerRef?
     @State private var adding = false
     @State private var newName = ""
     @State private var rerun = false
 
+    private var noteID: UUID { model.noteID }
+
     var body: some View {
         NavigationStack {
             List {
-                if let note = library.note(noteID) {
+                if let note = model.note {
+                    let readOnly = model.readOnly
                     if let failure = note.speakerAnalysisFailure { Section { Text(failure.speakerAnalysisMessage).font(.callout) } }
                     Section {
                         let stats = SpeakerStats.of(note.transcript)
@@ -34,15 +34,18 @@ struct SpeakersView: View {
                             .accessibilityIdentifier("speaker-\(speaker.id)")
                         }
                         Button(SpeakersCopy.addSpeaker, systemImage: "person.badge.plus") { newName = ""; adding = true }
+                            .accessibilityIdentifier("addSpeaker")
                     } header: { Text(SpeakersCopy.peopleInRecording) } footer: { Text(SpeakersCopy.speakersFooter) }
+                    .disabled(readOnly != nil)
                     Section {
-                        let busy = note.status == .transcribing || note.status == .queued
                         Button(SpeakersCopy.identifySpeakers, systemImage: "waveform.badge.magnifyingglass") {
-                            if !(note.speakers ?? []).isEmpty { rerun = true } else { Task { await requestAnalysis() } }
-                        }.disabled(note.transcript.isEmpty || busy || !note.audio.isPlayable)
-                        if busy {
+                            if !(note.speakers ?? []).isEmpty { rerun = true } else { Task { await model.identifySpeakers() } }
+                        }
+                        .disabled(note.transcript.isEmpty || readOnly != nil || !note.audio.isPlayable)
+                        .accessibilityIdentifier("identifySpeakers")
+                        if readOnly == .jobPending {
                             ProgressView(progress.processingPhase(for: noteID)?.message ?? "")
-                            Button(SpeakersCopy.cancelAnalysis, role: .cancel) { processing.stop(noteID) }
+                            Button(SpeakersCopy.cancelAnalysis, role: .cancel) { model.stopJob() }
                         }
                     } footer: { Text(SpeakersCopy.analysisFooter) }
                     NavigationLink(SpeakersCopy.voices) { SavedVoicesView() }
@@ -51,28 +54,17 @@ struct SpeakersView: View {
             .paperListBackground()
             .navigationTitle(SpeakersCopy.speakersTitle).navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button(SpeakersCopy.done) { dismiss() } } }
-            .sheet(item: $naming) { NameSpeakerSheet(noteID: noteID, speakerID: $0.id) }
+            .sheet(item: $naming) { NameSpeakerSheet(model: model.naming($0.id)) }
             .alert(SpeakersCopy.addSpeaker, isPresented: $adding) {
                 TextField(SpeakersCopy.nameField, text: $newName)
                 Button(SpeakersCopy.cancel, role: .cancel) {}
-                Button(SpeakersCopy.add) { voices.addSpeaker(noteID: noteID, name: newName) }
+                Button(SpeakersCopy.add) { model.addSpeaker(named: newName) }
             }
             .confirmationDialog(SpeakersCopy.analyzeAgainTitle, isPresented: $rerun, titleVisibility: .visible) {
-                Button(SpeakersCopy.analyzeAgain) { Task { await requestAnalysis() } }
+                Button(SpeakersCopy.analyzeAgain) { Task { await model.identifySpeakers() } }
             } message: { Text(SpeakersCopy.analyzeAgainBody) }
         }
         .tint(.ember)
-    }
-
-    /// Queues the speakers-only job; without consent the sheet gives way to the model download screen.
-    private func requestAnalysis() async {
-        switch await processing.transcribe(noteID, kind: .speakersOnly) {
-        case .needsConsent:
-            dismiss()
-            router.push(.modelDownload(noteID: noteID))
-        case .refused(let refusal): errors.present(refusal.message)
-        case .queued: break
-        }
     }
 }
 

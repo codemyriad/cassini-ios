@@ -22,6 +22,8 @@ import CassiniNotebook
     /// What the Settings screen reads.
     let settingsPorts: SettingsAdapter
     let libraryScreen: LibraryScreenModel
+    /// Builds each Note screen's model.
+    let noteScreens: NoteScreens
     /// Set once `start()` has returned to the app.
     let launchFinished = LaunchFinished()
 
@@ -60,6 +62,8 @@ import CassiniNotebook
         libraryScreen = Self.libraryScreen(environment: environment, library: library, processing: processing,
                                            recording: recording, trash: trash)
         libraryScreen.connect(router: router, errors: errors)
+        noteScreens = Self.noteScreens(library: library, voices: voices, processing: processing, playback: playback,
+                                       recording: recording, exports: exports, trash: trash, router: router, errors: errors)
         processing.modelDownload = ModelDownloadAdapter(
             settings: settings, processing: processing, transcriber: environment.transcriber,
             analyzer: environment.analyzer, storage: environment.storage, notifier: environment.notifier,
@@ -211,7 +215,7 @@ extension View {
             .environment(graph.recording)
             .environment(graph.imports).environment(graph.trash).environment(graph.trash.undo).environment(graph.exports)
             .environment(graph.settingsPorts)
-            .environment(graph.libraryScreen)
+            .environment(graph.libraryScreen).environment(graph.noteScreens)
             .environment(\.clock, graph.environment.clock)
             .environment(\.locale, graph.environment.locale)
             .environment(\.timeZone, graph.environment.timeZone)

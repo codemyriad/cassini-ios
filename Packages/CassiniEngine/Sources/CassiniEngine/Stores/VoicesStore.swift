@@ -24,6 +24,8 @@ import CassiniNotebook
         }
 
         public let reason: Reason
+
+        public init(reason: Reason) { self.reason = reason }
     }
 
     public private(set) var snapshot = VoiceSnapshot()

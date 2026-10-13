@@ -6,10 +6,8 @@ import CassiniNotebook
 /// passage as it was; otherwise the editor stays open and says "This passage changed while you were editing." While a
 /// job runs for the note, the editor is locked: it says why and cannot save.
 struct SegmentEditor: View {
-    let noteID: UUID
+    let model: NoteScreenModel
     let segment: TranscriptSegment
-    @Environment(LibraryStore.self) private var library
-    @Environment(ProcessingStore.self) private var processing
     @Environment(\.dismiss) private var dismiss
     @Environment(\.clock) private var clock
     @State private var text: String
@@ -17,15 +15,14 @@ struct SegmentEditor: View {
     @State private var problem: String?
     @State private var saving = false
 
-    init(noteID: UUID, segment: TranscriptSegment) {
-        self.noteID = noteID; self.segment = segment
+    init(model: NoteScreenModel, segment: TranscriptSegment) {
+        self.model = model; self.segment = segment
         _text = State(initialValue: segment.text); _speaker = State(initialValue: segment.speakerID ?? "")
     }
 
-    private var note: Note? { library.note(noteID) }
-    private var speakers: [NoteSpeaker] { note?.speakers ?? [] }
+    private var speakers: [NoteSpeaker] { model.note?.speakers ?? [] }
     /// A job for the note makes the transcript read-only.
-    private var locked: Bool { note.flatMap { ReadOnlyReason.of($0, job: processing.state.jobs[noteID]) } != nil }
+    private var locked: Bool { model.readOnly != nil }
 
     var body: some View {
         NavigationStack {
@@ -66,21 +63,17 @@ struct SegmentEditor: View {
     }
 
     private func save() {
-        let original = segment
         let revised = segment.revised(text: text, speakerID: speaker.isEmpty ? nil : speaker, speakers: speakers)
-        guard note?.holds(original) == true else {
-            problem = NoteCopy.passageChanged
-            return
-        }
-        guard revised != original else { dismiss(); return }
         saving = true
         let stamp = VersionStamp(date: clock.now)
         Task {
-            // The change runs again on the stored note when someone else saved it meanwhile; it then finds the passage
-            // gone, and the editor says so.
-            let saved = await library.commit(noteID) { _ = $0.revisePassage(original, to: revised, stamp: stamp) }
+            let outcome = await model.revisePassage(segment, to: revised, stamp: stamp)
             saving = false
-            if saved?.holds(revised) == true { dismiss() } else { problem = NoteCopy.passageChanged }
+            switch outcome {
+            case .saved: dismiss()
+            case .changed: problem = NoteCopy.passageChanged
+            case .locked: break // The editor says why already.
+            }
         }
     }
 }

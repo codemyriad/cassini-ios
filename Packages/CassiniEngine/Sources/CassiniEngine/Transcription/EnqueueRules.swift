@@ -37,6 +37,25 @@ public enum TranscribeOutcome: Hashable, Sendable {
     case refused(EnqueueRefusal)
 }
 
+/// What a screen does once a Transcribe, Transcribe again, Resume, Try again, Start over or Identify speakers has
+/// answered, the same for every screen that asks: without consent the model download screen opens over the note
+/// (`ScreenStack.offerModelDownload`, or from the Library `show`), and a refusal says why.
+public enum TranscribeFollowUp: Hashable, Sendable {
+    case none
+    case openModelDownload
+    case refused(EnqueueRefusal)
+}
+
+extension TranscribeOutcome {
+    public var followUp: TranscribeFollowUp {
+        switch self {
+        case .queued: .none
+        case .needsConsent: .openModelDownload
+        case .refused(let refusal): .refused(refusal)
+        }
+    }
+}
+
 /// What follows a saved recording or import while Transcribe automatically is on, as Android's `AfterFinish`.
 public enum HandOff: Hashable, Sendable {
     /// The note is in the queue.

@@ -16,35 +16,25 @@ struct NoteDetailView: View {
     let noteID: UUID
     /// What the Library asked the screen to do once it opens (an export, Document info, Rename).
     let start: NoteStartAction?
-    @Environment(LibraryStore.self) private var library
-    @Environment(PlaybackStore.self) private var playback
     @Environment(ProcessingStore.self) private var processing
-    @Environment(RecordingStore.self) private var recording
     @Environment(Router.self) private var router
-    @Environment(ErrorPresenter.self) private var errors
     @Environment(VoicesStore.self) private var voices
-    @Environment(ExportStore.self) private var exports
-    @Environment(TrashService.self) private var trash
     @Environment(\.clock) private var clock
     @Environment(\.calendar) private var calendar
     @State private var model: NoteScreenModel
     @State private var cache = TranscriptCache()
 
-    init(noteID: UUID, query: String? = nil, start: NoteStartAction? = nil) {
-        self.noteID = noteID
+    init(model: @autoclosure () -> NoteScreenModel, start: NoteStartAction? = nil) {
+        let model = model()
+        self.noteID = model.noteID
         self.start = start
-        _model = State(initialValue: NoteScreenModel(noteID: noteID, query: query))
+        _model = State(initialValue: model)
     }
 
-    private var note: Note? { library.note(noteID) }
-    private var job: Job? { processing.state.jobs[noteID] }
+    private var note: Note? { model.note }
+    private var job: Job? { model.job }
     /// Why the transcript cannot be changed now.
-    private var readOnly: ReadOnlyReason? { note.flatMap { ReadOnlyReason.of($0, job: job) } }
-
-    private var stores: NoteScreenStores {
-        NoteScreenStores(library: library, playback: playback, processing: processing, recording: recording, router: router,
-                         errors: errors, exports: exports, trash: trash)
-    }
+    private var readOnly: ReadOnlyReason? { model.readOnly }
 
     var body: some View {
         #if DEBUG
@@ -61,27 +51,18 @@ struct NoteDetailView: View {
         }
         .background(Color.paper)
         .navigationBarTitleDisplayMode(.inline)
-        .task(id: playerKey) {
-            if let note, playerKey != nil { playback.show(note, owner: model.playerOwner) } else { playback.leave(model.playerOwner) }
-        }
-        .task(id: job.map { "\($0.state)-\($0.doneMs)" }) { await model.loadSavedDraft(job: job, processing) }
-        .onDisappear { model.disappeared(playback) }
-        .onAppear { model.appeared(start: start, stores) }
-        .onChange(of: router.session(noteID).started) { _, started in if !started { model.runStart(start, stores) } }
+        .task(id: model.playerKey) { model.updatePlayer() }
+        .task(id: job.map { "\($0.state)-\($0.doneMs)" }) { await model.loadSavedDraft() }
+        .onDisappear { model.disappeared() }
+        .onAppear { model.appeared(start: start) }
+        .onChange(of: router.session(noteID).started) { _, started in if !started { model.runStart(start) } }
         .onChange(of: NoteScreenState.isGone(note)) { _, gone in if gone { router.close(noteID: noteID) } }
         .onChange(of: model.screen.search?.query) { _, query in router.keepSearch(query, for: noteID) }
         .backButtonTitle(router.below(noteID: noteID) == .library ? NoteCopy.backToLibrary : nil)
-        .noteSheetsAndDialogs(model: model, stores: stores)
+        .noteSheetsAndDialogs(model: model)
         .keepsNoteOverlay(noteID: noteID, note: note, readOnly: readOnly, sheet: $model.sheet, draft: $model.sheetDraft,
                           dialog: $model.screen.dialog)
         .shareSheet(item: $model.shareItem)
-    }
-
-    /// What the player opens; a change opens, reloads or leaves it. A mode without a player (a running job) leaves it,
-    /// and it follows the same block as a recording, so it opens again as soon as the recording lets it go.
-    private var playerKey: NotePlayer.Key? {
-        guard let note, NoteMode.of(note, job: job).hasPlayer else { return nil }
-        return NotePlayer.key(for: note, blocked: playback.isBlocked)
     }
 
     // MARK: Content
@@ -97,13 +78,13 @@ struct NoteDetailView: View {
             if case .processing = mode {
                 ProcessingBody(noteID: noteID, cache: cache) {
                     NoteHeader(note: note, subtitle: subtitle)
-                    NoteSectionView(section: .card, note: note, mode: mode, model: model, stores: stores)
+                    NoteSectionView(section: .card, note: note, mode: mode, model: model)
                 } banners: {
-                    NoteSectionView(section: .banners, note: note, mode: mode, model: model, stores: stores)
+                    NoteSectionView(section: .banners, note: note, mode: mode, model: model)
                 }
             } else {
                 NoteReadingScroll(note: note, mode: mode, transcript: transcript, subtitle: subtitle, matches: matches,
-                                  current: current, savedDraft: model.savedDraft, model: model, stores: stores, cache: cache,
+                                  current: current, savedDraft: model.savedDraft, model: model, cache: cache,
                                   actions: transcriptActions, suggestion: { suggestionCard($0, in: transcript) })
             }
         }
@@ -122,7 +103,7 @@ struct NoteDetailView: View {
             VStack(spacing: 0) {
                 FollowChipHost(noteID: noteID, follow: model.screen.follow) { model.resumeFollowing() }
                 if mode.hasPlayer, note.audio.isPlayable {
-                    NotePlayerBar(note: note, addBookmark: { model.showBookmarks = true })
+                    NotePlayerBar(note: note, markMoment: { model.markMoment(at: $0) })
                 }
             }
             .animation(.default, value: model.screen.follow)
@@ -134,7 +115,7 @@ struct NoteDetailView: View {
                         .accessibilityIdentifier("searchTranscript")
                 }
                 NoteMenu(note: note, transcribeRow: TranscribeRow.of(note, job: job), exportingDocument: model.exportingDocument,
-                         perform: { model.perform($0, note: note, job: job, readOnly: readOnly, stores) })
+                         perform: { model.perform($0) })
             }
         }
     }
@@ -147,20 +128,18 @@ struct NoteDetailView: View {
     /// the transcript and the read-only gate as they are when called, not as they were when it was drawn.
     private var transcriptActions: TranscriptActions {
         TranscriptActions(
-            wordTap: { model.run(model.screen.wordTapped($0, in: cache.shownSealed), stores) },
-            playTurn: { model.run(model.screen.playTurn($0, in: cache.shownSealed), stores) },
-            nameSpeaker: { model.run(model.screen.speakerTapped($0, readOnly: readOnly), stores) },
-            editPassage: { model.run(model.screen.editPassage($0, readOnly: readOnly), stores) },
-            markMoment: { model.markMoment(at: $0, stores) })
+            wordTap: { model.run(model.screen.wordTapped($0, in: cache.shownSealed)) },
+            playTurn: { model.run(model.screen.playTurn($0, in: cache.shownSealed)) },
+            nameSpeaker: { model.speakerTapped($0) },
+            editPassage: { model.editPassage($0) },
+            markMoment: { model.markMoment(at: $0) })
     }
 
     /// "Is this Luca?" above the first paragraph of a placeholder speaker a saved voice may be.
     private func suggestionCard(_ turn: NoteTurn, in transcript: NoteTranscript) -> AnyView? {
         guard let suggestion = turn.suggestion else { return nil }
         let ordinal = transcript.speakers.firstIndex(of: suggestion.speakerID) ?? 0
-        return AnyView(SuggestionCard(noteID: noteID, suggestion: suggestion, ordinal: ordinal) { id in
-            model.run(model.screen.speakerTapped(id, readOnly: readOnly), stores)
-        })
+        return AnyView(SuggestionCard(suggestion: suggestion, ordinal: ordinal, model: model))
     }
 }
 
@@ -171,38 +150,33 @@ struct NoteSectionView: View {
     let note: Note
     let mode: NoteMode
     let model: NoteScreenModel
-    let stores: NoteScreenStores
+    @Environment(ProcessingStore.self) private var processing
 
     private var noteID: UUID { note.id }
-    private var job: Job? { stores.processing.state.jobs[noteID] }
-    private var readOnly: ReadOnlyReason? { stores.library.note(noteID).flatMap { ReadOnlyReason.of($0, job: job) } }
 
     var body: some View {
         switch section {
         case .card:
-            if case .queued(let ahead, _) = mode { ProcessingCard(note: note, ahead: ahead) } else { ProcessingCard(note: note) }
+            if case .queued(let ahead, _) = mode {
+                ProcessingCard(note: note, ahead: ahead, model: model)
+            } else {
+                ProcessingCard(note: note, model: model)
+            }
         case .chips:
             if let chips = NoteChips.of(note) {
                 NoteChipsRow(chips: chips, toggleTrust: { model.screen.toggleTrust() },
-                             openVersions: { model.run(model.screen.versionsTapped(readOnly: readOnly), stores) },
-                             openSpeakers: { model.run(model.screen.speakersTapped(readOnly: readOnly), stores) })
+                             openVersions: { model.versionsTapped() }, openSpeakers: { model.speakersTapped() })
             }
         case .banners:
             RecordingNotices(noteID: noteID)
-            NoteBannersView(note: note, job: job, mode: mode, facts: bannerFacts,
-                            act: { _, action in
-                                guard let note = stores.library.note(noteID) else { return }
-                                model.run(model.screen.bannerAction(action, note: note, job: job), stores)
-                            },
-                            dismiss: { banner in
-                                guard let note = stores.library.note(noteID) else { return }
-                                model.run(model.screen.dismiss(banner, note: note, job: job), stores)
-                            })
+            NoteBannersView(note: note, job: model.job, mode: mode, facts: bannerFacts,
+                            act: { _, action in model.bannerAction(action) },
+                            dismiss: { model.dismiss($0) })
         }
     }
 
     private var bannerFacts: NoteBannerFacts {
-        let state = stores.processing.state
+        let state = processing.state
         return NoteBannerFacts(trustToggled: model.screen.trustToggled, queueHold: state.hold, waitingJobs: state.queue.count,
                                dismissed: model.screen.dismissed)
     }

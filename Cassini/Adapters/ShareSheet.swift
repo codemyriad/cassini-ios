@@ -1,4 +1,5 @@
 import SwiftUI
+import CassiniEngine
 
 /// The system share sheet for one file. It closes once an activity has shared the file or the user closed it without
 /// picking one; backing out of an activity (Mail, Messages, an extension) returns to the sheet with the file still
@@ -20,14 +21,6 @@ struct ShareSheet: UIViewControllerRepresentable {
     /// Whether a call of the completion handler ends the sheet: an activity finished, or there was none. Since iOS 13
     /// the handler also runs, with an activity and `completed == false`, when the user backs out of that activity.
     static func closes(activity: UIActivity.ActivityType?, completed: Bool) -> Bool { completed || activity == nil }
-}
-
-/// A file offered through the share sheet. A file made only for sharing (an export) is removed in `onComplete`,
-/// which runs once the sheet is gone; a note's own audio has none.
-struct ShareItem: Identifiable {
-    let id = UUID()
-    let url: URL
-    var onComplete: (@MainActor () -> Void)?
 }
 
 /// The item on screen in a share sheet, so the sheet's dismissal knows which one it ended.

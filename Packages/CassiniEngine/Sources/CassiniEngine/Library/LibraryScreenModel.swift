@@ -248,10 +248,10 @@ public final class LibraryScreenModel {
     }
 
     func handle(_ outcome: TranscribeOutcome, for id: UUID) {
-        switch outcome {
-        case .needsConsent: onEffect?(.openModelDownload(noteID: id))
+        switch outcome.followUp {
+        case .openModelDownload: onEffect?(.openModelDownload(noteID: id))
         case .refused(let refusal): onEffect?(.refused(refusal))
-        case .queued: break
+        case .none: break
         }
     }
 }

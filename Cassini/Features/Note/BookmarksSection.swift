@@ -6,15 +6,14 @@ import CassiniNotebook
 struct BookmarksSection: View {
     let note: Note
     @Binding var isExpanded: Bool
-    let seek: (TimeInterval) -> Void
-    @Environment(LibraryStore.self) private var library
+    let model: NoteScreenModel
 
     var body: some View {
         DisclosureGroup(isExpanded: $isExpanded) {
             VStack(spacing: 4) {
                 ForEach(note.bookmarks) { bookmark in
                     HStack {
-                        Button { seek(bookmark.time) } label: {
+                        Button { model.seek(bookmark.time) } label: {
                             HStack {
                                 Text(TimeText.clock(bookmark.time)).monospacedDigit().foregroundStyle(Color.ember)
                                 Text(NoteCopy.bookmarkLabel(bookmark)).foregroundStyle(Color.ink)
@@ -24,7 +23,7 @@ struct BookmarksSection: View {
                         }
                         .buttonStyle(.plain)
                         Button(NoteCopy.removeBookmark, systemImage: "minus.circle") {
-                            library.removeBookmark(bookmark.id, from: note.id)
+                            model.removeBookmark(bookmark.id)
                         }
                         .labelStyle(.iconOnly).frame(minWidth: HitTarget.minimum, minHeight: HitTarget.minimum)
                     }
