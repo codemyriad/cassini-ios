@@ -28,6 +28,8 @@ public struct PortableTranscript: Hashable, Sendable {
     public let unavailableVariants: [String: String]
     /// The OpusTags vendor string of the app that wrote the file.
     public let vendor: String?
+    /// `meeting.id`.
+    public let meetingID: String?
 
     public var selected: TranscriptVersion? { versions.first { $0.id == selectedVersionID } }
     public var hasTranscript: Bool { selected != nil }
@@ -36,7 +38,8 @@ public struct PortableTranscript: Hashable, Sendable {
 
     /// What the note stores about the document.
     public var info: DocumentInfo {
-        DocumentInfo(state: state, warnings: warnings, unavailableVariants: unavailableVariants, vendor: vendor)
+        DocumentInfo(state: state, warnings: warnings, unavailableVariants: unavailableVariants, vendor: vendor,
+                     meetingID: meetingID)
     }
 
     /// Reads, and verifies, the document at `url`; nil when it is plain audio (no `CASSINI_FORMAT`).
@@ -53,6 +56,7 @@ public struct PortableTranscript: Hashable, Sendable {
         warnings = document.warnings
         self.vendor = vendor
         let meeting = document.manifest?["meeting"]?.object
+        meetingID = meeting?["id"]?.string.flatMap { $0.isEmpty ? nil : $0 }
         title = document.title
         createdAt = meeting?["createdAtUtc"]?.string.flatMap(Self.instant)
         duration = (try? meeting?.number("durationMs")).map { Double($0) / 1000 }

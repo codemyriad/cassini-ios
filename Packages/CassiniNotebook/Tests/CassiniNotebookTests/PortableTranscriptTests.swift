@@ -59,7 +59,9 @@ import CassiniCore
         #expect(portable.duration == 1)
         #expect(portable.createdAt != nil)
         #expect(portable.speakers == [NoteSpeaker(id: "S1", name: "Ada")])
-        #expect(portable.info == DocumentInfo(state: .ok))
+        let meetingID = try #require(portable.meetingID, "Document info shows the meeting id")
+        #expect(meetingID.hasPrefix("mtg_"))
+        #expect(portable.info == DocumentInfo(state: .ok, meetingID: meetingID))
     }
 
     @Test func theFirstReadableVariantStandsInForAnUnavailableDefault() throws {

@@ -7,6 +7,8 @@ import CassiniNotebook
 struct NoteMenu: View {
     let note: Note
     let transcribeRow: TranscribeRow?
+    /// The Library's form of the row, for Transcribe again's caption.
+    var transcribeAction: TranscribeAction?
     /// A Cassini document is being prepared.
     let exportingDocument: Bool
     let perform: (NoteMenuAction) -> Void
@@ -64,7 +66,13 @@ struct NoteMenu: View {
         case .transcribe:
             Button(NoteCopy.transcribe, systemImage: "text.badge.waveform") { perform(.transcribe) }.disabled(disabled)
         case .transcribeAgain:
-            Button(NoteCopy.transcribeAgain, systemImage: "arrow.clockwise") { perform(.transcribeAgain) }.disabled(disabled)
+            Button { perform(.transcribeAgain) } label: {
+                Label(NoteCopy.transcribeAgain, systemImage: "arrow.clockwise")
+                if case .transcribeAgain(let version, let namesCarry)? = transcribeAction {
+                    Text(LibraryCopy.addsVersion(version) + (namesCarry ? " " + LibraryCopy.namesCarry : ""))
+                }
+            }
+            .disabled(disabled)
         case .transcribeAgainUnavailable:
             Button {} label: {
                 Text(NoteCopy.transcribeAgain)

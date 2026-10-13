@@ -32,6 +32,13 @@ struct DocumentInfoSheet: View {
                         if let model = facts.model { row(Self.model, model) }
                         if let line = speakersLine(facts) { row(NoteCopy.speakers, line) }
                         if let bytes = facts.fileBytes { row(Self.fileSize, bytes.formatted(.byteCount(style: .file))) }
+                        if let id = facts.meetingID {
+                            LabeledContent(Self.meetingID) {
+                                Text(verbatim: id).font(.footnote.monospaced()).foregroundStyle(Color.ink)
+                                    .multilineTextAlignment(.trailing).textSelection(.enabled)
+                            }
+                            .accessibilityIdentifier("meetingID")
+                        }
                         if let vendor = facts.vendor { row(Self.madeBy, vendor) }
                         if let error = facts.readError { row(Self.readError, error) }
                     }
@@ -63,7 +70,7 @@ struct DocumentInfoSheet: View {
     private func transcriptionLine(_ facts: DocumentInfoFacts) -> String? {
         var lines: [String] = []
         if let ms = facts.processingMs, let factor = facts.realtimeFactor {
-            let time = Duration.milliseconds(ms).formatted(.units(allowed: [.hours, .minutes, .seconds], width: .abbreviated))
+            let time = RecordingCopy.compact(Double(ms) / 1000)
             let speed = factor >= 10 ? factor.formatted(.number.precision(.fractionLength(0)))
                 : factor.formatted(.number.precision(.fractionLength(1)))
             lines.append(String(localized: "Transcribed on this device in \(time) · \(speed)× realtime", table: "Note"))
@@ -97,6 +104,7 @@ struct DocumentInfoSheet: View {
     private static let transcription = String(localized: "Transcription", table: "Note")
     private static let model = String(localized: "Model", table: "Note")
     private static let fileSize = String(localized: "File size", table: "Note")
+    private static let meetingID = String(localized: "Meeting ID", table: "Note", comment: "Document info: the document's meeting id")
     private static let madeBy = String(localized: "Made by", table: "Note", comment: "Document info: the app that wrote an imported document")
     private static let readError = String(localized: "Read error", table: "Note")
 }

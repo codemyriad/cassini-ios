@@ -17,7 +17,7 @@ struct NoteActionsMenu: View {
             Button(LibraryCopy.rename, systemImage: "pencil") { perform(.rename) }
             if !menu.recording {
                 transcribeItems(menu)
-                exportMenu(menu.export)
+                exportMenu(menu)
                 Button(LibraryCopy.documentInfo, systemImage: "info.circle") { perform(.documentInfo) }
                 Divider()
                 Button(TrashCopy.moveToTrash, systemImage: "trash", role: .destructive) { perform(.moveToTrash) }
@@ -49,17 +49,24 @@ struct NoteActionsMenu: View {
         }
     }
 
-    private func exportMenu(_ availability: TranscriptExportAvailability) -> some View {
-        let unavailable = ExportCopy.reason(availability)
+    /// The transcript formats (disabled, with the reason, for a note without a transcript), the Cassini document and
+    /// the original audio, which is always offered, as Android's Save a copy rows.
+    private func exportMenu(_ menu: LibraryRowMenu) -> some View {
+        let unavailable = ExportCopy.reason(menu.export)
         return Menu {
-            ForEach(TranscriptFormat.allCases) { format in
-                Button(ExportCopy.title(format)) { perform(.export(format)) }
+            Section {
+                ForEach(TranscriptFormat.allCases) { format in
+                    Button(ExportCopy.title(format)) { perform(.export(format)) }.disabled(unavailable != nil)
+                }
+            } header: {
+                if let unavailable { Text(unavailable) }
             }
+            Button(NoteCopy.exportDocument, systemImage: "doc.badge.arrow.up") { perform(.exportDocument) }
+                .disabled(!menu.exportsDocument)
+            Button(NoteCopy.shareAudio, systemImage: "waveform") { perform(.shareAudio) }.disabled(menu.transcribeWaits)
         } label: {
             Label(LibraryCopy.export, systemImage: "square.and.arrow.up")
-            if let unavailable { Text(unavailable) }
         }
-        .disabled(unavailable != nil)
     }
 
     private func perform(_ action: NoteAction) {

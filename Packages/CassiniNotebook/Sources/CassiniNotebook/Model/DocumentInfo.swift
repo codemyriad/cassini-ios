@@ -26,10 +26,12 @@ public struct DocumentInfo: Codable, Hashable, Sendable {
     public var trustAcknowledged: Bool
     /// The app that wrote the document, from its manifest.
     public var vendor: String?
+    /// The manifest's `meeting.id`, which Document info shows.
+    public var meetingID: String?
 
     public init(state: DocumentState, warnings: [String] = [], unavailableVariants: [String: String] = [:],
-                trustAcknowledged: Bool = false, vendor: String? = nil) {
+                trustAcknowledged: Bool = false, vendor: String? = nil, meetingID: String? = nil) {
         self.state = state; self.warnings = warnings; self.unavailableVariants = unavailableVariants
-        self.trustAcknowledged = trustAcknowledged; self.vendor = vendor
+        self.trustAcknowledged = trustAcknowledged; self.vendor = vendor; self.meetingID = meetingID
     }
 }

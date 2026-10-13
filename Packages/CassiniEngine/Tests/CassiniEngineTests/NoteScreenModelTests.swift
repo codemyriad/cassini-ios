@@ -193,6 +193,16 @@ import CassiniNotebook
         #expect(fake.calls.filter { $0 == "moveToTrash" }.count == 1)
     }
 
+    /// The Note menu's Transcribe again says what the Library's does: "Adds version 2. Speaker names carry over."
+    @Test func transcribeAgainSaysWhichVersionItAddsAndWhetherNamesCarryOver() async {
+        fake.note?.speakers?[0].name = "Anna"
+        #expect(model.transcribeAction == .transcribeAgain(nextVersion: 2, namesCarry: false))
+        fake.speakerModelsReady = true
+        model.appeared(start: nil)
+        await eventually { model.speakerModelsReady }
+        #expect(model.transcribeAction == .transcribeAgain(nextVersion: 2, namesCarry: true))
+    }
+
     // MARK: Follow
 
     // ports: NoteViewModelTest#aWordTapSeeksAndPlaysAndFollowModeResumes (the timer)

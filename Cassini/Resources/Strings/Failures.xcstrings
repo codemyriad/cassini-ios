@@ -35,6 +35,17 @@
         }
       }
     },
+    "Choose at least 200 milliseconds of audio.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scegli almeno 200 millisecondi di audio."
+          }
+        }
+      }
+    },
     "Could not read this audio. The original file has been kept.": {
       "extractionState": "manual",
       "localizations": {
@@ -127,23 +138,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Non sono state rilevate voci. Puoi assegnare i passaggi a mano."
-          }
-        }
-      }
-    },
-    "No speech was found in this recording.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No speech was found in this recording."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "In questa registrazione non è stato trovato parlato."
           }
         }
       }
@@ -466,36 +460,24 @@
         }
       }
     },
-    "This recording is too long to transcribe on this device.": {
+    "This recording contains no audio samples.": {
       "extractionState": "manual",
       "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "This recording is too long to transcribe on this device."
-          }
-        },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Questa registrazione è troppo lunga da trascrivere su questo dispositivo."
+            "value": "La registrazione non contiene campioni audio."
           }
         }
       }
     },
-    "This recording is too short to transcribe.": {
+    "This recording is too long to transcribe: one transcript holds up to 36 hours of audio and about 16 hours of speech. You can still play it, and share the audio file with Share original audio.": {
       "extractionState": "manual",
       "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "This recording is too short to transcribe."
-          }
-        },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Questa registrazione è troppo breve da trascrivere."
+            "value": "Questa registrazione è troppo lunga da trascrivere: una trascrizione contiene fino a 36 ore di audio e circa 16 ore di parlato. Puoi comunque ascoltarla e condividere il file audio con Condividi l’audio originale."
           }
         }
       }

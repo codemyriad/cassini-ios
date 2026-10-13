@@ -143,10 +143,12 @@ public final class LibraryScreenModel {
     public func menu(_ id: UUID) -> LibraryRowMenu? {
         _ = revision
         guard let note = index.entry(id)?.note else { return nil }
+        let processing = ports.processing(), finishing = ports.finishing() == id
         return LibraryRowMenu(isFavorite: note.isFavorite, recording: note.isRecording && ports.recording().noteID == id,
-                        transcribe: LibraryMapping.transcribeAction(note, job: ports.processing().jobs[id],
+                        transcribe: LibraryMapping.transcribeAction(note, job: processing.jobs[id],
                                                                     voiceModelReady: speakerModelsReady),
-                        transcribeWaits: ports.finishing() == id, export: TranscriptExports.availability(of: note))
+                        transcribeWaits: finishing, export: TranscriptExports.availability(of: note),
+                        exportsDocument: !note.transcript.isEmpty && !processing.isRunning(id) && !finishing)
     }
 
     // MARK: Events
@@ -201,6 +203,8 @@ public final class LibraryScreenModel {
         case .resume: await transcribe(id, kind: ports.processing().jobs[id]?.kind ?? .transcribe)
         case .startOver: dialog = .startOver(id)
         case .export(let format): onEffect?(.openNote(.note(id, start: .export(format))))
+        case .exportDocument: onEffect?(.openNote(.note(id, start: .exportDocument)))
+        case .shareAudio: onEffect?(.openNote(.note(id, start: .shareAudio)))
         case .documentInfo: onEffect?(.openNote(.note(id, start: .documentInfo)))
         case .moveToTrash: await ports.trash(id)
         }

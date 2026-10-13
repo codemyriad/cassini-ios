@@ -19,6 +19,7 @@ import CassiniNotebook
     public var recording = false
     public var playerBlocked = false
     public var draft: [DraftWord] = []
+    public var speakerModelsReady = false
     public var session = NoteSession()
     public var isOpen = true
     /// What Name a speaker is given; nil for a speaker that is gone.
@@ -80,6 +81,7 @@ import CassiniNotebook
             calls.append("savedDraft")
             return draft
         },
+        speakerModelsReady: { [weak self] in self?.speakerModelsReady ?? false },
         ownsPlayer: { [unowned self] _ in ownsPlayer }, play: { [unowned self] in calls.append("play") },
         playFrom: { [unowned self] _, time in calls.append("playFrom:\(time)") },
         showPlayer: { [unowned self] note, _ in calls.append("showPlayer:\(note.audioFilename)") },

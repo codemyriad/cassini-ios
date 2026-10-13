@@ -60,6 +60,9 @@ public enum NoteAction: Hashable, Sendable {
     case resume
     case startOver
     case export(TranscriptFormat)
+    /// Export Cassini document and Share original audio (Android's Save a copy rows).
+    case exportDocument
+    case shareAudio
     case documentInfo
     case moveToTrash
 }
@@ -73,12 +76,15 @@ public struct LibraryRowMenu: Hashable, Sendable {
     public var transcribe: TranscribeAction
     /// The recording's audio is still being written: Transcribe and Transcribe again wait for it.
     public var transcribeWaits: Bool
+    /// The transcript exports; the audio can be shared whatever this says.
     public var export: TranscriptExportAvailability
+    /// A Cassini document can be made: the note has a transcript and no job runs for it, as on the Note screen.
+    public var exportsDocument: Bool
 
     public init(isFavorite: Bool, recording: Bool, transcribe: TranscribeAction, transcribeWaits: Bool,
-                export: TranscriptExportAvailability) {
+                export: TranscriptExportAvailability, exportsDocument: Bool) {
         self.isFavorite = isFavorite; self.recording = recording; self.transcribe = transcribe
-        self.transcribeWaits = transcribeWaits; self.export = export
+        self.transcribeWaits = transcribeWaits; self.export = export; self.exportsDocument = exportsDocument
     }
 }
 

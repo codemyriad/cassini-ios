@@ -4,6 +4,8 @@ import CassiniNotebook
 /// Something the note screen does once when it opens, asked for from the Library.
 public enum NoteStartAction: Codable, Hashable, Sendable {
     case export(TranscriptFormat)
+    case exportDocument
+    case shareAudio
     case documentInfo
     case rename
 
@@ -11,6 +13,8 @@ public enum NoteStartAction: Codable, Hashable, Sendable {
     public var effect: NoteEffect {
         switch self {
         case .export(let format): .exportTranscript(format)
+        case .exportDocument: .exportDocument
+        case .shareAudio: .shareAudio
         case .documentInfo: .documentInfo
         case .rename: .rename
         }

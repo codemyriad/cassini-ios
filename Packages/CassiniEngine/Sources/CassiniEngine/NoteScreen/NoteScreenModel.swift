@@ -55,6 +55,8 @@ public final class NoteScreenModel {
         public var cancelJobDownload: @MainActor () -> Void
         /// The words of the note's saved progress.
         public var savedDraft: @MainActor (UUID) async -> [DraftWord]
+        /// Whether the speaker models are installed, so names carry over to a new version.
+        public var speakerModelsReady: @MainActor () async -> Bool
 
         // The player
         /// Whether the note holds the player and it can play.
@@ -103,6 +105,7 @@ public final class NoteScreenModel {
                     continueQueue: @escaping @MainActor () -> Void, clearFailed: @escaping @MainActor (UUID) -> Void,
                     cancelJobDownload: @escaping @MainActor () -> Void,
                     savedDraft: @escaping @MainActor (UUID) async -> [DraftWord],
+                    speakerModelsReady: @escaping @MainActor () async -> Bool,
                     ownsPlayer: @escaping @MainActor (UUID) -> Bool, play: @escaping @MainActor () -> Void,
                     playFrom: @escaping @MainActor (Note, TimeInterval) -> Void,
                     showPlayer: @escaping @MainActor (Note, PlaybackOwner) -> Void,
@@ -124,7 +127,7 @@ public final class NoteScreenModel {
             self.namingInput = namingInput; self.performNaming = performNaming
             self.transcribe = transcribe; self.startOver = startOver; self.stop = stop; self.dequeue = dequeue
             self.continueQueue = continueQueue; self.clearFailed = clearFailed; self.cancelJobDownload = cancelJobDownload
-            self.savedDraft = savedDraft
+            self.savedDraft = savedDraft; self.speakerModelsReady = speakerModelsReady
             self.ownsPlayer = ownsPlayer; self.play = play; self.playFrom = playFrom; self.showPlayer = showPlayer
             self.leavePlayer = leavePlayer; self.playerBlocked = playerBlocked
             self.recording = recording
@@ -155,6 +158,8 @@ public final class NoteScreenModel {
     public var showBookmarks = false
     /// The saved progress of a stopped or failed job, for its read-only draft.
     public private(set) var savedDraft: [DraftWord] = []
+    /// The speaker models are installed: Transcribe again says "Speaker names carry over."
+    public private(set) var speakerModelsReady = false
     /// This screen, as the owner of the player.
     @ObservationIgnored public let playerOwner = PlaybackOwner()
     @ObservationIgnored let ports: Ports
@@ -174,6 +179,12 @@ public final class NoteScreenModel {
     public var job: Job? { ports.job(noteID) }
     /// Why the transcript cannot be changed now (`ReadOnlyReason.of`); every sheet of the screen follows it.
     public var readOnly: ReadOnlyReason? { note.flatMap { ReadOnlyReason.of($0, job: job) } }
+
+    /// The note's transcribe row as the Library's actions menu has it, for Transcribe again's caption ("Adds version
+    /// 3. Speaker names carry over."), so both menus say the same.
+    public var transcribeAction: TranscribeAction? {
+        note.map { LibraryMapping.transcribeAction($0, job: job, voiceModelReady: speakerModelsReady) }
+    }
 
     // MARK: Effects
 
@@ -367,6 +378,7 @@ public final class NoteScreenModel {
         }
         updatePlayer()
         runStart(start)
+        Task { speakerModelsReady = await ports.speakerModelsReady() }
     }
 
     /// Runs the Library's start action once for the screen: the router remembers that it ran, and a route restored

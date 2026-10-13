@@ -635,6 +635,18 @@
         }
       }
     },
+    "Meeting ID": {
+      "comment": "Document info: the document's meeting id",
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ID della riunione"
+          }
+        }
+      }
+    },
     "Model": {
       "extractionState": "manual",
       "localizations": {

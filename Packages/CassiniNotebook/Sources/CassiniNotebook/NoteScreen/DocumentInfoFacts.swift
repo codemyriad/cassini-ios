@@ -20,6 +20,8 @@ public struct DocumentInfoFacts: Hashable, Sendable {
     public var namesFromVoices: Int
     public var resumedFromMs: Int64?
     public var fileBytes: Int64?
+    /// The imported document's meeting id (`meeting.id`), after the file size as on Android.
+    public var meetingID: String?
     /// The app that wrote an imported document.
     public var vendor: String?
     /// Why a damaged document's transcript could not be read.
@@ -46,7 +48,7 @@ public struct DocumentInfoFacts: Hashable, Sendable {
             speakersToldApart: provenance.map { $0.speakerDiarization != nil },
             namesFromVoices: named,
             resumedFromMs: provenance.flatMap { $0.resumedFromMs > 0 ? $0.resumedFromMs : nil },
-            fileBytes: fileBytes, vendor: note.document?.vendor, readError: readError)
+            fileBytes: fileBytes, meetingID: note.document?.meetingID, vendor: note.document?.vendor, readError: readError)
     }
 
     /// The name Document info shows for a provenance engine id: Apple's on-device speech model for this app's engine,

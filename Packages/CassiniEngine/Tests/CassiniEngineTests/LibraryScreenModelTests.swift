@@ -291,9 +291,13 @@ import CassiniNotebook
         await model.perform(.export(.text), on: doc)
         await model.perform(.documentInfo, on: doc)
         await model.perform(.export(.webVTT), on: doc)
+        await model.perform(.exportDocument, on: doc)
+        await model.perform(.shareAudio, on: doc)
         #expect(library.effects == [.openNote(.note(doc, start: .export(.text))), .openNote(.note(doc, start: .documentInfo)),
-                                    .openNote(.note(doc, start: .export(.webVTT)))])
+                                    .openNote(.note(doc, start: .export(.webVTT))), .openNote(.note(doc, start: .exportDocument)),
+                                    .openNote(.note(doc, start: .shareAudio))])
         #expect(model.dialog == nil)
+        #expect(model.menu(doc)?.exportsDocument == true)
     }
 
     // ports: LibraryViewModelTest#transcribeAgainOnAChangedDocumentConfirmsAFreshOne

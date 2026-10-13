@@ -38,6 +38,7 @@ extension AppGraph {
             continueQueue: { processing.continueQueue() }, clearFailed: { processing.clearFailed($0) },
             cancelJobDownload: { processing.cancelJobDownload() },
             savedDraft: { await processing.savedDraft($0) },
+            speakerModelsReady: { await processing.speakerModelsReady() },
             ownsPlayer: { playback.owns($0) }, play: { playback.play() }, playFrom: { playback.play($0, from: $1) },
             showPlayer: { playback.show($0, owner: $1) }, leavePlayer: { playback.leave($0) },
             playerBlocked: { playback.isBlocked }, recording: { recording.state.isActive },

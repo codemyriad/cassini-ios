@@ -114,7 +114,8 @@ struct NoteDetailView: View {
                     Button(NoteCopy.searchInTranscript, systemImage: "magnifyingglass") { model.screen.openSearch() }
                         .accessibilityIdentifier("searchTranscript")
                 }
-                NoteMenu(note: note, transcribeRow: TranscribeRow.of(note, job: job), exportingDocument: model.exportingDocument,
+                NoteMenu(note: note, transcribeRow: TranscribeRow.of(note, job: job), transcribeAction: model.transcribeAction,
+                         exportingDocument: model.exportingDocument,
                          perform: { model.perform($0) })
             }
         }
