@@ -54,6 +54,18 @@ import CassiniNotebook
         XCTFail("the transcript kept drawing on its own: \(RenderProbe.renders)")
     }
 
+    /// SwiftUI learns how to compare a view type in the background, and until it has, it redraws a paragraph whose
+    /// inputs did not change (seen on a busy machine). Makes `change` until it redraws only `expected`, so the checks
+    /// that follow measure the steady state a long playback runs in.
+    private func warmUp(_ window: UIWindow, expected: Set<String>, attempts: Int = 30, _ change: (Int) -> Void) {
+        for attempt in 0..<attempts {
+            RenderProbe.reset()
+            change(attempt)
+            settle(window)
+            if Set(RenderProbe.renders.keys) == expected { return }
+        }
+    }
+
     func testANewActiveWordRedrawsOnlyTheParagraphsThatHoldTheOldAndTheNewWord() {
         let transcript = NoteTranscripts.sealed(longNote())
         XCTAssertEqual(transcript.turns.count, 180)
@@ -66,6 +78,7 @@ import CassiniNotebook
         XCTAssertFalse(RenderProbe.renders.isEmpty, "the paragraphs on screen were drawn")
         XCTAssertNil(RenderProbe.renders[transcript.turns[179].id], "paragraphs far off screen are not made")
         settleUntilIdle(window)
+        warmUp(window, expected: [first]) { model.active = WordRef(turnID: first, index: 5 + $0 % 2) }
 
         RenderProbe.reset()
         model.active = WordRef(turnID: first, index: 3)
@@ -112,6 +125,7 @@ import CassiniNotebook
         XCTAssertNotNil(RenderProbe.renders["header"])
 
         let first = transcript.turns[0].id, second = transcript.turns[1].id
+        warmUp(window, expected: [first]) { playback.seek($0 % 2 == 0 ? 2.6 : 3.1) }
         playback.seek(1.1)
         settle(window)
         RenderProbe.reset()

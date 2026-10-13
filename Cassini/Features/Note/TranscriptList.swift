@@ -26,8 +26,9 @@ struct TranscriptHits: Equatable {
 }
 
 /// The transcript, paragraph by paragraph, in a lazy stack: only the paragraphs near the screen are made, and each one
-/// is drawn again only when what it shows changes (`TurnView` is `Equatable`). `activeWord` is the only input that
-/// moves with playback. `suggestion` puts a card above a paragraph, e.g. "Is this Luca?".
+/// is drawn again only when what it shows changes: `TurnView` is `Equatable`, which SwiftUI uses to diff a view that
+/// holds closures (not `.equatable()`, whose rows iOS 27 redraws without comparing them). `activeWord` is the only
+/// input that moves with playback. `suggestion` puts a card above a paragraph, e.g. "Is this Luca?".
 struct TranscriptList: View {
     let transcript: NoteTranscript
     var activeWord: WordRef?
@@ -47,7 +48,6 @@ struct TranscriptList: View {
                          matches: hits.ranges[turn.id] ?? [],
                          currentMatch: hits.current?.turnID == turn.id ? hits.current?.range : nil,
                          style: style, renamable: renamable, actions: actions, geometry: geometry)
-                    .equatable()
                     .id(turn.id)
             }
         }
