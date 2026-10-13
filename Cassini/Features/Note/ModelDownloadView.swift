@@ -71,7 +71,7 @@ private struct ModelDownloadContent: View {
             ModelDownloadActions(model: model)
         }
         .padding(.horizontal, 20).padding(.bottom, 24)
-        .frame(maxWidth: ReadableWidth.note).frame(maxWidth: .infinity)
+        .readableWidth()
     }
 }
 

@@ -28,7 +28,7 @@ struct TrashView: View {
                 }
             }
             .padding(.horizontal, 16).padding(.top, 6).padding(.bottom, 24)
-            .frame(maxWidth: ReadableWidth.library).frame(maxWidth: .infinity)
+            .readableWidth()
         }
         .background(Color.paper)
         .navigationTitle(TrashCopy.title).navigationBarTitleDisplayMode(.inline)

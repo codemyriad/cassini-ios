@@ -45,7 +45,7 @@ struct LibraryView: View {
                 }
             }
             .padding(.horizontal, Spacing.gutter).padding(.top, 12).padding(.bottom, 28)
-            .frame(maxWidth: ReadableWidth.library).frame(maxWidth: .infinity)
+            .readableWidth()
         }
         .scrollDismissesKeyboard(.immediately)
         .background(Color.paper)

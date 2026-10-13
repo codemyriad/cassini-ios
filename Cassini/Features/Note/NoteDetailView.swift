@@ -127,7 +127,7 @@ struct NoteDetailView: View {
                                           position: $scrollPosition, suggestion: { suggestionCard($0, in: transcript) })
                     }
                 }
-                .padding(Spacing.gutter).frame(maxWidth: ReadableWidth.note).frame(maxWidth: .infinity)
+                .padding(Spacing.gutter).readableWidth()
             }
             .scrollPosition($scrollPosition)
             .onScrollGeometryChange(for: ScrollMetrics.self) { ScrollMetrics($0) } action: { _, metrics in
@@ -149,7 +149,7 @@ struct NoteDetailView: View {
                                 next: { screen.search?.next(of: matches.count) },
                                 close: { screen.closeSearch() })
                     .padding(.horizontal, Spacing.gutter).padding(.vertical, 8)
-                    .frame(maxWidth: ReadableWidth.note).frame(maxWidth: .infinity)
+                    .readableWidth()
                     .background(Color.paper)
             }
         }

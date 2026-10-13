@@ -28,12 +28,12 @@ struct RecordingCard: View {
                 Image(systemName: card.paused ? "pause.circle" : "waveform.circle.fill").font(.title).foregroundStyle(Color.recordingAccent)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(LibraryCopy.recordingCard(card.title, paused: card.paused)).font(.headline).lineLimit(1)
-                    Text(LibraryCopy.tapToReturn).font(.caption).foregroundStyle(.white.opacity(0.7))
+                    Text(LibraryCopy.tapToReturn).font(.caption).foregroundStyle(Color.recordingSecondary)
                 }
                 Spacer(minLength: 8)
                 Text(TimeText.clock(card.elapsed)).font(.body.monospacedDigit())
             }
-            .foregroundStyle(.white).padding(18)
+            .foregroundStyle(Color.recordingText).padding(18)
             .background(Color.recordingBackground, in: RoundedRectangle(cornerRadius: Radius.card))
         }
         .buttonStyle(.plain)
@@ -87,39 +87,53 @@ struct ProgressBannerCard: View {
 }
 
 /// Import audio and Record, pinned to the bottom of the Library. While a recording runs, Record reads
-/// "Recording · 24:07" and returns to it. When the library cannot be opened both are off, and say why.
+/// "Recording · 24:07" and returns to it. When both do not fit side by side (a narrow window, large text), Import
+/// collapses to a round icon (Android `CaptureBar`). When the library cannot be opened both are off, and say why.
 struct CaptureBar: View {
     @Environment(RecordingStore.self) private var recording
-    @Environment(\.dynamicTypeSize) private var dynamicType
     let unavailable: Bool
     let importAudio: () -> Void
 
     var body: some View {
-        let layout = dynamicType.isAccessibilitySize ? AnyLayout(VStackLayout(spacing: 8)) : AnyLayout(HStackLayout(spacing: 18))
-        let active = recording.state.activeRecording
-        layout {
-            Button(action: importAudio) {
-                Label(LibraryCopy.importAudio, systemImage: "square.and.arrow.down")
-                    .font(.subheadline.weight(.semibold)).frame(minWidth: 88, minHeight: 52)
-            }
-            .accessibilityHint(unavailable ? LibraryCopy.unavailableTitle : "")
-            .accessibilityIdentifier("importButton")
-            Button { Task { await recording.start() } } label: {
-                if let active {
-                    Label(LibraryCopy.recordingButton(TimeText.clock(active.elapsed)), systemImage: "waveform")
-                } else {
-                    Label(LibraryCopy.record, systemImage: "mic.fill")
-                }
-            }
-            .buttonStyle(PrimaryButtonStyle())
-            .disabled(recording.isBusy)
-            .accessibilityLabel(active == nil ? LibraryCopy.recordDescription : LibraryCopy.returnToRecording)
-            .accessibilityHint(unavailable ? LibraryCopy.unavailableTitle : "")
-            .accessibilityIdentifier("recordButton")
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 18) { importButton(collapsed: false); recordButton }
+            HStack(spacing: 12) { importButton(collapsed: true); recordButton }
         }
         .disabled(unavailable)
         .dynamicTypeSize(...DynamicTypeSize.accessibility1).padding(.horizontal, Spacing.gutter).padding(.vertical, 14)
-        .frame(maxWidth: ReadableWidth.library).frame(maxWidth: .infinity)
+        .readableWidth()
         .background(.regularMaterial)
+    }
+
+    private func importButton(collapsed: Bool) -> some View {
+        Button(action: importAudio) {
+            if collapsed {
+                Label(LibraryCopy.importAudio, systemImage: "square.and.arrow.down")
+                    .labelStyle(.iconOnly).font(.title3.weight(.semibold))
+                    .frame(width: 52, height: 52)
+                    .background(Color.ink.opacity(0.06), in: Circle())
+            } else {
+                Label(LibraryCopy.importAudio, systemImage: "square.and.arrow.down")
+                    .font(.subheadline.weight(.semibold)).fixedSize().frame(minWidth: 88, minHeight: 52)
+            }
+        }
+        .accessibilityHint(unavailable ? LibraryCopy.unavailableTitle : "")
+        .accessibilityIdentifier("importButton")
+    }
+
+    private var recordButton: some View {
+        let active = recording.state.activeRecording
+        return Button { Task { await recording.start() } } label: {
+            if let active {
+                Label(LibraryCopy.recordingButton(TimeText.clock(active.elapsed)), systemImage: "waveform").fixedSize()
+            } else {
+                Label(LibraryCopy.record, systemImage: "mic.fill").fixedSize()
+            }
+        }
+        .buttonStyle(PrimaryButtonStyle())
+        .disabled(recording.isBusy)
+        .accessibilityLabel(active == nil ? LibraryCopy.recordDescription : LibraryCopy.returnToRecording)
+        .accessibilityHint(unavailable ? LibraryCopy.unavailableTitle : "")
+        .accessibilityIdentifier("recordButton")
     }
 }

@@ -19,7 +19,7 @@ private struct TrashUndoSnackbar: ViewModifier {
                 if let snackbar = undo.snackbar {
                     Snackbar(message: TrashCopy.moved(snackbar.note.title), actionTitle: TrashCopy.undo) { undo.undo() }
                         .padding(.horizontal, 16).padding(.bottom, 24)
-                        .frame(maxWidth: ReadableWidth.library).frame(maxWidth: .infinity)
+                        .readableWidth()
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                         .task(id: snackbar.id) {
                             // A task cancelled as the screen changes starts again and waits only for the time left.

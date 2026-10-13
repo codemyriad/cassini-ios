@@ -34,7 +34,7 @@ struct PlaybackBar: View {
             controls
         }
         .dynamicTypeSize(...DynamicTypeSize.accessibility1).padding(.horizontal, Spacing.gutter).padding(.top, 12).padding(.bottom, 8)
-        .frame(maxWidth: ReadableWidth.note).frame(maxWidth: .infinity).background(.regularMaterial)
+        .readableWidth().background(.regularMaterial)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(Text("Playback", tableName: "Playback"))
     }

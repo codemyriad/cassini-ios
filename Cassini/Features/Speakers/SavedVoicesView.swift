@@ -60,6 +60,7 @@ struct SavedVoicesView: View {
                 } footer: { Text(SpeakersCopy.forgetAllDataBody) }
             }
         }
+        .readableListWidth()
         .navigationTitle(SpeakersCopy.voices)
         .task { await voices.refresh() }
         .alert(SpeakersCopy.renameSaved, isPresented: presented(where: { if case .rename = $0 { true } else { false } })) {

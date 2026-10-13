@@ -75,6 +75,7 @@ private struct SettingsForm: View {
                 Text("About", tableName: "Settings")
             }
         }
+        .readableListWidth()
     }
 }
 

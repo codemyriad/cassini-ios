@@ -65,7 +65,7 @@ private struct LicenseTextPane: View {
                 }
             }
             .padding(20)
-            .frame(maxWidth: ReadableWidth.note).frame(maxWidth: .infinity)
+            .readableWidth()
         }
         .background(Color.paper)
         .navigationTitle(text.entry.title).navigationBarTitleDisplayMode(.inline)
