@@ -34,6 +34,7 @@ struct TranscriptVersionsView: View {
                     .accessibilityAddTraits(note?.selectedVersionID == version.id ? .isSelected : [])
                 }
             }
+            .paperListBackground()
             .navigationTitle(SpeakersCopy.versionsTitle).navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button(SpeakersCopy.done) { dismiss() } } }
         }

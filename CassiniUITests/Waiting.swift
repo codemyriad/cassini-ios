@@ -108,7 +108,7 @@ extension XCUIApplication {
     /// The app's own options, with whether each takes a value; the rest of the arguments are the system's.
     private static let options: [String: Bool] = [
         "--ui-testing": false, "--reset-test-data": false, "--seed-test-data": false, "--seed": true,
-        "--open-fixture": true, "--models-missing": false, "--notifications-denied": false,
+        "--open-fixture": true, "--models-missing": false, "--notifications-denied": false, "--capture-held": false,
     ]
     /// The system arguments of the process this runner launched last; nil when a new process must come first.
     private static var processArguments: [String]?

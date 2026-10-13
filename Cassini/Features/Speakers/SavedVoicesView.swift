@@ -66,6 +66,7 @@ struct SavedVoicesView: View {
                 } footer: { Text(SpeakersCopy.forgetAllDataBody).foregroundStyle(Color.muted) }
             }
         }
+        .paperListBackground()
         .readableListWidth()
         .navigationTitle(SpeakersCopy.voices)
         .task { await voices.refresh() }

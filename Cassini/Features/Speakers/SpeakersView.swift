@@ -48,6 +48,7 @@ struct SpeakersView: View {
                     NavigationLink(SpeakersCopy.voices) { SavedVoicesView() }
                 }
             }
+            .paperListBackground()
             .navigationTitle(SpeakersCopy.speakersTitle).navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button(SpeakersCopy.done) { dismiss() } } }
             .sheet(item: $naming) { NameSpeakerSheet(noteID: noteID, speakerID: $0.id) }

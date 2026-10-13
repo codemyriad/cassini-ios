@@ -143,6 +143,7 @@ private struct RecordingTimer: View {
             .minimumScaleFactor(0.5).lineLimit(1)
             .accessibilityLabel(Text("Recording duration", tableName: "Recording"))
             .accessibilityValue(RecordingCopy.spoken(elapsed))
+            .accessibilityIdentifier("recordingTimer")
     }
 }
 

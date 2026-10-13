@@ -14,7 +14,7 @@ struct SettingsView: View {
         Group {
             if let model { SettingsForm(model: model) } else { Color.paper }
         }
-        .scrollContentBackground(.hidden).background(Color.paper)
+        .paperListBackground()
         .navigationTitle(Text("Settings", tableName: "Settings")).navigationBarTitleDisplayMode(.inline)
         .task {
             let model = self.model ?? SettingsModel(ports: ports)

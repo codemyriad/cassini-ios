@@ -16,7 +16,7 @@ import XCTest
 ///
 /// The fake's second transcription of the note hears other words (`TestFixtures.transcribedAgainSegments`) to work
 /// around an open difference, not an intended rule: iOS's Transcribe again adds no version when the words equal the
-/// shown transcript, where Android always adds one (README, "Open differences from Android").
+/// shown transcript, where Android always adds one (docs/differences.md, "Open differences").
 final class NoteFlowTests: XCTestCase {
     private static let walk = "BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB"
 

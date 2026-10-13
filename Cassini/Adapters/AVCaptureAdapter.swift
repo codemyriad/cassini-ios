@@ -55,6 +55,9 @@ import CassiniNotebook
             try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetoothHFP])
             guard session.isInputAvailable else { throw AudioError.noInput }
             try session.setActive(true)
+            // A simulator on a Mac without a microphone reports an input but has no channels; recording from it ends
+            // the app inside Core Audio.
+            guard session.inputNumberOfChannels > 0 else { throw AudioError.noInput }
             // PCM in CAF stays readable if the process dies before stop() can finalize it.
             let capture = try AVAudioRecorder(url: url, settings: [AVFormatIDKey: kAudioFormatLinearPCM,
                 AVSampleRateKey: 48_000, AVNumberOfChannelsKey: 1, AVLinearPCMBitDepthKey: 16,

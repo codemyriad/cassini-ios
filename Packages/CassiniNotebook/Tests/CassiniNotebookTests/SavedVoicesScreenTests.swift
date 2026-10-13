@@ -3,7 +3,7 @@ import Testing
 @testable import CassiniNotebook
 
 /// Android's SavedVoicesViewModelTest over the pure screen state. The options menu is a system menu on iOS, so its
-/// open state is not kept (see docs/differences/WP8.md).
+/// open state is not kept (see docs/differences.md).
 @Suite struct SavedVoicesScreenTests {
     typealias F = VoiceFixtures
     let giulia = F.voice("g", "Giulia", seconds: 1_320)

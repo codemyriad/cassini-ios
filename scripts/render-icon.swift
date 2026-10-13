@@ -1,3 +1,6 @@
+// Draws Cassini's app icon (the orbit mark on the dark ground, 1024 x 1024, opaque) into
+// Cassini/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png. Run it from the repository root after changing
+// the drawing: swift scripts/render-icon.swift
 import AppKit
 let size = 1024
 let image = NSImage(size: NSSize(width: size, height: size))

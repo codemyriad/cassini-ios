@@ -170,6 +170,8 @@ private struct Footnote: View {
         Text("Transcription runs on this device. If iOS stops it in the background, your progress is kept.",
              tableName: "Processing")
             .font(.caption).foregroundStyle(Color.muted)
+            // The card is laid out beside the draft's list; the note wraps rather than being cut.
+            .fixedSize(horizontal: false, vertical: true)
     }
 }
 

@@ -15,3 +15,5 @@ xcuserdata/
 *.m4a
 Models/
 /.test-cache/
+# Italian screenshots (scripts/screenshots.sh --locale it) are for review, not committed.
+docs/screenshots/it/

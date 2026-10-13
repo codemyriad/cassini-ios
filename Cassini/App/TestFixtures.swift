@@ -15,8 +15,20 @@ enum TestFixtures {
     static let pausedDoneMs: Int64 = 12_000
     static let longID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
     static let silentID = UUID(uuidString: "22222222-2222-2222-2222-222222222222")!
+    static let reviewID = UUID(uuidString: "33333333-3333-3333-3333-333333333333")!
     static let fixtureDuration: TimeInterval = 24
     static let processingDuration: TimeInterval = 48 * 60 + 13
+    /// The audio the processing seed's job transcribes between two results, 1.2 s apart: its card shows 1–2 minutes
+    /// left for the 18 minutes of audio still to go.
+    static let processingPace: TimeInterval = 10
+    /// Where the recording seed's capture starts under `--capture-held`; it holds 7 s later, at 24:07.
+    static let heldCaptureStart: TimeInterval = 24 * 60
+    /// A waveform's worth (56 bars) of levels that rise and fall like speech, with two short pauses.
+    static let speechLevels: [Float] = (0..<WaveformBars.count).map { bar in
+        let x = Double(bar)
+        if (18...20).contains(bar) || (39...40).contains(bar) { return 0.04 }
+        return Float(0.25 + 0.35 * abs(sin(x * 0.55)) * (0.6 + 0.4 * abs(sin(x * 0.13 + 1))) + 0.15 * abs(sin(x * 1.7)))
+    }
 
     static let transcribedSegments: [TranscriptSegment] = [
         .init(text: "What if being productive meant paying closer attention, rather than doing more?", start: 0, end: 6, speaker: "Alex", speakerID: "alex"),
@@ -26,8 +38,8 @@ enum TestFixtures {
 
     /// What a second transcription of the same note hears: the last passage ends sooner. The other words work around
     /// an open difference from Android, not an intended rule: iOS's Transcribe again adds no version when the words
-    /// equal the shown transcript (`TranscriptionJob.saveTranscript`), where Android always adds one (README, "Open
-    /// differences from Android").
+    /// equal the shown transcript (`TranscriptionJob.saveTranscript`), where Android always adds one (docs/differences.md,
+    /// "Open differences").
     static let transcribedAgainSegments: [TranscriptSegment] = Array(transcribedSegments.dropLast()) + [
         .init(text: "Let’s protect an hour on Thursday for focused work. Just room to think.", start: 14, end: 24,
               speaker: "Alex", speakerID: "alex"),
@@ -40,6 +52,13 @@ enum TestFixtures {
         prints: [SpeakerPrint(speakerID: "s1", model: "fake-model", vector: [1, 0, 0], speechSeconds: 16),
                  SpeakerPrint(speakerID: "s2", model: "fake-model", vector: [0, 1, 0], speechSeconds: 8)])
 
+    /// What the processing seed's frozen job has finalized by 62 %: the start of a planning call.
+    static let processingDraft: [TranscriptSegment] = [
+        (0, "Morning, everyone. Three things on the agenda today: the launch date, the onboarding copy and hiring."),
+        (9, "Let’s start with the launch. Engineering thinks the last two weeks of November are realistic."),
+        (17, "That leaves a week of buffer before the holidays, which I’d rather keep than spend."),
+    ].map { start, text in timedSegment(text, start: start, end: start + 8.5) }
+
     /// The draft of `--draft-growing`: 120 sentences of 3 s, each its own words.
     static let growingDraft: [TranscriptSegment] = (0..<120).map { index in
         let start = Double(index) * 3
@@ -51,26 +70,46 @@ enum TestFixtures {
         return TranscriptSegment(text: texts.joined(separator: " "), start: start, end: start + 3, words: words)
     }
 
+    /// A passage whose words share its span evenly, as Apple's results carry their own times; its speaker is
+    /// `speaker`'s.
+    private static func timedSegment(_ text: String, start: TimeInterval, end: TimeInterval,
+                                     _ speaker: TranscriptSegment? = nil) -> TranscriptSegment {
+        let texts = text.split(separator: " ").map(String.init)
+        let step = (end - start) / Double(texts.count)
+        let words = texts.enumerated().map { offset, word in
+            TimedWord(text: (offset == 0 ? "" : " ") + word, start: start + Double(offset) * step,
+                      end: start + Double(offset + 1) * step)
+        }
+        return TranscriptSegment(text: text, start: start, end: end, speaker: speaker?.speaker,
+                                 speakerID: speaker?.speakerID, words: words)
+    }
+
     private static let waveform = (0..<96).map { Float(0.15 + abs(sin(Double($0) * 0.73)) * 0.55) }
 
     /// Writes the notes of `seed` into an empty library.
     static func seed(_ seed: AppEnvironment.Seed, into store: NoteStore, now: Date) async throws {
         guard try store.root.isEmptyDirectory else { return }
         var main = fixture(now: now)
-        if seed == .speakers || seed == .voices {
-            let sam = try seedVoices(root: store.root, seed: seed)
-            if seed == .speakers {
-                // Sam is not named yet, and the saved voice "Sam Rivera" may be them: the note asks "Is this Sam Rivera?".
-                main.speakers?[1].name = DefaultLabels.placeholder(2)
-                main.speakers?[1].match = .suggested(voice: sam, score: 0.78)
-                main.refreshSpeakerLabels()
-            }
+        var notes: [Note] = []
+        switch seed {
+        case .speakers:
+            // Sam is not named yet, and the saved voice "Sam Rivera" may be them: the note asks "Is this Sam Rivera?".
+            let sam = try seedSuggestedVoice(root: store.root)
+            main.speakers?[1].name = DefaultLabels.placeholder(2)
+            main.speakers?[1].match = .suggested(voice: sam, score: 0.78)
+            main.refreshSpeakerLabels()
+        case .voices:
+            notes = try seedSavedVoices(root: store.root, main: &main, now: now)
+        case .reading:
+            main.transcript = transcribedSegments.map { timedSegment($0.text, start: $0.start, end: $0.end, $0) }
+        default:
+            break
         }
-        var notes = [main, walk(now: now)]
+        notes = [main, walk(now: now)] + notes
         switch seed {
         case .library, .recording, .voices, .speakers:
             break
-        case .search:
+        case .search, .reading:
             notes += [transcribed("Garden plans for the spring", at: now.addingTimeInterval(-3 * 86_400),
                                   "We could move the tomatoes to the sunny corner and leave Thursday free for planting."),
                       transcribed("Notes from the design review", at: now.addingTimeInterval(-9 * 86_400),
@@ -99,11 +138,12 @@ enum TestFixtures {
         if seed == .statuses { try await seedStatusJobs(into: store, now: now) }
     }
 
-    /// What a seed needs once the app is ready: consent and a running job for `processing`.
+    /// What a seed needs once the app is ready: consent and a running job for `processing`, whose speaker step is
+    /// ahead of it, and for `statuses`, whose job has none.
     @MainActor static func prepare(_ seed: AppEnvironment.Seed, settings: SettingsStore, processing: ProcessingStore) {
         guard seed == .processing || seed == .statuses else { return }
         settings.recordConsent()
-        settings.identifySpeakers = false
+        settings.identifySpeakers = seed == .processing
         Task {
             await processing.transcribe(processingID, origin: .screen)
             // The frozen job never ends, so this one stays queued behind it.
@@ -193,21 +233,48 @@ enum TestFixtures {
         return note
     }
 
-    /// Saved voices with samples. Returns Sam's voice, which the speakers seed offers as a match.
-    private static func seedVoices(root: URL, seed: AppEnvironment.Seed) throws -> UUID {
+    /// The saved voice "Sam Rivera", with a sample from the morning walk. Returns its id.
+    private static func seedSuggestedVoice(root: URL) throws -> UUID {
         let library = try VoiceLibrary(root: root)
-        func print(_ speaker: String, _ vector: [Float]) -> SpeakerPrint {
-            SpeakerPrint(speakerID: speaker, model: "fake-model", vector: vector, speechSeconds: 12)
-        }
-        let sam = print("sam", [0, 1, 0]), alex = print("alex", [1, 0, 0])
+        let sam = voicePrint("sam", [0, 1, 0], seconds: 12), alex = voicePrint("alex", [1, 0, 0], seconds: 12)
         try library.savePrints([alex, sam], noteID: fixtureID)
-        var voices = [SavedVoice(name: "Sam Rivera", samples: [.init(noteID: walkID, print: sam)])]
-        if seed == .voices {
-            voices.append(SavedVoice(name: "Alex Moreau", samples: [.init(noteID: fixtureID, print: alex), .init(noteID: walkID, print: alex)]))
-            voices.append(SavedVoice(name: "Giulia Conti", samples: [.init(noteID: walkID, print: print("giulia", [0, 0, 1]))]))
-        }
+        let voice = SavedVoice(name: "Sam Rivera", samples: [.init(noteID: walkID, print: sam)])
+        try library.save([voice])
+        return voice.id
+    }
+
+    /// Three saved voices, each confirmed in the notes it was named in: Alex Moreau and Sam Rivera in `main`, which
+    /// takes their full names, and Alex Moreau and Giulia Conti in the design review this returns.
+    private static func seedSavedVoices(root: URL, main: inout Note, now: Date) throws -> [Note] {
+        let library = try VoiceLibrary(root: root)
+        var review = Note(id: reviewID, title: "Notes from the design review", createdAt: now.addingTimeInterval(-9 * 86_400),
+                          audioFilename: "audio.wav")
+        review.duration = fixtureDuration; review.status = .ready; review.language = "en-US"; review.waveform = waveform
+        review.transcript = [
+            .init(text: "The review agreed to keep the timeline focused.", start: 0, end: 12, speakerID: "giulia"),
+            .init(text: "And we revisit the colours next week.", start: 12, end: 24, speakerID: "alex"),
+        ]
+        let alexHere = voicePrint("alex", [1, 0, 0], seconds: 96), samHere = voicePrint("sam", [0, 1, 0], seconds: 74)
+        let alexThere = voicePrint("alex", [1, 0, 0], seconds: 41), giulia = voicePrint("giulia", [0, 0, 1], seconds: 88)
+        try library.savePrints([alexHere, samHere], noteID: fixtureID)
+        try library.savePrints([giulia, alexThere], noteID: reviewID)
+        let voices = [
+            SavedVoice(name: "Alex Moreau", samples: [.init(noteID: fixtureID, print: alexHere), .init(noteID: reviewID, print: alexThere)]),
+            SavedVoice(name: "Sam Rivera", samples: [.init(noteID: fixtureID, print: samHere)]),
+            SavedVoice(name: "Giulia Conti", samples: [.init(noteID: reviewID, print: giulia)]),
+        ]
         try library.save(voices)
-        return voices[0].id
+        main.speakers = [NoteSpeaker(id: "alex", name: "Alex Moreau", match: .confirmed(voice: voices[0].id, score: 0.91)),
+                         NoteSpeaker(id: "sam", name: "Sam Rivera", match: .confirmed(voice: voices[1].id, score: 0.88))]
+        main.refreshSpeakerLabels()
+        review.speakers = [NoteSpeaker(id: "giulia", name: "Giulia Conti", match: .confirmed(voice: voices[2].id, score: 0.9)),
+                           NoteSpeaker(id: "alex", name: "Alex Moreau", match: .confirmed(voice: voices[0].id, score: 0.86))]
+        review.refreshSpeakerLabels()
+        return [review]
+    }
+
+    private static func voicePrint(_ speaker: String, _ vector: [Float], seconds: Double) -> SpeakerPrint {
+        SpeakerPrint(speakerID: speaker, model: "fake-model", vector: vector, speechSeconds: seconds)
     }
 
     private static func writeSilence(to url: URL) throws {

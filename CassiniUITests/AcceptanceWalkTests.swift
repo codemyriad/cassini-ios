@@ -28,7 +28,8 @@ final class AcceptanceWalkTests: XCTestCase {
         XCTAssertTrue(title.waitForExistence(within: 10))
         XCTAssertEqual(title.label, Self.title)
         let words = app.descendants(matching: .any)["turn-w2"]
-        XCTAssertTrue(words.waitForExistence(within: 20), "the recording is transcribed after it is saved")
+        // Compression, the hand-off, the job and its save run one after another; on a loaded machine they took 30 s.
+        XCTAssertTrue(words.waitForExistence(within: 60), "the recording is transcribed after it is saved")
 
         // Read and listen: a word tap plays from there.
         let play = app.buttons["playButton"]
@@ -43,8 +44,8 @@ final class AcceptanceWalkTests: XCTestCase {
         let first = speakerHeader(app, "Speaker 1")
         XCTAssertTrue(first.waitForExistence(within: 15), "the speakers are told apart after the words")
         // Android seals a transcription and its speakers as one version. iOS keeps the transcript before the speaker
-        // analysis as a version of its own, so the chip says "Version 2 of 2": an open difference (README, "Open
-        // differences from Android"). The check fails, as expected, until that is fixed; then it passes and this fails.
+        // analysis as a version of its own, so the chip says "Version 2 of 2": an open difference (docs/differences.md,
+        // "Open differences"). The check fails, as expected, until that is fixed; then it passes and this fails.
         XCTExpectFailure("open difference: the speaker analysis after a transcription adds a version") {
             XCTAssertFalse(app.buttons["versionChip"].exists, "the first transcription is the note's only version")
         }

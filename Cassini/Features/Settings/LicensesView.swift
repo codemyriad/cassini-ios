@@ -20,7 +20,7 @@ struct LicensesView: View {
                 }
             }
         }
-        .scrollContentBackground(.hidden).background(Color.paper)
+        .paperListBackground()
         .navigationTitle(Text("Source code and notices", tableName: "Settings")).navigationBarTitleDisplayMode(.inline)
         .navigationDestination(item: Binding(get: { model.open }, set: { if $0 == nil { model.closeText() } })) { text in
             LicenseTextPane(text: text)

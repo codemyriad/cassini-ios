@@ -90,6 +90,13 @@ public struct ScreenStack: Hashable, Sendable {
         path.removeSubrange(index...)
     }
 
+    /// In split view, the note the detail column opens on: the Library beside it marks its row as selected.
+    public var selectedNoteID: UUID? { isSplit ? path.first?.noteID : nil }
+
+    /// In split view the detail column's first screen has no back button: the Library it came from is beside it, and
+    /// under it is only the column's placeholder.
+    public func hidesBackButton(_ route: Route) -> Bool { isSplit && path.first == route }
+
     /// The screen under the topmost `route`, for its back label.
     public func below(_ route: Route) -> Route? { BackStack.below(route, in: stack) }
 

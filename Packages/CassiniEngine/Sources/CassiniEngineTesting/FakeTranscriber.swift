@@ -13,8 +13,10 @@ public struct FakeTranscriber: Transcribing {
         /// Transcribe again that hears other words. Runs are counted per note (the folder of the request's audio,
         /// which stays the note's while its audio file changes), so one note's transcriptions never change another's.
         case sequence([[TranscriptSegment]], total: TimeInterval)
-        /// Reports `done` of `total` seconds and never finishes.
-        case frozen(done: TimeInterval, total: TimeInterval)
+        /// Finalizes `draft`, reports `done` of `total` seconds and never finishes.
+        /// With `pace`, two reports `pace` seconds of audio apart come first, as long apart as the job lets its
+        /// results be, so it measures its speed and estimates the time left.
+        case frozen(done: TimeInterval, total: TimeInterval, draft: [TranscriptSegment] = [], pace: TimeInterval? = nil)
         /// Downloads the speech model up to `fraction` and never finishes.
         case downloading(fraction: Double)
         /// Finalizes one of `segments` every `interval`, then never finishes: a draft that grows.
@@ -23,6 +25,7 @@ public struct FakeTranscriber: Transcribing {
     }
 
     public let script: Script
+    private static let resultInterval = Duration.milliseconds(1_200)
     public let status: ModelPartStatus
     private let runs = Runs()
 
@@ -37,7 +40,16 @@ public struct FakeTranscriber: Transcribing {
         case .sequence(let lists, let total):
             let run = runs.next(for: request.url.deletingLastPathComponent())
             return try finalize(lists.isEmpty ? [] : lists[min(run, lists.count - 1)], total: total, events: events)
-        case .frozen(let done, let total):
+        case .frozen(let done, let total, let draft, let pace):
+            for segment in draft { events(.finalized(segment)) }
+            // The job shows its results at most once a second; a report after the pause is shown whole.
+            if !draft.isEmpty || pace != nil { try await Task.sleep(for: Self.resultInterval) }
+            if let pace {
+                for back in [2.0, 1.0] {
+                    events(.progress(done: done - back * pace, total: total))
+                    try await Task.sleep(for: Self.resultInterval)
+                }
+            }
             events(.progress(done: done, total: total))
             while true { try await Task.sleep(for: .seconds(3600)) }
         case .downloading(let fraction):

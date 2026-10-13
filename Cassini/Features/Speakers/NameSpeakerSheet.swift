@@ -108,6 +108,7 @@ struct NameSpeakerSheet: View {
                 Section { Button(SpeakersCopy.mergeInto) { send(.mergeInto) }.accessibilityIdentifier("mergeInto") }
             }
         }
+        .paperListBackground()
         .disabled(saving)
     }
 

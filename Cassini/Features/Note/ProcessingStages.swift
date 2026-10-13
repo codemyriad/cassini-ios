@@ -17,6 +17,8 @@ struct StageTracker: View {
                         .foregroundStyle(state == .inProgress ? Color.ink : Color.muted)
                         .strikethrough(state == .skipped)
                         .lineLimit(2).minimumScaleFactor(0.8)
+                        // Wraps to its second line instead of truncating when the card is short of height.
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .accessibilityElement(children: .ignore)
@@ -52,6 +54,7 @@ struct StatGrid: View {
             GridRow {
                 ProcessingStat(label: Text("Time left", tableName: "Processing"), value: Text(ProgressText.timeLeft(progress.timeLeft)),
                      pending: progress.timeLeft == .calculating)
+                .accessibilityIdentifier("timeLeftStat")
                 ProcessingStat(label: Text("Processed", tableName: "Processing"),
                      value: Text(ProgressText.processed(doneMs: progress.doneMs, totalMs: progress.totalMs)).monospacedDigit())
             }

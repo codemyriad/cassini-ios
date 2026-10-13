@@ -38,6 +38,7 @@ struct RenameNoteDialog: View {
                     }
                 }
             }
+            .paperListBackground()
             .navigationTitle(LibraryCopy.rename).navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button(LibraryCopy.cancel) { dismiss() } }

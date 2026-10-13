@@ -9,7 +9,9 @@ import CassiniNotebook
     public let events: AsyncStream<CaptureEvent>
     private let continuation: AsyncStream<CaptureEvent>.Continuation
     private let levels: [Float]
-    private let frozenElapsed: TimeInterval?
+    private let heldAt: TimeInterval?
+    /// The levels a held capture has played.
+    private var played = 0
     private var url: URL?
     private var startedAt: Date?
     private var banked: TimeInterval = 0
@@ -17,15 +19,18 @@ import CassiniNotebook
     public private(set) var isPaused = false
     public var startError: (any Error)?
 
-    /// `levels` repeat while capturing; with `frozenElapsed` the elapsed time stands still at that value.
-    public init(levels: [Float] = [0.2, 0.45, 0.7, 0.35, 0.9, 0.5, 0.25, 0.6], frozenElapsed: TimeInterval? = nil) {
+    /// `levels` repeat while capturing. With `heldAt` the capture starts that far in, plays `levels` once, one per
+    /// waveform bar of captured time, and then holds: its time and waveform stand still, the same on every run.
+    public init(levels: [Float] = [0.2, 0.45, 0.7, 0.35, 0.9, 0.5, 0.25, 0.6], heldAt: TimeInterval? = nil) {
         (events, continuation) = AsyncStream.makeStream(of: CaptureEvent.self)
         self.levels = levels.isEmpty ? [0.5] : levels
-        self.frozenElapsed = frozenElapsed
+        self.heldAt = heldAt
     }
 
+    private static let heldStep = Double(WaveformBars.barMs) / 1000
+
     public var elapsed: TimeInterval {
-        if let frozenElapsed { return frozenElapsed }
+        if let heldAt { return heldAt + Double(played) * Self.heldStep }
         return banked + (startedAt.map { Date().timeIntervalSince($0) } ?? 0)
     }
 
@@ -34,7 +39,7 @@ import CassiniNotebook
     public func start(url: URL) async throws -> CaptureFormat {
         if let startError { throw startError }
         self.url = url
-        banked = 0; startedAt = Date(); isPaused = false
+        banked = 0; startedAt = Date(); isPaused = false; played = 0
         tick()
         return .pcm48kMono
     }
@@ -65,12 +70,25 @@ import CassiniNotebook
 
     private func tick() {
         ticker?.cancel()
+        if heldAt != nil { playHeld(); return }
         ticker = Task { [weak self, levels, continuation] in
             var index = 0
             while !Task.isCancelled, self != nil {
                 continuation.yield(.level(levels[index % levels.count]))
                 index += 1
                 try? await Task.sleep(for: .milliseconds(100))
+            }
+        }
+    }
+
+    /// Each level in the next bar of captured time, then nothing more.
+    private func playHeld() {
+        ticker = Task { [weak self, levels, continuation] in
+            for level in levels.dropFirst(self?.played ?? 0) {
+                guard !Task.isCancelled, let self else { return }
+                self.played += 1
+                continuation.yield(.level(level))
+                try? await Task.sleep(for: .milliseconds(50))
             }
         }
     }
