@@ -140,6 +140,8 @@ final class NoteScreenTests: XCTestCase {
         XCTAssertTrue(search.waitForExistence(within: 15))
         search.tap()
         search.typeText("lighthouse")
+        // The search answers a moment after the last keystroke; the workshop was on the screen before it did.
+        XCTAssertTrue(app.staticTexts["Silent memo"].waitForNonExistence(within: 5), "the search has answered")
         let row = app.staticTexts["Three hour workshop"]
         XCTAssertTrue(row.waitForExistence(within: 5))
         row.tap()
