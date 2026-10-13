@@ -1322,23 +1322,6 @@
         }
       }
     },
-    "Today": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Today"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Oggi"
-          }
-        }
-      }
-    },
     "Transcribe": {
       "extractionState": "manual",
       "localizations": {
@@ -1523,23 +1506,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Le parole possono ancora cambiare"
-          }
-        }
-      }
-    },
-    "Yesterday": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Yesterday"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ieri"
           }
         }
       }

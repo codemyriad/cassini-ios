@@ -166,28 +166,16 @@ public enum TranscribeAgainRule {
 
 /// The header subtitle outside reading mode: "Today, 10:02 · 48:13".
 public struct NoteSubtitle: Hashable, Sendable {
-    public enum Day: Hashable, Sendable {
-        case today, yesterday
-        /// The start of another day.
-        case date(Date)
-    }
-
-    public var day: Day
+    /// The day as the Library heads it (`DayGroups.key`): today, yesterday, or a date with the year outside the
+    /// current one.
+    public var day: DayKey
     public var createdAt: Date
     public var duration: TimeInterval
 
     /// Nil in reading mode, whose header has the search and the chips instead.
     public static func of(_ note: Note, mode: NoteMode, now: Date, calendar: Calendar) -> NoteSubtitle? {
         guard mode != .reading else { return nil }
-        let day = calendar.startOfDay(for: note.createdAt)
-        let today = calendar.startOfDay(for: now)
-        let label: Day = if day == today {
-            .today
-        } else if calendar.date(byAdding: .day, value: -1, to: today) == day {
-            .yesterday
-        } else {
-            .date(day)
-        }
-        return NoteSubtitle(day: label, createdAt: note.createdAt, duration: note.duration)
+        return NoteSubtitle(day: DayGroups.key(note.createdAt, now: now, calendar: calendar), createdAt: note.createdAt,
+                            duration: note.duration)
     }
 }

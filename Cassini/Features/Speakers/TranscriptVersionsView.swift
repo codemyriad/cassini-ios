@@ -7,6 +7,8 @@ import CassiniNotebook
 struct TranscriptVersionsView: View {
     let model: NoteScreenModel
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.calendar) private var calendar
+    @Environment(\.clock) private var clock
 
     var body: some View {
         NavigationStack {
@@ -17,7 +19,7 @@ struct TranscriptVersionsView: View {
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(SpeakersCopy.version(index + 1)).foregroundStyle(Color.ink)
-                                Text(verbatim: "\(SpeakersCopy.versionKind(version)) · \(version.createdAt.formatted(date: .abbreviated, time: .shortened))")
+                                Text(detail(version, in: note?.versions ?? []))
                                     .font(.caption).foregroundStyle(Color.muted)
                             }
                             Spacer()
@@ -32,6 +34,22 @@ struct TranscriptVersionsView: View {
             .paperListBackground()
             .navigationTitle(SpeakersCopy.versionsTitle).navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button(SpeakersCopy.done) { dismiss() } } }
+        }
+    }
+
+    /// "Transcribed 8 Oct, 9:41 AM · 4,812 words", "Speakers merged · from version 1 · 8 Oct, 9:41 AM", or what made
+    /// any other version with its date and word count, as Android's version rows read.
+    private func detail(_ version: TranscriptVersion, in versions: [TranscriptVersion]) -> String {
+        let date = DateLabels(calendar: calendar).shortDateTime(version.createdAt, now: clock.now)
+        let words = version.segments.reduce(0) { $0 + $1.text.split(whereSeparator: \.isWhitespace).count }
+        switch version.kind {
+        case .transcription: return SpeakersCopy.versionTranscribed(at: date, words: words)
+        case .mergedSpeakers:
+            if let source = version.derivedFrom.flatMap({ id in versions.firstIndex { $0.id == id } }) {
+                return SpeakersCopy.versionMerged(from: source + 1, at: date)
+            }
+            fallthrough
+        default: return SpeakersCopy.versionDetail(SpeakersCopy.versionKind(version), at: date, words: words)
         }
     }
 }

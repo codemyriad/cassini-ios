@@ -5,8 +5,7 @@ import CassiniNotebook
 struct NoteHeader: View {
     let note: Note
     let subtitle: NoteSubtitle?
-    @Environment(\.locale) private var locale
-    @Environment(\.timeZone) private var timeZone
+    @Environment(\.calendar) private var calendar
 
     var body: some View {
         #if DEBUG
@@ -16,7 +15,7 @@ struct NoteHeader: View {
             Text(note.title).font(.system(.largeTitle, design: .serif)).tracking(-0.7).foregroundStyle(Color.ink)
                 .textSelection(.enabled).accessibilityAddTraits(.isHeader).accessibilityIdentifier("noteTitle")
             if let subtitle {
-                Text(NoteCopy.subtitle(subtitle, locale: locale, timeZone: timeZone))
+                Text(NoteCopy.subtitle(subtitle, calendar: calendar))
                     .font(.subheadline.monospacedDigit()).foregroundStyle(Color.muted)
                     .accessibilityIdentifier("noteSubtitle")
             }

@@ -134,6 +134,33 @@ enum SpeakersCopy {
     static let versionsTitle = String(localized: "Versions", table: "Speakers")
     static func version(_ number: Int) -> String { String(localized: "Version \(number)", table: "Speakers") }
 
+    /// Versions' detail line of a transcription: "Transcribed 8 Oct, 9:41 AM · 4,812 words" (Android
+    /// `ui_versions_transcribed`).
+    static func versionTranscribed(at date: String, words: Int) -> String {
+        let count = wordCount(words)
+        return String(localized: "Transcribed \(date) · \(count)", table: "Speakers",
+                      comment: "Versions: a transcription's date and time, then its word count")
+    }
+
+    /// Versions' detail line of a merge: "Speakers merged · from version 1 · 8 Oct, 9:41 AM" (Android
+    /// `ui_versions_merged`).
+    static func versionMerged(from version: Int, at date: String) -> String {
+        String(localized: "Speakers merged · from version \(version) · \(date)", table: "Speakers",
+               comment: "Versions: a merge, the version it was made from, and its date and time")
+    }
+
+    /// Versions' detail line of any other version: what made it, its date and time and its word count.
+    static func versionDetail(_ kind: String, at date: String, words: Int) -> String {
+        let count = wordCount(words)
+        return String(localized: "\(kind) · \(date) · \(count)", table: "Speakers",
+                      comment: "Versions: what made a version (Edited passages, Previous transcript…), its date and time, and its word count")
+    }
+
+    /// "4,812 words".
+    static func wordCount(_ words: Int) -> String {
+        String(localized: "\(words) words", table: "Speakers", comment: "A transcript version's word count")
+    }
+
     /// What made a version, under its number in Versions.
     static func versionKind(_ version: TranscriptVersion) -> String {
         switch version.kind {

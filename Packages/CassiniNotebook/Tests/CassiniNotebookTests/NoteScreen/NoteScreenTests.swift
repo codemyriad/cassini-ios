@@ -233,7 +233,11 @@ import Testing
         let yesterday = NoteSubtitle.of(note, mode: .audioOnly, now: note.createdAt.addingTimeInterval(86_400), calendar: calendar)
         #expect(yesterday?.day == .yesterday)
         let later = NoteSubtitle.of(note, mode: .audioOnly, now: note.createdAt.addingTimeInterval(5 * 86_400), calendar: calendar)
-        #expect(later?.day == .date(calendar.startOfDay(for: note.createdAt)))
+        #expect(later?.day == DayGroups.key(note.createdAt, now: note.createdAt.addingTimeInterval(5 * 86_400), calendar: calendar))
+        guard case .date(_, let withYear)? = later?.day else { Issue.record("not a date"); return }
+        #expect(!withYear, "the year shows only for another year")
+        let lastYear = NoteSubtitle.of(note, mode: .audioOnly, now: note.createdAt.addingTimeInterval(400 * 86_400), calendar: calendar)
+        guard case .date(_, true)? = lastYear?.day else { Issue.record("no year for an earlier year"); return }
     }
 }
 

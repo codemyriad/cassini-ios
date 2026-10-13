@@ -7,7 +7,6 @@ struct TrashCard: View {
     let restore: () -> Void
     let deleteNow: () -> Void
     @Environment(\.calendar) private var calendar
-    @Environment(\.locale) private var locale
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -27,7 +26,7 @@ struct TrashCard: View {
     }
 
     private var meta: String {
-        TrashCopy.deleted(item.deletedOn, calendar: calendar, locale: locale) + " · " + TrashCopy.daysLeft(item.daysLeft)
+        TrashCopy.deleted(item.deletedOn, calendar: calendar) + " · " + TrashCopy.daysLeft(item.daysLeft)
     }
 
     @ViewBuilder private var buttons: some View {

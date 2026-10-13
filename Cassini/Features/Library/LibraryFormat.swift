@@ -6,26 +6,13 @@ struct LibraryFormat {
     let calendar: Calendar
     var locale: Locale { calendar.locale ?? .current }
 
-    /// "Today", "Yesterday", "Monday 5 Oct", "5 Oct 2025".
-    func day(_ key: DayKey) -> String {
-        switch key {
-        case .today: return LibraryCopy.today
-        case .yesterday: return LibraryCopy.yesterday
-        case .date(let day, let withYear):
-            guard let date = day.start(in: calendar) else { return "" }
-            let formatter = DateFormatter()
-            formatter.calendar = calendar; formatter.timeZone = calendar.timeZone; formatter.locale = locale
-            formatter.dateFormat = withYear ? "d MMM yyyy" : "EEEE d MMM"
-            return formatter.string(from: date).capitalized(firstLetterIn: locale)
-        }
-    }
+    private var dates: DateLabels { DateLabels(calendar: calendar) }
+
+    /// "Today", "Yesterday", "Monday 5 Oct", "5 Oct 2025" (`DateLabels.day`).
+    func day(_ key: DayKey) -> String { dates.day(key) }
 
     /// "9:41 AM", "09:41".
-    func time(_ date: Date) -> String {
-        var style = Date.FormatStyle(date: .omitted, time: .shortened)
-        style.calendar = calendar; style.timeZone = calendar.timeZone; style.locale = locale
-        return date.formatted(style)
-    }
+    func time(_ date: Date) -> String { dates.time(date) }
 
     /// "Today, 9:41 AM": the meta line of a search result.
     func dayTime(_ key: DayKey, _ date: Date) -> String { LibraryCopy.dayTime(day(key), time(date)) }
@@ -59,13 +46,5 @@ struct LibraryFormat {
         if row.isFavorite { parts.append(LibraryCopy.starredLabel.lowercased(with: locale)) }
         if let preview = row.preview { parts.append(preview.text) }
         return parts.joined(separator: ", ")
-    }
-}
-
-private extension String {
-    /// "lunedì 5 ott" → "Lunedì 5 ott": a header starts with a capital in every language.
-    func capitalized(firstLetterIn locale: Locale) -> String {
-        guard let first else { return self }
-        return String(first).uppercased(with: locale) + dropFirst()
     }
 }

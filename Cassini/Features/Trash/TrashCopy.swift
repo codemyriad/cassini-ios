@@ -54,19 +54,18 @@ enum TrashCopy {
         String(localized: "\(days) days left", table: "Trash", comment: "Recently Deleted card: days before the note is deleted for good")
     }
 
-    /// "Deleted today", "Deleted yesterday" or "Deleted Oct 2" (with the year outside the current one).
-    static func deleted(_ day: TrashDay, calendar: Calendar, locale: Locale) -> String {
+    /// "Deleted today", "Deleted yesterday" or "Deleted 2 Oct" (Android's `Dates.deleted`; with the year outside the
+    /// current one).
+    static func deleted(_ day: TrashDay, calendar: Calendar) -> String {
         switch day {
         case .today:
             return String(localized: "Deleted today", table: "Trash", comment: "Recently Deleted card: the note was deleted today")
         case .yesterday:
             return String(localized: "Deleted yesterday", table: "Trash", comment: "Recently Deleted card: the note was deleted yesterday")
         case .date(let date, let withYear):
-            var style = Date.FormatStyle(locale: locale, calendar: calendar, timeZone: calendar.timeZone).month(.abbreviated).day()
-            if withYear { style = style.year() }
-            let text = date.formatted(style)
+            let text = DateLabels(calendar: calendar).shortDate(date, withYear: withYear)
             return String(localized: "Deleted \(text)", table: "Trash",
-                          comment: "Recently Deleted card: the day the note was deleted, e.g. Deleted Oct 2")
+                          comment: "Recently Deleted card: the day the note was deleted, e.g. Deleted 2 Oct")
         }
     }
 }

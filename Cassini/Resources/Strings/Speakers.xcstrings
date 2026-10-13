@@ -18,6 +18,18 @@
         }
       }
     },
+    "%@ · %@ · %@": {
+      "comment": "Versions: what made a version (Edited passages, Previous transcript…), its date and time, and its word count",
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ · %@ · %@"
+          }
+        }
+      }
+    },
     "%lld notes": {
       "extractionState": "manual",
       "localizations": {
@@ -58,6 +70,54 @@
                 "stringUnit": {
                   "state": "translated",
                   "value": "%lld note"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld words": {
+      "comment": "A transcript version's word count",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld word"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld words"
+                }
+              }
+            }
+          }
+        },
+        "it": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld parola"
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld parole"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld parole"
                 }
               }
             }
@@ -1266,6 +1326,18 @@
         }
       }
     },
+    "Speakers merged · from version %lld · %@": {
+      "comment": "Versions: a merge, the version it was made from, and its date and time",
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voci unite · dalla versione %lld · %@"
+          }
+        }
+      }
+    },
     "Speaks for %@ in this note": {
       "extractionState": "manual",
       "localizations": {
@@ -1449,6 +1521,18 @@
           "stringUnit": {
             "state": "translated",
             "value": "Troppo poco parlato per ricordare questa voce."
+          }
+        }
+      }
+    },
+    "Transcribed %@ · %@": {
+      "comment": "Versions: a transcription's date and time, then its word count",
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascritta %@ · %@"
           }
         }
       }

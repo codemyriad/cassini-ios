@@ -211,7 +211,7 @@
       }
     },
     "Deleted %@": {
-      "comment": "Recently Deleted card: the day the note was deleted, e.g. Deleted Oct 2",
+      "comment": "Recently Deleted card: the day the note was deleted, e.g. Deleted 2 Oct",
       "localizations": {
         "en": {
           "stringUnit": {

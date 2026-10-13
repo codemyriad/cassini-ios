@@ -28,13 +28,10 @@ enum NoteCopy {
     static let close = String(localized: "Close", table: "Note")
     static let cancel = String(localized: "Cancel", table: "Note")
 
-    static func subtitle(_ subtitle: NoteSubtitle, locale: Locale, timeZone: TimeZone) -> String {
-        let time = subtitle.createdAt.formatted(Date.FormatStyle(date: .omitted, time: .shortened, locale: locale, timeZone: timeZone))
-        let day: String = switch subtitle.day {
-        case .today: String(localized: "Today", table: "Note")
-        case .yesterday: String(localized: "Yesterday", table: "Note")
-        case .date(let date): date.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted, locale: locale, timeZone: timeZone))
-        }
+    /// "Today, 10:02 · 48:13", "Monday 5 Oct, 10:02 · 48:13": the day as the Library heads it (`DateLabels.day`).
+    static func subtitle(_ subtitle: NoteSubtitle, calendar: Calendar) -> String {
+        let dates = DateLabels(calendar: calendar)
+        let day = dates.day(subtitle.day), time = dates.time(subtitle.createdAt)
         return String(localized: "\(day), \(time) · \(TimeText.clock(subtitle.duration))", table: "Note",
                       comment: "The Note screen's subtitle: day, time of day and duration (Today, 10:02 · 48:13)")
     }
