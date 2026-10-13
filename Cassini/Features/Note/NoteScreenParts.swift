@@ -87,12 +87,11 @@ struct FollowChipHost: View {
     }
 }
 
-/// The draft of the running job, as it grows; "Words may still change" while it does. `grew` is called after new
-/// text, not when the screen opens.
+/// The draft of the running job, as it grows; "Words may still change" while it does. `ProcessingBody` follows its
+/// end as the list grows.
 struct RunningDraft: View {
     let noteID: UUID
     let cache: TranscriptCache
-    var grew: () -> Void = {}
     @Environment(JobProgress.self) private var progress
 
     private var draft: DraftState? {
@@ -101,13 +100,9 @@ struct RunningDraft: View {
     }
 
     var body: some View {
-        let draft = draft
-        Group {
-            if let draft, !draft.words.isEmpty {
-                DraftSection(transcript: cache.draft(draft), changing: true)
-            }
+        if let draft, !draft.words.isEmpty {
+            DraftSection(transcript: cache.draft(draft), changing: true)
         }
-        .onChange(of: draft?.words.count ?? 0) { _, _ in grew() }
     }
 }
 

@@ -31,7 +31,7 @@ struct ProcessingBody<Top: View, Banners: View>: View {
                 VStack(alignment: .leading, spacing: Spacing.section) {
                     if !pinned { topContent }
                     banners()
-                    RunningDraft(noteID: noteID, cache: cache, grew: draftGrew)
+                    RunningDraft(noteID: noteID, cache: cache)
                 }
                 .padding(.horizontal, Spacing.gutter).padding(.top, pinned ? 0 : Spacing.gutter).padding(.bottom, Spacing.gutter)
                 .frame(maxWidth: ReadableWidth.note).frame(maxWidth: .infinity)
@@ -43,6 +43,10 @@ struct ProcessingBody<Top: View, Banners: View>: View {
                                         - geometry.contentInsets.bottom,
                                     contentHeight: geometry.contentSize.height)
             } action: { _, end in atEnd = end }
+            // Any draft change that makes the list taller (more words, or tentative words settling into longer text).
+            .onScrollGeometryChange(for: CGFloat.self) { $0.contentSize.height } action: { old, new in
+                if new > old { contentGrew() }
+            }
             .onScrollPhaseChange { old, new in
                 // A scroll the user made has ended; one Cassini made (to the end) leaves following as it was.
                 if new == .idle, old == .interacting || old == .decelerating { follow.scrollEnded(atEnd: atEnd) }
@@ -57,8 +61,8 @@ struct ProcessingBody<Top: View, Banners: View>: View {
             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { topHeight = $0 }
     }
 
-    /// New draft text: to the end, while the draft sticks to it.
-    private func draftGrew() {
+    /// Taller content: to the end, while the draft sticks to it.
+    private func contentGrew() {
         guard follow.sticks else { return }
         withAnimation(reduceMotion ? nil : .default) { position.scrollTo(edge: .bottom) }
     }
