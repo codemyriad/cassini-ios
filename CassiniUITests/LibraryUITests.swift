@@ -169,7 +169,7 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(garden.waitForExistence(within: 5))
         XCTAssertTrue(row(app, "Notes from the design review").waitForNonExistence(within: 5))
         garden.press(forDuration: 1)
-        app.buttons["Move to Recently Deleted"].tap()
+        app.buttons["Move to Recently Deleted"].tapWhenSettled()
         XCTAssertTrue(app.buttons["Undo"].waitForExistence(within: 5))
         XCTAssertFalse(garden.exists, "a note in Recently Deleted is not a result")
         XCTAssertTrue(app.staticTexts["Nothing matches “tomatoe”"].waitForExistence(within: 5))
@@ -254,13 +254,13 @@ final class LibraryUITests: XCTestCase {
         let paused = scrolledRow(app, "Paused standup")
         XCTAssertTrue(paused.waitForExistence(within: 10))
         paused.press(forDuration: 1)
-        app.buttons["Start over"].tap()
+        app.buttons["Start over"].tapWhenSettled()
         let startOver = app.alerts["Start over?"]
         XCTAssertTrue(startOver.waitForExistence(within: 5))
         startOver.buttons["Cancel"].tap()
         XCTAssertTrue(waitFor(paused, label: ", paused at 00:12"), "Cancel keeps the progress: \(paused.label)")
         paused.press(forDuration: 1)
-        app.buttons["Start over"].tap()
+        app.buttons["Start over"].tapWhenSettled()
         XCTAssertTrue(startOver.waitForExistence(within: 5))
         startOver.buttons["Start over"].tap()
         XCTAssertTrue(waitFor(row(app, "Paused standup"), label: ", queued"), row(app, "Paused standup").label)
@@ -269,7 +269,7 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(damaged.waitForExistence(within: 5))
         damaged.press(forDuration: 1)
         // The item reads "Transcribe again, Adds version 2."
-        app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Transcribe again'")).firstMatch.tap()
+        app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Transcribe again'")).firstMatch.tapWhenSettled()
         let fresh = app.alerts["Transcribe again?"]
         XCTAssertTrue(fresh.waitForExistence(within: 5), "a document whose versions can't be kept asks first")
         fresh.buttons["Cancel"].tap()
@@ -283,8 +283,8 @@ final class LibraryUITests: XCTestCase {
         let note = scrolledRow(app, "A quieter kind of productivity")
         XCTAssertTrue(note.waitForExistence(within: 5))
         note.press(forDuration: 1)
-        app.buttons["Export"].tap()
-        app.buttons["Subtitles · .vtt"].tap()
+        app.buttons["Export"].tapWhenSettled()
+        app.buttons["Subtitles · .vtt"].tapWhenSettled()
         XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 5))
         XCTAssertEqual(app.staticTexts["noteTitle"].label, "A quieter kind of productivity")
         let shareSheet = app.otherElements["ActivityListView"]
@@ -304,7 +304,7 @@ final class LibraryUITests: XCTestCase {
         let note = scrolledRow(app, "A quieter kind of productivity")
         XCTAssertTrue(note.waitForExistence(within: 5))
         note.press(forDuration: 1)
-        app.buttons["Document info"].tap()
+        app.buttons["Document info"].tapWhenSettled()
         XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 5))
         XCTAssertEqual(app.staticTexts["noteTitle"].label, "A quieter kind of productivity")
     }
@@ -313,7 +313,7 @@ final class LibraryUITests: XCTestCase {
         let note = row(app, title)
         XCTAssertTrue(note.waitForExistence(within: 5))
         note.press(forDuration: 1)
-        app.buttons["Rename"].tap()
+        app.buttons["Rename"].tapWhenSettled()
         let field = app.textFields["renameField"]
         XCTAssertTrue(field.waitForExistence(within: 5))
         return field

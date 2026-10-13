@@ -48,7 +48,7 @@ final class CassiniUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Pause"].waitForExistence(within: 3))
         app.buttons["Pause"].tap()
         app.buttons["Share and more"].tap()
-        app.buttons["Rename"].tap()
+        app.buttons["Rename"].tapWhenSettled()
         let title = app.textFields["renameField"]
         XCTAssertTrue(title.waitForExistence(within: 5))
         title.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
@@ -94,7 +94,7 @@ final class CassiniUITests: XCTestCase {
         let app = launch()
         openFixture(app)
         app.buttons["Share and more"].tap()
-        app.buttons["Move to Recently Deleted"].tap()
+        app.buttons["Move to Recently Deleted"].tapWhenSettled()
         XCTAssertTrue(app.textFields["librarySearch"].waitForExistence(within: 5))
         XCTAssertTrue(app.staticTexts["“A quieter kind of productivity” moved to Recently Deleted"].waitForExistence(within: 5),
                       "every move lands on the Library with its snackbar")
@@ -113,7 +113,7 @@ final class CassiniUITests: XCTestCase {
         let note = row(app, "Thoughts from the morning walk")
         XCTAssertTrue(note.waitForExistence(within: 5))
         note.press(forDuration: 1)
-        app.buttons["Move to Recently Deleted"].tap()
+        app.buttons["Move to Recently Deleted"].tapWhenSettled()
         let snackbar = app.staticTexts["“Thoughts from the morning walk” moved to Recently Deleted"]
         XCTAssertTrue(snackbar.waitForExistence(within: 5))
         XCTAssertFalse(row(app, "Thoughts from the morning walk").exists)
@@ -129,13 +129,13 @@ final class CassiniUITests: XCTestCase {
         app.launchAndWait()
         XCTAssertTrue(app.descendants(matching: .any)["progressHeadline"].waitForExistence(within: 15))
         app.buttons["Share and more"].tap()
-        app.buttons["Move to Recently Deleted"].tap()
+        app.buttons["Move to Recently Deleted"].tapWhenSettled()
         let alert = app.alerts["Stop transcription and move to Recently Deleted?"]
         XCTAssertTrue(alert.waitForExistence(within: 5))
         alert.buttons["Cancel"].tap()
         XCTAssertTrue(app.staticTexts["noteTitle"].exists, "Cancel keeps the note where it is")
         app.buttons["Share and more"].tap()
-        app.buttons["Move to Recently Deleted"].tap()
+        app.buttons["Move to Recently Deleted"].tapWhenSettled()
         XCTAssertTrue(alert.waitForExistence(within: 5))
         alert.buttons["Move to Recently Deleted"].tap()
         XCTAssertTrue(app.staticTexts["“Weekly planning call” moved to Recently Deleted"].waitForExistence(within: 10))

@@ -102,7 +102,7 @@ final class WideScreenTests: XCTestCase {
         let row = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Thoughts from the morning walk")).firstMatch
         XCTAssertTrue(row.waitForExistence(within: 5))
         row.press(forDuration: 1)
-        app.buttons["Rename"].tap()
+        app.buttons["Rename"].tapWhenSettled()
         let field = app.textFields["renameField"]
         XCTAssertTrue(field.waitForExistence(within: 5))
         let window = app.windows.firstMatch.frame

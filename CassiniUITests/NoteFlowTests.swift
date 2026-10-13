@@ -62,17 +62,17 @@ final class NoteFlowTests: XCTestCase {
 
         // The exports reach the share sheet.
         app.buttons["Share and more"].tap()
-        app.collectionViews.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Export transcript'")).firstMatch.tap()
-        app.collectionViews.buttons["Transcript as text"].tap()
+        app.collectionViews.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Export transcript'")).firstMatch.tapWhenSettled()
+        app.collectionViews.buttons["Transcript as text"].tapWhenSettled()
         closeShareSheet(app)
         for subtitles in ["Subtitles · .srt", "Subtitles · .vtt"] {
             app.buttons["Share and more"].tap()
-            app.collectionViews.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Export transcript'")).firstMatch.tap()
-            app.collectionViews.buttons[subtitles].tap()
+            app.collectionViews.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Export transcript'")).firstMatch.tapWhenSettled()
+            app.collectionViews.buttons[subtitles].tapWhenSettled()
             closeShareSheet(app)
         }
         app.buttons["Share and more"].tap()
-        app.collectionViews.buttons["Export Cassini document"].tap()
+        app.collectionViews.buttons["Export Cassini document"].tapWhenSettled()
         closeShareSheet(app)
         XCTAssertTrue(app.staticTexts["noteTitle"].exists, "the exports leave the note open")
     }

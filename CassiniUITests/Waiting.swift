@@ -25,6 +25,22 @@ extension XCUIElement {
     }
 }
 
+extension XCUIElement {
+    /// Taps a menu item once it has stopped moving. A context menu or a pull-down menu still animates in when the app's
+    /// own animations are off, and a tap that lands while it does is dropped on a busy machine ("Failed to tap", or a
+    /// tap that does nothing). Waits for the item to be hittable at the same frame twice in a row, then taps.
+    @MainActor func tapWhenSettled(within timeout: TimeInterval = 5) {
+        var last: CGRect?
+        _ = poll(within: timeout) {
+            guard exists, isHittable else { last = nil; return false }
+            let frame = self.frame
+            defer { last = frame }
+            return frame == last
+        }
+        tap()
+    }
+}
+
 /// Scrolling until something is on the screen. Each swipe costs about two and a half seconds, most of it XCTest
 /// waiting for the list to settle, so the condition is checked before every swipe, not swiped past.
 extension XCUIElement {

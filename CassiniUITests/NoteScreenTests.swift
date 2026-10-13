@@ -107,7 +107,7 @@ final class NoteScreenTests: XCTestCase {
     @MainActor func testAQueuedNoteKeepsItsTranscriptButCannotBeRenamed() {
         let app = open(seed: "processing")
         app.buttons["Share and more"].tap()
-        app.buttons["transcribeAgain"].tap()
+        app.buttons["transcribeAgain"].tapWhenSettled()
         XCTAssertTrue(app.staticTexts["Queued"].waitForExistence(within: 10))
         XCTAssertTrue(app.descendants(matching: .any)["turn-w0"].exists, "the transcript stays under the card")
         header(app, "Alex").tap()
@@ -136,7 +136,7 @@ final class NoteScreenTests: XCTestCase {
         XCTAssertTrue(fixture.waitForExistence(within: 5))
         fixture.tap()
         app.buttons["Share and more"].tap()
-        app.buttons["transcribeAgain"].tap()
+        app.buttons["transcribeAgain"].tapWhenSettled()
         let ahead = app.staticTexts["queuedAhead"]
         XCTAssertTrue(ahead.waitForExistence(within: 10))
         XCTAssertEqual(ahead.label, "Starts after the current transcription.")
@@ -205,10 +205,10 @@ final class NoteScreenTests: XCTestCase {
     @MainActor func testAQueuedNoteCanStillBeRenamed() {
         let app = open(seed: "processing")
         app.buttons["Share and more"].tap()
-        app.buttons["transcribeAgain"].tap()
+        app.buttons["transcribeAgain"].tapWhenSettled()
         XCTAssertTrue(app.staticTexts["Queued"].waitForExistence(within: 10))
         app.buttons["Share and more"].tap()
-        app.collectionViews.buttons["Rename"].tap()
+        app.collectionViews.buttons["Rename"].tapWhenSettled()
         let field = app.textFields["renameField"]
         XCTAssertTrue(field.waitForExistence(within: 5))
         field.tap()
@@ -262,7 +262,7 @@ final class NoteScreenTests: XCTestCase {
     @MainActor func testRenameFollowsTheLibrarysRule() {
         let app = open()
         app.buttons["Share and more"].tap()
-        app.collectionViews.buttons["Rename"].tap()
+        app.collectionViews.buttons["Rename"].tapWhenSettled()
         let field = app.textFields["renameField"]
         XCTAssertTrue(field.waitForExistence(within: 5))
         XCTAssertFalse(app.buttons["Save"].isEnabled, "an unchanged title is not saved")
@@ -294,7 +294,7 @@ final class NoteScreenTests: XCTestCase {
     @MainActor func testDocumentInfoShowsTheNotesFacts() {
         let app = open()
         app.buttons["Share and more"].tap()
-        app.buttons["Document info"].tap()
+        app.buttons["Document info"].tapWhenSettled()
         XCTAssertTrue(app.navigationBars["Document info"].waitForExistence(within: 5))
         XCTAssertTrue(app.staticTexts["00:24"].exists)
         app.buttons["Close"].tap()

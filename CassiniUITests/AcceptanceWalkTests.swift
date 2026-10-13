@@ -59,13 +59,13 @@ final class AcceptanceWalkTests: XCTestCase {
 
         // Export the transcript as subtitles.
         app.buttons["Share and more"].tap()
-        app.collectionViews.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Export transcript'")).firstMatch.tap()
-        app.collectionViews.buttons["Subtitles · .srt"].tap()
+        app.collectionViews.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Export transcript'")).firstMatch.tapWhenSettled()
+        app.collectionViews.buttons["Subtitles · .srt"].tapWhenSettled()
         closeShareSheet(app)
 
         // Move to Recently Deleted: the Library says so; Restore brings the note back with its names.
         app.buttons["Share and more"].tap()
-        app.buttons["Move to Recently Deleted"].tap()
+        app.buttons["Move to Recently Deleted"].tapWhenSettled()
         XCTAssertTrue(app.staticTexts["“\(Self.title)” moved to Recently Deleted"].waitForExistence(within: 10))
         XCTAssertFalse(row(app).exists)
         app.buttons["Recently Deleted"].tap()
