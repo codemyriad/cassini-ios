@@ -6,7 +6,6 @@ import CassiniEngine
     @UIApplicationDelegateAdaptor private var delegate: AppDelegate
     @State private var graph = AppGraph(environment: .resolve())
     @Environment(\.scenePhase) private var scenePhase
-    @State private var launched = false
 
     var body: some Scene {
         WindowGroup {
@@ -16,11 +15,11 @@ import CassiniEngine
                 .task {
                     delegate.notifications.handler = { [graph] in graph.handle($0) }
                     await graph.start()
-                    launched = true
+                    graph.launchFinished.value = true
                 }
                 #if DEBUG
                 .overlay(alignment: .bottomLeading) {
-                    if launched && graph.environment.launch.marksLaunchFinished { LaunchFinishedMarker() }
+                    if graph.environment.launch.marksLaunchFinished { LaunchFinishedMarker(finished: graph.launchFinished) }
                 }
                 #endif
                 .onOpenURL { url in
@@ -60,9 +59,13 @@ import CassiniEngine
 /// What a UI test waits for after a launch: the launch work is done (the seed is written, the library read, a fixture
 /// note opened), so the test's first step cannot overtake it on a busy machine. Invisible and not hit-testable.
 private struct LaunchFinishedMarker: View {
+    let finished: LaunchFinished
+
     var body: some View {
-        Text(verbatim: " ").font(.system(size: 1)).opacity(0.01).allowsHitTesting(false)
-            .accessibilityIdentifier("launchFinished")
+        if finished.value {
+            Text(verbatim: " ").font(.system(size: 1)).opacity(0.01).allowsHitTesting(false)
+                .accessibilityIdentifier("launchFinished")
+        }
     }
 }
 #endif
