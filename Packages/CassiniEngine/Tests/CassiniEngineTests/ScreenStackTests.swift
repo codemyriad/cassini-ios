@@ -100,3 +100,12 @@ import CassiniEngine
         #expect(screens.sessions.isEmpty, "no session without its screen")
     }
 }
+
+@Suite struct NoteStartActionTests {
+    /// The Library's start actions are the Note screen's own effects.
+    @Test func eachStartActionIsANoteEffect() {
+        #expect(NoteStartAction.export(.subtitles).effect == .exportTranscript(.subtitles))
+        #expect(NoteStartAction.documentInfo.effect == .documentInfo)
+        #expect(NoteStartAction.rename.effect == .rename)
+    }
+}

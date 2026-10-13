@@ -29,6 +29,23 @@ public enum NoteEffect: Hashable, Sendable {
     case continueQueue
     /// A dismissed final failure removes its job, so the transcript shows again.
     case clearFailed
+    /// Star or unstar the note.
+    case toggleStar
+    /// Open Rename.
+    case rename
+    /// Open Document info.
+    case documentInfo
+    /// Share the transcript in `format`.
+    case exportTranscript(TranscriptFormat)
+    /// Share the note as a Cassini document.
+    case exportDocument
+    /// Share a copy of the original audio.
+    case shareAudio
+    /// Stop the running job and keep its progress.
+    case stop
+    case removeFromQueue
+    /// Move to Recently Deleted; a running job asks first.
+    case moveToTrash
 }
 
 /// The Note screen's own state and its event rules (the parts of Android's `NoteViewModel` that do not need the
@@ -132,6 +149,30 @@ public struct NoteScreenState: Hashable, Sendable {
         }
         dismissed.insert(banner.id)
         return nil
+    }
+
+    // MARK: The note's menu
+
+    /// A row of the note's "…" menu. Speakers and Transcript versions follow the read-only gate as their chips do;
+    /// Start over and Transcribe again ask first as their banner buttons do; Resume goes on with the job's kind.
+    public mutating func menu(_ action: NoteMenuAction, note: Note, job: Job?, readOnly: ReadOnlyReason?) -> NoteEffect? {
+        switch action {
+        case .toggleStar: return .toggleStar
+        case .speakers: return speakersTapped(readOnly: readOnly)
+        case .versions: return versionsTapped(readOnly: readOnly)
+        case .rename: return .rename
+        case .documentInfo: return .documentInfo
+        case .exportTranscript(let format): return .exportTranscript(format)
+        case .exportDocument: return .exportDocument
+        case .shareAudio: return .shareAudio
+        case .transcribe: return .transcribe(.transcribe)
+        case .transcribeAgain: return transcribeAgain(note)
+        case .stop: return .stop
+        case .removeFromQueue: return .removeFromQueue
+        case .resume: return .transcribe(job?.kind ?? .transcribe)
+        case .startOver: return bannerAction(.startOver, note: note, job: job)
+        case .moveToTrash: return .moveToTrash
+        }
     }
 
     // MARK: Dialogs

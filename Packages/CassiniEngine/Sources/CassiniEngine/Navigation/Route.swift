@@ -6,6 +6,15 @@ public enum NoteStartAction: Codable, Hashable, Sendable {
     case export(TranscriptFormat)
     case documentInfo
     case rename
+
+    /// What the note screen does for it.
+    public var effect: NoteEffect {
+        switch self {
+        case .export(let format): .exportTranscript(format)
+        case .documentInfo: .documentInfo
+        case .rename: .rename
+        }
+    }
 }
 
 /// A screen in the navigation stack. Recording is a full-screen cover, not a route. Persisted in scene storage: never

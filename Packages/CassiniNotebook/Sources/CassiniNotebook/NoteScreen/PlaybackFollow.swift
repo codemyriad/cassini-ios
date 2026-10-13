@@ -22,6 +22,36 @@ public struct PlaybackFollow: Hashable, Sendable {
     /// The chip, a word tap, or `resumeAfter` without scrolling.
     public mutating func resume() { following = true }
 
+    /// What the transcript's scroll is doing, as far as following cares.
+    public enum Scrolling: Hashable, Sendable {
+        /// The user's finger is on it.
+        case dragging
+        /// It came to rest.
+        case idle
+        /// It moves by itself (a fling, an animation).
+        case moving
+    }
+
+    /// What the resume timer does after a change of `Scrolling`.
+    public enum ResumeTimer: Hashable, Sendable {
+        case keep
+        case cancel
+        /// Cancel any running one and resume following once this much time passed without scrolling.
+        case restart(Duration)
+    }
+
+    /// The scroll changed: a drag cancels the timer and pauses following while `playing`; a scroll that comes to
+    /// rest while following is paused starts `resumeAfter`.
+    public mutating func scrolled(_ scrolling: Scrolling, playing: Bool) -> ResumeTimer {
+        switch scrolling {
+        case .dragging:
+            dragged(playing: playing)
+            return .cancel
+        case .idle where !following: return .restart(Self.resumeAfter)
+        case .idle, .moving: return .keep
+        }
+    }
+
     /// The Follow playback chip shows while the note plays and following is paused.
     public func showsChip(playing: Bool) -> Bool { playing && !following }
 
@@ -30,5 +60,11 @@ public struct PlaybackFollow: Hashable, Sendable {
     public static func scroll(lineY: Double, height: Double) -> Double? {
         guard height > 0, lineY < 0 || lineY > band * height else { return nil }
         return lineY - anchor * height
+    }
+
+    /// Whether a search match's line, `lineY` from the top of a pane `height` tall and about `lineHeight` tall, is in
+    /// view already, so revealing it scrolls nothing.
+    public static func isInView(lineY: Double, lineHeight: Double, height: Double) -> Bool {
+        height > 0 && lineY >= 0 && lineY + lineHeight <= height
     }
 }

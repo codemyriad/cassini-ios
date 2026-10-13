@@ -1,60 +1,6 @@
 import SwiftUI
 import CassiniNotebook
 
-/// A sheet over the Note screen. Kept with the scene as its `NoteOverlay`, so it opens again when the screen comes
-/// back after Cassini was closed.
-enum NoteSheet: Identifiable {
-    /// Rename, starting from `draft` when one was being typed before Cassini was closed.
-    case rename(draft: String?)
-    case speakers, versions, documentInfo
-    /// Name this speaker, starting from `draft` when one was being typed before Cassini was closed.
-    case naming(String, draft: String?)
-    /// Edit passage, of the passage as it was when the editor opened.
-    case editing(TranscriptSegment)
-
-    var id: String {
-        switch self {
-        case .rename: "rename"
-        case .speakers: "speakers"
-        case .versions: "versions"
-        case .documentInfo: "documentInfo"
-        case .naming(let id, _): "naming-\(id)"
-        case .editing(let segment): "editing-\(segment.id)"
-        }
-    }
-
-    var overlay: NoteOverlay {
-        switch self {
-        case .rename: .rename
-        case .speakers: .speakers
-        case .versions: .versions
-        case .documentInfo: .documentInfo
-        case .naming(let id, _): .naming(speakerID: id)
-        case .editing(let segment): .editing(segmentID: segment.id)
-        }
-    }
-
-    init?(_ overlay: NoteOverlay, draft: String?, in note: Note) {
-        switch overlay {
-        case .rename: self = .rename(draft: draft)
-        case .speakers: self = .speakers
-        case .versions: self = .versions
-        case .documentInfo: self = .documentInfo
-        case .naming(let id): self = .naming(id, draft: draft)
-        case .editing(let id):
-            guard let segment = note.transcript.first(where: { $0.id == id }) else { return nil }
-            self = .editing(segment)
-        }
-    }
-
-    var draft: String? {
-        switch self {
-        case .naming(_, let draft), .rename(let draft): draft
-        case .speakers, .versions, .documentInfo, .editing: nil
-        }
-    }
-}
-
 extension View {
     /// Keeps the Note screen's open sheet, the text typed into Name this speaker or Rename, and the open question
     /// with the scene, and opens them again once the screen and its note are back after Cassini was closed (as the
