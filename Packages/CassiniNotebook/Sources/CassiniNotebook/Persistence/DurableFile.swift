@@ -3,7 +3,9 @@ import Foundation
 /// The durable write steps every metadata file goes through (Android's `NoteFiles`): the bytes go to `<name>.tmp`
 /// beside the target, are flushed to the storage device with `F_FULLFSYNC`, are renamed over the target in one step,
 /// and the directory is flushed so the rename survives a power cut. A crash at any point leaves the previous file or
-/// the new one, never a torn one; a leftover `.tmp` is removed by the launch sweep.
+/// the new one, never a torn one. A leftover `<name>.tmp` is never read: the next write of the file replaces it, the
+/// launch sweep removes the stale ones in note directories (`Sweep`), and the voice library deletes those of print
+/// files with the prints (`VoiceLibrary`).
 public enum DurableFile {
     public static let temporarySuffix = ".tmp"
 

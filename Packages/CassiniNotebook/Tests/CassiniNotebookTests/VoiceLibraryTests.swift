@@ -133,6 +133,9 @@ import Testing
         try library.savePrints([F.print("s", F.axis(0))], noteID: a)
         try library.savePrints([F.print("s", F.axis(1))], noteID: b)
         try write("{", to: file(NoteVoiceCodec.fileName(b) + ".corrupt-5"))
+        // A crash between the write of a print file and its rename leaves the prints in the temporary file.
+        try write("{}", to: file(NoteVoiceCodec.fileName(b) + DurableFile.temporarySuffix))
+        try write("[]", to: file("voices.json" + DurableFile.temporarySuffix))
         try write("keep", to: file("unrelated.txt"))
         #expect(library.hasEvidence)
 
@@ -155,6 +158,7 @@ import Testing
         try library.save([luca, anna])
         try library.savePrints([F.print("s", F.axis(0))], noteID: gone)
         try write("{", to: file(NoteVoiceCodec.fileName(gone) + ".corrupt-3"))
+        try write("{}", to: file(NoteVoiceCodec.fileName(gone) + DurableFile.temporarySuffix))
 
         #expect(try library.removeEvidence(noteID: gone) == [anna.id], "Anna had only samples of the note and is forgotten")
 
@@ -171,10 +175,13 @@ import Testing
         let gone = UUID(), kept = UUID()
         try library.savePrints([F.print("s", F.axis(0))], noteID: gone)
         try library.savePrints([F.print("s", F.axis(0)), F.print("t", F.axis(1))], noteID: kept)
+        let leftover = file(NoteVoiceCodec.fileName(gone) + DurableFile.temporarySuffix)
+        try write("{}", to: leftover)
 
         #expect(try library.sweepOrphans(keeping: [kept]) == [gone])
 
         #expect(!FileManager.default.fileExists(atPath: file(NoteVoiceCodec.fileName(gone)).path))
+        #expect(!FileManager.default.fileExists(atPath: leftover.path))
         #expect(try library.prints(noteID: kept).count == 2)
         #expect(try library.sweepOrphans(keeping: [kept]).isEmpty)
     }

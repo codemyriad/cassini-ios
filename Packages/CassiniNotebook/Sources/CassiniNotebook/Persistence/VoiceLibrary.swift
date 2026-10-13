@@ -174,7 +174,7 @@ public final class VoiceLibrary {
             .appendingPathComponent(url.lastPathComponent + ".corrupt-\(stamp)"))
     }
 
-    /// The print files of notes, with the copies set aside.
+    /// The print files of notes, with the copies set aside and the temporary files a crash left (`DurableFile`).
     private func noteFiles() -> [URL] {
         ((try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? [])
             .filter { noteID(of: $0) != nil }
@@ -193,9 +193,10 @@ public final class VoiceLibrary {
         }
     }
 
-    /// The note of a print file or of its set-aside copy.
+    /// The note of a print file, of its set-aside copy, or of the temporary file a write of it left behind.
     private func noteID(of url: URL) -> UUID? {
-        let name = url.lastPathComponent
+        var name = url.lastPathComponent
+        if name.hasSuffix(DurableFile.temporarySuffix) { name.removeLast(DurableFile.temporarySuffix.count) }
         let base = name.range(of: ".json.corrupt-").map { String(name[..<$0.lowerBound]) + ".json" } ?? name
         return NoteVoiceCodec.noteID(fileName: base)
     }
