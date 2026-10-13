@@ -96,7 +96,9 @@ import CassiniNotebook
     /// Puts a finished analysis into the note: speakers of their own, attributed passages, and matches to saved voices
     /// and to the note's own named speakers (`AnalysisMatches`), so their names carry over. Voiceprints are kept, and
     /// voices matched, only while `generation` is still current: an analysis that began before Forget everyone keeps
-    /// nothing.
+    /// nothing. Forget everyone may also run while the analysis is being put in: the prints are written only when no
+    /// forget ran on the `VoiceStore` actor since their read, and the matches are dropped when the generation moved on
+    /// before the note is written, so neither a print nor a link to a forgotten voice comes back.
     public func applySpeakerAnalysis(_ analysis: SpeakerAnalysis, to id: UUID, generation: Int) async throws {
         await retryUnreadable()
         guard let note = library.note(id), note.trashedAt == nil else { return }
@@ -105,12 +107,17 @@ import CassiniNotebook
                                                              prefix: UUID().uuidString + "_")
         var matching = AnalysisMatches()
         if generation == settings.voicesGeneration, let store {
-            let earlier = (try? await store.prints(noteID: id)) ?? []
+            let (earlier, count) = await store.printsForAnalysis(noteID: id)
             // A note's prints are kept even if the saved voices can't be changed now; the note keeps working without.
-            try? await store.appendPrints(prints, noteID: id)
-            matching = AnalysisMatches.of(note, turns: turns, prints: prints, savedVoices: savedVoices, earlierPrints: earlier,
-                                          trashed: Set(library.notes.filter { $0.trashedAt != nil }.map(\.id)))
+            let kept = (try? await store.appendPrints(prints, noteID: id, ifForgottenCount: count)) ?? true
+            if kept, generation == settings.voicesGeneration {
+                matching = AnalysisMatches.of(note, turns: turns, prints: prints, savedVoices: savedVoices,
+                                              earlierPrints: earlier,
+                                              trashed: Set(library.notes.filter { $0.trashedAt != nil }.map(\.id)))
+            }
         }
+        // Forget everyone that began since the matches were worked out drops them: its links are gone already.
+        if generation != settings.voicesGeneration { matching = AnalysisMatches() }
         let autoName = settings.automaticallyNameVoices
         let stamp = VersionStamp(date: clock.now)
         let saved = await library.commit(id) { [matching] note in

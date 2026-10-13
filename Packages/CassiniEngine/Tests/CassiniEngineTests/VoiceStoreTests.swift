@@ -67,7 +67,7 @@ import CassiniNotebook
         let store = try VoiceStore(root: root)
         let note = UUID()
         try await store.save([voice("Luca", notes: [note])])
-        try await store.appendPrints([print], noteID: note)
+        try await store.appendPrints([print], noteID: note, ifForgottenCount: 0)
         #expect(await store.forgetEveryone() == .done)
         let snapshot = await store.snapshot()
         #expect(snapshot.voices.isEmpty && !snapshot.hasEvidence && !snapshot.isReadOnly)
@@ -94,9 +94,21 @@ import CassiniNotebook
         let note = UUID()
         var later = print
         later.speakerID = "S2"
-        try await store.appendPrints([print], noteID: note)
-        try await store.appendPrints([later], noteID: note)
+        try await store.appendPrints([print], noteID: note, ifForgottenCount: 0)
+        try await store.appendPrints([later], noteID: note, ifForgottenCount: 0)
         #expect(try await store.prints(noteID: note).map(\.speakerID) == ["S1", "S2"])
         #expect(try await store.sweepOrphans(keeping: []) == [note])
+    }
+
+    /// An analysis that read the prints before Forget everyone writes none of its own after it.
+    @Test func printsReadBeforeAForgetAreNotWrittenAfterIt() async throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = try VoiceStore(root: root)
+        let note = UUID()
+        let (_, count) = await store.printsForAnalysis(noteID: note)
+        #expect(await store.forgetEveryone() == .done)
+        #expect(try await store.appendPrints([print], noteID: note, ifForgottenCount: count) == false)
+        #expect(try await store.prints(noteID: note).isEmpty)
+        #expect(await !store.snapshot().hasEvidence)
     }
 }

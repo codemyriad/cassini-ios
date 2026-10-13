@@ -33,6 +33,9 @@ public enum VoiceEdit: Hashable, Sendable {
 /// The saved voices and each note's voiceprints, read and written off the main actor, one change at a time.
 public actor VoiceStore {
     private let library: VoiceLibrary
+    /// How many times every print was forgotten (Forget everyone): a speaker analysis read at one count writes its
+    /// prints only while the count is the same (`appendPrints(_:noteID:ifForgottenCount:)`).
+    public private(set) var forgottenCount = 0
 
     /// Opens `<root>/PrivateVoices`, creating it when needed.
     public init(root: URL, now: @escaping @Sendable () -> Date = Date.init) throws {
@@ -87,6 +90,7 @@ public actor VoiceStore {
     /// that started before keeps nothing.
     public func forgetEveryone() -> VoiceEdit {
         guard library.canForgetEveryone else { return .readOnly }
+        forgottenCount += 1
         do {
             try library.forgetAll()
             return .done
@@ -99,10 +103,20 @@ public actor VoiceStore {
 
     public func savePrints(_ prints: [SpeakerPrint], noteID: UUID) throws { try library.savePrints(prints, noteID: noteID) }
 
-    /// Adds the prints of another analysis of the note.
-    public func appendPrints(_ prints: [SpeakerPrint], noteID: UUID) throws {
-        guard !prints.isEmpty else { return }
+    /// The note's prints and `forgottenCount`, read in one step, for a speaker analysis about to add its own.
+    public func printsForAnalysis(noteID: UUID) -> (prints: [SpeakerPrint], forgottenCount: Int) {
+        ((try? library.prints(noteID: noteID)) ?? [], forgottenCount)
+    }
+
+    /// Adds the prints of another analysis of the note, unless every print was forgotten since the analysis read
+    /// `count` (`printsForAnalysis`): then it writes nothing and returns false. The check and the write are one step
+    /// on the actor, so no print outlives a Forget everyone that ran meanwhile.
+    @discardableResult
+    public func appendPrints(_ prints: [SpeakerPrint], noteID: UUID, ifForgottenCount count: Int) throws -> Bool {
+        guard count == forgottenCount else { return false }
+        guard !prints.isEmpty else { return true }
         try library.savePrints(library.prints(noteID: noteID) + prints, noteID: noteID)
+        return true
     }
 
     /// Whether any note has voiceprints on disk.
@@ -113,7 +127,10 @@ public actor VoiceStore {
     @discardableResult public func removeEvidence(noteID: UUID) throws -> [UUID] { try library.removeEvidence(noteID: noteID) }
 
     /// Forgets every saved voice and every voiceprint.
-    public func forgetAll() throws { try library.forgetAll() }
+    public func forgetAll() throws {
+        forgottenCount += 1
+        try library.forgetAll()
+    }
 
     /// Deletes the voiceprints of notes not in `notes`, at launch. Returns those notes.
     @discardableResult public func sweepOrphans(keeping notes: Set<UUID>) throws -> [UUID] {

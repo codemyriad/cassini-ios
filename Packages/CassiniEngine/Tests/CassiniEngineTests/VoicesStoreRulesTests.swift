@@ -124,4 +124,33 @@ import CassiniNotebook
         #expect(library.note(note.id)?.speakers == nil)
         #expect(try await voices.store?.prints(noteID: note.id) == [])
     }
+
+    /// Forget everyone that starts while an analysis reads the note's prints: the analysis writes no print and links
+    /// no voice after the wipe (Android checks the generation inside the voice-file lock when it adopts the prints).
+    @Test func forgetEveryoneDuringAnAnalysisLeavesNoPrintAndNoLink() async throws {
+        var source = Note(title: "Known person")
+        source.speakers = [NoteSpeaker(id: "a", name: "Alex")]
+        source.transcript = [.init(text: "Reference", start: 0, end: 10, speaker: "Alex", speakerID: "a")]
+        var target = Note(title: "New conversation")
+        target.transcript = [.init(text: "New speech", start: 0, end: 10)]
+        try await start(source, target)
+        try await voices.store?.savePrints([print], noteID: source.id)
+        try await voices.perform([.rememberVoice(speakerID: "a", voiceID: nil, name: "Alex")], noteID: source.id, speakerID: "a")
+        settings.automaticallyNameVoices = true
+        let analysis = SpeakerAnalysis(turns: [.init(speakerID: "a", start: 0, end: 10)], prints: [print])
+
+        // The analysis suspends on its read of the prints; Forget everyone runs on the main actor meanwhile.
+        let generation = settings.voicesGeneration
+        let analysing = Task { try await voices.applySpeakerAnalysis(analysis, to: target.id, generation: generation) }
+        let forgetting = Task { await voices.forgetEveryone() }
+        try await analysing.value
+        #expect(await forgetting.value == .done)
+        await library.settle()
+
+        #expect(try await voices.store?.prints(noteID: target.id) == [], "no print outlives Forget everyone")
+        #expect(voices.savedVoices.isEmpty)
+        let speakers = try #require(library.note(target.id)?.speakers)
+        #expect(speakers.count == 1, "the analysis still attributes the passages")
+        #expect(speakers.allSatisfy { $0.match == .unmatched && $0.name == "Speaker 1" }, "no link to a forgotten voice comes back")
+    }
 }
