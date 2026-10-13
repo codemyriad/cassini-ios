@@ -105,13 +105,13 @@ import CassiniNotebook
 
     func stopAll() { coordinator?.stopAll() }
 
-    /// The download notice's Cancel: while the running job downloads a model, see
-    /// `TranscriptionCoordinator.cancelDownload()`; otherwise the standalone install is cancelled. The files fetched
-    /// so far stay.
-    func cancelDownload() {
-        if coordinator?.cancelDownload() == true { return }
-        models.cancel()
-    }
+    /// The processing card's Cancel of the running job's model download (`TranscriptionCoordinator.cancelDownload()`).
+    /// The files fetched so far stay.
+    func cancelJobDownload() { coordinator?.cancelDownload() }
+
+    /// The Settings banner's Cancel of the standalone install (`ModelInstalls.cancel()`); a job that downloads at the
+    /// same time goes on. The files fetched so far stay.
+    func cancelStandaloneDownload() { models.cancel() }
     func continueQueue() { coordinator?.continueQueue() }
 
     /// Start over: the saved progress goes and the note is queued from the beginning.

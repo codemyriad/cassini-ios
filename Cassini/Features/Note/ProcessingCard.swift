@@ -38,11 +38,11 @@ struct ProcessingCard: View {
     @ViewBuilder private func running(_ phase: JobPhase) -> some View {
         switch phase {
         case .transcribing(let running, _):
-            ProgressCardContent(progress: running, stop: { processing.stop(note.id) }, cancelDownload: processing.cancelDownload)
+            ProgressCardContent(progress: running, stop: { processing.stop(note.id) }, cancelDownload: processing.cancelJobDownload)
         case .downloading(let download):
             Header(headline: ProgressText.downloadingModels, range: nil, percent: download?.percent)
             ProgressView(value: download.map { Double($0.percent) / 100 }).tint(.ember)
-            if let download { DownloadRow(download: download, cancel: processing.cancelDownload) }
+            if let download { DownloadRow(download: download, cancel: processing.cancelJobDownload) }
             stopButton
             footnote
         case .stopping:

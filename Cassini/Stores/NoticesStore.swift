@@ -45,7 +45,7 @@ import CassiniNotebook
             Task { await recording.start() }
         case .cancel:
             // DL_DOWNLOADING in Settings: the standalone install stops; the files fetched so far stay.
-            processing.cancelDownload()
+            processing.cancelStandaloneDownload()
         case .resume, .startOver, .transcribe, .transcribeAgain, .playAnyway, .openNote, .openSettings:
             // The Note and Recording screens' own actions; never on a Library or Settings banner.
             break
