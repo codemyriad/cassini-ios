@@ -97,6 +97,7 @@ struct PlaybackBar: View {
                 Image(systemName: "goforward.10").font(.title2).frame(width: 52, height: 52)
             }
             .accessibilityLabel(Text("Forward 10 seconds", tableName: "Playback"))
+            .accessibilityIdentifier("skipForward")
             Spacer()
             Button {
                 library.markMoment(note.id, at: position)

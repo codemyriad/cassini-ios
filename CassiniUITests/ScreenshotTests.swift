@@ -41,9 +41,8 @@ final class ScreenshotTests: XCTestCase {
         XCTAssertTrue(headline.wait(until: NSPredicate(format: "label CONTAINS %@", "%"), within: 15))
         XCTAssertTrue(element(app, containing: "agenda").waitForExistence(within: 10), "the draft so far shows")
         // The draft follows its end as it arrives; back at its start, its header shows under the card.
-        let header = app.staticTexts.matching(NSPredicate(format: "label ==[c] %@", "Draft transcript")).firstMatch
         let parts = app.descendants(matching: .any).matching(identifier: "draftTranscript")
-        let draft = parts.element(boundBy: parts.count - 1)
+        let header = parts.element(boundBy: 0), draft = parts.element(boundBy: parts.count - 1)
         XCTAssertTrue(draft.scroll(up: false, attempts: 3) { header.exists && header.isHittable })
         capture("03-transcribing")
     }
@@ -52,7 +51,8 @@ final class ScreenshotTests: XCTestCase {
     /// may be them.
     @MainActor func test04NameASpeaker() throws {
         let app = try launchPhone(["--seed", "speakers", "--open-fixture", Self.fixture])
-        let header = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Speaker 2, at")).firstMatch
+        // The second passage is Speaker 2's.
+        let header = app.buttons["speakerHeader-w1"]
         XCTAssertTrue(header.waitForExistence(within: 10))
         header.tap()
         let field = app.textFields["speakerNameField"]
@@ -62,14 +62,13 @@ final class ScreenshotTests: XCTestCase {
         XCTAssertTrue(samRivera.waitForExistence(within: 5))
         samRivera.tap()
         XCTAssertTrue(field.wait(until: NSPredicate(format: "value == %@", "Sam Rivera"), within: 5))
-        dismissKeyboard(app)
         capture("04-name-a-speaker")
     }
 
     @MainActor func test05Settings() throws {
         let app = try launchPhone(["--seed", "library"])
-        app.buttons["Settings"].tap()
-        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(within: 5))
+        app.buttons["settingsButton"].tap()
+        XCTAssertTrue(app.switches.firstMatch.waitForExistence(within: 5), "Settings shows")
         capture("05-settings")
     }
 
@@ -79,8 +78,10 @@ final class ScreenshotTests: XCTestCase {
     @MainActor func test06Recording() throws {
         let app = try launchPhone(["--seed", "recording", "--capture-held"])
         app.buttons["recordButton"].tap()
-        XCTAssertTrue(app.buttons["Pause recording"].waitForEnabled(within: 8))
-        XCTAssertTrue(element(app, containing: "24 minutes, 7 seconds").waitForExistence(within: 10), "the capture holds")
+        XCTAssertTrue(app.buttons["pauseResumeRecording"].waitForEnabled(within: 8))
+        // The timer's value is spoken in the app's language: "24 minutes, 7 seconds".
+        let held = NSPredicate(format: "value BEGINSWITH '24 ' AND value CONTAINS ' 7 '")
+        XCTAssertTrue(app.staticTexts["recordingTimer"].wait(until: held, within: 10), "the capture holds")
         capture("06-recording")
     }
 
@@ -88,24 +89,25 @@ final class ScreenshotTests: XCTestCase {
         let app = try launchPhone(["--seed", "search"])
         let search = app.textFields["librarySearch"]
         search.tap()
-        search.typeText("Thursday")
+        // Search on the keyboard (a new line in the wrapping field) ends the search and hides the keyboard.
+        search.typeText("Thursday\n")
         XCTAssertTrue(row(app, "Garden plans for the spring").waitForExistence(within: 5))
         XCTAssertTrue(row(app, "Notes from the design review").waitForNonExistence(within: 5))
-        dismissKeyboard(app)
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(within: 5))
         capture("07-search")
     }
 
     @MainActor func test08RecentlyDeleted() throws {
         let app = try launchPhone(["--seed", "trash"])
-        app.buttons["Recently Deleted"].tap()
+        app.buttons["recentlyDeletedButton"].tap()
         XCTAssertTrue(app.staticTexts["Old interview draft"].waitForExistence(within: 5))
         capture("08-recently-deleted")
     }
 
     @MainActor func test09SavedVoices() throws {
         let app = try launchPhone(["--seed", "voices"])
-        app.buttons["Settings"].tap()
-        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(within: 5))
+        app.buttons["settingsButton"].tap()
+        XCTAssertTrue(app.switches.firstMatch.waitForExistence(within: 5), "Settings shows")
         let savedVoices = app.buttons["savedVoicesRow"]
         app.scroll(attempts: 6) { savedVoices.exists && savedVoices.isHittable }
         savedVoices.tap()
@@ -164,7 +166,7 @@ final class ScreenshotTests: XCTestCase {
     }
 
     @MainActor private func skipTenSeconds(_ app: XCUIApplication) {
-        let forward = app.buttons["Forward 10 seconds"]
+        let forward = app.buttons["skipForward"]
         XCTAssertTrue(forward.waitForExistence(within: 5))
         forward.tap()
         let position = app.descendants(matching: .any)["playbackPosition"]
@@ -177,13 +179,6 @@ final class ScreenshotTests: XCTestCase {
 
     @MainActor private func element(_ app: XCUIApplication, containing text: String) -> XCUIElement {
         app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", text)).firstMatch
-    }
-
-    @MainActor private func dismissKeyboard(_ app: XCUIApplication) {
-        guard app.keyboards.firstMatch.exists else { return }
-        print("keyboard keys: \(app.keyboards.buttons.allElementsBoundByIndex.map(\.label))")
-        app.keyboards.buttons.matching(NSPredicate(format: "label IN[c] %@", ["done", "return", "search"])).firstMatch.tap()
-        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(within: 5), "the keyboard went away")
     }
 
     /// The whole screen, status bar included, under the name `scripts/screenshots.sh` saves it as.

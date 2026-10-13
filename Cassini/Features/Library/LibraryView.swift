@@ -67,7 +67,9 @@ struct LibraryView: View {
             }.sharedBackgroundVisibility(.hidden)
             ToolbarItemGroup(placement: .topBarTrailing) {
                 Button(TrashCopy.title, systemImage: "trash") { router.show(.trash) }
+                    .accessibilityIdentifier("recentlyDeletedButton")
                 Button(LibraryCopy.settings, systemImage: "slider.horizontal.3") { router.show(.settings) }
+                    .accessibilityIdentifier("settingsButton")
             }
         }
         .onAppear(perform: restoreSceneState)
