@@ -37,6 +37,7 @@ struct DocumentInfoSheet: View {
                     }
                 }
             }
+            .paperListBackground()
             .navigationTitle(NoteCopy.documentInfo).navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button(NoteCopy.close) { dismiss() } } }
         }

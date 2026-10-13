@@ -28,7 +28,8 @@ final class AcceptanceWalkTests: XCTestCase {
         XCTAssertTrue(title.waitForExistence(within: 10))
         XCTAssertEqual(title.label, Self.title)
         let words = app.descendants(matching: .any)["turn-w2"]
-        XCTAssertTrue(words.waitForExistence(within: 20), "the recording is transcribed after it is saved")
+        // Compression, the hand-off, the job and its save run one after another; on a loaded machine they took 30 s.
+        XCTAssertTrue(words.waitForExistence(within: 60), "the recording is transcribed after it is saved")
 
         // Read and listen: a word tap plays from there.
         let play = app.buttons["playButton"]

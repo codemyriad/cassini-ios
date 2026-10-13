@@ -10,6 +10,7 @@
 #                            uncommitted and untracked files): the string catalog check when a source or a catalog
 #                            changed, the package test targets, the hosted tests and the UI test classes of the
 #                            changed areas. For iterating; run all once before finishing.
+#   scripts/test.sh build    only build for testing (scripts/screenshots.sh runs its tests from that build)
 #   scripts/test.sh clean    shut down and delete this worktree's simulator clones
 #
 # Extra arguments after the tier go to every xcodebuild test run, e.g.
@@ -658,7 +659,7 @@ extra_xcodebuild_from_extra() {
 
 case "$tier" in
     clean) delete_clones; echo "deleted the $prefix-* clones"; exit 0 ;;
-    fast|app|ui|all|changed) ;;
+    fast|app|ui|all|changed|build) ;;
     *) sed -n '2,36p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac
 
@@ -670,4 +671,5 @@ case "$tier" in
     ui)   start_first_boot; build_for_testing; tier_ui ;;
     all)  start_first_boot; check_strings; start_fast_beside; build_for_testing; tier_app; tier_ui; wait_fast_beside ;;
     changed) tier_changed ;;
+    build) build_for_testing ;;
 esac

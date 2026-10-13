@@ -49,6 +49,7 @@ struct SegmentEditor: View {
                     }
                 } header: { Text(NoteCopy.speaker) } footer: { Text(NoteCopy.speakerFooter) }
             }
+            .paperListBackground()
             .disabled(locked)
             .navigationTitle(NoteCopy.editPassage).navigationBarTitleDisplayMode(.inline)
             .toolbar {

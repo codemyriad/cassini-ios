@@ -47,9 +47,10 @@ import CassiniEngineTesting
     }
 
     /// Named sets of notes for UI tests and screenshots. `statuses` has a note for each Library row status but
-    /// Recording (the recording seed shows that one).
+    /// Recording (the recording seed shows that one); `reading` is `library` with word times in the fixture's
+    /// passages, so playback highlights one word.
     enum Seed: String, CaseIterable {
-        case library, search, speakers, trash, voices, processing, recording, statuses, long
+        case library, search, speakers, trash, voices, processing, recording, statuses, long, reading
     }
 
     var calendar: Calendar {
@@ -93,20 +94,23 @@ extension AppEnvironment {
                   openFixture: fixture(in: arguments), modelsMissing: arguments.contains("--models-missing"),
                   modelDownloading: arguments.contains("--model-downloading"),
                   draftGrowing: arguments.contains("--draft-growing"),
-                  notificationsDenied: arguments.contains("--notifications-denied"), inProcess: inProcess, token: token)
+                  notificationsDenied: arguments.contains("--notifications-denied"),
+                  heldCapture: arguments.contains("--capture-held"), region: value(after: "-AppleLocale", in: arguments),
+                  inProcess: inProcess, token: token)
     }
 
-    /// A separate library and preferences, a fixed clock and en_US formatting. Transcription is faked; the
-    /// recording seed also fakes the microphone and its permission. With `modelsMissing` the speech and speaker models
+    /// A separate library and preferences, a fixed clock and en_US formatting (or the region of `-AppleLocale`, for the
+    /// Italian screenshots). Transcription is faked; the recording seed also fakes the microphone and its permission. With `modelsMissing` the speech and speaker models
     /// are not installed, so a Transcribe asks for the download first; with `modelDownloading` (`--model-downloading`)
     /// the processing seed's job stays in its speech model download at 46 %, and with `draftGrowing` (`--draft-growing`)
-    /// its draft grows by a sentence every half second. A second transcription of the same note hears other words
+    /// its draft grows by a sentence every half second. `heldCapture` (`--capture-held`) starts the recording seed's
+    /// capture 24 minutes in and holds it after 7 s of speech-like levels, with 64 GiB free, for the screenshots. A second transcription of the same note hears other words
     /// (`TestFixtures.transcribedAgainSegments`). Speaker models are installed on the recording seed only.
     /// Notifications are never asked for and count as allowed, so no banner says they are off, unless
     /// `notificationsDenied` (`--notifications-denied`) turns them off.
     static func uiTesting(reset: Bool, seed: Seed?, openFixture: OpenFixture? = nil,
                           modelsMissing: Bool = false, modelDownloading: Bool = false, draftGrowing: Bool = false,
-                          notificationsDenied: Bool = false,
+                          notificationsDenied: Bool = false, heldCapture: Bool = false, region: String? = nil,
                           inProcess: Bool = false, token: String = "") -> AppEnvironment {
         let storage = UITestStorage.generation(reset: reset, inProcess: inProcess)
         let root = storage.root
@@ -117,7 +121,10 @@ extension AppEnvironment {
         case .processing where draftGrowing:
             FakeTranscriber(.growing(TestFixtures.growingDraft, every: .milliseconds(500), total: TestFixtures.processingDuration),
                             status: status)
-        case .processing, .statuses:
+        case .processing:
+            FakeTranscriber(.frozen(done: 0.62 * TestFixtures.processingDuration, total: TestFixtures.processingDuration,
+                                    draft: TestFixtures.processingDraft), status: status)
+        case .statuses:
             FakeTranscriber(.frozen(done: 0.62 * TestFixtures.processingDuration, total: TestFixtures.processingDuration),
                             status: status)
         default:
@@ -129,11 +136,14 @@ extension AppEnvironment {
             : FakeAnalyzer(modelIdentity: nil)
         return AppEnvironment(
             root: root, defaults: defaults, clock: FixedClock(now: uiTestingNow),
-            locale: Locale(identifier: "en_US"), timeZone: TimeZone(identifier: "UTC") ?? .gmt,
+            locale: Locale(identifier: region ?? "en_US"), timeZone: TimeZone(identifier: "UTC") ?? .gmt,
             transcriber: transcriber, analyzer: analyzer,
-            capture: seed == .recording ? FakeCapture() : AVCaptureAdapter(),
+            capture: seed != .recording ? AVCaptureAdapter()
+                : heldCapture ? FakeCapture(levels: TestFixtures.speechLevels, heldAt: TestFixtures.heldCaptureStart) : FakeCapture(),
             microphone: seed == .recording ? FakeMicrophonePermission() : AVMicrophonePermission(),
-            liveActivity: ActivityKitAdapter(), playback: AVPlaybackAdapter(), audio: LocalAudioProcessing(), storage: FileSystemStorageProbe(),
+            liveActivity: ActivityKitAdapter(), playback: AVPlaybackAdapter(), audio: LocalAudioProcessing(),
+            // A held capture also holds the free space, so its hint reads the same on every run.
+            storage: heldCapture ? FakeStorage() : FileSystemStorageProbe(),
             background: uiTestingBackground, notifier: FakeNotifier(auth: notificationsDenied ? .denied : .authorized),
             launch: LaunchOptions(seed: seed, openFixture: openFixture, restoresNavigation: false, marksLaunchFinished: true,
                                   token: token))
@@ -141,10 +151,13 @@ extension AppEnvironment {
 
     /// `--seed <name>`; `--seed-test-data` is the library seed.
     private static func seed(in arguments: [String]) -> Seed? {
-        if let index = arguments.firstIndex(of: "--seed"), arguments.indices.contains(index + 1) {
-            return Seed(rawValue: arguments[index + 1])
-        }
+        if let name = value(after: "--seed", in: arguments) { return Seed(rawValue: name) }
         return arguments.contains("--seed-test-data") ? .library : nil
+    }
+
+    private static func value(after option: String, in arguments: [String]) -> String? {
+        guard let index = arguments.firstIndex(of: option), arguments.indices.contains(index + 1) else { return nil }
+        return arguments[index + 1]
     }
 
     /// `--open-fixture [note id]`: the given note, or the newest.

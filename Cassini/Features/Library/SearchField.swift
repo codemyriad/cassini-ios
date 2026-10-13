@@ -17,6 +17,12 @@ struct SearchField: View {
                     .lineLimit(1...3)
                     .font(.body).autocorrectionDisabled().textInputAutocapitalization(.never)
                     .submitLabel(.search).focused($focused).onSubmit { focused = false }
+                    // A field that wraps takes Search as a new line rather than a submit: it ends the search instead.
+                    .onChange(of: query) { _, text in
+                        guard text.contains(where: \.isNewline) else { return }
+                        query = text.filter { !$0.isNewline }
+                        focused = false
+                    }
                     .accessibilityIdentifier("librarySearch")
                 if !query.isEmpty {
                     Button(LibraryCopy.clearSearch, systemImage: "xmark.circle.fill") { query = "" }
