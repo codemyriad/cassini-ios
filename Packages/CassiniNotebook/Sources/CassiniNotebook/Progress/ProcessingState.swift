@@ -39,8 +39,6 @@ public struct ProcessingState: Hashable, Sendable {
 
     public func isQueued(_ id: UUID) -> Bool { queue.contains(id) }
     public func isRunning(_ id: UUID) -> Bool { running?.noteID == id }
-    /// Jobs that run before this note's, counting the running one.
-    public func ahead(of id: UUID) -> Int? {
-        queue.firstIndex(of: id).map { $0 + (running == nil ? 0 : 1) }
-    }
+    /// The queued jobs that run before this note's, the running one not counted (Android's `NoteJobState.ahead`).
+    public func ahead(of id: UUID) -> Int? { queue.firstIndex(of: id) }
 }

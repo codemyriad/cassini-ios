@@ -19,7 +19,8 @@ import CassiniNotebook
         #expect(first.noteID == ids[0])
         try await h.waitUntil("the others wait") { h.coordinator.state.queue == [ids[1], ids[2]] }
         #expect(h.coordinator.state.isRunning(ids[0]))
-        #expect(h.coordinator.state.ahead(of: ids[2]) == 2)
+        #expect(h.coordinator.state.ahead(of: ids[1]) == 0, "the running job is not counted")
+        #expect(h.coordinator.state.ahead(of: ids[2]) == 1)
         #expect(await h.job(ids[0])?.state == .running)
         #expect(await h.notes.note(ids[0])?.status == .transcribing)
         #expect(await h.notes.note(ids[1])?.status == .queued)

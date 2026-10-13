@@ -210,7 +210,7 @@ extension Note {
     /// place.
     private var attributableInPlace: Int? {
         guard let index = shownVersionIndex, let version = versions?[index], version.kind == .transcription,
-              version.speakers.isEmpty, !transcript.contains(where: { $0.speakerID != nil }) else { return nil }
+              version.speakers.isEmpty else { return nil }
         return index
     }
 }

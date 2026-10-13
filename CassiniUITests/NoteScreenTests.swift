@@ -123,6 +123,29 @@ final class NoteScreenTests: XCTestCase {
         XCTAssertTrue(wait("exists == false", app.staticTexts["Queued"], timeout: 10))
     }
 
+    /// The Queued card counts the queued notes before this one; the running job is not counted.
+    @MainActor func testTheQueuedCardCountsTheNotesAheadOfIt() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed", "processing", "--open-fixture",
+                               "BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB"]
+        app.launchAndWait()
+        let transcribe = app.buttons["Transcribe"].firstMatch
+        XCTAssertTrue(transcribe.waitForExistence(within: 15))
+        transcribe.tap()
+        let ahead = app.staticTexts["queuedAhead"]
+        XCTAssertTrue(ahead.waitForExistence(within: 10))
+        XCTAssertEqual(ahead.label, "Starts after the current transcription.")
+
+        app.navigationBars.buttons["Back to library"].tap()
+        let fixture = app.buttons.matching(NSPredicate(format: "identifier == 'noteRow' AND label BEGINSWITH %@",
+                                                       "A quieter kind of productivity")).firstMatch
+        XCTAssertTrue(fixture.waitForExistence(within: 5))
+        fixture.tap()
+        app.buttons["More actions"].tap()
+        app.buttons["Transcribe again"].tap()
+        XCTAssertTrue(ahead.wait(until: NSPredicate(format: "label == '1 ahead of this note.'"), within: 10))
+    }
+
     /// The back button reads "Back to library" to VoiceOver.
     @MainActor func testTheBackButtonSaysBackToLibrary() {
         let app = open()

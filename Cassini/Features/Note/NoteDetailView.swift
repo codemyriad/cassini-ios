@@ -179,7 +179,8 @@ struct NoteSectionView: View {
 
     var body: some View {
         switch section {
-        case .card: ProcessingCard(note: note)
+        case .card:
+            if case .queued(let ahead, _) = mode { ProcessingCard(note: note, ahead: ahead) } else { ProcessingCard(note: note) }
         case .chips:
             if let chips = NoteChips.of(note) {
                 NoteChipsRow(chips: chips, toggleTrust: { model.screen.toggleTrust() },

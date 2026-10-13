@@ -4,9 +4,12 @@ import CassiniNotebook
 
 /// The Transcribing card of the Note screen: the headline over the audio it works on and the percentage, the bar, the
 /// five-step stepper, the stats (time left, processed audio, battery at finish, words so far), Stop and keep progress
-/// and a footnote. A queued note shows when it starts and Remove from queue instead.
+/// and a footnote. A queued note shows when it starts ("2 ahead of this note." with `ahead` queued jobs before it, as
+/// Android's QueuedCard) and Remove from queue instead.
 struct ProcessingCard: View {
     let note: Note
+    /// The queued jobs before this note's, the running one not counted.
+    var ahead = 0
     @Environment(ProcessingStore.self) private var processing
     @Environment(JobProgress.self) private var progress
 
@@ -26,8 +29,16 @@ struct ProcessingCard: View {
     private var queued: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Queued", tableName: "Processing").font(.subheadline.weight(.medium))
-            Text("Starts after the current transcription.", tableName: "Processing")
-                .font(.caption).foregroundStyle(Color.muted)
+            Group {
+                if ahead > 0 {
+                    Text("\(ahead) ahead of this note.", tableName: "Processing",
+                         comment: "Queued card: how many queued notes transcribe before this one")
+                } else {
+                    Text("Starts after the current transcription.", tableName: "Processing")
+                }
+            }
+            .font(.caption).foregroundStyle(Color.muted)
+            .accessibilityIdentifier("queuedAhead")
             Button { processing.dequeue(note.id) } label: {
                 Text("Remove from queue", tableName: "Processing").frame(maxWidth: .infinity, minHeight: HitTarget.minimum)
             }
