@@ -55,24 +55,24 @@ private struct SettingsForm: View {
             Section {
                 ForEach(model.models) { row in ModelRowView(row: row) { model.openModel(row.part) } }
             } header: {
-                Text("On-device models", tableName: "Settings")
+                Text("On-device models", tableName: "Settings").foregroundStyle(Color.muted)
             } footer: {
-                Text("Transcription runs on this device. Audio never leaves it.", tableName: "Settings")
+                Text("Transcription runs on this device. Audio never leaves it.", tableName: "Settings").foregroundStyle(Color.muted)
             }
             Section {
                 Toggle(isOn: $settings.identifySpeakers) { Text("Identify speakers after transcription", tableName: "Settings") }
                 Toggle(isOn: $settings.automaticallyNameVoices) { Text("Name strong voice matches automatically", tableName: "Settings") }
             } header: {
-                Text("Speakers", tableName: "Settings")
+                Text("Speakers", tableName: "Settings").foregroundStyle(Color.muted)
             } footer: {
-                Text("Matches can be wrong; check the names. Only voices you save are used to recognise people.", tableName: "Settings")
+                Text("Matches can be wrong; check the names. Only voices you save are used to recognise people.", tableName: "Settings").foregroundStyle(Color.muted)
             }
             PrivacySection(model: model)
             LibrarySection(totals: model.library)
             Section {
                 AboutCard(version: model.version, openNotices: model.openLicenses)
             } header: {
-                Text("About", tableName: "Settings")
+                Text("About", tableName: "Settings").foregroundStyle(Color.muted)
             }
         }
         .readableListWidth()
@@ -102,9 +102,9 @@ private struct AppLanguageSection: View {
             }
             .accessibilityHint(Text("Opens Cassini in the Settings app", tableName: "Settings"))
         } header: {
-            Text("App language", tableName: "Settings")
+            Text("App language", tableName: "Settings").foregroundStyle(Color.muted)
         } footer: {
-            Text("The language of speech is chosen separately, under Transcription.", tableName: "Settings")
+            Text("The language of speech is chosen separately, under Transcription.", tableName: "Settings").foregroundStyle(Color.muted)
         }
     }
 }
@@ -130,11 +130,13 @@ private struct TranscriptionSection: View {
             } label: {
                 Text("Speech language", tableName: "Settings")
             }
+            // A list of its own rather than a menu: a long language name wraps instead of being cut at large text sizes.
+            .pickerStyle(.navigationLink)
             Toggle(isOn: $autoTranscribe) { Text("Transcribe after recording or import", tableName: "Settings") }
         } header: {
-            Text("Transcription", tableName: "Settings")
+            Text("Transcription", tableName: "Settings").foregroundStyle(Color.muted)
         } footer: {
-            Text("A new language applies to the next transcription.", tableName: "Settings")
+            Text("A new language applies to the next transcription.", tableName: "Settings").foregroundStyle(Color.muted)
         }
     }
 
@@ -162,7 +164,7 @@ private struct PrivacySection: View {
             }
             .accessibilityIdentifier("recentlyDeletedRow")
         } header: {
-            Text("Privacy", tableName: "Settings")
+            Text("Privacy", tableName: "Settings").foregroundStyle(Color.muted)
         }
     }
 }
@@ -184,9 +186,9 @@ private struct LibrarySection: View {
                 Text("Audio duration", tableName: "Settings")
             }
         } header: {
-            Text("Your library", tableName: "Settings")
+            Text("Your library", tableName: "Settings").foregroundStyle(Color.muted)
         } footer: {
-            Text("Notes in Recently Deleted are not counted. They are deleted for good after 30 days.", tableName: "Settings")
+            Text("Notes in Recently Deleted are not counted. They are deleted for good after 30 days.", tableName: "Settings").foregroundStyle(Color.muted)
         }
     }
 }

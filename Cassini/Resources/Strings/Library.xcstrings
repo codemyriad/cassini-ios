@@ -846,6 +846,18 @@
         }
       }
     },
+    "Search": {
+      "comment": "Library search field placeholder at accessibility text sizes",
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cerca"
+          }
+        }
+      }
+    },
     "Search titles and what was said": {
       "comment": "Library search field placeholder",
       "extractionState": "manual",

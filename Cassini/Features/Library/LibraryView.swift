@@ -61,6 +61,8 @@ struct LibraryView: View {
             ToolbarItem(placement: .topBarLeading) {
                 HStack(spacing: 8) { OrbitMark(size: 25); Text(verbatim: "cassini").font(.system(.title3, design: .rounded, weight: .semibold)).tracking(-0.6) }
                     .foregroundStyle(Color.ink).fixedSize().accessibilityElement(children: .combine).accessibilityLabel(Text(verbatim: "Cassini"))
+                    .accessibilityAddTraits(.isHeader).accessibilityShowsLargeContentViewer()
+                    .accessibilityIdentifier("wordmark")
             }.sharedBackgroundVisibility(.hidden)
             ToolbarItemGroup(placement: .topBarTrailing) {
                 Button(TrashCopy.title, systemImage: "trash") { router.show(.trash) }
@@ -127,6 +129,7 @@ struct LibraryView: View {
                 .padding(.horizontal, 14).frame(minHeight: HitTarget.minimum)
                 .foregroundStyle(selected ? Color.paper : Color.muted)
                 .background(selected ? Color.ink : Color.clear, in: Capsule())
+                .contentShape(Capsule())
         }.buttonStyle(.plain).accessibilityAddTraits(selected ? .isSelected : [])
     }
 

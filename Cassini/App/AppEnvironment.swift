@@ -72,8 +72,7 @@ import CassiniEngineTesting
         if arguments.contains("--ui-testing") {
             return uiTesting(reset: arguments.contains("--reset-test-data"), seed: seed(in: arguments),
                              openFixture: fixture(in: arguments), modelsMissing: arguments.contains("--models-missing"),
-                             notificationsDenied: arguments.contains("--notifications-denied"),
-                             restoresSceneState: arguments.contains("--restores-scene-state"))
+                             notificationsDenied: arguments.contains("--notifications-denied"))
         }
         #endif
         return live()
@@ -90,11 +89,9 @@ extension AppEnvironment {
     /// recording seed also fakes the microphone and its permission. With `modelsMissing` the speech and speaker models
     /// are not installed, so a Transcribe asks for the download first. Speaker models are never installed.
     /// Notifications are never asked for and count as allowed, so no banner says they are off, unless
-    /// `notificationsDenied` (`--notifications-denied`) turns them off. The scene's state (the stack, open sheets and
-    /// dialogs) is restored only with `restoresSceneState` (`--restores-scene-state`), for the tests of that.
+    /// `notificationsDenied` (`--notifications-denied`) turns them off.
     static func uiTesting(reset: Bool, seed: Seed?, openFixture: OpenFixture? = nil,
-                          modelsMissing: Bool = false, notificationsDenied: Bool = false,
-                          restoresSceneState: Bool = false) -> AppEnvironment {
+                          modelsMissing: Bool = false, notificationsDenied: Bool = false) -> AppEnvironment {
         let root = URL.applicationSupportDirectory.appendingPathComponent("CassiniUITests", isDirectory: true)
         let defaults = UserDefaults(suiteName: uiTestingSuite) ?? .standard
         if reset {
@@ -114,8 +111,7 @@ extension AppEnvironment {
             microphone: seed == .recording ? FakeMicrophonePermission() : AVMicrophonePermission(),
             liveActivity: ActivityKitAdapter(), playback: AVPlaybackAdapter(), audio: LocalAudioProcessing(), storage: FileSystemStorageProbe(),
             background: UIKitBackgroundRunner(), notifier: FakeNotifier(auth: notificationsDenied ? .denied : .authorized),
-            launch: LaunchOptions(seed: seed, openFixture: openFixture, restoresNavigation: restoresSceneState,
-                                  marksLaunchFinished: true))
+            launch: LaunchOptions(seed: seed, openFixture: openFixture, restoresNavigation: false, marksLaunchFinished: true))
     }
 
     /// `--seed <name>`; `--seed-test-data` is the library seed.

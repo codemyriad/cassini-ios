@@ -35,7 +35,8 @@ struct TrashView: View {
         .toolbar {
             if !items.isEmpty {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button(TrashCopy.empty, role: .destructive) { dialogs.askEmpty(items: items) }.tint(.ember)
+                    Button(TrashCopy.empty, role: .destructive) { dialogs.askEmpty(items: items) }
+                        .buttonStyle(.borderedProminent).tint(Color.emberFill)
                 }
             }
         }

@@ -106,6 +106,7 @@ private struct RecordingStatus: View {
                 .foregroundStyle(isPaused ? Color.recordingSecondary : Color.recordingAccent)
         }
         .accessibilityElement(children: .ignore)
+        .accessibilityAddTraits(.isStaticText)
         .accessibilityLabel(Text("Recording status", tableName: "Recording"))
         .accessibilityValue(RecordingCopy.status(paused: isPaused))
     }
@@ -119,8 +120,9 @@ private struct RecordingTitleField: View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Title", tableName: "Recording").font(.footnote).foregroundStyle(Color.recordingSecondary).accessibilityHidden(true)
             HStack(spacing: 8) {
-                TextField(String(localized: "Title", table: "Recording"), text: $title)
-                    .font(.system(.title2, design: .serif)).focused($focused).submitLabel(.done)
+                // Wraps rather than cutting a long title at large text sizes.
+                TextField(String(localized: "Title", table: "Recording"), text: $title, axis: .vertical)
+                    .lineLimit(1...3).font(.system(.title2, design: .serif)).focused($focused).submitLabel(.done)
                     .textInputAutocapitalization(.sentences).onSubmit { focused = false }
                     .accessibilityIdentifier("recordingTitle")
                 Image(systemName: "pencil").foregroundStyle(Color.recordingSecondary).accessibilityHidden(true)

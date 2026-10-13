@@ -93,6 +93,9 @@ private struct Header: View {
     let headline: String
     let range: String?
     let percent: Int?
+    /// The percent grows with Dynamic Type from its 40 pt and 22 pt.
+    @ScaledMetric(relativeTo: .largeTitle) private var percentSize: CGFloat = 40
+    @ScaledMetric(relativeTo: .title2) private var signSize: CGFloat = 22
 
     var body: some View {
         HStack(alignment: .bottom) {
@@ -103,8 +106,8 @@ private struct Header: View {
             Spacer(minLength: Spacing.tight)
             if let percent {
                 HStack(alignment: .firstTextBaseline, spacing: 1) {
-                    Text(percent, format: .number).font(.system(size: 40, weight: .semibold, design: .rounded))
-                    Text(verbatim: "%").font(.system(size: 22, weight: .semibold, design: .rounded))
+                    Text(percent, format: .number).font(.system(size: percentSize, weight: .semibold, design: .rounded))
+                    Text(verbatim: "%").font(.system(size: signSize, weight: .semibold, design: .rounded))
                 }
                 .monospacedDigit().foregroundStyle(Color.ink)
             }

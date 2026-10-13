@@ -100,9 +100,14 @@ struct CaptureBar: View {
             HStack(spacing: 12) { importButton(collapsed: true); recordButton }
         }
         .disabled(unavailable)
-        .dynamicTypeSize(...DynamicTypeSize.accessibility1).padding(.horizontal, Spacing.gutter).padding(.vertical, 14)
+        // Pinned over the list, the bar stops growing at AX1 and shows the Large Content Viewer instead.
+        .dynamicTypeSize(...DynamicTypeSize.accessibility1).accessibilityShowsLargeContentViewer()
+        .padding(.horizontal, Spacing.gutter).padding(.vertical, 14)
         .readableWidth()
-        .background(.regularMaterial)
+        // Opaque, so its buttons keep their contrast over the list scrolling under it.
+        .background(Color.paper).overlay(alignment: .top) { Divider() }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("captureBar")
     }
 
     private func importButton(collapsed: Bool) -> some View {

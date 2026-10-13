@@ -99,12 +99,33 @@ extension View {
 }
 
 private struct ReadableListWidth: ViewModifier {
-    @State private var width: CGFloat = 0
+    @State private var geometry = Geometry()
+
+    /// The list's visible width and the insets beside it: in a split view the detail column's list runs under the
+    /// sidebar, which is its leading safe-area inset.
+    private struct Geometry: Equatable {
+        var width: CGFloat = 0
+        var leading: CGFloat = 0
+        var trailing: CGFloat = 0
+    }
+
+    /// Below this the list keeps its own margins (a phone).
+    private static let minimumMargin: CGFloat = 20
 
     func body(content: Content) -> some View {
-        content
-            .contentMargins(.horizontal, max(0, (width - ReadableWidth.content) / 2), for: .scrollContent)
-            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
+        let margin = (geometry.width - ReadableWidth.content) / 2
+        Group {
+            if margin > Self.minimumMargin {
+                content
+                    .contentMargins(.leading, geometry.leading + margin, for: .scrollContent)
+                    .contentMargins(.trailing, geometry.trailing + margin, for: .scrollContent)
+            } else {
+                content
+            }
+        }
+        .onGeometryChange(for: Geometry.self) { proxy in
+            Geometry(width: proxy.size.width, leading: proxy.safeAreaInsets.leading, trailing: proxy.safeAreaInsets.trailing)
+        } action: { geometry = $0 }
     }
 }
 
