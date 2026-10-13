@@ -101,8 +101,6 @@ for devices in json.load(sys.stdin)["devices"].values():
 boot() {
     local udid="$1"
     xcrun simctl bootstatus "$udid" -b > /dev/null 2>&1 || xcrun simctl bootstatus "$udid" -b > /dev/null
-    # The capture test records when the Mac has an input; granted up front, no permission alert races its taps.
-    xcrun simctl privacy "$udid" grant microphone app.codemyriad.cassini 2>/dev/null || true
 }
 
 our_clones() {
@@ -111,11 +109,11 @@ import json, sys
 prefix = sys.argv[1] + "-"
 for devices in json.load(sys.stdin)["devices"].values():
     for d in devices:
-        if d["name"].startswith(prefix): print(d["udid"], d["state"])' "$prefix"
+        if d["name"].startswith(prefix): print(d["udid"], d["state"], d["name"])' "$prefix"
 }
 
 shutdown_clones() {
-    our_clones | while read -r udid state; do
+    our_clones | while read -r udid state _; do
         [ "$state" = "Booted" ] && xcrun simctl shutdown "$udid" 2>/dev/null || true
     done
 }
@@ -254,8 +252,14 @@ PY
 # xcodebuild test-without-building of one test target on one simulator; $1 target, $2 log, $3 result bundle,
 # $4 udid, the rest test arguments.
 test_on() {
-    local target="$1" log="$2" bundle="$3" udid="$4"; shift 4
+    local target="$1" log="$2" bundle="$3" udid="$4" app; shift 4
     rm -rf "$bundle"
+    # xcodebuild replaces an installed app while it starts the tests, and a launch that meets the replacement fails
+    # or hangs. Without an installed app (or a left-over Live Activity of it) there is nothing to replace.
+    for app in app.codemyriad.cassini app.codemyriad.CassiniUITests.xctrunner; do
+        xcrun simctl terminate "$udid" "$app" > /dev/null 2>&1 || true
+        xcrun simctl uninstall "$udid" "$app" > /dev/null 2>&1 || true
+    done
     xcodebuild test-without-building -xctestrun "${xctestrun%.xctestrun}.only-$target.xctestrun" \
         -destination "platform=iOS Simulator,id=$udid" \
         -resultBundlePath "$bundle" -collect-test-diagnostics never -parallel-testing-enabled NO \
@@ -345,6 +349,11 @@ tier_ui() {
     fi
 
     local workers="${CASSINI_UI_WORKERS:-$(auto_workers)}"
+    # Booted iPhone clones this run does not use give their memory back.
+    our_clones | while read -r udid state name; do
+        case "$name" in "$prefix-iphone-"*) ;; *) continue ;; esac
+        if [ "$state" = Booted ] && [ "${name##*-}" -gt "$workers" ]; then xcrun simctl shutdown "$udid" 2>/dev/null || true; fi
+    done
     local plan; plan=$(plan_shards "$workers")
     local ipad_tests; ipad_tests=$(ui_tests | grep '/testIPad' || true)
 
