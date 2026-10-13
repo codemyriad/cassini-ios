@@ -74,7 +74,8 @@ import Testing
         #"{"id":"\#(UUID())",\#(field),"createdAt":0,"segments":[],"speakers":[]}"#
     }
 
-    /// Earlier builds stored each version's English name; it reads as the kind it named, and is written as that kind.
+    /// Earlier builds stored each version's English name; it reads as the kind it named, and is written as that kind
+    /// with the English name beside it, so an earlier build can still read the note.
     @Test func aVersionNameStoredInEnglishReadsAsItsKind() throws {
         let names = ["On-device transcription", "Previous transcript", "Before speaker merge", "Merged speakers",
                      "Before speaker analysis", "Speaker analysis", "Before passage edit", "Edited passages",
@@ -86,14 +87,19 @@ import Testing
                                                 .editedPassages, .editedTranscript, .imported, .legacy("Something else")])
         let written = try JSONSerialization.jsonObject(with: JSONEncoder().encode(note)) as? [String: Any]
         let versions = try #require(written?["versions"] as? [[String: Any]])
-        #expect(versions[0]["kind"] as? String == "transcription" && versions[0]["name"] == nil, "no English is written back")
+        #expect(versions[0]["kind"] as? String == "transcription")
+        #expect(versions[0]["name"] as? String == "On-device transcription", "an earlier build requires a name")
         #expect(versions[10]["name"] as? String == "Something else" && versions[10]["kind"] == nil)
         #expect(try JSONDecoder().decode(Note.self, from: JSONEncoder().encode(note)) == note)
     }
 
     @Test func anUnknownVersionKindIsKeptAsItsCode() throws {
         let note = try decode(#"{"schemaVersion":2,"id":"\#(id)","title":"T","createdAt":0,"audioFilename":"a.m4a","audio":{"plain":{}},"origin":"recorded","versions":[\#(version(#""kind":"future""#))]}"#)
-        #expect(note.versions?.first?.kind == .legacy("future"))
+        #expect(note.versions?.first?.kind == .unknown("future"))
+        let written = try JSONSerialization.jsonObject(with: JSONEncoder().encode(note)) as? [String: Any]
+        let versions = try #require(written?["versions"] as? [[String: Any]])
+        #expect(versions[0]["kind"] as? String == "future", "the newer build still reads its kind")
+        #expect(try JSONDecoder().decode(Note.self, from: JSONEncoder().encode(note)) == note)
     }
 
     /// Earlier builds stored an English default label on every bookmark; it reads as no label, and the user's own stay.
@@ -104,6 +110,8 @@ import Testing
         #expect(note.bookmarks.map(\.label) == [nil, nil, nil, "Budget decision", "Moment at the end"])
         let written = try JSONSerialization.jsonObject(with: JSONEncoder().encode(note)) as? [String: Any]
         let bookmarks = try #require(written?["bookmarks"] as? [[String: Any]])
-        #expect(bookmarks[0]["label"] == nil)
+        #expect(bookmarks[0]["label"] as? String == "Marked moment", "an earlier build requires a label")
+        #expect(bookmarks[3]["label"] as? String == "Budget decision")
+        #expect(try JSONDecoder().decode(Note.self, from: JSONEncoder().encode(note)).bookmarks.map(\.label) == note.bookmarks.map(\.label))
     }
 }

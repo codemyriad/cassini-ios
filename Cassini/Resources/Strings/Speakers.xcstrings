@@ -592,6 +592,18 @@
         }
       }
     },
+    "From a newer Cassini": {
+      "comment": "A version made by a newer build of Cassini, of a kind this one does not know",
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Da una versione più recente di Cassini"
+          }
+        }
+      }
+    },
     "Future notes will name %@ automatically. The voiceprint never leaves this device.": {
       "extractionState": "manual",
       "localizations": {

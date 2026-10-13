@@ -157,6 +157,8 @@ enum SpeakersCopy {
                 String(localized: "Imported", table: "Speakers", comment: "A version from an imported Cassini document")
             }
         case .legacy(let name): name
+        case .unknown: String(localized: "From a newer Cassini", table: "Speakers",
+                              comment: "A version made by a newer build of Cassini, of a kind this one does not know")
         }
     }
 

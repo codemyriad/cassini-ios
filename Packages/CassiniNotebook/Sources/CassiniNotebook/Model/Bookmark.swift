@@ -26,11 +26,15 @@ extension Bookmark: Codable {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(id, forKey: .id)
         try c.encode(time, forKey: .time)
-        try c.encodeIfPresent(label, forKey: .label)
+        // Builds from before unlabelled moments require a label; they get the English default, which this build
+        // reads back as no label.
+        try c.encode(label ?? Self.legacyDefault, forKey: .label)
     }
+
+    static let legacyDefault = "Marked moment"
 
     /// Earlier builds stored the English default label ("Marked moment", "Moment at 1:05") on every bookmark.
     static func isLegacyDefault(_ label: String) -> Bool {
-        label == "Marked moment" || label.wholeMatch(of: /Moment at (\d+:)?\d{1,2}:\d{2}/) != nil
+        label == legacyDefault || label.wholeMatch(of: /Moment at (\d+:)?\d{1,2}:\d{2}/) != nil
     }
 }

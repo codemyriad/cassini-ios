@@ -30,8 +30,11 @@ public enum TranscriptVersionKind: Hashable, Sendable {
     case editedTranscript
     /// A variant of an imported Cassini document (its id is the version's `portableID`).
     case imported
-    /// A name an earlier build stored that is none of the above; shown as it is.
+    /// A name an earlier build stored that is none of the above; shown as it is and written back as a name.
     case legacy(String)
+    /// A code a newer build stored that this one does not know; written back as that code, so the newer build still
+    /// reads the kind.
+    case unknown(String)
 
     /// The stored codes; `legacy` stores its name instead.
     var code: String? {
@@ -46,7 +49,27 @@ public enum TranscriptVersionKind: Hashable, Sendable {
         case .editedPassages: "editedPassages"
         case .editedTranscript: "editedTranscript"
         case .imported: "imported"
+        case .unknown(let code): code
         case .legacy: nil
+        }
+    }
+
+    /// The English name earlier builds showed and stored for each kind. It is written beside the code so a note stays
+    /// readable by a build from before kinds (which requires a name); this build reads the code.
+    var legacyName: String {
+        switch self {
+        case .transcription: "On-device transcription"
+        case .previous: "Previous transcript"
+        case .beforeSpeakerMerge: "Before speaker merge"
+        case .mergedSpeakers: "Merged speakers"
+        case .beforeSpeakerAnalysis: "Before speaker analysis"
+        case .speakerAnalysis: "Speaker analysis"
+        case .beforePassageEdit: "Before passage edit"
+        case .editedPassages: "Edited passages"
+        case .editedTranscript: "Edited transcript"
+        case .imported: "Imported"
+        case .legacy(let name): name
+        case .unknown(let code): code
         }
     }
 
@@ -54,7 +77,7 @@ public enum TranscriptVersionKind: Hashable, Sendable {
                                                  .beforeSpeakerAnalysis, .speakerAnalysis, .beforePassageEdit,
                                                  .editedPassages, .editedTranscript, .imported]
 
-    init(code: String) { self = Self.coded.first { $0.code == code } ?? .legacy(code) }
+    init(code: String) { self = Self.coded.first { $0.code == code } ?? .unknown(code) }
 
     /// Earlier builds stored the English name each kind was shown with.
     init(legacyName name: String) {
@@ -94,10 +117,8 @@ extension TranscriptVersion: Codable {
     public func encode(to encoder: any Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(id, forKey: .id)
-        switch kind {
-        case .legacy(let name): try c.encode(name, forKey: .name)
-        default: try c.encodeIfPresent(kind.code, forKey: .kind)
-        }
+        try c.encodeIfPresent(kind.code, forKey: .kind)
+        try c.encode(kind.legacyName, forKey: .name)
         try c.encodeIfPresent(portableID, forKey: .portableID)
         try c.encode(createdAt, forKey: .createdAt)
         try c.encode(segments, forKey: .segments)
