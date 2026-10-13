@@ -38,10 +38,11 @@ struct ProcessingCard: View {
     @ViewBuilder private func running(_ phase: JobPhase) -> some View {
         switch phase {
         case .transcribing(let running, _):
-            ProgressCardContent(progress: running, stop: { processing.stop(note.id) })
+            ProgressCardContent(progress: running, stop: { processing.stop(note.id) }, cancelDownload: processing.cancelDownload)
         case .downloading(let download):
             Header(headline: ProgressText.downloadingModels, range: nil, percent: download?.percent)
             ProgressView(value: download.map { Double($0.percent) / 100 }).tint(.ember)
+            if let download { DownloadRow(download: download, cancel: processing.cancelDownload) }
             stopButton
             footnote
         case .stopping:
@@ -64,6 +65,7 @@ struct ProcessingCard: View {
 private struct ProgressCardContent: View {
     let progress: RunningProgress
     let stop: () -> Void
+    let cancelDownload: () -> Void
 
     var body: some View {
         let range = progress.rangeStartMs != 0 || progress.rangeEndMs != 0
@@ -73,8 +75,7 @@ private struct ProgressCardContent: View {
             .accessibilityHidden(true)
         StageTracker(step: progress.step, speakersSkipped: progress.speakersSkipped)
         if let download = progress.download {
-            Text("Downloading models — \(download.percent)%", tableName: "Processing")
-                .font(.caption).foregroundStyle(Color.muted)
+            DownloadRow(download: download, cancel: cancelDownload)
         } else {
             StatGrid(progress: progress)
         }
@@ -84,6 +85,19 @@ private struct ProgressCardContent: View {
         }
         StopButton(action: stop)
         Footnote()
+    }
+}
+
+/// The job's model download inside the card (Android's): DL_DOWNLOADING with the part and Cancel, then DL_CHECKING
+/// while the files are checked. Cancel stops the job and keeps the files fetched so far.
+private struct DownloadRow: View {
+    let download: DownloadProgress
+    let cancel: () -> Void
+
+    var body: some View {
+        Banner(spec: Notices.downloading(download)) { action in
+            if action == .cancel { cancel() }
+        }
     }
 }
 

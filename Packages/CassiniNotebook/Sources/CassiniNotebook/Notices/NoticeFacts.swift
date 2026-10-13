@@ -37,15 +37,18 @@ public enum ModelPart: String, Codable, CaseIterable, Hashable, Sendable {
 
 public struct DownloadFact: Hashable, Sendable {
     public var part: ModelPart
-    /// Download progress, or nil while checking.
+    /// Download progress, nil while unknown.
     public var fraction: Double?
+    /// The files are being checked ("Checking files").
+    public var checking: Bool
     public var failure: DownloadError?
     /// The free space the install's check asked for; "Free about N MB" when it failed with `notEnoughStorage`.
     public var requiredFreeBytes: Int64
     public var at: Date
-    public init(part: ModelPart, fraction: Double? = nil, failure: DownloadError? = nil, requiredFreeBytes: Int64 = 0,
-                at: Date) {
-        self.part = part; self.fraction = fraction; self.failure = failure; self.requiredFreeBytes = requiredFreeBytes
+    public init(part: ModelPart, fraction: Double? = nil, checking: Bool = false, failure: DownloadError? = nil,
+                requiredFreeBytes: Int64 = 0, at: Date) {
+        self.part = part; self.fraction = fraction; self.checking = checking; self.failure = failure
+        self.requiredFreeBytes = requiredFreeBytes
         self.at = at
     }
 }

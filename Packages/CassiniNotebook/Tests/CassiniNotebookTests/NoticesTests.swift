@@ -212,6 +212,26 @@ import CassiniNotebook
         #expect(compression?.dismissible == true)
     }
 
+    // ports: NoticesTest (Notices.downloading: DL_DOWNLOADING, or DL_CHECKING while the files are verified)
+    @Test func aDownloadShowsItsPartAndProgressAndThenTheCheck() {
+        let downloading = Notices.downloading(DownloadProgress(part: .speakers, doneBytes: 296, totalBytes: 640, verifying: false))
+        #expect(downloading == BannerSpec(.dlDownloading, BannerArgs(bytes: 296, bytes2: 640, percent: 46, part: .speakers)))
+        #expect(downloading.actions == [.cancel])
+        let checking = Notices.downloading(DownloadProgress(part: .speakers, doneBytes: 4, totalBytes: 5, verifying: true))
+        #expect(checking == BannerSpec(.dlChecking, BannerArgs(percent: 80)))
+        #expect(Notices.downloading(DownloadProgress(part: .speakers, doneBytes: 0, totalBytes: 0, verifying: true)).args.percent == nil,
+                "a check without a file count has no percentage")
+    }
+
+    @Test func aStandaloneInstallShowsInSettingsUntilItFails() {
+        let running = DownloadFact(part: .speech, fraction: 0.469, at: .distantPast)
+        #expect(only(Notices.settings(NoticeFacts(download: running))) == BannerSpec(.dlDownloading, BannerArgs(percent: 46, part: .speech)))
+        let checking = DownloadFact(part: .speakers, fraction: 1, checking: true, at: .distantPast)
+        #expect(only(Notices.settings(NoticeFacts(download: checking)))?.kind == .dlChecking)
+        let failed = DownloadFact(part: .speech, failure: .noConnection, at: .distantPast)
+        #expect(Notices.settings(NoticeFacts(download: failed)).isEmpty, "a failure shows in the Library only")
+    }
+
     // ports: NoticeCenterTest#everyAppEmittedRowIsProduced
     @Test func everyAppEmittedRowIsProduced() {
         let produced = Set(produceAll().map(\.kind))
@@ -221,7 +241,7 @@ import CassiniNotebook
                                            .trustNewerFormat, .plainAudio, .unplayable]
         let expected = Set(BannerKind.allCases.filter { $0.appEmitted }).subtracting(noteScreen)
         #expect(expected.subtracting(produced).isEmpty, "\(expected.subtracting(produced))")
-        let catalogueOnly: Set<BannerKind> = [.txCalculating, .txBattery, .dlDownloading, .dlChecking]
+        let catalogueOnly: Set<BannerKind> = [.txCalculating, .txBattery]
         #expect(produced.isDisjoint(with: catalogueOnly))
     }
 
@@ -284,6 +304,8 @@ import CassiniNotebook
         all += Notices.job(job(.failed, failure: .audio))
         all += Notices.job(nil, oneVoice: true)
         all += DownloadError.allCases.map { Notices.download($0) }
+        all.append(Notices.downloading(DownloadProgress(part: .speakers, doneBytes: 1, totalBytes: 2, verifying: false)))
+        all.append(Notices.downloading(DownloadProgress(part: .speakers, doneBytes: 1, totalBytes: 2, verifying: true)))
         return all
     }
 }
@@ -313,8 +335,9 @@ import CassiniNotebook
 @Suite struct BannerKindTests {
     // ports: BannerKindTest#flagsTonesAndGroups
     @Test func flagsTonesAndGroups() {
-        // Apple installs its speech assets without a size or a file check of Cassini's: no download progress banner.
-        #expect(Set(BannerKind.allCases.filter { !$0.appEmitted }) == [.txCalculating, .txBattery, .dlDownloading, .dlChecking])
+        #expect(Set(BannerKind.allCases.filter { !$0.appEmitted }) == [.txCalculating, .txBattery])
+        #expect(BannerKind.dlDownloading.actions == [.cancel])
+        #expect(BannerKind.dlChecking.actions.isEmpty)
         #expect(Set(BannerKind.allCases.filter(\.dismissible)) == [.recovered, .recCompressionFailed, .notesUnreadable])
         let counts = Dictionary(grouping: BannerKind.allCases, by: \.group).mapValues(\.count)
         // Android's groups less NO_ENCODER, TX_MEMORY, IMPORT_WAV and REC_STOPPED_FILE_LIMIT, plus the iOS kinds.

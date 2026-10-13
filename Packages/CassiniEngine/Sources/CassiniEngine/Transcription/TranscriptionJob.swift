@@ -250,8 +250,10 @@ public struct TranscriptionJob: TranscriptionJobRunning {
         let task = Task {
             try await analyzer.analyze(url: url, allowDownload: allowDownload) { event in
                 switch event {
-                case .preparingModels(let fraction):
+                case .preparingModels(.downloading(let fraction)):
                     events(.downloading(fraction.map(Self.fractionProgress(.speakers))))
+                case .preparingModels(.checking):
+                    events(.downloading(DownloadProgress(part: .speakers, doneBytes: 0, totalBytes: 0, verifying: true)))
                 case .analyzing(let fraction):
                     events(.stageChanged(.speakers, startMs: 0, endMs: Int64(Double(totalMs) * min(max(fraction, 0), 1))))
                 }

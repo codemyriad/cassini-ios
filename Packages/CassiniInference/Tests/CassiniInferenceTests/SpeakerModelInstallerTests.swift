@@ -141,14 +141,14 @@ import CassiniNotebook
         try? FileManager.default.removeItem(at: directory)
     }
 
-    @Test func theProgressReachesEveryCallerInTheOrderTheFetchSentIt() async throws {
+    @Test func theProgressReachesEveryCallerInTheOrderTheFetchSentItThenTheCheck() async throws {
         let fractions = (1...200).map { Double($0) / 200 }
         let fetch = GatedFetch(writes: Fixture.files, gated: false, fractions: fractions)
-        let seen = Mutex<[Double]>([])
-        try await makeInstaller(fetch).install(allowDownload: true) { fraction in
-            if let fraction { seen.withLock { $0.append(fraction) } }
+        let seen = Mutex<[InstallProgress]>([])
+        try await makeInstaller(fetch).install(allowDownload: true) { progress in
+            if progress != .downloading(nil) { seen.withLock { $0.append(progress) } }
         }
-        #expect(seen.withLock { $0 } == fractions + [1])
+        #expect(seen.withLock { $0 } == (fractions + [1]).map(InstallProgress.downloading) + [.checking])
         try? FileManager.default.removeItem(at: directory)
     }
 

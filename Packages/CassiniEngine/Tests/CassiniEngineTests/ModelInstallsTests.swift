@@ -270,7 +270,7 @@ private final class ScriptedAnalyzer: SpeakerAnalyzing {
     private struct State {
         var status: ModelPartStatus
         var installs = 0
-        var progress: (@Sendable (Double?) -> Void)?
+        var progress: (@Sendable (InstallProgress) -> Void)?
         var finish: CheckedContinuation<Void, Error>?
         var cancels = 0
     }
@@ -286,7 +286,9 @@ private final class ScriptedAnalyzer: SpeakerAnalyzing {
     var installs: Int { state.withLock { $0.installs } }
     var cancels: Int { state.withLock { $0.cancels } }
 
-    func report(_ fraction: Double) { state.withLock { $0.progress }?(fraction) }
+    func report(_ fraction: Double) { state.withLock { $0.progress }?(.downloading(fraction)) }
+
+    func reportChecking() { state.withLock { $0.progress }?(.checking) }
 
     func finish(with error: SpeakerAnalysisError?, status: ModelPartStatus) {
         let waiter = state.withLock { state in
@@ -308,7 +310,7 @@ private final class ScriptedAnalyzer: SpeakerAnalyzing {
 
     var modelInstallBytes: Int64 { 54_000_000 }
 
-    func installModels(progress: @escaping @Sendable (Double?) -> Void) async throws {
+    func installModels(progress: @escaping @Sendable (InstallProgress) -> Void) async throws {
         state.withLock { $0.installs += 1; $0.progress = progress }
         guard gated else { return }
         try await withCheckedThrowingContinuation { continuation in state.withLock { $0.finish = continuation } }

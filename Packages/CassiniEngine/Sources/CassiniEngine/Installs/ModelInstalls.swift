@@ -70,7 +70,7 @@ import CassiniNotebook
     public func status(of part: ModelPart) -> ModelPartStatus? {
         let part = part == .voices ? .speakers : part
         if let download, download.failure == nil, download.part == part {
-            return .downloading(download.fraction)
+            return download.checking ? .checking : .downloading(download.fraction)
         }
         if let failure = failures[part], stored[part] != .ready, part != .speech || speechFailureLanguage == language() {
             return .failed(failure)
@@ -198,14 +198,14 @@ import CassiniNotebook
 
     /// Installs one part for install `number`; its failure, or nil. A cancel is no failure.
     private func install(_ part: ModelPart, _ number: Int) async -> DownloadFact? {
-        let report: @Sendable (Double?) -> Void = { [weak self] fraction in
-            Task { @MainActor in self?.report(part, fraction, number) }
+        let report: @Sendable (InstallProgress) -> Void = { [weak self] progress in
+            Task { @MainActor in self?.report(part, progress, number) }
         }
         let language = language()
         do {
             switch part {
             case .speech:
-                try await transcriber.installAssets(locale: Locale(identifier: language)) { report($0) }
+                try await transcriber.installAssets(locale: Locale(identifier: language)) { report(.downloading($0)) }
             case .speakers, .voices:
                 try await analyzer.installModels(progress: report)
             }
@@ -221,9 +221,12 @@ import CassiniNotebook
         }
     }
 
-    private func report(_ part: ModelPart, _ fraction: Double?, _ number: Int) {
+    private func report(_ part: ModelPart, _ progress: InstallProgress, _ number: Int) {
         guard installNumber == number, inFlight == part, download?.part == part, download?.failure == nil else { return }
-        download = DownloadFact(part: part, fraction: fraction, at: clock.now)
+        switch progress {
+        case .downloading(let fraction): download = DownloadFact(part: part, fraction: fraction, at: clock.now)
+        case .checking: download = DownloadFact(part: part, fraction: download?.fraction, checking: true, at: clock.now)
+        }
     }
 
     /// Reads the models again when the speech language changes, and when the running job's model download ends.

@@ -706,7 +706,7 @@ private struct InstallFailingAnalyzer: SpeakerAnalyzing {
     var modelIdentity: String? { get async { nil } }
     func modelStatus() async -> ModelPartStatus { .notDownloaded }
     func refreshModelStatus() async -> ModelPartStatus { .notDownloaded }
-    func installModels(progress: @escaping @Sendable (Double?) -> Void) async throws { throw failure }
+    func installModels(progress: @escaping @Sendable (InstallProgress) -> Void) async throws { throw failure }
     func cancelModelInstall() async {}
     var modelInstallBytes: Int64 { 0 }
 }
@@ -720,7 +720,7 @@ private struct FailingAnalyzer: SpeakerAnalyzing {
     var modelIdentity: String? { get async { "m:1" } }
     func modelStatus() async -> ModelPartStatus { .ready }
     func refreshModelStatus() async -> ModelPartStatus { .ready }
-    func installModels(progress: @escaping @Sendable (Double?) -> Void) async throws {}
+    func installModels(progress: @escaping @Sendable (InstallProgress) -> Void) async throws {}
     func cancelModelInstall() async {}
     var modelInstallBytes: Int64 { 0 }
 }
