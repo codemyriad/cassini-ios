@@ -612,8 +612,8 @@ tier_changed() {
         ui="$ui $(ui_classes_for "$f")"
         case "$f" in Cassini/*|CassiniShared/*|CassiniTests/*|Packages/*/Sources/*|Sources/*|Package.*|project.yml) hosted=1 ;; esac
     done <<< "$files"
-    swift=$(echo $swift | tr ' ' '\n' | sort -u | tr '\n' ' ')
-    ui=$(echo $ui | tr ' ' '\n' | sort -u | tr '\n' ' ')
+    swift=$(printf '%s\n' $swift | sort -u | xargs)
+    ui=$(printf '%s\n' $ui | sort -u | xargs)
     echo "  swift test: ${swift:-nothing}"
     echo "  hosted tests: $( [ $hosted = 1 ] && echo yes || echo no)"
     echo "  UI test classes: ${ui:-none}"
