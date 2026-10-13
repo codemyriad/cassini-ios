@@ -28,6 +28,7 @@ import CassiniNotebook
         var processing: ProcessingStore
         var playback: PlaybackStore
         var settings: SettingsStore
+        var notices: NoticeCenter
         var router: Router
         var ready: @MainActor () async -> Void
     }
@@ -46,7 +47,7 @@ import CassiniNotebook
         screen = RecordingScreenModel(controller: controller, ports: .init(
             permission: environment.microphone,
             modelsMissing: { await transcriber.assetStatus(locale: Locale(identifier: settings.speechLanguage)) != .ready },
-            notifier: environment.notifier, settings: settings))
+            askNotificationsOnce: { [notices = parts.notices] in await notices.askNotificationsOnce() }))
         recovery = CaptureRecovery(audio: environment.audio, repairer: CAFCaptureRepairer(), clock: environment.clock,
                                    recoveredTitle: { RecordingCopy.recoveredTitle(RecordingTitles.day($0, locale: locale, timeZone: timeZone)) })
         screen.onEffect = { [weak self] in self?.perform($0) }

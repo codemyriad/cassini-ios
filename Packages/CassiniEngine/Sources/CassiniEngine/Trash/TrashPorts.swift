@@ -12,6 +12,9 @@ import CassiniNotebook
     func delete(_ id: UUID) async throws
 }
 
+/// The Library's mirror is what Recently Deleted changes in the app.
+extension LibraryStore: TrashNotes {}
+
 /// What Recently Deleted asks of the transcription queue.
 @MainActor public protocol TrashQueue: AnyObject {
     /// A job runs for the note now: moving it asks first.

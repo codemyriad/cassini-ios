@@ -38,13 +38,14 @@ public final class RecordingScreenModel {
         public var permission: any MicrophonePermission
         /// Whether a part of the speech model is missing, so finishing without consent opens the model download.
         public var modelsMissing: @MainActor () async -> Bool
-        /// Asked once, at the first recording, for permission to tell about recordings that stopped on their own.
-        public var notifier: (any Notifier)?
-        public var settings: SettingsStore
+        /// At the first recording, asks once for permission to tell about recordings that stopped on their own
+        /// (`NoticeCenter.askNotificationsOnce`).
+        public var askNotificationsOnce: @MainActor () async -> Void
 
         public init(permission: any MicrophonePermission, modelsMissing: @escaping @MainActor () async -> Bool,
-                    notifier: (any Notifier)?, settings: SettingsStore) {
-            self.permission = permission; self.modelsMissing = modelsMissing; self.notifier = notifier; self.settings = settings
+                    askNotificationsOnce: @escaping @MainActor () async -> Void) {
+            self.permission = permission; self.modelsMissing = modelsMissing
+            self.askNotificationsOnce = askNotificationsOnce
         }
     }
 
@@ -149,10 +150,7 @@ public final class RecordingScreenModel {
             pendingStart = true
             permissionAnswered(granted: await ports.permission.request())
         }
-        if !ports.settings.notificationsAsked, let notifier = ports.notifier {
-            ports.settings.markNotificationsAsked()
-            await notifier.requestOnce()
-        }
+        await ports.askNotificationsOnce()
     }
 
     /// The answer to the system's microphone question.

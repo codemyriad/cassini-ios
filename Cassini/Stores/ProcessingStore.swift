@@ -19,21 +19,15 @@ import CassiniNotebook
     @ObservationIgnored let models: ModelInstalls
     @ObservationIgnored private let checkpoints: any CheckpointStoring
     @ObservationIgnored private let analyzer: any SpeakerAnalyzing
-    @ObservationIgnored private let library: LibraryStore
     @ObservationIgnored private let notices: NoticeCenter
-    /// Notes whose audio is still being written; they cannot be queued yet.
-    @ObservationIgnored private var finalizing: Set<UUID> = []
-    /// Notes waiting for their job to end on their way to Recently Deleted; they cannot be queued meanwhile.
-    @ObservationIgnored private var trashing: Set<UUID> = []
 
     init(coordinator: TranscriptionCoordinator?, progress: JobProgress, checkpoints: any CheckpointStoring,
-         models: ModelInstalls, analyzer: any SpeakerAnalyzing, library: LibraryStore, notices: NoticeCenter) {
+         models: ModelInstalls, analyzer: any SpeakerAnalyzing, notices: NoticeCenter) {
         self.coordinator = coordinator
         self.progress = progress
         self.checkpoints = checkpoints
         self.models = models
         self.analyzer = analyzer
-        self.library = library
         self.notices = notices
     }
 
@@ -41,15 +35,14 @@ import CassiniNotebook
 
     func speakerModelsReady() async -> Bool { await analyzer.modelStatus() == .ready }
 
-    func beginFinalizing(_ id: UUID) { finalizing.insert(id) }
-    func endFinalizing(_ id: UUID) { finalizing.remove(id) }
+    /// The recording's audio is being written, or is written (`TranscriptionCoordinator.beginFinalizing`).
+    func beginFinalizing(_ id: UUID) { coordinator?.beginFinalizing(id) }
+    func endFinalizing(_ id: UUID) { coordinator?.endFinalizing(id) }
 
     /// Transcribe, Transcribe again, Resume and Try again; see `TranscriptionCoordinator.transcribe`.
     @discardableResult
     func transcribe(_ id: UUID, kind: JobKind = .transcribe, origin: StartOrigin = .screen) async -> TranscribeOutcome {
         guard let coordinator else { return .refused(.noNote) }
-        if finalizing.contains(id) { return .refused(.recording) }
-        if trashing.contains(id) { return .refused(.trashed) }
         let outcome = await coordinator.transcribe(id, kind: kind, origin: origin)
         // The first Transcribe from the screen asks to notify the results; the queue does not wait for the answer.
         if origin == .screen { Task { [notices] in await notices.askNotificationsOnce() } }
@@ -64,7 +57,7 @@ import CassiniNotebook
     /// After a recording or an import is saved with Transcribe automatically on; see
     /// `TranscriptionCoordinator.handOff`.
     func handOff(_ id: UUID) async -> HandOff {
-        guard let coordinator, !finalizing.contains(id) else { return .audioOnly }
+        guard let coordinator else { return .audioOnly }
         return await coordinator.handOff(id)
     }
 
@@ -95,10 +88,8 @@ import CassiniNotebook
         dequeue(id)
     }
 
-    /// Remove from queue: the job goes, or is paused by the user when the note has saved progress. A recording whose
-    /// audio is still being written is not queued yet: it stays audio only.
+    /// Remove from queue (`TranscriptionCoordinator.dequeue`).
     func dequeue(_ id: UUID) {
-        if finalizing.contains(id) { library.update(id) { if $0.status == .queued { $0.status = .audioOnly } } }
         guard let coordinator else { return }
         Task { await coordinator.dequeue(id) }
     }
@@ -136,22 +127,10 @@ import CassiniNotebook
 
     // MARK: Recently Deleted
 
-    /// Moving to Recently Deleted: a running job stops and keeps its progress and a queued one leaves the queue (its
-    /// `work/` stays for Restore); nothing is said about the stop. Once the job has ended, `move` writes the trash with
-    /// the job the note keeps for Restore, as Android trashes a note only once its job has finished; until then the
-    /// note cannot be queued. When `move` fails the job is restored. Returns what `move` returned.
+    /// Moving to Recently Deleted (`TranscriptionCoordinator.trash(_:then:)`).
     func trash(_ id: UUID, then move: (TrashedJob?) -> Bool) async -> Bool {
         guard let coordinator else { return move(nil) }
-        trashing.insert(id)
-        defer { trashing.remove(id) }
-        let job = coordinator.moveToTrash(id)
-        await coordinator.waitForJob(of: id)
-        guard move(job) else {
-            // The note stays where it was: so does its job.
-            restore(id, trashedJob: job)
-            return false
-        }
-        return true
+        return await coordinator.trash(id, then: move)
     }
 
     func restore(_ id: UUID, trashedJob: TrashedJob?) {

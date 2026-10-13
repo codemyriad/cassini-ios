@@ -67,6 +67,11 @@ public final class TranscriptionCoordinator {
     /// Notes in Recently Deleted (read at launch, then kept in step by Trash and Restore). Their jobs never start or
     /// count as waiting, even before the note write lands.
     @ObservationIgnored var trashed: Set<UUID> = []
+    /// Notes whose recorded audio is still being written (`beginFinalizing`); they cannot be queued yet.
+    @ObservationIgnored var finalizing: Set<UUID> = []
+    /// Notes waiting for their job to end on their way to Recently Deleted (`trash(_:then:)`); they cannot be queued
+    /// meanwhile.
+    @ObservationIgnored var trashing: Set<UUID> = []
     @ObservationIgnored let log = Logger(subsystem: "app.codemyriad.cassini", category: "queue")
 
     /// How an interrupted job ends: `discard` (Start over) drops its work, `keep` pauses it with its progress, and
@@ -100,6 +105,7 @@ public final class TranscriptionCoordinator {
     /// when nothing holds it. Without consent the job becomes "Ready to transcribe" and nothing is downloaded.
     @discardableResult
     public func transcribe(_ noteID: UUID, kind: JobKind = .transcribe, origin: StartOrigin = .screen) async -> TranscribeOutcome {
+        if let refusal = admissionRefusal(noteID) { return .refused(refusal) }
         await readiness.wait()
         // A job asked to stop may still be ending: this request waits for its outcome, so that outcome never
         // overwrites it and the note is queued again once it has ended.
@@ -145,6 +151,7 @@ public final class TranscriptionCoordinator {
     /// "Remove from queue" on a queued note.
     @discardableResult
     public func dequeue(_ noteID: UUID) async -> DequeueOutcome {
+        await leaveQueuedWhileFinalizing(noteID)
         await readiness.wait()
         return await lock.run {
             guard await parts.jobs.job(noteID)?.state == .queued else { return .notQueued }

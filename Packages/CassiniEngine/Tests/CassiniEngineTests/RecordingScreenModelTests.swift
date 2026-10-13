@@ -18,13 +18,15 @@ import CassiniNotebook
         @MainActor init(consented: Bool = true, access: MicrophoneAccess = .granted, answer: Bool = true, notifier: Bool = true) throws {
             h = try RecordingHarness(consented: consented)
             permission = FakeMicrophonePermission(access: access, answer: answer)
+            h.notifier.setAuthorization(.notDetermined)
+            let center = NoticeCenter(settings: h.settings, notifier: h.notifier) { true }
             var screen: Screen?
             model = RecordingScreenModel(controller: h.controller, ports: .init(
                 permission: permission, modelsMissing: {
                     while screen?.lookupHeld == true { try? await Task.sleep(for: .milliseconds(5)) }
                     return screen?.missing ?? false
                 },
-                notifier: notifier ? h.notifier : nil, settings: h.settings))
+                askNotificationsOnce: { [center] in if notifier { await center.askNotificationsOnce() } }))
             screen = self
             model.onEffect = { [weak self] in self?.effects.append($0) }
         }
@@ -247,7 +249,7 @@ import CassiniNotebook
         h.controller.finish()
         guard case .ended(_, .saved) = try await h.awaitEnded() else { Issue.record("not saved"); return }
         let model = RecordingScreenModel(controller: h.controller, ports: .init(
-            permission: FakeMicrophonePermission(), modelsMissing: { false }, notifier: nil, settings: h.settings))
+            permission: FakeMicrophonePermission(), modelsMissing: { false }, askNotificationsOnce: {}))
         var effects: [RecordingEffect] = []
         model.onEffect = { effects.append($0) }
         await model.enter()

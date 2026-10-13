@@ -2,10 +2,8 @@ import Foundation
 import CassiniEngine
 import CassiniNotebook
 
-// What `TrashService` works over in the app: the Library's notes, the transcription queue, and the
-// recording, player, navigation and settings around a move.
-
-extension LibraryStore: TrashNotes {}
+// What `TrashService` works over in the app: the transcription queue, and the recording, player, navigation and
+// settings around a move. The Library's notes are `TrashNotes` in CassiniEngine.
 
 extension ProcessingStore: TrashQueue {
     func isRunning(_ noteID: UUID) -> Bool { state.isRunning(noteID) }

@@ -10,6 +10,7 @@ extension TranscriptionCoordinator {
     /// stays audio only. Audio longer than one transcription takes stays audio only too. The automatic request never
     /// clears a hold.
     public func handOff(_ noteID: UUID) async -> HandOff {
+        guard !finalizing.contains(noteID) else { return .audioOnly }
         await readiness.wait()
         guard let note = await parts.notes.note(noteID), note.duration <= Limits.maxTranscribeDuration else {
             return .audioOnly

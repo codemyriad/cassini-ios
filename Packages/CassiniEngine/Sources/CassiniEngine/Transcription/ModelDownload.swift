@@ -62,10 +62,9 @@ public struct ModelPlan: Hashable, Sendable {
     @discardableResult func transcribe(_ noteID: UUID) async -> TranscribeOutcome
     /// Downloads `parts` on their own, without a note.
     func downloadModels(_ parts: [ModelPart])
-    /// Notifications should be asked for now: never asked before, and not decided yet.
-    func shouldAskNotifications() async -> Bool
-    /// Asks for notifications once and waits for the answer; a denial blocks nothing.
-    func askNotifications() async
+    /// Asks for notifications once (`NoticeCenter.askNotificationsOnce`) and waits for the answer; a denial blocks
+    /// nothing.
+    func askNotificationsOnce() async
 }
 
 /// The model download screen ("Transcribe on this device"). With a note it offers "Download and transcribe" (for a
@@ -128,7 +127,7 @@ public final class ModelDownloadModel {
             return
         }
         noSpaceBytes = nil
-        if await ports.shouldAskNotifications() { await ports.askNotifications() }
+        await ports.askNotificationsOnce()
         ports.recordConsent(for: plan.missing)
         if let noteID { await ports.transcribe(noteID) } else { ports.downloadModels(plan.missing) }
         close()

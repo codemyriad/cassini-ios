@@ -10,7 +10,7 @@ import CassiniEngineTesting
     let suite: String
     let clock: FakeClock
     let background = FakeBackgroundRunner()
-    let notifier = FakeNotifier()
+    let notifier = FakeNotifier(auth: .notDetermined)
     let playback = FakePlayback(fileDuration: 2)
     let capture = FakeCapture()
     let microphone = FakeMicrophonePermission()

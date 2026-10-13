@@ -9,13 +9,13 @@ import CassiniNotebook
     private let transcriber: any Transcribing
     private let analyzer: any SpeakerAnalyzing
     private let storage: any StorageProbe
-    private let notifier: any Notifier
+    private let notices: NoticeCenter
     private let root: URL
 
     init(settings: SettingsStore, processing: ProcessingStore, transcriber: any Transcribing,
-         analyzer: any SpeakerAnalyzing, storage: any StorageProbe, notifier: any Notifier, root: URL) {
+         analyzer: any SpeakerAnalyzing, storage: any StorageProbe, notices: NoticeCenter, root: URL) {
         self.settings = settings; self.processing = processing; self.transcriber = transcriber
-        self.analyzer = analyzer; self.storage = storage; self.notifier = notifier; self.root = root
+        self.analyzer = analyzer; self.storage = storage; self.notices = notices; self.root = root
     }
 
     /// `ModelPlan.plan` over the speech assets of the chosen language and the speaker models' status, for the note's
@@ -47,14 +47,6 @@ import CassiniNotebook
         processing.models.install(parts)
     }
 
-    func shouldAskNotifications() async -> Bool {
-        guard !settings.notificationsAsked else { return false }
-        return await notifier.authorizationStatus() == .notDetermined
-    }
-
-    func askNotifications() async {
-        settings.markNotificationsAsked()
-        await notifier.requestOnce()
-    }
+    func askNotificationsOnce() async { await notices.askNotificationsOnce() }
 }
 

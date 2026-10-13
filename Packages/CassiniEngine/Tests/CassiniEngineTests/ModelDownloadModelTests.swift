@@ -24,8 +24,7 @@ import CassiniNotebook
         func recordDeclined() { declines += 1 }
         func transcribe(_ noteID: UUID) async -> TranscribeOutcome { transcribed.append(noteID); return .queued(changed: true) }
         func downloadModels(_ parts: [ModelPart]) { downloads.append(parts) }
-        func shouldAskNotifications() async -> Bool { askNotifications && !notificationsAsked }
-        func askNotifications() async { notificationsAsked = true }
+        func askNotificationsOnce() async { if askNotifications { notificationsAsked = true } }
     }
 
     private let ports = FakePorts()

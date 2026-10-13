@@ -44,7 +44,7 @@ import CassiniNotebook
         processing = Self.processing(environment: environment, library: library, voices: voices, settings: settings,
                                      notices: noticeCenter)
         recording = RecordingStore(.init(environment: environment, library: library, processing: processing,
-                                         playback: playback, settings: settings, router: router,
+                                         playback: playback, settings: settings, notices: noticeCenter, router: router,
                                          ready: { [startup] in _ = await startup.ready() }))
         let importService = library.noteStore.map {
             ImportService(notes: $0, files: CoordinatedFileImporter(storage: environment.storage), audio: environment.audio,
@@ -66,7 +66,7 @@ import CassiniNotebook
                                        recording: recording, exports: exports, trash: trash, router: router, errors: errors)
         processing.modelDownload = ModelDownloadAdapter(
             settings: settings, processing: processing, transcriber: environment.transcriber,
-            analyzer: environment.analyzer, storage: environment.storage, notifier: environment.notifier,
+            analyzer: environment.analyzer, storage: environment.storage, notices: noticeCenter,
             root: environment.root)
         settingsPorts = SettingsAdapter(settings: settings, library: library, voices: voices, processing: processing,
                                         notices: noticeCenter, transcriber: environment.transcriber)
@@ -114,7 +114,7 @@ import CassiniNotebook
         let models = ModelInstalls(transcriber: environment.transcriber, analyzer: environment.analyzer,
                                    clock: environment.clock, job: progress) { [settings] in settings.speechLanguage }
         return ProcessingStore(coordinator: coordinator, progress: progress, checkpoints: checkpoints, models: models,
-                               analyzer: environment.analyzer, library: library, notices: notices)
+                               analyzer: environment.analyzer, notices: notices)
     }
 
     /// The Library over the notes, the queue and the recorder.

@@ -61,11 +61,13 @@ import CassiniNotebook
         speechReady = await speechModelReady()
     }
 
-    /// Asks for permission to notify the first time the user records, transcribes or downloads, and only then.
+    /// Asks for permission to notify the first time the user records, transcribes or downloads, and only then: never
+    /// asked before and not decided yet (Android: not granted and never asked). The one place this is asked; the
+    /// recording and model download screens call it too, so Settings and the banners follow the answer.
     public func askNotificationsOnce() async {
         guard !settings.notificationsAsked else { return }
         settings.markNotificationsAsked()
-        await notifier.requestOnce()
+        if await notifier.authorizationStatus() == .notDetermined { await notifier.requestOnce() }
         notificationsOff = await notifier.authorizationStatus() == .denied
     }
 
