@@ -284,7 +284,7 @@ final class CassiniUITests: XCTestCase {
         app.launchAndWait()
         let headline = app.descendants(matching: .any)["progressHeadline"]
         XCTAssertTrue(headline.waitForExistence(within: 15))
-        let frozen = NSPredicate(format: "label == %@", "Finding words, 60%")
+        let frozen = NSPredicate(format: "label == %@", "Finding words, 50%")
         XCTAssertTrue(headline.wait(until: frozen, within: 10), headline.label)
         XCTAssertTrue(app.buttons["Stop and keep progress"].exists)
         capture("Processing")

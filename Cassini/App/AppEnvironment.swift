@@ -105,7 +105,8 @@ extension AppEnvironment {
     /// the processing seed's job stays in its speech model download at 46 %, and with `draftGrowing` (`--draft-growing`)
     /// its draft grows by a sentence every half second. `heldCapture` (`--capture-held`) starts the recording seed's
     /// capture 24 minutes in and holds it after 7 s of speech-like levels, with 64 GiB free, for the screenshots. A second transcription of the same note hears other words
-    /// (`TestFixtures.transcribedAgainSegments`). Speaker models are installed on the recording seed only.
+    /// (`TestFixtures.transcribedAgainSegments`). Speaker models are installed on the recording and processing seeds
+    /// only; the processing seed's job has measured its pace, so its card shows a time left.
     /// Notifications are never asked for and count as allowed, so no banner says they are off, unless
     /// `notificationsDenied` (`--notifications-denied`) turns them off.
     static func uiTesting(reset: Bool, seed: Seed?, openFixture: OpenFixture? = nil,
@@ -123,7 +124,7 @@ extension AppEnvironment {
                             status: status)
         case .processing:
             FakeTranscriber(.frozen(done: 0.62 * TestFixtures.processingDuration, total: TestFixtures.processingDuration,
-                                    draft: TestFixtures.processingDraft), status: status)
+                                    draft: TestFixtures.processingDraft, pace: TestFixtures.processingPace), status: status)
         case .statuses:
             FakeTranscriber(.frozen(done: 0.62 * TestFixtures.processingDuration, total: TestFixtures.processingDuration),
                             status: status)
@@ -131,9 +132,13 @@ extension AppEnvironment {
             FakeTranscriber(.sequence([TestFixtures.transcribedSegments, TestFixtures.transcribedAgainSegments],
                                       total: TestFixtures.fixtureDuration), status: status)
         }
-        // The recording seed tells the speakers apart, as a walk from recording to naming needs.
-        let analyzer = seed == .recording ? FakeAnalyzer(analysis: TestFixtures.recordingAnalysis)
-            : FakeAnalyzer(modelIdentity: nil)
+        // The recording seed tells the speakers apart, as a walk from recording to naming needs; the processing seed's
+        // job has its speaker step ahead.
+        let analyzer = switch seed {
+        case .recording: FakeAnalyzer(analysis: TestFixtures.recordingAnalysis)
+        case .processing where !modelsMissing: FakeAnalyzer()
+        default: FakeAnalyzer(modelIdentity: nil)
+        }
         return AppEnvironment(
             root: root, defaults: defaults, clock: FixedClock(now: uiTestingNow),
             locale: Locale(identifier: region ?? "en_US"), timeZone: TimeZone(identifier: "UTC") ?? .gmt,

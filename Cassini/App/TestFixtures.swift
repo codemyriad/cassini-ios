@@ -18,6 +18,9 @@ enum TestFixtures {
     static let reviewID = UUID(uuidString: "33333333-3333-3333-3333-333333333333")!
     static let fixtureDuration: TimeInterval = 24
     static let processingDuration: TimeInterval = 48 * 60 + 13
+    /// The audio the processing seed's job transcribes between two results, 1.2 s apart: its card shows 1–2 minutes
+    /// left for the 18 minutes of audio still to go.
+    static let processingPace: TimeInterval = 10
     /// Where the recording seed's capture starts under `--capture-held`; it holds 7 s later, at 24:07.
     static let heldCaptureStart: TimeInterval = 24 * 60
     /// A waveform's worth (56 bars) of levels that rise and fall like speech, with two short pauses.
@@ -135,11 +138,12 @@ enum TestFixtures {
         if seed == .statuses { try await seedStatusJobs(into: store, now: now) }
     }
 
-    /// What a seed needs once the app is ready: consent and a running job for `processing`.
+    /// What a seed needs once the app is ready: consent and a running job for `processing`, whose speaker step is
+    /// ahead of it, and for `statuses`, whose job has none.
     @MainActor static func prepare(_ seed: AppEnvironment.Seed, settings: SettingsStore, processing: ProcessingStore) {
         guard seed == .processing || seed == .statuses else { return }
         settings.recordConsent()
-        settings.identifySpeakers = false
+        settings.identifySpeakers = seed == .processing
         Task {
             await processing.transcribe(processingID, origin: .screen)
             // The frozen job never ends, so this one stays queued behind it.
