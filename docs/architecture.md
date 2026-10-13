@@ -1,8 +1,8 @@
 # Architecture
 
-Cassini for iOS is a SwiftUI app over five Swift packages, plus a Debug-only module of fakes. The packages hold every rule that Android unit-tests, so
-`swift test` covers them on the Mac. The app target only composes the packages, adapts them to the device, and
-renders. [Differences from Android](differences.md) explains where the design departs from Android's and why.
+Cassini for iOS is a SwiftUI app over five Swift packages, plus a Debug-only module of fakes. The packages hold every
+rule that Android unit-tests, so `swift test` covers them on the Mac. The app target only composes the packages,
+adapts them to the device, and renders. [Differences from Android](differences.md) explains where the design departs from Android's and why.
 
 ## Modules
 
