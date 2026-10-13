@@ -159,7 +159,7 @@ import CassiniNotebook
 
     /// Saves the playback position and keeps the app awake until every pending write has landed.
     func enterBackground() {
-        let token = environment.background.begin(title: "Saving your recordings", progress: Progress(), onExpire: {})
+        let token = environment.background.begin(title: String(localized: "Saving your recordings", table: "Recording"), progress: Progress(), onExpire: {})
         playback.savePosition()
         Task { [playback, library, background = environment.background] in
             await playback.settle()

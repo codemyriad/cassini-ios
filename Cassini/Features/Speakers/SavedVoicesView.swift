@@ -19,7 +19,11 @@ struct SavedVoicesView: View {
     var body: some View {
         List {
             Section {
-                Label(SpeakersCopy.privacy, systemImage: "lock").font(.footnote).foregroundStyle(Color.muted)
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Image(systemName: "lock").accessibilityHidden(true)
+                    Text(SpeakersCopy.privacy).fixedSize(horizontal: false, vertical: true)
+                }
+                .font(.footnote).foregroundStyle(Color.muted)
             }
             if readOnly {
                 Section {
@@ -42,7 +46,7 @@ struct SavedVoicesView: View {
                         PersonRow(person: person, index: index, editable: !readOnly, send: send)
                     }
                 } footer: {
-                    if !readOnly { Text(SpeakersCopy.footnote) }
+                    if !readOnly { Text(SpeakersCopy.footnote).foregroundStyle(Color.muted) }
                 }
             }
             if people.isEmpty, !readOnly {
@@ -51,15 +55,18 @@ struct SavedVoicesView: View {
             if !people.isEmpty {
                 Section {
                     Button(SpeakersCopy.forgetEveryoneMore, role: .destructive) { send(.forgetEveryone) }
+                        .foregroundStyle(Color.toneError)
                         .disabled(readOnly)
                         .accessibilityIdentifier("forgetEveryone")
                 }
             } else if voices.offersForgetAllData {
                 Section {
                     Button(SpeakersCopy.forgetAllData, role: .destructive) { forgettingAllData = true }
-                } footer: { Text(SpeakersCopy.forgetAllDataBody) }
+                        .foregroundStyle(Color.toneError)
+                } footer: { Text(SpeakersCopy.forgetAllDataBody).foregroundStyle(Color.muted) }
             }
         }
+        .readableListWidth()
         .navigationTitle(SpeakersCopy.voices)
         .task { await voices.refresh() }
         .alert(SpeakersCopy.renameSaved, isPresented: presented(where: { if case .rename = $0 { true } else { false } })) {

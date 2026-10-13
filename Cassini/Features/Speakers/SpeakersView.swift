@@ -91,7 +91,7 @@ private struct SpeakerRow: View {
             SpeakerAvatar(speaker: speaker.name, ordinal: ordinal)
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
-                    Text(speaker.name).foregroundStyle(Color.ink)
+                    Text(NoteCopy.speakerLabel(speaker.name, id: speaker.id, ordinal: ordinal)).foregroundStyle(Color.ink)
                     if case .auto(let id, _) = speaker.match, let voice = voices.voice(id), NameMatch.same(voice.name, speaker.name) {
                         Text(SpeakersCopy.auto).font(.caption2.weight(.semibold)).foregroundStyle(Color.toneInfo)
                             .padding(.horizontal, 6).padding(.vertical, 2).background(Tone.info.background, in: Capsule())

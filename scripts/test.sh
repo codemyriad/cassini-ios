@@ -1,14 +1,15 @@
 #!/bin/bash
 # Runs Cassini's tests in tiers and prints how long each step took.
 #
-#   scripts/test.sh fast     Swift package tests (swift test)
+#   scripts/test.sh fast     the string catalog check (scripts/check-strings.sh), then the Swift package tests
 #   scripts/test.sh app      build for testing, then the hosted unit tests (CassiniTests)
 #   scripts/test.sh ui       build for testing, then the UI tests, sharded across simulator clones
-#   scripts/test.sh all      fast, app and ui (fast runs beside the build)
+#   scripts/test.sh all      fast, app and ui (the package tests run beside the build)
 #   scripts/test.sh changed [base]
 #                            only what the changes since base touch (default: where the branch left main, plus
-#                            uncommitted and untracked files): the package test targets, the hosted tests and the UI
-#                            test classes of the changed areas. For iterating; run all once before finishing.
+#                            uncommitted and untracked files): the string catalog check when a source or a catalog
+#                            changed, the package test targets, the hosted tests and the UI test classes of the
+#                            changed areas. For iterating; run all once before finishing.
 #   scripts/test.sh clean    shut down and delete this worktree's simulator clones
 #
 # Extra arguments after the tier go to every xcodebuild test run, e.g.
@@ -255,6 +256,12 @@ save_swiftpm() {
     mv "$tmp" "$shared" 2>/dev/null || rm -rf "$tmp"
 }
 
+check_strings() {
+    step_start "string catalogs"
+    run_logged "$logs/check-strings.log" "$root/scripts/check-strings.sh"
+    step_end
+}
+
 # swift test, filtered by $1 when given (a regular expression over Target.Suite/test).
 swift_test() {
     local filter="${1:-}"
@@ -265,6 +272,7 @@ swift_test() {
 }
 
 tier_fast() {
+    check_strings
     step_start "swift test${1:+ (filtered)}"
     swift_test "${1:-}"
     step_end
@@ -603,7 +611,7 @@ swift_targets_for() {
 
 tier_changed() {
     local base="${base_ref:-$(git -C "$root" merge-base HEAD main 2>/dev/null || echo HEAD)}"
-    local files f swift="" ui="" hosted=0
+    local files f swift="" ui="" hosted=0 strings=0
     files=$(changed_files "$base")
     echo "changes since $(git -C "$root" rev-parse --short "$base"): $(printf '%s\n' "$files" | grep -c . || true) file(s)"
     while IFS= read -r f; do
@@ -611,18 +619,21 @@ tier_changed() {
         swift="$swift $(swift_targets_for "$f")"
         ui="$ui $(ui_classes_for "$f")"
         case "$f" in Cassini/*|CassiniShared/*|CassiniTests/*|Packages/*/Sources/*|Sources/*|Package.*|project.yml) hosted=1 ;; esac
+        case "$f" in Cassini/*.swift|CassiniShared/*.swift|CassiniActivity/*.swift|Cassini/Resources/Strings/*.xcstrings) strings=1 ;; esac
     done <<< "$files"
     swift=$(printf '%s\n' $swift | sort -u | xargs)
     ui=$(printf '%s\n' $ui | sort -u | xargs)
     echo "  swift test: ${swift:-nothing}"
     echo "  hosted tests: $( [ $hosted = 1 ] && echo yes || echo no)"
     echo "  UI test classes: ${ui:-none}"
+    echo "  string catalogs: $( [ $strings = 1 ] && echo yes || echo no)"
 
     local filter=""
     case " $swift " in *" ALL "*) filter="" ;; *) filter=$(echo $swift | sed 's/ /|/g') ;; esac
     if [ -z "$swift" ] && [ $hosted = 0 ] && [ -z "$ui" ]; then echo "nothing to test"; return 0; fi
     if [ $hosted = 0 ] && [ -z "$ui" ]; then tier_fast "$filter"; return; fi
     start_first_boot
+    [ $strings = 1 ] && check_strings
     [ -n "$swift" ] && start_fast_beside "$filter"
     build_for_testing
     [ $hosted = 1 ] && tier_app
@@ -648,7 +659,7 @@ extra_xcodebuild_from_extra() {
 case "$tier" in
     clean) delete_clones; echo "deleted the $prefix-* clones"; exit 0 ;;
     fast|app|ui|all|changed) ;;
-    *) sed -n '2,35p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+    *) sed -n '2,36p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac
 
 extra_xcodebuild_from_extra
@@ -657,6 +668,6 @@ case "$tier" in
     fast) tier_fast ;;
     app)  start_first_boot; build_for_testing; tier_app ;;
     ui)   start_first_boot; build_for_testing; tier_ui ;;
-    all)  start_first_boot; start_fast_beside; build_for_testing; tier_app; tier_ui; wait_fast_beside ;;
+    all)  start_first_boot; check_strings; start_fast_beside; build_for_testing; tier_app; tier_ui; wait_fast_beside ;;
     changed) tier_changed ;;
 esac

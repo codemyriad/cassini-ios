@@ -44,7 +44,7 @@ public struct PortableExportService: Sendable {
             }
             try Task.checkCancellation()
             var current = note.versions?.first { $0.id == note.selectedVersionID }
-                ?? TranscriptVersion(name: "", segments: note.transcript, speakers: note.speakers ?? [])
+                ?? TranscriptVersion(kind: .editedTranscript, segments: note.transcript, speakers: note.speakers ?? [])
             current.segments = note.transcript
             _ = try await Self.seal(note, opus, output, Self.record(current, run, variants))
             return output

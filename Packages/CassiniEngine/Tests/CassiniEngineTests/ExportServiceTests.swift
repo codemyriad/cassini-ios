@@ -101,7 +101,7 @@ struct ExportServiceTests {
     @Test func aVersionExportsItsOwnTranscript() async throws {
         defer { try? FileManager.default.removeItem(at: base) }
         var note = transcribedNote()
-        let older = TranscriptVersion(name: "Before", segments: [TranscriptSegment(text: "Prima", start: 0, end: 1, speakerID: "S1")],
+        let older = TranscriptVersion(kind: .previous, segments: [TranscriptSegment(text: "Prima", start: 0, end: 1, speakerID: "S1")],
                                       speakers: [NoteSpeaker(id: "S1", name: "Giulia")])
         note.versions = [older]
         try await notes.save(note)

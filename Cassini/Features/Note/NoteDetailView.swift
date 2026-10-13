@@ -29,6 +29,8 @@ struct NoteDetailView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var screen: NoteScreenState
     @State private var sheet: NoteSheet?
+    /// The text typed so far into Name this speaker or Rename, kept with the open sheet.
+    @State private var sheetDraft: String?
     @State private var shareItem: ShareItem?
     @State private var exportingDocument = false
     @State private var showBookmarks = false
@@ -84,6 +86,8 @@ struct NoteDetailView: View {
         .onChange(of: screen.search?.query) { _, query in router.keepSearch(query, for: noteID) }
         .backButtonTitle(router.below(noteID: noteID) == .library ? NoteCopy.backToLibrary : nil)
         .sheet(item: $sheet, content: sheetContent)
+        .keepsNoteOverlay(noteID: noteID, note: note, readOnly: readOnly, sheet: $sheet, draft: $sheetDraft,
+                          dialog: $screen.dialog)
         .alert(dialogTitle, isPresented: dialogShown, presenting: screen.dialog, actions: dialogActions,
                message: dialogMessage)
         .shareSheet(item: $shareItem)
@@ -126,7 +130,7 @@ struct NoteDetailView: View {
                                 next: { screen.search?.next(of: matches.count) },
                                 close: { screen.closeSearch() })
                     .padding(.horizontal, Spacing.gutter).padding(.vertical, 8)
-                    .frame(maxWidth: ReadableWidth.note).frame(maxWidth: .infinity)
+                    .readableWidth()
                     .background(Color.paper)
             }
         }
@@ -173,7 +177,7 @@ struct NoteDetailView: View {
                                           position: $scrollPosition, suggestion: { suggestionCard($0, in: transcript) })
                     }
                 }
-                .padding(Spacing.gutter).frame(maxWidth: ReadableWidth.note).frame(maxWidth: .infinity)
+                .padding(Spacing.gutter).readableWidth()
             }
             .scrollPosition($scrollPosition)
             .onScrollGeometryChange(for: ScrollMetrics.self) { ScrollMetrics($0) } action: { _, metrics in
@@ -245,8 +249,7 @@ struct NoteDetailView: View {
             nameSpeaker: { run(screen.speakerTapped($0, readOnly: readOnly)) },
             editPassage: { run(screen.editPassage($0, readOnly: readOnly)) },
             markMoment: { time in
-                let bookmark = UUID()
-                library.update(noteID) { $0.addBookmark(at: time, id: bookmark) }
+                library.markMoment(noteID, at: time)
                 showBookmarks = true
             })
     }
@@ -294,7 +297,7 @@ struct NoteDetailView: View {
         guard let effect else { return }
         switch effect {
         case .seekAndPlay(let time): seek(time)
-        case .nameSpeaker(let id): sheet = .naming(id)
+        case .nameSpeaker(let id): sheet = .naming(id, draft: nil)
         case .openVersions: sheet = .versions
         case .openSpeakers: sheet = .speakers
         case .editPassage(let id):
@@ -314,7 +317,7 @@ struct NoteDetailView: View {
         case .toggleStar: library.update(noteID) { $0.isFavorite.toggle() }
         case .speakers: run(screen.speakersTapped(readOnly: readOnly))
         case .versions: run(screen.versionsTapped(readOnly: readOnly))
-        case .rename: sheet = .rename
+        case .rename: sheet = .rename(draft: nil)
         case .documentInfo: sheet = .documentInfo
         case .exportTranscript(let format): export(format)
         case .exportDocument: exportDocument()
@@ -366,7 +369,7 @@ struct NoteDetailView: View {
         exportingDocument = true
         Task {
             do { shareItem = exports.shareItem(try await exports.exportPortable(noteID)) }
-            catch { errors.present(error.localizedDescription) }
+            catch { errors.present(ExportCopy.notSaved) }
             exportingDocument = false
         }
     }
@@ -389,7 +392,7 @@ struct NoteDetailView: View {
         switch start {
         case .export(let format): export(format)
         case .documentInfo: sheet = .documentInfo
-        case .rename: sheet = .rename
+        case .rename: sheet = .rename(draft: nil)
         }
     }
 
@@ -397,11 +400,12 @@ struct NoteDetailView: View {
 
     @ViewBuilder private func sheetContent(_ sheet: NoteSheet) -> some View {
         switch sheet {
-        case .rename: RenameNoteDialog(noteID: noteID)
+        case .rename(let draft): RenameNoteDialog(noteID: noteID, draft: draft) { sheetDraft = $0 }
         case .speakers: SpeakersView(noteID: noteID)
         case .versions: TranscriptVersionsView(noteID: noteID)
         case .documentInfo: DocumentInfoSheet(noteID: noteID)
-        case .naming(let speakerID): NameSpeakerSheet(noteID: noteID, speakerID: speakerID)
+        case .naming(let speakerID, let draft):
+            NameSpeakerSheet(noteID: noteID, speakerID: speakerID, draft: draft) { sheetDraft = $0 }
         case .editing(let segment): SegmentEditor(noteID: noteID, segment: segment)
         }
     }
@@ -436,24 +440,6 @@ struct NoteDetailView: View {
         case .readOnly: EmptyView()
         case .startOver: Text(NoteCopy.startOverBody)
         case .transcribeFresh: Text(NoteCopy.freshBody)
-        }
-    }
-}
-
-/// A sheet over the Note screen.
-enum NoteSheet: Identifiable {
-    case rename, speakers, versions, documentInfo
-    case naming(String)
-    case editing(TranscriptSegment)
-
-    var id: String {
-        switch self {
-        case .rename: "rename"
-        case .speakers: "speakers"
-        case .versions: "versions"
-        case .documentInfo: "documentInfo"
-        case .naming(let id): "naming-\(id)"
-        case .editing(let segment): "editing-\(segment.id)"
         }
     }
 }

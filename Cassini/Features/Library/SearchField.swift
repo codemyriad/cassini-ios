@@ -5,12 +5,16 @@ import SwiftUI
 struct SearchField: View {
     @Binding var query: String
     @FocusState private var focused: Bool
+    @Environment(\.dynamicTypeSize) private var dynamicType
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass").foregroundStyle(Color.muted).accessibilityHidden(true)
-                TextField(LibraryCopy.searchPlaceholder, text: $query)
+                // At accessibility sizes the long placeholder would be cut; "Search" says enough.
+                TextField(dynamicType.isAccessibilitySize ? LibraryCopy.searchPlaceholderShort : LibraryCopy.searchPlaceholder,
+                          text: $query, axis: .vertical)
+                    .lineLimit(1...3)
                     .font(.body).autocorrectionDisabled().textInputAutocapitalization(.never)
                     .submitLabel(.search).focused($focused).onSubmit { focused = false }
                     .accessibilityIdentifier("librarySearch")

@@ -25,7 +25,7 @@ struct ProcessingBody<Top: View, Banners: View>: View {
             if pinned {
                 topContent
                     .padding(.horizontal, Spacing.gutter).padding(.top, Spacing.gutter).padding(.bottom, Spacing.tight)
-                    .frame(maxWidth: ReadableWidth.note).frame(maxWidth: .infinity)
+                    .readableWidth()
             }
             ScrollView {
                 VStack(alignment: .leading, spacing: Spacing.section) {
@@ -34,7 +34,7 @@ struct ProcessingBody<Top: View, Banners: View>: View {
                     RunningDraft(noteID: noteID, cache: cache)
                 }
                 .padding(.horizontal, Spacing.gutter).padding(.top, pinned ? 0 : Spacing.gutter).padding(.bottom, Spacing.gutter)
-                .frame(maxWidth: ReadableWidth.note).frame(maxWidth: .infinity)
+                .readableWidth()
             }
             .scrollPosition($position)
             .onScrollGeometryChange(for: Bool.self) { geometry in

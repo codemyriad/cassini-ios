@@ -5,9 +5,12 @@ import CassiniNotebook
 /// Rename, from the Library and from the note screen alike (Android uses one Rename dialog for both): the field stops
 /// at the 200-character limit, a blank title says "Enter a title.", and Save, which stores the trimmed title
 /// (`LibraryScreenModel.rename`), is on only when the title changed. A sheet rather than Android's alert, so the
-/// blank-title error can sit under the field.
+/// blank-title error can sit under the field. The screen that opens it keeps the title being typed (`titleChanged`) and
+/// hands it back as `draft` when the sheet opens again after Cassini was closed.
 struct RenameNoteDialog: View {
     let noteID: UUID
+    var draft: String?
+    var titleChanged: (String) -> Void = { _ in }
     @Environment(LibraryStore.self) private var library
     @Environment(LibraryScreenModel.self) private var model
     @Environment(\.dismiss) private var dismiss
@@ -26,6 +29,7 @@ struct RenameNoteDialog: View {
                         .focused($focused).submitLabel(.done).onSubmit(save)
                         .onChange(of: title) { _, text in
                             if text.count > NoteTitles.maxLength { title = String(text.prefix(NoteTitles.maxLength)) }
+                            else { titleChanged(text) }
                         }
                         .accessibilityIdentifier("renameField")
                 } footer: {
@@ -43,7 +47,7 @@ struct RenameNoteDialog: View {
         .presentationDetents([.medium]).presentationDragIndicator(.visible)
         .onAppear {
             original = library.note(noteID)?.title ?? ""
-            title = original
+            title = draft ?? original
             focused = true
         }
     }

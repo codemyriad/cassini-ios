@@ -45,7 +45,7 @@ struct NoteRow: View {
             titleLayout {
                 let titleFont = Font.system(.title3, design: .serif, weight: .medium)
                 Text(HighlightedText.attributed(Highlighted(row.title, ranges: row.titleRanges), font: titleFont))
-                    .font(titleFont).foregroundStyle(Color.ink).lineLimit(2)
+                    .font(titleFont).foregroundStyle(Color.ink).lineLimit(dynamicType.isAccessibilitySize ? nil : 2)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .passive()
                 HStack(spacing: 6) {
@@ -54,8 +54,9 @@ struct NoteRow: View {
                 }.fixedSize().passive()
             }
             if let preview = row.preview {
+                // An excerpt by design, two lines as on Android.
                 Text(HighlightedText.attributed(preview, font: .subheadline)).font(.subheadline).foregroundStyle(Color.muted)
-                    .lineLimit(2).passive()
+                    .lineLimit(2).accessibilityIdentifier("rowPreview").passive()
             }
             FlowLayout(spacing: 8) {
                 Text(row.day.map { format.dayTime($0, row.createdAt) } ?? format.time(row.createdAt))
@@ -63,7 +64,7 @@ struct NoteRow: View {
                 RowChip(status: row.status).passive()
                 suffix
                 if row.bookmarkCount > 0 {
-                    Label("\(row.bookmarkCount)", systemImage: "bookmark.fill").font(.caption2).foregroundStyle(Color.muted).passive()
+                    Label { Text(row.bookmarkCount, format: .number) } icon: { Image(systemName: "bookmark.fill") }.font(.caption).foregroundStyle(Color.muted).passive()
                 }
             }
         }

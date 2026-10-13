@@ -65,8 +65,26 @@ enum NoteCopy {
     static let followPlayback = String(localized: "Follow playback", table: "Note")
     static let editPassage = String(localized: "Edit passage", table: "Note")
     static let markThisMoment = String(localized: "Mark this moment", table: "Note")
+
+    // MARK: Bookmarks (an iOS extra)
+
+    static func markedMoments(_ count: Int) -> String {
+        String(localized: "\(count) marked moments", table: "Note", comment: "The bookmarks section of a note: 3 marked moments")
+    }
+    static let removeBookmark = String(localized: "Remove bookmark", table: "Note")
+    /// The user's label, or "Moment at 01:05" for a moment marked without one.
+    static func bookmarkLabel(_ bookmark: Bookmark) -> String {
+        bookmark.label ?? String(localized: "Moment at \(TimeText.clock(bookmark.time))", table: "Note",
+                                 comment: "A bookmark without a label of its own, named by its time")
+    }
     static let copyText = String(localized: "Copy text", table: "Note")
     static let unknownSpeaker = String(localized: "Unknown speaker", table: "Note", comment: "A passage without a speaker")
+
+    /// A speaker's stored label as every screen shows it: a placeholder ("Speaker 2", which a note may hold in English
+    /// or Italian) in the reader's language, "Speaker `ordinal + 1`" for a blank one, any other label as it is.
+    static func speakerLabel(_ label: String, id: String, ordinal: Int) -> String {
+        speakerName(NoteTranscripts.name(label: label, id: id, ordinal: ordinal))
+    }
 
     static func speakerName(_ name: SpeakerName) -> String {
         switch name {

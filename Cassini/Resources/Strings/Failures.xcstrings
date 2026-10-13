@@ -12,7 +12,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Il modello vocale di Apple sul dispositivo non supporta questa lingua. Scegli un’altra lingua in Impostazioni."
           }
         }
@@ -46,8 +46,19 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Impossibile leggere l’audio. Il file originale è stato conservato."
+          }
+        }
+      }
+    },
+    "Could not save changes: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossibile salvare le modifiche: %@"
           }
         }
       }
@@ -114,7 +125,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Non sono state rilevate voci. Puoi assegnare i passaggi a mano."
           }
         }
@@ -131,7 +142,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "In questa registrazione non è stato trovato parlato."
           }
         }
@@ -154,6 +165,17 @@
         }
       }
     },
+    "OK": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OK"
+          }
+        }
+      }
+    },
     "On-device transcription is unavailable on this device. Your audio can still be played or exported.": {
       "extractionState": "manual",
       "localizations": {
@@ -165,8 +187,20 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "La trascrizione non è disponibile su questo dispositivo. Puoi comunque ascoltare o esportare l’audio."
+          }
+        }
+      }
+    },
+    "Open settings": {
+      "comment": "Opens this app's page in Settings",
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apri le impostazioni"
           }
         }
       }
@@ -216,8 +250,20 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "I progressi salvati non corrispondono più all’audio. Ricomincia per trascriverlo di nuovo."
+          }
+        }
+      }
+    },
+    "Something needs attention": {
+      "comment": "Title of an app-wide error alert",
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Qualcosa richiede attenzione"
           }
         }
       }
@@ -250,7 +296,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "L’analisi delle voci non è terminata. La trascrizione è salvata. Puoi riprovare da Voci."
           }
         }
@@ -284,7 +330,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Il sistema non può riservare un’altra lingua vocale. Prova una lingua già installata su questo dispositivo."
           }
         }
@@ -301,7 +347,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Impossibile salvare la trascrizione."
           }
         }
@@ -318,7 +364,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Impossibile aprire l’audio. Prova M4A, WAV, MP3, AIFF o CAF."
           }
         }
@@ -335,7 +381,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Questo dispositivo non può riprodurre il contenitore Opus importato. La trascrizione verificata è disponibile e il documento Cassini originale è conservato per la condivisione."
           }
         }
@@ -369,8 +415,8 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Questo documento non può ricevere una nuova trascrizione."
+            "state": "translated",
+            "value": "Questo documento non può avere una nuova trascrizione."
           }
         }
       }
@@ -409,6 +455,17 @@
         }
       }
     },
+    "This note’s details are not supported or are damaged. Its files have been kept.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I dettagli di questa nota non sono supportati o sono danneggiati. I suoi file sono stati conservati."
+          }
+        }
+      }
+    },
     "This recording is too long to transcribe on this device.": {
       "extractionState": "manual",
       "localizations": {
@@ -420,7 +477,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Questa registrazione è troppo lunga da trascrivere su questo dispositivo."
           }
         }
@@ -437,7 +494,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Questa registrazione è troppo breve da trascrivere."
           }
         }
@@ -454,8 +511,8 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "La trascrizione è stata interrotta. Tieni Cassini aperta, poi tocca Trascrivi per ricominciare."
+            "state": "translated",
+            "value": "La trascrizione è stata interrotta. Tieni aperto Cassini, poi tocca Trascrivi per ricominciare."
           }
         }
       }
@@ -471,7 +528,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Usa un WAV PCM a 16 bit, oppure M4A, MP3, AIFF o CAF."
           }
         }
@@ -505,7 +562,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Lo spazio sul dispositivo sta finendo. Libera spazio e riprova."
           }
         }

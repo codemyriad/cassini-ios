@@ -33,18 +33,13 @@ public enum PassageEdit: Hashable, Sendable {
 }
 
 extension Note {
-    /// The name of the version a passage edit keeps of the transcript before it, when no kept version holds it.
-    public static let beforePassageEditName = "Before passage edit"
-    /// The name of the version that holds a run of passage edits.
-    public static let editedVersionName = "Edited passages"
-
     /// Whether the transcript still holds `original` as it was.
     public func holds(_ original: TranscriptSegment) -> Bool { transcript.contains(original) }
 
     /// Replaces `original` with `revised` when the transcript still holds it unchanged.
     ///
     /// A run of edits keeps one version: the first edit keeps the transcript before it (unless a kept version holds it
-    /// already) and adds an "Edited passages" version, which is then shown; later edits change that version in place,
+    /// already) and adds an `editedPassages` version, which is then shown; later edits change that version in place,
     /// so twenty typo fixes add one copy of the transcript, not twenty. Both versions are stamped, so a rerun keeps the
     /// same ones. The edited version keeps the merge of the version it was made from (`saveCurrentVersion`).
     @discardableResult
@@ -57,18 +52,18 @@ extension Note {
             versions?[edited].segments = transcript
             return .saved
         }
-        saveCurrentVersion(name: Self.beforePassageEditName, id: stamp.before, date: stamp.date)
+        saveCurrentVersion(.beforePassageEdit, id: stamp.before, date: stamp.date)
         let base = selectedVersionID
         transcript[index] = revised
         selectedVersionID = nil
-        saveCurrentVersion(name: Self.editedVersionName, id: stamp.after, date: stamp.date, editedFrom: base)
+        saveCurrentVersion(.editedPassages, id: stamp.after, date: stamp.date, editedFrom: base)
         return .saved
     }
 
     /// The index of the shown version when it is a run of passage edits that holds the transcript as it is. Naming
     /// and matching speakers keep it holding the transcript (see `changeShownSpeakers`), so they do not end the run.
     private var shownEditedVersionIndex: Int? {
-        guard let index = shownVersionIndex, versions?[index].name == Self.editedVersionName else { return nil }
+        guard let index = shownVersionIndex, versions?[index].kind == .editedPassages else { return nil }
         return index
     }
 }

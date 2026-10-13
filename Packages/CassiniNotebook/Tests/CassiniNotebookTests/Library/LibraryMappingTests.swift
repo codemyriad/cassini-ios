@@ -152,10 +152,10 @@ struct LibraryMappingTests {
     @Test func aStalePreviewFollowsTheSelectedVersion() throws {
         var note = transcribed("t", speakers: 1)
         note.transcript = [TranscriptSegment(text: "First take of the meeting.", start: 0, end: 2)]
-        note.saveCurrentVersion(name: "First")
+        note.saveCurrentVersion(.transcription)
         let first = try #require(note.selectedVersionID)
         note.transcript = [TranscriptSegment(text: "Second take, transcribed again.", start: 0, end: 2)]
-        note.saveCurrentVersion(name: "Second")
+        note.saveCurrentVersion(.speakerAnalysis)
         note.previewText = PreviewText.of(note.transcript.flatMap(PreviewWord.of), positionMs: 0)?.display
         var index = LibraryIndex([note])
         #expect(index.entries[0].preview?.text == "Second take, transcribed again.")

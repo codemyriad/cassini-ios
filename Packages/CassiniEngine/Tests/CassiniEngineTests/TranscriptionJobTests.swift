@@ -22,7 +22,7 @@ import CassiniNotebook
         #expect(closed > events.lastIndex { $0.checkpointed != nil }!)
         let note = try #require(await h.note())
         #expect(note.transcript.flatMap(\.draftWords).map(\.text) == (0..<70).map { "w\($0)" })
-        #expect(note.versions?.last?.name == "On-device transcription")
+        #expect(note.versions?.last?.kind == .transcription)
         #expect(h.provenance(of: note)?.engine == "apple-speechtranscriber")
         #expect(h.applied.count == 1)
         #expect(!h.files.exists(h.noteID), "the work is removed once the note is saved")
@@ -484,7 +484,7 @@ import CassiniNotebook
         _ = try await h.notes.mutate(h.noteID) { $0.transcript = imported }
         #expect(await h.run().outcome == .done)
         let note = try #require(await h.note())
-        #expect(note.versions?.map(\.name) == ["Previous transcript", "On-device transcription"])
+        #expect(note.versions?.map(\.kind) == [.previous, .transcription])
         #expect(h.provenance(of: note)?.engine == "apple-speechtranscriber")
 
         let previous = try #require(note.versions?.first?.id), current = try #require(note.versions?.last?.id)

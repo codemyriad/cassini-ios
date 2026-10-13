@@ -40,7 +40,7 @@ import CassiniNotebook
     /// A Cassini document of the note's audio with every local transcript version added to it.
     func exportPortable(_ id: UUID) async throws -> URL {
         await ready()
-        await library.commit(id) { $0.saveCurrentVersion(name: "Edited transcript") }
+        await library.commit(id) { $0.saveCurrentVersion(.editedTranscript) }
         guard let service, let portable, let note = library.note(id), let original = library.originalAudioURL(note),
               let audio = library.audioURL(note) else {
             throw CocoaError(.fileReadNoSuchFile)

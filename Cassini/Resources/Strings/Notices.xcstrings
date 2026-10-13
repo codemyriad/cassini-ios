@@ -460,7 +460,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Cassini si è chiusa durante la trascrizione di %@."
+            "value": "Cassini si è chiuso durante la trascrizione di %@."
           }
         }
       }
@@ -477,7 +477,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Cassini si è chiusa durante la trascrizione di una nota."
+            "value": "Cassini si è chiuso durante la trascrizione di una nota."
           }
         }
       }
@@ -1718,23 +1718,6 @@
         }
       }
     },
-    "Start over?": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Start over?"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ricominciare?"
-          }
-        }
-      }
-    },
     "Stopped — storage almost full": {
       "extractionState": "manual",
       "localizations": {
@@ -1816,23 +1799,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Il download era danneggiato ed è stato scartato."
-          }
-        }
-      }
-    },
-    "The draft so far is discarded. Your recording is kept.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The draft so far is discarded. Your recording is kept."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "La bozza fin qui viene scartata. La registrazione resta."
           }
         }
       }

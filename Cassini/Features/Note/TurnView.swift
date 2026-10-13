@@ -131,7 +131,7 @@ struct TurnView: View, Equatable {
         case .draft:
             if let from = turn.unsettledFrom, turn.words.indices.contains(from),
                let rest = range(turn.offsets[from]..<turn.text.count) {
-                result[rest].foregroundColor = Color.muted.opacity(0.6)
+                result[rest].foregroundColor = Color.faint
             }
         }
         for match in matches {

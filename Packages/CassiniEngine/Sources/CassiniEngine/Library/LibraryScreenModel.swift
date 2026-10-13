@@ -2,8 +2,9 @@ import Foundation
 import Observation
 import CassiniNotebook
 
-/// A confirmation or form the Library opens over itself (Android `LibraryDialog`).
-public enum LibraryDialog: Identifiable, Hashable, Sendable {
+/// A confirmation or form the Library opens over itself (Android `LibraryDialog`). `Codable`, so the Library keeps the
+/// open one with the scene and it comes back after Cassini was closed.
+public enum LibraryDialog: Identifiable, Hashable, Codable, Sendable {
     case rename(UUID)
     /// "Start over?": the saved progress goes.
     case startOver(UUID)
@@ -11,6 +12,41 @@ public enum LibraryDialog: Identifiable, Hashable, Sendable {
     case transcribeFresh(UUID)
 
     public var id: Self { self }
+
+    public var noteID: UUID {
+        switch self {
+        case .rename(let id), .startOver(let id), .transcribeFresh(let id): id
+        }
+    }
+
+    /// The dialog to open again after Cassini was closed: none once its note is gone or in Recently Deleted.
+    public func restorable(over notes: [Note]) -> LibraryDialog? {
+        notes.contains { $0.id == noteID && $0.trashedAt == nil } ? self : nil
+    }
+}
+
+/// The Library's open dialog as the scene keeps it, with the title typed so far into Rename.
+public struct SavedLibraryDialog: Codable, Hashable, Sendable {
+    public var dialog: LibraryDialog
+    public var draft: String?
+
+    public init(_ dialog: LibraryDialog, draft: String? = nil) {
+        self.dialog = dialog
+        if case .rename = dialog { self.draft = draft }
+    }
+
+    public var encoded: Data? { try? JSONEncoder().encode(self) }
+
+    public init?(_ data: Data?) {
+        guard let data, let saved = try? JSONDecoder().decode(Self.self, from: data) else { return nil }
+        self = saved
+    }
+
+    /// What opens again over `notes` (`LibraryDialog.restorable`), with its draft; nil once its note is gone, and
+    /// the screen then drops what it kept.
+    public func restored(over notes: [Note]) -> SavedLibraryDialog? {
+        dialog.restorable(over: notes).map { SavedLibraryDialog($0, draft: draft) }
+    }
 }
 
 /// A row of a note's actions menu (Android `NoteAction`, features.md section 6).

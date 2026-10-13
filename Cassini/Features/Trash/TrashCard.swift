@@ -36,8 +36,10 @@ struct TrashCard: View {
         }
         .buttonStyle(.bordered).buttonBorderShape(.capsule).tint(.ink)
         Button(role: .destructive, action: deleteNow) {
-            Text(TrashCopy.deleteNow).font(.subheadline.weight(.semibold)).padding(.horizontal, 14).frame(minHeight: HitTarget.minimum)
+            // The role's system red is too light on the card; ember keeps 4.5:1.
+            Text(TrashCopy.deleteNow).font(.subheadline.weight(.semibold)).foregroundStyle(Color.toneError)
+                .padding(.horizontal, 14).frame(minHeight: HitTarget.minimum)
         }
-        .buttonStyle(.borderless).tint(.ember)
+        .buttonStyle(.borderless)
     }
 }

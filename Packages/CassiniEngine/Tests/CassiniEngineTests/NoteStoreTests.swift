@@ -142,7 +142,7 @@ import CassiniNotebook
         let version = UUID(), date = Date(timeIntervalSince1970: 1_000)
         let named = NoteEdit(note) {
             $0.renameSpeaker("a", name: "Alex")
-            $0.saveCurrentVersion(name: "Named", id: version, date: date)
+            $0.saveCurrentVersion(.speakerAnalysis, id: version, date: date)
         }
         try await store.mutate(note.id) { $0.status = .ready; $0.failure = nil }
 

@@ -9,6 +9,7 @@ struct LibraryView: View {
     @Environment(LibraryScreenModel.self) private var model
     @Environment(NoticesStore.self) private var notices
     @Environment(ImportStore.self) private var imports
+    @Environment(LibraryStore.self) private var library
     @Environment(Router.self) private var router
     @Environment(ErrorPresenter.self) private var errors
     @Environment(\.dynamicTypeSize) private var dynamicType
@@ -16,8 +17,12 @@ struct LibraryView: View {
     @Environment(\.restoresSceneState) private var restoresSceneState
     @SceneStorage("library.query") private var savedQuery = ""
     @SceneStorage("library.favoritesOnly") private var savedFavoritesOnly = false
+    /// The open dialog (Rename, Start over?, Transcribe again?) and the title typed into Rename, kept with the scene.
+    @SceneStorage("library.dialog") private var savedDialog: Data?
+    @State private var renameDraft: String?
     @State private var importing = false
     @State private var restored = false
+    @State private var dialogRestored = false
 
     var body: some View {
         @Bindable var model = model
@@ -45,7 +50,7 @@ struct LibraryView: View {
                 }
             }
             .padding(.horizontal, Spacing.gutter).padding(.top, 12).padding(.bottom, 28)
-            .frame(maxWidth: ReadableWidth.library).frame(maxWidth: .infinity)
+            .readableWidth()
         }
         .scrollDismissesKeyboard(.immediately)
         .background(Color.paper)
@@ -57,6 +62,8 @@ struct LibraryView: View {
             ToolbarItem(placement: .topBarLeading) {
                 HStack(spacing: 8) { OrbitMark(size: 25); Text(verbatim: "cassini").font(.system(.title3, design: .rounded, weight: .semibold)).tracking(-0.6) }
                     .foregroundStyle(Color.ink).fixedSize().accessibilityElement(children: .combine).accessibilityLabel(Text(verbatim: "Cassini"))
+                    .accessibilityAddTraits(.isHeader).accessibilityShowsLargeContentViewer()
+                    .accessibilityIdentifier("wordmark")
             }.sharedBackgroundVisibility(.hidden)
             ToolbarItemGroup(placement: .topBarTrailing) {
                 Button(TrashCopy.title, systemImage: "trash") { router.show(.trash) }
@@ -66,6 +73,13 @@ struct LibraryView: View {
         .onAppear(perform: restoreSceneState)
         .onChange(of: model.query) { _, query in if restoresSceneState { savedQuery = query } }
         .onChange(of: model.favoritesOnly) { _, only in if restoresSceneState { savedFavoritesOnly = only } }
+        .onChange(of: model.dialog) { _, dialog in
+            if dialog == nil { renameDraft = nil }
+            keepDialog()
+        }
+        .onChange(of: renameDraft) { _, _ in keepDialog() }
+        // The dialog's note must be read first.
+        .task(id: library.isLoaded) { restoreDialog() }
         .task { await model.refreshSpeakerModels() }
         .fileImporter(isPresented: $importing, allowedContentTypes: ImportStore.contentTypes, allowsMultipleSelection: true) { result in
             switch result {
@@ -73,7 +87,7 @@ struct LibraryView: View {
             case .failure(let error): errors.present(error.localizedDescription)
             }
         }
-        .sheet(item: renaming) { RenameNoteDialog(noteID: $0.id) }
+        .sheet(item: renaming) { RenameNoteDialog(noteID: $0.id, draft: renameDraft) { renameDraft = $0 } }
         .alert(LibraryCopy.startOverTitle, isPresented: confirming(\.startOver), presenting: model.dialog) { dialog in
             Button(LibraryCopy.startOver, role: .destructive) { confirm(dialog) }
             Button(LibraryCopy.cancel, role: .cancel) {}
@@ -118,6 +132,7 @@ struct LibraryView: View {
                 .padding(.horizontal, 14).frame(minHeight: HitTarget.minimum)
                 .foregroundStyle(selected ? Color.paper : Color.muted)
                 .background(selected ? Color.ink : Color.clear, in: Capsule())
+                .contentShape(Capsule())
         }.buttonStyle(.plain).accessibilityAddTraits(selected ? .isSelected : [])
     }
 
@@ -141,6 +156,24 @@ struct LibraryView: View {
         restored = true
         model.query = savedQuery
         model.favoritesOnly = savedFavoritesOnly
+    }
+
+    /// Opens the dialog the scene kept, once the notes are read, unless its note has gone meanwhile.
+    private func restoreDialog() {
+        guard restoresSceneState, library.isLoaded, !dialogRestored else { return }
+        dialogRestored = true
+        guard model.dialog == nil else { return }
+        guard let kept = SavedLibraryDialog(savedDialog)?.restored(over: library.notes) else {
+            savedDialog = nil
+            return
+        }
+        renameDraft = kept.draft
+        model.dialog = kept.dialog
+    }
+
+    private func keepDialog() {
+        guard restoresSceneState, dialogRestored else { return }
+        savedDialog = model.dialog.flatMap { SavedLibraryDialog($0, draft: renameDraft).encoded }
     }
 
     private struct RenameTarget: Identifiable { let id: UUID }

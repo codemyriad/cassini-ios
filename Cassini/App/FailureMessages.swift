@@ -73,3 +73,15 @@ extension UnplayableReason {
         }
     }
 }
+
+/// Why something failed, as a sentence on screen: the packages' own errors from the Failures table, any other in the
+/// system's words (Foundation's errors are localized by the system).
+enum FailureReason {
+    static func of(_ error: any Error) -> String {
+        switch error {
+        case RepositoryError.invalidDocument:
+            String(localized: "This note’s details are not supported or are damaged. Its files have been kept.", table: "Failures")
+        default: error.localizedDescription
+        }
+    }
+}

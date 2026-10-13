@@ -419,6 +419,17 @@
         }
       }
     },
+    "Saving your recordings": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Salvataggio delle registrazioni"
+          }
+        }
+      }
+    },
     "Space for about %@ more.": {
       "extractionState": "manual",
       "localizations": {

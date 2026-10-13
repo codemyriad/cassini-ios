@@ -22,12 +22,12 @@ import CassiniNotebook
         anna.match = matchA
         note.speakers = [anna, NoteSpeaker(id: "old_b", name: "Speaker 2")]
         note.refreshSpeakerLabels()
-        note.saveCurrentVersion(name: "Previous transcript")
+        note.saveCurrentVersion(.previous)
         note.transcript = [TranscriptSegment(text: "Nuova prima", start: 0, end: 4),
                            TranscriptSegment(text: "Nuova seconda", start: 5, end: 9)]
         note.speakers = []
         note.selectedVersionID = nil
-        note.saveCurrentVersion(name: "Transcript")
+        note.saveCurrentVersion(.transcription)
         return note
     }
 

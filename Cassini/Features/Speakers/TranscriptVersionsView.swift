@@ -21,7 +21,7 @@ struct TranscriptVersionsView: View {
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(SpeakersCopy.version(index + 1)).foregroundStyle(Color.ink)
-                                Text(verbatim: "\(version.name) · \(version.createdAt.formatted(date: .abbreviated, time: .shortened))")
+                                Text(verbatim: "\(SpeakersCopy.versionKind(version)) · \(version.createdAt.formatted(date: .abbreviated, time: .shortened))")
                                     .font(.caption).foregroundStyle(Color.muted)
                             }
                             Spacer()

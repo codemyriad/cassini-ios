@@ -133,17 +133,6 @@
         }
       }
     },
-    "Downloading models — %lld%%": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Download dei modelli — %lld%%"
-          }
-        }
-      }
-    },
     "Finding speakers": {
       "extractionState": "manual",
       "localizations": {

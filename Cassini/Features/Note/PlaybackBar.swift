@@ -33,10 +33,15 @@ struct PlaybackBar: View {
             .accessibilityHidden(true)
             controls
         }
-        .dynamicTypeSize(...DynamicTypeSize.accessibility1).padding(.horizontal, Spacing.gutter).padding(.top, 12).padding(.bottom, 8)
-        .frame(maxWidth: ReadableWidth.note).frame(maxWidth: .infinity).background(.regularMaterial)
+        // Five buttons in a row: past AX1 they would not fit, so the bar stops growing there and shows the Large
+        // Content Viewer instead (Android keeps the skip digits' size too).
+        .dynamicTypeSize(...DynamicTypeSize.accessibility1).accessibilityShowsLargeContentViewer()
+        .padding(.horizontal, Spacing.gutter).padding(.top, 12).padding(.bottom, 8)
+        // Opaque, so its text keeps its contrast over the transcript scrolling under it.
+        .readableWidth().background(Color.paper).overlay(alignment: .top) { Divider() }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(Text("Playback", tableName: "Playback"))
+        .accessibilityIdentifier("playbackBar")
     }
 
     private var slider: some View {
@@ -74,6 +79,7 @@ struct PlaybackBar: View {
                 Text(verbatim: "\(playback.rate.formatted())×").font(.subheadline.weight(.semibold)).frame(width: 48, height: 48)
             }
             .accessibilityLabel(Text("Playback speed", tableName: "Playback"))
+            .accessibilityIdentifier("playbackSpeed")
             Spacer()
             Button { playback.skip(-PlaybackSkip.interval) } label: {
                 Image(systemName: "gobackward.10").font(.title2).frame(width: 52, height: 52)
@@ -92,8 +98,7 @@ struct PlaybackBar: View {
             .accessibilityLabel(Text("Forward 10 seconds", tableName: "Playback"))
             Spacer()
             Button {
-                let time = position, bookmark = UUID()
-                library.update(note.id) { $0.addBookmark(at: time, id: bookmark) }
+                library.markMoment(note.id, at: position)
                 addBookmark()
             } label: { Image(systemName: "bookmark").font(.title3).frame(width: 48, height: 48) }
             .accessibilityLabel(Text("Mark this moment", tableName: "Playback"))

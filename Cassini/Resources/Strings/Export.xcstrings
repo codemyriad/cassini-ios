@@ -44,6 +44,12 @@
         "it": {
           "variations": {
             "plural": {
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld voci"
+                }
+              },
               "one": {
                 "stringUnit": {
                   "state": "translated",

@@ -1,7 +1,7 @@
 import Foundation
 
 /// A question the Note screen asks before it acts, or a change it refuses.
-public enum NoteDialog: Hashable, Sendable {
+public enum NoteDialog: Codable, Hashable, Sendable {
     /// A rename, merge, version change or passage edit that `ReadOnlyReason` does not allow now.
     case readOnly(ReadOnlyReason)
     /// "Start over? The draft so far is discarded. Your recording is kept."

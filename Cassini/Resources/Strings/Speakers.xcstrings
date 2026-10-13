@@ -133,23 +133,6 @@
         }
       }
     },
-    "Allow & Identify": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Allow & Identify"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Consenti e riconosci"
-          }
-        }
-      }
-    },
     "Also rename the saved voice?": {
       "extractionState": "manual",
       "localizations": {
@@ -218,6 +201,39 @@
         }
       }
     },
+    "Before passage edit": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prima della modifica dei passaggi"
+          }
+        }
+      }
+    },
+    "Before speaker analysis": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prima dell’analisi delle voci"
+          }
+        }
+      }
+    },
+    "Before speaker merge": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prima dell’unione delle voci"
+          }
+        }
+      }
+    },
     "Cancel": {
       "extractionState": "manual",
       "localizations": {
@@ -248,23 +264,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Annulla l’analisi"
-          }
-        }
-      }
-    },
-    "Cassini downloads the speaker models once, several hundred MB. Audio and voiceprints stay on this device.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cassini downloads the speaker models once, several hundred MB. Audio and voiceprints stay on this device."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cassini scarica una volta i modelli delle voci, diverse centinaia di MB. L’audio e le impronte vocali restano su questo dispositivo."
           }
         }
       }
@@ -384,19 +383,24 @@
         }
       }
     },
-    "Download speaker models?": {
+    "Edited passages": {
       "extractionState": "manual",
       "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Download speaker models?"
-          }
-        },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Scaricare i modelli delle voci?"
+            "value": "Passaggi modificati"
+          }
+        }
+      }
+    },
+    "Edited transcript": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascrizione modificata"
           }
         }
       }
@@ -537,6 +541,18 @@
         }
       }
     },
+    "From a newer Cassini": {
+      "comment": "A version made by a newer build of Cassini, of a kind this one does not know",
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Da una versione più recente di Cassini"
+          }
+        }
+      }
+    },
     "Future notes will name %@ automatically. The voiceprint never leaves this device.": {
       "extractionState": "manual",
       "localizations": {
@@ -618,6 +634,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Riconosci le voci"
+          }
+        }
+      }
+    },
+    "Imported": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Importata"
+          }
+        }
+      }
+    },
+    "Imported · %@": {
+      "comment": "A version from an imported Cassini document, with its id",
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Importata · %@"
           }
         }
       }
@@ -860,23 +899,6 @@
         }
       }
     },
-    "Not now": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Not now"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Non ora"
-          }
-        }
-      }
-    },
     "OK": {
       "extractionState": "manual",
       "localizations": {
@@ -890,6 +912,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "OK"
+          }
+        }
+      }
+    },
+    "On-device transcription": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascrizione sul dispositivo"
           }
         }
       }
@@ -941,6 +974,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Riproduci un campione di questa voce"
+          }
+        }
+      }
+    },
+    "Previous transcript": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascrizione precedente"
           }
         }
       }
@@ -1183,6 +1227,17 @@
         }
       }
     },
+    "Speaker analysis": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Analisi delle voci"
+          }
+        }
+      }
+    },
     "Speaker analysis runs on this device and may take several minutes for a long recording. Names you gave stay available in Versions when you analyze again.": {
       "extractionState": "manual",
       "localizations": {
@@ -1213,6 +1268,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Voci"
+          }
+        }
+      }
+    },
+    "Speakers merged": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voci unite"
           }
         }
       }

@@ -27,7 +27,7 @@ struct RecordingView: View {
                     VStack(spacing: 28) {
                         RecordingTimer(elapsed: screen.elapsed)
                         RecordingWaveform(levels: screen.levels, isPaused: screen.phase != .recording)
-                        Text(caption).font(.subheadline).foregroundStyle(.white.opacity(0.62))
+                        Text(caption).font(.subheadline).foregroundStyle(Color.recordingSecondary)
                             .multilineTextAlignment(.center).frame(maxWidth: 300)
                     }
                     Spacer(minLength: 24)
@@ -43,13 +43,13 @@ struct RecordingView: View {
                                       library: screen.minimise, pauseOrResume: screen.pauseOrResume, finish: screen.finish)
                 }
                 .padding(.horizontal, 16).padding(.top, 16).padding(.bottom, 28)
-                .frame(maxWidth: ReadableWidth.recording, minHeight: geometry.size.height)
+                .frame(maxWidth: ReadableWidth.content, minHeight: geometry.size.height)
                 .frame(maxWidth: .infinity)
             }
             .scrollBounceBehavior(.basedOnSize)
         }
         .background(Color.recordingBackground.ignoresSafeArea())
-        .foregroundStyle(.white)
+        .foregroundStyle(Color.recordingText)
         .preferredColorScheme(.dark)
         .onAppear { screen.appeared() }
         .onChange(of: screen.phase) { old, new in
@@ -99,13 +99,14 @@ private struct RecordingStatus: View {
     var body: some View {
         HStack(spacing: 8) {
             Group {
-                if isPaused { Circle().strokeBorder(.white.opacity(0.62), lineWidth: 1.5) } else { Circle().fill(Color.recordingLive) }
+                if isPaused { Circle().strokeBorder(Color.recordingSecondary, lineWidth: 1.5) } else { Circle().fill(Color.recordingLive) }
             }
             .frame(width: 10, height: 10)
             Text(RecordingCopy.status(paused: isPaused)).font(.subheadline.weight(.semibold))
-                .foregroundStyle(isPaused ? .white.opacity(0.62) : Color.recordingAccent)
+                .foregroundStyle(isPaused ? Color.recordingSecondary : Color.recordingAccent)
         }
         .accessibilityElement(children: .ignore)
+        .accessibilityAddTraits(.isStaticText)
         .accessibilityLabel(Text("Recording status", tableName: "Recording"))
         .accessibilityValue(RecordingCopy.status(paused: isPaused))
     }
@@ -117,13 +118,14 @@ private struct RecordingTitleField: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Title", tableName: "Recording").font(.footnote).foregroundStyle(.white.opacity(0.62)).accessibilityHidden(true)
+            Text("Title", tableName: "Recording").font(.footnote).foregroundStyle(Color.recordingSecondary).accessibilityHidden(true)
             HStack(spacing: 8) {
-                TextField(String(localized: "Title", table: "Recording"), text: $title)
-                    .font(.system(.title2, design: .serif)).focused($focused).submitLabel(.done)
+                // Wraps rather than cutting a long title at large text sizes.
+                TextField(String(localized: "Title", table: "Recording"), text: $title, axis: .vertical)
+                    .lineLimit(1...3).font(.system(.title2, design: .serif)).focused($focused).submitLabel(.done)
                     .textInputAutocapitalization(.sentences).onSubmit { focused = false }
                     .accessibilityIdentifier("recordingTitle")
-                Image(systemName: "pencil").foregroundStyle(.white.opacity(0.62)).accessibilityHidden(true)
+                Image(systemName: "pencil").foregroundStyle(Color.recordingSecondary).accessibilityHidden(true)
             }
             .padding(.vertical, 4).padding(.bottom, 6)
             .overlay(alignment: .bottom) { Rectangle().fill(.white.opacity(0.18)).frame(height: 1) }
@@ -166,7 +168,7 @@ private struct RecordingControls: View {
                 }
             }
             .disabled(!capturing).opacity(capturing ? 1 : 0.38)
-            .accessibilityLabel(Text(isPaused ? "Resume recording" : "Pause recording", tableName: "Recording"))
+            .accessibilityLabel(isPaused ? Text("Resume recording", tableName: "Recording") : Text("Pause recording", tableName: "Recording"))
             .accessibilityIdentifier("pauseResumeRecording")
             .frame(maxWidth: .infinity)
             LabelledCircle(label: Text("Finish", tableName: "Recording"), action: finish) {

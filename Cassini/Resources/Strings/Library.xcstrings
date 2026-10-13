@@ -229,6 +229,18 @@
         }
       }
     },
+    "Choose a recording": {
+      "comment": "The detail column of the split view before a note is open",
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scegli una registrazione"
+          }
+        }
+      }
+    },
     "Clear search": {
       "comment": "Library search field clear button",
       "extractionState": "manual",
@@ -589,6 +601,17 @@
         }
       }
     },
+    "Pick a recording in your library to read and listen.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scegli una registrazione nella libreria per leggerla e ascoltarla."
+          }
+        }
+      }
+    },
     "Queued": {
       "comment": "Row status",
       "extractionState": "manual",
@@ -823,6 +846,18 @@
         }
       }
     },
+    "Search": {
+      "comment": "Library search field placeholder at accessibility text sizes",
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cerca"
+          }
+        }
+      }
+    },
     "Search titles and what was said": {
       "comment": "Library search field placeholder",
       "extractionState": "manual",
@@ -980,7 +1015,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Interrompi e conserva i progressi"
+            "value": "Ferma e conserva i progressi"
           }
         }
       }

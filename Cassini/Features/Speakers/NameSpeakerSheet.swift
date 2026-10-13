@@ -3,10 +3,14 @@ import CassiniEngine
 import CassiniNotebook
 
 /// Name a speaker: the `SpeakerNaming` reducer on screen. Effects that change the note or the saved voices are carried
-/// out by `VoicesStore`; while they are written the sheet stays, and a failure keeps it open with its alert.
+/// out by `VoicesStore`; while they are written the sheet stays, and a failure keeps it open with its alert. The Note
+/// screen keeps the name being typed (`nameChanged`) and hands it back as `draft` when the sheet opens again after
+/// Cassini was closed.
 struct NameSpeakerSheet: View {
     let noteID: UUID
     let speakerID: String
+    var draft: String?
+    var nameChanged: (String) -> Void = { _ in }
     @Environment(LibraryStore.self) private var library
     @Environment(VoicesStore.self) private var voices
     @Environment(PlaybackStore.self) private var playback
@@ -26,7 +30,7 @@ struct NameSpeakerSheet: View {
             Group {
                 if let state { form(SpeakerNaming.ui(state)) } else { ProgressView() }
             }
-            .navigationTitle(state.map { SpeakerNaming.ui($0).label } ?? "")
+            .navigationTitle(state.map { shown(SpeakerNaming.ui($0).label) } ?? "")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button(SpeakersCopy.cancel) { send(.cancel) } }
@@ -37,15 +41,25 @@ struct NameSpeakerSheet: View {
                 }
             }
             .navigationDestination(isPresented: mergeShown) {
-                if let state, let merge = SpeakerNaming.mergeUI(state) { MergeSheet(merge: merge, send: send) }
+                if let state, let merge = SpeakerNaming.mergeUI(state) {
+                    MergeSheet(merge: merge, sourceOrdinal: state.input.ordinal, send: send)
+                }
             }
         }
         .tint(.ember)
-        .task { state = await voices.namingInput(noteID: noteID, speakerID: speakerID).map(SpeakerNaming.open) }
+        .task {
+            state = await voices.namingInput(noteID: noteID, speakerID: speakerID).map(SpeakerNaming.open)
+            if let draft { send(.nameChanged(draft)) }
+        }
         .onDisappear { playback.stopSample() }
         .alert(SpeakersCopy.couldNotSave, isPresented: Binding(get: { saveError != nil }, set: { if !$0 { saveError = nil } })) {
             Button(SpeakersCopy.ok) { saveError = nil }
         } message: { Text(saveError ?? "") }
+    }
+
+    /// This speaker's label in the reader's language (`NoteCopy.speakerLabel`).
+    private func shown(_ label: String) -> String {
+        NoteCopy.speakerLabel(label, id: speakerID, ordinal: state?.input.ordinal ?? 0)
     }
 
     /// A sample of this note is playing; it ends by itself at its end, on a pause, an interruption or a lost output.
@@ -63,6 +77,7 @@ struct NameSpeakerSheet: View {
                     .onAppear { nameField = ui.name }
                     .onChange(of: nameField) { _, text in
                         send(.nameChanged(text))
+                        nameChanged(state?.name ?? text)
                         if let name = state?.name, name != text { nameField = name }
                     }
                     .onChange(of: ui.name) { _, name in if name != nameField { nameField = name } }
@@ -96,7 +111,7 @@ struct NameSpeakerSheet: View {
         HStack(spacing: 12) {
             SpeakerAvatar(speaker: ui.label, ordinal: state?.input.ordinal ?? 0)
             VStack(alignment: .leading, spacing: 2) {
-                Text(ui.label).font(.headline).foregroundStyle(Color.ink).accessibilityAddTraits(.isHeader)
+                Text(shown(ui.label)).font(.headline).foregroundStyle(Color.ink).accessibilityAddTraits(.isHeader)
                 Text(SpeakersCopy.speaksFor(ui.speakingTime)).font(.caption).foregroundStyle(Color.muted)
             }
             Spacer()
@@ -213,7 +228,10 @@ struct NameSpeakerSheet: View {
 /// "Merge Speaker 2 into…": the other speakers with their tint and speaking time; a row asks to confirm.
 struct MergeSheet: View {
     let merge: MergeUI
+    let sourceOrdinal: Int
     let send: (NamingEvent) -> Void
+
+    private var source: String { NoteCopy.speakerLabel(merge.source, id: merge.sourceID, ordinal: sourceOrdinal) }
 
     var body: some View {
         List(merge.targets) { target in
@@ -221,22 +239,26 @@ struct MergeSheet: View {
                 HStack(spacing: 12) {
                     SpeakerAvatar(speaker: target.name, ordinal: target.ordinal)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(target.name).foregroundStyle(Color.ink)
+                        Text(Self.name(target)).foregroundStyle(Color.ink)
                         Text(RecordingCopy.compact(target.speakingTime)).font(.caption).foregroundStyle(Color.muted)
                     }
                 }.frame(minHeight: HitTarget.minimum)
             }
             .accessibilityIdentifier("mergeTarget-\(target.speakerID)")
         }
-        .navigationTitle(SpeakersCopy.mergeTitle(merge.source))
+        .navigationTitle(SpeakersCopy.mergeTitle(source))
         .navigationBarTitleDisplayMode(.inline)
-        .alert(merge.confirm.map { SpeakersCopy.mergeConfirmTitle(merge.source, $0.name) } ?? "",
+        .alert(merge.confirm.map { SpeakersCopy.mergeConfirmTitle(source, Self.name($0)) } ?? "",
                isPresented: Binding(get: { merge.confirm != nil }, set: { if !$0 { send(.cancelMerge) } }),
                presenting: merge.confirm) { target in
             Button(SpeakersCopy.cancel, role: .cancel) { send(.cancelMerge) }
             Button(SpeakersCopy.merge) { send(.confirmMerge) }
         } message: { target in
-            Text(SpeakersCopy.mergeConfirmBody(merge.source, target.name, added: merge.addedVersion, shown: merge.shownVersion))
+            Text(SpeakersCopy.mergeConfirmBody(source, Self.name(target), added: merge.addedVersion, shown: merge.shownVersion))
         }
+    }
+
+    private static func name(_ target: MergeTarget) -> String {
+        NoteCopy.speakerLabel(target.name, id: target.speakerID, ordinal: target.ordinal)
     }
 }

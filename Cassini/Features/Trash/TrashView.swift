@@ -28,14 +28,15 @@ struct TrashView: View {
                 }
             }
             .padding(.horizontal, 16).padding(.top, 6).padding(.bottom, 24)
-            .frame(maxWidth: ReadableWidth.library).frame(maxWidth: .infinity)
+            .readableWidth()
         }
         .background(Color.paper)
         .navigationTitle(TrashCopy.title).navigationBarTitleDisplayMode(.inline)
         .toolbar {
             if !items.isEmpty {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button(TrashCopy.empty, role: .destructive) { dialogs.askEmpty(items: items) }.tint(.ember)
+                    Button(TrashCopy.empty, role: .destructive) { dialogs.askEmpty(items: items) }
+                        .buttonStyle(.borderedProminent).tint(Color.emberFill)
                 }
             }
         }
