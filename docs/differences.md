@@ -163,12 +163,48 @@ that were not ported, with the reason for each.
 ### Provenance
 
 - Android writes the run record into the sealed document at the end of a job. iOS has no sealed document. It keeps the
-  latest on-device run's record beside the note, in `<note>/provenance.json` (`engine: apple-speechtranscriber`,
-  `language`, `x-inferenceMs`, `x-resumedFromMs` and, after the speaker step, `x-speakerDiarization {backend:
-  fluidaudio, model, sha, turnCount, speakerCount}`), together with a SHA-256 of the words it describes.
+  latest on-device run's record beside the note, in `<note>/provenance.json`, together with a SHA-256 of the words it
+  describes. The words' members are recorded when the words are saved, the speaker members when the speaker step has
+  put its speakers into the note.
 - An export writes this record into each variant whose words are still the run's (`ExportProvenance`). Otherwise the
   variant gets `{engine: cassini-ios, kind: user-edited}`. A version made by a merge also gets `x-speakerMerges`,
   `x-speakerAssignmentEditedBy` and `x-derivedFromTranscript`, as Android's merged variant does.
+- **Keys.** The record has Android's keys (`JobProvenance`, `SpeakerAttribution.record`) with iOS's values;
+  `ProvenanceGoldenTests` pins the key sets and JSON types against Android's:
+  - The processing step: `backend` "Apple Speech framework (SpeechAnalyzer, on-device)", `engine`
+    `apple-speechtranscriber`, `model` "Apple SpeechTranscriber <locale>" (the locale whose assets ran), `device` the
+    hardware model and OS ("iPhone17,1, iOS 26.0.1 (23A355)"; Android writes "Android CPU"), `source` "recording" as on
+    Android, and `version` "Speech framework of <OS and build>". Apple names no speech model version or revision, so
+    the OS build stands in for it; there is no `model revision` as in Android's `version`.
+  - `x-inferenceMs`, `x-resumedFromMs`, and `x-segmentation`, which describes what iOS runs: the whole file streamed
+    to the analyzer in 1 s blocks, the analyzer finding its own segments, and a resume 1 s before the checkpoint.
+  - `x-speakerDiarization`: `backend` (FluidAudio at its pinned commit, offline diarizer on Core ML), `model`
+    (`pyannote-community-1-wespeaker-coreml-v1`), `modelRevision` (the pinned FluidInference revision),
+    `modelSha256`, `elapsedMs` (the analysis without the model install), `turnCount`, `speakerCount`, `assignment`
+    (Android's string: `SpeakerAttribution.assign` follows the same rule; a passage without word times counts as one
+    word) and `sourceSeparation: false`. `modelSha256` is the fingerprint the voiceprints carry: a SHA-256 over the
+    embedding, filterbank and PLDA models' `model.mil` and `weight.bin` with their paths, not the digest of one
+    weights file as on Android, because iOS's diarizer is a bundle of four Core ML models. Records of earlier builds
+    stored it as `sha`, which still reads.
+  - `x-speakerIdentification`, counts only: `model`, `sha256`, `dim` (the print length), `metric: cosine`, the iOS
+    thresholds as `autoThreshold`, `suggestThreshold` and `margin`, `speakersWithPrints`, `autoApplied` (speakers the
+    analysis named from a saved voice) and `suggested` (speakers only offered one). With automatic naming off, a strong
+    match is offered, so it counts as suggested. Document info's "N names from saved voices" reads `autoApplied`, as
+    on Android.
+  - A re-attribution (Identify speakers again over a version that already had speakers) also writes
+    `x-derivedFromTranscript`, the variant it started from, and, when that variant is one of a verified imported
+    document's, that document's `provenance.attribution` as `x-sourceAttribution`, as Android's
+    `SpeakerAttribution.record` does. A first analysis is sealed into its transcription, so it has neither.
+- **Not applicable on iOS.** `x-speakerDiarization.threshold`, `minDurationOn` and `minDurationOff` are Sortformer's
+  post-processing parameters, and `x-incrementalDiarization` describes Sortformer's streaming windows and speaker
+  cache. FluidAudio's offline pipeline has neither, so iOS leaves the four keys out instead of writing values that
+  would mean something else.
+- **Older records.** A `provenance.json` written before these members existed still reads and exports. The export
+  leaves out what that build did not record (the processing step, `x-segmentation`, `elapsedMs`, `modelRevision`,
+  `assignment`, `sourceSeparation` and `x-speakerIdentification`) rather than guessing it, so Document info shows no
+  names from saved voices for such a note.
+- **One speaker record.** Only the latest speaker analysis's record is kept. A version of an earlier analysis keeps the
+  words' members and loses `x-speakerDiarization` and `x-speakerIdentification` once a later analysis replaces them.
 
 ### Saved voices
 

@@ -15,12 +15,15 @@ public struct ProvenanceRecord: Codable, Hashable, Sendable {
     /// `fingerprint(of:)` of the words the run saved.
     public var words: String
     public var speakerDiarization: TranscriptProvenance.SpeakerDiarization?
+    /// The speaker step's match counts, held with `speakerDiarization`; nil in records of older builds.
+    public var speakerIdentification: TranscriptProvenance.SpeakerIdentification?
     /// The speaker ids the analysis gave the words, sorted.
     public var speakerIDs: [String]?
 
     public init(provenance: TranscriptProvenance, transcript: [TranscriptSegment]) {
         var plain = provenance
         plain.speakerDiarization = nil
+        plain.speakerIdentification = nil
         self.provenance = plain
         words = Self.fingerprint(of: transcript)
     }
@@ -28,10 +31,13 @@ public struct ProvenanceRecord: Codable, Hashable, Sendable {
     /// Whether `transcript` holds the words this run made.
     public func describes(_ transcript: [TranscriptSegment]) -> Bool { words == Self.fingerprint(of: transcript) }
 
-    /// Records the speaker step over `transcript`, the words with the speakers it gave them.
+    /// Records the speaker step over `transcript`, the words with the speakers it gave them, and the step's matches
+    /// against the saved voices when it made prints.
     public mutating func addSpeakers(_ diarization: TranscriptProvenance.SpeakerDiarization,
+                                     identification: TranscriptProvenance.SpeakerIdentification? = nil,
                                      transcript: [TranscriptSegment]) {
         speakerDiarization = diarization
+        speakerIdentification = identification
         speakerIDs = Self.speakerIDs(of: transcript).sorted()
     }
 
@@ -43,6 +49,7 @@ public struct ProvenanceRecord: Codable, Hashable, Sendable {
         let current = Self.speakerIDs(of: transcript)
         if let speakerDiarization, let speakerIDs, !current.isEmpty, current.isSubset(of: Set(speakerIDs)) {
             result.speakerDiarization = speakerDiarization
+            result.speakerIdentification = speakerIdentification
         }
         return result
     }

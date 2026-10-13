@@ -84,6 +84,14 @@ public actor AppleSpeechTranscriber: Transcribing {
         }
     }
 
+    /// "Apple SpeechTranscriber it-IT": the module and the locale whose assets it runs. Apple names no model version,
+    /// so the OS build in the provenance's `version` stands in for it.
+    public func modelName(locale: Locale) async -> String? {
+        guard SpeechTranscriber.isAvailable,
+              let supported = await SpeechTranscriber.supportedLocale(equivalentTo: locale) else { return nil }
+        return "Apple SpeechTranscriber \(supported.identifier(.bcp47))"
+    }
+
     public func speechLanguages() async -> [SpeechLanguage] {
         let installed = Set(await SpeechTranscriber.installedLocales.map { $0.identifier(.bcp47) })
         return await SpeechTranscriber.supportedLocales.map { locale in

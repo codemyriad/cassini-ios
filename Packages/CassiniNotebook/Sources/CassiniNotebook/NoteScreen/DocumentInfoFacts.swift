@@ -16,7 +16,8 @@ public struct DocumentInfoFacts: Hashable, Sendable {
     public var model: String?
     /// Speakers told apart on this device, or all words shown as one voice; nil without a record of the run.
     public var speakersToldApart: Bool?
-    /// Speakers that carry a saved voice's name.
+    /// Speakers the run named automatically from a saved voice (`x-speakerIdentification.autoApplied`, as Android
+    /// reads it); 0 without that record.
     public var namesFromVoices: Int
     public var resumedFromMs: Int64?
     public var fileBytes: Int64?
@@ -31,7 +32,6 @@ public struct DocumentInfoFacts: Hashable, Sendable {
     /// the size of its audio file.
     public static func of(_ note: Note, provenance: TranscriptProvenance?, fileBytes: Int64?) -> DocumentInfoFacts {
         let speakers = Set(note.transcript.compactMap(\.speakerID))
-        let named = (note.speakers ?? []).filter { speakers.contains($0.id) && $0.linkedVoiceID != nil }.count
         let processing = provenance.flatMap { $0.inferenceMs > 0 ? $0.inferenceMs : nil }
         let readError: String? = switch note.document?.state {
         case .unreadable?, .invalidMetadata?:
@@ -46,7 +46,7 @@ public struct DocumentInfoFacts: Hashable, Sendable {
             realtimeFactor: processing.map { note.duration * 1000 / Double($0) },
             model: provenance.map { modelName($0.engine) },
             speakersToldApart: provenance.map { $0.speakerDiarization != nil },
-            namesFromVoices: named,
+            namesFromVoices: provenance?.speakerIdentification?.autoApplied ?? 0,
             resumedFromMs: provenance.flatMap { $0.resumedFromMs > 0 ? $0.resumedFromMs : nil },
             fileBytes: fileBytes, meetingID: note.document?.meetingID, vendor: note.document?.vendor, readError: readError)
     }

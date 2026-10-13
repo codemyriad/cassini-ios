@@ -277,7 +277,11 @@ import CassiniNotebook
 
         first.open()
         #expect(try await one.value.turns.map(\.speakerID) == ["one.m4a"])
-        #expect(try await two.value.turns.map(\.speakerID) == ["two.m4a"])
+        let second = try await two.value
+        #expect(second.turns.map(\.speakerID) == ["two.m4a"])
+        #expect(second.backend == SpeakerAnalyzer.backend, "the analyzer says what ran, for x-speakerDiarization")
+        #expect(second.modelRevision == Fixture.manifest.revision)
+        #expect((second.elapsedMs ?? -1) >= 0)
         #expect(state.withLock { $0.most } == 1)
         #expect(await installer.fetches == 1, "the models are installed once")
         try? FileManager.default.removeItem(at: directory)

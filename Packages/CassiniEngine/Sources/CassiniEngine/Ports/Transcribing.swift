@@ -49,6 +49,12 @@ public protocol Transcribing: Sendable {
     func installAssets(locale: Locale, progress: @escaping @Sendable (Double) -> Void) async throws
     /// The languages the speech model can transcribe here, each marked when its assets are installed.
     func speechLanguages() async -> [SpeechLanguage]
+    /// The speech model that transcribes `locale` here, as the provenance's `model` names it; nil when unknown.
+    func modelName(locale: Locale) async -> String?
+}
+
+extension Transcribing {
+    public func modelName(locale: Locale) async -> String? { nil }
 }
 
 /// A language of speech the transcriber offers.

@@ -128,9 +128,9 @@ This is a working iOS app, not yet an App Store release.
   own thresholds (0.85 automatic, 0.65 suggest, 0.12 margin, 6 s of speech) and keeps automatic naming off by default.
   The two apps' voiceprints are not compatible.
 - **Storage model.** A note is a `note.json` beside its audio. The portable Cassini document is sealed only at export,
-  with the run's provenance. Android keeps the transcript in a sealed document and a Room catalogue. The queue is
-  `jobs.json`, and checkpoints use iOS's own format. Search uses an in-memory index instead of FTS4. Saved voices keep
-  one sample per note instead of a running mean.
+  with the run's provenance under Android's keys, less the four that describe Sortformer. Android keeps the transcript
+  in a sealed document and a Room catalogue. The queue is `jobs.json`, and checkpoints use iOS's own format. Search
+  uses an in-memory index instead of FTS4. Saved voices keep one sample per note instead of a running mean.
 - **Recording.** iOS captures PCM CAF and compresses it to M4A, so there is no 1 GiB AAC limit, and the storage floor
   includes the room for that compression. The audio session does not mix with other apps, so a call pauses the
   recording. Losing the input pauses it too. A Live Activity replaces Android's ongoing notification, and recovery

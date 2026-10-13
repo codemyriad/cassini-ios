@@ -197,11 +197,14 @@ extension Note {
             versions?[sealed].speakers = speakers ?? []
         } else {
             saveCurrentVersion(.beforeSpeakerAnalysis, id: stamp.before, date: stamp.date)
+            // The version the analysis re-attributes: the one just kept, or the shown one when it already held them.
+            let source = selectedVersionID
             transcript = attributed
             speakers = analyzed
             refreshSpeakerLabels()
             selectedVersionID = nil
             saveCurrentVersion(.speakerAnalysis, id: stamp.after, date: stamp.date)
+            if let index = versions?.lastIndex(where: { $0.id == selectedVersionID }) { versions?[index].attributedFrom = source }
         }
         speakerAnalysisFailure = nil
     }

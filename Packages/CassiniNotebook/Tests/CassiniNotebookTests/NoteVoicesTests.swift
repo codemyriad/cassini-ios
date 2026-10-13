@@ -24,6 +24,7 @@ import Testing
         #expect(note.speakers?[1].match == .suggested(voice: luca.id, score: 0.7))
         #expect(note.versions?.map(\.kind) == [.beforeSpeakerAnalysis, .speakerAnalysis])
         #expect(note.versions?.map(\.id) == [stamp.before, stamp.after])
+        #expect(note.versions?.map(\.attributedFrom) == [nil, stamp.before], "x-derivedFromTranscript of an export")
         #expect(note.selectedVersionID == stamp.after)
         #expect(note.speakerAnalysisFailure == nil)
     }
@@ -40,12 +41,14 @@ import Testing
         #expect(versions[0].segments == note.transcript)
         #expect(note.selectedVersionID == F.id("words"))
         #expect(note.versionCount == 1)
+        #expect(versions[0].attributedFrom == nil, "the first analysis is no re-attribution")
 
         // Identify speakers again on the attributed transcription keeps it and adds the new attribution.
         note.applySpeakerAnalysis(turns: [.init(speakerID: "z", start: 0, end: 9)], matches: [:], voiceNames: [:],
                                   autoName: true, stamp: VersionStamp(before: F.id("b2"), after: F.id("a2"), date: stamp.date))
         #expect(note.versions?.map(\.kind) == [.transcription, .speakerAnalysis])
         #expect(note.versions?.first?.speakers.map(\.id) == ["x", "y"])
+        #expect(note.versions?.last?.attributedFrom == F.id("words"), "the shown version it re-attributed")
     }
 
     @Test func anAutomaticMatchNamesTheSpeakerOnlyWhenAutomaticNamingIsOn() {

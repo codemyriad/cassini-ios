@@ -68,16 +68,19 @@ public struct TranscriptionJob: TranscriptionJobRunning {
     private let limits: Limits
     private let uptimeMs: @Sendable () -> Int64
     private let availableMemory: @Sendable () -> Int64?
+    private let device: @Sendable () -> RunDevice
 
-    /// `availableMemory` is the memory left to Cassini, for the memory check at the start (`MemoryPreflight`).
+    /// `availableMemory` is the memory left to Cassini, for the memory check at the start (`MemoryPreflight`);
+    /// `device` the device and OS the provenance names.
     public init(notes: NoteStore, transcriber: any Transcribing, analyzer: any SpeakerAnalyzing,
                 checkpoints: any CheckpointStoring, provenance: any ProvenanceStoring, host: any TranscriptionJobHost,
                 clock: any AppClock, limits: Limits = Limits(),
                 uptimeMs: @escaping @Sendable () -> Int64 = TranscriptionJob.uptimeMs,
-                availableMemory: @escaping @Sendable () -> Int64? = TranscriptionJob.availableMemory) {
+                availableMemory: @escaping @Sendable () -> Int64? = TranscriptionJob.availableMemory,
+                device: @escaping @Sendable () -> RunDevice = RunDevice.current) {
         self.notes = notes; self.transcriber = transcriber; self.analyzer = analyzer; self.checkpoints = checkpoints
         self.provenance = provenance; self.host = host; self.clock = clock; self.limits = limits
-        self.uptimeMs = uptimeMs; self.availableMemory = availableMemory
+        self.uptimeMs = uptimeMs; self.availableMemory = availableMemory; self.device = device
     }
 
     /// `os_proc_available_memory()`: what Cassini can still allocate before iOS ends it; nil where the system does not
@@ -228,9 +231,10 @@ public struct TranscriptionJob: TranscriptionJobRunning {
     private func saveTranscript(_ words: CheckpointState, resumed: Bool, _ context: Context) async -> Bool {
         let segments = words.segments
         if resumed, provenance.load(context.noteID)?.describes(segments) == true { return true }
+        let model = await transcriber.modelName(locale: Locale(identifier: words.language))
         let record = ProvenanceRecord(
-            provenance: TranscriptProvenance(language: words.language, inferenceMs: words.inferenceMs,
-                                             resumedFromMs: words.resumedFromMs),
+            provenance: .appleRun(language: words.language, inferenceMs: words.inferenceMs,
+                                  resumedFromMs: words.resumedFromMs, model: model, device: device()),
             transcript: segments)
         let date = clock.now, before = UUID(), after = UUID()
         do {
@@ -303,17 +307,39 @@ public struct TranscriptionJob: TranscriptionJobRunning {
         return nil
     }
 
-    /// Adds the speaker record to the provenance of the words the analysis was given.
+    /// Adds the speaker record to the provenance of the words the analysis was given, with the counts of its matches
+    /// (`x-speakerIdentification`) when it made prints.
     private func recordSpeakers(_ analysis: SpeakerAnalysis, _ context: Context) async {
         guard let note = await notes.note(context.noteID), var record = provenance.load(context.noteID),
               record.describes(note.transcript) else { return }
         var identity = analysis.prints.first?.model
         if identity == nil { identity = await analyzer.modelIdentity }
         guard let identity else { return }
-        record.addSpeakers(TranscriptProvenance.SpeakerDiarization(
-            identity: identity, turnCount: analysis.turns.count,
-            speakerCount: Set(analysis.turns.map(\.speakerID)).count), transcript: note.transcript)
+        let diarization = TranscriptProvenance.SpeakerDiarization(
+            identity: identity, backend: analysis.backend ?? TranscriptProvenance.SpeakerDiarization.fluidAudio,
+            modelRevision: analysis.modelRevision, elapsedMs: analysis.elapsedMs, turnCount: analysis.turns.count,
+            speakerCount: Set(analysis.turns.map(\.speakerID)).count)
+        record.addSpeakers(diarization, identification: Self.identification(analysis, note), transcript: note.transcript)
         try? provenance.save(record, for: context.noteID)
+    }
+
+    /// The match counts of `analysis` as `note` took them: speakers named automatically from a saved voice (an
+    /// automatic or confirmed link), and speakers only offered one. Nil without prints.
+    static func identification(_ analysis: SpeakerAnalysis, _ note: Note) -> TranscriptProvenance.SpeakerIdentification? {
+        guard let first = analysis.prints.first else { return nil }
+        let shown = Set(note.transcript.compactMap(\.speakerID))
+        let speakers = (note.speakers ?? []).filter { shown.contains($0.id) }
+        var automatic = 0, suggested = 0
+        for speaker in speakers {
+            switch speaker.match {
+            case .auto, .confirmed: automatic += 1
+            case .suggested: suggested += 1
+            default: break
+            }
+        }
+        return TranscriptProvenance.SpeakerIdentification(
+            identity: first.model, dim: first.vector.count, thresholds: .ios, speakersWithPrints: analysis.prints.count,
+            autoApplied: automatic, suggested: suggested)
     }
 
     /// Every word stays one voice; the job still succeeds.

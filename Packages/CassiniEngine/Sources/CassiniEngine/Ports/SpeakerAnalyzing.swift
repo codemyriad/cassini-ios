@@ -4,7 +4,16 @@ import CassiniNotebook
 public struct SpeakerAnalysis: Hashable, Sendable {
     public var turns: [SpeakerTurn]
     public var prints: [SpeakerPrint]
-    public init(turns: [SpeakerTurn], prints: [SpeakerPrint]) { self.turns = turns; self.prints = prints }
+    /// What ran, for the `x-speakerDiarization` record: the library and how it ran (nil: `fluidaudio`), the revision
+    /// the models were installed from, and the time the analysis itself took, without the model install.
+    public var backend: String?
+    public var modelRevision: String?
+    public var elapsedMs: Int64?
+    public init(turns: [SpeakerTurn], prints: [SpeakerPrint], backend: String? = nil, modelRevision: String? = nil,
+                elapsedMs: Int64? = nil) {
+        self.turns = turns; self.prints = prints
+        self.backend = backend; self.modelRevision = modelRevision; self.elapsedMs = elapsedMs
+    }
 }
 
 /// How far a model install has got.

@@ -13,6 +13,11 @@ import CassiniNotebook
 public actor SpeakerAnalyzer: SpeakerAnalyzing {
     public static let modelID = "pyannote-community-1-wespeaker-coreml-v1"
     public static let manifest = SpeakerModelManifest.diarizer
+    /// The FluidAudio commit `Package.swift` pins (a test checks it against `Package.resolved`).
+    public static let fluidAudioRevision = "e560c6445ffdc42e60c7b282d162aae271f18e2a"
+    /// The `x-speakerDiarization` backend: the library at its commit, and how it runs.
+    public static let backend = "FluidAudio \(fluidAudioRevision.prefix(7)) offline diarizer "
+        + "(pyannote segmentation, WeSpeaker embeddings, VBx clustering), Core ML"
 
     /// Loads the installed models from the models directory and analyses one local file with them.
     public typealias Analysis = @Sendable (_ url: URL, _ models: URL,
@@ -81,8 +86,13 @@ public actor SpeakerAnalyzer: SpeakerAnalyzing {
         await takeTurn()
         defer { endTurn() }
         try Task.checkCancellation()
-        let result = try await analysis(url, try Self.prepare(installer.directory), progress)
+        let started = ContinuousClock.now
+        var result = try await analysis(url, try Self.prepare(installer.directory), progress)
+        let elapsed = ContinuousClock.now - started
         if let model = result.prints.first?.model { identity = model }
+        result.backend = result.backend ?? Self.backend
+        result.modelRevision = result.modelRevision ?? installer.manifest.revision
+        result.elapsedMs = result.elapsedMs ?? Int64((elapsed / .milliseconds(1)).rounded())
         return result
     }
 

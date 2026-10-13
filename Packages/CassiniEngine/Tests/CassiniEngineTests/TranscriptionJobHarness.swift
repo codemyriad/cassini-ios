@@ -81,6 +81,8 @@ extension TranscriptionJobTests {
 
     /// Emits `script` from the request's start offset: each result whose end is after it, then its progress.
     final class ScriptedTranscriber: Transcribing, @unchecked Sendable {
+        func modelName(locale: Locale) async -> String? { "Fake SpeechTranscriber \(locale.identifier(.bcp47))" }
+
         /// 14 results of 5 s, one word a second ("w0" at 0–0.8 s).
         static let seventySeconds: [TranscriptSegment] = (0..<14).map { index in
             let words = (0..<5).map { k in

@@ -14,6 +14,9 @@ public struct TranscriptVersion: Identifiable, Hashable, Sendable {
     public var speakerMerges: [String: String]?
     /// The version a merge made this one from (`x-derivedFromTranscript` in an export).
     public var derivedFrom: UUID?
+    /// The version a later speaker analysis gave new speakers to make this one (Identify speakers again):
+    /// `x-derivedFromTranscript` beside `x-speakerDiarization` in an export, as Android records a re-attribution.
+    public var attributedFrom: UUID?
     public init(kind: TranscriptVersionKind, segments: [TranscriptSegment], speakers: [NoteSpeaker]) {
         self.kind = kind; self.segments = segments; self.speakers = speakers
     }
@@ -104,7 +107,7 @@ public enum TranscriptVersionKind: Hashable, Sendable {
 
 extension TranscriptVersion: Codable {
     private enum CodingKeys: String, CodingKey {
-        case id, kind, name, portableID, createdAt, segments, speakers, speakerMerges, derivedFrom
+        case id, kind, name, portableID, createdAt, segments, speakers, speakerMerges, derivedFrom, attributedFrom
     }
 
     public init(from decoder: any Decoder) throws {
@@ -121,6 +124,7 @@ extension TranscriptVersion: Codable {
         speakers = try c.decode([NoteSpeaker].self, forKey: .speakers)
         speakerMerges = try c.decodeIfPresent([String: String].self, forKey: .speakerMerges)
         derivedFrom = try c.decodeIfPresent(UUID.self, forKey: .derivedFrom)
+        attributedFrom = try c.decodeIfPresent(UUID.self, forKey: .attributedFrom)
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -134,5 +138,6 @@ extension TranscriptVersion: Codable {
         try c.encode(speakers, forKey: .speakers)
         try c.encodeIfPresent(speakerMerges, forKey: .speakerMerges)
         try c.encodeIfPresent(derivedFrom, forKey: .derivedFrom)
+        try c.encodeIfPresent(attributedFrom, forKey: .attributedFrom)
     }
 }

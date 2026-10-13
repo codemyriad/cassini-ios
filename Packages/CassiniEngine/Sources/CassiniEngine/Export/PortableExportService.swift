@@ -33,20 +33,21 @@ public struct PortableExportService: Sendable {
             }
             var variants = Self.keptVariants(of: note)
             let run = provenance.load(note.id)
+            let audit = Self.attributionAudit(of: note, original: original)
             for (index, version) in Self.versionsToSeal(of: note).enumerated() {
                 try Task.checkCancellation()
                 var snapshot = note
                 snapshot.transcript = version.segments
                 snapshot.speakers = version.speakers
                 let next = work.appendingPathComponent("version-\(index).opus")
-                variants[version.id] = try await Self.seal(snapshot, opus, next, Self.record(version, run, variants))
+                variants[version.id] = try await Self.seal(snapshot, opus, next, Self.record(version, run, variants, note, audit))
                 opus = next
             }
             try Task.checkCancellation()
             var current = note.versions?.first { $0.id == note.selectedVersionID }
                 ?? TranscriptVersion(kind: .editedTranscript, segments: note.transcript, speakers: note.speakers ?? [])
             current.segments = note.transcript
-            _ = try await Self.seal(note, opus, output, Self.record(current, run, variants))
+            _ = try await Self.seal(note, opus, output, Self.record(current, run, variants, note, audit))
             return output
         } catch {
             try? FileManager.default.removeItem(at: output)
@@ -73,11 +74,26 @@ public struct PortableExportService: Sendable {
         return ids
     }
 
-    /// The provenance record of `version`: the run's while it holds the run's words, and its merge, which names the
-    /// variant its source version became.
-    private static func record(_ version: TranscriptVersion, _ run: ProvenanceRecord?, _ variants: [UUID: String]) -> JSONObject {
-        ExportProvenance.record(run: run?.provenance(for: version.segments), merges: version.speakerMerges,
-                                derivedFrom: version.derivedFrom.flatMap { variants[$0] })
+    /// The provenance record of `version`: the run's while it holds the run's words; for a re-attribution, the
+    /// variant its source version became and, when that source is a variant of the verified document, the document's
+    /// attribution audit; and its merge, which names the variant its source version became.
+    private static func record(_ version: TranscriptVersion, _ run: ProvenanceRecord?, _ variants: [UUID: String],
+                               _ note: Note, _ audit: JSONObject?) -> JSONObject {
+        let source = version.attributedFrom.flatMap { id in note.versions?.first { $0.id == id } }
+        return ExportProvenance.record(run: run?.provenance(for: version.segments), merges: version.speakerMerges,
+                                       derivedFrom: version.derivedFrom.flatMap { variants[$0] },
+                                       attributedFrom: version.attributedFrom.flatMap { variants[$0] },
+                                       sourceAttribution: source?.portableID == nil ? nil : audit)
+    }
+
+    /// The verified source document's `provenance.attribution`, which describes its own variants; nil for any other
+    /// source, which the export seals afresh, and when no version re-attributes one of its variants. The source was
+    /// verified at import, so only its tags are read again.
+    private static func attributionAudit(of note: Note, original: URL) -> JSONObject? {
+        guard note.document?.state == .ok, let versions = note.versions else { return nil }
+        let imported = Set(versions.filter { $0.portableID != nil }.map(\.id))
+        guard versions.contains(where: { $0.attributedFrom.map(imported.contains) ?? false }) else { return nil }
+        return CassiniDocument.read(original, verify: false).manifest?["provenance"]?.object?["attribution"]?.object
     }
 
     private static func seal(_ note: Note, _ opus: URL, _ target: URL, _ processing: JSONObject) async throws -> String? {

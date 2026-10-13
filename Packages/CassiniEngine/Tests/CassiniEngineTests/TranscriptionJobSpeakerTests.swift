@@ -1,7 +1,7 @@
 import Foundation
 import Synchronization
 import Testing
-import CassiniEngine
+@testable import CassiniEngine
 import CassiniEngineTesting
 import CassiniNotebook
 
@@ -29,27 +29,69 @@ extension TranscriptionJobTests {
             #expect(await h.note()?.speakerAnalysisFailure == .speakers)
         }
 
-        // ports: TranscriptionJobTest#provenanceEqualsThe010Record (adapted: the iOS record)
+        // ports: TranscriptionJobTest#provenanceEqualsThe010Record (adapted: the iOS record; ProvenanceGoldenTests pins
+        // the key sets against Android's)
         @Test func provenanceCarriesTheEngineAndTheSpeakerRecord() async throws {
             let analysis = SpeakerAnalysis(
                 turns: [.init(speakerID: "a", start: 0, end: 30), .init(speakerID: "b", start: 30, end: 70),
                         .init(speakerID: "a", start: 70, end: 71)],
-                prints: [SpeakerPrint(speakerID: "a", model: "pyannote-community-1:abc123", vector: [1, 0], speechSeconds: 30)])
+                prints: [SpeakerPrint(speakerID: "a", model: "pyannote-community-1:abc123", vector: [1, 0], speechSeconds: 30)],
+                backend: "FluidAudio test", modelRevision: "rev1", elapsedMs: 640)
             let h = try await Harness(analyzer: FakeAnalyzer(analysis: analysis))
             #expect(await h.run().outcome == .done)
             let provenance = try #require(h.provenance(of: await h.note()))
             let record = provenance.record()
-            #expect(record.keys == ["engine", "language", "x-inferenceMs", "x-resumedFromMs", "x-speakerDiarization"])
+            #expect(record.keys == ["backend", "engine", "model", "device", "source", "version", "language", "x-inferenceMs",
+                                    "x-segmentation", "x-resumedFromMs", "x-speakerDiarization", "x-speakerIdentification"])
             #expect(record["engine"]?.string == "apple-speechtranscriber")
+            #expect(record["backend"]?.string == TranscriptProvenance.appleSpeechBackend)
+            #expect(record["model"]?.string == "Fake SpeechTranscriber it-IT", "what the transcriber names its model")
+            #expect(record["device"]?.string == RunDevice.current().description)
+            #expect(record["source"]?.string == "recording")
             #expect(record["language"]?.string == "it-IT")
+            #expect(record["x-segmentation"]?.string == TranscriptProvenance.appleSegmentation)
             let diarization = try #require(record["x-speakerDiarization"]?.object)
-            #expect(diarization.keys == ["backend", "model", "sha", "turnCount", "speakerCount"])
-            #expect(diarization["backend"]?.string == "fluidaudio")
+            #expect(diarization.keys == ["backend", "model", "modelRevision", "modelSha256", "elapsedMs", "turnCount",
+                                         "speakerCount", "assignment", "sourceSeparation"])
+            #expect(diarization["backend"]?.string == "FluidAudio test")
             #expect(diarization["model"]?.string == "pyannote-community-1")
-            #expect(diarization["sha"]?.string == "abc123")
+            #expect(diarization["modelSha256"]?.string == "abc123")
+            #expect(diarization["modelRevision"]?.string == "rev1")
+            #expect(diarization["elapsedMs"] == .int(640))
+            #expect(diarization["sourceSeparation"] == .bool(false))
             #expect(provenance.speakerDiarization?.turnCount == 3)
             #expect(provenance.speakerDiarization?.speakerCount == 2)
+            let identification = try #require(provenance.speakerIdentification)
+            #expect(identification.model == "pyannote-community-1" && identification.sha256 == "abc123")
+            #expect(identification.dim == 2 && identification.speakersWithPrints == 1)
+            #expect(identification.autoApplied == 0 && identification.suggested == 0, "the fake host matches nobody")
             #expect(h.applied.map(\.generation) == [7])
+        }
+
+        /// The counts come from the speakers as the note took them: named from a saved voice, or only offered one.
+        @Test func theIdentificationCountsTheMatchesTheNoteTook() throws {
+            let prints = ["a", "b", "c"].map { SpeakerPrint(speakerID: $0, model: "m:sha", vector: [1, 0, 0], speechSeconds: 9) }
+            let analysis = SpeakerAnalysis(turns: [], prints: prints)
+            var note = Note(title: "Three")
+            note.transcript = ["a", "b", "c", "d"].enumerated().map { index, id in
+                TranscriptSegment(text: id, start: Double(index), end: Double(index) + 1, speakerID: id)
+            }
+            let voice = UUID()
+            note.speakers = [NoteSpeaker(id: "a", name: "Luca"), NoteSpeaker(id: "b", name: "Sara"),
+                             NoteSpeaker(id: "c", name: "Speaker 3"), NoteSpeaker(id: "d", name: "Speaker 4"),
+                             NoteSpeaker(id: "gone", name: "Elsewhere")]
+            note.speakers?[0].match = .auto(voice: voice, score: 0.9)
+            note.speakers?[1].match = .confirmed(voice: UUID(), score: 0.9)
+            note.speakers?[2].match = .suggested(voice: UUID(), score: 0.7)
+            note.speakers?[4].match = .auto(voice: UUID(), score: 0.9)
+            let identification = try #require(TranscriptionJob.identification(analysis, note))
+            #expect(identification.speakersWithPrints == 3)
+            #expect(identification.autoApplied == 2)
+            #expect(identification.suggested == 1)
+            #expect(identification.dim == 3 && identification.model == "m" && identification.sha256 == "sha")
+            #expect(identification.autoThreshold == 0.85 && identification.suggestThreshold == 0.65
+                    && identification.margin == 0.12)
+            #expect(TranscriptionJob.identification(SpeakerAnalysis(turns: [], prints: []), note) == nil, "no prints")
         }
 
         @Test func withoutTheSpeakerStepTheWordsAreSavedAlone() async throws {

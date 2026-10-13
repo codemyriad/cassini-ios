@@ -42,6 +42,15 @@ import CassiniInference
         #expect(notices.contains("libopus"))
     }
 
+    /// The diarization provenance names the FluidAudio commit Cassini builds with.
+    @Test func theDiarizationBackendNamesThePinnedFluidAudioCommit() throws {
+        let resolved = try String(contentsOf: Self.root.appendingPathComponent("Package.resolved"), encoding: .utf8)
+        let package = try String(contentsOf: Self.root.appendingPathComponent("Package.swift"), encoding: .utf8)
+        #expect(resolved.contains("\"revision\" : \"\(SpeakerAnalyzer.fluidAudioRevision)\""))
+        #expect(package.contains("FluidAudio.git\", revision: \"\(SpeakerAnalyzer.fluidAudioRevision)\""))
+        #expect(SpeakerAnalyzer.backend.hasPrefix("FluidAudio \(SpeakerAnalyzer.fluidAudioRevision.prefix(7)) "))
+    }
+
     @Test func theModelNoticesNameThePinnedRevision() throws {
         let models = try texts.text(.models)
         #expect(models.contains(SpeakerModelManifest.diarizer.revision))

@@ -25,6 +25,8 @@ public struct FakeTranscriber: Transcribing {
 
     public init(_ script: Script, status: ModelPartStatus = .ready) { self.script = script; self.status = status }
 
+    public func modelName(locale: Locale) async -> String? { "Fake SpeechTranscriber \(locale.identifier(.bcp47))" }
+
     public func transcribe(_ request: TranscriptionRequest,
                            events: @escaping @Sendable (TranscriptionEvent) -> Void) async throws -> TranscriptionResult {
         if status == .notDownloaded, !request.allowDownload { throw TranscriptionError.needsConsent }

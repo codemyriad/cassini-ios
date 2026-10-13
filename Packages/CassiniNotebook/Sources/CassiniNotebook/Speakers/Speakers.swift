@@ -44,7 +44,7 @@ extension Note {
     /// Keeps the transcript and speakers as a version, unless the selected version already holds them. A caller whose
     /// change may run again passes the version's `id` and `date`, so that the rerun makes the same version. The
     /// transcript counts as an edited copy of the selected version, so the new version keeps that version's merge
-    /// (`speakerMerges`, `derivedFrom`) for the export's provenance.
+    /// (`speakerMerges`, `derivedFrom`) and re-attribution (`attributedFrom`) for the export's provenance.
     public mutating func saveCurrentVersion(_ kind: TranscriptVersionKind, id versionID: UUID = UUID(), date: Date = Date()) {
         saveCurrentVersion(kind, id: versionID, date: date, editedFrom: selectedVersionID)
     }
@@ -59,6 +59,7 @@ extension Note {
         if let source = base.flatMap({ id in history.first { $0.id == id } }) {
             version.speakerMerges = source.speakerMerges
             version.derivedFrom = source.derivedFrom
+            version.attributedFrom = source.attributedFrom
         }
         history.append(version); selectedVersionID = version.id
         versions = history

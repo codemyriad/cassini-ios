@@ -159,7 +159,7 @@ private actor Gate {
     private func runRecord(_ note: Note) -> ProvenanceRecord {
         var record = ProvenanceRecord(provenance: TranscriptProvenance(language: "en-US", inferenceMs: 1_500, resumedFromMs: 600),
                                       transcript: note.transcript)
-        record.addSpeakers(.init(model: "diarizer", sha: "abc", turnCount: 2, speakerCount: 2), transcript: note.transcript)
+        record.addSpeakers(.init(model: "diarizer", modelSha256: "abc", turnCount: 2, speakerCount: 2), transcript: note.transcript)
         return record
     }
 
@@ -226,6 +226,51 @@ private actor Gate {
         #expect(merged["x-speakerDiarization"] != nil, "a merge only removes speaker ids")
         #expect(Set(document.selected()?.transcript?.words.map(\.speaker) ?? []) == ["a"])
     }
+    // ports: SpeakerAttributionTest#newVariantPreservesAudioEarlierWordsAndNamedSpeakers (the derived variant's record)
+    /// Identify speakers again on a verified document's variant: the new variant names the one it re-attributed and
+    /// carries that document's attribution audit, as Android's `SpeakerAttribution.record` does.
+    @Test func aReattributionNamesTheVariantItCameFromAndItsAudit() async throws {
+        let folder = try folder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let original = folder.appendingPathComponent("source.opus")
+        let words = [Word("spk_1", 0, 1_000, "Hello"), Word("spk_1", 1_200, 2_000, "there")]
+        let sealed = try CassiniDocument.create(ImportFixtures.opus(packets: 100), transcript: Transcript(words, language: "en-US"),
+                                                title: "Two", processing: JSONObject([("engine", .string("desktop"))]))
+        try Data(sealed).write(to: original)
+        let source = CassiniDocument.read(sealed)
+        let audit = try #require(source.manifest?["provenance"]?.object?["attribution"]?.object)
+        let variant = try #require(source.defaultId)
+
+        var note = Note(title: "Two")
+        note.language = "en-US"
+        note.document = DocumentInfo(state: .ok)
+        note.transcript = [TranscriptSegment(text: "Hello there", start: 0, end: 2, speaker: "Speaker 1", speakerID: "spk_1",
+                                             words: [TimedWord(text: "Hello", start: 0, end: 1),
+                                                     TimedWord(text: "there", start: 1.2, end: 2)])]
+        note.speakers = [NoteSpeaker(id: "spk_1", name: "Speaker 1")]
+        var imported = TranscriptVersion(kind: .imported, segments: note.transcript, speakers: note.speakers ?? [])
+        imported.portableID = variant
+        note.versions = [imported]
+        note.selectedVersionID = imported.id
+        var record = ProvenanceRecord(provenance: TranscriptProvenance(language: "en-US", inferenceMs: 0, resumedFromMs: 0),
+                                      transcript: note.transcript)
+        let turns = [SpeakerTurn(speakerID: "x_a", start: 0, end: 1.1), SpeakerTurn(speakerID: "x_b", start: 1.1, end: 2)]
+        note.applySpeakerAnalysis(turns: turns, matches: [:], voiceNames: [:], autoName: false, stamp: VersionStamp(date: Date()))
+        #expect(note.versions?.last?.attributedFrom == imported.id)
+        record.addSpeakers(.init(model: "diarizer", modelSha256: "abc", turnCount: 2, speakerCount: 2), transcript: note.transcript)
+
+        let output = try await PortableExportService(audio: FakeAudioProcessing(), provenance: FakeProvenance([note.id: record]))
+            .export(note, original: original, playable: original, into: folder, filename: "Two")
+
+        let document = CassiniDocument.read(output)
+        #expect(document.state == .ok)
+        let derived = try #require(processing(document, document.defaultId))
+        #expect(derived["x-derivedFromTranscript"] == .string(variant))
+        #expect(derived["x-sourceAttribution"] == .object(audit))
+        #expect(derived["x-speakerDiarization"]?.object?["modelSha256"] == .string("abc"))
+        #expect(processing(document, variant) == JSONObject([("engine", .string("desktop"))]), "the source keeps its record")
+    }
+
     @Test func aMergedVersionEditedAfterwardsKeepsTheMergeAliases() async throws {
         let folder = try folder()
         defer { try? FileManager.default.removeItem(at: folder) }
