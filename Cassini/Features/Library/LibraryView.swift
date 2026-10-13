@@ -139,7 +139,7 @@ struct LibraryView: View {
     }
 
     private func row(_ row: LibraryRow, day: DayKey) -> some View {
-        NoteRow(row: row, day: day) { action in
+        NoteRow(row: row, day: day, selected: router.selectedNoteID == row.id) { action in
             switch action {
             case .open: model.open(row.id)
             case .resume: Task { await model.resume(row.id) }

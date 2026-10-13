@@ -17,6 +17,19 @@ import CassiniEngine
         #expect(screens.path == [.note(b)])
     }
 
+    @Test func inSplitViewTheDetailsFirstScreenIsSelectedAndHasNoBackButton() {
+        var screens = ScreenStack(path: [.note(a), .savedVoices])
+        #expect(screens.selectedNoteID == nil, "a phone has no selection")
+        #expect(!screens.hidesBackButton(.note(a)))
+        screens.isSplit = true
+        #expect(screens.selectedNoteID == a)
+        #expect(screens.hidesBackButton(.note(a)))
+        #expect(!screens.hidesBackButton(.savedVoices), "a screen pushed over it goes back to it")
+        screens.show(.settings)
+        #expect(screens.selectedNoteID == nil)
+        #expect(screens.hidesBackButton(.settings))
+    }
+
     @Test func closingANotePopsItAndTheScreensAboveIt() {
         var screens = ScreenStack(path: [.note(a), .savedVoices])
         screens.close(noteID: b)

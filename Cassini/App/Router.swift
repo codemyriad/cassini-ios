@@ -43,6 +43,8 @@ enum FullScreenRoute: String, Identifiable, Hashable {
     func popToLibrary() { update { $0.popToLibrary() } }
     func offerModelDownload(for noteID: UUID) { update { $0.offerModelDownload(for: noteID) } }
     func close(noteID: UUID) { update { $0.close(noteID: noteID) } }
+    var selectedNoteID: UUID? { screens.selectedNoteID }
+    func hidesBackButton(_ route: Route) -> Bool { screens.hidesBackButton(route) }
     func below(_ route: Route) -> Route? { screens.below(route) }
     func below(noteID: UUID) -> Route? { screens.below(noteID: noteID) }
     func set(_ stack: [Route]) { update { $0.set(stack) } }

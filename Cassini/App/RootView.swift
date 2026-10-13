@@ -52,7 +52,13 @@ struct RootView: View {
 
 private struct RouteDestination: View {
     let route: Route
+    @Environment(Router.self) private var router
+
     var body: some View {
+        screen.navigationBarBackButtonHidden(router.hidesBackButton(route))
+    }
+
+    @ViewBuilder private var screen: some View {
         switch route {
         case .library: LibraryView()
         case .note(let id, let query, let start): NoteDetailView(noteID: id, query: query, start: start)

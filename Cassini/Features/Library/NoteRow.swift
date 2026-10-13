@@ -16,6 +16,8 @@ struct NoteRow: View {
     let row: LibraryRow
     /// The day of the section the row is in; search results carry their own.
     let day: DayKey
+    /// The note open beside the Library in split view.
+    var selected = false
     let perform: (NoteRowAction) -> Void
     @Environment(\.calendar) private var calendar
     @Environment(\.dynamicTypeSize) private var dynamicType
@@ -29,12 +31,18 @@ struct NoteRow: View {
                 .accessibilityLabel(format.rowLabel(row, day: day))
                 .accessibilityHint(LibraryCopy.openNote)
                 .accessibilityIdentifier("noteRow")
+                .accessibilityAddTraits(selected ? .isSelected : [])
                 .accessibilityActions { accessibilityActions }
             content(format)
         }
-        .background(row.highlighted ? Color.card : Color.card.opacity(0.55), in: RoundedRectangle(cornerRadius: Radius.card))
+        .background(row.highlighted || selected ? Color.card : Color.card.opacity(0.55),
+                    in: RoundedRectangle(cornerRadius: Radius.card))
         .overlay {
-            if row.highlighted { RoundedRectangle(cornerRadius: Radius.card).stroke(Tone.info.color.opacity(0.35), lineWidth: 1) }
+            if selected {
+                RoundedRectangle(cornerRadius: Radius.card).stroke(Color.ember.opacity(0.6), lineWidth: 1.5)
+            } else if row.highlighted {
+                RoundedRectangle(cornerRadius: Radius.card).stroke(Tone.info.color.opacity(0.35), lineWidth: 1)
+            }
         }
     }
 
