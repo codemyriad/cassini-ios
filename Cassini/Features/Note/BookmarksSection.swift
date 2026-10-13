@@ -1,4 +1,5 @@
 import SwiftUI
+import CassiniEngine
 import CassiniNotebook
 
 /// The note's marked moments (an iOS extra), folded under their count: each seeks to its moment, and can be removed.

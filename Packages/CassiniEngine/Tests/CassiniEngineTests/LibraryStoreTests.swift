@@ -2,18 +2,19 @@ import XCTest
 import CassiniNotebook
 import CassiniEngine
 import CassiniEngineTesting
-@testable import Cassini
 
-/// The Library's note mirror over a store whose writes can be made to fail.
+/// The Library's note mirror over a store whose writes can be made to fail: edits replayed over what other writers
+/// save, and changes shown while their write failed (`showUnsaved`) carried by the next write.
 @MainActor final class LibraryStoreTests: XCTestCase {
     private var root: URL!
     private var persistence: CountingNotePersistence!
     private var library: LibraryStore!
+    private var failures: [any Error] = []
 
     override func setUp() async throws {
         root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         persistence = try CountingNotePersistence(root: root)
-        library = LibraryStore(noteStore: NoteStore(persistence: persistence), errors: ErrorPresenter())
+        library = LibraryStore(noteStore: NoteStore(persistence: persistence)) { [unowned self] in failures.append($0) }
         await library.load()
     }
 
@@ -140,5 +141,36 @@ import CassiniEngineTesting
         XCTAssertEqual(library.note(id)?.status, .transcribing)
         XCTAssertEqual(try stored(id)?.status, .transcribing)
         XCTAssertEqual(try stored(id)?.audio, .plain)
+    }
+
+    /// An edit is replayed over the stored note when it is written, so a field another writer saved meanwhile stays.
+    func testAnEditKeepsWhatAnotherWriterSavedMeanwhile() async throws {
+        let note = Note(title: "Standup")
+        try await library.insert(note)
+        let store = try XCTUnwrap(library.noteStore)
+        try await store.mutate(note.id) { $0.playbackPosition = 7 }
+        library.update(note.id) { $0.title = "Retro" }
+        await library.settle()
+        let onDisk = try XCTUnwrap(try stored(note.id))
+        XCTAssertEqual(onDisk.title, "Retro")
+        XCTAssertEqual(onDisk.playbackPosition, 7, "the other writer's change is kept")
+        XCTAssertEqual(library.note(note.id)?.playbackPosition, 7)
+        XCTAssertTrue(failures.isEmpty)
+    }
+
+    /// A failed write puts the note back as stored and reports the failure; a commit says it failed.
+    func testAFailedWriteIsPutBackAndReported() async throws {
+        let note = Note(title: "Standup")
+        try await library.insert(note)
+        persistence.failSaves(true)
+        library.update(note.id) { $0.title = "Retro" }
+        XCTAssertEqual(library.note(note.id)?.title, "Retro", "shown at once")
+        await library.settle()
+        XCTAssertEqual(library.note(note.id)?.title, "Standup")
+        XCTAssertEqual(failures.count, 1)
+        let committed = await library.commit(note.id, reportsFailure: false) { $0.playbackPosition = 2 }
+        XCTAssertNil(committed)
+        XCTAssertEqual(failures.count, 1, "a commit that does not report stays quiet")
+        persistence.failSaves(false)
     }
 }

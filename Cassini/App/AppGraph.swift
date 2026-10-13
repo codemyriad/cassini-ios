@@ -33,7 +33,7 @@ import CassiniNotebook
             await transcriber.assetStatus(locale: Locale(identifier: settings.speechLanguage)) == .ready
         }
         library = LibraryStore(root: environment.root, errors: errors)
-        voices = VoicesStore(library: library, settings: settings, errors: errors, clock: environment.clock)
+        voices = VoicesStore(library: library, settings: settings, clock: environment.clock)
         playback = PlaybackStore(playback: environment.playback, library: library, preview: { note, position in
             var note = note
             note.playbackPosition = position

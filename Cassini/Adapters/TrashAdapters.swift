@@ -2,7 +2,7 @@ import Foundation
 import CassiniEngine
 import CassiniNotebook
 
-// What `TrashService` works over in the app: the Library's notes, the transcription queue, the saved voices, and the
+// What `TrashService` works over in the app: the Library's notes, the transcription queue, and the
 // recording, player, navigation and settings around a move.
 
 extension LibraryStore: TrashNotes {}
@@ -11,11 +11,6 @@ extension ProcessingStore: TrashQueue {
     func isRunning(_ noteID: UUID) -> Bool { state.isRunning(noteID) }
 
     func cancelAndRemove(_ noteID: UUID) async { await forget(noteID) }
-}
-
-extension VoicesStore: VoiceEvidence {
-    /// Newer, damaged or unreadable saved voices stop every permanent deletion, as before WP8's read-only voices.
-    var isReadable: Bool { !isReadOnly }
 }
 
 @MainActor final class AppTrashHost: TrashHost {

@@ -1,4 +1,5 @@
 import SwiftUI
+import CassiniEngine
 import CassiniNotebook
 
 /// The Read & listen player: the position slider over the waveform, the position and total duration, then back
