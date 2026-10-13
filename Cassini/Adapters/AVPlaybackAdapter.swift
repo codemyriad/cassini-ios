@@ -7,7 +7,7 @@ import CassiniNotebook
 /// Playback through `AVAudioPlayer`, with Now Playing metadata and the lock-screen controls (iOS extras).
 ///
 /// - The audio session is taken on `play()` and given back on pause and unload with `.notifyOthersOnDeactivation`, so
-///   the audio another app was playing resumes. `load` swaps the file and keeps the session, so a reload that plays on
+///   the audio another app was playing resumes. Both happen off the main thread, in order (`AudioSession`). `load` swaps the file and keeps the session, so a reload that plays on
 ///   does not hand the audio to other apps for a moment.
 /// - Only the start of an interruption pauses (never its end), and so does losing the output in use (unplugged
 ///   headphones). The system has usually paused the player already when an interruption begins, so the event is sent
@@ -82,7 +82,8 @@ import CassiniNotebook
         guard let player else { return }
         let session = AVAudioSession.sharedInstance()
         try session.setCategory(.playback, mode: .spokenAudio)
-        try session.setActive(true)
+        // Off the main thread (`AudioSession`); a session that cannot be had stops playback as an interruption does.
+        AudioSession.activate { [weak self] error in if error != nil { self?.pauseAndReport(.interrupted) } }
         holdsSession = true
         if finished { player.currentTime = 0; finished = false }
         guard player.play() else {
@@ -127,7 +128,7 @@ import CassiniNotebook
     private func releaseSession() {
         guard holdsSession else { return }
         holdsSession = false
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        AudioSession.deactivate()
     }
 
     private func updateNowPlaying() {

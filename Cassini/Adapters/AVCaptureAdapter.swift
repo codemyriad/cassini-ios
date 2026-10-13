@@ -54,7 +54,7 @@ import CassiniNotebook
         do {
             try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetoothHFP])
             guard session.isInputAvailable else { throw AudioError.noInput }
-            try session.setActive(true)
+            try await AudioSession.activate()
             // A simulator on a Mac without a microphone reports an input but has no channels; recording from it ends
             // the app inside Core Audio.
             guard session.inputNumberOfChannels > 0 else { throw AudioError.noInput }
@@ -72,7 +72,7 @@ import CassiniNotebook
             RunLoop.main.add(meterTimer, forMode: .common)
             return .pcm48kMono
         } catch {
-            try? session.setActive(false, options: .notifyOthersOnDeactivation)
+            AudioSession.deactivate()
             throw (error as? AudioError) ?? .startFailed
         }
     }
@@ -82,17 +82,21 @@ import CassiniNotebook
         recorder.pause(); isPaused = true
     }
 
+    /// Resumes once the session is active again, off the main thread (`AudioSession`); when another app still holds
+    /// the audio, the capture stays paused as after an interruption.
     func resume() throws {
-        guard let recorder else { return }
-        try AVAudioSession.sharedInstance().setActive(true)
-        guard recorder.record() else { throw AudioError.startFailed }
+        guard recorder != nil else { return }
         isPaused = false
+        AudioSession.activate { [weak self] error in
+            guard let self, let recorder = self.recorder, !self.isPaused else { return }
+            if error != nil || !recorder.record() { self.pauseAndReport(.interrupted) }
+        }
     }
 
     func stop() async throws -> CaptureResult {
         let duration = recorder?.currentTime ?? 0
         recorder?.stop(); timer?.invalidate(); timer = nil; recorder = nil; isPaused = false
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        AudioSession.deactivate()
         return CaptureResult(duration: duration)
     }
 
