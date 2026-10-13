@@ -80,10 +80,8 @@ import CassiniNotebook
 
     func play() throws {
         guard let player else { return }
-        let session = AVAudioSession.sharedInstance()
-        try session.setCategory(.playback, mode: .spokenAudio)
         // Off the main thread (`AudioSession`); a session that cannot be had stops playback as an interruption does.
-        AudioSession.activate { [weak self] error in if error != nil { self?.pauseAndReport(.interrupted) } }
+        AudioSession.activateForPlayback { [weak self] error in if error != nil { self?.pauseAndReport(.interrupted) } }
         holdsSession = true
         if finished { player.currentTime = 0; finished = false }
         guard player.play() else {

@@ -6,16 +6,23 @@ import AVFoundation
 enum AudioSession {
     private static let queue = DispatchQueue(label: "app.codemyriad.cassini.audio-session", qos: .userInitiated)
 
-    /// Activates the session; `done` runs on the main actor with the error, if any.
-    static func activate(_ done: @escaping @MainActor @Sendable ((any Error)?) -> Void = { _ in }) {
+    /// Activates the session for playback of spoken audio (its category set first, when it changed); `done` runs on the
+    /// main actor with the error, if any.
+    static func activateForPlayback(_ done: @escaping @MainActor @Sendable ((any Error)?) -> Void) {
         queue.async {
-            let result = Result { try AVAudioSession.sharedInstance().setActive(true) }
+            let result = Result {
+                let session = AVAudioSession.sharedInstance()
+                if session.category != .playback || session.mode != .spokenAudio {
+                    try session.setCategory(.playback, mode: .spokenAudio)
+                }
+                try session.setActive(true)
+            }
             let failure: (any Error)? = if case .failure(let error) = result { error } else { nil }
             Task { @MainActor in done(failure) }
         }
     }
 
-    /// Activates the session and waits for it.
+    /// Activates the session as it is set up and waits for it.
     static func activate() async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
             queue.async {

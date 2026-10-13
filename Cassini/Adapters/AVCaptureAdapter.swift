@@ -87,7 +87,9 @@ import CassiniNotebook
     func resume() throws {
         guard recorder != nil else { return }
         isPaused = false
-        AudioSession.activate { [weak self] error in
+        Task { [weak self] in
+            let error: (any Error)?
+            do { try await AudioSession.activate(); error = nil } catch let failure { error = failure }
             guard let self, let recorder = self.recorder, !self.isPaused else { return }
             if error != nil || !recorder.record() { self.pauseAndReport(.interrupted) }
         }
