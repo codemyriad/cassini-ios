@@ -177,12 +177,26 @@ final class NoteScreenTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Queued"].waitForExistence(within: 10))
         app.buttons["More actions"].tap()
         app.collectionViews.buttons["Rename"].tap()
-        let field = app.textFields["recordingTitleField"]
+        let field = app.textFields["renameField"]
         XCTAssertTrue(field.waitForExistence(within: 5))
         field.tap()
         field.clearAndType("Supplier call")
         app.buttons["Save"].tap()
         XCTAssertTrue(wait("label == 'Supplier call'", app.staticTexts["noteTitle"]))
+    }
+
+    /// The note screen's Rename is the Library's dialog: Save waits for a change, and a blank title says why.
+    @MainActor func testRenameFollowsTheLibrarysRule() {
+        let app = open()
+        app.buttons["More actions"].tap()
+        app.collectionViews.buttons["Rename"].tap()
+        let field = app.textFields["renameField"]
+        XCTAssertTrue(field.waitForExistence(within: 5))
+        XCTAssertFalse(app.buttons["Save"].isEnabled, "an unchanged title is not saved")
+        field.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
+        field.clearAndType(" ")
+        XCTAssertTrue(app.staticTexts["Enter a title."].waitForExistence(within: 3))
+        XCTAssertFalse(app.buttons["Save"].isEnabled)
     }
 
     // ports: SheetBehaviourTest#aPlainNoteDisablesTextExportAndHasNoDocumentInfo

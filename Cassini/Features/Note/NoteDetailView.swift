@@ -379,7 +379,7 @@ struct NoteDetailView: View {
 
     @ViewBuilder private func sheetContent(_ sheet: NoteSheet) -> some View {
         switch sheet {
-        case .rename: RenameNoteSheet(noteID: noteID)
+        case .rename: RenameNoteDialog(noteID: noteID)
         case .speakers: SpeakersView(noteID: noteID)
         case .versions: TranscriptVersionsView(noteID: noteID)
         case .documentInfo: DocumentInfoSheet(noteID: noteID)

@@ -49,7 +49,7 @@ final class CassiniUITests: XCTestCase {
         app.buttons["Pause"].tap()
         app.buttons["More actions"].tap()
         app.buttons["Rename"].tap()
-        let title = app.textFields["recordingTitleField"]
+        let title = app.textFields["renameField"]
         XCTAssertTrue(title.waitForExistence(within: 5))
         title.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
         title.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 100))

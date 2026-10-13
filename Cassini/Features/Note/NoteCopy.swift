@@ -130,7 +130,6 @@ enum NoteCopy {
 
     // MARK: Rename and the missing note
 
-    static let titleField = String(localized: "Title", table: "Note")
     static let unavailableTitle = String(localized: "Recording unavailable", table: "Note")
     static let unavailableBody = String(localized: "Return to your library to choose a recording.", table: "Note")
     static let backToLibrary = String(localized: "Back to library", table: "Note")
