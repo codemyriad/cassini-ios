@@ -213,8 +213,10 @@ final class LibraryUITests: XCTestCase {
     @MainActor func testTheNoteRenameStopsAtTheTitleLimit() {
         let app = launch()
         let field = openRename(app, "Thoughts from the morning walk")
+        clear(field)
         let full = String(repeating: "a", count: 200)
-        field.replaceText(with: full + "a")
+        // Typed, not pasted: after a paste here the sheet's Save sometimes did not answer the next tap.
+        field.typeText(full + "a")
         // The field cuts what goes past the limit as it changes, a moment after the typing on a busy machine.
         _ = field.wait(until: NSPredicate(format: "value == %@", full), within: 3)
         XCTAssertEqual(field.value as? String, full)
