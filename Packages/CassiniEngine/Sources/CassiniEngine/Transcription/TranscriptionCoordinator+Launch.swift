@@ -20,7 +20,8 @@ extension TranscriptionCoordinator {
     ///
     /// A `jobs.json` that cannot be read is never overwritten (see `JobStore.load`): the queue opens empty, or takes no
     /// writes when the file is kept, no `work/` is deleted, notes that say they were queued are set back, and the
-    /// failure is thrown once the queue is open.
+    /// failure is thrown once the queue is open. When it was moved aside, each note's saved progress becomes a job
+    /// paused by the user (`Reconcile.rebuilt`), so the next launch keeps that `work/`.
     @discardableResult
     public func reconcileOnStart(activeNoteID: UUID? = nil) async throws -> ReconcileReport {
         defer { markReady() }
@@ -39,10 +40,16 @@ extension TranscriptionCoordinator {
         let plan = Reconcile.plan(
             jobs: jobs, checkpoints: checkpoints, work: work, trashed: trashed, existing: Set(notes.map(\.id)),
             activeNoteID: activeNoteID, hold: settings.queueHold, now: parts.clock.now)
-        do { try await parts.jobs.replace(plan.jobs, removing: plan.removeJobs) } catch {
+        // A queue moved aside starts empty but takes writes: the saved progress becomes paused jobs again.
+        var rebuilt: [Job] = []
+        if case .unreadable(movedTo: _?)? = loadFailure {
+            rebuilt = Reconcile.rebuilt(work: work, checkpoints: checkpoints, trashed: trashed,
+                                        existing: Set(notes.map(\.id)), activeNoteID: activeNoteID, now: parts.clock.now)
+        }
+        do { try await parts.jobs.replace(plan.jobs, adding: rebuilt, removing: plan.removeJobs) } catch {
             // The repair goes on in memory, so no job stays running without a run; the next write saves it.
             log.error("Cannot save the repaired queue: \(String(describing: error))")
-            await parts.jobs.assume(plan.jobs, removing: plan.removeJobs)
+            await parts.jobs.assume(plan.jobs, adding: rebuilt, removing: plan.removeJobs)
         }
         // Without the stored queue every `work/` would look orphaned: none is deleted.
         for id in plan.deleteWork where loadFailure == nil {

@@ -207,6 +207,22 @@ import CassiniNotebook
                                   now: now)
         #expect(plan.deleteWork.isEmpty)
     }
+
+    /// After a damaged `jobs.json`: only the saved progress of a note that exists, is not in Recently Deleted and is
+    /// not being recorded comes back, as a job paused by the user with the checkpoint's numbers.
+    @Test func theSavedProgressOfAnUnreadableQueueComesBackAsPausedJobs() {
+        let saved = UUID(), mismatched = UUID(), bare = UUID(), trashed = UUID(), recording = UUID(), gone = UUID()
+        let checkpoint = CheckpointStatus.saved(doneMs: 28_000, totalMs: 60_000, words: 40)
+        let jobs = Reconcile.rebuilt(
+            work: [saved, mismatched, bare, trashed, recording, gone],
+            checkpoints: [saved: checkpoint, mismatched: .mismatch, bare: .missing, trashed: checkpoint,
+                          recording: checkpoint, gone: checkpoint],
+            trashed: [trashed], existing: [saved, mismatched, bare, trashed, recording], activeNoteID: recording, now: now)
+        #expect(jobs.map(\.noteID) == [saved])
+        #expect(jobs.first?.state == .paused && jobs.first?.pauseReason == .user && jobs.first?.kind == .transcribe)
+        #expect(jobs.first?.doneMs == 28_000 && jobs.first?.totalMs == 60_000 && jobs.first?.words == 40)
+        #expect(jobs.first?.seq == 1)
+    }
 }
 
 @Suite struct EnqueueRulesTests {

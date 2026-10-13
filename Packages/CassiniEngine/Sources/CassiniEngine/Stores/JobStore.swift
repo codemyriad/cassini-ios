@@ -112,9 +112,10 @@ public actor JobStore {
     }
 
     /// Writes every job of `changed` and drops the jobs of `removing` in one atomic write, each changed job keeping the
-    /// `seq` it has; jobs that are not stored are ignored.
-    public func replace(_ changed: [Job], removing: [UUID] = []) throws {
-        let known = changed.filter { jobs[$0.noteID] != nil }
+    /// `seq` it has; jobs that are not stored are ignored, unless they are in `adding` (the launch's rebuild of the
+    /// jobs of a queue that could not be read), which writes the jobs it has that are not stored yet.
+    public func replace(_ changed: [Job], adding: [Job] = [], removing: [UUID] = []) throws {
+        let known = changed.filter { jobs[$0.noteID] != nil } + adding.filter { jobs[$0.noteID] == nil }
         let gone = removing.filter { jobs[$0] != nil }
         guard !known.isEmpty || !gone.isEmpty else { return }
         try write(known, removing: gone)
@@ -122,8 +123,9 @@ public actor JobStore {
 
     /// `replace` in memory only, for a repair that could not be written: the queue goes on from the repaired jobs, and
     /// the next write saves them with its own change.
-    public func assume(_ changed: [Job], removing: [UUID] = []) {
+    public func assume(_ changed: [Job], adding: [Job] = [], removing: [UUID] = []) {
         for job in changed where jobs[job.noteID] != nil { jobs[job.noteID] = job }
+        for job in adding where jobs[job.noteID] == nil { jobs[job.noteID] = job }
         for id in removing { jobs[id] = nil }
     }
 

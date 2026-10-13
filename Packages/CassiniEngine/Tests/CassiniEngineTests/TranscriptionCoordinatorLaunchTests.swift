@@ -26,9 +26,21 @@ extension TranscriptionCoordinatorTests {
             #expect(try Data(contentsOf: aside) == broken)
             #expect(h.checkpoints.hasWork(note.id), "no saved progress is deleted without the queue")
             #expect(await h.notes.note(note.id)?.status == .audioOnly, "the note no longer says it is queued")
+            let paused = try #require(await h.job(note.id), "the saved progress is a paused job again")
+            #expect(paused.state == .paused && paused.pauseReason == .user)
+            #expect(paused.doneMs == 28_000 && paused.totalMs == 60_000 && paused.words == 40)
 
-            #expect(await h.coordinator.transcribe(note.id) == .queued(changed: true))
-            #expect(try await h.run(0).noteID == note.id)
+            // The next launch reads the rebuilt queue: the work is owned, so it stays, and the note shows its progress.
+            let next = try h.reopened()
+            try await next.start()
+            #expect(next.checkpoints.hasWork(note.id), "the saved progress outlives the launch after the damage")
+            #expect(next.coordinator.state.jobs[note.id]?.state == .paused)
+            #expect(next.coordinator.state.jobs[note.id]?.doneMs == 28_000)
+
+            #expect(await next.coordinator.transcribe(note.id) == .queued(changed: true))
+            let resumed = try await next.run(0)
+            #expect(resumed.noteID == note.id)
+            #expect(resumed.job.doneMs == 28_000, "Resume goes on from the saved progress")
             #expect(try Data(contentsOf: aside) == broken)
         }
 

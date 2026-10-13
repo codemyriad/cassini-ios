@@ -75,6 +75,23 @@ public enum Reconcile {
         return plan
     }
 
+    /// The jobs to write after a `jobs.json` that could not be read was moved aside and the queue started empty: each
+    /// note with saved progress (`checkpoints` holds `.saved`) that exists, is not in Recently Deleted and is not being
+    /// recorded gets a job paused by the user with its checkpoint's numbers, in note-id order, so its `work/` is owned
+    /// and kept at the next launch, and Resume goes on from it (as Android's catalogue rebuild turns such work into a
+    /// paused job). The job's language is empty: the run takes the note's.
+    public static func rebuilt(work: Set<UUID>, checkpoints: [UUID: CheckpointStatus], trashed: Set<UUID>,
+                               existing: Set<UUID>, activeNoteID: UUID?, now: Date) -> [Job] {
+        let resumable = work.intersection(existing).subtracting(trashed).filter { id in
+            guard id != activeNoteID, case .saved? = checkpoints[id] else { return false }
+            return true
+        }
+        return resumable.sorted { $0.uuidString < $1.uuidString }.enumerated().map { index, id in
+            Job(noteID: id, seq: index + 1, kind: .transcribe, state: .paused, pauseReason: .user, enqueuedAt: now)
+                .withNumbers(of: checkpoints[id] ?? .missing)
+        }
+    }
+
     private static func running(_ job: Job, _ checkpoint: CheckpointStatus, _ hold: QueueHold?, _ now: Date,
                                 _ plan: inout Plan) {
         var changed = job
