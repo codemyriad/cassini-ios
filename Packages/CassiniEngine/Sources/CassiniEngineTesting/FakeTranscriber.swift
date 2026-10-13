@@ -10,6 +10,8 @@ public struct FakeTranscriber: Transcribing {
         case returns([TranscriptSegment], total: TimeInterval)
         /// Reports `done` of `total` seconds and never finishes.
         case frozen(done: TimeInterval, total: TimeInterval)
+        /// Downloads the speech model up to `fraction` and never finishes.
+        case downloading(fraction: Double)
         case fails(TranscriptionError)
     }
 
@@ -31,6 +33,9 @@ public struct FakeTranscriber: Transcribing {
             return TranscriptionResult(segments: segments)
         case .frozen(let done, let total):
             events(.progress(done: done, total: total))
+            while true { try await Task.sleep(for: .seconds(3600)) }
+        case .downloading(let fraction):
+            events(.preparingModel(fraction))
             while true { try await Task.sleep(for: .seconds(3600)) }
         case .fails(let error):
             throw error

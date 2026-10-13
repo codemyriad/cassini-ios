@@ -72,6 +72,7 @@ import CassiniEngineTesting
         if arguments.contains("--ui-testing") {
             return uiTesting(reset: arguments.contains("--reset-test-data"), seed: seed(in: arguments),
                              openFixture: fixture(in: arguments), modelsMissing: arguments.contains("--models-missing"),
+                             modelDownloading: arguments.contains("--model-downloading"),
                              notificationsDenied: arguments.contains("--notifications-denied"))
         }
         #endif
@@ -87,11 +88,13 @@ extension AppEnvironment {
 
     /// A separate library and preferences, a fixed clock and en_US formatting. Transcription is faked; the
     /// recording seed also fakes the microphone and its permission. With `modelsMissing` the speech and speaker models
-    /// are not installed, so a Transcribe asks for the download first. Speaker models are never installed.
+    /// are not installed, so a Transcribe asks for the download first; with `modelDownloading` (`--model-downloading`)
+    /// the processing seed's job stays in its speech model download at 46 %. Speaker models are never installed.
     /// Notifications are never asked for and count as allowed, so no banner says they are off, unless
     /// `notificationsDenied` (`--notifications-denied`) turns them off.
     static func uiTesting(reset: Bool, seed: Seed?, openFixture: OpenFixture? = nil,
-                          modelsMissing: Bool = false, notificationsDenied: Bool = false) -> AppEnvironment {
+                          modelsMissing: Bool = false, modelDownloading: Bool = false,
+                          notificationsDenied: Bool = false) -> AppEnvironment {
         let root = URL.applicationSupportDirectory.appendingPathComponent("CassiniUITests", isDirectory: true)
         let defaults = UserDefaults(suiteName: uiTestingSuite) ?? .standard
         if reset {
@@ -99,10 +102,13 @@ extension AppEnvironment {
             defaults.removePersistentDomain(forName: uiTestingSuite)
         }
         let status: ModelPartStatus = modelsMissing ? .notDownloaded : .ready
-        let transcriber = seed == .processing || seed == .statuses
-            ? FakeTranscriber(.frozen(done: 0.62 * TestFixtures.processingDuration, total: TestFixtures.processingDuration),
-                              status: status)
-            : FakeTranscriber(.returns(TestFixtures.transcribedSegments, total: TestFixtures.fixtureDuration), status: status)
+        let transcriber = switch seed {
+        case .processing where modelDownloading: FakeTranscriber(.downloading(fraction: 0.46), status: status)
+        case .processing, .statuses:
+            FakeTranscriber(.frozen(done: 0.62 * TestFixtures.processingDuration, total: TestFixtures.processingDuration),
+                            status: status)
+        default: FakeTranscriber(.returns(TestFixtures.transcribedSegments, total: TestFixtures.fixtureDuration), status: status)
+        }
         return AppEnvironment(
             root: root, defaults: defaults, clock: FixedClock(now: uiTestingNow),
             locale: Locale(identifier: "en_US"), timeZone: TimeZone(identifier: "UTC") ?? .gmt,

@@ -1,6 +1,9 @@
 import Foundation
 import Synchronization
 import CassiniNotebook
+#if os(iOS)
+import os
+#endif
 
 /// What a job reads from the app's settings when it starts.
 public struct JobSettings: Hashable, Sendable {
@@ -68,14 +71,28 @@ public struct TranscriptionJob: TranscriptionJobRunning {
     private let clock: any AppClock
     private let limits: Limits
     private let uptimeMs: @Sendable () -> Int64
+    private let availableMemory: @Sendable () -> Int64?
 
+    /// `availableMemory` is the memory left to Cassini, for the memory check at the start (`MemoryPreflight`).
     public init(notes: NoteStore, transcriber: any Transcribing, analyzer: any SpeakerAnalyzing,
                 checkpoints: any CheckpointStoring, provenance: any ProvenanceStoring, host: any TranscriptionJobHost,
                 clock: any AppClock, limits: Limits = Limits(),
-                uptimeMs: @escaping @Sendable () -> Int64 = TranscriptionJob.uptimeMs) {
+                uptimeMs: @escaping @Sendable () -> Int64 = TranscriptionJob.uptimeMs,
+                availableMemory: @escaping @Sendable () -> Int64? = TranscriptionJob.availableMemory) {
         self.notes = notes; self.transcriber = transcriber; self.analyzer = analyzer; self.checkpoints = checkpoints
         self.provenance = provenance; self.host = host; self.clock = clock; self.limits = limits
-        self.uptimeMs = uptimeMs
+        self.uptimeMs = uptimeMs; self.availableMemory = availableMemory
+    }
+
+    /// `os_proc_available_memory()`: what Cassini can still allocate before iOS ends it; nil where the system does not
+    /// tell (a Mac).
+    @Sendable public static func availableMemory() -> Int64? {
+        #if os(iOS)
+        let bytes = os_proc_available_memory()
+        return bytes > 0 ? Int64(bytes) : nil
+        #else
+        return nil
+        #endif
     }
 
     /// Monotonic milliseconds.
@@ -131,8 +148,9 @@ public struct TranscriptionJob: TranscriptionJobRunning {
         let restored = checkpoint.map {
             RestoredCheckpoint(doneMs: $0.doneMs, totalMs: $0.totalMs, words: $0.draftWords, elapsedMs: $0.elapsedMs)
         }
-        events(.started(JobStart(totalMs: checkpoint?.totalMs ?? knownMs, restored: restored, speakers: speakers,
-                                 prints: speakers)))
+        let totalMs = checkpoint?.totalMs ?? knownMs
+        events(.started(JobStart(totalMs: totalMs, restored: restored, speakers: speakers, prints: speakers,
+                                 lowMemory: MemoryPreflight.lowMemory(durationMs: totalMs, availableBytes: availableMemory()))))
         var context = Context(noteID: job.noteID, url: url, source: note.audioFilename, language: language,
                               knownMs: knownMs, settings: settings, stop: stop, events: events)
         context.signature = CheckpointState.signature(of: url)

@@ -80,8 +80,7 @@ private struct ProgressCardContent: View {
             StatGrid(progress: progress)
         }
         if progress.lowMemory {
-            Text("This phone is low on memory. Close other apps if transcription stops.", tableName: "Processing")
-                .font(.caption).foregroundStyle(Color.toneWarn)
+            LowMemoryHint()
         }
         StopButton(action: stop)
         Footnote()
@@ -98,6 +97,21 @@ private struct DownloadRow: View {
         Banner(spec: Notices.downloading(download)) { action in
             if action == .cancel { cancel() }
         }
+    }
+}
+
+/// The memory check's hint (Android's copy), naming the kind of device it runs on.
+private struct LowMemoryHint: View {
+    var body: some View {
+        Group {
+            if UIDevice.current.userInterfaceIdiom == .pad {
+                Text("This iPad is low on memory. Close other apps if transcription stops.", tableName: "Processing",
+                     comment: "The memory hint on the processing card of an iPad")
+            } else {
+                Text("This phone is low on memory. Close other apps if transcription stops.", tableName: "Processing")
+            }
+        }
+        .font(.caption).foregroundStyle(Color.toneWarn)
     }
 }
 

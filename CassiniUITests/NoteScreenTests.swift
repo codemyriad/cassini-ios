@@ -185,6 +185,21 @@ final class NoteScreenTests: XCTestCase {
         XCTAssertTrue(wait("label == 'Supplier call'", app.staticTexts["noteTitle"]))
     }
 
+    // ports: ModelDownloadFlowTest (Cancel in the processing card's download banner)
+    /// The job's model download shows its part in the card, and Cancel stops the job: the note is audio only again.
+    @MainActor func testCancelInTheCardsDownloadStopsTheJob() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed", "processing", "--model-downloading",
+                               "--open-fixture", "CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC"]
+        app.launchAndWait()
+        let banner = app.descendants(matching: .any)["banner.DL_DOWNLOADING"]
+        XCTAssertTrue(banner.waitForExistence(within: 15))
+        XCTAssertTrue(app.staticTexts["Downloading speech recognition — 46%"].exists)
+        banner.buttons["Cancel"].tap()
+        XCTAssertTrue(banner.waitForNonExistence(within: 10))
+        XCTAssertTrue(app.buttons["Transcribe"].waitForExistence(within: 10), "the note is audio only again")
+    }
+
     /// The note screen's Rename is the Library's dialog: Save waits for a change, and a blank title says why.
     @MainActor func testRenameFollowsTheLibrarysRule() {
         let app = open()
