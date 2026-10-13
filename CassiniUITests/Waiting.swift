@@ -24,6 +24,44 @@ extension XCUIElement {
     }
 }
 
+/// Scrolling until something is on the screen. Each swipe costs about two and a half seconds, most of it XCTest
+/// waiting for the list to settle, so the condition is checked before every swipe, not swiped past.
+extension XCUIElement {
+    /// Swipes this scroll view up (towards the end of the list) or down until `done` holds, at most `attempts` times.
+    /// `fast` swipes fling further, for getting to the end of a list rather than to a row.
+    @MainActor @discardableResult
+    func scroll(up: Bool = true, attempts: Int = 8, fast: Bool = false, until done: () -> Bool) -> Bool {
+        let velocity: XCUIGestureVelocity = fast ? .fast : .default
+        for _ in 0..<attempts {
+            if done() { return true }
+            if up { swipeUp(velocity: velocity) } else { swipeDown(velocity: velocity) }
+        }
+        return done()
+    }
+}
+
+extension XCUIElement {
+    /// Replaces the text of this focused field with `text` in one edit, as Android's `performTextReplacement`: all of
+    /// it selected, then `text` pasted. Typing 200 characters one key at a time takes XCTest about four seconds.
+    @MainActor func replaceText(with text: String) {
+        UIPasteboard.general.string = text
+        typeKey("a", modifierFlags: .command)
+        typeKey("v", modifierFlags: .command)
+    }
+}
+
+/// The labels of the elements on the screen whose identifier is `identifier`, from one snapshot of the app: one
+/// round trip instead of one or more per element.
+@MainActor func labels(in app: XCUIApplication, identifier: String) -> [String] {
+    guard let root = try? app.snapshot() else { return [] }
+    var found: [String] = [], stack: [any XCUIElementSnapshot] = [root]
+    while let element = stack.popLast() {
+        if element.identifier == identifier { found.append(element.label) }
+        stack.append(contentsOf: element.children)
+    }
+    return found
+}
+
 @MainActor func poll(within timeout: TimeInterval, _ condition: () -> Bool) -> Bool {
     let deadline = Date().addingTimeInterval(timeout)
     while true {
@@ -36,9 +74,15 @@ extension XCUIElement {
 extension XCUIApplication {
     /// Launches and waits until the app's launch work is done: the seed written, the library read and any fixture note
     /// opened. A step taken before that, on a busy machine, could find an empty screen.
-    @MainActor func launchAndWait(file: StaticString = #filePath, line: UInt = #line) {
+    ///
+    /// When the app is already on the screen, launched with the same system arguments (such as a text size), and the
+    /// launch resets the test data, the launch happens inside the app (`Launches.relaunchInApp`): about a second
+    /// instead of five. `fresh` asks for a new process.
+    @MainActor func launchAndWait(fresh: Bool = false, file: StaticString = #filePath, line: UInt = #line) {
+        if !fresh, Launches.relaunchInApp(launchArguments) { return }
         Self.settleInstall()
         launch()
+        Launches.launched(launchArguments)
         XCTAssertTrue(staticTexts["launchFinished"].waitForExistence(within: 30), "the launch did not finish", file: file, line: line)
     }
 
@@ -56,6 +100,80 @@ extension XCUIApplication {
             app.launch()
             _ = app.staticTexts["launchFinished"].waitForExistence(within: 15)
             app.terminate()
+        }
+    }
+}
+
+/// UI-test launches made inside the running app. XCTest's launch of a new process costs about five seconds (ending
+/// the last one, setting up the automation session, waiting for the app to settle); the app instead answers
+/// `cassini://ui-test/relaunch` by building a new app graph from the arguments, as a launch would, over a library
+/// and preferences of their own (`UITestRelaunch` and `UITestStorage` in the app). A new process is still launched
+/// for the first test of a runner, after a test that failed, when the app is not in the foreground (a test ended
+/// it, to check what persists), when the arguments keep the test data, and when the system arguments differ.
+@MainActor enum Launches {
+    /// The app's own options, with whether each takes a value; the rest of the arguments are the system's.
+    private static let options: [String: Bool] = [
+        "--ui-testing": false, "--reset-test-data": false, "--seed-test-data": false, "--seed": true,
+        "--open-fixture": true, "--models-missing": false, "--notifications-denied": false,
+    ]
+    /// The system arguments of the process this runner launched last; nil when a new process must come first.
+    private static var processArguments: [String]?
+    private static let observer = FailureObserver()
+
+    static func systemArguments(_ arguments: [String]) -> [String] {
+        var system: [String] = [], index = arguments.startIndex
+        while index < arguments.endIndex {
+            let argument = arguments[index]
+            index += 1
+            guard let takesValue = options[argument] else { system.append(argument); continue }
+            if takesValue, index < arguments.endIndex, !arguments[index].hasPrefix("-") { index += 1 }
+        }
+        return system
+    }
+
+    static func launched(_ arguments: [String]) {
+        observer.register()
+        processArguments = systemArguments(arguments)
+    }
+
+    /// A test failed: whatever it left on the screen goes with a new process.
+    static func invalidate() { processArguments = nil }
+
+    /// Relaunches inside the app and waits for its launch work; false when the launch needs a new process or the
+    /// app did not answer.
+    static func relaunchInApp(_ arguments: [String]) -> Bool {
+        guard arguments.contains("--reset-test-data"), let running = processArguments,
+              running == systemArguments(arguments), XCUIApplication().state == .runningForeground else { return false }
+        let token = UUID().uuidString
+        var components = URLComponents()
+        components.scheme = "cassini"; components.host = "ui-test"; components.path = "/relaunch"
+        components.queryItems = [URLQueryItem(name: "token", value: token)] + arguments.map { URLQueryItem(name: "arg", value: $0) }
+        guard let url = components.url else { return false }
+        XCUIDevice.shared.system.open(url)
+        let marker = XCUIApplication().staticTexts.matching(NSPredicate(format: "identifier == 'launchFinished' AND value == %@", token))
+            .firstMatch
+        if marker.waitForExistence(within: 10) { return true }
+        let markers = XCUIApplication().staticTexts.matching(identifier: "launchFinished").allElementsBoundByIndex
+        print("The relaunch inside the app did not answer (state \(XCUIApplication().state.rawValue), markers "
+              + "\(markers.map { $0.value as? String ?? "?" })); launching a new process")
+        processArguments = nil
+        return false
+    }
+
+    /// Forgets the launched process when a test fails, so the next test starts in a new one.
+    private final class FailureObserver: NSObject, XCTestObservation {
+        private var registered = false
+
+        @MainActor func register() {
+            guard !registered else { return }
+            registered = true
+            XCTestObservationCenter.shared.addTestObserver(self)
+        }
+
+        // Not every recorded issue fails the test: the app's runtime warnings are issues too.
+        nonisolated func testCaseDidFinish(_ testCase: XCTestCase) {
+            guard testCase.testRun?.hasSucceeded == false else { return }
+            MainActor.assumeIsolated { Launches.invalidate() }
         }
     }
 }

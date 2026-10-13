@@ -33,7 +33,7 @@ final class SpeakerNamingFlowTests: XCTestCase {
         app.buttons["Settings"].tap()
         XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(within: 5))
         let savedVoices = app.buttons["savedVoicesRow"]
-        for _ in 0..<6 where !savedVoices.isHittable { app.swipeUp() }
+        app.scroll(attempts: 6) { savedVoices.exists && savedVoices.isHittable }
         savedVoices.tap()
         XCTAssertTrue(element(app, containing: "Sam Rivera").waitForExistence(within: 5))
         XCTAssertTrue(element(app, containing: "1 note").waitForExistence(within: 5))

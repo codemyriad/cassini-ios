@@ -19,10 +19,18 @@ import CassiniEngine
                 }
                 #if DEBUG
                 .overlay(alignment: .bottomLeading) {
-                    if graph.environment.launch.marksLaunchFinished { LaunchFinishedMarker(finished: graph.launchFinished) }
+                    if graph.environment.launch.marksLaunchFinished {
+                        LaunchFinishedMarker(finished: graph.launchFinished, token: graph.environment.launch.token)
+                    }
                 }
                 #endif
                 .onOpenURL { url in
+                    #if DEBUG
+                    if let relaunch = UITestRelaunch(url: url, launchedForUITests: graph.environment.launch.marksLaunchFinished) {
+                        graph = relaunch.graph(replacing: graph)
+                        return
+                    }
+                    #endif
                     if let link = DeepLinks.parse(url: url) { graph.handle(link) } else { graph.imports.open(url) }
                 }
                 .onChange(of: scenePhase, initial: true) { _, phase in
@@ -33,6 +41,8 @@ import CassiniEngine
                     if phase == .active, graph.startup.isReady { Task { _ = try? await graph.trash.purgeExpired() } }
                     if phase == .background { graph.enterBackground() }
                 }
+                // A new graph (a UI-test relaunch inside the app) starts every screen, task and observer afresh.
+                .id(ObjectIdentifier(graph))
         }
     }
 }
@@ -57,14 +67,17 @@ import CassiniEngine
 
 #if DEBUG
 /// What a UI test waits for after a launch: the launch work is done (the seed is written, the library read, a fixture
-/// note opened), so the test's first step cannot overtake it on a busy machine. Invisible and not hit-testable.
+/// note opened), so the test's first step cannot overtake it on a busy machine. Invisible and not hit-testable. Its
+/// value is the token of the relaunch inside the app that built the graph.
 private struct LaunchFinishedMarker: View {
     let finished: LaunchFinished
+    /// The relaunch this graph answers (`UITestRelaunch`); empty for a launch of the process.
+    let token: String
 
     var body: some View {
         if finished.value {
             Text(verbatim: " ").font(.system(size: 1)).opacity(0.01).allowsHitTesting(false)
-                .accessibilityIdentifier("launchFinished")
+                .accessibilityIdentifier("launchFinished").accessibilityValue(Text(verbatim: token))
         }
     }
 }

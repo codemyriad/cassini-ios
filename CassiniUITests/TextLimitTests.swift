@@ -13,14 +13,10 @@ final class TextLimitTests: XCTestCase {
         return app
     }
 
-    /// Types past `limit` into `field`, then one more character; it shows `limit` characters each time.
+    /// Fills `field` past `limit` in one edit, then types one more character; it shows `limit` characters each time.
     @MainActor private func fillPastTheLimit(_ field: XCUIElement, _ limit: Int, file: StaticString = #filePath, line: UInt = #line) {
-        // The cursor goes to the end, so the deletes clear the whole field.
-        field.coordinate(withNormalizedOffset: CGVector(dx: 0.98, dy: 0.5)).tap()
-        let count = (field.value as? String)?.count ?? 0
-        field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: count + 2))
         let full = String(repeating: "a", count: limit)
-        field.typeText(full + "a")
+        field.replaceText(with: full + "a")
         // The field cuts what goes past the limit as it changes, a moment after the typing on a busy machine.
         _ = field.wait(until: NSPredicate(format: "value == %@", full), within: 3)
         XCTAssertEqual(field.value as? String, full, file: file, line: line)
@@ -34,8 +30,9 @@ final class TextLimitTests: XCTestCase {
         let app = launch(["--seed", "voices"])
         XCTAssertTrue(app.buttons["Settings"].waitForExistence(within: 15))
         app.buttons["Settings"].tap()
+        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(within: 5))
         let savedVoices = app.buttons["savedVoicesRow"]
-        for _ in 0..<6 where !savedVoices.isHittable { app.swipeUp() }
+        app.scroll(attempts: 6) { savedVoices.exists && savedVoices.isHittable }
         savedVoices.tap()
         let options = app.buttons["Options for Alex Moreau"]
         XCTAssertTrue(options.waitForExistence(within: 5))
@@ -43,6 +40,7 @@ final class TextLimitTests: XCTestCase {
         app.buttons["Rename…"].tap()
         let field = app.alerts.textFields.firstMatch
         XCTAssertTrue(field.waitForExistence(within: 5))
+        field.tap()
         fillPastTheLimit(field, Self.nameLimit)
     }
 
