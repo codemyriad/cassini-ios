@@ -4,8 +4,8 @@ import CassiniEngine
 import CassiniEngineTesting
 import CassiniNotebook
 
-/// The rules of `VoicesStore` over real note and voice files (the app's `VoicesStoreTests` drive the same store through
-/// the app graph): what Name a speaker is given, the trashed notes left out of matching, the Forget everyone generation
+/// The rules of `VoicesStore` over real note and voice files (`VoicesStoreTests` has the naming and saved-voice
+/// flows): what Name a speaker is given, the trashed notes left out of matching, the Forget everyone generation
 /// guard, and why a save is refused.
 @MainActor @Suite(.serialized) final class VoicesStoreRulesTests {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
