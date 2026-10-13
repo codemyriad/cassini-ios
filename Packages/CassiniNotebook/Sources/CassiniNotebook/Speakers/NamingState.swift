@@ -101,6 +101,21 @@ public struct NamingResult: Hashable, Sendable {
     public var state: NamingState?
     public var effects: [NamingEffect]
     public init(_ state: NamingState?, _ effects: [NamingEffect] = []) { self.state = state; self.effects = effects }
+
+    /// The effects that change the note or the saved voices, in order: the sheet stays while they are written and
+    /// closes once they are (`NamingCommit`).
+    public var writes: [NamingEffect] { effects.filter(\.isWrite) }
+}
+
+extension NamingEffect {
+    /// Whether the effect changes the note or the saved voices, rather than the sheet (a sample, the question's focus,
+    /// closing).
+    public var isWrite: Bool {
+        switch self {
+        case .playRange, .focusQuestion, .close: false
+        case .relabel, .rememberVoice, .renameVoice, .clearMatch, .unenrol, .reject, .merge: true
+        }
+    }
 }
 
 /// The Name a speaker sheet as the screen shows it.

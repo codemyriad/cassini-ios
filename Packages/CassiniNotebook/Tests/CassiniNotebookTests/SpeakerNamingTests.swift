@@ -237,3 +237,14 @@ import Testing
         #expect(effects(state, .save) == [.relabel(speakerID: "s3", name: "Anna"), .close])
     }
 }
+
+@Suite struct NamingWritesTests {
+    /// The sheet's own effects (a sample, the question's focus, closing) are never written.
+    @Test func onlyNoteAndVoiceChangesAreWrites() {
+        let window = SampleWindow(start: 1, end: 5)
+        let result = NamingResult(nil, [.playRange(window), .relabel(speakerID: "a", name: "Anna"), .focusQuestion,
+                                        .rememberVoice(speakerID: "a", voiceID: nil, name: "Anna"), .close])
+        #expect(result.writes == [.relabel(speakerID: "a", name: "Anna"), .rememberVoice(speakerID: "a", voiceID: nil, name: "Anna")])
+        #expect(NamingResult(nil, [.close]).writes.isEmpty)
+    }
+}
