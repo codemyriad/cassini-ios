@@ -178,6 +178,8 @@ import CassiniNotebook
         try await until { transcriber.installs == 1 }
         installs.cancel()
         try await until { transcriber.cancelled }
+        // The cancelled install ends by reading the models again; nothing is installed after that read.
+        try await until { installs.status(of: .speech) == .notDownloaded }
         try await Task.sleep(for: .milliseconds(50))
         #expect(analyzer.installs == 0, "the parts after the cancelled one are dropped")
         #expect(analyzer.cancels == 0, "the speaker models' install was not running")
