@@ -18,9 +18,10 @@ extension XCUIElement {
         poll(within: timeout) { exists && isEnabled }
     }
 
-    /// Waits until `predicate`, over the element's attributes as for `XCTNSPredicateExpectation`, holds.
+    /// Waits until `predicate`, over the element's attributes as for `XCTNSPredicateExpectation`, holds. While the
+    /// element is missing only `exists == false` can hold (reading another attribute of it would fail the test).
     @MainActor func wait(until predicate: NSPredicate, within timeout: TimeInterval) -> Bool {
-        poll(within: timeout) { predicate.evaluate(with: self) }
+        poll(within: timeout) { exists ? predicate.evaluate(with: self) : predicate.evaluate(with: ["exists": false]) }
     }
 }
 
@@ -41,12 +42,22 @@ extension XCUIElement {
 }
 
 extension XCUIElement {
-    /// Replaces the text of this focused field with `text` in one edit, as Android's `performTextReplacement`: all of
-    /// it selected, then `text` pasted. Typing 200 characters one key at a time takes XCTest about four seconds.
+    /// Replaces the text of this focused field with `text` in one edit, as Android's `performTextReplacement`: the
+    /// field cleared, then `text` pasted. Typing 200 characters one key at a time takes XCTest about four seconds.
+    /// A paste that does not land (the shortcut can be dropped on a busy machine) is typed instead.
     @MainActor func replaceText(with text: String) {
+        let current = (value as? String) ?? ""
+        let placeholder = placeholderValue ?? ""
+        let length = current == placeholder ? 0 : current.count
+        if length > 0 { typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: length + 2)) }
         UIPasteboard.general.string = text
-        typeKey("a", modifierFlags: .command)
         typeKey("v", modifierFlags: .command)
+        // The field may cut what is pasted to its limit.
+        let pasted = poll(within: 2) { ((value as? String).map { $0.count > 1 && text.hasPrefix($0) }) ?? false }
+        guard !pasted else { return }
+        let left = (value as? String).map { $0 == placeholder ? 0 : $0.count } ?? 0
+        if left > 0 { typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: left + 2)) }
+        typeText(text)
     }
 }
 
@@ -80,27 +91,9 @@ extension XCUIApplication {
     /// instead of five. `fresh` asks for a new process.
     @MainActor func launchAndWait(fresh: Bool = false, file: StaticString = #filePath, line: UInt = #line) {
         if !fresh, Launches.relaunchInApp(launchArguments) { return }
-        Self.settleInstall()
         launch()
         Launches.launched(launchArguments)
         XCTAssertTrue(staticTexts["launchFinished"].waitForExistence(within: 30), "the launch did not finish", file: file, line: line)
-    }
-
-    @MainActor private static var installSettled = false
-
-    /// xcodebuild installs the app while the test runner starts, so the runner's first launch can meet that install:
-    /// the launch fails, or the app it reaches is ended under it. Once per runner, before the first test's own launch,
-    /// a launch whose problems are expected lets the install finish.
-    @MainActor private static func settleInstall() {
-        guard !installSettled else { return }
-        installSettled = true
-        let app = XCUIApplication()
-        app.launchArguments = ["--ui-testing", "--reset-test-data"]
-        XCTExpectFailure("the first launch can meet xcodebuild's install of the app", options: .nonStrict()) {
-            app.launch()
-            _ = app.staticTexts["launchFinished"].waitForExistence(within: 15)
-            app.terminate()
-        }
     }
 }
 

@@ -387,18 +387,23 @@ test_on() {
 never_started() {
     local rc="$1" log="$2"
     [ "$rc" = 124 ] && return 0
-    [ "$rc" != 0 ] && ! grep -q "^Test Case '" "$log" && grep -qE "failed to launch|Failed to install|Early unexpected exit|Test runner never began" "$log"
+    [ "$rc" != 0 ] && ! grep -q "^Test Case '" "$log" && grep -qiE "failed to launch|failed to install|early unexpected exit|test runner never began|unknown to FrontBoard" "$log"
 }
 
-# test_on once more, on a freshly booted clone, when the first run never started a test.
+# test_on once more when the first run never started a test: at once when the app or runner failed to launch
+# (FrontBoard sometimes has not registered an app installed a moment before), on a freshly booted clone when it hung.
 test_on_retrying() {
     local target="$1" log="$2" bundle="$3" udid="$4" rc=0
     test_on "$@" || rc=$?
     if never_started "$rc" "$log"; then
-        echo "  $(basename "$log" .log): no test started (exit $rc); rebooting the clone and trying once more"
         mv "$log" "${log%.log}-attempt-1.log"
-        xcrun simctl shutdown "$udid" > /dev/null 2>&1 || true
-        boot "$udid"
+        if [ "$rc" = 124 ]; then
+            echo "  $(basename "$log" .log): no test started; rebooting the clone and trying once more"
+            xcrun simctl shutdown "$udid" > /dev/null 2>&1 || true
+            boot "$udid"
+        else
+            echo "  $(basename "$log" .log): the test host or runner did not launch; trying once more"
+        fi
         rc=0; test_on "$@" || rc=$?
     fi
     return $rc

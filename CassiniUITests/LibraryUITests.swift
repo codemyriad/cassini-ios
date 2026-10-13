@@ -245,12 +245,9 @@ final class LibraryUITests: XCTestCase {
         XCTAssertLessThanOrEqual(last.frame.maxY, record.frame.minY, "row \(last.frame) under the bar \(record.frame)")
     }
 
-    /// The long-press menu: Start over and a Transcribe again that replaces the versions ask first, and Export and
-    /// Document info open the note, which starts them.
+    /// The long-press menu: Start over and a Transcribe again that replaces the versions ask first.
     // ports: LibraryBehaviourTest#theConfirmationsOfTheSheetRows
-    // ports: LibraryBehaviourTest#theSubtitleChooserExportsTheNote
-    // ports: LibraryBehaviourTest#documentInfoOpensAsADialog
-    @MainActor func testTheActionsMenuConfirmsAndOpensTheNoteForItsExports() {
+    @MainActor func testTheActionsMenuAsksBeforeStartingOverOrReplacingTheVersions() {
         let app = launch(["--seed", "statuses"])
         let paused = scrolledRow(app, "Paused standup")
         XCTAssertTrue(paused.waitForExistence(within: 10))
@@ -275,17 +272,19 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(fresh.waitForExistence(within: 5), "a document whose versions can't be kept asks first")
         fresh.buttons["Cancel"].tap()
         XCTAssertTrue(waitFor(row(app, "Damaged document"), label: ", can’t read transcript"))
+    }
 
-        // Back up the list to the note, which is above the damaged one.
-        let note = row(app, "A quieter kind of productivity")
-        list(app).scroll(up: false) { note.exists && note.isHittable }
+    /// Export in the long-press menu opens the note, which runs the export: the share sheet offers the subtitles.
+    // ports: LibraryBehaviourTest#theSubtitleChooserExportsTheNote
+    @MainActor func testTheActionsMenuExportOpensTheNoteWhichSharesTheSubtitles() {
+        let app = launch(["--seed", "statuses"])
+        let note = scrolledRow(app, "A quieter kind of productivity")
         XCTAssertTrue(note.waitForExistence(within: 5))
         note.press(forDuration: 1)
         app.buttons["Export"].tap()
         app.buttons["Subtitles · .vtt"].tap()
         XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 5))
         XCTAssertEqual(app.staticTexts["noteTitle"].label, "A quieter kind of productivity")
-        // The note runs the export it was opened for: the share sheet offers the subtitles.
         let shareSheet = app.otherElements["ActivityListView"]
         XCTAssertTrue(shareSheet.waitForExistence(within: 10), "the note shares the exported subtitles")
         // iOS 27 sometimes draws the sheet's Close in a floating bar outside the activity list, and the sheet's
@@ -294,8 +293,13 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(close.waitForExistence(within: 10))
         close.tap()
         XCTAssertTrue(shareSheet.waitForNonExistence(within: 5))
-        app.navigationBars.buttons.element(boundBy: 0).tap()
+    }
 
+    /// Document info in the long-press menu opens the note, which shows it.
+    // ports: LibraryBehaviourTest#documentInfoOpensAsADialog
+    @MainActor func testTheActionsMenuDocumentInfoOpensTheNote() {
+        let app = launch(["--seed", "statuses"])
+        let note = scrolledRow(app, "A quieter kind of productivity")
         XCTAssertTrue(note.waitForExistence(within: 5))
         note.press(forDuration: 1)
         app.buttons["Document info"].tap()

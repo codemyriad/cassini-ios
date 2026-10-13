@@ -15,6 +15,8 @@ final class TextLimitTests: XCTestCase {
 
     /// Fills `field` past `limit` in one edit, then types one more character; it shows `limit` characters each time.
     @MainActor private func fillPastTheLimit(_ field: XCUIElement, _ limit: Int, file: StaticString = #filePath, line: UInt = #line) {
+        // The cursor goes to the end, so the deletes clear the whole field.
+        field.coordinate(withNormalizedOffset: CGVector(dx: 0.98, dy: 0.5)).tap()
         let full = String(repeating: "a", count: limit)
         field.replaceText(with: full + "a")
         // The field cuts what goes past the limit as it changes, a moment after the typing on a busy machine.
@@ -40,7 +42,6 @@ final class TextLimitTests: XCTestCase {
         app.buttons["Rename…"].tap()
         let field = app.alerts.textFields.firstMatch
         XCTAssertTrue(field.waitForExistence(within: 5))
-        field.tap()
         fillPastTheLimit(field, Self.nameLimit)
     }
 
