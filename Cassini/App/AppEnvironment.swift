@@ -100,7 +100,8 @@ extension AppEnvironment {
     /// recording seed also fakes the microphone and its permission. With `modelsMissing` the speech and speaker models
     /// are not installed, so a Transcribe asks for the download first; with `modelDownloading` (`--model-downloading`)
     /// the processing seed's job stays in its speech model download at 46 %, and with `draftGrowing` (`--draft-growing`)
-    /// its draft grows by a sentence every half second. Speaker models are never installed.
+    /// its draft grows by a sentence every half second. A second transcription of the same note hears other words
+    /// (`TestFixtures.transcribedAgainSegments`). Speaker models are installed on the recording seed only.
     /// Notifications are never asked for and count as allowed, so no banner says they are off, unless
     /// `notificationsDenied` (`--notifications-denied`) turns them off.
     static func uiTesting(reset: Bool, seed: Seed?, openFixture: OpenFixture? = nil,
@@ -119,12 +120,17 @@ extension AppEnvironment {
         case .processing, .statuses:
             FakeTranscriber(.frozen(done: 0.62 * TestFixtures.processingDuration, total: TestFixtures.processingDuration),
                             status: status)
-        default: FakeTranscriber(.returns(TestFixtures.transcribedSegments, total: TestFixtures.fixtureDuration), status: status)
+        default:
+            FakeTranscriber(.sequence([TestFixtures.transcribedSegments, TestFixtures.transcribedAgainSegments],
+                                      total: TestFixtures.fixtureDuration), status: status)
         }
+        // The recording seed tells the speakers apart, as a walk from recording to naming needs.
+        let analyzer = seed == .recording ? FakeAnalyzer(analysis: TestFixtures.recordingAnalysis)
+            : FakeAnalyzer(modelIdentity: nil)
         return AppEnvironment(
             root: root, defaults: defaults, clock: FixedClock(now: uiTestingNow),
             locale: Locale(identifier: "en_US"), timeZone: TimeZone(identifier: "UTC") ?? .gmt,
-            transcriber: transcriber, analyzer: FakeAnalyzer(modelIdentity: nil),
+            transcriber: transcriber, analyzer: analyzer,
             capture: seed == .recording ? FakeCapture() : AVCaptureAdapter(),
             microphone: seed == .recording ? FakeMicrophonePermission() : AVMicrophonePermission(),
             liveActivity: ActivityKitAdapter(), playback: AVPlaybackAdapter(), audio: LocalAudioProcessing(), storage: FileSystemStorageProbe(),

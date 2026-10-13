@@ -45,6 +45,13 @@ This is a working first iOS implementation, not an App Store release or complete
 - Speech models are managed by iOS. Model installation currently shows an indeterminate preparation state; transcript progress is based on finalized audio timestamps.
 - System backups may include recordings and transcripts. Voiceprints and downloaded speaker models are excluded from backups. No app-managed cloud sync, analytics, or audio upload is implemented. Apple and Hugging Face model downloads require separate consent.
 
+## Open differences from Android
+
+These differ from Android's behaviour, which wins; they are not intended and are left to the parity work.
+
+- Transcribe again adds no version when the new words equal the transcript shown (`TranscriptionJob.saveTranscript`). Android always adds one. The UI-test fake therefore hears other words on a note's second transcription (`TestFixtures.transcribedAgainSegments`).
+- The speaker analysis that follows a transcription keeps the transcript before it as a version of its own (`Note.applySpeakerAnalysis`). Android seals a transcription and its speakers as one version, so with the speaker models installed iOS shows "Version 2 of 2 · transcribed again" after the first transcription and "Version 4 of 4" after a Transcribe again. `AcceptanceWalkTests` pins it with an expected failure.
+
 ## Verify
 
 ```sh

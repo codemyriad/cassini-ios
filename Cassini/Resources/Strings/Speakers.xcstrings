@@ -1159,23 +1159,6 @@
         }
       }
     },
-    "Saved voices can’t be read. Restore them before deleting for good, so this note’s voice samples can be removed.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Saved voices can’t be read. Restore them before deleting for good, so this note’s voice samples can be removed."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Impossibile leggere le voci salvate. Ripristinale prima di eliminare definitivamente, così i campioni vocali di questa nota possono essere rimossi."
-          }
-        }
-      }
-    },
     "Saved voices, closest first": {
       "extractionState": "manual",
       "localizations": {

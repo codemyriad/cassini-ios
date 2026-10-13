@@ -20,6 +20,18 @@ public enum ModelRowStatus: Hashable, Sendable {
 
     /// Only a Not downloaded and a Failed row are buttons: they open the model download screen, with no note.
     public var opensModelDownload: Bool { self == .notDownloaded || self == .failed }
+
+    /// The status's tone (Android `SettingsScreen`): Ready teal, Downloading and Checking blue, Pending amber, Failed
+    /// red, the rest plain.
+    public var tone: Tone {
+        switch self {
+        case .ready: .ok
+        case .downloading, .checking: .info
+        case .pending: .warn
+        case .failed: .error
+        case .notDownloaded, .unavailable: .plain
+        }
+    }
 }
 
 /// How big a part is, for its row's subtitle.

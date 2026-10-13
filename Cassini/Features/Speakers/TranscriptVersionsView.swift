@@ -1,4 +1,5 @@
 import SwiftUI
+import CassiniEngine
 import CassiniNotebook
 
 /// The kept versions of a note's transcript, numbered from 1. Opening it changes nothing: versions are kept where the

@@ -1,23 +1,23 @@
 import Foundation
 import Observation
-import CassiniEngine
 import CassiniNotebook
 
 /// The notes as the screens see them: a main-actor mirror of `NoteStore`. Edits show at once and are written in
 /// order as `NoteEdit`s, so a note saved meanwhile by another writer keeps both changes; a failed write puts the note
 /// back as stored and reports the error. A change that must stick although its write failed (`showUnsaved`) stays on
 /// screen beneath later edits and rides along with the note's next write until one succeeds.
-@MainActor @Observable final class LibraryStore {
+@MainActor @Observable public final class LibraryStore {
     /// Newest first.
-    private(set) var notes: [Note] = []
+    public private(set) var notes: [Note] = []
     /// Why the library could not be opened; nil when it is open.
-    private(set) var loadFailure: String?
+    public private(set) var loadFailure: String?
     /// The notes have been read.
-    private(set) var isLoaded = false
-    private(set) var unreadableCount = 0
+    public private(set) var isLoaded = false
+    public private(set) var unreadableCount = 0
 
-    @ObservationIgnored let noteStore: NoteStore?
-    @ObservationIgnored private let errors: ErrorPresenter
+    @ObservationIgnored public let noteStore: NoteStore?
+    /// Shows a write that failed; the app words it.
+    @ObservationIgnored private let reportFailure: @MainActor (any Error) -> Void
     @ObservationIgnored private var tail: Task<Void, Never>?
     /// Queued edits per note; while a note has any, the mirror shows them rather than what others save.
     @ObservationIgnored private var pendingWrites: [UUID: Int] = [:]
@@ -31,8 +31,9 @@ import CassiniNotebook
         let change: @Sendable (inout Note) -> Void
     }
 
-    init(root: URL, errors: ErrorPresenter) {
-        self.errors = errors
+    /// The library under `root`; `reportFailure` shows a write that failed.
+    public init(root: URL, reportFailure: @escaping @MainActor (any Error) -> Void) {
+        self.reportFailure = reportFailure
         do { noteStore = try NoteStore(root: root) } catch {
             noteStore = nil
             loadFailure = error.localizedDescription
@@ -40,14 +41,14 @@ import CassiniNotebook
     }
 
     /// A library over `noteStore`, for tests.
-    init(noteStore: NoteStore, errors: ErrorPresenter) {
-        self.errors = errors
+    public init(noteStore: NoteStore, reportFailure: @escaping @MainActor (any Error) -> Void) {
+        self.reportFailure = reportFailure
         self.noteStore = noteStore
     }
 
     /// Reads every note, then follows the changes others write. It subscribes before reading, so a change saved
     /// while the notes are read is applied after them rather than lost; a note placed meanwhile is kept.
-    func load() async {
+    public func load() async {
         // A library that cannot be opened is the Library's "Your notes can't be opened" banner (`loadFailure`).
         guard let noteStore else { return }
         let stream = await noteStore.changes()
@@ -69,18 +70,18 @@ import CassiniNotebook
         }
     }
 
-    func note(_ id: UUID) -> Note? { notes.first { $0.id == id } }
-    func audioURL(_ note: Note) -> URL? { noteStore?.audioURL(for: note) }
-    func originalAudioURL(_ note: Note) -> URL? { noteStore?.originalAudioURL(for: note) }
-    func directory(for id: UUID) -> URL? { noteStore?.directory(for: id) }
-    var root: URL? { noteStore?.root }
+    public func note(_ id: UUID) -> Note? { notes.first { $0.id == id } }
+    public func audioURL(_ note: Note) -> URL? { noteStore?.audioURL(for: note) }
+    public func originalAudioURL(_ note: Note) -> URL? { noteStore?.originalAudioURL(for: note) }
+    public func directory(for id: UUID) -> URL? { noteStore?.directory(for: id) }
+    public var root: URL? { noteStore?.root }
 
     /// Changes the note now and writes the change in the background. False when there is no such note.
     ///
     /// `change` may run again on the stored note when another writer saved it in between, so it must only set the
     /// fields it owns, never assign the whole note, and ids and dates it stamps on the note should be made before it.
     @discardableResult
-    func update(_ id: UUID, _ change: @escaping @Sendable (inout Note) -> Void) -> Bool {
+    public func update(_ id: UUID, _ change: @escaping @Sendable (inout Note) -> Void) -> Bool {
         guard let noteStore, let edit = applyLocally(id, change) else { return false }
         guard !edit.changesNothing else { return true }
         pendingWrites[id, default: 0] += 1
@@ -92,7 +93,7 @@ import CassiniNotebook
     /// such note or the write failed. A failed write shows the save alert unless `reportsFailure` is false (a playback
     /// position, which the next save replaces).
     @discardableResult
-    func commit(_ id: UUID, reportsFailure: Bool = true, _ change: @escaping @Sendable (inout Note) -> Void) async -> Note? {
+    public func commit(_ id: UUID, reportsFailure: Bool = true, _ change: @escaping @Sendable (inout Note) -> Void) async -> Note? {
         guard let noteStore, let edit = applyLocally(id, change) else { return nil }
         pendingWrites[id, default: 0] += 1
         return await enqueue { await self.write(edit, in: noteStore, reportsFailure: reportsFailure) }.value
@@ -101,7 +102,7 @@ import CassiniNotebook
     /// Shows a change whose write failed. It stays on screen over whatever others store, beneath the edits made after
     /// it, and is written with the note's next write, which then keeps it on disk; until that succeeds the next launch
     /// sees the note as stored. `change` follows the rules of `update(_:_:)`.
-    func showUnsaved(_ id: UUID, _ change: @escaping @Sendable (inout Note) -> Void) {
+    public func showUnsaved(_ id: UUID, _ change: @escaping @Sendable (inout Note) -> Void) {
         guard var shown = note(id) else { return }
         unsaved[id, default: []].append(Unsaved(change: change))
         change(&shown)
@@ -109,7 +110,7 @@ import CassiniNotebook
     }
 
     /// Applies `change` to every note, writing only the notes it changed.
-    func updateAll(_ change: @escaping @Sendable (inout Note) -> Void) {
+    public func updateAll(_ change: @escaping @Sendable (inout Note) -> Void) {
         guard let noteStore else { return }
         let edits = notes.map { NoteEdit($0, change) }.filter { !$0.changesNothing }
         guard !edits.isEmpty else { return }
@@ -121,19 +122,19 @@ import CassiniNotebook
             do {
                 try await noteStore.applyAll(carrying.map(\.edit))
                 for (edit, carried) in carrying { self.clearUnsaved(edit.id, carried) }
-            } catch { self.reportSaveFailure(error) }
+            } catch { self.reportFailure(error) }
             for id in ids { await self.finishWrite(id, in: noteStore) }
         }
     }
 
-    func insert(_ note: Note) async throws {
+    public func insert(_ note: Note) async throws {
         guard let noteStore else { throw CocoaError(.fileWriteUnknown) }
         try await enqueueThrowing { try await noteStore.save(note) }
         place(note)
     }
 
     /// Deletes the note's directory and the note.
-    func delete(_ id: UUID) async throws {
+    public func delete(_ id: UUID) async throws {
         guard let noteStore else { throw CocoaError(.fileWriteUnknown) }
         try await enqueueThrowing { try await noteStore.delete(id) }
         notes.removeAll { $0.id == id }
@@ -141,17 +142,17 @@ import CassiniNotebook
     }
 
     /// Shows a note that another writer (an import) just saved to `NoteStore`, ahead of its change notification.
-    func adopt(_ note: Note) {
+    public func adopt(_ note: Note) {
         guard pendingWrites[note.id, default: 0] == 0 else { return }
         place(note)
     }
 
     /// Waits until every write asked for so far has finished.
-    func settle() async { await tail?.value }
+    public func settle() async { await tail?.value }
 
     /// Takes the stored notes now, without waiting for their changes to arrive: after work that wrote `NoteStore`
     /// directly, such as the launch's recovery. Notes with queued edits keep showing them.
-    func refresh() async {
+    public func refresh() async {
         guard let noteStore else { return }
         for note in await noteStore.all() where pendingWrites[note.id, default: 0] == 0 { place(note) }
     }
@@ -186,7 +187,7 @@ import CassiniNotebook
             written = try await noteStore.apply(edit)
             clearUnsaved(edit.id, carried)
         } catch {
-            if reportsFailure { reportSaveFailure(error) }
+            if reportsFailure { reportFailure(error) }
             written = nil
         }
         await finishWrite(edit.id, in: noteStore)
@@ -206,10 +207,6 @@ import CassiniNotebook
         if pendingWrites[id] == 1, let stored = await noteStore.note(id), pendingWrites[id] == 1 { place(stored) }
         pendingWrites[id, default: 1] -= 1
         if pendingWrites[id] == 0 { pendingWrites[id] = nil }
-    }
-
-    private func reportSaveFailure(_ error: any Error) {
-        errors.present(String(localized: "Could not save changes: \(FailureReason.of(error))", table: "Failures"))
     }
 
     /// Queues `body` behind every write asked for so far; the queue is joined at once, so writes keep their order.

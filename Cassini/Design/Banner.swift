@@ -12,7 +12,7 @@ struct Banner: View {
     var onDismiss: (() -> Void)?
 
     var body: some View {
-        let tone = Tone(spec.kind.tone)
+        let tone = spec.kind.tone
         let title = BannerCopy.title(spec)
         HStack(alignment: .top, spacing: 10) {
             Circle().fill(tone.color).frame(width: 10, height: 10).padding(.top, 5).accessibilityHidden(true)
@@ -111,18 +111,6 @@ struct BannerList: View {
                     Banner(spec: spec, style: style, onAction: { onAction(spec, $0) }, onDismiss: { onDismiss(spec) })
                 }
             }
-        }
-    }
-}
-
-extension Tone {
-    init(_ tone: BannerTone) {
-        switch tone {
-        case .ok: self = .ok
-        case .info: self = .info
-        case .warn: self = .warn
-        case .error: self = .error
-        case .plain: self = .plain
         }
     }
 }

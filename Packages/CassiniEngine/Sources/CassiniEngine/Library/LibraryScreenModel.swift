@@ -2,116 +2,6 @@ import Foundation
 import Observation
 import CassiniNotebook
 
-/// A confirmation or form the Library opens over itself (Android `LibraryDialog`). `Codable`, so the Library keeps the
-/// open one with the scene and it comes back after Cassini was closed.
-public enum LibraryDialog: Identifiable, Hashable, Codable, Sendable {
-    case rename(UUID)
-    /// "Start over?": the saved progress goes.
-    case startOver(UUID)
-    /// Transcribe again on a document whose versions cannot be kept.
-    case transcribeFresh(UUID)
-
-    public var id: Self { self }
-
-    public var noteID: UUID {
-        switch self {
-        case .rename(let id), .startOver(let id), .transcribeFresh(let id): id
-        }
-    }
-
-    /// The dialog to open again after Cassini was closed: none once its note is gone or in Recently Deleted.
-    public func restorable(over notes: [Note]) -> LibraryDialog? {
-        notes.contains { $0.id == noteID && $0.trashedAt == nil } ? self : nil
-    }
-}
-
-/// The Library's open dialog as the scene keeps it, with the title typed so far into Rename.
-public struct SavedLibraryDialog: Codable, Hashable, Sendable {
-    public var dialog: LibraryDialog
-    public var draft: String?
-
-    public init(_ dialog: LibraryDialog, draft: String? = nil) {
-        self.dialog = dialog
-        if case .rename = dialog { self.draft = draft }
-    }
-
-    public var encoded: Data? { try? JSONEncoder().encode(self) }
-
-    public init?(_ data: Data?) {
-        guard let data, let saved = try? JSONDecoder().decode(Self.self, from: data) else { return nil }
-        self = saved
-    }
-
-    /// What opens again over `notes` (`LibraryDialog.restorable`), with its draft; nil once its note is gone, and
-    /// the screen then drops what it kept.
-    public func restored(over notes: [Note]) -> SavedLibraryDialog? {
-        dialog.restorable(over: notes).map { SavedLibraryDialog($0, draft: draft) }
-    }
-}
-
-/// A row of a note's actions menu (Android `NoteAction`, features.md section 6).
-public enum NoteAction: Hashable, Sendable {
-    case toggleStar
-    case rename
-    case transcribe
-    case transcribeAgain
-    /// Stop and keep progress.
-    case stop
-    case removeFromQueue
-    case resume
-    case startOver
-    case export(TranscriptFormat)
-    case documentInfo
-    case moveToTrash
-}
-
-/// What a note's actions menu offers (Android `NoteActionsUi`).
-public struct LibraryRowMenu: Hashable, Sendable {
-    public var isFavorite: Bool
-    /// The note is being recorded: only Star and Rename.
-    public var recording: Bool
-    /// The transcribe row for the note's job.
-    public var transcribe: TranscribeAction
-    /// The recording's audio is still being written: Transcribe and Transcribe again wait for it.
-    public var transcribeWaits: Bool
-    public var export: TranscriptExportAvailability
-
-    public init(isFavorite: Bool, recording: Bool, transcribe: TranscribeAction, transcribeWaits: Bool,
-                export: TranscriptExportAvailability) {
-        self.isFavorite = isFavorite; self.recording = recording; self.transcribe = transcribe
-        self.transcribeWaits = transcribeWaits; self.export = export
-    }
-}
-
-/// Where the Library sends the user.
-public enum LibraryEffect: Hashable, Sendable {
-    case openNote(Route)
-    /// The Recording screen: it starts a recording, or returns to the one in progress.
-    case openRecording
-    case openSettings
-    case openModelDownload(noteID: UUID?)
-    /// A Transcribe the queue refused; the app says why.
-    case refused(EnqueueRefusal)
-}
-
-/// What the Library shows: the day sections, or while searching the flat results, and what it says instead of rows.
-public struct LibraryContent: Hashable, Sendable {
-    /// The notes have not been read yet: nothing below the search, so the empty state never flashes.
-    public var loading: Bool
-    public var sections: [DaySection]
-    /// The flat results while a query is open; nil when not searching.
-    public var results: [LibraryRow]?
-    public var emptyState: LibraryEmptyState?
-    /// What only the Library knows, for its banners (`Notices.library`).
-    public var facts: LibraryFacts
-
-    public init(loading: Bool = false, sections: [DaySection] = [], results: [LibraryRow]? = nil,
-                emptyState: LibraryEmptyState? = nil, facts: LibraryFacts = LibraryFacts()) {
-        self.loading = loading; self.sections = sections; self.results = results; self.emptyState = emptyState
-        self.facts = facts
-    }
-}
-
 /// The Library (Android `LibraryViewModel`, features.md section 1): its rows built from the notes, the queue and the
 /// recorder; the search, run 150 ms after the last keystroke (an empty query at once); the actions menu of each row
 /// and its confirmations; and where its rows, inline actions and progress banner lead.
@@ -184,7 +74,7 @@ public final class LibraryScreenModel {
     public private(set) var speakerModelsReady = false
 
     @ObservationIgnored public var onEffect: (@MainActor (LibraryEffect) -> Void)?
-    @ObservationIgnored private let ports: Ports
+    @ObservationIgnored let ports: Ports
     @ObservationIgnored private var index = LibraryIndex()
     /// `index.revision`, observed, so the view reads the rows again when the notes change.
     private var revision = 0
@@ -357,19 +247,21 @@ public final class LibraryScreenModel {
         }
     }
 
-    private func handle(_ outcome: TranscribeOutcome, for id: UUID) {
+    func handle(_ outcome: TranscribeOutcome, for id: UUID) {
         switch outcome {
         case .needsConsent: onEffect?(.openModelDownload(noteID: id))
         case .refused(let refusal): onEffect?(.refused(refusal))
         case .queued: break
         }
     }
+}
 
-    // MARK: Index and search
-
+/// The Library's index of the notes, kept up to date as they change, and its search, run off the main actor after
+/// the debounce.
+private extension LibraryScreenModel {
     /// Indexes the notes now and again each time they change: the change is observed, and the index is brought up to
     /// date on the main actor right after it.
-    private func observeNotes() {
+    func observeNotes() {
         pendingNotes = nil
         let notes = withObservationTracking { ports.notes() } onChange: { [weak self] in
             // The stores change on the main actor, so the update is scheduled right away and `settle()` sees it.
@@ -385,7 +277,7 @@ public final class LibraryScreenModel {
         if !searched.isEmpty, found?.revision != revision { search() }
     }
 
-    private func notesChanged() {
+    func notesChanged() {
         guard pendingNotes == nil else { return }
         pendingNotes = Task { @MainActor [weak self] in self?.observeNotes() }
     }
@@ -393,7 +285,7 @@ public final class LibraryScreenModel {
     /// Searches the notes for `searched` off the main actor, a thousand notes being more than a frame's work; the
     /// tokens it works out are kept for the next search. A search over notes that changed meanwhile still publishes
     /// its results, then runs again over the new notes; a new query cancels it.
-    private func search() {
+    func search() {
         let query = searched
         if let running {
             if running.query == query { return } // it searches again over the new notes when it answers
@@ -415,7 +307,7 @@ public final class LibraryScreenModel {
         running = (query, task)
     }
 
-    private func scheduleSearch() {
+    func scheduleSearch() {
         pendingSearch?.cancel()
         let text = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard text != searched else { pendingSearch = nil; return }

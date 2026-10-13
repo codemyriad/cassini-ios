@@ -2,15 +2,6 @@ import SwiftUI
 import CassiniEngine
 import CassiniNotebook
 
-/// What a row of the note's "…" menu asks the Note screen to do.
-enum NoteMenuAction {
-    case toggleStar, speakers, versions, rename, documentInfo
-    case exportTranscript(TranscriptFormat)
-    case exportDocument, shareAudio
-    case transcribe, transcribeAgain, stop, removeFromQueue, resume, startOver
-    case moveToTrash
-}
-
 /// The "…" menu of a note (Android's Note actions sheet as a system menu): star, speakers, versions, rename, document
 /// info, the exports, the transcription row for the note's job, and Move to Recently Deleted.
 struct NoteMenu: View {

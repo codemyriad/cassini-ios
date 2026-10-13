@@ -165,7 +165,6 @@ enum SpeakersCopy {
     static func voiceNotSaved(_ reason: String) -> String {
         String(localized: "The saved voice could not be written: \(reason). Try again.", table: "Speakers")
     }
-    static let evidenceUnavailable = String(localized: "Saved voices can’t be read. Restore them before deleting for good, so this note’s voice samples can be removed.", table: "Speakers")
     /// Why an edit of the saved voices did not happen; nil when it did.
     static func message(_ edit: VoiceEdit) -> String? {
         switch edit {

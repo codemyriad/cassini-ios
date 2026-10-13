@@ -2,10 +2,8 @@ import SwiftUI
 import CassiniEngine
 import CassiniNotebook
 
-/// Name a speaker: the `SpeakerNaming` reducer on screen. Effects that change the note or the saved voices are carried
-/// out by `VoicesStore`; while they are written the sheet stays, and a failure keeps it open with its alert. The Note
-/// screen keeps the name being typed (`nameChanged`) and hands it back as `draft` when the sheet opens again after
-/// Cassini was closed.
+/// Name a speaker: `NameSpeakerModel` (the `SpeakerNaming` reducer and its writes) on screen. The Note screen keeps the
+/// name being typed (`nameChanged`) and hands it back as `draft` when the sheet opens again after Cassini was closed.
 struct NameSpeakerSheet: View {
     let noteID: UUID
     let speakerID: String
@@ -17,13 +15,22 @@ struct NameSpeakerSheet: View {
     @Environment(SettingsStore.self) private var settings
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var state: NamingState?
-    @State private var saving = false
-    @State private var saveError: String?
+    @State private var model: NameSpeakerModel
     @State private var pulse = false
     /// The field's own text: a name cut to its limit is put back into the field, which a computed binding cannot do.
     @State private var nameField = ""
     @AccessibilityFocusState private var questionFocused: Bool
+
+    init(noteID: UUID, speakerID: String, draft: String? = nil, nameChanged: @escaping (String) -> Void = { _ in }) {
+        self.noteID = noteID
+        self.speakerID = speakerID
+        self.draft = draft
+        self.nameChanged = nameChanged
+        _model = State(initialValue: NameSpeakerModel(noteID: noteID, speakerID: speakerID))
+    }
+
+    private var state: NamingState? { model.state }
+    private var saving: Bool { model.saving }
 
     var body: some View {
         NavigationStack {
@@ -47,14 +54,11 @@ struct NameSpeakerSheet: View {
             }
         }
         .tint(.ember)
-        .task {
-            state = await voices.namingInput(noteID: noteID, speakerID: speakerID).map(SpeakerNaming.open)
-            if let draft { send(.nameChanged(draft)) }
-        }
+        .task { await model.open(voices: voices, draft: draft, sheet: handle) }
         .onDisappear { playback.stopSample() }
-        .alert(SpeakersCopy.couldNotSave, isPresented: Binding(get: { saveError != nil }, set: { if !$0 { saveError = nil } })) {
-            Button(SpeakersCopy.ok) { saveError = nil }
-        } message: { Text(saveError ?? "") }
+        .alert(SpeakersCopy.couldNotSave, isPresented: Binding(get: { model.saveError != nil }, set: { if !$0 { model.saveError = nil } })) {
+            Button(SpeakersCopy.ok) { model.saveError = nil }
+        } message: { Text(model.saveError ?? "") }
     }
 
     /// This speaker's label in the reader's language (`NoteCopy.speakerLabel`).
@@ -174,31 +178,13 @@ struct NameSpeakerSheet: View {
 
     // MARK: - Events
 
-    private func send(_ event: NamingEvent) {
-        guard let current = state, !saving else { return }
-        let result = SpeakerNaming.reduce(current, event)
-        var writes: [NamingEffect] = []
-        for effect in result.effects {
-            switch effect {
-            case .playRange(let window): toggleSample(window)
-            case .focusQuestion: focusQuestion()
-            case .close: break
-            default: writes.append(effect)
-            }
-        }
-        guard !writes.isEmpty else {
-            if let next = result.state { state = next } else { close() }
-            return
-        }
-        saving = true
-        Task {
-            do throws(VoicesStore.SaveFailure) {
-                try await voices.perform(writes, noteID: noteID, speakerID: speakerID)
-                close()
-            } catch {
-                saveError = error.message
-            }
-            saving = false
+    private func send(_ event: NamingEvent) { model.send(event, voices: voices, sheet: handle) }
+
+    private func handle(_ action: NameSpeakerModel.SheetAction) {
+        switch action {
+        case .toggleSample(let window): toggleSample(window)
+        case .focusQuestion: focusQuestion()
+        case .close: close()
         }
     }
 
@@ -222,43 +208,5 @@ struct NameSpeakerSheet: View {
     private func close() {
         playback.stopSample()
         dismiss()
-    }
-}
-
-/// "Merge Speaker 2 into…": the other speakers with their tint and speaking time; a row asks to confirm.
-struct MergeSheet: View {
-    let merge: MergeUI
-    let sourceOrdinal: Int
-    let send: (NamingEvent) -> Void
-
-    private var source: String { NoteCopy.speakerLabel(merge.source, id: merge.sourceID, ordinal: sourceOrdinal) }
-
-    var body: some View {
-        List(merge.targets) { target in
-            Button { send(.mergeTarget(target.speakerID)) } label: {
-                HStack(spacing: 12) {
-                    SpeakerAvatar(speaker: target.name, ordinal: target.ordinal)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(Self.name(target)).foregroundStyle(Color.ink)
-                        Text(RecordingCopy.compact(target.speakingTime)).font(.caption).foregroundStyle(Color.muted)
-                    }
-                }.frame(minHeight: HitTarget.minimum)
-            }
-            .accessibilityIdentifier("mergeTarget-\(target.speakerID)")
-        }
-        .navigationTitle(SpeakersCopy.mergeTitle(source))
-        .navigationBarTitleDisplayMode(.inline)
-        .alert(merge.confirm.map { SpeakersCopy.mergeConfirmTitle(source, Self.name($0)) } ?? "",
-               isPresented: Binding(get: { merge.confirm != nil }, set: { if !$0 { send(.cancelMerge) } }),
-               presenting: merge.confirm) { target in
-            Button(SpeakersCopy.cancel, role: .cancel) { send(.cancelMerge) }
-            Button(SpeakersCopy.merge) { send(.confirmMerge) }
-        } message: { target in
-            Text(SpeakersCopy.mergeConfirmBody(source, Self.name(target), added: merge.addedVersion, shown: merge.shownVersion))
-        }
-    }
-
-    private static func name(_ target: MergeTarget) -> String {
-        NoteCopy.speakerLabel(target.name, id: target.speakerID, ordinal: target.ordinal)
     }
 }
