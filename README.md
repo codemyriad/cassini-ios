@@ -161,7 +161,7 @@ scripts/test.sh clean    # delete this worktree's simulator clones
 The script builds once into `DerivedData.noindex` and runs the tests from that build. It clones the simulators
 (`ts-<worktree>-iphone-N`, plus an iPad for the `testIPad*` tests), keeps the iPhone clones booted for the next run,
 and splits the UI tests across up to three clones, fewer when memory is short. The shards are balanced by each test's
-last measured time. Arguments after the tier go to xcodebuild, so `scripts/test.sh ui
+measured time, averaged with the time stored before. Arguments after the tier go to xcodebuild, so `scripts/test.sh ui
 -only-testing:CassiniUITests/NoteScreenTests` runs one class, still sharded. The header of `scripts/test.sh` lists its
 environment variables. `scripts/test-remote.sh [tier]` runs the same tier on the Mac named by `CASSINI_MAC`, or here
 when that is unset.

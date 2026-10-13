@@ -32,7 +32,7 @@
 # persists between runs so later builds are incremental. Package checkouts are shared between worktrees under the
 # cache, one directory per Package.resolved: Xcode's directly, SwiftPM's as a copy-on-write seed for a worktree without
 # .build/. Logs and result bundles are in DerivedData/test-logs (the run before in DerivedData/test-logs.previous).
-# The UI shards are balanced by each test's last measured time, kept in the cache (scripts/ui-test-durations.tsv
+# The UI shards are balanced by each test's measured time averaged with the one stored before, kept in the cache (scripts/ui-test-durations.tsv
 # when the cache has none).
 set -euo pipefail
 
