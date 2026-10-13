@@ -1,29 +1,32 @@
 # Architecture
 
-Cassini for iOS is a SwiftUI app over five Swift packages. The packages hold every rule that Android unit-tests, so
+Cassini for iOS is a SwiftUI app over five Swift packages, plus a Debug-only module of fakes. The packages hold every rule that Android unit-tests, so
 `swift test` covers them on the Mac. The app target only composes the packages, adapts them to the device, and
 renders. [Differences from Android](differences.md) explains where the design departs from Android's and why.
 
 ## Modules
 
 ```
-                 Cassini (app target: composition, adapters, views)      CassiniActivity (Live Activity widget)
-                  │        │             │              │                         │
-                  │        │             │              │                 CassiniShared (activity attributes,
-                  │        │             │              │                 intents; compiled into both targets)
-                  ▼        ▼             ▼              ▼
-     CassiniInference   CassiniAudio   CassiniEngineTesting (Debug only)
-      │ (Apple Speech,   │ (CAF repair,   │ (fakes for tests and UI-test launches)
-      │  FluidAudio)     │  libopus)      │
-      ▼                  │                ▼
-     CassiniEngine ◀─────┼──────────────── (stores, coordinators, ports)
-      │                  │
-      ▼                  │
-     CassiniNotebook     │   (model, pure rules, persistence)
-      │                  │
-      ▼                  ▼
-     CassiniCore  (portable Ogg Opus document: read, verify, seal) ── CZlib
+Cassini (app: composition, adapters, views) ───────────────┐      CassiniActivity (Live Activity widget)
+  │            │              │                            │        │
+  │            │              │                            │        └─ CassiniShared (activity attributes and
+  │            │              │                            │           intents, compiled into both targets)
+  ▼            ▼              ▼                            ▼
+CassiniInference   CassiniAudio    CassiniEngineTesting (Debug only: fakes of the ports)
+  │ Apple Speech,    │ CAF repair,    │
+  │ FluidAudio       │ libopus        │
+  ▼                  │                ▼
+CassiniEngine ◀──────┼──────── stores, coordinators, screen models, ports
+  │                  │
+  ▼                  │
+CassiniNotebook      │         model, pure rules, file formats
+  │                  │
+  ▼                  ▼
+CassiniCore ───────────────── the portable Ogg Opus document (read, verify, seal), over CZlib
 ```
+
+Every arrow points at a dependency. The app imports all five packages; `CassiniEngineTesting` is linked only in Debug,
+for UI-test launches.
 
 | Module | What it holds |
 |---|---|
