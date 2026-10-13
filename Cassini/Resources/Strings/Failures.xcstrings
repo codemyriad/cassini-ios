@@ -455,6 +455,17 @@
         }
       }
     },
+    "This note’s details are not supported or are damaged. Its files have been kept.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I dettagli di questa nota non sono supportati o sono danneggiati. I suoi file sono stati conservati."
+          }
+        }
+      }
+    },
     "This recording is too long to transcribe on this device.": {
       "extractionState": "manual",
       "localizations": {

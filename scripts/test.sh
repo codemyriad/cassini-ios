@@ -7,8 +7,9 @@
 #   scripts/test.sh all      fast, app and ui (the package tests run beside the build)
 #   scripts/test.sh changed [base]
 #                            only what the changes since base touch (default: where the branch left main, plus
-#                            uncommitted and untracked files): the package test targets, the hosted tests and the UI
-#                            test classes of the changed areas. For iterating; run all once before finishing.
+#                            uncommitted and untracked files): the string catalog check when a source or a catalog
+#                            changed, the package test targets, the hosted tests and the UI test classes of the
+#                            changed areas. For iterating; run all once before finishing.
 #   scripts/test.sh clean    shut down and delete this worktree's simulator clones
 #
 # Extra arguments after the tier go to every xcodebuild test run, e.g.
@@ -610,7 +611,7 @@ swift_targets_for() {
 
 tier_changed() {
     local base="${base_ref:-$(git -C "$root" merge-base HEAD main 2>/dev/null || echo HEAD)}"
-    local files f swift="" ui="" hosted=0
+    local files f swift="" ui="" hosted=0 strings=0
     files=$(changed_files "$base")
     echo "changes since $(git -C "$root" rev-parse --short "$base"): $(printf '%s\n' "$files" | grep -c . || true) file(s)"
     while IFS= read -r f; do
@@ -618,18 +619,21 @@ tier_changed() {
         swift="$swift $(swift_targets_for "$f")"
         ui="$ui $(ui_classes_for "$f")"
         case "$f" in Cassini/*|CassiniShared/*|CassiniTests/*|Packages/*/Sources/*|Sources/*|Package.*|project.yml) hosted=1 ;; esac
+        case "$f" in Cassini/*.swift|CassiniShared/*.swift|CassiniActivity/*.swift|Cassini/Resources/Strings/*.xcstrings) strings=1 ;; esac
     done <<< "$files"
     swift=$(printf '%s\n' $swift | sort -u | xargs)
     ui=$(printf '%s\n' $ui | sort -u | xargs)
     echo "  swift test: ${swift:-nothing}"
     echo "  hosted tests: $( [ $hosted = 1 ] && echo yes || echo no)"
     echo "  UI test classes: ${ui:-none}"
+    echo "  string catalogs: $( [ $strings = 1 ] && echo yes || echo no)"
 
     local filter=""
     case " $swift " in *" ALL "*) filter="" ;; *) filter=$(echo $swift | sed 's/ /|/g') ;; esac
     if [ -z "$swift" ] && [ $hosted = 0 ] && [ -z "$ui" ]; then echo "nothing to test"; return 0; fi
     if [ $hosted = 0 ] && [ -z "$ui" ]; then tier_fast "$filter"; return; fi
     start_first_boot
+    [ $strings = 1 ] && check_strings
     [ -n "$swift" ] && start_fast_beside "$filter"
     build_for_testing
     [ $hosted = 1 ] && tier_app
@@ -655,7 +659,7 @@ extra_xcodebuild_from_extra() {
 case "$tier" in
     clean) delete_clones; echo "deleted the $prefix-* clones"; exit 0 ;;
     fast|app|ui|all|changed) ;;
-    *) sed -n '2,35p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+    *) sed -n '2,36p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac
 
 extra_xcodebuild_from_extra

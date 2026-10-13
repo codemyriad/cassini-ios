@@ -193,7 +193,7 @@ import CassiniNotebook
             // The voices stay as they were, so the note's links go back too; the names typed stay.
             await library.commit(noteID) { $0.restoreVoiceLinks(from: before) }
             await refresh()
-            throw SaveFailure(message: SpeakersCopy.voiceNotSaved(error.localizedDescription))
+            throw SaveFailure(message: SpeakersCopy.voiceNotSaved(FailureReason.of(error)))
         }
         if written.changes != changes {
             let current = written.changes
