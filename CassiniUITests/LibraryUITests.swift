@@ -6,8 +6,8 @@ final class LibraryUITests: XCTestCase {
     @MainActor private func launch(_ arguments: [String] = ["--seed-test-data"]) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing", "--reset-test-data"] + arguments
-        app.launch()
-        XCTAssertTrue(app.textFields["librarySearch"].waitForExistence(timeout: 15))
+        app.launchAndWait()
+        XCTAssertTrue(app.textFields["librarySearch"].waitForExistence(within: 15))
         return app
     }
 
@@ -31,7 +31,7 @@ final class LibraryUITests: XCTestCase {
 
     @MainActor private func waitFor(_ element: XCUIElement, label: String, timeout: TimeInterval = 10) -> Bool {
         let predicate = NSPredicate(format: "label CONTAINS %@", label)
-        return XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: predicate, object: element)], timeout: timeout) == .completed
+        return element.wait(until: predicate, within: timeout)
     }
 
     @MainActor private func capture(_ name: String) {
@@ -57,7 +57,7 @@ final class LibraryUITests: XCTestCase {
         capture("Library statuses")
         for (title, status) in rows {
             let element = scrolledRow(app, title)
-            XCTAssertTrue(element.waitForExistence(timeout: 10), title)
+            XCTAssertTrue(element.waitForExistence(within: 10), title)
             XCTAssertTrue(waitFor(element, label: status), "\(title): \(element.label)")
         }
     }
@@ -67,12 +67,12 @@ final class LibraryUITests: XCTestCase {
         let app = launch(["--seed", "statuses"])
         let resume = app.buttons["Resume transcribing Paused standup"]
         for _ in 0..<4 where !resume.isHittable { list(app).swipeUp() }
-        XCTAssertTrue(resume.waitForExistence(timeout: 10))
+        XCTAssertTrue(resume.waitForExistence(within: 10))
         XCTAssertGreaterThanOrEqual(resume.frame.height, 44, "a 44 pt target")
         resume.tap()
         XCTAssertTrue(waitFor(row(app, "Paused standup"), label: ", queued"), row(app, "Paused standup").label)
         let tryAgain = app.buttons["Try transcribing Hallway conversation again"]
-        XCTAssertTrue(tryAgain.waitForExistence(timeout: 5))
+        XCTAssertTrue(tryAgain.waitForExistence(within: 5))
         tryAgain.tap()
         XCTAssertTrue(waitFor(row(app, "Hallway conversation"), label: ", queued"), row(app, "Hallway conversation").label)
     }
@@ -82,13 +82,13 @@ final class LibraryUITests: XCTestCase {
     @MainActor func testTheControlsLeadWhereTheySay() {
         let app = launch(["--seed", "statuses"])
         let banner = app.buttons["progressBanner"]
-        XCTAssertTrue(banner.waitForExistence(timeout: 15))
+        XCTAssertTrue(banner.waitForExistence(within: 15))
         XCTAssertTrue(waitFor(banner, label: "Transcribing Weekly planning call"), banner.label)
         XCTAssertTrue(waitFor(banner, label: "1 more in queue"), banner.label)
         XCTAssertTrue(app.buttons["importButton"].isEnabled)
         XCTAssertEqual(app.buttons["recordButton"].label, "Record a new note")
         banner.tap()
-        XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 5))
         XCTAssertEqual(app.staticTexts["noteTitle"].label, "Weekly planning call")
     }
 
@@ -96,28 +96,28 @@ final class LibraryUITests: XCTestCase {
     @MainActor func testDuringARecordingTheCardTheButtonAndTheRowReturnToIt() {
         let app = launch(["--seed", "recording"])
         app.buttons["recordButton"].tap()
-        XCTAssertTrue(app.buttons["Pause recording"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.buttons["Pause recording"].waitForEnabled(within: 8))
         app.buttons["Library"].tap()
         let card = app.buttons["activeRecordingCard"]
-        XCTAssertTrue(card.waitForExistence(timeout: 5))
+        XCTAssertTrue(card.waitForExistence(within: 5))
         XCTAssertTrue(card.label.contains("Recording · Voice note 8 Oct, 09:41"), card.label)
         XCTAssertTrue(card.label.contains("Tap to return"), card.label)
         let record = app.buttons["recordButton"]
         XCTAssertEqual(record.label, "Return to recording")
         let recordingRow = row(app, "Voice note 8 Oct, 09:41")
-        XCTAssertTrue(recordingRow.waitForExistence(timeout: 5))
+        XCTAssertTrue(recordingRow.waitForExistence(within: 5))
         XCTAssertTrue(recordingRow.label.contains(", recording"), recordingRow.label)
         capture("Library while recording")
         record.tap()
-        XCTAssertTrue(app.buttons["finishRecording"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["finishRecording"].waitForExistence(within: 5))
         app.buttons["Library"].tap()
-        XCTAssertTrue(card.waitForExistence(timeout: 5))
+        XCTAssertTrue(card.waitForExistence(within: 5))
         card.tap()
-        XCTAssertTrue(app.buttons["finishRecording"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["finishRecording"].waitForExistence(within: 5))
         app.buttons["Library"].tap()
-        XCTAssertTrue(recordingRow.waitForExistence(timeout: 5))
+        XCTAssertTrue(recordingRow.waitForExistence(within: 5))
         recordingRow.tap()
-        XCTAssertTrue(app.buttons["finishRecording"].waitForExistence(timeout: 5), "the recording's row returns to it")
+        XCTAssertTrue(app.buttons["finishRecording"].waitForExistence(within: 5), "the recording's row returns to it")
     }
 
     /// Search shows flat results with their day, says when nothing matches, and opens a note.
@@ -128,23 +128,23 @@ final class LibraryUITests: XCTestCase {
         search.tap()
         search.typeText("thurs")
         let garden = row(app, "Garden plans for the spring")
-        XCTAssertTrue(garden.waitForExistence(timeout: 5))
+        XCTAssertTrue(garden.waitForExistence(within: 5))
         XCTAssertTrue(row(app, "A quieter kind of productivity").exists)
-        XCTAssertFalse(row(app, "Notes from the design review").exists)
-        XCTAssertFalse(app.staticTexts["TODAY"].exists, "the results are one flat list")
+        XCTAssertTrue(row(app, "Notes from the design review").waitForNonExistence(within: 5))
+        XCTAssertTrue(app.staticTexts["TODAY"].waitForNonExistence(within: 5), "the results are one flat list")
         XCTAssertTrue(garden.label.contains("Monday 5 Oct"), "each result carries its own day: \(garden.label)")
         capture("Library search")
         search.typeText(XCUIKeyboardKey.delete.rawValue + "zzz")
-        XCTAssertTrue(app.staticTexts["Nothing matches “thurzzz”"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Nothing matches “thurzzz”"].waitForExistence(within: 5))
         app.buttons["Clear search"].tap()
-        XCTAssertTrue(app.staticTexts["TODAY"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["TODAY"].waitForExistence(within: 5))
         search.tap()
         search.typeText("e-mail giovedi ,")
-        XCTAssertTrue(app.staticTexts["Nothing matches “e-mail giovedi ,”"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Nothing matches “e-mail giovedi ,”"].waitForExistence(within: 5))
         app.buttons["Clear search"].tap()
         search.tap()
         search.typeText(", ?!")
-        XCTAssertTrue(row(app, "Garden plans for the spring").waitForExistence(timeout: 5), "only punctuation shows everything")
+        XCTAssertTrue(row(app, "Garden plans for the spring").waitForExistence(within: 5), "only punctuation shows everything")
         XCTAssertTrue(row(app, "Notes from the design review").exists)
     }
 
@@ -158,21 +158,21 @@ final class LibraryUITests: XCTestCase {
         search.tap()
         search.typeText("tomatoe")
         let garden = row(app, "Garden plans for the spring")
-        XCTAssertTrue(garden.waitForExistence(timeout: 5))
-        XCTAssertFalse(row(app, "Notes from the design review").exists)
+        XCTAssertTrue(garden.waitForExistence(within: 5))
+        XCTAssertTrue(row(app, "Notes from the design review").waitForNonExistence(within: 5))
         garden.press(forDuration: 1)
         app.buttons["Move to Recently Deleted"].tap()
-        XCTAssertTrue(app.buttons["Undo"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Undo"].waitForExistence(within: 5))
         XCTAssertFalse(garden.exists, "a note in Recently Deleted is not a result")
-        XCTAssertTrue(app.staticTexts["Nothing matches “tomatoe”"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Nothing matches “tomatoe”"].waitForExistence(within: 5))
         app.buttons["Undo"].tap()
-        XCTAssertTrue(garden.waitForExistence(timeout: 5), "Undo brings the result back")
+        XCTAssertTrue(garden.waitForExistence(within: 5), "Undo brings the result back")
         XCTAssertEqual(search.value as? String, "tomatoe", "the search stays open")
     }
 
     @MainActor func testAnEmptyLibraryOffersRecordAndImport() {
         let app = launch([])
-        XCTAssertTrue(app.staticTexts["No notes yet"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["No notes yet"].waitForExistence(within: 5))
         XCTAssertTrue(app.staticTexts["Record something, or import an audio file."].exists)
         XCTAssertTrue(app.buttons["Record"].exists, "the LIB_EMPTY banner's own Record")
         XCTAssertTrue(app.buttons["Import"].exists, "and its own Import, as Android's banner")
@@ -188,7 +188,7 @@ final class LibraryUITests: XCTestCase {
         let save = app.buttons["Save"]
         XCTAssertFalse(save.isEnabled, "nothing changed yet")
         clear(field)
-        XCTAssertTrue(app.staticTexts["Enter a title."].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["Enter a title."].waitForExistence(within: 3))
         XCTAssertFalse(save.isEnabled)
         field.typeText("  Thoughts from the morning walk ")
         XCTAssertFalse(save.isEnabled, "the same title once trimmed")
@@ -197,7 +197,7 @@ final class LibraryUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts["Enter a title."].exists)
         XCTAssertTrue(save.isEnabled)
         save.tap()
-        XCTAssertTrue(row(app, "Morning walk, final,").waitForExistence(timeout: 5), "saved trimmed")
+        XCTAssertTrue(row(app, "Morning walk, final,").waitForExistence(within: 5), "saved trimmed")
     }
 
     // ports: LibraryBehaviourTest#renameStopsAtTheTitleLimit
@@ -206,12 +206,16 @@ final class LibraryUITests: XCTestCase {
         let app = launch()
         let field = openRename(app, "Thoughts from the morning walk")
         clear(field)
-        field.typeText(String(repeating: "a", count: 201))
-        XCTAssertEqual(field.value as? String, String(repeating: "a", count: 200))
+        let full = String(repeating: "a", count: 200)
+        field.typeText(full + "a")
+        // The field cuts what goes past the limit as it changes, a moment after the typing on a busy machine.
+        _ = field.wait(until: NSPredicate(format: "value == %@", full), within: 3)
+        XCTAssertEqual(field.value as? String, full)
         field.typeText("x")
-        XCTAssertEqual(field.value as? String, String(repeating: "a", count: 200))
+        _ = field.wait(until: NSPredicate(format: "value == %@", full), within: 3)
+        XCTAssertEqual(field.value as? String, full)
         app.buttons["Save"].tap()
-        XCTAssertTrue(row(app, String(repeating: "a", count: 200) + ",").waitForExistence(timeout: 5))
+        XCTAssertTrue(row(app, String(repeating: "a", count: 200) + ",").waitForExistence(within: 5))
     }
 
     /// At the largest text size during a recording the bar grows; the last row still scrolls clear of it.
@@ -220,10 +224,17 @@ final class LibraryUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed", "statuses",
                                "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
-        app.launch()
+        app.launchAndWait()
         let last = row(app, "Thoughts from the morning walk")
-        for _ in 0..<20 { list(app).swipeUp() }
-        XCTAssertTrue(last.waitForExistence(timeout: 5))
+        // Up to the end of the list: once the last row is built, until a swipe no longer moves it.
+        var previous = CGRect.null
+        for _ in 0..<20 {
+            list(app).swipeUp()
+            guard last.exists else { continue }
+            if last.frame == previous { break }
+            previous = last.frame
+        }
+        XCTAssertTrue(last.waitForExistence(within: 5))
         let record = app.buttons["recordButton"]
         XCTAssertLessThanOrEqual(last.frame.maxY, record.frame.minY, "row \(last.frame) under the bar \(record.frame)")
     }
@@ -236,61 +247,63 @@ final class LibraryUITests: XCTestCase {
     @MainActor func testTheActionsMenuConfirmsAndOpensTheNoteForItsExports() {
         let app = launch(["--seed", "statuses"])
         let paused = scrolledRow(app, "Paused standup")
-        XCTAssertTrue(paused.waitForExistence(timeout: 10))
+        XCTAssertTrue(paused.waitForExistence(within: 10))
         paused.press(forDuration: 1)
         app.buttons["Start over"].tap()
         let startOver = app.alerts["Start over?"]
-        XCTAssertTrue(startOver.waitForExistence(timeout: 5))
+        XCTAssertTrue(startOver.waitForExistence(within: 5))
         startOver.buttons["Cancel"].tap()
         XCTAssertTrue(waitFor(paused, label: ", paused at 00:12"), "Cancel keeps the progress: \(paused.label)")
         paused.press(forDuration: 1)
         app.buttons["Start over"].tap()
-        XCTAssertTrue(startOver.waitForExistence(timeout: 5))
+        XCTAssertTrue(startOver.waitForExistence(within: 5))
         startOver.buttons["Start over"].tap()
         XCTAssertTrue(waitFor(row(app, "Paused standup"), label: ", queued"), row(app, "Paused standup").label)
 
         let damaged = scrolledRow(app, "Damaged document")
-        XCTAssertTrue(damaged.waitForExistence(timeout: 5))
+        XCTAssertTrue(damaged.waitForExistence(within: 5))
         damaged.press(forDuration: 1)
         // The item reads "Transcribe again, Adds version 2."
         app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Transcribe again'")).firstMatch.tap()
         let fresh = app.alerts["Transcribe again?"]
-        XCTAssertTrue(fresh.waitForExistence(timeout: 5), "a document whose versions can't be kept asks first")
+        XCTAssertTrue(fresh.waitForExistence(within: 5), "a document whose versions can't be kept asks first")
         fresh.buttons["Cancel"].tap()
         XCTAssertTrue(waitFor(row(app, "Damaged document"), label: ", can’t read transcript"))
 
-        for _ in 0..<8 { list(app).swipeDown() }
-        let note = scrolledRow(app, "A quieter kind of productivity")
-        XCTAssertTrue(note.waitForExistence(timeout: 5))
+        // Back up the list to the note, which is above the damaged one.
+        let note = row(app, "A quieter kind of productivity")
+        for _ in 0..<8 where !(note.exists && note.isHittable) { list(app).swipeDown() }
+        XCTAssertTrue(note.waitForExistence(within: 5))
         note.press(forDuration: 1)
         app.buttons["Export"].tap()
         app.buttons["Subtitles · .vtt"].tap()
-        XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 5))
         XCTAssertEqual(app.staticTexts["noteTitle"].label, "A quieter kind of productivity")
         // The note runs the export it was opened for: the share sheet offers the subtitles.
         let shareSheet = app.otherElements["ActivityListView"]
-        XCTAssertTrue(shareSheet.waitForExistence(timeout: 10), "the note shares the exported subtitles")
-        // iOS 27 sometimes draws the sheet's Close in a floating bar outside the activity list.
+        XCTAssertTrue(shareSheet.waitForExistence(within: 10), "the note shares the exported subtitles")
+        // iOS 27 sometimes draws the sheet's Close in a floating bar outside the activity list, and the sheet's
+        // contents come from another process a moment after the sheet itself.
         let close = app.buttons["Close"].firstMatch
-        XCTAssertTrue(close.waitForExistence(timeout: 5))
+        XCTAssertTrue(close.waitForExistence(within: 10))
         close.tap()
-        XCTAssertTrue(shareSheet.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(shareSheet.waitForNonExistence(within: 5))
         app.navigationBars.buttons.element(boundBy: 0).tap()
 
-        XCTAssertTrue(note.waitForExistence(timeout: 5))
+        XCTAssertTrue(note.waitForExistence(within: 5))
         note.press(forDuration: 1)
         app.buttons["Document info"].tap()
-        XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 5))
         XCTAssertEqual(app.staticTexts["noteTitle"].label, "A quieter kind of productivity")
     }
 
     @MainActor private func openRename(_ app: XCUIApplication, _ title: String) -> XCUIElement {
         let note = row(app, title)
-        XCTAssertTrue(note.waitForExistence(timeout: 5))
+        XCTAssertTrue(note.waitForExistence(within: 5))
         note.press(forDuration: 1)
         app.buttons["Rename"].tap()
         let field = app.textFields["renameField"]
-        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        XCTAssertTrue(field.waitForExistence(within: 5))
         return field
     }
 

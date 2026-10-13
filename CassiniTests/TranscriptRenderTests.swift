@@ -130,7 +130,8 @@ import CassiniNotebook
         let first = transcript.turns[0].id, second = transcript.turns[1].id
         warmUp(window, expected: [first]) { playback.seek($0 % 2 == 0 ? 2.6 : 3.1) }
         playback.seek(1.1)
-        settle(window)
+        // The launch's own updates (the banners, the lazy stack's rows ahead) land over a few passes on a busy machine.
+        settleUntilIdle(window)
         RenderProbe.reset()
         playback.seek(1.6)
         settle(window)

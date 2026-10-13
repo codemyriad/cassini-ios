@@ -22,6 +22,8 @@ import CassiniNotebook
     /// What the Settings screen reads.
     let settingsPorts: SettingsAdapter
     let libraryScreen: LibraryScreenModel
+    /// Set once `start()` has returned to the app.
+    let launchFinished = LaunchFinished()
 
     init(environment: AppEnvironment) {
         self.environment = environment
@@ -215,4 +217,9 @@ extension View {
             .environment(\.timeZone, graph.environment.timeZone)
             .environment(\.calendar, graph.environment.calendar)
     }
+}
+
+/// Whether the launch work is done; UI-test launches show it (`launchFinished`).
+@MainActor @Observable final class LaunchFinished {
+    var value = false
 }

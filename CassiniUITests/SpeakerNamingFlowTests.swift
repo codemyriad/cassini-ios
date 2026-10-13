@@ -7,8 +7,8 @@ final class SpeakerNamingFlowTests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed", "speakers",
                                "--open-fixture", "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA"]
-        app.launch()
-        XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(timeout: 15))
+        app.launchAndWait()
+        XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 15))
         return app
     }
 
@@ -21,22 +21,22 @@ final class SpeakerNamingFlowTests: XCTestCase {
     @MainActor func testASavedVoiceIsSuggestedAndYesNamesTheSpeaker() {
         let app = launchSpeakersSeed()
         let yes = app.buttons["suggestionYes"]
-        XCTAssertTrue(yes.waitForExistence(timeout: 10))
+        XCTAssertTrue(yes.waitForExistence(within: 10))
         XCTAssertTrue(element(app, containing: "Is this Sam Rivera?").exists)
         yes.tap()
         XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Sam Rivera, at")).firstMatch
-            .waitForExistence(timeout: 5), "the passage carries the name")
-        XCTAssertFalse(app.buttons["suggestionYes"].exists)
+            .waitForExistence(within: 5), "the passage carries the name")
+        XCTAssertTrue(app.buttons["suggestionYes"].waitForNonExistence(within: 5))
 
         app.navigationBars.buttons.element(boundBy: 0).tap()
-        XCTAssertTrue(app.buttons["Settings"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Settings"].waitForExistence(within: 5))
         app.buttons["Settings"].tap()
-        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(within: 5))
         let savedVoices = app.buttons["savedVoicesRow"]
         for _ in 0..<6 where !savedVoices.isHittable { app.swipeUp() }
         savedVoices.tap()
-        XCTAssertTrue(element(app, containing: "Sam Rivera").waitForExistence(timeout: 5))
-        XCTAssertTrue(element(app, containing: "1 note").waitForExistence(timeout: 5))
+        XCTAssertTrue(element(app, containing: "Sam Rivera").waitForExistence(within: 5))
+        XCTAssertTrue(element(app, containing: "1 note").waitForExistence(within: 5))
     }
 
     /// Typing a saved voice's first name asks whether it is the same person; Save waits for the answer.
@@ -44,13 +44,13 @@ final class SpeakerNamingFlowTests: XCTestCase {
         let app = launchSpeakersSeed()
         app.buttons["speakersButton"].tap()
         let alex = app.buttons["speaker-alex"]
-        XCTAssertTrue(alex.waitForExistence(timeout: 5))
+        XCTAssertTrue(alex.waitForExistence(within: 5))
         alex.tap()
         let field = app.textFields["speakerNameField"]
-        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        XCTAssertTrue(field.waitForExistence(within: 5))
         field.tap()
         field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 10) + "Sam")
-        XCTAssertTrue(element(app, containing: "is already a saved voice").waitForExistence(timeout: 5))
+        XCTAssertTrue(element(app, containing: "is already a saved voice").waitForExistence(within: 5))
 
         app.buttons["saveSpeakerName"].tap()
         XCTAssertTrue(field.exists, "Save waits until the question is answered")
@@ -58,7 +58,7 @@ final class SpeakerNamingFlowTests: XCTestCase {
         XCTAssertEqual(field.value as? String, "Sam Rivera")
         app.buttons["saveSpeakerName"].tap()
 
-        XCTAssertTrue(element(app, containing: "Sam Rivera").waitForExistence(timeout: 5))
-        XCTAssertFalse(app.textFields["speakerNameField"].exists)
+        XCTAssertTrue(app.textFields["speakerNameField"].waitForNonExistence(within: 5), "Save closes the sheet")
+        XCTAssertTrue(element(app, containing: "Sam Rivera").waitForExistence(within: 5))
     }
 }

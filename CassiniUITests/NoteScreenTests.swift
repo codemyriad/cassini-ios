@@ -8,8 +8,8 @@ final class NoteScreenTests: XCTestCase {
     @MainActor private func open(seed: String = "library", _ arguments: [String] = []) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed", seed, "--open-fixture", Self.fixture] + arguments
-        app.launch()
-        XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(timeout: 15))
+        app.launchAndWait()
+        XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 15))
         return app
     }
 
@@ -18,8 +18,7 @@ final class NoteScreenTests: XCTestCase {
     }
 
     @MainActor private func wait(_ predicate: String, _ element: XCUIElement, timeout: TimeInterval = 5) -> Bool {
-        XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: predicate), object: element)],
-                       timeout: timeout) == .completed
+        element.wait(until: NSPredicate(format: predicate), within: timeout)
     }
 
     /// One element per paragraph and one per speaker header, not one per word; the header names the speaker and its
@@ -37,16 +36,16 @@ final class NoteScreenTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(alex.frame.height, 44)
         XCTAssertTrue(app.buttons["speakersButton"].label.contains("2 speakers"))
         alex.tap()
-        XCTAssertTrue(app.textFields["speakerNameField"].waitForExistence(timeout: 5), "the header opens Name a speaker")
+        XCTAssertTrue(app.textFields["speakerNameField"].waitForExistence(within: 5), "the header opens Name a speaker")
     }
 
     // ports: ScreenBehaviourTest#aWordTapAsksToPlayFromThatWord
     @MainActor func testAWordTapPlaysFromThere() {
         let app = open()
         let play = app.buttons["playButton"]
-        XCTAssertTrue(play.waitForExistence(timeout: 5))
+        XCTAssertTrue(play.waitForExistence(within: 5))
         let third = app.descendants(matching: .any)["turn-w2"]
-        XCTAssertTrue(third.waitForExistence(timeout: 5))
+        XCTAssertTrue(third.waitForExistence(within: 5))
         third.tap()
         XCTAssertTrue(wait("label == 'Pause'", play), "a word tap plays")
         let position = app.descendants(matching: .any)["playbackPosition"]
@@ -62,13 +61,18 @@ final class NoteScreenTests: XCTestCase {
         let app = open(UIDevice.current.userInterfaceIdiom == .pad ? largest : [])
         let chip = app.buttons["followPlayback"]
         let transcript = app.descendants(matching: .any)["turn-w0"]
-        XCTAssertTrue(transcript.waitForExistence(timeout: 5))
+        XCTAssertTrue(transcript.waitForExistence(within: 5))
         transcript.swipeUp()
-        XCTAssertFalse(chip.waitForExistence(timeout: 1), "paused: a drag leaves following on")
-        app.buttons["playButton"].tap()
-        XCTAssertTrue(app.buttons["Pause"].waitForExistence(timeout: 3))
-        app.descendants(matching: .any)["turn-w1"].swipeDown()
-        XCTAssertTrue(chip.waitForExistence(timeout: 3), "a drag during playback pauses following")
+        XCTAssertFalse(chip.waitForExistence(within: 1), "paused: a drag leaves following on")
+        let play = app.buttons["playButton"]
+        play.tap()
+        XCTAssertTrue(play.wait(until: NSPredicate(format: "label == 'Pause' AND value == 'Playing'"), within: 3))
+        // Playing scrolls the transcript back to the active word; the drag comes once that scroll has stopped.
+        let second = app.descendants(matching: .any)["turn-w1"]
+        var frame = CGRect.null
+        XCTAssertTrue(poll(within: 5) { defer { frame = second.frame }; return second.frame == frame })
+        second.swipeDown()
+        XCTAssertTrue(chip.waitForExistence(within: 3), "a drag during playback pauses following")
         chip.tap()
         XCTAssertTrue(wait("exists == false", chip), "the chip resumes following")
     }
@@ -78,10 +82,10 @@ final class NoteScreenTests: XCTestCase {
         let app = open()
         app.buttons["searchTranscript"].tap()
         let field = app.textFields["transcriptSearch"]
-        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        XCTAssertTrue(field.waitForExistence(within: 5))
         field.typeText("no")
         let counter = app.staticTexts["searchCounter"]
-        XCTAssertTrue(counter.waitForExistence(timeout: 5))
+        XCTAssertTrue(counter.waitForExistence(within: 5))
         XCTAssertEqual(counter.label, "1 of 3")
         app.buttons["Next match"].tap()
         XCTAssertEqual(counter.label, "2 of 3")
@@ -104,16 +108,16 @@ final class NoteScreenTests: XCTestCase {
         let app = open(seed: "processing")
         app.buttons["More actions"].tap()
         app.buttons["Transcribe again"].tap()
-        XCTAssertTrue(app.staticTexts["Queued"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Queued"].waitForExistence(within: 10))
         XCTAssertTrue(app.descendants(matching: .any)["turn-w0"].exists, "the transcript stays under the card")
         header(app, "Alex").tap()
         let alert = app.alerts["Wait until transcription finishes"]
-        XCTAssertTrue(alert.waitForExistence(timeout: 5))
+        XCTAssertTrue(alert.waitForExistence(within: 5))
         alert.buttons["Close"].tap()
         XCTAssertFalse(app.textFields["speakerNameField"].exists, "no Name sheet")
         app.buttons["More actions"].tap()
         let remove = app.collectionViews.buttons["Remove from queue"]
-        XCTAssertTrue(remove.waitForExistence(timeout: 3), "no Transcribe again while queued")
+        XCTAssertTrue(remove.waitForExistence(within: 3), "no Transcribe again while queued")
         XCTAssertFalse(app.collectionViews.buttons["Transcribe again"].exists)
         remove.tap()
         XCTAssertTrue(wait("exists == false", app.staticTexts["Queued"], timeout: 10))
@@ -123,9 +127,9 @@ final class NoteScreenTests: XCTestCase {
     @MainActor func testTheBackButtonSaysBackToLibrary() {
         let app = open()
         let back = app.navigationBars.buttons["Back to library"]
-        XCTAssertTrue(back.waitForExistence(timeout: 5))
+        XCTAssertTrue(back.waitForExistence(within: 5))
         back.tap()
-        XCTAssertTrue(app.textFields["librarySearch"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.textFields["librarySearch"].waitForExistence(within: 5))
     }
 
     // ports: NoteViewModelTest#searchFromTheLibraryIsPrefilledAndStepsThroughMatches
@@ -134,21 +138,23 @@ final class NoteScreenTests: XCTestCase {
     @MainActor func testANoteOpenedFromALibrarySearchScrollsToTheFirstMatch() {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed", "long"]
-        app.launch()
+        app.launchAndWait()
         let search = app.textFields["librarySearch"]
-        XCTAssertTrue(search.waitForExistence(timeout: 15))
+        XCTAssertTrue(search.waitForExistence(within: 15))
         search.tap()
         search.typeText("lighthouse")
+        // The search answers a moment after the last keystroke; the workshop was on the screen before it did.
+        XCTAssertTrue(app.staticTexts["Silent memo"].waitForNonExistence(within: 5), "the search has answered")
         let row = app.staticTexts["Three hour workshop"]
-        XCTAssertTrue(row.waitForExistence(timeout: 5))
+        XCTAssertTrue(row.waitForExistence(within: 5))
         row.tap()
         let counter = app.staticTexts["searchCounter"]
-        XCTAssertTrue(counter.waitForExistence(timeout: 10))
+        XCTAssertTrue(counter.waitForExistence(within: 10))
         XCTAssertEqual(counter.label, "1 of 1")
         XCTAssertEqual(app.textFields["transcriptSearch"].value as? String, "lighthouse")
         let match = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "We end the day at the lighthouse."))
             .firstMatch
-        XCTAssertTrue(match.waitForExistence(timeout: 5))
+        XCTAssertTrue(match.waitForExistence(within: 5))
         XCTAssertTrue(wait("hittable == true", match), "the match is on screen")
     }
 
@@ -157,9 +163,9 @@ final class NoteScreenTests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed", "long", "--open-fixture",
                                "22222222-2222-2222-2222-222222222222"]
-        app.launch()
-        XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(timeout: 15))
-        XCTAssertTrue(app.descendants(matching: .any)["noSpeech"].waitForExistence(timeout: 5))
+        app.launchAndWait()
+        XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 15))
+        XCTAssertTrue(app.descendants(matching: .any)["noSpeech"].waitForExistence(within: 5))
     }
 
     // ports: NoteOverlaysBehaviourTest#renameConfirmsTheNewTitle
@@ -168,11 +174,11 @@ final class NoteScreenTests: XCTestCase {
         let app = open(seed: "processing")
         app.buttons["More actions"].tap()
         app.buttons["Transcribe again"].tap()
-        XCTAssertTrue(app.staticTexts["Queued"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Queued"].waitForExistence(within: 10))
         app.buttons["More actions"].tap()
         app.collectionViews.buttons["Rename"].tap()
         let field = app.textFields["recordingTitleField"]
-        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        XCTAssertTrue(field.waitForExistence(within: 5))
         field.tap()
         field.clearAndType("Supplier call")
         app.buttons["Save"].tap()
@@ -184,25 +190,25 @@ final class NoteScreenTests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed-test-data", "--open-fixture",
                                "BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB"]
-        app.launch()
-        XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(timeout: 15))
+        app.launchAndWait()
+        XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 15))
         app.buttons["More actions"].tap()
         let share = app.collectionViews.buttons["Share original audio"]
-        XCTAssertTrue(app.collectionViews.buttons["Transcribe"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.collectionViews.buttons["Transcribe"].waitForExistence(within: 3))
         XCTAssertFalse(app.collectionViews.buttons["Document info"].exists)
         let export = app.collectionViews.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Export transcript")).firstMatch
         XCTAssertEqual(export.label, "Export transcript, Available after transcription")
         XCTAssertTrue(share.exists && share.isEnabled, "the audio can be shared")
         export.tap()
         let text = app.collectionViews.buttons["Transcript as text"]
-        XCTAssertTrue(!text.waitForExistence(timeout: 2) || !text.isEnabled, "no transcript to export")
+        XCTAssertTrue(!text.waitForExistence(within: 2) || !text.isEnabled, "no transcript to export")
     }
 
     @MainActor func testDocumentInfoShowsTheNotesFacts() {
         let app = open()
         app.buttons["More actions"].tap()
         app.buttons["Document info"].tap()
-        XCTAssertTrue(app.navigationBars["Document info"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.navigationBars["Document info"].waitForExistence(within: 5))
         XCTAssertTrue(app.staticTexts["00:24"].exists)
         app.buttons["Close"].tap()
         XCTAssertTrue(wait("exists == false", app.navigationBars["Document info"]))
@@ -213,8 +219,8 @@ final class NoteScreenTests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed-test-data", "--open-fixture",
                                "BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB"]
-        app.launch()
-        XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(timeout: 15))
+        app.launchAndWait()
+        XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 15))
         XCTAssertTrue(app.staticTexts["Plain audio"].exists)
         XCTAssertTrue(app.staticTexts["No transcript yet."].exists)
         let subtitle = app.staticTexts["noteSubtitle"].label

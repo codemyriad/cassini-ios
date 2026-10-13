@@ -12,3 +12,4 @@ xcuserdata/
 *.caf
 *.m4a
 Models/
+/.test-cache/
