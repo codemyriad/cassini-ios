@@ -5,9 +5,9 @@ import XCTest
 final class NoteScreenTests: XCTestCase {
     private static let fixture = "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA"
 
-    @MainActor private func open(seed: String = "library") -> XCUIApplication {
+    @MainActor private func open(seed: String = "library", _ arguments: [String] = []) -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed", seed, "--open-fixture", Self.fixture]
+        app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed", seed, "--open-fixture", Self.fixture] + arguments
         app.launch()
         XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(timeout: 15))
         return app
@@ -56,7 +56,10 @@ final class NoteScreenTests: XCTestCase {
     // ports: ScreenBehaviourTest#aDragDuringPlaybackPausesFollowingAndShowsTheChip
     // ports: ScreenBehaviourTest#aDragWithPlaybackPausedLeavesFollowingOn
     @MainActor func testADragDuringPlaybackShowsFollowPlaybackAndTheChipResumesIt() {
-        let app = open()
+        // On an iPad the fixture's three paragraphs scroll only at the largest text size; a drag on a transcript that
+        // fits is a tap.
+        let largest = ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
+        let app = open(UIDevice.current.userInterfaceIdiom == .pad ? largest : [])
         let chip = app.buttons["followPlayback"]
         let transcript = app.descendants(matching: .any)["turn-w0"]
         XCTAssertTrue(transcript.waitForExistence(timeout: 5))

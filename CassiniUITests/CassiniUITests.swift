@@ -287,6 +287,8 @@ final class CassiniUITests: XCTestCase {
     @MainActor func testIPadShowsTheLibraryBesideTheNote() throws {
         try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad, "split view is for regular width")
         XCUIDevice.shared.orientation = .landscapeLeft
+        // The tests after this one expect the device as they found it.
+        addTeardownBlock { @MainActor in XCUIDevice.shared.orientation = .portrait }
         let app = launch()
         openFixture(app)
         let search = app.textFields["librarySearch"], title = app.staticTexts["noteTitle"]

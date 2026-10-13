@@ -15,10 +15,17 @@ final class LibraryUITests: XCTestCase {
         app.buttons.matching(NSPredicate(format: "identifier == 'noteRow' AND label BEGINSWITH %@", title)).firstMatch
     }
 
-    /// The row titled `title`, scrolled to when the list has not built it yet.
+    /// The library's list. Swipes go to it: on iPad the middle of the screen is the note beside it.
+    @MainActor private func list(_ app: XCUIApplication) -> XCUIElement {
+        app.scrollViews.containing(.button, identifier: "noteRow").firstMatch
+    }
+
+    /// The row titled `title`, scrolled to when the list has not built it yet or it is under the bottom bar.
     @MainActor private func scrolledRow(_ app: XCUIApplication, _ title: String) -> XCUIElement {
-        let element = row(app, title)
-        for _ in 0..<8 where !element.exists || !element.isHittable { app.swipeUp() }
+        let element = row(app, title), bar = app.buttons["recordButton"]
+        for _ in 0..<8 where !(element.exists && element.isHittable && element.frame.maxY <= bar.frame.minY) {
+            list(app).swipeUp()
+        }
         return element
     }
 
@@ -59,7 +66,7 @@ final class LibraryUITests: XCTestCase {
     @MainActor func testResumeAndTryAgainQueueTheNote() {
         let app = launch(["--seed", "statuses"])
         let resume = app.buttons["Resume transcribing Paused standup"]
-        for _ in 0..<4 where !resume.isHittable { app.swipeUp() }
+        for _ in 0..<4 where !resume.isHittable { list(app).swipeUp() }
         XCTAssertTrue(resume.waitForExistence(timeout: 10))
         XCTAssertGreaterThanOrEqual(resume.frame.height, 44, "a 44 pt target")
         resume.tap()
@@ -215,7 +222,7 @@ final class LibraryUITests: XCTestCase {
                                "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
         app.launch()
         let last = row(app, "Thoughts from the morning walk")
-        for _ in 0..<20 { app.swipeUp() }
+        for _ in 0..<20 { list(app).swipeUp() }
         XCTAssertTrue(last.waitForExistence(timeout: 5))
         let record = app.buttons["recordButton"]
         XCTAssertLessThanOrEqual(last.frame.maxY, record.frame.minY, "row \(last.frame) under the bar \(record.frame)")
@@ -252,7 +259,7 @@ final class LibraryUITests: XCTestCase {
         fresh.buttons["Cancel"].tap()
         XCTAssertTrue(waitFor(row(app, "Damaged document"), label: ", can’t read transcript"))
 
-        for _ in 0..<8 { app.swipeDown() }
+        for _ in 0..<8 { list(app).swipeDown() }
         let note = scrolledRow(app, "A quieter kind of productivity")
         XCTAssertTrue(note.waitForExistence(timeout: 5))
         note.press(forDuration: 1)

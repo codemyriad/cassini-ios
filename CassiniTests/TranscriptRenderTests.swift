@@ -55,14 +55,17 @@ import CassiniNotebook
     }
 
     /// SwiftUI learns how to compare a view type in the background, and until it has, it redraws a paragraph whose
-    /// inputs did not change (seen on a busy machine). Makes `change` until it redraws only `expected`, so the checks
-    /// that follow measure the steady state a long playback runs in.
-    private func warmUp(_ window: UIWindow, expected: Set<String>, attempts: Int = 30, _ change: (Int) -> Void) {
-        for attempt in 0..<attempts {
+    /// inputs did not change (for seconds on a busy machine). Makes `change` until it redraws only `expected`, for up
+    /// to `timeout`, so the checks that follow measure the steady state a long playback runs in.
+    private func warmUp(_ window: UIWindow, expected: Set<String>, timeout: TimeInterval = 30, _ change: (Int) -> Void) {
+        let deadline = Date().addingTimeInterval(timeout)
+        var attempt = 0
+        while Date() < deadline {
             RenderProbe.reset()
             change(attempt)
             settle(window)
             if Set(RenderProbe.renders.keys) == expected { return }
+            attempt += 1
         }
     }
 

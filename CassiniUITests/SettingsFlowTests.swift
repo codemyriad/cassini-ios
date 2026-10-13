@@ -31,7 +31,9 @@ final class SettingsFlowTests: XCTestCase {
     // ports: SettingsViewModelTest#showsTheModelRowsTheCountsTheVersionAndTheNotificationsBanner (on the screen)
     @MainActor func testSettingsShowsTheModelRowsTheBannerTheCountsAndTheBundleVersion() {
         let app = openSettings()
-        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "App language")).firstMatch.exists)
+        // In the iPad split view the list fills in after the navigation bar.
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "App language")).firstMatch
+            .waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Notifications are off"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["Turn on"].exists)
         let speech = element(app, startingWith: "Speech recognition")
@@ -42,7 +44,8 @@ final class SettingsFlowTests: XCTestCase {
         let voices = row(app, startingWith: "Saved voices")
         reveal(voices, in: app)
         XCTAssertTrue(voices.label.contains("None yet"), voices.label)
-        XCTAssertTrue(row(app, startingWith: "Recently Deleted").label.contains("Empty"))
+        // With its value: on iPad the library's toolbar beside Settings has a Recently Deleted button too.
+        XCTAssertTrue(row(app, startingWith: "Recently Deleted,").label.contains("Empty"))
         let version = element(app, startingWith: "Cassini 0.1.0")
         reveal(version, in: app)
     }
