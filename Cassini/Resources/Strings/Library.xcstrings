@@ -229,6 +229,18 @@
         }
       }
     },
+    "Choose a recording": {
+      "comment": "The detail column of the split view before a note is open",
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scegli una registrazione"
+          }
+        }
+      }
+    },
     "Clear search": {
       "comment": "Library search field clear button",
       "extractionState": "manual",
@@ -585,6 +597,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "In pausa a %@"
+          }
+        }
+      }
+    },
+    "Pick a recording in your library to read and listen.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scegli una registrazione nella libreria per leggerla e ascoltarla."
           }
         }
       }
@@ -980,7 +1003,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Interrompi e conserva i progressi"
+            "value": "Ferma e conserva i progressi"
           }
         }
       }

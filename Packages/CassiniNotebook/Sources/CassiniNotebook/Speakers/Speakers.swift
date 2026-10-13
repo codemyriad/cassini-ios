@@ -43,18 +43,18 @@ extension Note {
 
     /// Keeps the transcript and speakers as a version, unless the selected version already holds them. A caller whose
     /// change may run again passes the version's `id` and `date`, so that the rerun makes the same version.
-    public mutating func saveCurrentVersion(name: String, id versionID: UUID = UUID(), date: Date = Date()) {
+    public mutating func saveCurrentVersion(_ kind: TranscriptVersionKind, id versionID: UUID = UUID(), date: Date = Date()) {
         guard !transcript.isEmpty else { return }
         guard shownVersionIndex == nil else { return }
         var history = versions ?? []
-        var version = TranscriptVersion(name: name, segments: transcript, speakers: speakers ?? [])
+        var version = TranscriptVersion(kind: kind, segments: transcript, speakers: speakers ?? [])
         version.id = versionID; version.createdAt = date
         history.append(version); selectedVersionID = version.id
         versions = history
     }
 
     public mutating func selectVersion(_ id: UUID) {
-        saveCurrentVersion(name: "Previous transcript")
+        saveCurrentVersion(.previous)
         guard let version = versions?.first(where: { $0.id == id }) else { return }
         transcript = version.segments; speakers = version.speakers; selectedVersionID = id
     }
@@ -110,7 +110,7 @@ extension Note {
     public mutating func mergeSpeaker(_ source: String, into target: String, stamp: VersionStamp = VersionStamp(date: Date())) {
         guard source != target, speaker(source) != nil, let targetIndex = speakers?.firstIndex(where: { $0.id == target })
         else { return }
-        saveCurrentVersion(name: "Before speaker merge", id: stamp.before, date: stamp.date)
+        saveCurrentVersion(.beforeSpeakerMerge, id: stamp.before, date: stamp.date)
         for index in transcript.indices where transcript[index].speakerID == source { transcript[index].speakerID = target }
         if case .confirmed(let voice, let score) = speakers?[targetIndex].match {
             speakers?[targetIndex].match = .auto(voice: voice, score: score)
@@ -118,7 +118,7 @@ extension Note {
         speakers?.removeAll { $0.id == source }
         refreshSpeakerLabels()
         selectedVersionID = nil
-        saveCurrentVersion(name: Self.mergedVersionName, id: stamp.after, date: stamp.date)
+        saveCurrentVersion(.mergedSpeakers, id: stamp.after, date: stamp.date)
     }
 
     public mutating func addSpeaker(id: String, name: String) {

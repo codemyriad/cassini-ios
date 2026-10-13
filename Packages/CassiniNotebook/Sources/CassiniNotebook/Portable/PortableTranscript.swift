@@ -67,7 +67,7 @@ public struct PortableTranscript: Hashable, Sendable {
                     unavailable[variant.id] = variant.error ?? "unavailable"
                     continue
                 }
-                var version = TranscriptVersion(name: "Imported · \(variant.id)", segments: Self.segments(transcript, document),
+                var version = TranscriptVersion(kind: .imported, segments: Self.segments(transcript, document),
                                                 speakers: Self.speakers(transcript, document))
                 version.portableID = variant.id
                 versions.append(version)

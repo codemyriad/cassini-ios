@@ -33,7 +33,7 @@ import Testing
     let privateID = UUID(); speaker.match = .confirmed(voice: privateID, score: 0.9); speaker.excludedVoiceIDs = [privateID]
     note.speakers = [speaker]
     note.transcript = [.init(text: "Hello", start: 0, end: 1, speaker: "Alex", speakerID: "speaker")]
-    note.saveCurrentVersion(name: "Original")
+    note.saveCurrentVersion(.transcription)
     let json = String(decoding: try JSONExport.data(note), as: UTF8.self)
     #expect(!json.contains(privateID.uuidString))
     #expect(!json.contains("vector"))
@@ -54,10 +54,10 @@ import Testing
 @Test func editingAnImportedVersionPreservesTheOriginalSnapshot() throws {
     var note = Note(title: "History")
     note.transcript = [.init(text: "Original", start: 0, end: 1)]
-    note.saveCurrentVersion(name: "Imported")
+    note.saveCurrentVersion(.imported)
     let original = try #require(note.selectedVersionID)
     note.transcript[0].text = "Edited"
-    note.saveCurrentVersion(name: "Edited")
+    note.saveCurrentVersion(.editedPassages)
     #expect(note.versions?.count == 2)
     note.selectVersion(original)
     #expect(note.text == "Original")

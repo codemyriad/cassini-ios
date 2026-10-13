@@ -25,6 +25,12 @@
         "it": {
           "variations": {
             "plural": {
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld giorni rimasti"
+                }
+              },
               "one": {
                 "stringUnit": {
                   "state": "translated",
@@ -66,6 +72,12 @@
         "it": {
           "variations": {
             "plural": {
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Non è stato possibile eliminare %lld note. Restano in Eliminati di recente."
+                }
+              },
               "one": {
                 "stringUnit": {
                   "state": "translated",
@@ -141,6 +153,12 @@
         "it": {
           "variations": {
             "plural": {
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Eliminare %lld note per sempre?"
+                }
+              },
               "one": {
                 "stringUnit": {
                   "state": "translated",

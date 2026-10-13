@@ -69,4 +69,41 @@ import Testing
         let note = try decode(#"{"schemaVersion":2,"id":"\#(id)","title":"T","createdAt":0,"audioFilename":"a.m4a","audio":{"plain":{}},"origin":"recorded","failure":"SOMETHING_NEW"}"#)
         #expect(note.failure == .unknown)
     }
+
+    private func version(_ field: String) -> String {
+        #"{"id":"\#(UUID())",\#(field),"createdAt":0,"segments":[],"speakers":[]}"#
+    }
+
+    /// Earlier builds stored each version's English name; it reads as the kind it named, and is written as that kind.
+    @Test func aVersionNameStoredInEnglishReadsAsItsKind() throws {
+        let names = ["On-device transcription", "Previous transcript", "Before speaker merge", "Merged speakers",
+                     "Before speaker analysis", "Speaker analysis", "Before passage edit", "Edited passages",
+                     "Edited transcript", "Imported · v2", "Something else"]
+        let json = names.map { version(#""name":"\#($0)""#) }.joined(separator: ",")
+        let note = try decode(#"{"schemaVersion":2,"id":"\#(id)","title":"T","createdAt":0,"audioFilename":"a.m4a","audio":{"plain":{}},"origin":"recorded","versions":[\#(json)]}"#)
+        #expect(note.versions?.map(\.kind) == [.transcription, .previous, .beforeSpeakerMerge, .mergedSpeakers,
+                                                .beforeSpeakerAnalysis, .speakerAnalysis, .beforePassageEdit,
+                                                .editedPassages, .editedTranscript, .imported, .legacy("Something else")])
+        let written = try JSONSerialization.jsonObject(with: JSONEncoder().encode(note)) as? [String: Any]
+        let versions = try #require(written?["versions"] as? [[String: Any]])
+        #expect(versions[0]["kind"] as? String == "transcription" && versions[0]["name"] == nil, "no English is written back")
+        #expect(versions[10]["name"] as? String == "Something else" && versions[10]["kind"] == nil)
+        #expect(try JSONDecoder().decode(Note.self, from: JSONEncoder().encode(note)) == note)
+    }
+
+    @Test func anUnknownVersionKindIsKeptAsItsCode() throws {
+        let note = try decode(#"{"schemaVersion":2,"id":"\#(id)","title":"T","createdAt":0,"audioFilename":"a.m4a","audio":{"plain":{}},"origin":"recorded","versions":[\#(version(#""kind":"future""#))]}"#)
+        #expect(note.versions?.first?.kind == .legacy("future"))
+    }
+
+    /// Earlier builds stored an English default label on every bookmark; it reads as no label, and the user's own stay.
+    @Test func aDefaultBookmarkLabelStoredInEnglishReadsAsNoLabel() throws {
+        let marks = ["Marked moment", "Moment at 01:05", "Moment at 1:02:03", "Budget decision", "Moment at the end"]
+            .enumerated().map { #"{"id":"\#(UUID())","time":\#($0.offset),"label":"\#($0.element)"}"# }.joined(separator: ",")
+        let note = try decode(#"{"schemaVersion":2,"id":"\#(id)","title":"T","createdAt":0,"audioFilename":"a.m4a","audio":{"plain":{}},"origin":"recorded","bookmarks":[\#(marks)]}"#)
+        #expect(note.bookmarks.map(\.label) == [nil, nil, nil, "Budget decision", "Moment at the end"])
+        let written = try JSONSerialization.jsonObject(with: JSONEncoder().encode(note)) as? [String: Any]
+        let bookmarks = try #require(written?["bookmarks"] as? [[String: Any]])
+        #expect(bookmarks[0]["label"] == nil)
+    }
 }

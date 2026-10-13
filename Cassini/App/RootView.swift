@@ -19,8 +19,8 @@ struct RootView: View {
                     LibraryView()
                 } detail: {
                     NavigationStack(path: $router.path) {
-                        ContentUnavailableView("Choose a recording", systemImage: "waveform",
-                                               description: Text("Pick a recording in your library to read and listen."))
+                        ContentUnavailableView(RootCopy.chooseRecording, systemImage: "waveform",
+                                               description: Text(RootCopy.chooseRecordingBody))
                             .background(Color.paper)
                             .routeDestinations()
                     }
@@ -33,10 +33,10 @@ struct RootView: View {
         }
         .fullScreenCover(item: $router.fullScreen) { _ in RecordingView() }
         .trashStopConfirmation()
-        .alert("Something needs attention", isPresented: Binding(get: { errors.current != nil }, set: { if !$0, let id = errors.current?.id { errors.dismiss(id) } }),
+        .alert(RootCopy.errorTitle, isPresented: Binding(get: { errors.current != nil }, set: { if !$0, let id = errors.current?.id { errors.dismiss(id) } }),
                presenting: errors.current) { error in
-            Button("OK", role: .cancel) {}
-            if error.offersSettings { Button("Open Settings") { openSystemSettings() } }
+            Button(RootCopy.ok, role: .cancel) {}
+            if error.offersSettings { Button(RootCopy.openSettings) { openSystemSettings() } }
         } message: { error in
             Text(error.message)
         }

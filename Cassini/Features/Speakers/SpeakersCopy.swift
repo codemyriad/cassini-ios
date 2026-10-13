@@ -138,6 +138,28 @@ enum SpeakersCopy {
     static let versionsTitle = String(localized: "Versions", table: "Speakers")
     static func version(_ number: Int) -> String { String(localized: "Version \(number)", table: "Speakers") }
 
+    /// What made a version, under its number in Versions.
+    static func versionKind(_ version: TranscriptVersion) -> String {
+        switch version.kind {
+        case .transcription: String(localized: "On-device transcription", table: "Speakers")
+        case .previous: String(localized: "Previous transcript", table: "Speakers")
+        case .beforeSpeakerMerge: String(localized: "Before speaker merge", table: "Speakers")
+        case .mergedSpeakers: String(localized: "Speakers merged", table: "Speakers")
+        case .beforeSpeakerAnalysis: String(localized: "Before speaker analysis", table: "Speakers")
+        case .speakerAnalysis: String(localized: "Speaker analysis", table: "Speakers")
+        case .beforePassageEdit: String(localized: "Before passage edit", table: "Speakers")
+        case .editedPassages: String(localized: "Edited passages", table: "Speakers")
+        case .editedTranscript: String(localized: "Edited transcript", table: "Speakers")
+        case .imported:
+            if let id = version.portableID {
+                String(localized: "Imported · \(id)", table: "Speakers", comment: "A version from an imported Cassini document, with its id")
+            } else {
+                String(localized: "Imported", table: "Speakers", comment: "A version from an imported Cassini document")
+            }
+        case .legacy(let name): name
+        }
+    }
+
     // MARK: Errors
 
     static let voicesReadOnly = String(localized: "Saved voices can’t be changed now. Nothing was changed.", table: "Speakers")

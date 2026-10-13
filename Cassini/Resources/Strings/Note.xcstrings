@@ -53,6 +53,54 @@
         }
       }
     },
+    "%lld marked moments": {
+      "comment": "The bookmarks section of a note: 3 marked moments",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld marked moment"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld marked moments"
+                }
+              }
+            }
+          }
+        },
+        "it": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld momento segnato"
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld momenti segnati"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld momenti segnati"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld names from saved voices": {
       "extractionState": "manual",
       "localizations": {
@@ -604,6 +652,18 @@
         }
       }
     },
+    "Moment at %@": {
+      "comment": "A bookmark without a label of its own, named by its time",
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Momento a %@"
+          }
+        }
+      }
+    },
     "More actions": {
       "extractionState": "manual",
       "localizations": {
@@ -838,6 +898,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Registrazione non disponibile"
+          }
+        }
+      }
+    },
+    "Remove bookmark": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rimuovi il segnalibro"
           }
         }
       }

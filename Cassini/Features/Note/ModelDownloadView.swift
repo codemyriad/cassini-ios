@@ -87,7 +87,10 @@ private struct ModelDownloadActions: View {
             }
             Button { Task { await model.download() } } label: {
                 ZStack {
-                    Text(model.withNote ? "Download and transcribe" : "Download", tableName: "Transcription")
+                    Group {
+                        if model.withNote { Text("Download and transcribe", tableName: "Transcription") }
+                        else { Text("Download", tableName: "Transcription") }
+                    }
                         .opacity(model.busy ? 0 : 1)
                     if model.busy { ProgressView().tint(.white) }
                 }

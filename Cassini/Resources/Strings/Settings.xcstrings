@@ -42,6 +42,12 @@
         "it": {
           "variations": {
             "plural": {
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld note"
+                }
+              },
               "one": {
                 "stringUnit": {
                   "state": "translated",
@@ -83,6 +89,12 @@
         "it": {
           "variations": {
             "plural": {
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld persone"
+                }
+              },
               "one": {
                 "stringUnit": {
                   "state": "translated",

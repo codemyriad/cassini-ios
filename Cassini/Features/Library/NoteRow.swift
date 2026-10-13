@@ -63,7 +63,7 @@ struct NoteRow: View {
                 RowChip(status: row.status).passive()
                 suffix
                 if row.bookmarkCount > 0 {
-                    Label("\(row.bookmarkCount)", systemImage: "bookmark.fill").font(.caption2).foregroundStyle(Color.muted).passive()
+                    Label { Text(row.bookmarkCount, format: .number) } icon: { Image(systemName: "bookmark.fill") }.font(.caption2).foregroundStyle(Color.muted).passive()
                 }
             }
         }

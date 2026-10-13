@@ -133,12 +133,12 @@ extension Note {
             }
             return speaker
         }
-        saveCurrentVersion(name: "Before speaker analysis", id: stamp.before, date: stamp.date)
+        saveCurrentVersion(.beforeSpeakerAnalysis, id: stamp.before, date: stamp.date)
         transcript = attributed
         speakers = analyzed
         refreshSpeakerLabels()
         selectedVersionID = nil
-        saveCurrentVersion(name: "Speaker analysis", id: stamp.after, date: stamp.date)
+        saveCurrentVersion(.speakerAnalysis, id: stamp.after, date: stamp.date)
         speakerAnalysisFailure = nil
     }
 }

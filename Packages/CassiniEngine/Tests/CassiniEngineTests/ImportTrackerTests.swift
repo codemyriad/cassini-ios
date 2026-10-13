@@ -100,7 +100,7 @@ private actor Gate {
         let playable = folder.appendingPathComponent("audio.m4a")
         try Data(ImportFixtures.m4a).write(to: playable)
         var note = transcribed("encoded")
-        var earlier = TranscriptVersion(name: "Earlier", segments: [TranscriptSegment(text: "Hi", start: 0, end: 1, speakerID: "a")],
+        var earlier = TranscriptVersion(kind: .transcription, segments: [TranscriptSegment(text: "Hi", start: 0, end: 1, speakerID: "a")],
                                         speakers: note.speakers ?? [])
         earlier.portableID = nil
         note.versions = [earlier]

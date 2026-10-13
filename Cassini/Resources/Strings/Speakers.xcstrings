@@ -218,6 +218,39 @@
         }
       }
     },
+    "Before passage edit": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prima della modifica dei passaggi"
+          }
+        }
+      }
+    },
+    "Before speaker analysis": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prima dell’analisi delle voci"
+          }
+        }
+      }
+    },
+    "Before speaker merge": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prima dell’unione delle voci"
+          }
+        }
+      }
+    },
     "Cancel": {
       "extractionState": "manual",
       "localizations": {
@@ -397,6 +430,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Scaricare i modelli delle voci?"
+          }
+        }
+      }
+    },
+    "Edited passages": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Passaggi modificati"
+          }
+        }
+      }
+    },
+    "Edited transcript": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascrizione modificata"
           }
         }
       }
@@ -618,6 +673,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Riconosci le voci"
+          }
+        }
+      }
+    },
+    "Imported": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Importata"
+          }
+        }
+      }
+    },
+    "Imported · %@": {
+      "comment": "A version from an imported Cassini document, with its id",
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Importata · %@"
           }
         }
       }
@@ -894,6 +972,17 @@
         }
       }
     },
+    "On-device transcription": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascrizione sul dispositivo"
+          }
+        }
+      }
+    },
     "Options for %@": {
       "extractionState": "manual",
       "localizations": {
@@ -941,6 +1030,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Riproduci un campione di questa voce"
+          }
+        }
+      }
+    },
+    "Previous transcript": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascrizione precedente"
           }
         }
       }
@@ -1183,6 +1283,17 @@
         }
       }
     },
+    "Speaker analysis": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Analisi delle voci"
+          }
+        }
+      }
+    },
     "Speaker analysis runs on this device and may take several minutes for a long recording. Names you gave stay available in Versions when you analyze again.": {
       "extractionState": "manual",
       "localizations": {
@@ -1213,6 +1324,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Voci"
+          }
+        }
+      }
+    },
+    "Speakers merged": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voci unite"
           }
         }
       }

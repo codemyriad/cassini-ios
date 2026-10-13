@@ -5,7 +5,12 @@ extension Note {
     /// the id, so a note edit that adds a bookmark gives the same bookmark each time it runs.
     public mutating func addBookmark(at time: Double, id: UUID) {
         guard !bookmarks.contains(where: { abs($0.time - time) < 1 }) else { return }
-        bookmarks.append(Bookmark(id: id, time: min(time, max(duration, time)), label: "Moment at \(TimeText.clock(time))"))
+        bookmarks.append(Bookmark(id: id, time: min(time, max(duration, time))))
         bookmarks.sort { $0.time < $1.time }
+    }
+
+    /// Removes the bookmark; an unknown id changes nothing.
+    public mutating func removeBookmark(_ id: UUID) {
+        bookmarks.removeAll { $0.id == id }
     }
 }

@@ -22,7 +22,7 @@ import Testing
         #expect(note.speakers?.map(\.id) == ["x", "y"])
         #expect(note.transcript.map(\.speaker) == ["Speaker 1", "Speaker 2"])
         #expect(note.speakers?[1].match == .suggested(voice: luca.id, score: 0.7))
-        #expect(note.versions?.map(\.name) == ["Before speaker analysis", "Speaker analysis"])
+        #expect(note.versions?.map(\.kind) == [.beforeSpeakerAnalysis, .speakerAnalysis])
         #expect(note.versions?.map(\.id) == [stamp.before, stamp.after])
         #expect(note.selectedVersionID == stamp.after)
         #expect(note.speakerAnalysisFailure == nil)
@@ -96,7 +96,7 @@ import Testing
         var rejected = NoteSpeaker(id: "b", name: "Speaker 2", match: .rejected(voice: anna, score: 0.6))
         rejected.excludedVoiceIDs = [anna]
         note.speakers = [NoteSpeaker(id: "a", name: "Anna", match: .confirmed(voice: anna, score: 0.8)), rejected]
-        note.saveCurrentVersion(name: "Named", id: stamp.before, date: stamp.date)
+        note.saveCurrentVersion(.speakerAnalysis, id: stamp.before, date: stamp.date)
         note.unlinkVoice(anna)
         #expect(note.speakers?.map(\.match) == [.unmatched, .rejected(voice: anna, score: 0.6)])
         #expect(note.speakers?[0].name == "Anna")
@@ -112,7 +112,7 @@ import Testing
         var note = conversation()
         let anna = F.id("anna"), luca = F.id("luca")
         note.speakers = [NoteSpeaker(id: "a", name: "Anna", match: .confirmed(voice: anna, score: 0.8))]
-        note.saveCurrentVersion(name: "Named", id: stamp.before, date: stamp.date)
+        note.saveCurrentVersion(.speakerAnalysis, id: stamp.before, date: stamp.date)
         let before = note
         note.renameSpeaker("a", name: "Annie")
         note.rejectVoice(luca, for: "a", restorePlaceholder: false)

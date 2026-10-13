@@ -227,8 +227,7 @@ struct NoteDetailView: View {
             nameSpeaker: { run(screen.speakerTapped($0, readOnly: readOnly)) },
             editPassage: { run(screen.editPassage($0, readOnly: readOnly)) },
             markMoment: { time in
-                let bookmark = UUID()
-                library.update(noteID) { $0.addBookmark(at: time, id: bookmark) }
+                library.markMoment(noteID, at: time)
                 showBookmarks = true
             })
     }
@@ -341,7 +340,7 @@ struct NoteDetailView: View {
         exportingDocument = true
         Task {
             do { shareItem = exports.shareItem(try await exports.exportPortable(noteID)) }
-            catch { errors.present(error.localizedDescription) }
+            catch { errors.present(ExportCopy.notSaved) }
             exportingDocument = false
         }
     }

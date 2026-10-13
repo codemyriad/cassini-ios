@@ -166,7 +166,7 @@ private struct RecordingControls: View {
                 }
             }
             .disabled(!capturing).opacity(capturing ? 1 : 0.38)
-            .accessibilityLabel(Text(isPaused ? "Resume recording" : "Pause recording", tableName: "Recording"))
+            .accessibilityLabel(isPaused ? Text("Resume recording", tableName: "Recording") : Text("Pause recording", tableName: "Recording"))
             .accessibilityIdentifier("pauseResumeRecording")
             .frame(maxWidth: .infinity)
             LabelledCircle(label: Text("Finish", tableName: "Recording"), action: finish) {

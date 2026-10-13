@@ -81,7 +81,7 @@ struct TranscriptExportsTests {
 
     @Test func aVersionExportsItsOwnWordsAndNames() throws {
         var source = note([TranscriptSegment(text: "Nuovo", start: 0, end: 1, speakerID: "S1")], speakers: [.init(id: "S1", name: "Anna")])
-        let version = TranscriptVersion(name: "Before", segments: [TranscriptSegment(text: "Vecchio", start: 1, end: 2, speakerID: "S1")],
+        let version = TranscriptVersion(kind: .previous, segments: [TranscriptSegment(text: "Vecchio", start: 1, end: 2, speakerID: "S1")],
                                         speakers: [.init(id: "S1", name: "Bruno")])
         source.versions = [version]
         let vtt = String(decoding: try TranscriptExports.data(source, format: .webVTT, version: version, texts: texts), as: UTF8.self)

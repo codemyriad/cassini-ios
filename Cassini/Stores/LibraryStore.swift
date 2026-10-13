@@ -209,7 +209,7 @@ import CassiniNotebook
     }
 
     private func reportSaveFailure(_ error: any Error) {
-        errors.present("Could not save changes: \(error.localizedDescription)")
+        errors.present(String(localized: "Could not save changes: \(error.localizedDescription)", table: "Failures"))
     }
 
     /// Queues `body` behind every write asked for so far; the queue is joined at once, so writes keep their order.

@@ -252,7 +252,7 @@ import CassiniEngineTesting
         XCTAssertTrue(stored.isFavorite)
         XCTAssertEqual(stored.speakers?.map(\.name), ["Speaker 1", "Speaker 2"])
         XCTAssertEqual(stored.transcript.map(\.speaker), ["Speaker 1", "Speaker 2"])
-        XCTAssertEqual(stored.versions?.map(\.name), ["Before speaker analysis", "Speaker analysis"])
+        XCTAssertEqual(stored.versions?.map(\.kind), [.beforeSpeakerAnalysis, .speakerAnalysis])
         XCTAssertEqual(stored.selectedVersionID, stored.versions?.last?.id)
         XCTAssertEqual(library.note(note.id), stored)
         XCTAssertNil(test.graph.errors.current)
@@ -314,9 +314,9 @@ import CassiniEngineTesting
         note.speakers = [NoteSpeaker(id: "a", name: "Alex", match: .confirmed(voice: alex, score: 1))]
         note.transcript = [.init(text: "Hello", start: 0, end: 8, speaker: "Alex", speakerID: "a")]
         let first = UUID()
-        note.saveCurrentVersion(name: "First", id: first)
+        note.saveCurrentVersion(.transcription, id: first)
         note.transcript = [.init(text: "Hello again", start: 0, end: 8, speaker: "Alex", speakerID: "a")]
-        note.saveCurrentVersion(name: "Second")
+        note.saveCurrentVersion(.speakerAnalysis)
         try NoteRepository(root: test.root).save(note)
         let folder = test.root.appendingPathComponent("PrivateVoices", isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -375,7 +375,7 @@ import CassiniEngineTesting
         let voices = test.graph.voices, library = test.graph.library
         try await remember("Alex", in: note.id, voices: voices)
         let alex = try XCTUnwrap(voices.savedVoices.first)
-        library.update(note.id) { $0.saveCurrentVersion(name: "Named") }
+        library.update(note.id) { $0.saveCurrentVersion(.speakerAnalysis) }
         await library.settle()
         let folder = test.root.appendingPathComponent("PrivateVoices", isDirectory: true)
         try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: folder.path)

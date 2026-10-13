@@ -145,18 +145,13 @@ public struct NoteChips: Hashable, Sendable {
         let shown = note.mergeVersionNumbers.shown
         let count = note.versionCount
         guard count >= 2 else { return nil }
-        let kind: VersionChip.Kind = switch versions.indices.contains(shown - 1) ? versions[shown - 1].name : nil {
-        case Note.mergedVersionName?: .merged
-        case Note.editedVersionName?: .edited
+        let kind: VersionChip.Kind = switch versions.indices.contains(shown - 1) ? versions[shown - 1].kind : nil {
+        case .mergedSpeakers?: .merged
+        case .editedPassages?: .edited
         default: shown > 1 ? .transcribedAgain : .original
         }
         return VersionChip(index: shown, count: count, kind: kind)
     }
-}
-
-extension Note {
-    /// The name `mergeSpeaker` gives the version it adds.
-    public static let mergedVersionName = "Merged speakers"
 }
 
 /// What a Transcribe again does to a document (Android `needsFreshConfirmation`); whether it is refused is

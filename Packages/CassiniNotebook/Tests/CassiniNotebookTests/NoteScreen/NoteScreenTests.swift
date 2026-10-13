@@ -210,7 +210,7 @@ import Testing
     @Test func theChipsShowTrustVersionAndSpeakers() {
         var note = F.weeklySync
         #expect(NoteChips.of(note) == NoteChips(trust: nil, version: nil, speakers: 3))
-        note.saveCurrentVersion(name: "Speaker analysis")
+        note.saveCurrentVersion(.speakerAnalysis)
         #expect(NoteChips.of(note)?.version == nil, "one version: no chip")
         note.mergeSpeaker("b", into: "a", stamp: VersionStamp(date: Date(timeIntervalSince1970: 1)))
         let chip = NoteChips.of(note)?.version
@@ -290,7 +290,7 @@ import Testing
         #expect(note.revisePassage(original, to: original, stamp: stamp) == .unchanged)
         #expect(note.revisePassage(original, to: edited, stamp: stamp) == .saved)
         #expect(note.transcript[0] == edited)
-        #expect(note.versions?.map(\.name) == [Note.beforePassageEditName, Note.editedVersionName])
+        #expect(note.versions?.map(\.kind) == [.beforePassageEdit, .editedPassages])
         #expect(note.versions?[0].segments[0] == original)
         #expect(note.selectedVersionID == stamp.after && note.versions?[1].segments == note.transcript)
         #expect(note.revisePassage(original, to: edited, stamp: stamp) == .changed, "the passage is gone")
@@ -300,14 +300,14 @@ import Testing
     /// A run of edits keeps one copy of the transcript, and the chip calls it edited, not transcribed again.
     @Test func editsInARowKeepOneEditedVersion() {
         var note = F.weeklySync
-        note.saveCurrentVersion(name: "On-device transcription")
+        note.saveCurrentVersion(.transcription)
         let first = note.transcript[0], second = note.transcript[1]
         note.revisePassage(first, to: first.revised(text: "Salve.", speakerID: first.speakerID, speakers: note.speakers!),
                            stamp: VersionStamp(date: Date()))
         #expect(note.versions?.count == 2, "the kept transcription is the version before")
         note.revisePassage(second, to: second.revised(text: "Bene.", speakerID: second.speakerID, speakers: note.speakers!),
                            stamp: VersionStamp(date: Date()))
-        #expect(note.versions?.map(\.name) == ["On-device transcription", Note.editedVersionName])
+        #expect(note.versions?.map(\.kind) == [.transcription, .editedPassages])
         #expect(note.versions?[1].segments == note.transcript && note.transcript[1].text == "Bene.")
         #expect(note.versions?[0].segments[0] == first, "the version before keeps the passage as it was")
         #expect(NoteChips.of(note)?.version == VersionChip(index: 2, count: 2, kind: .edited))
@@ -331,7 +331,7 @@ import Testing
         note.renameSpeaker("a", name: "Giulia")
         note.apply([.match(speakerID: "b", .suggested(voice: UUID(), score: 0.7))])
         note.addSpeaker(id: "c", name: "Paolo")
-        #expect(note.versions?.map(\.name) == ["Before speaker analysis", "Speaker analysis"])
+        #expect(note.versions?.map(\.kind) == [.beforeSpeakerAnalysis, .speakerAnalysis])
         #expect(note.versions?[1].speakers == note.speakers && note.versions?[1].segments == note.transcript,
                 "the shown version takes the names")
         #expect(note.versions?[0].segments.allSatisfy { $0.speaker == nil } == true, "the version before stays as it was")
@@ -355,7 +355,7 @@ import Testing
         let again = note.transcript[1]
         note.revisePassage(again, to: again.revised(text: "Terzo.", speakerID: again.speakerID, speakers: note.speakers!),
                            stamp: VersionStamp(date: Date()))
-        #expect(note.versions?.map(\.name) == ["Before speaker analysis", "Speaker analysis", Note.editedVersionName])
+        #expect(note.versions?.map(\.kind) == [.beforeSpeakerAnalysis, .speakerAnalysis, .editedPassages])
         #expect(note.versions?[2].segments == note.transcript && note.versions?[2].speakers == note.speakers)
         #expect(note.transcript.map(\.speaker) == ["Giulia", "Speaker 2"])
         #expect(NoteChips.of(note)?.version == VersionChip(index: 3, count: 3, kind: .edited))
@@ -365,16 +365,16 @@ import Testing
     /// Editing an older version keeps it and adds the edits after the kept versions.
     @Test func editingAnOlderVersionAddsTheEditsAfterTheKeptOnes() {
         var note = F.weeklySync
-        note.saveCurrentVersion(name: "First")
+        note.saveCurrentVersion(.transcription)
         let firstID = note.selectedVersionID!
         note.selectedVersionID = nil
         note.transcript[0].text = "Altro."
-        note.saveCurrentVersion(name: "Second")
+        note.saveCurrentVersion(.speakerAnalysis)
         note.selectVersion(firstID)
         let passage = note.transcript[0]
         note.revisePassage(passage, to: passage.revised(text: "Salve.", speakerID: passage.speakerID, speakers: note.speakers!),
                            stamp: VersionStamp(date: Date()))
-        #expect(note.versions?.map(\.name) == ["First", "Second", Note.editedVersionName])
+        #expect(note.versions?.map(\.kind) == [.transcription, .speakerAnalysis, .editedPassages])
         #expect(NoteChips.of(note)?.version == VersionChip(index: 3, count: 3, kind: .edited))
     }
 }

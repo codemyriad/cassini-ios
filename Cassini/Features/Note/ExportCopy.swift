@@ -52,6 +52,9 @@ enum ExportCopy {
     /// Why an export was not made.
     static func message(_ error: ExportError) -> String {
         if case .notAvailable(let availability) = error, let reason = reason(availability) { return reason }
-        return String(localized: "Couldn’t save the file", table: "Export")
+        return notSaved
     }
+
+    /// An export, or a Cassini document, that could not be written.
+    static let notSaved = String(localized: "Couldn’t save the file", table: "Export")
 }

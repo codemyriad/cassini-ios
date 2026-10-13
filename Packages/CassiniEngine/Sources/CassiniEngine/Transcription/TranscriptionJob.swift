@@ -55,10 +55,6 @@ public struct TranscriptionJob: TranscriptionJobRunning {
         }
     }
 
-    /// Note version names the job stores.
-    static let previousVersionName = "Previous transcript"
-    static let transcriptVersionName = "On-device transcription"
-
     private let notes: NoteStore
     private let transcriber: any Transcribing
     private let analyzer: any SpeakerAnalyzing
@@ -221,11 +217,11 @@ public struct TranscriptionJob: TranscriptionJobRunning {
         do {
             let saved = try await notes.mutate(context.noteID) { note in
                 guard note.transcript != segments else { return }
-                note.saveCurrentVersion(name: Self.previousVersionName, id: before, date: date)
+                note.saveCurrentVersion(.previous, id: before, date: date)
                 note.transcript = segments
                 note.speakers = []
                 note.selectedVersionID = nil
-                note.saveCurrentVersion(name: Self.transcriptVersionName, id: after, date: date)
+                note.saveCurrentVersion(.transcription, id: after, date: date)
                 note.failure = nil
                 note.speakerAnalysisFailure = nil
             }

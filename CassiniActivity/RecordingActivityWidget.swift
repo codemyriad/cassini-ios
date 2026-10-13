@@ -58,7 +58,7 @@ private struct LockScreenRecording: View {
             HStack(spacing: 10) {
                 StatusDot(isPaused: state.isPaused)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(state.isPaused ? "Recording paused" : "Recording", tableName: "Recording")
+                    (state.isPaused ? Text("Recording paused", tableName: "Recording") : Text("Recording", tableName: "Recording"))
                         .font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.7))
                     Text(state.title).font(.headline).lineLimit(1).foregroundStyle(.white)
                 }

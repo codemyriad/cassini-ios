@@ -1,7 +1,7 @@
 #!/bin/bash
 # Runs Cassini's tests in tiers and prints how long each step took.
 #
-#   scripts/test.sh fast    Swift package tests (swift test)
+#   scripts/test.sh fast    the string catalog check (scripts/check-strings.sh), then the Swift package tests (swift test)
 #   scripts/test.sh app     build for testing, then the hosted unit tests (CassiniTests)
 #   scripts/test.sh ui      build for testing, then the UI tests, sharded across simulator clones
 #   scripts/test.sh all     fast, app and ui
@@ -196,6 +196,9 @@ save_swiftpm() {
 }
 
 tier_fast() {
+    step_start "string catalogs"
+    run_logged "$logs/check-strings.log" "$root/scripts/check-strings.sh"
+    step_end
     conformance_env
     seed_swiftpm
     step_start "swift test"

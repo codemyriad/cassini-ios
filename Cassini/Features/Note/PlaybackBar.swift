@@ -92,8 +92,7 @@ struct PlaybackBar: View {
             .accessibilityLabel(Text("Forward 10 seconds", tableName: "Playback"))
             Spacer()
             Button {
-                let time = position, bookmark = UUID()
-                library.update(note.id) { $0.addBookmark(at: time, id: bookmark) }
+                library.markMoment(note.id, at: position)
                 addBookmark()
             } label: { Image(systemName: "bookmark").font(.title3).frame(width: 48, height: 48) }
             .accessibilityLabel(Text("Mark this moment", tableName: "Playback"))
