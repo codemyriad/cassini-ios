@@ -381,7 +381,9 @@ These features exist only on iOS. They were kept by decision.
 
 - **Split view.** Settings, Recently Deleted, Saved voices, Licenses and the model download are pushed routes, as on
   Android. On a regular width (iPad, or a large iPhone in landscape), the Library is a sidebar and the note opens
-  beside it (`NavigationSplitView`). On a compact width it is one stack.
+  beside it (`NavigationSplitView`), its row marked as selected. The detail column's first screen has no back button,
+  since the Library it came from is beside it (`ScreenStack.selectedNoteID`, `hidesBackButton`). On a compact width it
+  is one stack.
 - **Back.** iOS has no system Back. The navigation bar's back button is titled after the screen below
   (`ScreenStack.below`), for example "Back to library", and VoiceOver reads that title. Back-to-clear and the other
   system-back tests do not apply.
