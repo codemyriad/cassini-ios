@@ -676,23 +676,6 @@
         }
       }
     },
-    "More actions": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "More actions"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Altre azioni"
-          }
-        }
-      }
-    },
     "Name this speaker": {
       "extractionState": "manual",
       "localizations": {
@@ -1091,6 +1074,18 @@
           "stringUnit": {
             "state": "translated",
             "value": "Versione selezionata"
+          }
+        }
+      }
+    },
+    "Share and more": {
+      "comment": "The Note screen's actions button (Android ui_note_share_more)",
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Condividi e altro"
           }
         }
       }

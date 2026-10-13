@@ -7,7 +7,7 @@ enum NoteCopy {
     // MARK: Header and menu
 
     static let searchInTranscript = String(localized: "Search in transcript", table: "Note")
-    static let moreActions = String(localized: "More actions", table: "Note")
+    static let shareAndMore = String(localized: "Share and more", table: "Note", comment: "The Note screen's actions button (Android ui_note_share_more)")
     static let star = String(localized: "Star", table: "Note", comment: "Menu: star the note")
     static let removeStar = String(localized: "Remove star", table: "Note")
     static let speakers = String(localized: "Speakers", table: "Note")

@@ -339,7 +339,14 @@ stricter or looser than the spec.
   measured finalization. The speaker step extrapolates from its own progress.
 - **Read-only gate.** Any job row, except one waiting for consent, makes the transcript read-only, as on Android. iOS
   has no draft naming, so Android's SAVING reason and the draft's renamable headers do not exist. While the gate is
-  closed, the suggestion cards are hidden.
+  closed, the suggestion cards are hidden, and every sheet of the Note screen follows it through `NoteScreenModel`: the
+  Speakers list's speakers and Add a speaker are disabled, Identify speakers waits, Edit passage is locked, and an open
+  Name a speaker sheet saves nothing.
+- **The progress card's footnote** reads "Transcription runs on this device. If iOS stops it in the background, your
+  progress is kept." in place of Android's "Keeps going if you leave the app…" and its "Notifications are off, so
+  progress shows only here." variant. iOS shows a running drain's progress in its own continued-processing UI whatever
+  the notification permission is, and may end that time (see "When iOS takes the time back" above), so neither of
+  Android's lines holds.
 - **The draft** shows Apple's volatile results as words that may still change. It follows its end as on Android: the
   header and the progress card stay fixed above it while 160 pt are left for the draft.
 - **Recently Deleted.** A queued job of a note moved to Recently Deleted is removed from the queue right after the
@@ -397,7 +404,15 @@ These features exist only on iOS. They were kept by decision.
 - **Sheets and alerts.** Rename is a sheet with "Enter a title." under the field, because an iOS alert's text field
   takes no inline error. The Library and the Note screen share one Rename sheet and one rule. The confirmation "Stop
   transcription and move to Recently Deleted?" is presented from the root, so both screens share it.
-- **The actions sheet** is a context menu (long press) with the same rows. Export is a submenu.
+- **The actions sheet** is a context menu (long press) with the same rows. Export is a submenu: the transcript
+  formats (disabled, with the reason, without a transcript), Export Cassini document and Share original audio (Android's
+  Save a copy rows), the audio always offered. The Note screen's menu has the same rows, and both show Transcribe
+  again's "Adds version N. Speaker names carry over.". Its button is labelled "Share and more", as on Android.
+- **Rename of a saved voice** is the same sheet as a note's Rename: 80 characters, "Enter a name." under the field, and
+  Save only for a changed name, where Android uses its rename dialog.
+- **Versions** rows read Android's "Transcribed 8 Oct, 15:40 · 4,812 words" and "Speakers merged · from version 1 ·
+  8 Oct, 16:02". A version kind Android does not have (Edited passages, Previous transcript, …) shows its name, its date
+  and its word count. No language is added: iOS versions do not record one.
 - **The Undo snackbar** stays 10 s, and 30 s while VoiceOver runs. iOS has no recommended-timeout setting. The message
   is also announced, and Undo is both a button and an action of the message.
 - **Header.** The iOS wordmark and the serif headline stay. The headline reads "Notes" at accessibility text sizes.
@@ -407,8 +422,18 @@ These features exist only on iOS. They were kept by decision.
 - **App language.** iOS sets an app's language in the Settings app, so the row shows the current language and opens
   Cassini's page there. Android has a Phone / English / Italiano control.
 - **Copy.** Android's English is used, with "device" for "phone" ("Remember this voice on this device", "Transcribe on
-  this device", "Voiceprints stay on this device"), because Cassini also runs on iPad. Dates follow the locale: en_US
-  reads "Deleted Oct 2" where Android's English reads "Deleted 2 Oct".
+  this device", "Voiceprints stay on this device"), because Cassini also runs on iPad. Dates have Android's forms
+  (`DateLabels`): "Monday 5 Oct" in the Library and on the Note screen, "Deleted 2 Oct", "8 Oct, 9:41 AM", the year
+  only for another year; the time of day follows the locale's 12- or 24-hour clock.
+- **Failure copy.** Each stored failure code reads as Android's `error_*`, with iOS's own limits and names (LONG: about
+  16 hours of speech, Share original audio). Some codes say something else because the platform differs: OPEN
+  (Android asks to choose the file again, because its access to a picked file can lapse; iOS copies an import, so the
+  message names the formats it reads), SAVE (Android saves through a file picker, so it asks for another location; iOS
+  shares a file it made), SPACE (Android's is about room for a model; iOS's is about the device's storage), AUDIO and WAV
+  (the formats AVFoundation reads), MODEL (Apple's speech model can be missing for the device, not only not downloaded)
+  and SPEAKERS (Android's says no turns were found; iOS's says the step did not finish and the transcript is saved).
+  INTERRUPTED, UNSUPPORTED_LANGUAGE, RESERVATION_LIMIT and CHECKPOINT_MISMATCH exist only on iOS.
+- **No NO_ENCODER banner.** libopus is built into Cassini (`CassiniAudio`), so the encoder is always there.
 - **String check.** Android lint fails on missing translations. iOS has `scripts/check-strings.sh`, which runs in
   `scripts/test.sh fast`. It fails on an Italian value that is missing, new, `needs_review` or empty, on a plural that
   lacks its `one`, `many` and `other` forms, on placeholders that differ from the English, on stale or missing keys,
@@ -421,8 +446,9 @@ These features exist only on iOS. They were kept by decision.
   "Paused by iOS" and "Transcription stopped" carry Resume.
 - There are no ongoing notifications. The recording uses a Live Activity, and a drain uses the system's
   continued-processing progress.
-- Notification permission is asked once: at the first recording, the first Transcribe from a screen, or the model
-  download. NOTIFICATIONS_OFF means denied. Before the first question, nothing counts as off.
+- Notification permission is asked once (`NoticeCenter.askNotificationsOnce`, for every path): at the first
+  recording, the first Transcribe from a screen, or the model download, and only while it is not decided.
+  NOTIFICATIONS_OFF means denied. Before the first question, nothing counts as off.
 - `cassini://note/<id>` and `cassini://recording` go through `DeepLinks.parse`. Android's `ACTION_VIEW` import is
   iOS's `onOpenURL` of a file.
 
@@ -455,6 +481,10 @@ These features exist only on iOS. They were kept by decision.
 - A reload is keyed on the file's size and modification date, because iOS has no document written in place.
 
 ## Android tests without an iOS port
+
+- **`NoteViewModelTest#theExportAfterProcessDeathStillRuns`.** Android exports through a file picker, so the export
+  waits for the picked target across a process death. iOS makes the file first and then offers the share sheet;
+  nothing waits for a target, and a closed share sheet removes its file.
 
 - **Room, SQLite and the sealed document:** `sqliteHasFts4WithUnicode61AndRemoveDiacritics`,
   `replacingTheCacheKeepsTheFtsDocid`, the adopt and marker cases of the queue and job tests, and `CheckpointData` and

@@ -57,7 +57,7 @@ struct NoteMenu: View {
         } label: {
             Image(systemName: "ellipsis").frame(minWidth: HitTarget.minimum, minHeight: HitTarget.minimum)
         }
-        .accessibilityLabel(NoteCopy.moreActions)
+        .accessibilityLabel(NoteCopy.shareAndMore)
         .accessibilityIdentifier("noteActions")
     }
 

@@ -106,7 +106,7 @@ final class NoteScreenTests: XCTestCase {
     /// The processing seed runs a job that never ends, so Transcribe again queues the fixture behind it.
     @MainActor func testAQueuedNoteKeepsItsTranscriptButCannotBeRenamed() {
         let app = open(seed: "processing")
-        app.buttons["More actions"].tap()
+        app.buttons["Share and more"].tap()
         app.buttons["transcribeAgain"].tap()
         XCTAssertTrue(app.staticTexts["Queued"].waitForExistence(within: 10))
         XCTAssertTrue(app.descendants(matching: .any)["turn-w0"].exists, "the transcript stays under the card")
@@ -115,7 +115,7 @@ final class NoteScreenTests: XCTestCase {
         XCTAssertTrue(alert.waitForExistence(within: 5))
         alert.buttons["Close"].tap()
         XCTAssertFalse(app.textFields["speakerNameField"].exists, "no Name sheet")
-        app.buttons["More actions"].tap()
+        app.buttons["Share and more"].tap()
         let remove = app.collectionViews.buttons["Remove from queue"]
         XCTAssertTrue(remove.waitForExistence(within: 3), "no Transcribe again while queued")
         XCTAssertFalse(app.collectionViews.buttons["transcribeAgain"].exists)
@@ -135,7 +135,7 @@ final class NoteScreenTests: XCTestCase {
                                                        "A quieter kind of productivity")).firstMatch
         XCTAssertTrue(fixture.waitForExistence(within: 5))
         fixture.tap()
-        app.buttons["More actions"].tap()
+        app.buttons["Share and more"].tap()
         app.buttons["transcribeAgain"].tap()
         let ahead = app.staticTexts["queuedAhead"]
         XCTAssertTrue(ahead.waitForExistence(within: 10))
@@ -204,10 +204,10 @@ final class NoteScreenTests: XCTestCase {
     /// The title can be renamed while the transcript is read-only.
     @MainActor func testAQueuedNoteCanStillBeRenamed() {
         let app = open(seed: "processing")
-        app.buttons["More actions"].tap()
+        app.buttons["Share and more"].tap()
         app.buttons["transcribeAgain"].tap()
         XCTAssertTrue(app.staticTexts["Queued"].waitForExistence(within: 10))
-        app.buttons["More actions"].tap()
+        app.buttons["Share and more"].tap()
         app.collectionViews.buttons["Rename"].tap()
         let field = app.textFields["renameField"]
         XCTAssertTrue(field.waitForExistence(within: 5))
@@ -261,7 +261,7 @@ final class NoteScreenTests: XCTestCase {
     /// The note screen's Rename is the Library's dialog: Save waits for a change, and a blank title says why.
     @MainActor func testRenameFollowsTheLibrarysRule() {
         let app = open()
-        app.buttons["More actions"].tap()
+        app.buttons["Share and more"].tap()
         app.collectionViews.buttons["Rename"].tap()
         let field = app.textFields["renameField"]
         XCTAssertTrue(field.waitForExistence(within: 5))
@@ -279,7 +279,7 @@ final class NoteScreenTests: XCTestCase {
                                "BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB"]
         app.launchAndWait()
         XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 15))
-        app.buttons["More actions"].tap()
+        app.buttons["Share and more"].tap()
         let share = app.collectionViews.buttons["Share original audio"]
         XCTAssertTrue(app.collectionViews.buttons["Transcribe"].waitForExistence(within: 3))
         XCTAssertFalse(app.collectionViews.buttons["Document info"].exists)
@@ -293,7 +293,7 @@ final class NoteScreenTests: XCTestCase {
 
     @MainActor func testDocumentInfoShowsTheNotesFacts() {
         let app = open()
-        app.buttons["More actions"].tap()
+        app.buttons["Share and more"].tap()
         app.buttons["Document info"].tap()
         XCTAssertTrue(app.navigationBars["Document info"].waitForExistence(within: 5))
         XCTAssertTrue(app.staticTexts["00:24"].exists)

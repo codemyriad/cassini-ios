@@ -45,7 +45,7 @@ final class NoteFlowTests: XCTestCase {
         XCTAssertTrue(play.wait(until: NSPredicate(format: "label == 'Play'"), within: 3))
 
         // Transcribe again: version 2, and Versions lists both.
-        app.buttons["More actions"].tap()
+        app.buttons["Share and more"].tap()
         let again = app.collectionViews.buttons["transcribeAgain"]
         XCTAssertTrue(again.waitForExistence(within: 3))
         XCTAssertTrue(again.label.contains("Adds version 2."), "the menu says which version it adds: \(again.label)")
@@ -61,17 +61,17 @@ final class NoteFlowTests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Versions"].waitForNonExistence(within: 5))
 
         // The exports reach the share sheet.
-        app.buttons["More actions"].tap()
+        app.buttons["Share and more"].tap()
         app.collectionViews.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Export transcript'")).firstMatch.tap()
         app.collectionViews.buttons["Transcript as text"].tap()
         closeShareSheet(app)
         for subtitles in ["Subtitles · .srt", "Subtitles · .vtt"] {
-            app.buttons["More actions"].tap()
+            app.buttons["Share and more"].tap()
             app.collectionViews.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Export transcript'")).firstMatch.tap()
             app.collectionViews.buttons[subtitles].tap()
             closeShareSheet(app)
         }
-        app.buttons["More actions"].tap()
+        app.buttons["Share and more"].tap()
         app.collectionViews.buttons["Export Cassini document"].tap()
         closeShareSheet(app)
         XCTAssertTrue(app.staticTexts["noteTitle"].exists, "the exports leave the note open")
