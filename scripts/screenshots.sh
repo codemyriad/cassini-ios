@@ -11,8 +11,8 @@
 # It builds through `scripts/test.sh build` and runs the tests on simulator clones of its own (<prefix>-shots-iphone and
 # <prefix>-shots-ipad, which `scripts/test.sh clean` deletes). The device gets the appearance and the region (en_US or
 # it_IT), and its status bar is pinned: 9:41, a full battery that is not charging, full Wi-Fi and cellular bars. An
-# iPad's status bar also shows the date, 8 October, with the wrong weekday ("Sun"): inside an app the simulator drops
-# the override's year and names the day as in 2000, whatever year is given. The tests launch the app with the UI-test clock, named seeds and the same language and region, and
+# iPad's status bar also shows the date, 8 October, but with the wrong weekday ("Sun"): the simulator's home screen
+# shows the override's Thursday, an app's status bar does not, and --time takes only ISO dates. The tests launch the app with the UI-test clock, named seeds and the same language and region, and
 # attach each shot under the name it is saved as. The attachments are exported from the result bundle with
 # `xcrun xcresulttool export attachments`, mapped by name, scaled to at most 1200 px (sips) and quantised with pngquant
 # when it is installed. A full run that took every shot removes the PNGs of the set that it no longer makes; a run that
@@ -121,7 +121,7 @@ for device in $devices; do
         xcrun simctl bootstatus "$udid" -b > /dev/null
     fi
     # The override takes an ISO date: the UI-test clock's 8 October 2026, 9:41 in the Mac's time zone, which the
-    # simulator shares. Only the iPad shows the date, and in an app with the weekday of 8 October 2000 (see above).
+    # simulator shares. Only the iPad shows the date, and in an app with the wrong weekday (see above).
     now=$(date -u -r "$(date -j -f "%Y-%m-%dT%H:%M:%S" "2026-10-08T09:41:00" "+%s")" "+%Y-%m-%dT%H:%M:%S.000Z")
     xcrun simctl status_bar "$udid" override --time "$now" --dataNetwork wifi --wifiMode active --wifiBars 3 \
         --cellularMode active --cellularBars 4 --operatorName "" --batteryState discharging --batteryLevel 100
