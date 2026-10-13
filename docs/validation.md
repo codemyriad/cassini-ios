@@ -7,13 +7,14 @@ Pro 13-inch (M5)). The counts were taken on 13 October 2026 with `scripts/test.s
 
 ## Automated checks
 
-`scripts/test.sh` runs the tiers. Its header lists the options, and the [README](../README.md#verify) summarises them.
+`scripts/test.sh` runs the tiers. The modules are targets of the one root `Package.swift`, so every `swift test`
+command below runs from the repository root, not from a folder under `Packages/`. Its header lists the options, and the [README](../README.md#verify) summarises them.
 
 | Tier | What runs | Count |
 |---|---|---|
-| `fast` | `scripts/check-strings.sh`, then `swift test` over the packages | 1,044 tests: 1,035 Swift Testing tests in 151 suites and 9 XCTest cases; the real-model test is skipped unless enabled |
-| `app` | The hosted unit tests (`CassiniTests`) in the app on a simulator | 88 |
-| `ui` | The UI tests (`CassiniUITests`) on up to three iPhone clones, and the `testIPad*` tests on an iPad clone | 82 test methods: 64 run on the iPhones, the 7 `testIPad*` tests on the iPad, and the 11 `ScreenshotTests` skip |
+| `fast` | `scripts/check-strings.sh`, then `swift test` over the packages | 1,095 tests: 1,086 Swift Testing tests in 155 suites and 9 XCTest cases; the real-model test is skipped unless enabled |
+| `app` | The hosted unit tests (`CassiniTests`) in the app on a simulator | 73 |
+| `ui` | The UI tests (`CassiniUITests`) on up to three iPhone clones, and the `testIPad*` tests on an iPad clone | 84 test methods: 65 run on the iPhones, the 8 `testIPad*` tests on the iPad, and the 11 `ScreenshotTests` skip |
 | `all` | All three; the package tests run beside the build | |
 
 ### `fast`: the string catalogs and the package tests
@@ -25,16 +26,17 @@ Pro 13-inch (M5)). The counts were taken on 13 October 2026 with `scripts/test.s
   `CASSINI_CONFORMANCE` to a checkout's `spec/conformance`, or keep `../cassini-format` beside the repository, which
   `scripts/test.sh` finds. With `CASSINI_CONFORMANCE_REQUIRED=1`, which `scripts/test-remote.sh` sets, missing vectors
   fail the run instead of being skipped.
-- **CassiniNotebook** (501). The pure rules ported from Android's `:core` and view-model tests: search, previews, day groups
+- **CassiniNotebook** (502). The pure rules ported from Android's `:core` and view-model tests: search, previews, day groups
   and row statuses; the Note screen's modes, state, follow and draft rules; transcript turns and tints; banners and
   notice facts; progress, battery projection, checkpoints (including Android's checkpoint golden) and memory
   preflight; recording policy and banners; speaker attribution, naming, matching and saved voices; trash arithmetic;
   the TXT, SRT and WebVTT exports byte for byte against Android's goldens; the note schema and its migration; durable
   writes.
-- **CassiniEngine** (412, and 9 XCTest cases). The stores, coordinators and screen models over fakes of every port: the transcription queue
-  (enqueue rules, drain, hand-off, background time, cancel, launch reconcile, trash), the transcription job (windows,
-  checkpoints, resume, refusals, speaker step), recording (capture, storage floor, finish, recovery, the screen
-  model), playback, trash and purge order, notices, import and export, model installs and consent, settings and
+- **CassiniEngine** (462, and 9 XCTest cases). The stores, coordinators and screen models over fakes of every port:
+  the transcription queue (enqueue and admission rules, drain, hand-off, background time, cancel, launch reconcile,
+  trash), the transcription job (windows, checkpoints, resume, refusals, speaker step), recording (capture, storage
+  floor, finish, recovery, the screen model), the Note screen and Name a speaker models, saved voices and naming over
+  real files, playback, trash and purge order, notices, import and export, model installs and consent, settings and
   licences, navigation and deep links.
 - **CassiniInference** (28). The file reader behind `AppleSpeechTranscriber`, the speaker model installer and manifest,
   the licence assets, and the opt-in real-model test (below).
@@ -45,7 +47,7 @@ Pro 13-inch (M5)). The counts were taken on 13 October 2026 with `scripts/test.s
 The app's adapters and composition, in the app on a simulator, over an `AppGraph` with a temporary library
 (`CassiniTests/TestGraph.swift`): the real audio pipeline (CAF inspection, M4A compression, import integrity, malformed
 audio, recovery), the graph's launch work, the Library over a thousand notes, playback through the app's player,
-recording, trash, voices, notifications and deep links, notices, exports and the share sheet's files, the Router,
+recording, trash, a speaker analysis racing Forget everyone, notifications and deep links, the date forms, notices, exports and the share sheet's files, the Router,
 the rendering of a three-hour transcript, the copy of every banner, and `ContrastTests`, which checks every colour pair
 a screen draws in light and dark.
 
