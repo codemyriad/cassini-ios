@@ -2,6 +2,9 @@ import Foundation
 import CassiniNotebook
 
 /// The launch repair, and starting a waiting queue when Cassini comes to the screen.
+///
+/// Touches: `visible`, `trashed` (read from the notes at launch), the stored queue and `work/` before the queue is
+/// ready; the observed state only through `recordLoadFailure`, `refresh` and `markReady`.
 extension TranscriptionCoordinator {
     /// The app came to the screen or left it. On the screen, a waiting queue starts when nothing runs, nothing holds
     /// it and the models may be used; paused jobs never resume on their own.
@@ -25,8 +28,7 @@ extension TranscriptionCoordinator {
         do {
             jobs = try await parts.jobs.load(now: parts.clock.now)
         } catch {
-            log.error("Cannot read the queue: \(String(describing: error))")
-            loadFailure = error as? JobStore.Failure ?? .readOnly
+            recordLoadFailure(error)
             jobs = []
         }
         let notes = await parts.notes.all()
@@ -61,13 +63,6 @@ extension TranscriptionCoordinator {
         }
         if let loadFailure { throw loadFailure }
         return plan.report
-    }
-
-    func markReady() {
-        guard !isReady else { return }
-        isReady = true
-        readiness.signal()
-        if visible { Task { await startWaitingQueue() } }
     }
 
     func startWaitingQueue() async {

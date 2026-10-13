@@ -2,6 +2,8 @@ import Foundation
 import CassiniNotebook
 
 /// What happens to a note once it is saved, and the Cancel of a running job's model download.
+///
+/// Touches: `active` (marks its Cancel mode and stops it); everything else through the queue actions.
 extension TranscriptionCoordinator {
     /// After a recording or an import is saved, with Transcribe automatically on: the note is queued when the models
     /// may be used, the model download screen should ask when the person has not declined it, and otherwise the note

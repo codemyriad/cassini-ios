@@ -4,6 +4,9 @@ import CassiniNotebook
 
 /// The end of a recording: the note sealed with its title and duration, then its audio compressed and handed to
 /// transcription.
+///
+/// Touches: `policy`, `titleWrite` and `captureURL` (ended and cleared), `compressions`; the state only through
+/// `setState`, `setFinalizing` and `endActivity`.
 extension RecordingController {
     func end(_ stop: Stop, title: String?) async {
         guard let current = state.activeRecording else { return }
@@ -15,8 +18,7 @@ extension RecordingController {
         let duration = (try? await parts.capture.stop().duration) ?? elapsed
         let url = captureURL
         captureURL = nil
-        parts.liveActivity?.end()
-        activity = nil
+        endActivity()
 
         guard let url, Self.hasAudio(at: url) else {
             try? await parts.notes.discard(id)
@@ -63,13 +65,13 @@ extension RecordingController {
 
     /// Reads the waveform, compresses the capture to M4A and hands the note to transcription.
     func compress(_ id: UUID, _ capture: URL, thenTranscribe transcribe: Bool) {
-        finalizing.insert(id)
+        setFinalizing(id, true)
         parts.handoff.audioFinalizing(id)
         compressions[id] = Task { [weak self] in
             guard let self else { return }
             defer { compressions[id] = nil } // Last, so `settle()` waits for the hand-off too.
             let readable = await finishAudio(id, capture)
-            finalizing.remove(id)
+            setFinalizing(id, false)
             parts.handoff.audioReady(id)
             // Cancelled while compressing ("Waiting to transcribe" shows Cancel): the user's choice stands.
             guard transcribe, await parts.notes.note(id)?.status == .queued else { return }

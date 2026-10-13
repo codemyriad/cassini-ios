@@ -21,6 +21,11 @@ import CassiniNotebook
 ///   A seal that cannot be written is shown on screen anyway and written with the note's next write
 ///   (`RecordingNotes.showUnsaved`), and the note opens audio only; failing that, the next launch's recovery seals it.
 /// - Another app taking the audio pauses the recording; it stays paused until the user resumes.
+///
+/// `RecordingController+Capture.swift` and `+Finish.swift` split this class by topic; each one's header names the
+/// internals it touches. The observed state (`state`, `bars`, `finalizing`, `startingTitle`) and the Live Activity
+/// are written only in this file: `state` through `setState`, which tells the observers, and the rest through
+/// `addLevel`, `setFinalizing` and `publishActivity`/`endActivity`.
 @MainActor @Observable
 public final class RecordingController {
     public struct Timing: Sendable {
@@ -69,13 +74,13 @@ public final class RecordingController {
 
     enum Stop { case user, space, microphone }
 
-    public internal(set) var state: RecordingState = .idle
+    public private(set) var state: RecordingState = .idle
     /// The last 7 s of microphone levels.
-    public internal(set) var bars = WaveformBars()
+    public private(set) var bars = WaveformBars()
     /// Notes whose audio is still being compressed after the finish.
-    public internal(set) var finalizing: Set<UUID> = []
+    public private(set) var finalizing: Set<UUID> = []
     /// The title typed while the capture starts; the recording takes it once it runs.
-    public internal(set) var startingTitle: String?
+    public private(set) var startingTitle: String?
 
     /// Whether the app is on screen; an automatic stop in the background posts a notification.
     @ObservationIgnored public var isAppActive = true
@@ -83,16 +88,16 @@ public final class RecordingController {
     @ObservationIgnored public var onCompressionFailed: (@MainActor (UUID) -> Void)?
 
     @ObservationIgnored let parts: Parts
-    @ObservationIgnored var observers: [@MainActor (RecordingState) -> Void] = []
+    @ObservationIgnored private var observers: [@MainActor (RecordingState) -> Void] = []
     @ObservationIgnored var operations: Task<Void, Never>?
     @ObservationIgnored var policy: Task<Void, Never>?
     @ObservationIgnored var titleWrite: Task<Void, Never>?
     @ObservationIgnored var compressions: [UUID: Task<Void, Never>] = [:]
     @ObservationIgnored var events: Task<Void, Never>?
     @ObservationIgnored var captureURL: URL?
-    @ObservationIgnored var activity: RecordingActivityState?
+    @ObservationIgnored private var activity: RecordingActivityState?
     /// States not yet told to every observer, oldest first.
-    @ObservationIgnored var undelivered: [RecordingState] = []
+    @ObservationIgnored private var undelivered: [RecordingState] = []
 
     public init(parts: Parts) {
         self.parts = parts
@@ -219,6 +224,22 @@ public final class RecordingController {
             for observer in observers { observer(current) }
             undelivered.removeFirst()
         }
+    }
+
+    /// A microphone level for the waveform, at the time captured so far.
+    func addLevel(_ level: Float) {
+        bars.add(level, atMs: Int64(parts.capture.elapsed * 1000))
+    }
+
+    /// The note's audio is being compressed after the finish, or no longer is.
+    func setFinalizing(_ noteID: UUID, _ isFinalizing: Bool) {
+        if isFinalizing { finalizing.insert(noteID) } else { finalizing.remove(noteID) }
+    }
+
+    /// Ends the Live Activity of the recording.
+    func endActivity() {
+        parts.liveActivity?.end()
+        activity = nil
     }
 
     /// Runs `work` after every operation asked for before it.

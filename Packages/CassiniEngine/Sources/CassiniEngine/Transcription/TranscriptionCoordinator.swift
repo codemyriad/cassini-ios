@@ -10,6 +10,10 @@ import CassiniNotebook
 ///   so a job's outcome and a user action never interleave.
 /// - Nothing reads the queue before `reconcileOnStart` has repaired it; queue actions wait for it.
 /// - `note.json` keeps the coarse `status` (and the failure of a failed job) in step with the job, for older readers.
+///
+/// The `TranscriptionCoordinator+*.swift` extensions split this class by topic and share its internals; each one's
+/// header names the internals it touches. The observed state (`state`, `isReady`, `loadFailure`) is written only in
+/// this file, through `refresh`, `setHold`, `setRunning`, `markTrashed`, `markReady` and `recordLoadFailure`.
 @MainActor @Observable
 public final class TranscriptionCoordinator {
     /// The coordinator's collaborators; the app passes its adapters, tests pass fakes.
@@ -39,13 +43,13 @@ public final class TranscriptionCoordinator {
         }
     }
 
-    public internal(set) var state = ProcessingState()
+    public private(set) var state = ProcessingState()
     /// The launch repair has run and the queue may be read.
-    public internal(set) var isReady = false
+    public private(set) var isReady = false
     /// A drain loop runs: a job runs or is about to be claimed.
     public var isDraining: Bool { drainTask != nil }
     /// Why the stored queue could not be read at launch, for the notice that tells it; nil when it was read.
-    public internal(set) var loadFailure: JobStore.Failure?
+    public private(set) var loadFailure: JobStore.Failure?
 
     @ObservationIgnored let parts: Parts
     @ObservationIgnored let settings: SettingsStore
@@ -209,5 +213,63 @@ public final class TranscriptionCoordinator {
     public func waitForJob(of noteID: UUID) async {
         guard let current = active, current.noteID == noteID else { return }
         await current.finished.wait()
+    }
+
+    // MARK: Observed state: its only writers
+
+    /// Reads the stored jobs into `state`: the jobs, the queue without the trashed notes, and the hold.
+    func refresh() async {
+        let all = await parts.jobs.all()
+        var next = state
+        next.jobs = Dictionary(uniqueKeysWithValues: all.map { ($0.noteID, $0) })
+        next.queue = all.filter { $0.state == .queued && !trashed.contains($0.noteID) }.map(\.noteID)
+        next.hold = settings.queueHold
+        if next != state { state = next }
+    }
+
+    func setHold(_ hold: QueueHold?) {
+        settings.queueHold = hold
+        state.hold = hold
+    }
+
+    /// The running job as the Note screen and the Library show it; nil once it ended.
+    func setRunning(_ running: RunningJob?) {
+        if running != state.running { state.running = running }
+    }
+
+    /// The note went to Recently Deleted: its job never starts or counts as waiting from now on.
+    func markTrashed(_ noteID: UUID) {
+        trashed.insert(noteID)
+        state.queue.removeAll { $0 == noteID }
+    }
+
+    /// The launch repair has run: queue actions stop waiting, and a waiting queue starts when Cassini is on screen.
+    func markReady() {
+        guard !isReady else { return }
+        isReady = true
+        readiness.signal()
+        if visible { Task { await startWaitingQueue() } }
+    }
+
+    func recordLoadFailure(_ error: any Error) {
+        log.error("Cannot read the queue: \(String(describing: error))")
+        loadFailure = error as? JobStore.Failure ?? .readOnly
+    }
+
+    // MARK: Notifications
+
+    /// The result notification of `outcome` (`ResultNotification.announcing`), only while Cassini is not on the screen.
+    func announce(_ current: Active, _ outcome: JobOutcome) async {
+        guard !visible else { return }
+        let sealed = outcome == .done || outcome == .adoptPending
+        let note = sealed ? await parts.notes.note(current.noteID) : nil
+        guard let notification = ResultNotification.announcing(outcome, noteID: current.noteID, title: current.title,
+                                                               note: note) else { return }
+        await parts.notifier.post(notification)
+    }
+
+    func notifyHidden(_ noteID: UUID, _ title: String, _ kind: ResultNotification.Kind) async {
+        guard !visible else { return }
+        await parts.notifier.post(ResultNotification(noteID: noteID, title: title, kind: kind))
     }
 }

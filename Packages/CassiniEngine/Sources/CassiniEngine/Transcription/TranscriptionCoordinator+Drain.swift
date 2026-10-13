@@ -2,6 +2,9 @@ import Foundation
 import CassiniNotebook
 
 /// The drain loop: one job at a time in queue order, in the background time it holds, and the system's Stop.
+///
+/// Touches: `drainTask`, `rerun`, `background` and `backgroundProgress` (main actor); `active` and the outcome
+/// writes inside `lock`'s section; the running job only through `setRunning`, the hold through `setHold`.
 extension TranscriptionCoordinator {
     /// Starts the drain loop, or makes the running one look at the queue again before it ends.
     public func drain() {
@@ -73,7 +76,7 @@ extension TranscriptionCoordinator {
 
     func start(_ current: Active) {
         active = current
-        state.running = RunningJob(noteID: current.noteID, title: current.title)
+        setRunning(RunningJob(noteID: current.noteID, title: current.title))
         parts.progress?.begin(current.noteID, finalizationMs: settings.finalizationMs)
         let (events, sink) = AsyncStream.makeStream(of: JobEvent.self)
         current.events = Task { [weak self] in
@@ -97,7 +100,7 @@ extension TranscriptionCoordinator {
             // The jobs first: while `active` is set, Trash reads the job from it, and after, from `state.jobs`.
             await refresh()
             active = nil
-            state.running = nil
+            setRunning(nil)
             parts.progress?.end()
         }
         current.finished.signal()
@@ -107,7 +110,7 @@ extension TranscriptionCoordinator {
     func apply(_ event: JobEvent, to current: Active) {
         guard active === current, let running = state.running else { return }
         let updated = running.applying(event)
-        if updated != running { state.running = updated }
+        setRunning(updated)
         parts.progress?.apply(event)
         let fraction = parts.progress?.fraction(for: current.noteID) ?? updated.fraction
         backgroundProgress.completedUnitCount = Int64(((fraction ?? 0) * 100).rounded())

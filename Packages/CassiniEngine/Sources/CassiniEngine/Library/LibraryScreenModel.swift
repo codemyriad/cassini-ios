@@ -65,7 +65,7 @@ public final class LibraryScreenModel {
         didSet { if query != oldValue { scheduleSearch() } }
     }
     /// The trimmed query the results are for; it follows `query` after the debounce.
-    public internal(set) var searched = ""
+    public private(set) var searched = ""
     /// Only starred notes (an iOS extra).
     public var favoritesOnly = false
     /// The confirmation or form open over the Library.
@@ -75,17 +75,17 @@ public final class LibraryScreenModel {
 
     @ObservationIgnored public var onEffect: (@MainActor (LibraryEffect) -> Void)?
     @ObservationIgnored let ports: Ports
-    @ObservationIgnored var index = LibraryIndex()
+    @ObservationIgnored private var index = LibraryIndex()
     /// `index.revision`, observed, so the view reads the rows again when the notes change.
-    var revision = 0
-    @ObservationIgnored var pendingSearch: Task<Void, Never>?
-    @ObservationIgnored var pendingNotes: Task<Void, Never>?
+    private var revision = 0
+    @ObservationIgnored private var pendingSearch: Task<Void, Never>?
+    @ObservationIgnored private var pendingNotes: Task<Void, Never>?
     /// The last search's results: for `query` over the notes at `revision` of the index.
-    var found: Found?
+    private var found: Found?
     /// The search running off the main actor.
-    @ObservationIgnored var running: (query: String, task: Task<Void, Never>)?
+    @ObservationIgnored private var running: (query: String, task: Task<Void, Never>)?
 
-    struct Found {
+    private struct Found {
         let query: String
         let revision: Int
         let hits: [LibraryIndex.Hit]
@@ -252,6 +252,79 @@ public final class LibraryScreenModel {
         case .needsConsent: onEffect?(.openModelDownload(noteID: id))
         case .refused(let refusal): onEffect?(.refused(refusal))
         case .queued: break
+        }
+    }
+}
+
+/// The Library's index of the notes, kept up to date as they change, and its search, run off the main actor after
+/// the debounce.
+private extension LibraryScreenModel {
+    /// Indexes the notes now and again each time they change: the change is observed, and the index is brought up to
+    /// date on the main actor right after it.
+    func observeNotes() {
+        pendingNotes = nil
+        let notes = withObservationTracking { ports.notes() } onChange: { [weak self] in
+            // The stores change on the main actor, so the update is scheduled right away and `settle()` sees it.
+            if Thread.isMainThread {
+                MainActor.assumeIsolated { self?.notesChanged() }
+            } else {
+                Task { @MainActor [weak self] in self?.notesChanged() }
+            }
+        }
+        index.update(notes)
+        guard index.revision != revision else { return }
+        revision = index.revision
+        if !searched.isEmpty, found?.revision != revision { search() }
+    }
+
+    func notesChanged() {
+        guard pendingNotes == nil else { return }
+        pendingNotes = Task { @MainActor [weak self] in self?.observeNotes() }
+    }
+
+    /// Searches the notes for `searched` off the main actor, a thousand notes being more than a frame's work; the
+    /// tokens it works out are kept for the next search. A search over notes that changed meanwhile still publishes
+    /// its results, then runs again over the new notes; a new query cancels it.
+    func search() {
+        let query = searched
+        if let running {
+            if running.query == query { return } // it searches again over the new notes when it answers
+            running.task.cancel()
+        }
+        let snapshot = index, revision = index.revision
+        let task = Task { [weak self] in
+            let work = Task.detached(priority: .userInitiated) {
+                var copy = snapshot
+                return (copy.search(SearchQuery(query)), copy)
+            }
+            let (hits, searched) = await withTaskCancellationHandler { await work.value } onCancel: { work.cancel() }
+            guard let self, !Task.isCancelled else { return }
+            index.adoptTokens(from: searched)
+            found = Found(query: query, revision: revision, hits: hits)
+            running = nil
+            if self.searched == query, revision != index.revision { search() }
+        }
+        running = (query, task)
+    }
+
+    func scheduleSearch() {
+        pendingSearch?.cancel()
+        let text = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard text != searched else { pendingSearch = nil; return }
+        guard !text.isEmpty else {
+            searched = ""
+            found = nil
+            running?.task.cancel()
+            running = nil
+            pendingSearch = nil
+            return
+        }
+        pendingSearch = Task { [weak self, clock = ports.clock] in
+            do { try await clock.sleep(for: Self.searchDebounce) } catch { return }
+            guard let self, !Task.isCancelled else { return }
+            pendingSearch = nil
+            searched = text
+            search()
         }
     }
 }

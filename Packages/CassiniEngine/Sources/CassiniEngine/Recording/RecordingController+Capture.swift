@@ -4,6 +4,8 @@ import CassiniNotebook
 
 /// While recording: the capture's events, the storage and length policy checked each second, and the title written
 /// as it is typed.
+///
+/// Touches: `titleWrite`, and reads `captureURL`; the state only through `setState`, `addLevel` and `publishActivity`.
 extension RecordingController {
     func runPolicy() async {
         while !Task.isCancelled {
@@ -43,7 +45,7 @@ extension RecordingController {
         switch event {
         case .level(let level):
             guard active.pause == nil else { return }
-            bars.add(level, atMs: Int64(parts.capture.elapsed * 1000))
+            addLevel(level)
         case .interrupted, .routeLost:
             // A user pause stays a user pause; the end of the interruption does not resume.
             guard active.pause == nil else { return }

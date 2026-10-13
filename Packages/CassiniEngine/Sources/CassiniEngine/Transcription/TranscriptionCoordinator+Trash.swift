@@ -2,12 +2,14 @@ import Foundation
 import CassiniNotebook
 
 /// The queue around Recently Deleted: a note that goes there, comes back, or is deleted for good.
+///
+/// Touches: `trashed` (through `markTrashed`, and removed on Restore and delete), `active` to stop its job, and the
+/// queue writes inside `lock`'s section.
 extension TranscriptionCoordinator {
     /// Before a note goes to Recently Deleted: a running job stops and keeps its progress, a queued job leaves the
     /// queue (its `work/` stays for Restore), any other job stays. Returns what the note should remember for Restore.
     public func moveToTrash(_ noteID: UUID) -> TrashedJob? {
-        trashed.insert(noteID)
-        state.queue.removeAll { $0 == noteID }
+        markTrashed(noteID)
         if let current = active, current.noteID == noteID {
             current.stop.stop(.pause(.user))
             return TrashedJob(state: .paused, kind: current.job.kind)

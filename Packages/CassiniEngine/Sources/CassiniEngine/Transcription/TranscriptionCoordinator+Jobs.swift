@@ -2,6 +2,9 @@ import Foundation
 import CassiniNotebook
 
 /// The queue's writes and the note statuses that follow them; every one runs inside the serial section.
+///
+/// Touches: `parts.jobs`, `parts.notes` and `parts.checkpoints` (writes), `trashed` (an enqueue takes the note out),
+/// `refresh()`.
 extension TranscriptionCoordinator {
     /// The language a job is queued with, and whether the note takes it too (only for the transcribe kinds).
     struct Language {
@@ -98,20 +101,6 @@ extension TranscriptionCoordinator {
         } catch {
             log.error("Cannot save the status of \(noteID): \(String(describing: error))")
         }
-    }
-
-    func refresh() async {
-        let all = await parts.jobs.all()
-        var next = state
-        next.jobs = Dictionary(uniqueKeysWithValues: all.map { ($0.noteID, $0) })
-        next.queue = all.filter { $0.state == .queued && !trashed.contains($0.noteID) }.map(\.noteID)
-        next.hold = settings.queueHold
-        if next != state { state = next }
-    }
-
-    func setHold(_ hold: QueueHold?) {
-        settings.queueHold = hold
-        state.hold = hold
     }
 
     /// Runs a queue write; a failed one is logged and leaves the queue as it was. Returns the result, nil on failure.
