@@ -18,7 +18,8 @@ struct SuggestionCard: View {
             Button { nameSpeaker(suggestion.speakerID) } label: {
                 HStack(spacing: 10) {
                     SpeakerAvatar(speaker: suggestion.label, ordinal: ordinal, size: 28)
-                    Text(suggestion.label).font(.subheadline.weight(.semibold)).foregroundStyle(Color.ink)
+                    Text(NoteCopy.speakerLabel(suggestion.label, id: suggestion.speakerID, ordinal: ordinal))
+                        .font(.subheadline.weight(.semibold)).foregroundStyle(Color.ink)
                     Text(TimeText.clock(suggestion.start)).font(.caption.monospacedDigit()).foregroundStyle(Color.muted)
                     Spacer()
                 }.frame(minHeight: HitTarget.minimum).contentShape(Rectangle())

@@ -80,6 +80,12 @@ enum NoteCopy {
     static let copyText = String(localized: "Copy text", table: "Note")
     static let unknownSpeaker = String(localized: "Unknown speaker", table: "Note", comment: "A passage without a speaker")
 
+    /// A speaker's stored label as every screen shows it: a placeholder ("Speaker 2", which a note may hold in English
+    /// or Italian) in the reader's language, "Speaker `ordinal + 1`" for a blank one, any other label as it is.
+    static func speakerLabel(_ label: String, id: String, ordinal: Int) -> String {
+        speakerName(NoteTranscripts.name(label: label, id: id, ordinal: ordinal))
+    }
+
     static func speakerName(_ name: SpeakerName) -> String {
         switch name {
         case .named(let text): text

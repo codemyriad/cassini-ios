@@ -43,7 +43,9 @@ struct SegmentEditor: View {
                 Section {
                     Picker(NoteCopy.speaker, selection: $speaker) {
                         Text(NoteCopy.unassigned).tag("")
-                        ForEach(speakers) { Text($0.name).tag($0.id) }
+                        ForEach(Array(speakers.enumerated()), id: \.element.id) { ordinal, speaker in
+                            Text(NoteCopy.speakerLabel(speaker.name, id: speaker.id, ordinal: ordinal)).tag(speaker.id)
+                        }
                     }
                 } header: { Text(NoteCopy.speaker) } footer: { Text(NoteCopy.speakerFooter) }
             }
