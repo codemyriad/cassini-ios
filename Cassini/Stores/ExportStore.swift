@@ -30,6 +30,13 @@ import CassiniNotebook
         return try await service.exportTranscript(id, format: format, texts: texts)
     }
 
+    /// A copy of the note's original audio named after its title, for "Share original audio".
+    func copyAudio(_ id: UUID) async throws(ExportError) -> URL {
+        guard let service else { throw .cannotSave }
+        await ready()
+        return try await service.copyAudio(id)
+    }
+
     /// A Cassini document of the note's audio with every local transcript version added to it.
     func exportPortable(_ id: UUID) async throws -> URL {
         await ready()

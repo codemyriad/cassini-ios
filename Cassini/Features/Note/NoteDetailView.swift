@@ -300,7 +300,7 @@ struct NoteDetailView: View {
         case .documentInfo: sheet = .documentInfo
         case .exportTranscript(let format): export(format)
         case .exportDocument: exportDocument()
-        case .shareAudio: if let url = library.originalAudioURL(note) { shareItem = ShareItem(url: url) }
+        case .shareAudio: shareAudio()
         case .transcribe: requestTranscription(.transcribe)
         case .transcribeAgain: run(screen.transcribeAgain(note))
         case .stop: processing.stop(noteID)
@@ -333,6 +333,13 @@ struct NoteDetailView: View {
     private func export(_ format: TranscriptFormat) {
         Task {
             do throws(ExportError) { shareItem = exports.shareItem(try await exports.exportTranscript(noteID, format: format)) }
+            catch { errors.present(ExportCopy.message(error)) }
+        }
+    }
+
+    private func shareAudio() {
+        Task {
+            do throws(ExportError) { shareItem = exports.shareItem(try await exports.copyAudio(noteID)) }
             catch { errors.present(ExportCopy.message(error)) }
         }
     }
