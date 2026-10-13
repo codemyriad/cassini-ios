@@ -1,5 +1,6 @@
 #if DEBUG
 import Foundation
+import Synchronization
 import CassiniEngine
 import CassiniNotebook
 
@@ -8,6 +9,9 @@ import CassiniNotebook
 public struct FakeTranscriber: Transcribing {
     public enum Script: Sendable {
         case returns([TranscriptSegment], total: TimeInterval)
+        /// The n-th transcription returns the n-th list, and every one after the last returns the last: a Transcribe
+        /// again that hears other words.
+        case sequence([[TranscriptSegment]], total: TimeInterval)
         /// Reports `done` of `total` seconds and never finishes.
         case frozen(done: TimeInterval, total: TimeInterval)
         /// Downloads the speech model up to `fraction` and never finishes.
@@ -19,6 +23,7 @@ public struct FakeTranscriber: Transcribing {
 
     public let script: Script
     public let status: ModelPartStatus
+    private let runs = Runs()
 
     public init(_ script: Script, status: ModelPartStatus = .ready) { self.script = script; self.status = status }
 
@@ -27,12 +32,10 @@ public struct FakeTranscriber: Transcribing {
         if status == .notDownloaded, !request.allowDownload { throw TranscriptionError.needsConsent }
         switch script {
         case .returns(let segments, let total):
-            for segment in segments {
-                try Task.checkCancellation()
-                events(.finalized(segment))
-                events(.progress(done: segment.end, total: total))
-            }
-            return TranscriptionResult(segments: segments)
+            return try finalize(segments, total: total, events: events)
+        case .sequence(let lists, let total):
+            let run = runs.next()
+            return try finalize(lists.isEmpty ? [] : lists[min(run, lists.count - 1)], total: total, events: events)
         case .frozen(let done, let total):
             events(.progress(done: done, total: total))
             while true { try await Task.sleep(for: .seconds(3600)) }
@@ -51,11 +54,29 @@ public struct FakeTranscriber: Transcribing {
         }
     }
 
+    private func finalize(_ segments: [TranscriptSegment], total: TimeInterval,
+                          events: @Sendable (TranscriptionEvent) -> Void) throws -> TranscriptionResult {
+        for segment in segments {
+            try Task.checkCancellation()
+            events(.finalized(segment))
+            events(.progress(done: segment.end, total: total))
+        }
+        return TranscriptionResult(segments: segments)
+    }
+
     public func assetStatus(locale: Locale) async -> ModelPartStatus { status }
 
     /// Reports the download as done at once; nothing is installed, so `assetStatus` stays as it was.
     public func installAssets(locale: Locale, progress: @escaping @Sendable (Double) -> Void) async throws {
         progress(1)
+    }
+
+    /// How many transcriptions have started, shared by the copies of one transcriber.
+    private final class Runs: Sendable {
+        private let count = Mutex(0)
+
+        /// The number of this run, from 0.
+        func next() -> Int { count.withLock { defer { $0 += 1 }; return $0 } }
     }
 }
 #endif

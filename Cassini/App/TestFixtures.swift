@@ -24,6 +24,20 @@ enum TestFixtures {
         .init(text: "Let’s protect an hour on Thursday for focused work. No notifications, no meetings. Just room to think.", start: 14, end: 24, speaker: "Alex", speakerID: "alex"),
     ]
 
+    /// What a second transcription of a note hears: the last passage ends sooner. Transcribe again adds a version only
+    /// when the words differ.
+    static let transcribedAgainSegments: [TranscriptSegment] = Array(transcribedSegments.dropLast()) + [
+        .init(text: "Let’s protect an hour on Thursday for focused work. Just room to think.", start: 14, end: 24,
+              speaker: "Alex", speakerID: "alex"),
+    ]
+
+    /// The speaker analysis of the recording seed: two voices taking turns as in `transcribedSegments`.
+    static let recordingAnalysis = SpeakerAnalysis(
+        turns: [SpeakerTurn(speakerID: "s1", start: 0, end: 6), SpeakerTurn(speakerID: "s2", start: 6, end: 14),
+                SpeakerTurn(speakerID: "s1", start: 14, end: 24)],
+        prints: [SpeakerPrint(speakerID: "s1", model: "fake-model", vector: [1, 0, 0], speechSeconds: 16),
+                 SpeakerPrint(speakerID: "s2", model: "fake-model", vector: [0, 1, 0], speechSeconds: 8)])
+
     /// The draft of `--draft-growing`: 120 sentences of 3 s, each its own words.
     static let growingDraft: [TranscriptSegment] = (0..<120).map { index in
         let start = Double(index) * 3
