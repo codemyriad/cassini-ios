@@ -37,6 +37,25 @@ import Testing
     #expect(again.derivedFrom == merged.id)
 }
 
+@Test func anEditOfAMergedVersionKeepsTheMerge() throws {
+    var note = Note(title: "Conversation")
+    note.transcript = [.init(text: "First", start: 0, end: 1, speakerID: "a"), .init(text: "Second", start: 1, end: 2, speakerID: "b")]
+    note.speakers = [NoteSpeaker(id: "a", name: "A"), NoteSpeaker(id: "b", name: "B")]
+    note.mergeSpeaker("b", into: "a")
+    let merged = try #require(note.versions?.last)
+    let original = try #require(note.transcript.last)
+    note.revisePassage(original, to: original.revised(text: "Second, edited", speakerID: "a", speakers: note.speakers ?? []),
+                       stamp: VersionStamp(date: Date()))
+    let edited = try #require(note.versions?.last)
+    #expect(edited.id == note.selectedVersionID && edited.id != merged.id)
+    #expect(edited.speakerMerges == ["b": "a"])
+    #expect(edited.derivedFrom == merged.derivedFrom)
+    // A version kept of the edited transcript (before an export, say) keeps it too.
+    note.transcript[0].text = "First, edited"
+    note.saveCurrentVersion(name: "Edited transcript")
+    #expect(note.versions?.last?.speakerMerges == ["b": "a"])
+}
+
 @Test func trashUsesCalendarDaysAcrossDSTAndClockRollback() throws {
     var calendar = Calendar(identifier: .gregorian); calendar.timeZone = try #require(TimeZone(identifier: "Europe/Berlin"))
     let deleted = try #require(calendar.date(from: DateComponents(year: 2026, month: 10, day: 10, hour: 23)))

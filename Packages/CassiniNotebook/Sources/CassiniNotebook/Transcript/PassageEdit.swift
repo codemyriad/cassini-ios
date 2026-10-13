@@ -46,7 +46,7 @@ extension Note {
     /// A run of edits keeps one version: the first edit keeps the transcript before it (unless a kept version holds it
     /// already) and adds an "Edited passages" version, which is then shown; later edits change that version in place,
     /// so twenty typo fixes add one copy of the transcript, not twenty. Both versions are stamped, so a rerun keeps the
-    /// same ones.
+    /// same ones. The edited version keeps the merge of the version it was made from (`saveCurrentVersion`).
     @discardableResult
     public mutating func revisePassage(_ original: TranscriptSegment, to revised: TranscriptSegment,
                                        stamp: VersionStamp) -> PassageEdit {
@@ -58,9 +58,10 @@ extension Note {
             return .saved
         }
         saveCurrentVersion(name: Self.beforePassageEditName, id: stamp.before, date: stamp.date)
+        let base = selectedVersionID
         transcript[index] = revised
         selectedVersionID = nil
-        saveCurrentVersion(name: Self.editedVersionName, id: stamp.after, date: stamp.date)
+        saveCurrentVersion(name: Self.editedVersionName, id: stamp.after, date: stamp.date, editedFrom: base)
         return .saved
     }
 

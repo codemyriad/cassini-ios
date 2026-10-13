@@ -226,4 +226,27 @@ private actor Gate {
         #expect(merged["x-speakerDiarization"] != nil, "a merge only removes speaker ids")
         #expect(Set(document.selected()?.transcript?.words.map(\.speaker) ?? []) == ["a"])
     }
+    @Test func aMergedVersionEditedAfterwardsKeepsTheMergeAliases() async throws {
+        let folder = try folder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let original = folder.appendingPathComponent("source.opus")
+        try Data(ImportFixtures.opus(packets: 100)).write(to: original)
+        var note = twoSpeakers()
+        let record = runRecord(note)
+        note.mergeSpeaker("b", into: "a")
+        let passage = try #require(note.transcript.last)
+        note.revisePassage(passage, to: passage.revised(text: "everyone", speakerID: "a", speakers: note.speakers ?? []),
+                           stamp: VersionStamp(date: Date()))
+
+        let output = try await PortableExportService(audio: FakeAudioProcessing(), provenance: FakeProvenance([note.id: record]))
+            .export(note, original: original, playable: original, into: folder, filename: "Two")
+
+        let document = CassiniDocument.read(output)
+        #expect(document.variants.count == 3)
+        let before = try #require(document.variants.first?.id)
+        let edited = try #require(processing(document, document.defaultId))
+        #expect(edited["kind"] == .string("user-edited"), "the edit changed the run's words")
+        #expect(edited["x-speakerMerges"] == .object(JSONObject([("b", .string("a"))])))
+        #expect(edited["x-derivedFromTranscript"] == .string(before))
+    }
 }
