@@ -7,6 +7,7 @@ struct TrashCard: View {
     let restore: () -> Void
     let deleteNow: () -> Void
     @Environment(\.calendar) private var calendar
+    @Environment(\.dynamicTypeSize) private var dynamicType
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -15,14 +16,17 @@ struct TrashCard: View {
                 Text(TimeText.clock(item.duration)).font(.caption.monospacedDigit()).foregroundStyle(Color.muted)
             }
             Text(meta).font(.caption).foregroundStyle(Color.muted)
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 8) { buttons }
-                VStack(alignment: .leading, spacing: 8) { buttons }
-            }
+            // Side by side, or one under the other at accessibility sizes. Not a ViewThatFits: at the largest size on an
+            // iPad its unused row left the audit three clipped texts without an element.
+            buttonsLayout { buttons }
             .padding(.top, 8)
         }
         .padding(.horizontal, 14).padding(.top, 14).padding(.bottom, 10)
         .cardBackground(radius: Radius.control)
+    }
+
+    private var buttonsLayout: AnyLayout {
+        dynamicType.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8)) : AnyLayout(HStackLayout(spacing: 8))
     }
 
     private var meta: String {
