@@ -74,6 +74,39 @@ import CassiniNotebook
         #expect(analysed(note, saved: [anna], trashed: [other], autoName: true).speakers?.first?.name == "Speaker 1")
     }
 
+    @Test func aSpeakerRememberedFromThisNoteAloneKeepsItsNameAndLink() {
+        // "Remember this voice" in this note: the voice's only sample is this note's print of the speaker.
+        let annaID = UUID()
+        let note = transcribedAgain(nameA: "Anna Rossi", matchA: .confirmed(voice: annaID, score: 0.9))
+        let anna = SavedVoice(id: annaID, name: "Anna Rossi",
+                              samples: [VoiceSample(noteID: note.id, print: print("old_a", [1, 0, 0]))])
+        let again = analysed(note, saved: [anna], autoName: false)
+        #expect(again.speakers?.map(\.name) == ["Anna Rossi", "Speaker 2"])
+        if case .confirmed(let voice, _) = again.speakers?.first?.match { #expect(voice == annaID) }
+        else { Issue.record("expected a confirmed link") }
+    }
+
+    @Test func aSpeakerConfirmedToAVoiceOfOtherNotesKeepsItsNameWithAutomaticNamingOff() {
+        let anna = SavedVoice(name: "Anna Rossi", samples: [VoiceSample(noteID: UUID(), print: print("x", [1, 0, 0]))])
+        let note = transcribedAgain(nameA: "Anna Rossi", matchA: .confirmed(voice: anna.id, score: 0.9))
+        let again = analysed(note, saved: [anna], autoName: false)
+        #expect(again.speakers?.first?.name == "Anna Rossi")
+        if case .confirmed(let voice, _) = again.speakers?.first?.match { #expect(voice == anna.id) }
+        else { Issue.record("expected a confirmed link") }
+        // An unlinked note that only resembles the voice gets a suggestion, as before.
+        #expect(analysed(transcribedAgain(nameA: "Speaker 1"), saved: [anna]).speakers?.first?.match
+            == .suggested(voice: anna.id, score: again.speakers?.first?.match.score ?? 0))
+    }
+
+    @Test func anAutomaticLinkComesBackAsAutomatic() {
+        let anna = SavedVoice(name: "Anna Rossi", samples: [VoiceSample(noteID: UUID(), print: print("x", [1, 0, 0]))])
+        let note = transcribedAgain(nameA: "Anna Rossi", matchA: .auto(voice: anna.id, score: 0.9))
+        let again = analysed(note, saved: [anna], autoName: false)
+        #expect(again.speakers?.first?.name == "Anna Rossi")
+        if case .auto(let voice, _) = again.speakers?.first?.match { #expect(voice == anna.id) }
+        else { Issue.record("expected an automatic link") }
+    }
+
     @Test func identifySpeakersAgainCarriesTheShownNames() {
         var note = Note(title: "Riunione")
         note.transcript = [TranscriptSegment(text: "Prima", start: 0, end: 4, speakerID: "old_a"),

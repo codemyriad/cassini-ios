@@ -106,19 +106,38 @@ extension Note {
         }
     }
 
-    /// The named speakers this note had, as note-local voices (Android's), so that Transcribe again and Identify
-    /// speakers again carry their names over even when they were never saved. The speakers are the shown ones, or,
-    /// when the shown transcript has none yet (Transcribe again cleared them), those of the latest version that has
-    /// some. A speaker counts with a name that is no placeholder, its print among `prints`, no rejection, and no match
-    /// to a saved voice in `savedVoiceIDs` (those match on their own). Speakers with the same name make one voice.
-    public func localVoices(prints: [SpeakerPrint], savedVoiceIDs: Set<UUID>) -> [SavedVoice] {
+    /// The named speakers whose names an analysis carries over: the shown ones, or, when the shown transcript has none
+    /// yet (Transcribe again cleared them), those of the latest version that has some. A speaker counts with a name
+    /// that is no placeholder and no rejection.
+    private var carriedSpeakers: [NoteSpeaker] {
         let shown = speakers ?? []
         let named = shown.isEmpty ? (versions ?? []).last(where: { !$0.speakers.isEmpty })?.speakers ?? [] : shown
+        return named.filter { !DefaultLabels.isDefault(id: $0.id, label: $0.name) && !$0.match.isRejection }
+    }
+
+    /// The saved voices the carried speakers are linked to (`carriedSpeakers`, `NoteSpeaker.linkedVoiceID`), each with
+    /// the link it had. An automatic match to one of them gets that link back, so a speaker named after a saved voice
+    /// keeps its name on Transcribe again and Identify speakers again even with automatic naming off.
+    public var carriedVoiceLinks: [UUID: VoiceMatchState] {
+        var links: [UUID: VoiceMatchState] = [:]
+        for speaker in carriedSpeakers {
+            guard let voice = speaker.linkedVoiceID else { continue }
+            // A confirmation wins over an automatic match of another speaker to the same voice.
+            if case .confirmed = links[voice] { continue }
+            links[voice] = speaker.match
+        }
+        return links
+    }
+
+    /// The carried speakers (`carriedSpeakers`) as note-local voices (Android's), so that Transcribe again and Identify
+    /// speakers again carry their names over even when they were never saved. A speaker counts with its print among
+    /// `prints` and no link to a saved voice in `savedVoiceIDs` (those match on their own, `carriedVoiceLinks`).
+    /// Speakers with the same name make one voice.
+    public func localVoices(prints: [SpeakerPrint], savedVoiceIDs: Set<UUID>) -> [SavedVoice] {
         let byID = Dictionary(prints.map { ($0.speakerID, $0) }, uniquingKeysWith: { _, latest in latest })
         var voices: [SavedVoice] = []
-        for speaker in named {
-            guard !DefaultLabels.isDefault(id: speaker.id, label: speaker.name), !speaker.match.isRejection,
-                  !(speaker.match.voiceID.map(savedVoiceIDs.contains) ?? false), let print = byID[speaker.id] else { continue }
+        for speaker in carriedSpeakers {
+            guard !(speaker.linkedVoiceID.map(savedVoiceIDs.contains) ?? false), let print = byID[speaker.id] else { continue }
             let sample = VoiceSample(noteID: id, print: print)
             if let index = voices.firstIndex(where: { NameMatch.same($0.name, speaker.name) }) {
                 voices[index].samples.append(sample)
@@ -133,10 +152,13 @@ extension Note {
     /// speaker of `turns`, the speakers are numbered in order of first appearance and get their match (`autoName` names
     /// a speaker after an automatic match), and the result is a new version. A match to one of `localVoices` (the
     /// note's own names, `localVoices(prints:savedVoiceIDs:)`) names the speaker when it is automatic, whatever
-    /// `autoName` says, and links it to no saved voice, as Android stores such a match as none. Without a valid turn,
+    /// `autoName` says, and links it to no saved voice, as Android stores such a match as none. An automatic match to
+    /// a voice of `carriedLinks` (`carriedVoiceLinks`) names the speaker whatever `autoName` says too, and gives it the
+    /// link it had: confirmed stays confirmed. Without a valid turn,
     /// or when no passage gets a speaker, nothing but `speakerAnalysisFailure` changes.
     public mutating func applySpeakerAnalysis(turns: [SpeakerTurn], matches: [String: VoiceMatch], voiceNames: [UUID: String],
-                                              localVoices: Set<UUID> = [], autoName: Bool, stamp: VersionStamp) {
+                                              localVoices: Set<UUID> = [], carriedLinks: [UUID: VoiceMatchState] = [:],
+                                              autoName: Bool, stamp: VersionStamp) {
         let attributed = SpeakerAttribution.assign(transcript, turns: turns)
         var order: [String] = []
         for segment in attributed { if let id = segment.speakerID, !order.contains(id) { order.append(id) } }
@@ -152,7 +174,10 @@ extension Note {
             else { return speaker }
             if localVoices.contains(match.voiceID) {
                 if match.automatic { speaker.name = name }
-            } else if autoName && match.automatic {
+            } else if match.automatic, case .confirmed = carriedLinks[match.voiceID] {
+                speaker.name = name
+                speaker.match = .confirmed(voice: match.voiceID, score: match.score)
+            } else if match.automatic && (autoName || carriedLinks[match.voiceID] != nil) {
                 speaker.name = name
                 speaker.match = .auto(voice: match.voiceID, score: match.score)
             } else {
