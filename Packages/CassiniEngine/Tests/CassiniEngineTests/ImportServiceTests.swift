@@ -179,7 +179,8 @@ private func sha256(_ url: URL) throws -> String {
         #expect(note.originalAudioFilename == ImportService.documentFilename)
         #expect(note.audioFilename == ImportService.playbackFilename)
         #expect(note.title == "Seduta del consiglio")
-        #expect(note.document == DocumentInfo(state: .ok, vendor: CassiniDocument.vendor))
+        #expect(note.document == DocumentInfo(state: .ok, vendor: CassiniDocument.vendor,
+                                              meetingID: try manifest.object("meeting").string("id")))
         #expect(note.sourceSha256 == (try sha256(url)))
         let created = try manifest.object("meeting").string("createdAtUtc")
         #expect(note.createdAt == (try Date(created, strategy: .iso8601)))

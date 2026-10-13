@@ -234,7 +234,7 @@ final class CassiniUITests: XCTestCase {
         let app = launch(seed: false, arguments: ["--seed", "trash"])
         app.buttons["Recently Deleted"].tap()
         XCTAssertTrue(app.staticTexts["Old interview draft"].waitForExistence(within: 5))
-        XCTAssertTrue(app.staticTexts["Deleted Oct 1 · 23 days left"].exists)
+        XCTAssertTrue(app.staticTexts["Deleted 1 Oct · 23 days left"].exists)
         XCTAssertTrue(app.staticTexts["Deleted yesterday · 29 days left"].exists)
         capture("Trash")
     }

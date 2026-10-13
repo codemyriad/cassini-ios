@@ -268,8 +268,12 @@ swift_test() {
     local filter="${1:-}"
     conformance_env
     seed_swiftpm
-    run_logged "$logs/swift-test.log" swift test ${filter:+--filter "$filter"}
+    # The checkouts are saved whatever the tests did; the tests' failure is the function's, also where it is called
+    # as `swift_test || rc=$?`, which turns errexit off inside it.
+    local rc=0
+    run_logged "$logs/swift-test.log" swift test ${filter:+--filter "$filter"} || rc=$?
     save_swiftpm
+    return "$rc"
 }
 
 tier_fast() {
