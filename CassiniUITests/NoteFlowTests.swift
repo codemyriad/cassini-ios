@@ -13,10 +13,7 @@ import XCTest
 /// whole seconds, is checked against that passage's start with Android's slack. The share sheet is a separate
 /// process, so the text, SRT, VTT and document exports are checked to reach it, and their bytes are covered by the
 /// export goldens in the packages (`ExportGoldenTests`, `ExportServiceTests`) rather than read back here.
-///
-/// The fake's second transcription of the note hears other words (`TestFixtures.transcribedAgainSegments`) to work
-/// around an open difference, not an intended rule: iOS's Transcribe again adds no version when the words equal the
-/// shown transcript, where Android always adds one (docs/differences.md, "Open differences").
+/// The fake hears the same words again on Transcribe again, which adds version 2 all the same, as on Android.
 final class NoteFlowTests: XCTestCase {
     private static let walk = "BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB"
 

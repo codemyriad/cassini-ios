@@ -148,9 +148,12 @@ extension Note {
         return voices
     }
 
-    /// Puts a speaker analysis into the note: the transcript before it is kept as a version, every passage gets a
-    /// speaker of `turns`, the speakers are numbered in order of first appearance and get their match (`autoName` names
-    /// a speaker after an automatic match), and the result is a new version. A match to one of `localVoices` (the
+    /// Puts a speaker analysis into the note: every passage gets a speaker of `turns`, the speakers are numbered in
+    /// order of first appearance and get their match (`autoName` names a speaker after an automatic match). A
+    /// transcription shown as it was made, with no speakers yet (the analysis that follows it in the same job, or
+    /// Identify speakers on it later), takes the speakers into its own version, as Android seals a transcription and
+    /// its speakers as one variant. Otherwise the transcript before it is kept as a version and the result is a new
+    /// one. A match to one of `localVoices` (the
     /// note's own names, `localVoices(prints:savedVoiceIDs:)`) names the speaker when it is automatic, whatever
     /// `autoName` says, and links it to no saved voice, as Android stores such a match as none. An automatic match to
     /// a voice of `carriedLinks` (`carriedVoiceLinks`) names the speaker whatever `autoName` says too, and gives it the
@@ -185,12 +188,29 @@ extension Note {
             }
             return speaker
         }
-        saveCurrentVersion(.beforeSpeakerAnalysis, id: stamp.before, date: stamp.date)
-        transcript = attributed
-        speakers = analyzed
-        refreshSpeakerLabels()
-        selectedVersionID = nil
-        saveCurrentVersion(.speakerAnalysis, id: stamp.after, date: stamp.date)
+        if let sealed = attributableInPlace {
+            // A transcription and its speakers are one version, as Android seals them.
+            transcript = attributed
+            speakers = analyzed
+            refreshSpeakerLabels()
+            versions?[sealed].segments = transcript
+            versions?[sealed].speakers = speakers ?? []
+        } else {
+            saveCurrentVersion(.beforeSpeakerAnalysis, id: stamp.before, date: stamp.date)
+            transcript = attributed
+            speakers = analyzed
+            refreshSpeakerLabels()
+            selectedVersionID = nil
+            saveCurrentVersion(.speakerAnalysis, id: stamp.after, date: stamp.date)
+        }
         speakerAnalysisFailure = nil
+    }
+
+    /// The index of the shown version when it is a transcription without speakers, which an analysis attributes in
+    /// place.
+    private var attributableInPlace: Int? {
+        guard let index = shownVersionIndex, let version = versions?[index], version.kind == .transcription,
+              version.speakers.isEmpty, !transcript.contains(where: { $0.speakerID != nil }) else { return nil }
+        return index
     }
 }

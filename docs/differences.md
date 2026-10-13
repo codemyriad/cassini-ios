@@ -7,9 +7,8 @@ a platform constraint. This page lists every difference that remains and the rea
 [README](../README.md#differences-from-android) has a summary.
 
 The sections follow the areas of the app: engines and thresholds, the storage model, recording, transcription, the
-iOS extras and the platform. [Open differences](#open-differences) lists the two that are not intended and still
-need fixing. [Android tests without an iOS port](#android-tests-without-an-ios-port) lists the tests that were not
-ported, with the reason for each.
+iOS extras and the platform. [Android tests without an iOS port](#android-tests-without-an-ios-port) lists the tests
+that were not ported, with the reason for each.
 
 ## Engines and thresholds
 
@@ -363,7 +362,10 @@ These features exist only on iOS. They were kept by decision.
   while a job runs.
 - **JSON export** of the note, with voice links and exclusions removed.
 - **The Speakers list** (the note's speakers, Add a speaker, Identify speakers, Saved voices). Android opens Name a
-  speaker from the transcript only. The speaker count in the chips row opens this list.
+  speaker from the transcript only. The speaker count in the chips row opens this list. A transcription and its
+  speakers are one version, as on Android; Identify speakers on a transcript that has speakers already adds a version
+  with the new ones, so the earlier attribution stays available. While a job is pending for the note, the list's
+  speakers and Add a speaker are disabled, as the transcript's read-only rule asks.
 - **"Recently Deleted"** instead of "Trash", as in Photos and Notes. The rest of the copy is Android's, and the Italian
   is "Eliminati di recente".
 - **Forget all voice data** in Saved voices. It is offered when nobody is saved but notes still hold voiceprints, and
@@ -451,18 +453,6 @@ These features exist only on iOS. They were kept by decision.
   the start of an interruption pauses. Losing the output in use (Android's "becoming noisy") pauses too. Playback never
   resumes by itself.
 - A reload is keyed on the file's size and modification date, because iOS has no document written in place.
-
-## Open differences
-
-These differ from Android's behaviour, which wins. They are not intended and are left to the parity work.
-
-- **Transcribe again** adds no version when the new words equal the transcript shown (`TranscriptionJob.saveTranscript`).
-  Android always adds one. The UI-test fake therefore hears different words on a note's second transcription
-  (`TestFixtures.transcribedAgainSegments`).
-- **The speaker analysis that follows a transcription** keeps the transcript from before it as a version of its own
-  (`Note.applySpeakerAnalysis`). Android seals a transcription and its speakers as one version. With the speaker models
-  installed, iOS therefore shows "Version 2 of 2 · transcribed again" after the first transcription, and "Version 4 of
-  4" after a Transcribe again. `AcceptanceWalkTests` pins this with an expected failure.
 
 ## Android tests without an iOS port
 

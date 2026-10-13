@@ -36,15 +36,6 @@ enum TestFixtures {
         .init(text: "Let’s protect an hour on Thursday for focused work. No notifications, no meetings. Just room to think.", start: 14, end: 24, speaker: "Alex", speakerID: "alex"),
     ]
 
-    /// What a second transcription of the same note hears: the last passage ends sooner. The other words work around
-    /// an open difference from Android, not an intended rule: iOS's Transcribe again adds no version when the words
-    /// equal the shown transcript (`TranscriptionJob.saveTranscript`), where Android always adds one (docs/differences.md,
-    /// "Open differences").
-    static let transcribedAgainSegments: [TranscriptSegment] = Array(transcribedSegments.dropLast()) + [
-        .init(text: "Let’s protect an hour on Thursday for focused work. Just room to think.", start: 14, end: 24,
-              speaker: "Alex", speakerID: "alex"),
-    ]
-
     /// The speaker analysis of the recording seed: two voices taking turns as in `transcribedSegments`.
     static let recordingAnalysis = SpeakerAnalysis(
         turns: [SpeakerTurn(speakerID: "s1", start: 0, end: 6), SpeakerTurn(speakerID: "s2", start: 6, end: 14),

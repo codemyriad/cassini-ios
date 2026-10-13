@@ -28,6 +28,26 @@ import Testing
         #expect(note.speakerAnalysisFailure == nil)
     }
 
+    /// A transcription and its speakers are one version, as Android seals them as one variant.
+    @Test func anAnalysisOfAFreshTranscriptionSealsItsSpeakersIntoThatVersion() throws {
+        var note = conversation()
+        note.saveCurrentVersion(.transcription, id: F.id("words"), date: stamp.date)
+        note.applySpeakerAnalysis(turns: [.init(speakerID: "x", start: 0, end: 4.5), .init(speakerID: "y", start: 5, end: 9)],
+                                  matches: [:], voiceNames: [:], autoName: true, stamp: stamp)
+        let versions = try #require(note.versions)
+        #expect(versions.map(\.id) == [F.id("words")], "no version before or after the analysis")
+        #expect(versions[0].speakers.map(\.id) == ["x", "y"])
+        #expect(versions[0].segments == note.transcript)
+        #expect(note.selectedVersionID == F.id("words"))
+        #expect(note.versionCount == 1)
+
+        // Identify speakers again on the attributed transcription keeps it and adds the new attribution.
+        note.applySpeakerAnalysis(turns: [.init(speakerID: "z", start: 0, end: 9)], matches: [:], voiceNames: [:],
+                                  autoName: true, stamp: VersionStamp(before: F.id("b2"), after: F.id("a2"), date: stamp.date))
+        #expect(note.versions?.map(\.kind) == [.transcription, .speakerAnalysis])
+        #expect(note.versions?.first?.speakers.map(\.id) == ["x", "y"])
+    }
+
     @Test func anAutomaticMatchNamesTheSpeakerOnlyWhenAutomaticNamingIsOn() {
         let luca = F.voice("luca", "Luca")
         let match = ["x": VoiceMatch(voiceID: luca.id, score: 0.9, automatic: true)]

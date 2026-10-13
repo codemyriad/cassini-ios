@@ -104,8 +104,7 @@ extension AppEnvironment {
     /// are not installed, so a Transcribe asks for the download first; with `modelDownloading` (`--model-downloading`)
     /// the processing seed's job stays in its speech model download at 46 %, and with `draftGrowing` (`--draft-growing`)
     /// its draft grows by a sentence every half second. `heldCapture` (`--capture-held`) starts the recording seed's
-    /// capture 24 minutes in and holds it after 7 s of speech-like levels, with 64 GiB free, for the screenshots. A second transcription of the same note hears other words
-    /// (`TestFixtures.transcribedAgainSegments`). Speaker models are installed on the recording and processing seeds
+    /// capture 24 minutes in and holds it after 7 s of speech-like levels, with 64 GiB free, for the screenshots. Speaker models are installed on the recording and processing seeds
     /// only; the processing seed's job has measured its pace, so its card shows a time left.
     /// Notifications are never asked for and count as allowed, so no banner says they are off, unless
     /// `notificationsDenied` (`--notifications-denied`) turns them off.
@@ -129,8 +128,7 @@ extension AppEnvironment {
             FakeTranscriber(.frozen(done: 0.62 * TestFixtures.processingDuration, total: TestFixtures.processingDuration),
                             status: status)
         default:
-            FakeTranscriber(.sequence([TestFixtures.transcribedSegments, TestFixtures.transcribedAgainSegments],
-                                      total: TestFixtures.fixtureDuration), status: status)
+            FakeTranscriber(.returns(TestFixtures.transcribedSegments, total: TestFixtures.fixtureDuration), status: status)
         }
         // The recording seed tells the speakers apart, as a walk from recording to naming needs; the processing seed's
         // job has its speaker step ahead.

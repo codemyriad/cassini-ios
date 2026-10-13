@@ -145,9 +145,6 @@ This is a working iOS app, not yet an App Store release.
   title of the screen below. The iPad has a split view. Rename is a sheet. Notifications are silent results with
   hidden-preview text. The warm iOS palette and system fonts stay, with contrast checked by tests. Content width is
   capped at Android's 560 pt.
-- **Open differences.** These are not intended, and are left to the parity work. Transcribe again adds no version
-  when the words are unchanged. The speaker analysis after a transcription keeps the transcript before it as a version
-  of its own.
 
 ## Verify
 

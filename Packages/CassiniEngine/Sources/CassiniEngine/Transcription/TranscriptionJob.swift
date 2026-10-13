@@ -222,8 +222,9 @@ public struct TranscriptionJob: TranscriptionJobRunning {
         }
     }
 
-    /// Puts the words into the note as a new version and records their provenance. A run that resumed for its speaker
-    /// step finds them saved already (the record describes them) and leaves the note as it is, edits and all.
+    /// Puts the words into the note as a new version, even when they equal the transcript shown (as Android adds a
+    /// variant for every transcription), and records their provenance. A run that resumed for its speaker step finds
+    /// them saved already (the record describes them) and leaves the note as it is, edits and all.
     private func saveTranscript(_ words: CheckpointState, resumed: Bool, _ context: Context) async -> Bool {
         let segments = words.segments
         if resumed, provenance.load(context.noteID)?.describes(segments) == true { return true }
@@ -234,7 +235,6 @@ public struct TranscriptionJob: TranscriptionJobRunning {
         let date = clock.now, before = UUID(), after = UUID()
         do {
             let saved = try await notes.mutate(context.noteID) { note in
-                guard note.transcript != segments else { return }
                 note.saveCurrentVersion(.previous, id: before, date: date)
                 note.transcript = segments
                 note.speakers = []

@@ -269,6 +269,17 @@ import CassiniNotebook
         #expect(h.applied.count == 1)
     }
 
+    /// Transcribe again adds a version whatever it hears, as Android adds a variant for every transcription.
+    @Test func transcribingAgainAddsAVersionEvenForTheSameWords() async throws {
+        let h = try await Harness()
+        #expect(await h.run().outcome == .done)
+        #expect(await h.note()?.versions?.map(\.kind) == [.transcription])
+        #expect(await h.run().outcome == .done)
+        let note = try #require(await h.note())
+        #expect(note.versions?.map(\.kind) == [.transcription, .transcription])
+        #expect(note.selectedVersionID == note.versions?.last?.id)
+    }
+
     @Test func theProvenanceDescribesOnlyTheTranscriptTheRunMade() async throws {
         let analysis = SpeakerAnalysis(turns: [.init(speakerID: "a", start: 0, end: 70)],
                                        prints: [SpeakerPrint(speakerID: "a", model: "m:1", vector: [1], speechSeconds: 70)])

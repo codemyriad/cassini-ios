@@ -1,6 +1,5 @@
 #if DEBUG
 import Foundation
-import Synchronization
 import CassiniEngine
 import CassiniNotebook
 
@@ -9,10 +8,6 @@ import CassiniNotebook
 public struct FakeTranscriber: Transcribing {
     public enum Script: Sendable {
         case returns([TranscriptSegment], total: TimeInterval)
-        /// A note's n-th transcription returns the n-th list, and every one after the last returns the last: a
-        /// Transcribe again that hears other words. Runs are counted per note (the folder of the request's audio,
-        /// which stays the note's while its audio file changes), so one note's transcriptions never change another's.
-        case sequence([[TranscriptSegment]], total: TimeInterval)
         /// Finalizes `draft`, reports `done` of `total` seconds and never finishes.
         /// With `pace`, two reports `pace` seconds of audio apart come first, as long apart as the job lets its
         /// results be, so it measures its speed and estimates the time left.
@@ -27,7 +22,6 @@ public struct FakeTranscriber: Transcribing {
     public let script: Script
     private static let resultInterval = Duration.milliseconds(1_200)
     public let status: ModelPartStatus
-    private let runs = Runs()
 
     public init(_ script: Script, status: ModelPartStatus = .ready) { self.script = script; self.status = status }
 
@@ -37,9 +31,6 @@ public struct FakeTranscriber: Transcribing {
         switch script {
         case .returns(let segments, let total):
             return try finalize(segments, total: total, events: events)
-        case .sequence(let lists, let total):
-            let run = runs.next(for: request.url.deletingLastPathComponent())
-            return try finalize(lists.isEmpty ? [] : lists[min(run, lists.count - 1)], total: total, events: events)
         case .frozen(let done, let total, let draft, let pace):
             for segment in draft { events(.finalized(segment)) }
             // The job shows its results at most once a second; a report after the pause is shown whole.
@@ -82,20 +73,6 @@ public struct FakeTranscriber: Transcribing {
     /// Reports the download as done at once; nothing is installed, so `assetStatus` stays as it was.
     public func installAssets(locale: Locale, progress: @escaping @Sendable (Double) -> Void) async throws {
         progress(1)
-    }
-
-    /// How many transcriptions of each note have started, by the note's folder, shared by the copies of one
-    /// transcriber.
-    private final class Runs: Sendable {
-        private let counts = Mutex<[URL: Int]>([:])
-
-        /// The number of this run of the note in `folder`, from 0.
-        func next(for folder: URL) -> Int {
-            counts.withLock { counts in
-                defer { counts[folder, default: 0] += 1 }
-                return counts[folder, default: 0]
-            }
-        }
     }
 }
 #endif
