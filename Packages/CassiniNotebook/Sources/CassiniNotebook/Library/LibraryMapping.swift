@@ -332,7 +332,8 @@ public enum LibraryMapping {
     // MARK: Note actions
 
     /// The transcribe item of `note`'s actions for its `job`. Names carry over to a new version only through voice
-    /// prints, so "Speaker names carry over." needs `voiceModelReady` and a named speaker.
+    /// prints (the note-local voices of `AnalysisMatches`), so "Speaker names carry over." needs `voiceModelReady` and
+    /// a named speaker, as on Android.
     public static func transcribeAction(_ note: Note, job: Job?, voiceModelReady: Bool) -> TranscribeAction {
         switch job?.state {
         case .running: return .stop

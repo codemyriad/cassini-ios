@@ -106,12 +106,37 @@ extension Note {
         }
     }
 
+    /// The named speakers this note had, as note-local voices (Android's), so that Transcribe again and Identify
+    /// speakers again carry their names over even when they were never saved. The speakers are the shown ones, or,
+    /// when the shown transcript has none yet (Transcribe again cleared them), those of the latest version that has
+    /// some. A speaker counts with a name that is no placeholder, its print among `prints`, no rejection, and no match
+    /// to a saved voice in `savedVoiceIDs` (those match on their own). Speakers with the same name make one voice.
+    public func localVoices(prints: [SpeakerPrint], savedVoiceIDs: Set<UUID>) -> [SavedVoice] {
+        let shown = speakers ?? []
+        let named = shown.isEmpty ? (versions ?? []).last(where: { !$0.speakers.isEmpty })?.speakers ?? [] : shown
+        let byID = Dictionary(prints.map { ($0.speakerID, $0) }, uniquingKeysWith: { _, latest in latest })
+        var voices: [SavedVoice] = []
+        for speaker in named {
+            guard !DefaultLabels.isDefault(id: speaker.id, label: speaker.name), !speaker.match.isRejection,
+                  !(speaker.match.voiceID.map(savedVoiceIDs.contains) ?? false), let print = byID[speaker.id] else { continue }
+            let sample = VoiceSample(noteID: id, print: print)
+            if let index = voices.firstIndex(where: { NameMatch.same($0.name, speaker.name) }) {
+                voices[index].samples.append(sample)
+            } else {
+                voices.append(SavedVoice(name: speaker.name, samples: [sample]))
+            }
+        }
+        return voices
+    }
+
     /// Puts a speaker analysis into the note: the transcript before it is kept as a version, every passage gets a
     /// speaker of `turns`, the speakers are numbered in order of first appearance and get their match (`autoName` names
-    /// a speaker after an automatic match), and the result is a new version. Without a valid turn, or when no passage
-    /// gets a speaker, nothing but `speakerAnalysisFailure` changes.
+    /// a speaker after an automatic match), and the result is a new version. A match to one of `localVoices` (the
+    /// note's own names, `localVoices(prints:savedVoiceIDs:)`) names the speaker when it is automatic, whatever
+    /// `autoName` says, and links it to no saved voice, as Android stores such a match as none. Without a valid turn,
+    /// or when no passage gets a speaker, nothing but `speakerAnalysisFailure` changes.
     public mutating func applySpeakerAnalysis(turns: [SpeakerTurn], matches: [String: VoiceMatch], voiceNames: [UUID: String],
-                                              autoName: Bool, stamp: VersionStamp) {
+                                              localVoices: Set<UUID> = [], autoName: Bool, stamp: VersionStamp) {
         let attributed = SpeakerAttribution.assign(transcript, turns: turns)
         var order: [String] = []
         for segment in attributed { if let id = segment.speakerID, !order.contains(id) { order.append(id) } }
@@ -125,7 +150,9 @@ extension Note {
             speaker.excludedVoiceIDs = (excluded[id] ?? []).sorted { $0.uuidString < $1.uuidString }
             guard let match = matches[id], let name = voiceNames[match.voiceID], !speaker.excludedVoiceIDs.contains(match.voiceID)
             else { return speaker }
-            if autoName && match.automatic {
+            if localVoices.contains(match.voiceID) {
+                if match.automatic { speaker.name = name }
+            } else if autoName && match.automatic {
                 speaker.name = name
                 speaker.match = .auto(voice: match.voiceID, score: match.score)
             } else {
