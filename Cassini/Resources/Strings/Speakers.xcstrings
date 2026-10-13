@@ -465,6 +465,18 @@
         }
       }
     },
+    "Enter a name.": {
+      "comment": "Rename saved voice: the name field is blank",
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inserisci un nome."
+          }
+        }
+      }
+    },
     "Everything %@ said will be shown as %@.": {
       "extractionState": "manual",
       "localizations": {
@@ -1130,6 +1142,18 @@
           "stringUnit": {
             "state": "translated",
             "value": "Stessa persona"
+          }
+        }
+      }
+    },
+    "Save": {
+      "comment": "Rename saved voice: the button that saves the name",
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Salva"
           }
         }
       }

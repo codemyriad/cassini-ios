@@ -46,7 +46,10 @@ final class NoteFlowTests: XCTestCase {
 
         // Transcribe again: version 2, and Versions lists both.
         app.buttons["More actions"].tap()
-        app.collectionViews.buttons["Transcribe again"].tap()
+        let again = app.collectionViews.buttons["transcribeAgain"]
+        XCTAssertTrue(again.waitForExistence(within: 3))
+        XCTAssertTrue(again.label.contains("Adds version 2."), "the menu says which version it adds: \(again.label)")
+        again.tap()
         let chip = app.buttons["versionChip"]
         XCTAssertTrue(chip.wait(until: NSPredicate(format: "label BEGINSWITH 'Version 2 of 2'"), within: 15),
                       "the second transcription is version 2")

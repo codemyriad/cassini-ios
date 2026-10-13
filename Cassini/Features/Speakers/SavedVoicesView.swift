@@ -9,7 +9,6 @@ struct SavedVoicesView: View {
     @Environment(VoicesStore.self) private var voices
     @Environment(ErrorPresenter.self) private var errors
     @SceneStorage("savedVoices.dialog") private var dialogKey: String?
-    @State private var renameText = ""
     @State private var forgettingAllData = false
 
     private var people: [SavedVoiceSummary] { voices.summaries }
@@ -70,13 +69,16 @@ struct SavedVoicesView: View {
         .readableListWidth()
         .navigationTitle(SpeakersCopy.voices)
         .task { await voices.refresh() }
-        .alert(SpeakersCopy.renameSaved, isPresented: presented(where: { if case .rename = $0 { true } else { false } })) {
-            TextField(SpeakersCopy.nameField, text: $renameText)
-                .textInputAutocapitalization(.words)
-                .onChange(of: renameText) { _, text in if text.count > Limits.nameMaxLength { renameText = String(text.prefix(Limits.nameMaxLength)) } }
-            Button(SpeakersCopy.cancel, role: .cancel) { send(.dismissDialog) }
-            Button(SpeakersCopy.renameSaved) {
-                if case .rename(let id, _) = dialog { send(.renameConfirmed(id, name: renameText)) }
+        .sheet(isPresented: presented(where: { if case .rename = $0 { true } else { false } })) {
+            if case .rename(let id, let name)? = dialog {
+                // Android's rename dialog: 80 characters, "Enter a name." under the field, Save once it changed.
+                RenameSheet(navigationTitle: SpeakersCopy.renameSaved, fieldLabel: SpeakersCopy.nameField, original: name,
+                            limit: Limits.nameMaxLength, blankMessage: SpeakersCopy.nameBlank, saveLabel: SpeakersCopy.save,
+                            cancelLabel: SpeakersCopy.cancel, fieldIdentifier: "renameVoiceField", capitalization: .words,
+                            clean: Self.cleanName) { cleaned in
+                    send(.renameConfirmed(id, name: cleaned))
+                    return true
+                }
             }
         }
         .alert(dialogTitle, isPresented: presented(where: { if case .rename = $0 { false } else { true } })) {
@@ -87,9 +89,12 @@ struct SavedVoicesView: View {
             Button(SpeakersCopy.cancel, role: .cancel) {}
             Button(SpeakersCopy.forgetAllData, role: .destructive) { Task { report(await voices.forgetEveryone()) } }
         } message: { Text(SpeakersCopy.forgetAllDataBody) }
-        .onChange(of: dialogKey, initial: true) {
-            if case .rename(_, let name) = dialog { renameText = name }
-        }
+    }
+
+    /// A saved voice's name as it is stored: trimmed; nil when blank.
+    private static func cleanName(_ name: String) -> String? {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 
     private func presented(where matches: @escaping (SavedVoicesDialog) -> Bool) -> Binding<Bool> {

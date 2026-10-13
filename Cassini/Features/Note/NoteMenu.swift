@@ -73,6 +73,7 @@ struct NoteMenu: View {
                 }
             }
             .disabled(disabled)
+            .accessibilityIdentifier("transcribeAgain")
         case .transcribeAgainUnavailable:
             Button {} label: {
                 Text(NoteCopy.transcribeAgain)

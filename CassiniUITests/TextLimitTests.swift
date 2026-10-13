@@ -40,9 +40,20 @@ final class TextLimitTests: XCTestCase {
         XCTAssertTrue(options.waitForExistence(within: 5))
         options.tap()
         app.buttons["Rename…"].tap()
-        let field = app.alerts.textFields.firstMatch
+        let field = app.textFields["renameVoiceField"]
         XCTAssertTrue(field.waitForExistence(within: 5))
+        let save = app.navigationBars.buttons["Save"]
+        XCTAssertFalse(save.isEnabled, "Save waits for a changed name")
         fillPastTheLimit(field, Self.nameLimit)
+        XCTAssertTrue(save.isEnabled)
+
+        // A blank name says "Enter a name." under the field, as Android's dialog does.
+        field.replaceText(with: " ")
+        XCTAssertTrue(app.staticTexts["Enter a name."].waitForExistence(within: 3), "a blank name says so under the field")
+        XCTAssertFalse(save.isEnabled)
+        field.replaceText(with: "Alexandra")
+        save.tap()
+        XCTAssertTrue(app.staticTexts["Alexandra"].waitForExistence(within: 5), "the saved voice has its new name")
     }
 
     // ports: TextLimitBehaviourTest#theNameFieldStopsAtTheNameLimit

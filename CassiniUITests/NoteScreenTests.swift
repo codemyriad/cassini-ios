@@ -107,7 +107,7 @@ final class NoteScreenTests: XCTestCase {
     @MainActor func testAQueuedNoteKeepsItsTranscriptButCannotBeRenamed() {
         let app = open(seed: "processing")
         app.buttons["More actions"].tap()
-        app.buttons["Transcribe again"].tap()
+        app.buttons["transcribeAgain"].tap()
         XCTAssertTrue(app.staticTexts["Queued"].waitForExistence(within: 10))
         XCTAssertTrue(app.descendants(matching: .any)["turn-w0"].exists, "the transcript stays under the card")
         header(app, "Alex").tap()
@@ -118,7 +118,7 @@ final class NoteScreenTests: XCTestCase {
         app.buttons["More actions"].tap()
         let remove = app.collectionViews.buttons["Remove from queue"]
         XCTAssertTrue(remove.waitForExistence(within: 3), "no Transcribe again while queued")
-        XCTAssertFalse(app.collectionViews.buttons["Transcribe again"].exists)
+        XCTAssertFalse(app.collectionViews.buttons["transcribeAgain"].exists)
         remove.tap()
         XCTAssertTrue(wait("exists == false", app.staticTexts["Queued"], timeout: 10))
     }
@@ -126,23 +126,32 @@ final class NoteScreenTests: XCTestCase {
     /// The Queued card counts the queued notes before this one; the running job is not counted.
     @MainActor func testTheQueuedCardCountsTheNotesAheadOfIt() {
         let app = XCUIApplication()
-        app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed", "processing", "--open-fixture",
-                               "BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB"]
+        app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed", "processing"]
         app.launchAndWait()
-        let transcribe = app.buttons["Transcribe"].firstMatch
-        XCTAssertTrue(transcribe.waitForExistence(within: 15))
-        transcribe.tap()
-        let ahead = app.staticTexts["queuedAhead"]
-        XCTAssertTrue(ahead.waitForExistence(within: 10))
-        XCTAssertEqual(ahead.label, "Starts after the current transcription.")
-
-        app.navigationBars.buttons["Back to library"].tap()
+        // The seed's job runs first, so the notes queued below wait behind it.
+        let banner = app.buttons["progressBanner"]
+        XCTAssertTrue(banner.wait(until: NSPredicate(format: "label BEGINSWITH 'Transcribing'"), within: 15))
         let fixture = app.buttons.matching(NSPredicate(format: "identifier == 'noteRow' AND label BEGINSWITH %@",
                                                        "A quieter kind of productivity")).firstMatch
         XCTAssertTrue(fixture.waitForExistence(within: 5))
         fixture.tap()
         app.buttons["More actions"].tap()
-        app.buttons["Transcribe again"].tap()
+        app.buttons["transcribeAgain"].tap()
+        let ahead = app.staticTexts["queuedAhead"]
+        XCTAssertTrue(ahead.waitForExistence(within: 10))
+        XCTAssertEqual(ahead.label, "Starts after the current transcription.")
+
+        app.navigationBars.buttons["Back to library"].tap()
+        let walk = app.buttons.matching(NSPredicate(format: "identifier == 'noteRow' AND label BEGINSWITH %@",
+                                                    "Thoughts from the morning walk")).firstMatch
+        XCTAssertTrue(walk.waitForExistence(within: 5))
+        // The capture bar floats over the end of the list: the row is scrolled above it.
+        let bar = app.buttons["recordButton"]
+        XCTAssertTrue(app.scroll(attempts: 4) { walk.isHittable && walk.frame.maxY < bar.frame.minY }, "the row scrolls into view")
+        walk.tap()
+        let transcribe = app.buttons["Transcribe"].firstMatch
+        XCTAssertTrue(transcribe.waitForExistence(within: 5))
+        transcribe.tap()
         XCTAssertTrue(ahead.wait(until: NSPredicate(format: "label == '1 ahead of this note.'"), within: 10))
     }
 
@@ -196,7 +205,7 @@ final class NoteScreenTests: XCTestCase {
     @MainActor func testAQueuedNoteCanStillBeRenamed() {
         let app = open(seed: "processing")
         app.buttons["More actions"].tap()
-        app.buttons["Transcribe again"].tap()
+        app.buttons["transcribeAgain"].tap()
         XCTAssertTrue(app.staticTexts["Queued"].waitForExistence(within: 10))
         app.buttons["More actions"].tap()
         app.collectionViews.buttons["Rename"].tap()

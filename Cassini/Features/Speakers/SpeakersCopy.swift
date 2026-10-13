@@ -25,6 +25,8 @@ enum SpeakersCopy {
     static func savedAs(_ name: String) -> String { String(localized: "This voice is saved as “\(name)”.", table: "Speakers") }
     static let renameSavedQuestion = String(localized: "Also rename the saved voice?", table: "Speakers")
     static let renameSaved = String(localized: "Rename saved voice", table: "Speakers")
+    static let nameBlank = String(localized: "Enter a name.", table: "Speakers", comment: "Rename saved voice: the name field is blank")
+    static let save = String(localized: "Save", table: "Speakers", comment: "Rename saved voice: the button that saves the name")
     static func notName(_ name: String) -> String { String(localized: "Not \(name)?", table: "Speakers") }
     static let remember = String(localized: "Remember this voice on this device", table: "Speakers")
 
