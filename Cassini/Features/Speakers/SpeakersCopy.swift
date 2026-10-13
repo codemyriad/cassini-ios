@@ -126,10 +126,6 @@ enum SpeakersCopy {
     static let analyzeAgainTitle = String(localized: "Analyze speakers again?", table: "Speakers")
     static let analyzeAgain = String(localized: "Analyze again", table: "Speakers")
     static let analyzeAgainBody = String(localized: "This adds a new version. You can go back to the current names in Versions.", table: "Speakers")
-    static let downloadModelsTitle = String(localized: "Download speaker models?", table: "Speakers")
-    static let downloadModelsBody = String(localized: "Cassini downloads the speaker models once, several hundred MB. Audio and voiceprints stay on this device.", table: "Speakers")
-    static let allowAndIdentify = String(localized: "Allow & Identify", table: "Speakers")
-    static let notNow = String(localized: "Not now", table: "Speakers")
     static let auto = String(localized: "auto", table: "Speakers")
     static func mightBe(_ name: String) -> String { String(localized: "Might be \(name)", table: "Speakers") }
 

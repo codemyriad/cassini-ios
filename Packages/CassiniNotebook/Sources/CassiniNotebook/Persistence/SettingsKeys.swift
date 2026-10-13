@@ -16,8 +16,6 @@ public enum SettingsKeys {
     public static let queueHold = "queue.hold"
     /// Epoch milliseconds of the newest recovered recording the user has seen; it never goes back.
     public static let recoveredAck = "notices.recoveredAck"
-    public static let importFailureAck = "notices.importFailureAck"
-    public static let downloadFailureAck = "notices.downloadFailureAck"
     public static let notificationsAsked = "notifications.asked"
     /// Running estimate of the matching and saving time after the words, in milliseconds.
     public static let finalizationMs = "processing.finalizationMs"
@@ -31,7 +29,7 @@ public enum SettingsKeys {
 
     public static let all: [String] = [
         speechLanguage, autoTranscribe, identifySpeakers, automaticallyNameVoices, speakerModelIdentity,
-        modelsConsentAt, modelsDeclinedAt, speakerModelsConsentAt, queueHold, recoveredAck, importFailureAck,
-        downloadFailureAck, notificationsAsked, finalizationMs, trashLastPurgeAt, voicesGeneration,
+        modelsConsentAt, modelsDeclinedAt, speakerModelsConsentAt, queueHold, recoveredAck,
+        notificationsAsked, finalizationMs, trashLastPurgeAt, voicesGeneration,
     ]
 }

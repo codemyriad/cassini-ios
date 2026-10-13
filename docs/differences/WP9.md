@@ -47,8 +47,8 @@
   TRUST_AUDIO_CHANGED and TRUST_UNREADABLE, which asks WP6's fresh-transcript question first.
 - **Dismissal.** RECOVERED is acknowledged in `notices.recoveredAck` (it never goes back). An import error is closed
   until the next import fails and a download failure until the next install fails, by their sources (`ImportTracker`,
-  `ProcessingStore`), in memory as on Android; the `notices.importFailureAck` / `notices.downloadFailureAck` keys stay
-  unused, since the failures themselves are not kept across launches.
+  `ProcessingStore`), in memory as on Android, which has no such keys; the unused `notices.importFailureAck` /
+  `notices.downloadFailureAck` keys were removed in Phase C, since the failures themselves are not kept across launches.
 - **RECOVERED** says the count and the duration of the latest recorded of the recovered recordings
   (`RecoveredRecording.createdAt`, Android's note `createdAt`), as Android; the interim notice summed them. Open opens
   that one. Only recovered notes still in the library count, as Android's `notes.library()`: one moved to Recently

@@ -58,7 +58,7 @@ import CassiniNotebook
         defer { test.tearDown() }
         let note = try seed(test)
         let graph = test.graph
-        graph.settings.downloadsAllowed = true
+        graph.settings.recordConsent()
         graph.settings.identifySpeakers = false
         let language = graph.settings.speechLanguage
         // iOS took the background time back from a Transcribe again after its first second.
@@ -89,7 +89,7 @@ import CassiniNotebook
         let test = TestGraph(transcriber: FakeTranscriber(.returns([TranscriptSegment(text: "Hello.", start: 0, end: 1)], total: 2)))
         defer { test.tearDown() }
         let note = try seed(test)
-        test.graph.settings.downloadsAllowed = true
+        test.graph.settings.recordConsent()
         test.graph.settings.identifySpeakers = false
         await test.graph.start()
         // An old "Transcription paused" notification: its job was resumed from the screen and finished since.
@@ -115,7 +115,7 @@ import CassiniNotebook
         let test = TestGraph()
         defer { test.tearDown() }
         let note = try seed(test)
-        test.graph.settings.downloadsAllowed = true
+        test.graph.settings.recordConsent()
         await test.graph.start()
         await test.graph.processing.transcribe(note.id, origin: .automatic)
         #expect(test.notifier.requestCount == 0, "an automatic start asks nothing")

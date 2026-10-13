@@ -26,12 +26,13 @@ public struct ModelPlan: Hashable, Sendable {
     /// What the model download screen installs. Apple's speech model counts unless it is ready or cannot be used for
     /// the language. The speaker models count when they are not ready and either a note's job tells speakers apart
     /// (`identifySpeakers`) or there is no note: the standalone download from a Settings row installs every part that
-    /// is not ready, whatever the Speakers switch says.
+    /// is not ready, whatever the Speakers switch says. A note's speakers-only job (Identify speakers) needs the speaker
+    /// models alone.
     public static func plan(speech: ModelPartStatus, speakers: ModelPartStatus, forNote: Bool, identifySpeakers: Bool,
-                            speakersInstallBytes: Int64) -> ModelPlan {
+                            speakersOnly: Bool = false, speakersInstallBytes: Int64) -> ModelPlan {
         var missing: [ModelPart] = []
-        if speech != .ready, speech != .unsupported { missing.append(.speech) }
-        if speakers != .ready, !forNote || identifySpeakers { missing.append(.speakers) }
+        if speech != .ready, speech != .unsupported, !speakersOnly { missing.append(.speech) }
+        if speakers != .ready, !forNote || identifySpeakers || speakersOnly { missing.append(.speakers) }
         return ModelPlan(missing: missing, speakersInstallBytes: speakersInstallBytes)
     }
 

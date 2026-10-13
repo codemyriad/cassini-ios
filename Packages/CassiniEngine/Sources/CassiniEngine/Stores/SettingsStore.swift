@@ -24,8 +24,6 @@ public final class SettingsStore {
     public var speakerModelsConsentAt: Date? { didSet { write(speakerModelsConsentAt, SettingsKeys.speakerModelsConsentAt) } }
     public var queueHold: QueueHold? { didSet { write(queueHold?.rawValue, SettingsKeys.queueHold) } }
     public private(set) var recoveredAck: Date? { didSet { write(recoveredAck, SettingsKeys.recoveredAck) } }
-    public private(set) var importFailureAck: Date? { didSet { write(importFailureAck, SettingsKeys.importFailureAck) } }
-    public private(set) var downloadFailureAck: Date? { didSet { write(downloadFailureAck, SettingsKeys.downloadFailureAck) } }
     public private(set) var notificationsAsked: Bool {
         didSet { defaults.set(notificationsAsked, forKey: SettingsKeys.notificationsAsked) }
     }
@@ -47,8 +45,6 @@ public final class SettingsStore {
         speakerModelsConsentAt = Self.date(defaults, SettingsKeys.speakerModelsConsentAt)
         queueHold = defaults.string(forKey: SettingsKeys.queueHold).flatMap(QueueHold.init(rawValue:))
         recoveredAck = Self.date(defaults, SettingsKeys.recoveredAck)
-        importFailureAck = Self.date(defaults, SettingsKeys.importFailureAck)
-        downloadFailureAck = Self.date(defaults, SettingsKeys.downloadFailureAck)
         notificationsAsked = defaults.bool(forKey: SettingsKeys.notificationsAsked)
         finalizationMs = (defaults.object(forKey: SettingsKeys.finalizationMs) as? NSNumber)?.int64Value
         trashLastPurgeAt = Self.date(defaults, SettingsKeys.trashLastPurgeAt)
@@ -57,18 +53,15 @@ public final class SettingsStore {
     }
 
     /// Whether the speech model may be downloaded.
-    public var downloadsAllowed: Bool {
-        get { modelsConsentAt != nil }
-        set { modelsConsentAt = newValue ? (modelsConsentAt ?? clock.now) : nil }
-    }
+    public var downloadsAllowed: Bool { modelsConsentAt != nil }
 
     /// Whether the speaker models may be downloaded.
-    public var speakerDownloadsAllowed: Bool {
-        get { speakerModelsConsentAt != nil }
-        set { speakerModelsConsentAt = newValue ? (speakerModelsConsentAt ?? clock.now) : nil }
-    }
+    public var speakerDownloadsAllowed: Bool { speakerModelsConsentAt != nil }
 
+    /// Consent to download the speech model, given on the model download screen.
     public func recordConsent() { modelsConsentAt = clock.now }
+    /// Consent to download the speaker models, given on the model download screen; the first consent is kept.
+    public func recordSpeakerConsent() { speakerModelsConsentAt = speakerModelsConsentAt ?? clock.now }
     public func recordDeclined() { modelsDeclinedAt = clock.now }
 
     /// Records that recovered recordings up to `date` were seen; the acknowledgement never goes back.
@@ -76,8 +69,6 @@ public final class SettingsStore {
         recoveredAck = max(recoveredAck ?? .distantPast, date)
     }
 
-    public func acknowledgeImportFailure(at date: Date) { importFailureAck = date }
-    public func acknowledgeDownloadFailure(at date: Date) { downloadFailureAck = date }
     public func markNotificationsAsked() { notificationsAsked = true }
     public func recordPurge() { trashLastPurgeAt = clock.now }
 

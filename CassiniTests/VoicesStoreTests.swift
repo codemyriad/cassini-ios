@@ -82,7 +82,7 @@ import CassiniEngineTesting
         try Data().write(to: test.root.appendingPathComponent(note.id.uuidString).appendingPathComponent("audio.caf"))
         await test.graph.start()
         let graph = test.graph
-        graph.settings.speakerDownloadsAllowed = true
+        graph.settings.recordSpeakerConsent()
 
         let outcome = await graph.processing.transcribe(note.id, kind: .speakersOnly)
         XCTAssertEqual(outcome, .queued(changed: true))

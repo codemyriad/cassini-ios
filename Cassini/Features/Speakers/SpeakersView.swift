@@ -3,17 +3,18 @@ import CassiniEngine
 import CassiniNotebook
 
 /// The speakers of a note (an iOS screen; Android reaches naming from the transcript only): each speaker opens Name a
-/// speaker, Identify speakers runs the analysis again, and Saved voices is one tap away.
+/// speaker, Identify speakers runs the analysis again, and Saved voices is one tap away. Without consent for the speaker
+/// models, Identify speakers opens the model download screen, the only place consent is given.
 struct SpeakersView: View {
     let noteID: UUID
     @Environment(LibraryStore.self) private var library
     @Environment(VoicesStore.self) private var voices
     @Environment(ProcessingStore.self) private var processing
     @Environment(JobProgress.self) private var progress
-    @Environment(SettingsStore.self) private var settings
+    @Environment(Router.self) private var router
+    @Environment(ErrorPresenter.self) private var errors
     @Environment(\.dismiss) private var dismiss
     @State private var naming: SpeakerRef?
-    @State private var consent = false
     @State private var adding = false
     @State private var newName = ""
     @State private var rerun = false
@@ -58,20 +59,19 @@ struct SpeakersView: View {
             .confirmationDialog(SpeakersCopy.analyzeAgainTitle, isPresented: $rerun, titleVisibility: .visible) {
                 Button(SpeakersCopy.analyzeAgain) { Task { await requestAnalysis() } }
             } message: { Text(SpeakersCopy.analyzeAgainBody) }
-            .alert(SpeakersCopy.downloadModelsTitle, isPresented: $consent) {
-                Button(SpeakersCopy.allowAndIdentify) {
-                    settings.speakerDownloadsAllowed = true
-                    processing.request(noteID, kind: .speakersOnly, origin: .screen)
-                }
-                Button(SpeakersCopy.notNow, role: .cancel) {}
-            } message: { Text(SpeakersCopy.downloadModelsBody) }
         }
         .tint(.ember)
     }
 
+    /// Queues the speakers-only job; without consent the sheet gives way to the model download screen.
     private func requestAnalysis() async {
-        if settings.speakerDownloadsAllowed { processing.request(noteID, kind: .speakersOnly, origin: .screen); return }
-        if await processing.speakerModelsReady() { processing.request(noteID, kind: .speakersOnly, origin: .screen) } else { consent = true }
+        switch await processing.transcribe(noteID, kind: .speakersOnly) {
+        case .needsConsent:
+            dismiss()
+            router.push(.modelDownload(noteID: noteID))
+        case .refused(let refusal): errors.present(refusal.message)
+        case .queued: break
+        }
     }
 }
 

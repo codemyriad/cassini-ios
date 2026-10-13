@@ -18,18 +18,21 @@ import CassiniNotebook
         self.analyzer = analyzer; self.storage = storage; self.notifier = notifier; self.root = root
     }
 
-    /// `ModelPlan.plan` over the speech assets of the chosen language and the speaker models' status.
+    /// `ModelPlan.plan` over the speech assets of the chosen language and the speaker models' status, for the note's
+    /// job.
     func plan(for noteID: UUID?) async -> ModelPlan {
-        ModelPlan.plan(speech: await transcriber.assetStatus(locale: Locale(identifier: settings.speechLanguage)),
-                       speakers: await analyzer.modelStatus(), forNote: noteID != nil,
-                       identifySpeakers: settings.identifySpeakers, speakersInstallBytes: analyzer.modelInstallBytes)
+        let speakersOnly = noteID.flatMap { processing.state.jobs[$0]?.kind } == .speakersOnly
+        return ModelPlan.plan(speech: await transcriber.assetStatus(locale: Locale(identifier: settings.speechLanguage)),
+                              speakers: await analyzer.modelStatus(), forNote: noteID != nil,
+                              identifySpeakers: settings.identifySpeakers, speakersOnly: speakersOnly,
+                              speakersInstallBytes: analyzer.modelInstallBytes)
     }
 
     func usableBytes() async -> Int64 { storage.availableBytes(at: root) }
 
     func recordConsent(for parts: [ModelPart]) {
         if parts.contains(.speech) { settings.recordConsent() }
-        if parts.contains(.speakers) { settings.speakerDownloadsAllowed = true }
+        if parts.contains(.speakers) { settings.recordSpeakerConsent() }
     }
 
     func recordDeclined() { settings.recordDeclined() }

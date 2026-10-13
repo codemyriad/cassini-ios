@@ -172,6 +172,16 @@ import CassiniNotebook
                 "a language the device cannot transcribe has nothing to download")
     }
 
+    @Test func aSpeakersOnlyJobPlansTheSpeakerModelsAlone() {
+        func plan(speech: ModelPartStatus, speakers: ModelPartStatus, identify: Bool) -> [ModelPart] {
+            ModelPlan.plan(speech: speech, speakers: speakers, forNote: true, identifySpeakers: identify,
+                           speakersOnly: true, speakersInstallBytes: 54_000_000).missing
+        }
+        // Identify speakers asks for the speaker models whatever the switch says, and never for the speech model.
+        #expect(plan(speech: .notDownloaded, speakers: .notDownloaded, identify: false) == [.speakers])
+        #expect(plan(speech: .notDownloaded, speakers: .ready, identify: true).isEmpty)
+    }
+
     @Test func thePlanKeepsThePartOrderAndNeedsNoSpaceWhenComplete() {
         #expect(ModelPlan(missing: [.speakers, .speech], speakersInstallBytes: 1).missing == [.speech, .speakers])
         #expect(ModelPlan(missing: [], speakersInstallBytes: 1).requiredFreeBytes == 0)

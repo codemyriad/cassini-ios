@@ -83,7 +83,7 @@ import CassiniNotebook
             notes.append(note)
         }
         let graph = test.graph
-        graph.settings.downloadsAllowed = true
+        graph.settings.recordConsent()
         graph.settings.identifySpeakers = false
         graph.settings.queueHold = .user
         await graph.start()
