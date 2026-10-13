@@ -52,6 +52,23 @@
         }
       }
     },
+    "Download and identify speakers": {
+      "comment": "Model download button with a note waiting for Identify speakers",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download and identify speakers"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scarica e riconosci le voci"
+          }
+        }
+      }
+    },
     "Download and transcribe": {
       "comment": "Model download button with a note waiting",
       "localizations": {

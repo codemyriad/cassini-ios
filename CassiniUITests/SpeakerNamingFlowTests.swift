@@ -76,6 +76,7 @@ final class SpeakerNamingFlowTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Transcribe on this device"].waitForExistence(within: 10))
         XCTAssertTrue(app.staticTexts["Telling speakers apart"].exists)
         XCTAssertFalse(app.staticTexts["Speech recognition"].exists, "Identify speakers needs no speech model")
+        XCTAssertTrue(app.buttons["Download and identify speakers"].exists)
         app.buttons["Not now — keep the audio"].tap()
         XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 5))
     }

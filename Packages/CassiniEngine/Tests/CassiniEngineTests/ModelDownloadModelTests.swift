@@ -145,6 +145,23 @@ import CassiniNotebook
         #expect(effects.list == [.close])
     }
 
+    /// Identify speakers without consent: declining the speaker models is no refusal of the speech model, which
+    /// automatic transcription reads.
+    @Test func notNowForASpeakersOnlyJobRefusesNoSpeechModel() async {
+        ports.plan = ModelPlan.plan(speech: .notDownloaded, speakers: .notDownloaded, forNote: true, identifySpeakers: false,
+                                    speakersOnly: true, speakersInstallBytes: 54_000_000)
+        let effects = Effects()
+        let model = await model(effects: effects)
+        #expect(model.identifiesSpeakers)
+        model.notNow()
+        #expect(ports.declines == 0)
+        #expect(ports.consents.isEmpty)
+        #expect(effects.list == [.close])
+        // A transcription's plan still says "Download and transcribe".
+        ports.plan = Self.fresh
+        #expect(await self.model(effects: Effects()).identifiesSpeakers == false)
+    }
+
     // ports: ModelDownloadViewModelTest#closeOnlyPopsAndSourcesOpenLicenses
     @Test func closeOnlyClosesAndSourcesOpenLicenses() async {
         let effects = Effects()
