@@ -3,10 +3,14 @@ import CassiniEngine
 import CassiniNotebook
 
 /// Name a speaker: the `SpeakerNaming` reducer on screen. Effects that change the note or the saved voices are carried
-/// out by `VoicesStore`; while they are written the sheet stays, and a failure keeps it open with its alert.
+/// out by `VoicesStore`; while they are written the sheet stays, and a failure keeps it open with its alert. The Note
+/// screen keeps the name being typed (`nameChanged`) and hands it back as `draft` when the sheet opens again after
+/// Cassini was closed.
 struct NameSpeakerSheet: View {
     let noteID: UUID
     let speakerID: String
+    var draft: String?
+    var nameChanged: (String) -> Void = { _ in }
     @Environment(LibraryStore.self) private var library
     @Environment(VoicesStore.self) private var voices
     @Environment(PlaybackStore.self) private var playback
@@ -41,7 +45,10 @@ struct NameSpeakerSheet: View {
             }
         }
         .tint(.ember)
-        .task { state = await voices.namingInput(noteID: noteID, speakerID: speakerID).map(SpeakerNaming.open) }
+        .task {
+            state = await voices.namingInput(noteID: noteID, speakerID: speakerID).map(SpeakerNaming.open)
+            if let draft { send(.nameChanged(draft)) }
+        }
         .onDisappear { playback.stopSample() }
         .alert(SpeakersCopy.couldNotSave, isPresented: Binding(get: { saveError != nil }, set: { if !$0 { saveError = nil } })) {
             Button(SpeakersCopy.ok) { saveError = nil }
@@ -63,6 +70,7 @@ struct NameSpeakerSheet: View {
                     .onAppear { nameField = ui.name }
                     .onChange(of: nameField) { _, text in
                         send(.nameChanged(text))
+                        nameChanged(state?.name ?? text)
                         if let name = state?.name, name != text { nameField = name }
                     }
                     .onChange(of: ui.name) { _, name in if name != nameField { nameField = name } }

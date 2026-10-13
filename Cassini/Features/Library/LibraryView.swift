@@ -9,6 +9,7 @@ struct LibraryView: View {
     @Environment(LibraryScreenModel.self) private var model
     @Environment(NoticesStore.self) private var notices
     @Environment(ImportStore.self) private var imports
+    @Environment(LibraryStore.self) private var library
     @Environment(Router.self) private var router
     @Environment(ErrorPresenter.self) private var errors
     @Environment(\.dynamicTypeSize) private var dynamicType
@@ -16,8 +17,11 @@ struct LibraryView: View {
     @Environment(\.restoresSceneState) private var restoresSceneState
     @SceneStorage("library.query") private var savedQuery = ""
     @SceneStorage("library.favoritesOnly") private var savedFavoritesOnly = false
+    /// The open dialog (Rename, Start over?, Transcribe again?), kept with the scene.
+    @SceneStorage("library.dialog") private var savedDialog: Data?
     @State private var importing = false
     @State private var restored = false
+    @State private var dialogRestored = false
 
     var body: some View {
         @Bindable var model = model
@@ -66,6 +70,11 @@ struct LibraryView: View {
         .onAppear(perform: restoreSceneState)
         .onChange(of: model.query) { _, query in if restoresSceneState { savedQuery = query } }
         .onChange(of: model.favoritesOnly) { _, only in if restoresSceneState { savedFavoritesOnly = only } }
+        .onChange(of: model.dialog) { _, dialog in
+            if restoresSceneState, dialogRestored { savedDialog = dialog.flatMap { try? JSONEncoder().encode($0) } }
+        }
+        // The dialog's note must be read first.
+        .task(id: library.isLoaded) { restoreDialog() }
         .task { await model.refreshSpeakerModels() }
         .fileImporter(isPresented: $importing, allowedContentTypes: ImportStore.contentTypes, allowsMultipleSelection: true) { result in
             switch result {
@@ -141,6 +150,16 @@ struct LibraryView: View {
         restored = true
         model.query = savedQuery
         model.favoritesOnly = savedFavoritesOnly
+    }
+
+    /// Opens the dialog the scene kept, once the notes are read, unless its note has gone meanwhile.
+    private func restoreDialog() {
+        guard restoresSceneState, library.isLoaded, !dialogRestored else { return }
+        dialogRestored = true
+        guard model.dialog == nil, let data = savedDialog,
+              let dialog = try? JSONDecoder().decode(LibraryDialog.self, from: data) else { return }
+        model.dialog = dialog.restorable(over: library.notes)
+        if model.dialog == nil { savedDialog = nil }
     }
 
     private struct RenameTarget: Identifiable { let id: UUID }

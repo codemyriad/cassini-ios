@@ -29,6 +29,8 @@ struct NoteDetailView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var screen: NoteScreenState
     @State private var sheet: NoteSheet?
+    /// The name typed so far into Name this speaker, kept with the open sheet.
+    @State private var namingDraft: String?
     @State private var shareItem: ShareItem?
     @State private var exportingDocument = false
     @State private var showBookmarks = false
@@ -84,6 +86,7 @@ struct NoteDetailView: View {
         .onChange(of: screen.search?.query) { _, query in router.keepSearch(query, for: noteID) }
         .backButtonTitle(router.below(noteID: noteID) == .library ? NoteCopy.backToLibrary : nil)
         .sheet(item: $sheet, content: sheetContent)
+        .keepsNoteOverlay(note: note, readOnly: readOnly, sheet: $sheet, draft: $namingDraft)
         .alert(dialogTitle, isPresented: dialogShown, presenting: screen.dialog, actions: dialogActions,
                message: dialogMessage)
         .shareSheet(item: $shareItem)
@@ -275,7 +278,7 @@ struct NoteDetailView: View {
         guard let effect else { return }
         switch effect {
         case .seekAndPlay(let time): seek(time)
-        case .nameSpeaker(let id): sheet = .naming(id)
+        case .nameSpeaker(let id): sheet = .naming(id, draft: nil)
         case .openVersions: sheet = .versions
         case .openSpeakers: sheet = .speakers
         case .editPassage(let id):
@@ -375,7 +378,8 @@ struct NoteDetailView: View {
         case .speakers: SpeakersView(noteID: noteID)
         case .versions: TranscriptVersionsView(noteID: noteID)
         case .documentInfo: DocumentInfoSheet(noteID: noteID)
-        case .naming(let speakerID): NameSpeakerSheet(noteID: noteID, speakerID: speakerID)
+        case .naming(let speakerID, let draft):
+            NameSpeakerSheet(noteID: noteID, speakerID: speakerID, draft: draft) { namingDraft = $0 }
         case .editing(let segment): SegmentEditor(noteID: noteID, segment: segment)
         }
     }
@@ -410,24 +414,6 @@ struct NoteDetailView: View {
         case .readOnly: EmptyView()
         case .startOver: Text(NoteCopy.startOverBody)
         case .transcribeFresh: Text(NoteCopy.freshBody)
-        }
-    }
-}
-
-/// A sheet over the Note screen.
-enum NoteSheet: Identifiable {
-    case rename, speakers, versions, documentInfo
-    case naming(String)
-    case editing(TranscriptSegment)
-
-    var id: String {
-        switch self {
-        case .rename: "rename"
-        case .speakers: "speakers"
-        case .versions: "versions"
-        case .documentInfo: "documentInfo"
-        case .naming(let id): "naming-\(id)"
-        case .editing(let segment): "editing-\(segment.id)"
         }
     }
 }

@@ -2,8 +2,9 @@ import Foundation
 import Observation
 import CassiniNotebook
 
-/// A confirmation or form the Library opens over itself (Android `LibraryDialog`).
-public enum LibraryDialog: Identifiable, Hashable, Sendable {
+/// A confirmation or form the Library opens over itself (Android `LibraryDialog`). `Codable`, so the Library keeps the
+/// open one with the scene and it comes back after Cassini was closed.
+public enum LibraryDialog: Identifiable, Hashable, Codable, Sendable {
     case rename(UUID)
     /// "Start over?": the saved progress goes.
     case startOver(UUID)
@@ -11,6 +12,17 @@ public enum LibraryDialog: Identifiable, Hashable, Sendable {
     case transcribeFresh(UUID)
 
     public var id: Self { self }
+
+    public var noteID: UUID {
+        switch self {
+        case .rename(let id), .startOver(let id), .transcribeFresh(let id): id
+        }
+    }
+
+    /// The dialog to open again after Cassini was closed: none once its note is gone or in Recently Deleted.
+    public func restorable(over notes: [Note]) -> LibraryDialog? {
+        notes.contains { $0.id == noteID && $0.trashedAt == nil } ? self : nil
+    }
 }
 
 /// A row of a note's actions menu (Android `NoteAction`, features.md section 6).
