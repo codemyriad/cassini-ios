@@ -27,9 +27,6 @@ import CassiniNotebook
         self.heldAt = heldAt
     }
 
-    /// Where a held capture stands once it has played its levels.
-    public var heldUntil: TimeInterval? { heldAt.map { $0 + Double(levels.count) * Self.heldStep } }
-
     private static let heldStep = Double(WaveformBars.barMs) / 1000
 
     public var elapsed: TimeInterval {

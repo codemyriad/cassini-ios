@@ -12,7 +12,7 @@ Cassini (app: composition, adapters, views) ────────────
   │            │              │                            │        └─ CassiniShared (activity attributes and
   │            │              │                            │           intents, compiled into both targets)
   ▼            ▼              ▼                            ▼
-CassiniInference   CassiniAudio    CassiniEngineTesting (Debug only: fakes of the ports)
+CassiniInference   CassiniAudio    CassiniEngineTesting (fakes of the ports; empty in Release)
   │ Apple Speech,    │ CAF repair,    │
   │ FluidAudio       │ libopus        │
   ▼                  │                ▼
@@ -25,8 +25,8 @@ CassiniNotebook      │         model, pure rules, file formats
 CassiniCore ───────────────── the portable Ogg Opus document (read, verify, seal), over CZlib
 ```
 
-Every arrow points at a dependency. The app imports all five packages; `CassiniEngineTesting` is linked only in Debug,
-for UI-test launches.
+Every arrow points at a dependency. The app imports all five packages. `CassiniEngineTesting` is linked in every
+build for the UI-test launches, and is empty in Release, where every source is compiled out.
 
 | Module | What it holds |
 |---|---|
@@ -43,7 +43,8 @@ for UI-test launches.
 - **Ports.** `CassiniEngine/Ports` declares everything that touches the device: `Transcribing`, `SpeakerAnalyzing`,
   `AudioCapture`, `AudioPlayback`, `AudioProcessing`, `BackgroundRunner`, `LiveActivityPort`, `Notifier`,
   `StorageProbe`, `FileImporting`, `AppClock` and `TranscriptionJobRunning`. The engine depends only on these
-  protocols. `CassiniInference`, `CassiniAudio` and the app's adapters implement them for the device, and
+  protocols. `CassiniInference` and the app's adapters implement them for the device (the app's
+  `LocalAudioProcessing`, for one, does its work with `CassiniAudio`, which knows nothing of the engine), and
   `CassiniEngineTesting` implements them for tests.
 - **Rules before effects.** A screen's logic is a pure reducer in CassiniNotebook (`NoteScreenState`,
   `SpeakerNaming`, `LibraryMapping`, `RecordingBanner`, …). Each reducer returns effects, and an engine model or an app
