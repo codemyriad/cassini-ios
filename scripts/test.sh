@@ -13,7 +13,8 @@
 #
 # Environment:
 #   CASSINI_UI_WORKERS   UI shards (default: as many as memory allows, at most 3)
-#   CASSINI_UI_IPAD=0    skip the iPad shard (the tests named testIPad*)
+#   CASSINI_UI_IPAD      what the iPad clone runs: the tests named testIPad* (default), all (every UI test, beside
+#                        the iPhone shards; the longest step then) or 0 (nothing)
 #   CASSINI_KEEP_SIMS=0  shut the clones down afterwards (default: keep them booted for the next run)
 #   CASSINI_TEST_CACHE   shared cache directory (default: .test-cache beside the main checkout's .git)
 #   CASSINI_IPHONE / CASSINI_IPAD  device types to clone (default "iPhone 17", "iPad Pro 13-inch (M5)")
@@ -329,7 +330,7 @@ plan_shards() {
 record_durations() {
     local tmp="$timings_file.new"
     { [ -f "$timings_file" ] && cat "$timings_file"
-      cat "$logs"/ui-*.log 2>/dev/null | sed -nE "s/^Test Case '-\[CassiniUITests\.([A-Za-z0-9_]+) ([A-Za-z0-9_]+)\]' (passed|failed|skipped) \(([0-9.]+) seconds\).*/\1\/\2	\4/p"
+      cat "$logs"/ui-[0-9]*.log 2>/dev/null | sed -nE "s/^Test Case '-\[CassiniUITests\.([A-Za-z0-9_]+) ([A-Za-z0-9_]+)\]' (passed|failed|skipped) \(([0-9.]+) seconds\).*/\1\/\2	\4/p"
     } | awk -F'\t' '{ d[$1] = $2 } END { for (k in d) print k "\t" d[k] }' | sort > "$tmp"
     mv "$tmp" "$timings_file"
 }
@@ -355,7 +356,11 @@ tier_ui() {
         if [ "$state" = Booted ] && [ "${name##*-}" -gt "$workers" ]; then xcrun simctl shutdown "$udid" 2>/dev/null || true; fi
     done
     local plan; plan=$(plan_shards "$workers")
-    local ipad_tests; ipad_tests=$(ui_tests | grep '/testIPad' || true)
+    local ipad_tests
+    case "${CASSINI_UI_IPAD:-1}" in
+        all) ipad_tests=$(ui_tests) ;;
+        *) ipad_tests=$(ui_tests | grep '/testIPad' || true) ;;
+    esac
 
     step_start "boot $workers iPhone clone(s)$( [ "${CASSINI_UI_IPAD:-1}" != 0 ] && [ -n "$ipad_tests" ] && echo ' + iPad')"
     local udids=() pids=() k
@@ -407,6 +412,11 @@ tier_ui() {
     [ -n "$ipad" ] && xcrun simctl shutdown "$ipad" 2>/dev/null || true
     [ -z "$failed" ] || return 1
     [ "$ran" = "$expected" ] || die "expected $expected UI tests, $ran ran"
+    if [ -n "$ipad" ]; then
+        ran=$(grep -cE "^Test Case '-\[CassiniUITests\.[A-Za-z0-9_]+ [A-Za-z0-9_]+\]' (passed|failed|skipped)" "$logs/ui-ipad.log" || true)
+        expected=$(echo "$ipad_tests" | wc -l | tr -d ' ')
+        [ "$ran" = "$expected" ] || die "expected $expected UI tests on the iPad, $ran ran"
+    fi
 }
 
 case "$tier" in
