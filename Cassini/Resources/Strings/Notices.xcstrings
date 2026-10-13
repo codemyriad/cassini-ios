@@ -499,6 +499,18 @@
         }
       }
     },
+    "Checking files": {
+      "comment": "A model install checks its files; no count yet",
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verifica dei file"
+          }
+        }
+      }
+    },
     "Checking files — %lld%%": {
       "extractionState": "manual",
       "localizations": {
