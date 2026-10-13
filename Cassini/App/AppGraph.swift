@@ -54,7 +54,7 @@ import CassiniNotebook
             notes: library, queue: processing, voices: voices,
             host: AppTrashHost(recording: recording, playback: playback, router: router, settings: settings),
             undo: TrashUndo(), clock: environment.clock, calendar: environment.calendar))
-        exports = ExportStore(library: library, portable: PortableExportService(audio: environment.audio),
+        exports = ExportStore(library: library, audio: environment.audio,
                               folder: environment.exports,
                               locale: environment.locale, timeZone: environment.timeZone) { [startup] in _ = await startup.ready() }
         libraryScreen = Self.libraryScreen(environment: environment, library: library, processing: processing,

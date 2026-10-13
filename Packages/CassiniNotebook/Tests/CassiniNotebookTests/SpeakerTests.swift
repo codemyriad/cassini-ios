@@ -18,6 +18,25 @@ import Testing
     #expect(note.versions?.count == 2)
 }
 
+@Test func aMergeRecordsItsAliasAndTheVersionItWasMadeFrom() throws {
+    var note = Note(title: "Conversation")
+    note.transcript = [.init(text: "First", start: 0, end: 1, speakerID: "a"), .init(text: "Second", start: 1, end: 2, speakerID: "b"),
+                       .init(text: "Third", start: 2, end: 3, speakerID: "c")]
+    note.speakers = [NoteSpeaker(id: "a", name: "A"), NoteSpeaker(id: "b", name: "B"), NoteSpeaker(id: "c", name: "C")]
+    note.mergeSpeaker("b", into: "a")
+    let first = try #require(note.versions?.first)
+    let merged = try #require(note.versions?.last)
+    #expect(first.speakerMerges == nil)
+    #expect(merged.speakerMerges == ["b": "a"])
+    #expect(merged.derivedFrom == first.id)
+    // A second merge starts from the merged version, which is the one shown.
+    note.mergeSpeaker("c", into: "a")
+    let again = try #require(note.versions?.last)
+    #expect(note.versions?.count == 3)
+    #expect(again.speakerMerges == ["c": "a"])
+    #expect(again.derivedFrom == merged.id)
+}
+
 @Test func trashUsesCalendarDaysAcrossDSTAndClockRollback() throws {
     var calendar = Calendar(identifier: .gregorian); calendar.timeZone = try #require(TimeZone(identifier: "Europe/Berlin"))
     let deleted = try #require(calendar.date(from: DateComponents(year: 2026, month: 10, day: 10, hour: 23)))
