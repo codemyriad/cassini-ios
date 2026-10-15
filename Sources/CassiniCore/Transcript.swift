@@ -10,12 +10,14 @@ public struct Word: Hashable, Sendable {
 /**
  * Decode scaffolding, never transcript data: [capMs] is the furthest end the word gate may extend
  * the word to over its speaker's continuing audio, the end of its last piece INCLUDING trailing
- * punctuation. A cap not above the word's end permits no extension.
+ * punctuation. A cap not above the word's end permits no extension. Android's `TimedWord`; iOS names it
+ * `DecodedWord` because the note model already has a `TimedWord`.
  */
-struct TimedWord: Equatable, Sendable {
-    let word: Word
-    var capMs: Int64 = 0
-    var extentCapMs: Int64 { capMs > word.endMs ? capMs : word.endMs }
+public struct DecodedWord: Hashable, Sendable {
+    public var word: Word
+    public var capMs: Int64
+    public init(_ word: Word, capMs: Int64 = 0) { self.word = word; self.capMs = capMs }
+    public var extentCapMs: Int64 { capMs > word.endMs ? capMs : word.endMs }
 }
 
 /**
@@ -72,16 +74,16 @@ public struct Transcript: Hashable, Sendable {
      * included. Only a word with a speech-bearing piece gets one; a mark alone has no audio of its
      * own, and its timestamp is the next onset, so a cap would walk it over the next word.
      */
-    static func timedWordsFromTokens(_ tokens: [String], timestamps: [Float], durations: [Float]) throws -> [TimedWord] {
+    public static func timedWordsFromTokens(_ tokens: [String], timestamps: [Float], durations: [Float]) throws -> [DecodedWord] {
         try check(tokens.count == timestamps.count && tokens.count == durations.count, "Invalid word timings")
-        var words: [TimedWord] = []
+        var words: [DecodedWord] = []
         var text = ""
         var start: Int64 = 0, speechEnd: Int64 = 0, pieceEnd: Int64 = 0
         var spoken = false
         var previousTimestamp: Float = -1
         func flush() {
             let end = max(start, speechEnd)
-            if !text.isEmpty { words.append(TimedWord(word: Word("spk_1", start, end, text), capMs: spoken ? max(end, pieceEnd) : end)) }
+            if !text.isEmpty { words.append(DecodedWord(Word("spk_1", start, end, text), capMs: spoken ? max(end, pieceEnd) : end)) }
             text = ""
             spoken = false
         }

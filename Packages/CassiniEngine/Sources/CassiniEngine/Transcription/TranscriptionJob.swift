@@ -198,7 +198,7 @@ public struct TranscriptionJob: TranscriptionJobRunning {
 
     private func decodeWords(_ context: Context, from checkpoint: CheckpointState?) async -> WordsResult {
         let resumeDoneMs = checkpoint?.doneMs ?? 0
-        let startMs = resumeDoneMs > 0 ? SpeechWindows.resumeStartMs(doneMs: resumeDoneMs) : 0
+        let startMs = resumeDoneMs > 0 ? AppleSpeechWindows.resumeStartMs(doneMs: resumeDoneMs) : 0
         let decode = WordsDecode(
             base: checkpoint ?? CheckpointState(source: context.source, signature: context.signature,
                                                 language: context.language, segments: [], doneMs: 0,
