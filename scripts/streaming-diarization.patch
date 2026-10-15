@@ -1,0 +1,250 @@
+diff --git a/sherpa-onnx/csrc/offline-speaker-diarization-impl.h b/sherpa-onnx/csrc/offline-speaker-diarization-impl.h
+index d2cbdebd..6de39645 100644
+--- a/sherpa-onnx/csrc/offline-speaker-diarization-impl.h
++++ b/sherpa-onnx/csrc/offline-speaker-diarization-impl.h
+@@ -20,6 +20,13 @@ class OfflineSpeakerDiarizationImpl {
+   static std::unique_ptr<OfflineSpeakerDiarizationImpl> Create(
+       Manager *mgr, const OfflineSpeakerDiarizationConfig &config);
+ 
++  virtual OfflineSpeakerDiarizationResult ProcessStreamingChunk(const float *audio, int32_t n) {
++    return Process(audio, n);
++  }
++
++  virtual std::vector<float> SaveStreamingState() const { return {}; }
++  virtual bool RestoreStreamingState(const std::vector<float> &) { return false; }
++
+   virtual ~OfflineSpeakerDiarizationImpl() = default;
+ 
+   virtual int32_t SampleRate() const = 0;
+diff --git a/sherpa-onnx/csrc/offline-speaker-diarization-sortformer-impl.h b/sherpa-onnx/csrc/offline-speaker-diarization-sortformer-impl.h
+index 6e964d74..bba1ee93 100644
+--- a/sherpa-onnx/csrc/offline-speaker-diarization-sortformer-impl.h
++++ b/sherpa-onnx/csrc/offline-speaker-diarization-sortformer-impl.h
+@@ -67,13 +67,31 @@ class OfflineSpeakerDiarizationSortformerImpl
+     return ComputeResult(probs);
+   }
+ 
++  OfflineSpeakerDiarizationResult ProcessStreamingChunk(const float *audio, int32_t n) override {
++    if (!streaming_cache_) {
++      streaming_cache_ = std::make_unique<SortformerSpeakerCache>(model_.GetModelMetaData().cache);
++    }
++    return ComputeResult(ComputeSpeakerProbs(audio, n, nullptr, nullptr, streaming_cache_.get()), true);
++  }
++
++  std::vector<float> SaveStreamingState() const override {
++    return streaming_cache_ ? streaming_cache_->SaveState() : std::vector<float>{};
++  }
++  bool RestoreStreamingState(const std::vector<float> &v) override {
++    auto cache = std::make_unique<SortformerSpeakerCache>(model_.GetModelMetaData().cache);
++    if (!cache->RestoreState(v)) return false;
++    streaming_cache_ = std::move(cache);
++    return true;
++  }
++
+   // Return a row-major matrix of shape (num_frames, num_speakers) with the
+   // activity probability of each speaker in each 10 ms frame.
+   // num_frames is n / hop_length.
+   std::vector<float> ComputeSpeakerProbs(
+       const float *audio, int32_t n,
+       OfflineSpeakerDiarizationProgressCallback callback = nullptr,
+-      void *callback_arg = nullptr) const {
++      void *callback_arg = nullptr,
++      SortformerSpeakerCache *persistent_cache = nullptr) const {
+     const auto &meta = model_.GetModelMetaData();
+     const int32_t num_speakers = meta.cache.num_speakers;
+     const int32_t factor = meta.cache.subsampling_factor;
+@@ -97,7 +115,8 @@ class OfflineSpeakerDiarizationSortformerImpl
+ 
+     std::vector<float> ans(static_cast<int64_t>(num_frames) * num_speakers);
+ 
+-    SortformerSpeakerCache cache(meta.cache);
++    SortformerSpeakerCache local_cache(meta.cache);
++    SortformerSpeakerCache &cache = persistent_cache ? *persistent_cache : local_cache;
+ 
+     auto memory_info =
+         Ort::MemoryInfo::CreateCpu(OrtDeviceAllocator, OrtMemTypeDefault);
+@@ -157,6 +176,8 @@ class OfflineSpeakerDiarizationSortformerImpl
+   }
+ 
+  private:
++  std::unique_ptr<SortformerSpeakerCache> streaming_cache_;
++
+   void Init() {
+     const auto &meta = model_.GetModelMetaData();
+ 
+@@ -251,7 +272,7 @@ class OfflineSpeakerDiarizationSortformerImpl
+   }
+ 
+   OfflineSpeakerDiarizationResult ComputeResult(
+-      const std::vector<float> &probs) const {
++      const std::vector<float> &probs, bool preserve_slots = false) const {
+     const auto &meta = model_.GetModelMetaData();
+     const int32_t num_speakers = meta.cache.num_speakers;
+     const int32_t num_frames =
+@@ -276,7 +297,7 @@ class OfflineSpeakerDiarizationSortformerImpl
+           start_index = f;
+         } else if (!is_active && start_index >= 0) {
+           this_speaker.emplace_back(start_index * frame_shift, f * frame_shift,
+-                                    num_found);
++                                    preserve_slots ? s : num_found);
+           start_index = -1;
+         }
+       }
+diff --git a/sherpa-onnx/csrc/offline-speaker-diarization.cc b/sherpa-onnx/csrc/offline-speaker-diarization.cc
+index f3dce842..b6faedaf 100644
+--- a/sherpa-onnx/csrc/offline-speaker-diarization.cc
++++ b/sherpa-onnx/csrc/offline-speaker-diarization.cc
+@@ -110,6 +110,18 @@ OfflineSpeakerDiarizationResult OfflineSpeakerDiarization::Process(
+   return impl_->Process(audio, n, std::move(callback), callback_arg);
+ }
+ 
++OfflineSpeakerDiarizationResult OfflineSpeakerDiarization::ProcessStreamingChunk(
++    const float *audio, int32_t n) {
++  return impl_->ProcessStreamingChunk(audio, n);
++}
++
++std::vector<float> OfflineSpeakerDiarization::SaveStreamingState() const {
++  return impl_->SaveStreamingState();
++}
++bool OfflineSpeakerDiarization::RestoreStreamingState(const std::vector<float> &v) {
++  return impl_->RestoreStreamingState(v);
++}
++
+ #if __ANDROID_API__ >= 9
+ template OfflineSpeakerDiarization::OfflineSpeakerDiarization(
+     AAssetManager *mgr, const OfflineSpeakerDiarizationConfig &config);
+diff --git a/sherpa-onnx/csrc/offline-speaker-diarization.h b/sherpa-onnx/csrc/offline-speaker-diarization.h
+index acbb6f52..b173e8f9 100644
+--- a/sherpa-onnx/csrc/offline-speaker-diarization.h
++++ b/sherpa-onnx/csrc/offline-speaker-diarization.h
+@@ -75,6 +75,13 @@ class OfflineSpeakerDiarization {
+       OfflineSpeakerDiarizationProgressCallback callback = nullptr,
+       void *callback_arg = nullptr) const;
+ 
++  std::vector<float> SaveStreamingState() const;
++  bool RestoreStreamingState(const std::vector<float> &state);
++
++  // Sortformer-only incremental mode. Retains its bounded speaker cache across calls.
++  // Results use the supplied chunk's local clock. A new instance starts a new recording.
++  OfflineSpeakerDiarizationResult ProcessStreamingChunk(const float *audio, int32_t n);
++
+  private:
+   std::unique_ptr<OfflineSpeakerDiarizationImpl> impl_;
+ };
+diff --git a/sherpa-onnx/csrc/sortformer-speaker-cache.cc b/sherpa-onnx/csrc/sortformer-speaker-cache.cc
+index b2a2a037..a14f7b51 100644
+--- a/sherpa-onnx/csrc/sortformer-speaker-cache.cc
++++ b/sherpa-onnx/csrc/sortformer-speaker-cache.cc
+@@ -66,6 +66,33 @@ SortformerSpeakerCache::SortformerSpeakerCache(
+       static_cast<int32_t>(std::floor(budget * config_.weak_boost_rate));
+ }
+ 
++std::vector<float> SortformerSpeakerCache::SaveState() const {
++  std::vector<float> ans = {1, static_cast<float>(config_.hidden_size),
++      static_cast<float>(config_.num_speakers), static_cast<float>(num_cache_frames_),
++      static_cast<float>(num_fifo_frames_), is_compressed_ ? 1.0f : 0.0f,
++      static_cast<float>(cache_probs_.size())};
++  ans.insert(ans.end(), cache_embeds_.begin(), cache_embeds_.end());
++  ans.insert(ans.end(), cache_probs_.begin(), cache_probs_.end());
++  ans.insert(ans.end(), fifo_.begin(), fifo_.end());
++  return ans;
++}
++bool SortformerSpeakerCache::RestoreState(const std::vector<float> &v) {
++  if (v.size() < 7 || v[0] != 1 || v[1] != config_.hidden_size || v[2] != config_.num_speakers) return false;
++  for (int i = 3; i <= 6; ++i) if (!std::isfinite(v[i]) || v[i] < 0 || v[i] != std::floor(v[i])) return false;
++  if (v[3] > config_.speaker_cache_length || v[4] > config_.fifo_length || v[5] > 1 || v[6] > v[3] * config_.num_speakers) return false;
++  int nc = static_cast<int>(v[3]), nf = static_cast<int>(v[4]), np = static_cast<int>(v[6]);
++  if (np != 0 && np != nc * config_.num_speakers) return false;
++  if (v[5] == 1 && np != nc * config_.num_speakers) return false;
++  size_t ne = nc * config_.hidden_size, nfe = nf * config_.hidden_size;
++  if (v.size() != 7 + ne + np + nfe) return false;
++  auto a = v.begin() + 7;
++  cache_embeds_.assign(a, a + ne); a += ne;
++  cache_probs_.assign(a, a + np); a += np;
++  fifo_.assign(a, v.end());
++  num_cache_frames_ = nc; num_fifo_frames_ = nf; is_compressed_ = v[5] == 1;
++  return true;
++}
++
+ std::vector<float> SortformerSpeakerCache::GetEmbeds() const {
+   std::vector<float> ans;
+   ans.reserve(cache_embeds_.size() + fifo_.size());
+diff --git a/sherpa-onnx/csrc/sortformer-speaker-cache.h b/sherpa-onnx/csrc/sortformer-speaker-cache.h
+index c25ba4d9..66198ae5 100644
+--- a/sherpa-onnx/csrc/sortformer-speaker-cache.h
++++ b/sherpa-onnx/csrc/sortformer-speaker-cache.h
+@@ -58,6 +58,9 @@ class SortformerSpeakerCache {
+   int32_t NumSpeakerCacheFrames() const { return num_cache_frames_; }
+   int32_t NumFifoFrames() const { return num_fifo_frames_; }
+ 
++  std::vector<float> SaveState() const;
++  bool RestoreState(const std::vector<float> &state);
++
+   // Return the speaker cache followed by the FIFO queue. It is a row-major
+   // matrix of shape (NumCachedFrames(), hidden_size).
+   std::vector<float> GetEmbeds() const;
+diff --git a/sherpa-onnx/jni/offline-speaker-diarization.cc b/sherpa-onnx/jni/offline-speaker-diarization.cc
+index 5927d81c..17680248 100644
+--- a/sherpa-onnx/jni/offline-speaker-diarization.cc
++++ b/sherpa-onnx/jni/offline-speaker-diarization.cc
+@@ -230,6 +230,18 @@ Java_com_k2fsa_sherpa_onnx_OfflineSpeakerDiarization_process(
+   return ProcessImpl(env, segments);
+ }
+ 
++SHERPA_ONNX_EXTERN_C
++JNIEXPORT jobjectArray JNICALL
++Java_com_k2fsa_sherpa_onnx_OfflineSpeakerDiarization_processStreamingChunk(
++    JNIEnv *env, jobject /*obj*/, jlong ptr, jfloatArray samples) {
++  auto sd = reinterpret_cast<sherpa_onnx::OfflineSpeakerDiarization *>(ptr);
++  jfloat *p = env->GetFloatArrayElements(samples, nullptr);
++  jsize n = env->GetArrayLength(samples);
++  auto segments = sd->ProcessStreamingChunk(p, n).SortByStartTime();
++  env->ReleaseFloatArrayElements(samples, p, JNI_ABORT);
++  return ProcessImpl(env, segments);
++}
++
+ SHERPA_ONNX_EXTERN_C
+ JNIEXPORT jobjectArray JNICALL
+ Java_com_k2fsa_sherpa_onnx_OfflineSpeakerDiarization_processWithCallback(
+@@ -281,3 +293,20 @@ Java_com_k2fsa_sherpa_onnx_OfflineSpeakerDiarization_getSampleRate(
+   return reinterpret_cast<sherpa_onnx::OfflineSpeakerDiarization *>(ptr)
+       ->SampleRate();
+ }
++
++SHERPA_ONNX_EXTERN_C JNIEXPORT jfloatArray JNICALL
++Java_com_k2fsa_sherpa_onnx_OfflineSpeakerDiarization_saveStreamingState(JNIEnv *env, jobject, jlong ptr) {
++  auto v = reinterpret_cast<sherpa_onnx::OfflineSpeakerDiarization *>(ptr)->SaveStreamingState();
++  auto ans = env->NewFloatArray(v.size());
++  if (ans) env->SetFloatArrayRegion(ans, 0, v.size(), v.data());
++  return ans;
++}
++SHERPA_ONNX_EXTERN_C JNIEXPORT jboolean JNICALL
++Java_com_k2fsa_sherpa_onnx_OfflineSpeakerDiarization_restoreStreamingState(JNIEnv *env, jobject, jlong ptr, jfloatArray values) {
++  jsize n = env->GetArrayLength(values);
++  if (n > 200000) return false;
++  std::vector<float> v(n);
++  env->GetFloatArrayRegion(values, 0, n, v.data());
++  if (env->ExceptionCheck()) return false;
++  return reinterpret_cast<sherpa_onnx::OfflineSpeakerDiarization *>(ptr)->RestoreStreamingState(v);
++}
+diff --git a/sherpa-onnx/kotlin-api/OfflineSpeakerDiarization.kt b/sherpa-onnx/kotlin-api/OfflineSpeakerDiarization.kt
+index 60b0b962..a8adce16 100644
+--- a/sherpa-onnx/kotlin-api/OfflineSpeakerDiarization.kt
++++ b/sherpa-onnx/kotlin-api/OfflineSpeakerDiarization.kt
+@@ -75,6 +75,16 @@ class OfflineSpeakerDiarization(
+ 
+     fun process(samples: FloatArray) = process(ptr, samples)
+ 
++    /** Sortformer chunks from one recording; retains its speaker cache. Times are chunk-local. */
++    fun processStreamingChunk(samples: FloatArray) = processStreamingChunk(ptr, samples)
++
++    private external fun processStreamingChunk(ptr: Long, samples: FloatArray): Array<OfflineSpeakerDiarizationSegment>
++
++    fun saveStreamingState() = saveStreamingState(ptr)
++    fun restoreStreamingState(values: FloatArray) = restoreStreamingState(ptr, values)
++    private external fun saveStreamingState(ptr: Long): FloatArray
++    private external fun restoreStreamingState(ptr: Long, values: FloatArray): Boolean
++
+     fun processWithCallback(
+         samples: FloatArray,
+         callback: (numProcessedChunks: Int, numTotalChunks: Int, arg: Long) -> Int,

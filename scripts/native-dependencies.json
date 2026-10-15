@@ -13,10 +13,12 @@
   },
   {
     "name": "sherpa-onnx-ios",
-    "version": "1.13.7-dbbeef9c-ios.1",
+    "version": "1.13.7-dbbeef9c-ios.2",
     "file": "sherpa-onnx-1.13.7-dbbeef9c-ios-no-tts.xcframework.zip",
     "url": "",
-    "sha256": "3ff3f3bb03bc32f1e9d6cf1bc81df22a5290c2af8c2899c7394886e99f05f6d1"
+    "sha256": "a2924ea6d4d40f423ab10ffa179a00e8ad6c0a3ef0d4db62efb2cf5e0ea18953",
+    "patchSha256": "91b3f2c55e2d5188a71a3602a56f94d3ae128e0b04635838c5f70800412700d5",
+    "cApiPatchSha256": "19ad205be861863a6bbca8c10b6743578b925325f4a307251492e190c060f009"
   },
   {
     "name": "eigen",

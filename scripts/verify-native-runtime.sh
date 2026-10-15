@@ -9,9 +9,12 @@
 #   - the lock: the sherpa-onnx source is the codemyriad fork at a full commit, ONNX Runtime is 1.27.1;
 #   - when a build is present in .tools/sherpa (scripts/build-sherpa-xcframework.sh): the zip's SwiftPM checksum is the
 #     lock's (unless the lock still says PENDING), both slices (ios-arm64, ios-arm64-simulator) export the C API Cassini
-#     calls, the header has tokens_arr, no espeak-ng, piper or TTS model code is linked in (TTS is off; the C API keeps
-#     its SherpaOnnx*OfflineTts* entry points as stubs), and the deployment target is 15.1; the unpacked ONNX Runtime
-#     has the pinned slices and its zip the pinned checksum.
+#     calls (recognizer, VAD, and the streaming Sortformer diarizer and CAM++ extractor Android's speaker path uses,
+#     compiled in rather than the "not enabled" stubs), the header has tokens_arr and the streaming diarization calls,
+#     no espeak-ng, piper or TTS model code is linked in (TTS is off; the C API keeps its SherpaOnnx*OfflineTts* entry
+#     points as stubs), and the deployment target is 15.1; the unpacked ONNX Runtime has the pinned slices and its zip
+#     the pinned checksum;
+#   - always: both streaming-diarization patches match the hashes the lock pins.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 . scripts/native-common.sh
@@ -19,6 +22,24 @@ quiet=false
 [ "${1:-}" = --quiet ] && quiet=true
 say() { $quiet || printf '%s\n' "$*"; }
 status=0
+
+# The C API behind what cassini-android's Kotlin calls for speakers (engine/.../speakers/SortformerStream.kt and
+# VoiceprintExtractor.kt). OfflineSpeakerDiarization: constructor, processWithCallback, processStreamingChunk,
+# saveStreamingState, restoreStreamingState, release, with the segment array the JNI sorts by start time.
+diarization_symbols=(SherpaOnnxCreateOfflineSpeakerDiarization SherpaOnnxDestroyOfflineSpeakerDiarization
+    SherpaOnnxOfflineSpeakerDiarizationGetSampleRate SherpaOnnxOfflineSpeakerDiarizationProcessWithCallback
+    SherpaOnnxOfflineSpeakerDiarizationResultGetNumSegments SherpaOnnxOfflineSpeakerDiarizationResultSortByStartTime
+    SherpaOnnxOfflineSpeakerDiarizationDestroySegment SherpaOnnxOfflineSpeakerDiarizationDestroyResult
+    SherpaOnnxOfflineSpeakerDiarizationProcessStreamingChunk SherpaOnnxOfflineSpeakerDiarizationSaveStreamingState
+    SherpaOnnxOfflineSpeakerDiarizationDestroyStreamingState SherpaOnnxOfflineSpeakerDiarizationRestoreStreamingState)
+# SpeakerEmbeddingExtractor (CAM++): constructor, createStream, acceptWaveform, inputFinished, isReady, compute,
+# stream.release, release.
+embedding_symbols=(SherpaOnnxCreateSpeakerEmbeddingExtractor SherpaOnnxDestroySpeakerEmbeddingExtractor
+    SherpaOnnxSpeakerEmbeddingExtractorDim SherpaOnnxSpeakerEmbeddingExtractorCreateStream
+    SherpaOnnxOnlineStreamAcceptWaveform SherpaOnnxOnlineStreamInputFinished SherpaOnnxSpeakerEmbeddingExtractorIsReady
+    SherpaOnnxSpeakerEmbeddingExtractorComputeEmbedding SherpaOnnxSpeakerEmbeddingExtractorDestroyEmbedding
+    SherpaOnnxDestroyOnlineStream)
+
 fail() { say "FAIL: $*"; status=1; }
 ok() { say "ok: $*"; }
 
@@ -31,6 +52,16 @@ else
     fail "sherpa-onnx source $source_url is not a codemyriad/sherpa-onnx commit archive"
 fi
 [ "$(pin onnxruntime-ios version)" = 1.27.1 ] && ok "ONNX Runtime 1.27.1" || fail "ONNX Runtime is $(pin onnxruntime-ios version), not 1.27.1"
+# patchSha256 is the same value as cassini-android's lock: the file is Android's, byte for byte.
+for entry in "streaming-diarization.patch patchSha256" "streaming-diarization-c-api.patch cApiPatchSha256"; do
+    set -- $entry
+    if [ "$(sha256_of "scripts/$1")" = "$(pin sherpa-onnx-ios "$2")" ]; then
+        ok "scripts/$1 matches the lock"
+    else
+        fail "scripts/$1 changed since the build was pinned;" \
+             "rebuild with scripts/build-sherpa-xcframework.sh and update $2 and sha256"
+    fi
+done
 sherpa_sha=$(pin sherpa-onnx-ios sha256)
 ort_sha=$(pin onnxruntime-ios sha256)
 
@@ -76,9 +107,26 @@ if [ -d "$sherpa_xcframework" ]; then
         exported=$(nm -gU "$lib" 2>/dev/null | awk '{print $NF}' | sort -u)
         for symbol in SherpaOnnxCreateOfflineRecognizer SherpaOnnxCreateOfflineStream SherpaOnnxAcceptWaveformOffline \
                       SherpaOnnxDecodeOfflineStream SherpaOnnxGetOfflineStreamResult \
-                      SherpaOnnxDestroyOfflineRecognizerResult SherpaOnnxCreateVoiceActivityDetector; do
+                      SherpaOnnxDestroyOfflineRecognizerResult SherpaOnnxCreateVoiceActivityDetector \
+                      "${diarization_symbols[@]}" "${embedding_symbols[@]}"; do
             grep -qx "_$symbol" <<<"$exported" || fail "$slice does not export $symbol"
         done
+        # With diarization off the C API keeps its diarization entry points as stubs that log "not enabled"; the
+        # streaming patch and the CAM++ extractor must be compiled in, not only declared.
+        defined=$(nm -C -U "$lib" 2>/dev/null)
+        speakers_ok=true
+        for symbol in "${diarization_symbols[@]}" "${embedding_symbols[@]}"; do
+            grep -qx "_$symbol" <<<"$exported" || speakers_ok=false
+        done
+        for code in 'OfflineSpeakerDiarizationSortformerImpl::ProcessStreamingChunk(' \
+                    'OfflineSpeakerDiarizationSortformerImpl::SaveStreamingState(' \
+                    'OfflineSpeakerDiarizationSortformerImpl::RestoreStreamingState(' \
+                    'SortformerSpeakerCache::RestoreState(' \
+                    'OfflineSpeakerSegmentationSortformerModel::Forward(' \
+                    'SpeakerEmbeddingExtractorGeneralImpl::Compute('; do
+            grep -qF "sherpa_onnx::$code" <<<"$defined" || { fail "$slice has no $code...)"; speakers_ok=false; }
+        done
+        $speakers_ok && ok "$slice: streaming Sortformer diarization and speaker-embedding C API exported and compiled in"
         tts=$(nm "$lib" 2>/dev/null | grep -cE 'espeak_|[Pp]iper|OfflineTtsImpl|OfflineTtsVits|OfflineTtsKokoro' || true)
         [ "$tts" = 0 ] && ok "$slice: C API exported, no espeak-ng, piper or TTS symbols" || fail "$slice has $tts espeak-ng, piper or TTS symbols"
         platforms=$(otool -l "$lib" | awk '/LC_BUILD_VERSION/{b=1} b&&/platform/{p=$2} b&&/minos/{print p, $2; b=0}' | sort -u)
@@ -90,6 +138,10 @@ if [ -d "$sherpa_xcframework" ]; then
     done
     header=$sherpa_xcframework/ios-arm64/SherpaOnnxC.framework/Headers/sherpa-onnx/c-api/c-api.h
     grep -q 'const char \*const \*tokens_arr;' "$header" && ok "c-api.h has tokens_arr" || fail "c-api.h has no tokens_arr"
+    grep -q 'SherpaOnnxOfflineSpeakerSegmentationSortformerModelConfig sortformer;' "$header" \
+        && grep -q '^SherpaOnnxOfflineSpeakerDiarizationProcessStreamingChunk($' "$header" \
+        && ok "c-api.h has the Sortformer config and the streaming diarization calls" \
+        || fail "c-api.h lacks the Sortformer config or scripts/streaming-diarization-c-api.patch"
 fi
 if [ -d "$onnxruntime_xcframework" ]; then
     for slice in ios-arm64 ios-arm64_x86_64-simulator; do

@@ -1,0 +1,139 @@
+--- a/sherpa-onnx/c-api/c-api.cc
++++ b/sherpa-onnx/c-api/c-api.cc
+@@ -3322,8 +3322,43 @@
+ 
+   auto ans = new SherpaOnnxOfflineSpeakerDiarizationResult;
+   ans->impl = sd->impl->Process(samples, n, wrapper);
++
++  return ans;
++}
++
++const SherpaOnnxOfflineSpeakerDiarizationResult *
++SherpaOnnxOfflineSpeakerDiarizationProcessStreamingChunk(
++    const SherpaOnnxOfflineSpeakerDiarization *sd, const float *samples,
++    int32_t n) {
++  auto ans = new SherpaOnnxOfflineSpeakerDiarizationResult;
++  ans->impl = sd->impl->ProcessStreamingChunk(samples, n);
+ 
+   return ans;
++}
++
++const float *SherpaOnnxOfflineSpeakerDiarizationSaveStreamingState(
++    const SherpaOnnxOfflineSpeakerDiarization *sd, int32_t *n) {
++  auto v = sd->impl->SaveStreamingState();
++  auto ans = new float[v.size() + 1];
++  std::copy(v.begin(), v.end(), ans);
++  *n = static_cast<int32_t>(v.size());
++
++  return ans;
++}
++
++void SherpaOnnxOfflineSpeakerDiarizationDestroyStreamingState(
++    const float *state) {
++  delete[] state;
++}
++
++int32_t SherpaOnnxOfflineSpeakerDiarizationRestoreStreamingState(
++    const SherpaOnnxOfflineSpeakerDiarization *sd, const float *state,
++    int32_t n) {
++  // The same bound as the JNI's restoreStreamingState.
++  if (n < 0 || n > 200000 || (n > 0 && !state)) return 0;
++  std::vector<float> v(state, state + n);
++
++  return sd->impl->RestoreStreamingState(v) ? 1 : 0;
+ }
+ #else
+ 
+@@ -3414,10 +3449,41 @@
+ 
+ void SherpaOnnxOfflineSpeakerDiarizationDestroyResult(
+     const SherpaOnnxOfflineSpeakerDiarizationResult *r) {
++  SHERPA_ONNX_LOGE(
++      "Speaker diarization is not enabled. Please rebuild sherpa-onnx");
++}
++
++const SherpaOnnxOfflineSpeakerDiarizationResult *
++SherpaOnnxOfflineSpeakerDiarizationProcessStreamingChunk(
++    const SherpaOnnxOfflineSpeakerDiarization *sd, const float *samples,
++    int32_t n) {
++  SHERPA_ONNX_LOGE(
++      "Speaker diarization is not enabled. Please rebuild sherpa-onnx");
++  return nullptr;
++}
++
++const float *SherpaOnnxOfflineSpeakerDiarizationSaveStreamingState(
++    const SherpaOnnxOfflineSpeakerDiarization *sd, int32_t *n) {
++  SHERPA_ONNX_LOGE(
++      "Speaker diarization is not enabled. Please rebuild sherpa-onnx");
++  *n = 0;
++  return nullptr;
++}
++
++void SherpaOnnxOfflineSpeakerDiarizationDestroyStreamingState(
++    const float *state) {
+   SHERPA_ONNX_LOGE(
+       "Speaker diarization is not enabled. Please rebuild sherpa-onnx");
+ }
+ 
++int32_t SherpaOnnxOfflineSpeakerDiarizationRestoreStreamingState(
++    const SherpaOnnxOfflineSpeakerDiarization *sd, const float *state,
++    int32_t n) {
++  SHERPA_ONNX_LOGE(
++      "Speaker diarization is not enabled. Please rebuild sherpa-onnx");
++  return 0;
++}
++
+ #endif
+ 
+ #ifdef __OHOS__
+--- a/sherpa-onnx/c-api/c-api.h
++++ b/sherpa-onnx/c-api/c-api.h
+@@ -4114,7 +4114,48 @@
+  */
+ SHERPA_ONNX_API void SherpaOnnxOfflineSpeakerDiarizationDestroyResult(
+     const SherpaOnnxOfflineSpeakerDiarizationResult *r);
++
++/**
++ * @brief Sortformer-only incremental mode: diarize one chunk of a recording.
++ *
++ * The diarizer keeps its bounded speaker cache across calls, so speaker IDs
++ * stay the same from chunk to chunk. Segment times use the chunk's own clock.
++ * A new diarizer starts a new recording. Other models diarize the chunk alone.
++ *
++ * @return A newly allocated diarization result. Free it with
++ *         SherpaOnnxOfflineSpeakerDiarizationDestroyResult().
++ */
++SHERPA_ONNX_API const SherpaOnnxOfflineSpeakerDiarizationResult *
++SherpaOnnxOfflineSpeakerDiarizationProcessStreamingChunk(
++    const SherpaOnnxOfflineSpeakerDiarization *sd, const float *samples,
++    int32_t n);
+ 
++/**
++ * @brief Save the incremental mode's speaker cache.
++ *
++ * @param n Receives the number of floats; 0 when there is no state yet.
++ * @return A newly allocated array of *n floats. Free it with
++ *         SherpaOnnxOfflineSpeakerDiarizationDestroyStreamingState().
++ */
++SHERPA_ONNX_API const float *
++SherpaOnnxOfflineSpeakerDiarizationSaveStreamingState(
++    const SherpaOnnxOfflineSpeakerDiarization *sd, int32_t *n);
++
++/** @brief Free an array from SherpaOnnxOfflineSpeakerDiarizationSaveStreamingState(). */
++SHERPA_ONNX_API void SherpaOnnxOfflineSpeakerDiarizationDestroyStreamingState(
++    const float *state);
++
++/**
++ * @brief Restore a speaker cache saved by
++ * SherpaOnnxOfflineSpeakerDiarizationSaveStreamingState().
++ *
++ * @return 1 on success; 0 when the state does not fit this model, is longer
++ *         than 200000 floats, or the model is not Sortformer.
++ */
++SHERPA_ONNX_API int32_t SherpaOnnxOfflineSpeakerDiarizationRestoreStreamingState(
++    const SherpaOnnxOfflineSpeakerDiarization *sd, const float *state,
++    int32_t n);
++
+ // =========================================================================
+ // For offline speech enhancement
+ // =========================================================================
