@@ -18,25 +18,27 @@ import CassiniNotebook
 
     private func cleanUp() { UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite) }
 
-    private func consent(_ settings: SettingsStore, speech: ModelPartStatus, speakers: Bool) -> ModelConsent {
+    private func consent(_ settings: SettingsStore, speech: ModelPartStatus, speakers: Bool,
+                         parakeet: Bool = false) -> ModelConsent {
         ModelConsent.recorded(settings: settings, speech: FakeTranscriber(.returns([], total: 0), status: speech),
-                              speakers: FakeAnalyzer(modelIdentity: speakers ? "fake-model" : nil))
+                              speakers: FakeAnalyzer(modelIdentity: speakers ? "fake-model" : nil),
+                              parakeetReady: { parakeet })
     }
 
-    // ports: ModelRepositoryTest#nothingInstalledAndNoConsent
+    // ports (Apple Speech fallback, ModelRepositoryTests has the port): ModelRepositoryTest#nothingInstalledAndNoConsent
     @Test func nothingInstalledAndNoConsent() async {
         defer { cleanUp() }
         let consent = consent(settings(), speech: .notDownloaded, speakers: false)
         #expect(await !consent.allows(.transcribe, "en-US"))
         #expect(await !consent.allows(.transcribeAgain, "en-US"))
         #expect(await !consent.allows(.speakersOnly, "en-US"))
-        let plan = ModelDownloadPlan.plan(speech: .notDownloaded, speakers: .notDownloaded, forNote: false, identifySpeakers: true,
-                                  speakersInstallBytes: 100)
+        let plan = ModelDownloadPlan.plan(speech: .notDownloaded, speakers: .notDownloaded, forNote: false,
+                                          identifySpeakers: true, speakersInstallBytes: 100)
         #expect(plan.missing == [.speech, .speakers])
         #expect(plan.requiredFreeBytes == ModelDownloadPlan.speechInstallBytes + 100)
     }
 
-    // ports: ModelRepositoryTest#markerFilesDecideReadiness
+    // ports (Apple Speech fallback, ModelRepositoryTests has the port): ModelRepositoryTest#markerFilesDecideReadiness
     /// An installed model counts as consent for its own kind: the speech model for transcriptions, the speaker models
     /// for Identify speakers. A language Apple does not offer asks nothing; its job says so.
     @Test func anInstalledModelCountsAsConsentForItsKind() async {
@@ -47,12 +49,12 @@ import CassiniNotebook
         #expect(await !speech.allows(.speakersOnly, "en-US"))
         #expect(await consent(settings, speech: .unsupported, speakers: false).allows(.transcribe, "en-US"))
         #expect(await consent(settings, speech: .notDownloaded, speakers: true).allows(.speakersOnly, "en-US"))
-        let plan = ModelDownloadPlan.plan(speech: .ready, speakers: .notDownloaded, forNote: true, identifySpeakers: true,
-                                  speakersInstallBytes: 100)
+        let plan = ModelDownloadPlan.plan(speech: .ready, speakers: .notDownloaded, forNote: true,
+                                          identifySpeakers: true, speakersInstallBytes: 100)
         #expect(plan.missing == [.speakers])
     }
 
-    // ports: ModelRepositoryTest#consentIsTheStoredTimeOrParakeet
+    // ports (Apple Speech fallback, ModelRepositoryTests has the port): ModelRepositoryTest#consentIsTheStoredTimeOrParakeet
     @Test func consentIsTheStoredTimeOrAnInstalledModel() async {
         defer { cleanUp() }
         let settings = settings()
@@ -66,5 +68,15 @@ import CassiniNotebook
         #expect(await !consent.allows(.speakersOnly, "en-US"), "the speaker models have a consent of their own")
         settings.recordSpeakerConsent()
         #expect(await consent.allows(.speakersOnly, "en-US"))
+    }
+
+    /// Android's consent rule: Parakeet installed counts as consent for transcriptions, even with Apple's speech
+    /// assets missing; the speaker models keep their own consent.
+    @Test func anInstalledParakeetCountsAsConsent() async {
+        defer { cleanUp() }
+        let consent = consent(settings(), speech: .notDownloaded, speakers: false, parakeet: true)
+        #expect(await consent.allows(.transcribe, "en-US"))
+        #expect(await consent.allows(.transcribeAgain, "en-US"))
+        #expect(await !consent.allows(.speakersOnly, "en-US"))
     }
 }

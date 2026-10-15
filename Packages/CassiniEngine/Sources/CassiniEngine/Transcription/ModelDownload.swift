@@ -2,7 +2,10 @@ import Foundation
 import Observation
 import CassiniNotebook
 
-/// The models a job still needs, and the free space their install asks for.
+/// The models a job still needs, and the free space their install asks for, as the Model download screen shows them.
+/// The speech part here is Apple's assets, which a device that cannot hold Parakeet Ultra keeps using (decision D2);
+/// the catalog's own figures are `ModelPlan` (640 MiB for speech), which this plan takes over when the transcriber
+/// moves to Ultra.
 public struct ModelDownloadPlan: Hashable, Sendable {
     /// Missing parts, in `ModelPart` order.
     public var missing: [ModelPart]

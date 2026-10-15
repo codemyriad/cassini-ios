@@ -27,6 +27,8 @@ import CassiniEngineTesting
     var launch = LaunchOptions()
     /// Where exports wait for the share sheet; the launch sweep empties it.
     var exports = URL.temporaryDirectory.appendingPathComponent("Exports", isDirectory: true)
+    /// Where the pinned models (Parakeet Ultra, Silero VAD) are installed, excluded from backups.
+    var models = ModelCatalog.defaultRoot
 
     /// What a UI-test launch asks for.
     struct LaunchOptions {
@@ -149,7 +151,8 @@ extension AppEnvironment {
             storage: heldCapture ? FakeStorage() : FileSystemStorageProbe(),
             background: uiTestingBackground, notifier: FakeNotifier(auth: notificationsDenied ? .denied : .authorized),
             launch: LaunchOptions(seed: seed, openFixture: openFixture, restoresNavigation: false, marksLaunchFinished: true,
-                                  token: token))
+                                  token: token),
+            models: root.appendingPathComponent("CassiniModels", isDirectory: true))
     }
 
     /// `--seed <name>`; `--seed-test-data` is the library seed.

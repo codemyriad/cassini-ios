@@ -147,8 +147,8 @@ import CassiniNotebook
     /// Identify speakers without consent: declining the speaker models is no refusal of the speech model, which
     /// automatic transcription reads.
     @Test func notNowForASpeakersOnlyJobRefusesNoSpeechModel() async {
-        ports.plan = ModelDownloadPlan.plan(speech: .notDownloaded, speakers: .notDownloaded, forNote: true, identifySpeakers: false,
-                                    speakersOnly: true, speakersInstallBytes: 54_000_000)
+        ports.plan = ModelDownloadPlan.plan(speech: .notDownloaded, speakers: .notDownloaded, forNote: true,
+                                            identifySpeakers: false, speakersOnly: true, speakersInstallBytes: 54_000_000)
         let effects = Effects()
         let model = await model(effects: effects)
         #expect(model.identifiesSpeakers)
@@ -175,7 +175,7 @@ import CassiniNotebook
     @Test func theStandaloneDownloadPlansTheSpeakerModelsEvenWithIdentifySpeakersOff() {
         func plan(speech: ModelPartStatus, speakers: ModelPartStatus, forNote: Bool, identify: Bool) -> [ModelPart] {
             ModelDownloadPlan.plan(speech: speech, speakers: speakers, forNote: forNote, identifySpeakers: identify,
-                           speakersInstallBytes: 54_000_000).missing
+                                   speakersInstallBytes: 54_000_000).missing
         }
         // The Speakers row of Settings, tapped with Identify speakers off.
         #expect(plan(speech: .ready, speakers: .notDownloaded, forNote: false, identify: false) == [.speakers])
@@ -191,7 +191,7 @@ import CassiniNotebook
     @Test func aSpeakersOnlyJobPlansTheSpeakerModelsAlone() {
         func plan(speech: ModelPartStatus, speakers: ModelPartStatus, identify: Bool) -> [ModelPart] {
             ModelDownloadPlan.plan(speech: speech, speakers: speakers, forNote: true, identifySpeakers: identify,
-                           speakersOnly: true, speakersInstallBytes: 54_000_000).missing
+                                   speakersOnly: true, speakersInstallBytes: 54_000_000).missing
         }
         // Identify speakers asks for the speaker models whatever the switch says, and never for the speech model.
         #expect(plan(speech: .notDownloaded, speakers: .notDownloaded, identify: false) == [.speakers])
