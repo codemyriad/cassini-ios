@@ -13,8 +13,9 @@
 # CASSINI_SHERPA_LOCAL=1 then makes Package.swift link the two xcframeworks; scripts/verify-native-runtime.sh compares
 # the build with the lock in scripts/native-dependencies.json.
 #
-# The build is reproducible: a second run from a clean .tools/sherpa-build gives the same checksum. Archives are
-# written with ZERO_AR_DATE and libtool -D, the files in the zip get one fixed time and a sorted order.
+# The build is reproducible: a second run from a clean .tools/sherpa-build gives the same checksum, also from another
+# checkout path or umask. Archives are written with ZERO_AR_DATE, libtool -D and a fixed umask, the xcframework's
+# Info.plist lists its slices in sorted order, and the files in the zip get one fixed time and a sorted order.
 #
 # Environment:
 #   SHERPA_ONNX_SRC   an existing sherpa-onnx checkout to build instead of the pinned source archive
@@ -32,6 +33,9 @@ jobs=${CASSINI_JOBS:-$(sysctl -n hw.ncpu)}
 deployment_target=15.1
 artifact=$(pin sherpa-onnx-ios file)
 export ZERO_AR_DATE=1 LC_ALL=C SOURCE_DATE_EPOCH=315532800
+# libtool -D zeroes the members' dates and owners but keeps their modes, and zip records modes too: without a fixed
+# umask, a shell with umask 002 builds a different checksum from the same sources.
+umask 022
 # The fork's scripts default to ORT 1.28.1; Cassini pins 1.27.1, the same as Android.
 export SHERPA_ONNX_ONNXRUNTIME_VERSION=$(pin onnxruntime-ios version)
 
@@ -105,9 +109,12 @@ build_slice() {
         -DCMAKE_C_FLAGS="-ffile-prefix-map=$work=." \
         -DCMAKE_CXX_FLAGS="-ffile-prefix-map=$work=." \
         > "$dir.configure.log"
-    # FetchContent must not reach the network for anything the lock does not pin.
-    if grep -q "Downloading .* from http" "$dir.configure.log"; then
-        grep "Downloading .* from http" "$dir.configure.log" >&2
+    # FetchContent must not reach the network for anything the lock does not pin. The cmake files word the message
+    # differently ("Downloading eigen from <url>", "Downloading simple-sentencepiece <url>", "Downloading pre-compiled
+    # onnxruntime"); a dependency found locally logs its local path instead of a URL.
+    local network='^-- Downloading .*(://|pre-compiled)'
+    if grep -qE "$network" "$dir.configure.log"; then
+        grep -E "$network" "$dir.configure.log" >&2
         printf 'CMake downloaded a dependency that is not in scripts/native-dependencies.json.\n' >&2
         exit 1
     fi
@@ -180,6 +187,11 @@ xcodebuild -create-xcframework \
     -framework "$work/os64/SherpaOnnxC.framework" \
     -framework "$work/simulator_arm64/SherpaOnnxC.framework" \
     -output "$stage/SherpaOnnxC.xcframework" > /dev/null
+# xcodebuild lists the slices in no fixed order; sort them so the Info.plist, and so the checksum, is stable.
+/usr/bin/python3 -I -c 'import plistlib, sys
+with open(sys.argv[1], "rb") as f: info = plistlib.load(f)
+info["AvailableLibraries"].sort(key=lambda library: library["LibraryIdentifier"])
+with open(sys.argv[1], "wb") as f: plistlib.dump(info, f, sort_keys=True)' "$stage/SherpaOnnxC.xcframework/Info.plist"
 
 # One time and one order for every entry, so the zip depends only on the bytes inside.
 find "$stage" -exec touch -h -t 198001010000 {} +

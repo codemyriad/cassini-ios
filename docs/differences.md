@@ -42,8 +42,10 @@ that were not ported, with the reason for each.
   no TTS (`scripts/build-sherpa-xcframework.sh`; Android's AAR keeps its JNI layer and the streaming-diarization
   patch, which iOS does not apply because it keeps FluidAudio). Android builds arm64-v8a and x86_64; iOS builds the
   device (`ios-arm64`) and the Apple-silicon simulator (`ios-arm64-simulator`) only, so there is no x86_64 simulator
-  slice. Android's goldens come from the x86_64 emulator; the arm64 simulator decodes FLEURS-it short with "4.892"
-  where the golden has "4892" and otherwise matches it word for word, so iOS will keep goldens of its own.
+  slice. Android's goldens come from the x86_64 emulator; the arm64 simulator, decoding FLEURS-it short whole without
+  the 500 ms tail, gives "4.892" where the golden has "4892" and otherwise matches it word for word (with the tail it
+  also gives "raggiun" for "raggiunge"; the goldens decode VAD spans, which the spike does not), so iOS will keep
+  goldens of its own.
 
 ### Speaker analysis
 
