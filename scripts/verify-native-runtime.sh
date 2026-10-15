@@ -10,9 +10,11 @@
 #   - when a build is present in .tools/sherpa (scripts/build-sherpa-xcframework.sh): the zip's SwiftPM checksum is the
 #     lock's (unless the lock still says PENDING), both slices (ios-arm64, ios-arm64-simulator) export the C API Cassini
 #     calls (recognizer, VAD, and the streaming Sortformer diarizer and CAM++ extractor Android's speaker path uses,
-#     compiled in rather than the "not enabled" stubs), the header has tokens_arr and the streaming diarization calls, no espeak-ng, piper or TTS model code is linked in (TTS is off; the C API keeps
-#     its SherpaOnnx*OfflineTts* entry points as stubs), and the deployment target is 15.1; the unpacked ONNX Runtime
-#     has the pinned slices and its zip the pinned checksum.
+#     compiled in rather than the "not enabled" stubs), the header has tokens_arr and the streaming diarization calls,
+#     no espeak-ng, piper or TTS model code is linked in (TTS is off; the C API keeps its SherpaOnnx*OfflineTts* entry
+#     points as stubs), and the deployment target is 15.1; the unpacked ONNX Runtime has the pinned slices and its zip
+#     the pinned checksum;
+#   - always: both streaming-diarization patches match the hashes the lock pins.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 . scripts/native-common.sh
@@ -56,7 +58,8 @@ for entry in "streaming-diarization.patch patchSha256" "streaming-diarization-c-
     if [ "$(sha256_of "scripts/$1")" = "$(pin sherpa-onnx-ios "$2")" ]; then
         ok "scripts/$1 matches the lock"
     else
-        fail "scripts/$1 changed since the build was pinned; rebuild with scripts/build-sherpa-xcframework.sh and update $2 and sha256"
+        fail "scripts/$1 changed since the build was pinned;" \
+             "rebuild with scripts/build-sherpa-xcframework.sh and update $2 and sha256"
     fi
 done
 sherpa_sha=$(pin sherpa-onnx-ios sha256)
