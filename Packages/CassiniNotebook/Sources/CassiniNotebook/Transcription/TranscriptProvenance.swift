@@ -3,8 +3,7 @@ import Foundation
 
 /// How the note's transcript was made on this device, for the `provenance.speechToText` record of an export. The keys of
 /// `record()` are Android's (`JobProvenance`, `SpeakerAttribution.record`) and a contract with the desktop pipeline:
-/// never rename them. Every member added after the first release is optional, so a `provenance.json` an older build
-/// wrote still reads, and its record leaves out what that build did not know.
+/// never rename them.
 public struct TranscriptProvenance: Codable, Hashable, Sendable {
     public static let appleSpeech = "apple-speechtranscriber"
     /// The processing step's `backend`: Apple's speech framework, which runs the model on the device.
@@ -29,31 +28,30 @@ public struct TranscriptProvenance: Codable, Hashable, Sendable {
 
         public var backend: String
         public var model: String
-        /// The revision the model was made from, when the analysis tells it.
-        public var modelRevision: String?
-        /// The SHA-256 of the model file (`modelSha256`; older builds stored a fingerprint of FluidAudio's models
-        /// as `sha`).
-        public var modelSha256: String?
-        /// Sortformer's activity threshold and minimum turn and gap (`Diarization`); nil in records of FluidAudio
-        /// builds, whose pipeline had none.
-        public var threshold: Double?
-        public var minDurationOn: Double?
-        public var minDurationOff: Double?
-        /// Time spent in the analysis itself, without the model install; nil in records of older builds.
-        public var elapsedMs: Int64?
+        /// The revision the model was made from.
+        public var modelRevision: String
+        /// The SHA-256 of the model file.
+        public var modelSha256: String
+        /// Sortformer's activity threshold and minimum turn and gap (`Diarization`).
+        public var threshold: Double
+        public var minDurationOn: Double
+        public var minDurationOff: Double
+        /// Time spent in the analysis itself, without the model install.
+        public var elapsedMs: Int64
         public var turnCount: Int
         public var speakerCount: Int
-        /// Nil in records of older builds, which did not write it.
-        public var assignment: String?
-        /// Whether the speakers were separated from a mix before the analysis; iOS never does. Nil in older records.
-        public var sourceSeparation: Bool?
+        public var assignment: String
+        /// Whether the speakers were separated from a mix before the analysis; iOS never does.
+        public var sourceSeparation: Bool
         /// `x-incrementalDiarization` of the record: how a streaming diarizer read the recording.
         public var incremental: String?
 
-        public init(backend: String, model: String, modelRevision: String? = nil, modelSha256: String?,
-                    threshold: Double? = nil, minDurationOn: Double? = nil, minDurationOff: Double? = nil,
-                    elapsedMs: Int64? = nil, turnCount: Int, speakerCount: Int, assignment: String? = assignmentRule,
-                    sourceSeparation: Bool? = false, incremental: String? = nil) {
+        public init(backend: String = sortformerBackend, model: String = sortformerModel, modelRevision: String,
+                    modelSha256: String, threshold: Double = decimal(Diarization.threshold),
+                    minDurationOn: Double = decimal(Diarization.minDurationOn),
+                    minDurationOff: Double = decimal(Diarization.minDurationOff), elapsedMs: Int64, turnCount: Int,
+                    speakerCount: Int, assignment: String = assignmentRule, sourceSeparation: Bool = false,
+                    incremental: String? = nil) {
             self.backend = backend; self.model = model; self.modelRevision = modelRevision
             self.modelSha256 = modelSha256; self.threshold = threshold; self.minDurationOn = minDurationOn
             self.minDurationOff = minDurationOff; self.elapsedMs = elapsedMs; self.turnCount = turnCount
@@ -66,73 +64,21 @@ public struct TranscriptProvenance: Codable, Hashable, Sendable {
         /// the speakers of the words. `streaming` adds `x-incrementalDiarization`.
         public static func sortformer(revision: String, sha256: String, elapsedMs: Int64, turnCount: Int,
                                       speakerCount: Int, streaming: Bool) -> SpeakerDiarization {
-            SpeakerDiarization(backend: sortformerBackend, model: sortformerModel, modelRevision: revision,
-                               modelSha256: sha256, threshold: decimal(Diarization.threshold),
-                               minDurationOn: decimal(Diarization.minDurationOn),
-                               minDurationOff: decimal(Diarization.minDurationOff), elapsedMs: elapsedMs,
-                               turnCount: turnCount, speakerCount: speakerCount,
-                               incremental: streaming ? incrementalWindows : nil)
+            SpeakerDiarization(modelRevision: revision, modelSha256: sha256, elapsedMs: elapsedMs, turnCount: turnCount,
+                               speakerCount: speakerCount, incremental: streaming ? incrementalWindows : nil)
         }
 
         /// A Float written as its shortest decimal (0.3, not the Float's 0.30000001192…), as Android's `toDouble()`
         /// of these constants serialises.
-        static func decimal(_ value: Float) -> Double { Double("\(value)") ?? Double(value) }
-
-        private enum CodingKeys: String, CodingKey {
-            case backend, model, modelRevision, modelSha256, threshold, minDurationOn, minDurationOff, elapsedMs
-            case turnCount, speakerCount, assignment, sourceSeparation, incremental
-            /// What builds before the rename stored `modelSha256` as.
-            case sha
-        }
-
-        public init(from decoder: any Decoder) throws {
-            let c = try decoder.container(keyedBy: CodingKeys.self)
-            backend = try c.decode(String.self, forKey: .backend)
-            model = try c.decode(String.self, forKey: .model)
-            modelRevision = try c.decodeIfPresent(String.self, forKey: .modelRevision)
-            modelSha256 = try c.decodeIfPresent(String.self, forKey: .modelSha256)
-                ?? c.decodeIfPresent(String.self, forKey: .sha)
-            threshold = try c.decodeIfPresent(Double.self, forKey: .threshold)
-            minDurationOn = try c.decodeIfPresent(Double.self, forKey: .minDurationOn)
-            minDurationOff = try c.decodeIfPresent(Double.self, forKey: .minDurationOff)
-            elapsedMs = try c.decodeIfPresent(Int64.self, forKey: .elapsedMs)
-            turnCount = try c.decode(Int.self, forKey: .turnCount)
-            speakerCount = try c.decode(Int.self, forKey: .speakerCount)
-            assignment = try c.decodeIfPresent(String.self, forKey: .assignment)
-            sourceSeparation = try c.decodeIfPresent(Bool.self, forKey: .sourceSeparation)
-            incremental = try c.decodeIfPresent(String.self, forKey: .incremental)
-        }
-
-        public func encode(to encoder: any Encoder) throws {
-            var c = encoder.container(keyedBy: CodingKeys.self)
-            try c.encode(backend, forKey: .backend)
-            try c.encode(model, forKey: .model)
-            try c.encodeIfPresent(modelRevision, forKey: .modelRevision)
-            try c.encodeIfPresent(modelSha256, forKey: .modelSha256)
-            try c.encodeIfPresent(threshold, forKey: .threshold)
-            try c.encodeIfPresent(minDurationOn, forKey: .minDurationOn)
-            try c.encodeIfPresent(minDurationOff, forKey: .minDurationOff)
-            try c.encodeIfPresent(elapsedMs, forKey: .elapsedMs)
-            try c.encode(turnCount, forKey: .turnCount)
-            try c.encode(speakerCount, forKey: .speakerCount)
-            try c.encodeIfPresent(assignment, forKey: .assignment)
-            try c.encodeIfPresent(sourceSeparation, forKey: .sourceSeparation)
-            try c.encodeIfPresent(incremental, forKey: .incremental)
-        }
+        public static func decimal(_ value: Float) -> Double { Double("\(value)") ?? Double(value) }
 
         func record() -> JSONObject {
-            var record = JSONObject([("backend", .string(backend)), ("model", .string(model))])
-            if let modelRevision { record["modelRevision"] = .string(modelRevision) }
-            if let modelSha256 { record["modelSha256"] = .string(modelSha256) }
-            if let threshold { record["threshold"] = .number("\(threshold)") }
-            if let minDurationOn { record["minDurationOn"] = .number("\(minDurationOn)") }
-            if let minDurationOff { record["minDurationOff"] = .number("\(minDurationOff)") }
-            if let elapsedMs { record["elapsedMs"] = .int(elapsedMs) }
-            record["turnCount"] = .int(turnCount)
-            record["speakerCount"] = .int(speakerCount)
-            if let assignment { record["assignment"] = .string(assignment) }
-            if let sourceSeparation { record["sourceSeparation"] = .bool(sourceSeparation) }
-            return record
+            JSONObject([("backend", .string(backend)), ("model", .string(model)), ("modelRevision", .string(modelRevision)),
+                        ("modelSha256", .string(modelSha256)), ("threshold", .number("\(threshold)")),
+                        ("minDurationOn", .number("\(minDurationOn)")), ("minDurationOff", .number("\(minDurationOff)")),
+                        ("elapsedMs", .int(elapsedMs)), ("turnCount", .int(turnCount)),
+                        ("speakerCount", .int(speakerCount)), ("assignment", .string(assignment)),
+                        ("sourceSeparation", .bool(sourceSeparation))])
         }
     }
 
@@ -140,10 +86,10 @@ public struct TranscriptProvenance: Codable, Hashable, Sendable {
     public struct SpeakerIdentification: Codable, Hashable, Sendable {
         public static let cosine = "cosine"
 
-        /// The print model, without its fingerprint.
+        /// The print model's name.
         public var model: String
-        /// The fingerprint the prints carry with the model.
-        public var sha256: String?
+        /// The SHA-256 of the print model's file.
+        public var sha256: String
         /// The length of a print.
         public var dim: Int
         public var metric: String
@@ -157,27 +103,18 @@ public struct TranscriptProvenance: Codable, Hashable, Sendable {
         /// Speakers offered a saved voice without being named by it.
         public var suggested: Int
 
-        public init(model: String, sha256: String?, dim: Int, metric: String = cosine, autoThreshold: Double,
+        public init(model: String, sha256: String, dim: Int, metric: String = cosine, autoThreshold: Double,
                     suggestThreshold: Double, margin: Double, speakersWithPrints: Int, autoApplied: Int, suggested: Int) {
             self.model = model; self.sha256 = sha256; self.dim = dim; self.metric = metric
             self.autoThreshold = autoThreshold; self.suggestThreshold = suggestThreshold; self.margin = margin
             self.speakersWithPrints = speakersWithPrints; self.autoApplied = autoApplied; self.suggested = suggested
         }
 
-        /// The record of prints of the model `identity` (`model:sha256`), `dim` long, matched with `thresholds`. The
-        /// thresholds are written as their shortest decimal (0.85, not the Float's 0.8500000238…).
-        public init(identity: String, dim: Int, thresholds: VoiceThresholds, speakersWithPrints: Int, autoApplied: Int,
-                    suggested: Int) {
-            let (model, sha) = TranscriptProvenance.split(identity)
-            self.init(model: model, sha256: sha, dim: dim, autoThreshold: Self.decimal(thresholds.automatic),
-                      suggestThreshold: Self.decimal(thresholds.suggest), margin: Self.decimal(thresholds.margin),
-                      speakersWithPrints: speakersWithPrints, autoApplied: autoApplied, suggested: suggested)
-        }
-
         /// The record of CAM++ prints (`VoiceprintModel`), as Android's `JobProvenance.identification` writes it:
-        /// the model's name and SHA-256, the print length `dim` and Android's thresholds.
+        /// the model's name and SHA-256, the print length `dim` and Android's thresholds, as their shortest decimals.
         public static func campplus(dim: Int, speakersWithPrints: Int, autoApplied: Int, suggested: Int) -> SpeakerIdentification {
             let thresholds = VoiceprintModel.thresholds
+            let decimal = SpeakerDiarization.decimal
             return SpeakerIdentification(model: VoiceprintModel.name, sha256: VoiceprintModel.sha256, dim: dim,
                                          autoThreshold: decimal(thresholds.automatic),
                                          suggestThreshold: decimal(thresholds.suggest), margin: decimal(thresholds.margin),
@@ -185,11 +122,8 @@ public struct TranscriptProvenance: Codable, Hashable, Sendable {
                                          suggested: suggested)
         }
 
-        private static func decimal(_ value: Float) -> Double { Double("\(value)") ?? Double(value) }
-
         func record() -> JSONObject {
-            var record = JSONObject([("model", .string(model))])
-            if let sha256 { record["sha256"] = .string(sha256) }
+            var record = JSONObject([("model", .string(model)), ("sha256", .string(sha256))])
             record["dim"] = .int(dim)
             record["metric"] = .string(metric)
             record["autoThreshold"] = .number("\(autoThreshold)")
@@ -202,7 +136,7 @@ public struct TranscriptProvenance: Codable, Hashable, Sendable {
         }
     }
 
-    // The spec's processing step. Nil in records of builds that did not write them.
+    // The spec's processing step.
     public var backend: String?
     public var engine: String
     public var model: String?
@@ -279,12 +213,6 @@ public struct TranscriptProvenance: Codable, Hashable, Sendable {
         }
         if let speakerIdentification { record["x-speakerIdentification"] = .object(speakerIdentification.record()) }
         return record
-    }
-
-    /// `model:sha256` as its two parts; the second is nil without a colon.
-    static func split(_ identity: String) -> (model: String, sha: String?) {
-        let parts = identity.split(separator: ":", maxSplits: 1).map(String.init)
-        return (parts.first ?? identity, parts.count > 1 ? parts[1] : nil)
     }
 }
 

@@ -19,7 +19,6 @@ import CassiniNotebook
         #expect(settings.speechLanguage == "en-US")
         #expect(settings.autoTranscribe && settings.identifySpeakers)
         #expect(!settings.automaticallyNameVoices)
-        #expect(settings.speakerModelIdentity == nil)
         #expect(settings.modelsConsentAt == nil && settings.modelsDeclinedAt == nil && settings.speakerModelsConsentAt == nil)
         #expect(settings.queueHold == nil)
         #expect(settings.recoveredAck == nil)
@@ -36,7 +35,6 @@ import CassiniNotebook
         settings.autoTranscribe = false
         settings.identifySpeakers = false
         settings.automaticallyNameVoices = true
-        settings.speakerModelIdentity = "model:abc"
         settings.recordConsent()
         clock.advance(by: .seconds(1)); settings.recordDeclined()
         settings.recordSpeakerConsent()
@@ -50,7 +48,6 @@ import CassiniNotebook
         let reopened = store()
         #expect(reopened.speechLanguage == "it-IT")
         #expect(!reopened.autoTranscribe && !reopened.identifySpeakers && reopened.automaticallyNameVoices)
-        #expect(reopened.speakerModelIdentity == "model:abc")
         #expect(reopened.modelsConsentAt == Date(timeIntervalSince1970: 1_000))
         #expect(reopened.modelsDeclinedAt == Date(timeIntervalSince1970: 1_001))
         #expect(reopened.speakerModelsConsentAt == Date(timeIntervalSince1970: 1_001))
@@ -94,19 +91,5 @@ import CassiniNotebook
         settings.acknowledgeRecovered(upTo: Date(timeIntervalSince1970: 3))
         #expect(store().recoveredAck == Date(timeIntervalSince1970: 5))
         #expect(!settings.notificationsAsked)
-    }
-
-    @Test func schemaOneDownloadSwitchesBecomeConsentAndLanguagesBecomeBCP47() {
-        defer { cleanUp() }
-        defaults().set(true, forKey: SettingsKeys.legacyModelDownloadsAllowed)
-        defaults().set(false, forKey: SettingsKeys.legacySpeakerDownloadsAllowed)
-        defaults().set("pt_BR", forKey: SettingsKeys.speechLanguage)
-        let settings = store()
-        #expect(settings.modelsConsentAt == clock.now)
-        #expect(settings.speakerModelsConsentAt == nil)
-        #expect(settings.speechLanguage == "pt-BR")
-        #expect(defaults().object(forKey: SettingsKeys.legacyModelDownloadsAllowed) == nil)
-        settings.modelsConsentAt = nil
-        #expect(store().modelsConsentAt == nil, "a withdrawn consent is not migrated again")
     }
 }

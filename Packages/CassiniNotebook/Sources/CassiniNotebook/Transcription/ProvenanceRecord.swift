@@ -15,7 +15,7 @@ public struct ProvenanceRecord: Codable, Hashable, Sendable {
     /// `fingerprint(of:)` of the words the run saved.
     public var words: String
     public var speakerDiarization: TranscriptProvenance.SpeakerDiarization?
-    /// The speaker step's match counts, held with `speakerDiarization`; nil in records of older builds.
+    /// The speaker step's match counts, held with `speakerDiarization`; nil when no prints were made.
     public var speakerIdentification: TranscriptProvenance.SpeakerIdentification?
     /// The speaker ids the analysis gave the words, sorted.
     public var speakerIDs: [String]?

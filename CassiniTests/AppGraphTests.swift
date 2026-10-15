@@ -8,15 +8,15 @@ import CassiniEngineTesting
     // ports: AppGraphTest#theGraphBuildsOnAScratchRootAndReadyCompletes
     func testTheGraphBuildsOnAScratchRootAndReadyCompletes() async throws {
         let test = TestGraph(); defer { test.tearDown() }
-        let standardIdentity = UserDefaults.standard.string(forKey: SettingsKeys.speakerModelIdentity)
+        let standardQueueHold = UserDefaults.standard.string(forKey: SettingsKeys.queueHold)
         let report = await test.graph.start()
         XCTAssertTrue(test.graph.startup.isReady)
         XCTAssertEqual(report.ran, StartupStep.allCases)
         XCTAssertEqual(report.failed, [:])
         XCTAssertTrue(FileManager.default.fileExists(atPath: test.root.path), "the library is under the scratch root")
         XCTAssertNil(test.graph.library.loadFailure)
-        test.graph.settings.speakerModelIdentity = "scratch-model"
-        XCTAssertEqual(UserDefaults.standard.string(forKey: SettingsKeys.speakerModelIdentity), standardIdentity, "preferences never leak into the standard suite")
+        test.graph.settings.queueHold = .user
+        XCTAssertEqual(UserDefaults.standard.string(forKey: SettingsKeys.queueHold), standardQueueHold, "preferences never leak into the standard suite")
     }
 
     func testBackgroundExpiryPausesTheJobHoldsTheQueueAndEndsTheTaskBeforeReturning() async throws {

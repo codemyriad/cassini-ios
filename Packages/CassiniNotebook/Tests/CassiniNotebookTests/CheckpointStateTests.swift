@@ -43,7 +43,7 @@ import CassiniNotebook
         return try CheckpointState.decode(JSONSerialization.data(withJSONObject: json))
     }
 
-    // ports: CheckpointStateTest#encodingWritesExactlyTheVersionTwoMembers (adapted: iOS version 1 members)
+    // ports: CheckpointStateTest#encodingWritesExactlyTheVersionTwoMembers (adapted: iOS members)
     @Test func encodingWritesExactlyTheMembers() throws {
         let data = try state().encoded()
         #expect(try members(data) == CheckpointState.keys)
@@ -226,7 +226,7 @@ import CassiniNotebook
         #expect(throws: (any Error).self) { try JSONDecoder().decode(DiarizerState.self, from: JSONEncoder().encode(big)) }
     }
 
-    /// A version 2 file without the member (speakers off, or written before they streamed) still reads.
+    /// A run that does not tell speakers apart as it goes writes no `speakers`.
     // ports: CheckpointStateTest#aJobWithoutEncoderOrDiarizerOmitsThem
     @Test func aCheckpointWithoutSpeakersStillReads() throws {
         let decoded = try stored(state()) { $0["speakers"] = nil }

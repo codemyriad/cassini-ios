@@ -100,12 +100,12 @@ import CassiniNotebook
     }
 
     // ports: CheckpointGoldenTest#aCheckpointOfParakeetV3IsNotResumedWithUltra (the job)
-    @Test func anAppleEraOrAppleFallbackCheckpointIsNotResumedWithUltra() async throws {
+    @Test func aParakeetV3OrAppleFallbackCheckpointIsNotResumedWithUltra() async throws {
         let (h, transcriber) = try await harness()
-        let folder = h.files.directory(for: h.noteID)
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let appleEra = #"{"version":1,"source":"audio.m4a","signature":"\#(CheckpointState.signature(of: h.audioURL))","language":"it-IT","segments":[],"doneMs":0,"totalMs":70000,"elapsedMs":0,"inferenceMs":0,"resumedFromMs":0,"wordsComplete":false}"#
-        try Data(appleEra.utf8).write(to: folder.appendingPathComponent(CheckpointFiles.filename))
+        // Parakeet TDT 0.6B v3's revision, Android's model before Ultra.
+        try h.files.save(CheckpointState(source: "audio.m4a", signature: CheckpointState.signature(of: h.audioURL),
+                                         model: "2bda32ec70b097a55adaa07d9a7173915b43cc78", segments: [], doneMs: 0,
+                                         totalMs: 70_000, elapsedMs: 0), for: h.noteID)
         #expect(await h.run().outcome == .failed(.checkpointMismatch))
         #expect(transcriber.requests.isEmpty)
 

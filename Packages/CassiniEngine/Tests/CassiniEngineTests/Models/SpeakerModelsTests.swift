@@ -6,7 +6,7 @@ import CassiniEngineTesting
 import CassiniNotebook
 
 /// The speaker models through the catalog (`SpeakerModels`): one row for the diarizer and CAM++, installed by the
-/// shared installer with the speaker consent of iOS, and the FluidAudio builds' folder removed. The fetcher writes
+/// shared installer with the speaker consent of iOS. The fetcher writes
 /// sparse files of the pinned sizes, so nothing is downloaded.
 @MainActor @Suite final class SpeakerModelsTests {
     private let folder = TemporaryFolder()
@@ -78,14 +78,6 @@ import CassiniNotebook
             try await offline.install { _ in }
         }
         #expect(fetcher.fetched.isEmpty)
-    }
-
-    @Test func theFluidAudioFolderIsRemoved() async throws {
-        let retired = models.root.appendingPathComponent("speaker-diarization/Embedding.mlmodelc", isDirectory: true)
-        try FileManager.default.createDirectory(at: retired, withIntermediateDirectories: true)
-        try Data("x".utf8).write(to: retired.appendingPathComponent("model.mil"))
-        _ = await models.refresh(linked: true)
-        #expect(!FileManager.default.fileExists(atPath: models.root.appendingPathComponent("speaker-diarization").path))
     }
 
     @Test func theCatalogPartsAndDownloadsAreAndroids() {

@@ -39,7 +39,7 @@ public protocol TranscriptionJobHost: Sendable {
 ///   from the window it saved; Apple Speech saves its finalized results once 30 s more audio is final (and at most every
 ///   10 s), resumes 1 s before the checkpoint and drops the words it already has. Both save at a stop and when the words
 ///   are complete; `JobEvent.checkpointed` follows each save that is on disk. A checkpoint that no longer matches the
-///   audio or the recognizer (an Apple-era version 1 file, another language for Apple Speech) fails with
+///   audio or the recognizer (another version, model, or language for Apple Speech) fails with
 ///   `CHECKPOINT_MISMATCH`.
 /// - **Failures.** A recognizer that throws a `JobFailure` (`TIMINGS`, `MEMORY`, `MODEL`) fails with it; a cancellation
 ///   (`CancellationError`, `CANCELLED`) ends cancelled unless a pause asked for it.
@@ -146,7 +146,7 @@ public struct TranscriptionJob: TranscriptionJobRunning {
             let expected = CheckpointState.Expected(source: note.audioFilename, signature: CheckpointState.signature(of: url),
                                                     model: recognizer.checkpointModel(language: language))
             do {
-                // A checkpoint of another version (Apple Speech before Ultra) or recognizer does not resume.
+                // A checkpoint of another version or recognizer does not resume.
                 checkpoint = try checkpoints.load(job.noteID)
                 try checkpoint?.validate(expected)
             } catch {

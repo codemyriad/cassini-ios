@@ -58,12 +58,8 @@ import CassiniNotebook
         let printed = try #require(await voices.namingInput(noteID: note.id, speakerID: "a"))
         #expect(printed.print == print && printed.voiceModelReady)
 
-        // A print of the FluidAudio builds (WeSpeaker) counts as none: no voice of CAM++ can take it.
-        let old = SpeakerPrint(speakerID: "b", model: "pyannote-community-1-wespeaker-coreml-v1:abc", vector: [1, 0],
-                               speechSeconds: 10)
-        try await voices.store?.savePrints([print, old], noteID: note.id)
-        let stale = try #require(await voices.namingInput(noteID: note.id, speakerID: "b"))
-        #expect(stale.print == nil && !stale.voiceModelReady)
+        let unprinted = try #require(await voices.namingInput(noteID: note.id, speakerID: "b"))
+        #expect(unprinted.print == nil && !unprinted.voiceModelReady)
         voices.printsReady = { true }
         #expect(await voices.namingInput(noteID: note.id, speakerID: "b")?.voiceModelReady == true,
                 "the voiceprint model is installed: the next analysis makes a print")

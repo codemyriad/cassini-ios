@@ -230,7 +230,7 @@ swiftpm_path_files() {
 }
 
 # A worktree without .build/ starts from the dependencies another worktree resolved for the same Package.resolved,
-# cloned (APFS copy-on-write) with the paths moved over: SwiftPM otherwise fetches FluidAudio again, minutes over the
+# cloned (APFS copy-on-write) with the paths moved over: SwiftPM otherwise fetches the packages again, minutes over the
 # network.
 seed_swiftpm() {
     local shared="$cache/swiftpm-$(package_key)" file

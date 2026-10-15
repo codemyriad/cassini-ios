@@ -25,11 +25,10 @@ import Testing
         }
     }
 
-    /// iOS: before the version field, voices.json was a bare array.
-    @Test func theLegacyBareArrayStillReads() throws {
-        let voice = F.voice("anna", "Anna")
-        let legacy = try JSONEncoder().encode([voice])
-        #expect(try VoiceCodec.decode(legacy) == [voice])
+    /// iOS: anything but a versioned file is unparseable.
+    @Test func aBareArrayOrBrokenJSONIsUnparseable() throws {
+        let bare = try JSONEncoder().encode([F.voice("anna", "Anna")])
+        #expect(throws: DecodingError.self) { try VoiceCodec.decode(bare) }
         #expect(throws: DecodingError.self) { try VoiceCodec.decode(Data("{not json".utf8)) }
     }
 
@@ -69,7 +68,6 @@ import Testing
         let object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
         #expect(object["version"] as? Int == 1)
         #expect(try NoteVoiceCodec.decode(data) == prints)
-        #expect(try NoteVoiceCodec.decode(JSONEncoder().encode(prints)) == prints, "the bare array of before still reads")
     }
 
     // ports: NoteVoiceCodecTest#aVersionMismatchThrowsAndSaysWhetherTheFileIsNewer

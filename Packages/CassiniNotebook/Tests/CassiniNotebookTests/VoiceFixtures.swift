@@ -3,7 +3,7 @@ import Foundation
 
 /// Voices and prints for the speaker tests: unit vectors in a small space, of the model "m" unless said otherwise.
 enum VoiceFixtures {
-    static let model = "m"
+    static let model = VoiceprintModel.sha256
     static let dimension = 8
 
     static func axis(_ index: Int, dimension: Int = dimension) -> [Float] {

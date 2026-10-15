@@ -64,9 +64,6 @@ import Testing
     @Test func anotherModelIsStale() {
         #expect(VoiceStaleness.isStale(voice(String(repeating: "0", count: 64), dim: 512), model: VoiceprintModel.sha256,
                                        dimension: VoiceprintModel.dimension))
-        #expect(VoiceStaleness.isStale(voice("pyannote-community-1-wespeaker-coreml-v1:abc", dim: 256),
-                                       model: VoiceprintModel.sha256, dimension: VoiceprintModel.dimension),
-                "a voice of the FluidAudio builds is named again")
     }
 
     // ports: VoiceStalenessTest#anotherDimensionIsStale

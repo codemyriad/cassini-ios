@@ -5,7 +5,6 @@ public enum SettingsKeys {
     public static let identifySpeakers = "identifySpeakers"
     /// Off unless the user turns it on.
     public static let automaticallyNameVoices = "automaticallyNameVoices"
-    public static let speakerModelIdentity = "speakerModelIdentity"
 
     /// Epoch milliseconds of the user's agreement to download the speech model.
     public static let modelsConsentAt = "models.consentAt"
@@ -23,12 +22,8 @@ public enum SettingsKeys {
     /// Bumped by Forget everyone, so an analysis that started before keeps no voiceprints.
     public static let voicesGeneration = "voices.generation"
 
-    /// Schema 1 booleans, migrated to the consent timestamps on first launch.
-    public static let legacyModelDownloadsAllowed = "modelDownloadsAllowed"
-    public static let legacySpeakerDownloadsAllowed = "speakerDownloadsAllowed"
-
     public static let all: [String] = [
-        speechLanguage, autoTranscribe, identifySpeakers, automaticallyNameVoices, speakerModelIdentity,
+        speechLanguage, autoTranscribe, identifySpeakers, automaticallyNameVoices,
         modelsConsentAt, modelsDeclinedAt, speakerModelsConsentAt, queueHold, recoveredAck,
         notificationsAsked, finalizationMs, trashLastPurgeAt, voicesGeneration,
     ]

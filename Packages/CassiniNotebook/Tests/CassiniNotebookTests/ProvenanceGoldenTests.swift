@@ -111,33 +111,6 @@ import CassiniNotebook
         #expect(run.record()["x-incrementalDiarization"] == nil)
     }
 
-    /// `provenance.json` as builds before these members wrote it: it still reads, its old `sha` is the model's
-    /// SHA-256, and the export leaves out what that build did not record.
-    @Test func aRecordOfAnOlderBuildStillReadsAndExports() throws {
-        let legacy = """
-        {"provenance":{"engine":"apple-speechtranscriber","inferenceMs":1200,"language":"en-US","resumedFromMs":0},
-         "speakerDiarization":{"backend":"fluidaudio","model":"m","sha":"abc","speakerCount":2,"turnCount":3},
-         "speakerIDs":["x_a","x_b"],"words":"\(ProvenanceRecord.fingerprint(of: []))"}
-        """
-        let decoded = try JSONDecoder().decode(ProvenanceRecord.self, from: Data(legacy.utf8))
-        let diarization = try #require(decoded.speakerDiarization)
-        #expect(diarization.modelSha256 == "abc")
-        #expect(diarization.assignment == nil && diarization.elapsedMs == nil && diarization.sourceSeparation == nil)
-        #expect(decoded.speakerIdentification == nil)
-        var run = decoded.provenance
-        run.speakerDiarization = diarization
-        let record = run.record()
-        #expect(record.keys == ["engine", "language", "x-inferenceMs", "x-resumedFromMs", "x-speakerDiarization"])
-        #expect(record["x-speakerDiarization"]?.object?.keys == ["backend", "model", "modelSha256", "turnCount", "speakerCount"])
-
-        // Written again, the record keeps the new name only.
-        var again = decoded
-        again.speakerIdentification = Self.run().speakerIdentification
-        let text = try #require(String(data: JSONEncoder().encode(again), encoding: .utf8))
-        #expect(text.contains("\"modelSha256\":\"abc\"") && !text.contains("\"sha\""))
-        #expect(try JSONDecoder().decode(ProvenanceRecord.self, from: Data(text.utf8)) == again)
-    }
-
     @Test func aFullRecordSurvivesProvenanceJSON() throws {
         let words = [TranscriptSegment(text: "Ciao", start: 0, end: 1, speakerID: "x_a",
                                        words: [TimedWord(text: "Ciao", start: 0, end: 1)])]

@@ -41,8 +41,8 @@ public struct NamingInput: Hashable, Sendable {
     public var voices: [SavedVoice]
     public var voicesReadOnly: Bool
     public var voiceModelReady: Bool
-    /// The model of the current analyses, for staleness when there is no print.
-    public var currentModel: String?
+    /// The voiceprint model, for staleness when there is no print.
+    public var currentModel: String
     public var mergeTargets: [MergeTarget]
     public var versions: MergeVersions
     public var canSample: Bool
@@ -51,7 +51,8 @@ public struct NamingInput: Hashable, Sendable {
 
     public init(speakerID: String, label: String, ordinal: Int = 0, speakingTime: Double = 0, sample: SampleWindow? = nil,
                 print: SpeakerPrint? = nil, match: VoiceMatchState = .unmatched, voices: [SavedVoice] = [],
-                voicesReadOnly: Bool = false, voiceModelReady: Bool = true, currentModel: String? = nil,
+                voicesReadOnly: Bool = false, voiceModelReady: Bool = true,
+                currentModel: String = VoiceprintModel.sha256,
                 mergeTargets: [MergeTarget] = [], versions: MergeVersions = MergeVersions(shown: 1, added: 2), canSample: Bool = true,
                 draft: Bool = false, willHavePrint: Bool = false) {
         self.speakerID = speakerID; self.label = label; self.ordinal = ordinal; self.speakingTime = speakingTime
@@ -69,9 +70,9 @@ public struct NamingInput: Hashable, Sendable {
 
     /// What the sheet needs about the note's speaker `speakerID`, with the speaker's latest `print` and the saved
     /// voices as they are now; nil when the note has no such speaker. Merge targets are the other speakers who say
-    /// something. Remember works with a print of its own, or once an analysis has named its model.
+    /// something. Remember works with a print of its own, or once the voiceprint model is installed (`voiceModelReady`).
     public static func of(_ note: Note, speakerID: String, print: SpeakerPrint?, voices: [SavedVoice],
-                          voicesReadOnly: Bool, currentModel: String?, voiceModelReady: Bool? = nil) -> NamingInput? {
+                          voicesReadOnly: Bool, voiceModelReady: Bool) -> NamingInput? {
         guard let index = note.speakers?.firstIndex(where: { $0.id == speakerID }),
               let speaker = note.speakers?[index] else { return nil }
         let stats = SpeakerStats.of(note.transcript)
@@ -85,7 +86,7 @@ public struct NamingInput: Hashable, Sendable {
         return NamingInput(
             speakerID: speakerID, label: speaker.name, ordinal: stat?.ordinal ?? index, speakingTime: stat?.speakingTime ?? 0,
             sample: stat?.sample, print: print, match: speaker.match, voices: voices, voicesReadOnly: voicesReadOnly,
-            voiceModelReady: print != nil || (voiceModelReady ?? (currentModel != nil)), currentModel: currentModel,
+            voiceModelReady: print != nil || voiceModelReady,
             mergeTargets: targets, versions: MergeVersions(shown: versions.shown, added: versions.added),
             canSample: note.audio.isPlayable)
     }

@@ -84,8 +84,7 @@ import Testing
         #expect(match(prints, voices, excluded: ["a": [], "x": [F.id("anna")]]) == match(prints, voices))
     }
 
-    /// iOS: a print or a sample with less than four seconds of speech is not compared (Android makes no print of less;
-    /// iOS keeps samples, which a FluidAudio build may have saved with less).
+    /// iOS: a print or a sample with less than four seconds of speech is not compared (Android makes no print of less).
     @Test func tooLittleSpeechIsNeverMatched() {
         let voices = [F.voice("anna")]
         #expect(VoiceMatcher.match(prints: [F.print("s", F.axis(0), seconds: 3.9)], voices: voices).isEmpty)

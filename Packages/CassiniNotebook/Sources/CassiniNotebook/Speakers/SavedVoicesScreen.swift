@@ -14,7 +14,7 @@ public struct SavedVoiceSummary: Hashable, Sendable, Identifiable {
 
 public enum SavedVoiceList {
     /// The saved voices sorted by notes, then confirmed seconds, then name.
-    public static func summaries(_ voices: [SavedVoice], notes: [Note], model: String?,
+    public static func summaries(_ voices: [SavedVoice], notes: [Note], model: String = VoiceprintModel.sha256,
                                  dimension: Int? = nil) -> [SavedVoiceSummary] {
         var counts: [UUID: Int] = [:]
         for note in notes where note.trashedAt == nil {

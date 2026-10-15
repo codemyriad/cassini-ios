@@ -59,23 +59,10 @@ public struct SpeakerModels: Sendable {
         return .notDownloaded
     }
 
-    /// The folders of the FluidAudio builds' speaker models (pyannote community-1 on Core ML) under the models root.
-    /// Nothing reads them any more.
-    public static let retiredFolders = ["speaker-diarization"]
-
-    /// Reads the files again, then the status. The FluidAudio builds' model folder goes first.
+    /// Reads the files again, then the status.
     public func refresh(linked: Bool) async -> ModelPartStatus {
-        removeRetired()
         await repository.refresh()
         return status(linked: linked)
-    }
-
-    /// Deletes the retired model folders; a folder that cannot be deleted is tried again at the next refresh.
-    public func removeRetired() {
-        for folder in Self.retiredFolders {
-            let url = root.appendingPathComponent(folder, isDirectory: true)
-            if FileManager.default.fileExists(atPath: url.path) { try? FileManager.default.removeItem(at: url) }
-        }
     }
 
     /// Installs the missing speaker models, or joins the install that runs; `progress` gets the fraction of both

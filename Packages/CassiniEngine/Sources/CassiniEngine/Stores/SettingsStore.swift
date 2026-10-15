@@ -16,9 +16,6 @@ public final class SettingsStore {
     public var automaticallyNameVoices: Bool {
         didSet { defaults.set(automaticallyNameVoices, forKey: SettingsKeys.automaticallyNameVoices) }
     }
-    public var speakerModelIdentity: String? {
-        didSet { write(speakerModelIdentity, SettingsKeys.speakerModelIdentity) }
-    }
     public var modelsConsentAt: Date? { didSet { write(modelsConsentAt, SettingsKeys.modelsConsentAt) } }
     public var modelsDeclinedAt: Date? { didSet { write(modelsDeclinedAt, SettingsKeys.modelsDeclinedAt) } }
     public var speakerModelsConsentAt: Date? { didSet { write(speakerModelsConsentAt, SettingsKeys.speakerModelsConsentAt) } }
@@ -39,7 +36,6 @@ public final class SettingsStore {
         autoTranscribe = defaults.object(forKey: SettingsKeys.autoTranscribe) as? Bool ?? true
         identifySpeakers = defaults.object(forKey: SettingsKeys.identifySpeakers) as? Bool ?? true
         automaticallyNameVoices = defaults.bool(forKey: SettingsKeys.automaticallyNameVoices)
-        speakerModelIdentity = defaults.string(forKey: SettingsKeys.speakerModelIdentity)
         modelsConsentAt = Self.date(defaults, SettingsKeys.modelsConsentAt)
         modelsDeclinedAt = Self.date(defaults, SettingsKeys.modelsDeclinedAt)
         speakerModelsConsentAt = Self.date(defaults, SettingsKeys.speakerModelsConsentAt)
@@ -49,7 +45,6 @@ public final class SettingsStore {
         finalizationMs = (defaults.object(forKey: SettingsKeys.finalizationMs) as? NSNumber)?.int64Value
         trashLastPurgeAt = Self.date(defaults, SettingsKeys.trashLastPurgeAt)
         voicesGeneration = defaults.integer(forKey: SettingsKeys.voicesGeneration)
-        migrateSchemaOne(storedLanguage: storedLanguage)
     }
 
     /// Whether the speech model may be downloaded.
@@ -83,22 +78,6 @@ public final class SettingsStore {
     @discardableResult public func advanceVoicesGeneration() -> Int {
         voicesGeneration += 1
         return voicesGeneration
-    }
-
-    private func migrateSchemaOne(storedLanguage: String?) {
-        if let storedLanguage, storedLanguage != speechLanguage {
-            defaults.set(speechLanguage, forKey: SettingsKeys.speechLanguage)
-        }
-        if defaults.object(forKey: SettingsKeys.legacyModelDownloadsAllowed) != nil {
-            if defaults.bool(forKey: SettingsKeys.legacyModelDownloadsAllowed), modelsConsentAt == nil { modelsConsentAt = clock.now }
-            defaults.removeObject(forKey: SettingsKeys.legacyModelDownloadsAllowed)
-        }
-        if defaults.object(forKey: SettingsKeys.legacySpeakerDownloadsAllowed) != nil {
-            if defaults.bool(forKey: SettingsKeys.legacySpeakerDownloadsAllowed), speakerModelsConsentAt == nil {
-                speakerModelsConsentAt = clock.now
-            }
-            defaults.removeObject(forKey: SettingsKeys.legacySpeakerDownloadsAllowed)
-        }
     }
 
     private func write(_ value: String?, _ key: String) {

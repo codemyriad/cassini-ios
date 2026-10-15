@@ -149,8 +149,7 @@ import CassiniNotebook
         await retryUnreadable()
         guard let note = library.note(noteID), note.speaker(speakerID) != nil else { return nil }
         return NamingInput.of(note, speakerID: speakerID, print: await print(noteID: noteID, speakerID: speakerID),
-                              voices: savedVoices, voicesReadOnly: isReadOnly, currentModel: VoiceprintModel.sha256,
-                              voiceModelReady: await printsReady())
+                              voices: savedVoices, voicesReadOnly: isReadOnly, voiceModelReady: await printsReady())
     }
 
     /// Carries out the sheet's effects for one speaker: the note first, then the saved voices.
@@ -210,10 +209,9 @@ import CassiniNotebook
         for voice in written.forgotten { library.updateAll { $0.unlinkVoice(voice) } }
     }
 
-    /// The speaker's latest CAM++ print. A print of the FluidAudio builds (WeSpeaker) counts as none: it matches no
-    /// saved voice of this build, so the speaker cannot be remembered with it until it is identified again.
+    /// The speaker's latest print.
     private func print(noteID: UUID, speakerID: String) async -> SpeakerPrint? {
-        try? await store?.prints(noteID: noteID).last { $0.speakerID == speakerID && $0.model == VoiceprintModel.sha256 }
+        try? await store?.prints(noteID: noteID).last { $0.speakerID == speakerID }
     }
 
     // MARK: - Saved voices
