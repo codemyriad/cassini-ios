@@ -610,6 +610,7 @@ swift_targets_for() {
         Packages/CassiniEngine/Sources/*) echo "CassiniEngineTests CassiniInferenceTests" ;;
         Packages/CassiniInference/Sources/*) echo "CassiniInferenceTests" ;;
         Packages/CassiniAudio/Sources/*|Sources/COpusBridge/*) echo "CassiniAudioTests" ;;
+        Packages/CassiniSherpa/Sources/*) echo "CassiniSherpaTests" ;;
         Packages/*/Tests/*) echo "$1" | cut -d/ -f4 ;;
     esac
 }

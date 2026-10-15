@@ -30,6 +30,9 @@ targets:
         product: CassiniAudio
       - package: Cassini
         product: CassiniInference
+      # The sherpa-onnx runtime; native code only when CASSINI_SHERPA_LOCAL is set (Package.swift).
+      - package: Cassini
+        product: CassiniSherpa
       # Imported only in Debug builds, for UI-test launches.
       - package: Cassini
         product: CassiniEngineTesting
@@ -89,6 +92,8 @@ targets:
         product: CassiniAudio
       - package: Cassini
         product: CassiniInference
+      - package: Cassini
+        product: CassiniSherpa
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
