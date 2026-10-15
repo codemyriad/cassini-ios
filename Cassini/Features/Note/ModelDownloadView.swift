@@ -37,7 +37,7 @@ struct ModelDownloadView: View {
 
 private struct ModelDownloadContent: View {
     let model: ModelDownloadModel
-    let plan: ModelPlan
+    let plan: ModelDownloadPlan
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {

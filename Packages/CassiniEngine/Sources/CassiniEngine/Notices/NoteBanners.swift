@@ -7,7 +7,7 @@ import CassiniNotebook
 public enum NoteBanners {
     /// The free space a failed model download asks for: a job downloads only the speech model, and iOS does not tell
     /// an asset's size before it is downloaded, so this is the plan's estimate (never 0).
-    public static let downloadFreeBytes = ModelPlan.speechInstallBytes
+    public static let downloadFreeBytes = ModelDownloadPlan.speechInstallBytes
 
     /// A finished transcript whose speakers could not be told apart (Android `NoteMapping.oneVoice`): on iOS, one whose
     /// speaker step failed. A speaker step that found nobody is `noSpeakers`.

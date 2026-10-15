@@ -10,14 +10,18 @@ public struct ModelConsent: Sendable {
         self.allows = allows
     }
 
-    /// The recorded consent, or nothing to download: the speech model for the transcribe kinds (installed, or not
-    /// offered for the language, which the job then reports), the speaker models for speakers only.
+    /// The recorded consent, or nothing to download: for the transcribe kinds, Android's rule (`models.consentAt`, or
+    /// Parakeet installed, `parakeetReady`), and Apple's speech assets installed or not offered for the language (which
+    /// the job then reports); the speaker models for speakers only. The Apple rule is checked on every device while
+    /// the transcriber is still Apple Speech; once it moves to Ultra it must apply only on fallback devices (decision
+    /// D2), or assets iOS installed for dictation would count as consent to the Parakeet download.
     @MainActor public static func recorded(settings: SettingsStore, speech: any Transcribing,
-                                           speakers: any SpeakerAnalyzing) -> ModelConsent {
+                                           speakers: any SpeakerAnalyzing,
+                                           parakeetReady: @escaping @Sendable () -> Bool) -> ModelConsent {
         ModelConsent { kind, language in
             switch kind {
             case .transcribe, .transcribeAgain:
-                if settings.modelsConsentAt != nil { return true }
+                if settings.modelsConsentAt != nil || parakeetReady() { return true }
                 let status = await speech.assetStatus(locale: Locale(identifier: language))
                 return status == .ready || status == .unsupported
             case .speakersOnly:

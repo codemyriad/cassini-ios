@@ -214,7 +214,7 @@ import CassiniNotebook
             if error is CancellationError || Task.isCancelled || installNumber != number { return nil }
             var (failure, bytes) = Self.failure(error)
             // iOS does not tell a speech asset's size: "Free about N MB" says what the plan asks for.
-            if part == .speech, bytes == 0 { bytes = ModelPlan.speechInstallBytes }
+            if part == .speech, bytes == 0 { bytes = ModelDownloadPlan.speechInstallBytes }
             failures[part] = failure
             if part == .speech { speechFailureLanguage = language }
             return DownloadFact(part: part, failure: failure, requiredFreeBytes: bytes, at: clock.now)

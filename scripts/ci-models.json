@@ -1,0 +1,81 @@
+{
+  "comment": "The models of ModelCatalog (Packages/CassiniEngine/Sources/CassiniEngine/Models/ModelCatalog.swift) for scripts/fetch-ci-models.py, the same list as Android's scripts/ci-models.json. ModelCatalogTests.theCiModelListIsTheCatalog makes sure that this file and the catalog agree.",
+  "models": [
+    {
+      "directory": "parakeet-ultra",
+      "marker": "verified",
+      "markerValue": "b86784a3a5356cbd126f710b61cd90c5fe5898f1",
+      "artifacts": [
+        {
+          "name": "encoder.int8.onnx",
+          "size": 652282347,
+          "sha256": "f4d06712d32431b1718eceba2153c314ac4425e8fe708a3534f5e56c5ad53697",
+          "url": "https://huggingface.co/tpmaerk/parakeet-ultra-sherpa-onnx-int8/resolve/b86784a3a5356cbd126f710b61cd90c5fe5898f1/encoder.int8.onnx"
+        },
+        {
+          "name": "decoder.int8.onnx",
+          "size": 11845275,
+          "sha256": "94373c6405c8149d1c9d1e9862514e0e3e88dab1c7de18fac9d5df9c6ba5efdd",
+          "url": "https://huggingface.co/tpmaerk/parakeet-ultra-sherpa-onnx-int8/resolve/b86784a3a5356cbd126f710b61cd90c5fe5898f1/decoder.int8.onnx"
+        },
+        {
+          "name": "joiner.int8.onnx",
+          "size": 6355277,
+          "sha256": "8a71aaccfdba3d451775507a889afd2257d2e754463fd81095a8c8f290f924c2",
+          "url": "https://huggingface.co/tpmaerk/parakeet-ultra-sherpa-onnx-int8/resolve/b86784a3a5356cbd126f710b61cd90c5fe5898f1/joiner.int8.onnx"
+        },
+        {
+          "name": "tokens.txt",
+          "size": 93939,
+          "sha256": "d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d",
+          "url": "https://huggingface.co/tpmaerk/parakeet-ultra-sherpa-onnx-int8/resolve/b86784a3a5356cbd126f710b61cd90c5fe5898f1/tokens.txt"
+        }
+      ]
+    },
+    {
+      "directory": "vad",
+      "marker": "verified",
+      "markerValue": "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6",
+      "artifacts": [
+        {
+          "name": "silero_vad.onnx",
+          "size": 643854,
+          "sha256": "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6",
+          "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx"
+        }
+      ]
+    },
+    {
+      "directory": "speaker-models",
+      "marker": "verified",
+      "markerValue": "01d1f893f394cc0418ae78425d216ed62c334c0125e650135332a7a8e595f168",
+      "artifacts": [
+        {
+          "name": "nemotron-3-diarization.int8.onnx",
+          "size": 103941758,
+          "sha256": "01d1f893f394cc0418ae78425d216ed62c334c0125e650135332a7a8e595f168",
+          "url": ""
+        }
+      ],
+      "download": {
+        "name": "nemotron-3-diarization.int8.onnx.zst",
+        "size": 64982914,
+        "sha256": "51249515e4cb49dc00c5d5dc0a41ac59aa91157d689ec9586b3f4bf567c3f602",
+        "url": "https://dist.gocassini.com/models/files/51249515e4cb49dc00c5d5dc0a41ac59aa91157d689ec9586b3f4bf567c3f602/model.int8.onnx.zst"
+      }
+    },
+    {
+      "directory": "speaker-models",
+      "marker": "verified-voiceprint",
+      "markerValue": "357a834f702b80161e5b981182c038e18553c1f2ca752ed6cec2052365d4129b",
+      "artifacts": [
+        {
+          "name": "voiceprint-campplus.onnx",
+          "size": 29596978,
+          "sha256": "357a834f702b80161e5b981182c038e18553c1f2ca752ed6cec2052365d4129b",
+          "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx"
+        }
+      ]
+    }
+  ]
+}

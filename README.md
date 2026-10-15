@@ -129,7 +129,10 @@ This is a working iOS app, not yet an App Store release.
   FluidAudio's offline pyannote, WeSpeaker and VBx pipeline for speakers, where Android uses streaming Sortformer and
   CAM++. The speech language is chosen in Settings, because Apple's models are per language. Voice matching uses its
   own thresholds (0.85 automatic, 0.65 suggest, 0.12 margin, 6 s of speech) and keeps automatic naming off by default.
-  The two apps' voiceprints are not compatible.
+  The two apps' voiceprints are not compatible. The move to Parakeet Ultra has begun: the pinned model catalog, plan, redirect
+  policy, fetcher and installer are ported with Android's tests, behind an `HTTPTransport` port over a data-task
+  `URLSession` that never follows a redirect itself, but the app does not use them yet. Devices that cannot hold Ultra
+  keep Apple Speech.
 - **Storage model.** A note is a `note.json` beside its audio. The portable Cassini document is sealed only at export,
   with the run's provenance under Android's keys, less the four that describe Sortformer. Android keeps the transcript
   in a sealed document and a Room catalogue. The queue is `jobs.json`, and checkpoints use iOS's own format. Search

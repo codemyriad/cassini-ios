@@ -151,7 +151,7 @@ import CassiniNotebook
         let failed = job(.failed, failure: .download(.notEnoughStorage))
         let banner = try #require(banners(plain, job: failed).first)
         #expect(banner.kind == .dlNoSpace)
-        #expect(banner.args.bytes == ModelPlan.speechInstallBytes)
+        #expect(banner.args.bytes == ModelDownloadPlan.speechInstallBytes)
         #expect(banner.args.bytes > 0, "never \"Free about 0 MB\"")
         var screen = NoteScreenState()
         #expect(screen.bannerAction(.retry, note: plain, job: failed) == .transcribe(.transcribe))

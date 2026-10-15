@@ -2,8 +2,11 @@ import Foundation
 import Observation
 import CassiniNotebook
 
-/// The models a job still needs, and the free space their install asks for.
-public struct ModelPlan: Hashable, Sendable {
+/// The models a job still needs, and the free space their install asks for, as the Model download screen shows them.
+/// The speech part here is Apple's assets, which a device that cannot hold Parakeet Ultra keeps using (decision D2);
+/// the catalog's own figures are `ModelPlan` (640 MiB for speech), which this plan takes over when the transcriber
+/// moves to Ultra.
+public struct ModelDownloadPlan: Hashable, Sendable {
     /// Missing parts, in `ModelPart` order.
     public var missing: [ModelPart]
     /// Free space to have before the first byte; 0 when nothing is missing.
@@ -33,11 +36,11 @@ public struct ModelPlan: Hashable, Sendable {
     /// is not ready, whatever the Speakers switch says. A note's speakers-only job (Identify speakers) needs the speaker
     /// models alone.
     public static func plan(speech: ModelPartStatus, speakers: ModelPartStatus, forNote: Bool, identifySpeakers: Bool,
-                            speakersOnly: Bool = false, speakersInstallBytes: Int64) -> ModelPlan {
+                            speakersOnly: Bool = false, speakersInstallBytes: Int64) -> ModelDownloadPlan {
         var missing: [ModelPart] = []
         if speech != .ready, speech != .unsupported, !speakersOnly { missing.append(.speech) }
         if speakers != .ready, !forNote || identifySpeakers || speakersOnly { missing.append(.speakers) }
-        return ModelPlan(missing: missing, speakersInstallBytes: speakersInstallBytes, speakersOnly: speakersOnly)
+        return ModelDownloadPlan(missing: missing, speakersInstallBytes: speakersInstallBytes, speakersOnly: speakersOnly)
     }
 
     public var isEmpty: Bool { missing.isEmpty }
@@ -51,7 +54,7 @@ public struct ModelPlan: Hashable, Sendable {
 @MainActor public protocol ModelDownloadPorts: AnyObject {
     /// The missing parts and the free space their install needs. With a note, the parts its job uses; without one
     /// (the standalone download from Settings), every part that is not ready.
-    func plan(for noteID: UUID?) async -> ModelPlan
+    func plan(for noteID: UUID?) async -> ModelDownloadPlan
     /// Free bytes where the models go.
     func usableBytes() async -> Int64
     /// Agrees to downloading `parts`.
@@ -87,7 +90,7 @@ public final class ModelDownloadModel {
 
     public let noteID: UUID?
     /// Nil until it is read, and when nothing is missing (the screen is never shown without parts).
-    public private(set) var plan: ModelPlan?
+    public private(set) var plan: ModelDownloadPlan?
     /// The primary button shows its spinner.
     public private(set) var busy = false
     /// The bytes the "Not enough storage" banner asks for; nil without that banner.

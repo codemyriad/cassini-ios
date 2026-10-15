@@ -117,3 +117,8 @@ public final class SettingsStore {
         (defaults.object(forKey: key) as? NSNumber).map { Date(timeIntervalSince1970: Double($0.int64Value) / 1000) }
     }
 }
+
+/// The speech consent of `ModelRepository`: `models.consentAt` and `models.declinedAt`.
+extension SettingsStore: ModelConsentRecords {
+    public func consentAt() async -> Date? { modelsConsentAt }
+}

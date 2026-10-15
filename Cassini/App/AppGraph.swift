@@ -104,7 +104,8 @@ import CassiniNotebook
             let parts = TranscriptionCoordinator.Parts(
                 jobs: JobStore(repository: JobRepository(root: environment.root)), notes: notes, runner: job,
                 checkpoints: NoteWorkFolders(notes: notes),
-                consent: .recorded(settings: settings, speech: environment.transcriber, speakers: environment.analyzer),
+                consent: .recorded(settings: settings, speech: environment.transcriber, speakers: environment.analyzer,
+                                  parakeetReady: { [models = environment.models] in ModelCatalog.parakeet.ready(in: models) }),
                 notifier: environment.notifier, background: environment.background, clock: environment.clock,
                 backgroundTitle: { String(localized: "Transcribing “\($0)”", table: "Transcription",
                                           comment: "The system's progress while a note is transcribed") },

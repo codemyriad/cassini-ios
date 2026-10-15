@@ -53,7 +53,7 @@ that were not ported, with the reason for each.
 - **Speech model size.** iOS does not report the size of Apple's speech assets before they are downloaded. Settings
   shows "Managed by iOS" instead of a size, and "Not available" when Apple has no model for the language or the
   device. The model download screen lists the missing parts without sizes. Its free-space check and the "Needs about N
-  free" figure use an estimate per part: 512 MiB for the speech model (`ModelPlan.speechInstallBytes`) and the pinned
+  free" figure use an estimate per part: 512 MiB for the speech model (`ModelDownloadPlan.speechInstallBytes`) and the pinned
   files plus 32 MiB for the speaker models. DL_NO_SPACE quotes the plan's figure. When there is no figure, its body
   reads "Free some space and try again." and never "0 MB".
 - **Download progress.** Apple's assets and FluidAudio both report only a fraction, not bytes. `DownloadProgress`
@@ -73,6 +73,32 @@ that were not ported, with the reason for each.
   the 500 ms tail, gives "4.892" where the golden has "4892" and otherwise matches it word for word (with the tail it
   also gives "raggiun" for "raggiunge"; the goldens decode VAD spans, which the spike does not), so iOS will keep
   goldens of its own.
+- **Pinned model downloads (in progress, not yet used by the app).** `CassiniEngine/Models` ports Android's
+  `ModelCatalog`, `ModelPart` rules, `ModelPlan`, `RedirectPolicy`, `ArtifactFetcher`, `ModelInstaller`,
+  `ModelRepository` and `ModelInstallOwner` (as `PinnedModelInstaller`) with the same pins, URLs, directories,
+  markers, figures (640 + 62 + 28 = 730 MiB, about 860 MiB free) and tests. The catalog already lists Android's
+  speaker models (Nemotron Sortformer and CAM++) for the speaker package; until it lands, and on devices that keep
+  Apple Speech because they cannot hold Ultra (a platform constraint), the Model download screen shows
+  `ModelDownloadPlan`'s figures. The differences that remain:
+  - **Transport.** `ArtifactFetcher` talks to an `HTTPTransport` port. The app's adapter, `URLSessionTransport`, is
+    a data-task `URLSession` whose delegate refuses every redirect, so `RedirectPolicy` decides each hop as
+    `HttpURLConnection` with `instanceFollowRedirects = false` does on Android. It asks for `Accept-Encoding:
+    identity`, so the byte counts are the file's. A background `URLSession` is not used: it follows redirects itself
+    and hides the Range answers.
+  - **Cancellation** is Swift task cancellation, checked between blocks where Android checks the thread's interrupt.
+  - **Network check.** iOS has no `NET_CAPABILITY_VALIDATED`; `NetworkPath` reads `NWPathMonitor` (satisfied, and
+    whether the path is expensive or constrained, for the consent screen's mobile-data note).
+  - **A full disk** during a download is `NOT_ENOUGH_STORAGE`, as iOS reports it as its own error. Android reads it
+    as an I/O error (`INTERRUPTED`). Both check the free space before the first byte.
+  - **Stopped by the system.** `PinnedModelInstaller.stopDownloads()` stands for the end of the
+    `BGContinuedProcessingTask`, as Android's for the foreground service's time-out.
+  - **Compressed downloads.** The diarizer is seekable Zstandard, which Apple's Compression framework does not read.
+    `ArtifactFetcher.fetchCompressed` takes a `Decompressing` port; the decoder comes with the speaker package, and
+    `aCompressedDownloadChecksOnceFromZeroToItsSize` runs with a stand-in format.
+  - **Consent** follows Android (`models.consentAt`, or Parakeet installed), plus the Apple Speech rule on fallback
+    devices (assets installed, or not offered for the language).
+  - `ModelInstallOwnerTest` is ported twice while FluidAudio stays: `SpeakerModelInstallerTests` for its speaker
+    models, `PinnedModelInstallerTests` for the pinned ones.
 
 ### Speaker analysis
 
@@ -111,7 +137,8 @@ that were not ported, with the reason for each.
   or ends never turns the switch back on during another download. Analyses load the models with the switch on, so a
   damaged file fails the load instead of being downloaded again without consent.
 - **Redirects.** FluidAudio builds its own `URLSession`s and exposes no session delegate, so Cassini cannot restrict
-  redirects. `RedirectPolicyTest` has no port. Integrity rests on the pinned revision and the hash check of every file.
+  the redirects of its downloads. Integrity rests on the pinned revision and the hash check of every file. Cassini's
+  own downloads (the pinned models) follow `RedirectPolicy`, whose test is ported.
   `Privacy.txt` lists the hosts the downloads normally use.
 - **Offline errors.** iOS has no reachability check. URL Loading already reports an offline device as
   `notConnectedToInternet` (or `timedOut`, `cannotFindHost`, `dataNotAllowed`), and these map to `NO_CONNECTION`.
@@ -610,8 +637,9 @@ iOS-only: `DecodeConstantsTests` (every constant, the provenance strings, the re
   `SpeakerNamingTest`, `SpeakerStatsTest`, `ProgressTrackerTest` and `SheetBehaviourTest`.
 - **Android platform:** foreground-service types, a refused service start, the ongoing-notification tests,
   `belowApi33OnlyTheMicrophoneIsAsked`, `TrashViewModelTest#backCloses`, `LicensesBackTo`, the AAC file-limit tests,
-  the platform Opus encoder half of `PortableDocumentTest`, and `RedirectPolicyTest` (see
-  [Speaker analysis](#speaker-analysis)).
+  and the platform Opus encoder half of `PortableDocumentTest`.
+- **Zstandard:** `ZstdModelTest`, which decodes the real seekable Zstandard diarizer. Its decoder comes with the speaker
+  package; until then `ArtifactFetcherTest#aCompressedDownloadChecksOnceFromZeroToItsSize` runs with a stand-in format.
 - **Races that cannot happen** with a synchronous `AVAudioPlayer` open are kept in their event order, with the open
   finished first. Purge races that need two threads are ported as the interleavings at the first step.
 - **Restoration after process death** is covered by unit tests of the restore rules (`SavedNoteOverlay`,
