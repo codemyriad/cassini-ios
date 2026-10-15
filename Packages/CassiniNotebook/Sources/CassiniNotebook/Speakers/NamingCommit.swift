@@ -53,7 +53,9 @@ public struct NamingCommit: Hashable, Sendable {
             case .unenrol(let id):
                 commit.unenrol(speaker, noteID: noteID)
                 commit.changes.append(.match(speakerID: id, .unmatched))
-            case .reject(let id, let voiceID, _, let unenrol, let restore):
+            case .reject(_, _, _, _, _, draft: true):
+                break // The draft's reject, carried out by the draft path.
+            case .reject(let id, let voiceID, _, let unenrol, let restore, _):
                 if unenrol { commit.unenrol(speaker, noteID: noteID) }
                 commit.changes.append(.reject(speakerID: id, voiceID: voiceID, restorePlaceholder: restore))
             case .merge(let source, let target):

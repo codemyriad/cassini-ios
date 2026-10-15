@@ -81,7 +81,8 @@ public enum SpeakerNaming {
         if case .confirmed = input.match { confirmed = true }
         let reject = NamingEffect.reject(speakerID: input.speakerID, voiceID: voice.id, voiceName: voice.name,
                                          unenrol: confirmed,
-                                         restorePlaceholder: input.namedLabel.map { NameMatch.same($0, voice.name) } ?? false)
+                                         restorePlaceholder: input.namedLabel.map { NameMatch.same($0, voice.name) } ?? false,
+                                         draft: input.draft)
         return NamingResult(nil, [reject, .close])
     }
 

@@ -646,8 +646,10 @@ agrees; and CAM++ gives 512-dimension unit prints, the two speakers' cosine belo
 
 Differences in the wrappers: Android's draft `DraftName` effect carries the Remember choice as `""` (a new voice) or
 a voice id; iOS uses `DraftVoice.new` or `.saved(id)`. The draft merge sheet has no version line (Android's `sealed`
-is null; iOS sets `MergeUI.draft`). A chunk or recording that is not 16 kHz, or a chunk longer than 28 s, throws
-`SherpaError.invalidAudio` where Android's `require` throws; cancellation is Swift task cancellation, checked around
+is null; iOS sets `MergeUI.draft`). A draft "Not X" is `reject(…, draft: true)`, which `NamingCommit` leaves to
+the draft path, as Android's `Reject.draft`. A chunk that is not 16 kHz or is longer than 28 s throws
+`SherpaError.invalidAudio` where Android's `require` throws; a whole recording that is not 16 kHz also throws it,
+where Android resamples (iOS's decoder already yields 16 kHz); cancellation is Swift task cancellation, checked around
 each native call where Android checks the thread's interrupt. `NativeBudget` (Android's one-native-model-at-a-time
 lock) has no iOS counterpart yet.
 

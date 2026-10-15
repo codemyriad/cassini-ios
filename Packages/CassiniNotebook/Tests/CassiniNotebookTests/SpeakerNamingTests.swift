@@ -166,7 +166,7 @@ import Testing
         #expect(result.effects == [.reject(speakerID: "s3", voiceID: luca.id, voiceName: "Luca Bianchi", unenrol: false,
                                            restorePlaceholder: true), .close])
         let confirmed = SpeakerNaming.open(input(label: "Anna", match: .confirmed(voice: anna.id, score: 0.8)))
-        guard case .reject(_, _, _, let unenrol, let restore) = try #require(SpeakerNaming.reduce(confirmed, .notThisPerson).effects.first)
+        guard case .reject(_, _, _, let unenrol, let restore, _) = try #require(SpeakerNaming.reduce(confirmed, .notThisPerson).effects.first)
         else { Issue.record("no rejection"); return }
         #expect(unenrol, "a confirmed match is unenrolled first")
         #expect(!restore, "the label is not the voice's name")
@@ -222,6 +222,17 @@ import Testing
             Issue.record("not a draft name"); return
         }
         #expect(none == nil)
+    }
+
+    /// iOS: "Not X" in a draft is the draft's reject (Android's `Reject.draft`), which leaves the sealed note alone.
+    @Test func aDraftRejectionGoesToTheDraft() throws {
+        let draft = SpeakerNaming.open(input(label: "Luca Bianchi", match: .auto(voice: luca.id, score: 0.86), draft: true))
+        let effects = SpeakerNaming.reduce(draft, .notThisPerson).effects
+        #expect(effects == [.reject(speakerID: "s3", voiceID: luca.id, voiceName: "Luca Bianchi", unenrol: false,
+                                    restorePlaceholder: true, draft: true), .close])
+        let commit = NamingCommit.plan(effects, noteID: UUID(), speaker: NoteSpeaker(id: "s3", name: "Luca Bianchi"),
+                                       print: nil, voices: [luca], voicesReadOnly: false)
+        #expect(commit.changes.isEmpty && commit.voices == [luca])
     }
 
     // ports: SpeakerNamingTest#theSamplePlaysOnlyWithAPlayer

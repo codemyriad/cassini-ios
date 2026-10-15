@@ -86,8 +86,10 @@ public enum NamingEffect: Hashable, Sendable {
     /// Take back the confirmed sample of the speaker: it was confirmed as someone else.
     case unenrol(speakerID: String)
     /// "Not <name>": the voice is rejected for the speaker; `unenrol` takes a confirmed sample back first, and
-    /// `restorePlaceholder` returns a label equal to that name to "Speaker N".
-    case reject(speakerID: String, voiceID: UUID, voiceName: String, unenrol: Bool, restorePlaceholder: Bool)
+    /// `restorePlaceholder` returns a label equal to that name to "Speaker N". In a draft (`draft`) it is the draft's
+    /// reject (Android's `DraftNames.reject`) and the sealed note is not touched.
+    case reject(speakerID: String, voiceID: UUID, voiceName: String, unenrol: Bool, restorePlaceholder: Bool,
+                draft: Bool = false)
     /// Merge `source` into `target`; this adds a version.
     case merge(source: String, target: String)
     /// Draft: merge `source` into `target` in the draft's names; `targetLabel` is the target's name, if it has one.
