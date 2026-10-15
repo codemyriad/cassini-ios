@@ -102,7 +102,8 @@ exact revisions.
 
 ## Current boundaries
 
-This is a working iOS app, not yet an App Store release.
+This is a working iOS app, not yet an App Store release. [Distribution](docs/distribution.md) lists what signing and
+TestFlight still need.
 
 - Recognition quality is Apple's, and it depends on the device and the language. The simulator screenshots and tests
   use fake transcription, so they say nothing about accuracy.
