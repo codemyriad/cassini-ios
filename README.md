@@ -147,7 +147,8 @@ This is a working iOS app, not yet an App Store release.
 - **Platform.** The app language is set in the Settings app. iOS has no system Back, so the back button carries the
   title of the screen below. The iPad has a split view. Rename is a sheet. Notifications are silent results with
   hidden-preview text. The warm iOS palette and system fonts stay, with contrast checked by tests. Content width is
-  capped at Android's 560 pt. The App Store build declares its privacy manifests, export compliance and memory entitlement.
+  capped at Android's 560 pt. The App Store build declares its privacy manifests, export compliance and memory
+  entitlement.
 
 ## Verify
 
