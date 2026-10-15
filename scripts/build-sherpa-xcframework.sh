@@ -3,6 +3,16 @@
 # NeMo frontend of upstream PR #4024) against ONNX Runtime 1.27.1, C API only, no TTS, for iPhone (OS64) and the
 # Apple-silicon simulator (SIMULATORARM64). The iOS counterpart of cassini-android's scripts/build-native-aar.sh.
 #
+# Speakers: speaker diarization is on, as in Android's build (the fork's build-android-*.sh pass
+# SHERPA_ONNX_ENABLE_SPEAKER_DIARIZATION=ON), so the C API has the Sortformer diarizer and the CAM++ speaker-embedding
+# extractor. Two patches go onto the source before CMake runs:
+#   scripts/streaming-diarization.patch        Android's file, byte for byte: Sortformer's incremental mode
+#                                             (ProcessStreamingChunk, Save/RestoreStreamingState) in csrc, plus JNI
+#                                             and Kotlin entry points, which this build does not compile;
+#   scripts/streaming-diarization-c-api.patch  iOS only: the same calls in the C API, as
+#                                             SherpaOnnxOfflineSpeakerDiarizationProcessStreamingChunk,
+#                                             ...SaveStreamingState, ...DestroyStreamingState, ...RestoreStreamingState.
+#
 #   scripts/build-sherpa-xcframework.sh
 #
 # Writes, all under the gitignored .tools/:
@@ -53,8 +63,19 @@ else
     src=$(cd "$SHERPA_ONNX_SRC" && pwd)
 fi
 # The source sits inside this repository's .tools/; keep git (show-info.cmake runs it) from finding Cassini's repo.
+# git apply needs the same: inside Cassini's repo it would silently skip every path.
 GIT_CEILING_DIRECTORIES=$(dirname "$src")
 export GIT_CEILING_DIRECTORIES
+
+# Apply each patch the way Android's build-native-aar.sh does, or accept a source that already has it.
+for patch in streaming-diarization.patch streaming-diarization-c-api.patch; do
+    if (cd "$src" && git apply --check "$root/scripts/$patch" 2>/dev/null); then
+        (cd "$src" && git apply "$root/scripts/$patch")
+    elif ! (cd "$src" && git apply --reverse --check "$root/scripts/$patch" 2>/dev/null); then
+        printf 'The source does not match scripts/%s.\n' "$patch" >&2
+        exit 1
+    fi
+done
 
 # The CMake dependencies, fetched once into .tools/downloads and checked against the lock. The fork's cmake files
 # look for them in the source directory before downloading, and check the same SHA-256 again.
@@ -95,6 +116,7 @@ build_slice() {
         -DCMAKE_INSTALL_PREFIX="$dir/install" \
         -DBUILD_SHARED_LIBS=OFF \
         -DSHERPA_ONNX_ENABLE_TTS=OFF \
+        -DSHERPA_ONNX_ENABLE_SPEAKER_DIARIZATION=ON \
         -DBUILD_PIPER_PHONMIZE_EXE=OFF -DBUILD_PIPER_PHONMIZE_TESTS=OFF \
         -DBUILD_ESPEAK_NG_EXE=OFF -DBUILD_ESPEAK_NG_TESTS=OFF \
         -DSHERPA_ONNX_ENABLE_PYTHON=OFF \
@@ -135,6 +157,14 @@ archives=(libkaldi-native-fbank-core.a libkissfft-float.a libsherpa-onnx-c-api.a
 # make_framework <build dir> <supported platform>: merge the archives into SherpaOnnxC.framework in that dir.
 make_framework() {
     local dir="$1" supported="$2" fw="$1/SherpaOnnxC.framework" a inputs=()
+    # Every archive the build makes is merged or knowingly left out (the C++ API wraps the C API; Cassini calls C).
+    for a in "$dir"/lib/*.a; do
+        case " ${archives[*]} libsherpa-onnx-cxx-api.a " in
+            *" $(basename "$a") "*) ;;
+            *) printf 'the build made %s, which the script does not know; add it to archives or skip it\n' "$a" >&2
+               exit 1 ;;
+        esac
+    done
     for a in "${archives[@]}"; do
         [ -f "$dir/lib/$a" ] || { printf 'missing %s/lib/%s\n' "$dir" "$a" >&2; exit 1; }
         inputs+=("$dir/lib/$a")
