@@ -37,6 +37,13 @@ that were not ported, with the reason for each.
   therefore carries per-mille counts, and the download banner has no byte counts. Apple install errors map to
   `NO_CONNECTION` (URL connectivity errors), `NOT_ENOUGH_STORAGE` (out of space) or `INSTALL`. Apple gives no
   "free about N MB" figure for its own downloads.
+- **Native runtime (in progress, not yet used by the app).** The Parakeet Ultra port builds the same sherpa-onnx fork
+  commit (dbbeef9c) against the same ONNX Runtime (1.27.1) as Android, as a static xcframework with only the C API and
+  no TTS (`scripts/build-sherpa-xcframework.sh`; Android's AAR keeps its JNI layer and the streaming-diarization
+  patch, which iOS does not apply because it keeps FluidAudio). Android builds arm64-v8a and x86_64; iOS builds the
+  device (`ios-arm64`) and the Apple-silicon simulator (`ios-arm64-simulator`) only, so there is no x86_64 simulator
+  slice. Android's goldens come from the x86_64 emulator; the arm64 simulator decodes FLEURS-it short with "4.892"
+  where the golden has "4892" and otherwise matches it word for word, so iOS will keep goldens of its own.
 
 ### Speaker analysis
 

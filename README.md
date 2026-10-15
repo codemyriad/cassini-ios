@@ -177,6 +177,25 @@ Thursday 8 October 2026 09:41 UTC, en_US formatting, and fake transcription and 
 library: `--seed library|search|reading|speakers|voices|trash|processing|recording|statuses|long`. A normal launch
 starts empty, and Release builds link no fakes.
 
+### Native speech runtime (in progress)
+
+The move to Parakeet Ultra builds sherpa-onnx for iOS from the same fork and commit as Android (codemyriad/sherpa-onnx
+`dbbeef9c`, which carries the NeMo frontend of upstream #4024) against ONNX Runtime 1.27.1, with the C API and without
+TTS. It is not yet a release asset, so a normal build links no native code and the app still uses Apple's recognizer.
+
+```sh
+scripts/build-sherpa-xcframework.sh   # pinned sources -> .tools/sherpa/SherpaOnnxC.xcframework and a reproducible zip
+scripts/verify-native-runtime.sh      # the lock (scripts/native-dependencies.json) against Package.swift and the build
+scripts/sherpa-bench.sh               # simulator spike: Ultra decode vs Android's golden, memory and speed
+```
+
+`CASSINI_SHERPA_LOCAL=1` makes `Package.swift` link the two xcframeworks in the gitignored `.tools/sherpa` into
+`CassiniSherpa`, the only module that imports `SherpaOnnxC`. The binaries are iOS-only (`.when(platforms: [.iOS])`),
+so `swift test` on macOS links and downloads neither. Unlike Android's two ABIs, iOS builds only the device
+(`ios-arm64`) and the Apple-silicon simulator (`ios-arm64-simulator`) slices, so a build with the local runtime is
+arm64-only. `CassiniTests/SherpaBenchTests` skips itself unless that build runs with the models named in its
+environment.
+
 [Validation](docs/validation.md) lists what each tier covers, the test counts and the device checklist.
 [Architecture](docs/architecture.md) describes the modules, state ownership, startup, storage and the
 transcription lifecycle.
