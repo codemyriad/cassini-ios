@@ -523,6 +523,23 @@ These features exist only on iOS. They were kept by decision.
   resumes by itself.
 - A reload is keyed on the file's size and modification date, because iOS has no document written in place.
 
+### App Store
+
+These have no Android counterpart; they are what App Store Connect reads from the build.
+
+- **Privacy manifests.** `Cassini/Resources/PrivacyInfo.xcprivacy` declares no tracking, no collected data, and the
+  required-reason APIs the code and FluidAudio call: UserDefaults (CA92.1, the app's settings), disk space (E174.1,
+  the checks before recording, a checkpoint and a model install; 85F4.1, "Space for about N more" on the recording
+  screen), file timestamps (C617.1, sizes and dates of files in the app container) and system boot time (35F9.1,
+  `ProcessInfo.systemUptime` timing the playback position saves). The Live Activity extension links CassiniNotebook
+  and has its own manifest, `CassiniActivity/PrivacyInfo.xcprivacy`, with C617.1 only: its binary references no
+  UserDefaults. `AppStoreManifestTests` checks both in the built app.
+- **Export compliance.** `ITSAppUsesNonExemptEncryption` is false: the app uses only HTTPS through `URLSession` and
+  CryptoKit hashing, so no build waits for the encryption question.
+- **Memory limit.** `Cassini/Cassini.entitlements` asks for `com.apple.developer.kernel.increased-memory-limit`, which
+  raises the limit on devices that allow it. Android has no equivalent.
+- **App Privacy answers.** "Data Not Collected", no tracking. Model downloads send no user data.
+
 ## Android tests without an iOS port
 
 - **`NoteViewModelTest#theExportAfterProcessDeathStillRuns`.** Android exports through a file picker, so the export
