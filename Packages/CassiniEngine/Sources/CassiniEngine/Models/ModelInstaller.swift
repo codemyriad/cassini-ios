@@ -163,11 +163,8 @@ public struct ModelInstaller: Sendable {
                 return online() ? .interrupted : .noConnection
             }
         }
+        if CheckpointFiles.isOutOfSpace(failure) { return .notEnoughStorage }
         let error = failure as NSError
-        if (error.domain == NSCocoaErrorDomain && error.code == NSFileWriteOutOfSpaceError)
-            || (error.domain == NSPOSIXErrorDomain && error.code == Int(ENOSPC)) {
-            return .notEnoughStorage
-        }
         if error.domain == NSPOSIXErrorDomain || (error.domain == NSCocoaErrorDomain && error.code >= 256 && error.code < 1024) {
             // Android's IOException: a read or write that failed.
             return online() ? .interrupted : .noConnection

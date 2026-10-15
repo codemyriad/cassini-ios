@@ -204,8 +204,8 @@ public final class ModelRepository: Sendable {
 
     /// Installs one `model` through the fetcher, with no status update: deletes its marker, fetches and verifies its
     /// files (resuming `.part` files), then writes the marker. `progress` gets the bytes of the model's download and
-    /// whether they are being checked. Any failure is thrown as a `ModelError` (a file or network error becomes
-    /// DOWNLOAD), or as `CancellationError`.
+    /// whether they are being checked. Any failure is thrown as a `ModelError` (a full disk becomes SPACE, any other
+    /// file or network error DOWNLOAD), or as `CancellationError`.
     public func installModel(_ model: ModelDescriptor,
                              progress: @escaping @Sendable (Int64, Bool) -> Void) async throws {
         try prepareRoot()
@@ -219,6 +219,8 @@ public final class ModelRepository: Sendable {
             throw error
         } catch {
             if ModelInstaller.isCancellation(error) { throw error }
+            // iOS reports a full disk as its own error: NOT_ENOUGH_STORAGE, where Android reads it as an I/O error.
+            if CheckpointFiles.isOutOfSpace(error) { throw ModelError(.space, "\(error)") }
             throw ModelError(.modelDownload, "\(error)")
         }
         do {

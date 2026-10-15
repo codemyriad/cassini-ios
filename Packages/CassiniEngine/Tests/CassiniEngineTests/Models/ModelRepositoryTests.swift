@@ -173,6 +173,28 @@ import CassiniNotebook
         #expect(!repo.publishProgress(.speech, .ready), "a readiness is no progress")
     }
 
+    /// iOS only: a write that finds the disk full is NOT_ENOUGH_STORAGE (iOS reports it as its own error), not a
+    /// failed download.
+    @Test func aFullDiskDuringADownloadIsNotEnoughStorage() async throws {
+        struct FullDisk: ModelFetching {
+            func fetch(_ model: ModelDescriptor, into directory: URL,
+                       progress: @escaping @Sendable (Int64, Bool) -> Void) async throws {
+                throw CocoaError(.fileWriteOutOfSpace)
+            }
+        }
+        let repo = ModelRepository(root: models, consent: settings, fetcher: FullDisk())
+        let error = await #expect(throws: ModelError.self) {
+            try await repo.installModel(ModelCatalog.voiceprint) { _, _ in }
+        }
+        #expect(error?.failure == .space)
+        let store = RepositoryModelStore(models: repo, storage: FakeStorage(), online: { true }, consented: true)
+        let speech = ModelPlan([ModelPlan.of(root: models).missing[0]])
+
+        let outcome = try await ModelInstaller(store: store).install([.speech]) { _ in }
+
+        #expect(outcome == .failed(part: .speech, error: .notEnoughStorage, requiredFreeBytes: speech.requiredFreeBytes))
+    }
+
     /// iOS only: the models download again, so they stay out of backups.
     @Test func theModelsAreExcludedFromBackups() async throws {
         let repo = repository()
