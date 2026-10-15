@@ -18,11 +18,11 @@ import CassiniNotebook
         self.analyzer = analyzer; self.storage = storage; self.notices = notices; self.root = root
     }
 
-    /// `ModelPlan.plan` over the speech assets of the chosen language and the speaker models' status, for the note's
+    /// `ModelDownloadPlan.plan` over the speech assets of the chosen language and the speaker models' status, for the note's
     /// job.
-    func plan(for noteID: UUID?) async -> ModelPlan {
+    func plan(for noteID: UUID?) async -> ModelDownloadPlan {
         let speakersOnly = noteID.flatMap { processing.state.jobs[$0]?.kind } == .speakersOnly
-        return ModelPlan.plan(speech: await transcriber.assetStatus(locale: Locale(identifier: settings.speechLanguage)),
+        return ModelDownloadPlan.plan(speech: await transcriber.assetStatus(locale: Locale(identifier: settings.speechLanguage)),
                               speakers: await analyzer.modelStatus(), forNote: noteID != nil,
                               identifySpeakers: settings.identifySpeakers, speakersOnly: speakersOnly,
                               speakersInstallBytes: analyzer.modelInstallBytes)

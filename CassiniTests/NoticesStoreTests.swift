@@ -108,7 +108,7 @@ import CassiniNotebook
         graph.processing.models.install([.speech])
         await waitUntil { graph.processing.models.download?.failure != nil }
         let banner = try #require(graph.notices.library(LibraryFacts(loading: true)).first { $0.kind == .dlNoSpace })
-        #expect(banner.args.bytes == ModelPlan.speechInstallBytes)
+        #expect(banner.args.bytes == ModelDownloadPlan.speechInstallBytes)
         #expect(BannerCopy.body(banner, locale: Locale(identifier: "en_US")) == "Free about 512 MB and try again.")
     }
 

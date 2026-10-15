@@ -30,10 +30,10 @@ import CassiniNotebook
         #expect(await !consent.allows(.transcribe, "en-US"))
         #expect(await !consent.allows(.transcribeAgain, "en-US"))
         #expect(await !consent.allows(.speakersOnly, "en-US"))
-        let plan = ModelPlan.plan(speech: .notDownloaded, speakers: .notDownloaded, forNote: false, identifySpeakers: true,
+        let plan = ModelDownloadPlan.plan(speech: .notDownloaded, speakers: .notDownloaded, forNote: false, identifySpeakers: true,
                                   speakersInstallBytes: 100)
         #expect(plan.missing == [.speech, .speakers])
-        #expect(plan.requiredFreeBytes == ModelPlan.speechInstallBytes + 100)
+        #expect(plan.requiredFreeBytes == ModelDownloadPlan.speechInstallBytes + 100)
     }
 
     // ports: ModelRepositoryTest#markerFilesDecideReadiness
@@ -47,7 +47,7 @@ import CassiniNotebook
         #expect(await !speech.allows(.speakersOnly, "en-US"))
         #expect(await consent(settings, speech: .unsupported, speakers: false).allows(.transcribe, "en-US"))
         #expect(await consent(settings, speech: .notDownloaded, speakers: true).allows(.speakersOnly, "en-US"))
-        let plan = ModelPlan.plan(speech: .ready, speakers: .notDownloaded, forNote: true, identifySpeakers: true,
+        let plan = ModelDownloadPlan.plan(speech: .ready, speakers: .notDownloaded, forNote: true, identifySpeakers: true,
                                   speakersInstallBytes: 100)
         #expect(plan.missing == [.speakers])
     }
