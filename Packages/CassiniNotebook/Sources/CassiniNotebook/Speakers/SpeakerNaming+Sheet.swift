@@ -16,7 +16,7 @@ extension SpeakerNaming {
             showAll: !state.showAll && ranked.count > visibleVoices, ranked: input.print != nil,
             samePerson: samePerson(state)?.name, renameSaved: renameQuestion(state)?.name, notName: notName(input)?.name,
             remember: state.remember && reason == nil, rememberEnabled: reason == nil,
-            rememberReason: reason, canMerge: canMerge(state), save: saveState(state))
+            rememberReason: reason, canMerge: canMerge(state), save: saveState(state), draft: input.draft)
     }
 
     /// The Merge sheet, or nil while the Name sheet shows.
@@ -25,7 +25,8 @@ extension SpeakerNaming {
         let targets = state.input.mergeTargets
         return MergeUI(sourceID: state.input.speakerID, source: state.input.label, targets: targets,
                        confirm: step.target.flatMap { id in targets.first { $0.speakerID == id } },
-                       shownVersion: state.input.versions.shown, addedVersion: state.input.versions.added)
+                       shownVersion: state.input.versions.shown, addedVersion: state.input.versions.added,
+                       draft: state.input.draft)
     }
 
     /// Disabled only for an empty name, or when nothing changed and the speaker is already confirmed: an automatic,
@@ -49,7 +50,7 @@ extension SpeakerNaming {
     /// "Someone else", and the typed name is a saved voice's full name or first word. The best scored one.
     public static func samePerson(_ state: NamingState) -> SavedVoice? {
         let typed = NameMatch.normalise(state.name)
-        guard effectiveRemember(state), state.boundVoiceID == nil, state.input.print != nil,
+        guard effectiveRemember(state), state.boundVoiceID == nil, state.input.hasPrint,
               !typed.isEmpty, typed != state.declinedSamePerson else { return nil }
         return NameMatch.samePerson(state.name, voices: state.input.voices, scores: NameMatch.scores(state.input.print, voices: state.input.voices))
     }
@@ -68,11 +69,12 @@ extension SpeakerNaming {
     /// The voice of "Not <name>?": an automatic or confirmed match to a saved voice.
     public static func notName(_ input: NamingInput) -> SavedVoice? { linkedVoice(input) }
 
-    /// Why Remember is off, or nil when it can be on.
+    /// Why Remember is off, or nil when it can be on. A draft speaker's speech is its speaking time, as on Android.
     public static func rememberReason(_ input: NamingInput) -> RememberReason? {
         if input.voicesReadOnly { return .readOnly }
         if !input.voiceModelReady { return .noModel }
-        guard let print = input.print, print.speechSeconds >= minimumRememberSeconds else { return .tooLittleSpeech }
+        let speech = input.draft ? input.speakingTime : input.print?.speechSeconds ?? 0
+        guard input.hasPrint, speech >= minimumRememberSeconds else { return .tooLittleSpeech }
         return nil
     }
 }

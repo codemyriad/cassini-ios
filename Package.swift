@@ -52,6 +52,6 @@ let package = Package(
         .target(name: "CassiniEngineTesting", dependencies: ["CassiniCore", "CassiniEngine", "CassiniNotebook"], path: "Packages/CassiniEngine/Sources/CassiniEngineTesting"),
         .testTarget(name: "CassiniEngineTests", dependencies: ["CassiniEngine", "CassiniEngineTesting", "CassiniNotebook"], path: "Packages/CassiniEngine/Tests/CassiniEngineTests"),
         sherpaTarget,
-        .testTarget(name: "CassiniSherpaTests", dependencies: ["CassiniSherpa", "CassiniEngine"], path: "Packages/CassiniSherpa/Tests/CassiniSherpaTests")
+        .testTarget(name: "CassiniSherpaTests", dependencies: ["CassiniSherpa", "CassiniEngine", "CassiniNotebook"], path: "Packages/CassiniSherpa/Tests/CassiniSherpaTests")
     ] + sherpaBinaries
 )

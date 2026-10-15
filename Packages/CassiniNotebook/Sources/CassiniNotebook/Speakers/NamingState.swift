@@ -86,14 +86,27 @@ public enum NamingEffect: Hashable, Sendable {
     /// Take back the confirmed sample of the speaker: it was confirmed as someone else.
     case unenrol(speakerID: String)
     /// "Not <name>": the voice is rejected for the speaker; `unenrol` takes a confirmed sample back first, and
-    /// `restorePlaceholder` returns a label equal to that name to "Speaker N".
-    case reject(speakerID: String, voiceID: UUID, voiceName: String, unenrol: Bool, restorePlaceholder: Bool)
+    /// `restorePlaceholder` returns a label equal to that name to "Speaker N". In a draft (`draft`) it is the draft's
+    /// reject (Android's `DraftNames.reject`) and the sealed note is not touched.
+    case reject(speakerID: String, voiceID: UUID, voiceName: String, unenrol: Bool, restorePlaceholder: Bool,
+                draft: Bool = false)
     /// Merge `source` into `target`; this adds a version.
     case merge(source: String, target: String)
+    /// Draft: merge `source` into `target` in the draft's names; `targetLabel` is the target's name, if it has one.
+    case mergeDraft(source: String, target: String, targetLabel: String?)
+    /// Draft save: name the speaker `name`. `voice` is the Remember choice (nil for none); `confirm` binds the saved
+    /// voice at once with `score`.
+    case draftName(speakerID: String, name: String, voice: DraftVoice?, confirm: Bool, score: Float)
     case playRange(SampleWindow)
     /// Save was pressed with a question open: focus the question and say "Answer the question above first".
     case focusQuestion
     case close
+}
+
+/// Which voice a draft save remembers: a new one, or a saved one (Android's "" and voice id).
+public enum DraftVoice: Hashable, Sendable {
+    case new
+    case saved(UUID)
 }
 
 /// The sheet after an event (`state` nil once it closed) and the effects to carry out.
@@ -113,7 +126,7 @@ extension NamingEffect {
     public var isWrite: Bool {
         switch self {
         case .playRange, .focusQuestion, .close: false
-        case .relabel, .rememberVoice, .renameVoice, .clearMatch, .unenrol, .reject, .merge: true
+        case .relabel, .rememberVoice, .renameVoice, .clearMatch, .unenrol, .reject, .merge, .mergeDraft, .draftName: true
         }
     }
 }
@@ -148,6 +161,8 @@ public struct NameSheetUI: Hashable, Sendable {
     public var rememberReason: RememberReason?
     public var canMerge: Bool
     public var save: SaveState
+    /// The sheet names a speaker of a running job's draft.
+    public var draft: Bool
 }
 
 /// The Merge sheet.
@@ -158,4 +173,6 @@ public struct MergeUI: Hashable, Sendable {
     public var confirm: MergeTarget?
     public var shownVersion: Int
     public var addedVersion: Int
+    /// A draft merge changes the draft and adds no version, so the version line is not shown.
+    public var draft: Bool
 }

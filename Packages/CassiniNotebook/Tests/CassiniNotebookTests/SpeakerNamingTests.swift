@@ -2,8 +2,8 @@ import Foundation
 import Testing
 @testable import CassiniNotebook
 
-/// The Name a speaker reducer: every question path, the Save rule, "Not X" and merges. Android's draft cases are not
-/// ported: iOS names speakers only after the analysis (see docs/differences.md).
+/// The Name a speaker reducer: every question path, the Save rule, "Not X" and merges, on a sealed note and on a
+/// running job's draft (Android's draft cases, ported with the streaming diarizer).
 @Suite struct SpeakerNamingTests {
     typealias F = VoiceFixtures
     let anna = F.voice("anna", "Anna Ricci", F.axis(0))
@@ -13,11 +13,12 @@ import Testing
 
     func input(label: String = "Speaker 3", match: VoiceMatchState = .unmatched, print: [Float]? = F.axis(0),
                seconds: Double = 12, voices: [SavedVoice]? = nil, modelReady: Bool = true,
-               targets: [MergeTarget]? = nil) -> NamingInput {
+               targets: [MergeTarget]? = nil, draft: Bool = false) -> NamingInput {
         NamingInput(speakerID: "s3", label: label, ordinal: 2, speakingTime: 192,
-                    sample: SampleWindow(start: 10, end: 20), print: print.map { F.print("s3", $0, seconds: seconds) },
+                    sample: SampleWindow(start: 10, end: 20), print: draft ? nil : print.map { F.print("s3", $0, seconds: seconds) },
                     match: match, voices: voices ?? [anna, luca, elodie], voiceModelReady: modelReady,
-                    mergeTargets: targets ?? paolo, versions: MergeVersions(shown: 1, added: 2))
+                    mergeTargets: targets ?? paolo, versions: MergeVersions(shown: 1, added: 2),
+                    draft: draft, willHavePrint: draft && modelReady)
     }
 
     func on(_ state: NamingState, _ events: NamingEvent...) throws -> NamingState {
@@ -165,7 +166,7 @@ import Testing
         #expect(result.effects == [.reject(speakerID: "s3", voiceID: luca.id, voiceName: "Luca Bianchi", unenrol: false,
                                            restorePlaceholder: true), .close])
         let confirmed = SpeakerNaming.open(input(label: "Anna", match: .confirmed(voice: anna.id, score: 0.8)))
-        guard case .reject(_, _, _, let unenrol, let restore) = try #require(SpeakerNaming.reduce(confirmed, .notThisPerson).effects.first)
+        guard case .reject(_, _, _, let unenrol, let restore, _) = try #require(SpeakerNaming.reduce(confirmed, .notThisPerson).effects.first)
         else { Issue.record("no rejection"); return }
         #expect(unenrol, "a confirmed match is unenrolled first")
         #expect(!restore, "the label is not the voice's name")
@@ -192,6 +193,46 @@ import Testing
         #expect(SpeakerNaming.mergeUI(try on(confirm, .closeMerge)) == nil, "back to the Name sheet")
         #expect(effects(confirm, .confirmMerge) == [.merge(source: "s3", target: "s1"), .close])
         #expect(!SpeakerNaming.ui(SpeakerNaming.open(input(targets: []))).canMerge)
+    }
+
+    // ports: SpeakerNamingTest#aDraftMergeChangesTheDraftWithTheTargetsName
+    @Test func aDraftMergeChangesTheDraftWithTheTargetsName() throws {
+        let confirm = try on(SpeakerNaming.open(input(draft: true)), .mergeInto, .mergeTarget("s1"))
+        #expect(SpeakerNaming.mergeUI(confirm)?.draft == true, "This changes the draft.")
+        #expect(effects(confirm, .confirmMerge) == [.mergeDraft(source: "s3", target: "s1", targetLabel: "Paolo"), .close])
+        let unnamed = [MergeTarget(speakerID: "s1", name: "Speaker 1", ordinal: 0, speakingTime: 9)]
+        let placeholder = try on(SpeakerNaming.open(input(targets: unnamed, draft: true)), .mergeInto, .mergeTarget("s1"))
+        #expect(effects(placeholder, .confirmMerge) == [.mergeDraft(source: "s3", target: "s1", targetLabel: nil), .close])
+    }
+
+    // ports: SpeakerNamingTest#aDraftSaveRenamesAndRemembersANewOrBoundVoice
+    @Test func aDraftSaveRenamesAndRemembersANewOrBoundVoice() throws {
+        let draft = SpeakerNaming.open(input(draft: true))
+        #expect(SpeakerNaming.ui(draft).draft)
+        let typed = try on(draft, .nameChanged("Giorgio"))
+        #expect(effects(typed, .save) == [.draftName(speakerID: "s3", name: "Giorgio", voice: .new, confirm: false, score: 1), .close])
+        let bound = try on(draft, .pickVoice(luca.id))
+        guard case .draftName(_, _, let voice, let confirm, _) = try #require(effects(bound, .save).first) else {
+            Issue.record("not a draft name"); return
+        }
+        #expect(voice == .saved(luca.id))
+        #expect(confirm)
+        let forget = try on(draft, .rememberToggled(false), .nameChanged("Giorgio"))
+        guard case .draftName(_, _, let none, _, _) = try #require(effects(forget, .save).first) else {
+            Issue.record("not a draft name"); return
+        }
+        #expect(none == nil)
+    }
+
+    /// iOS: "Not X" in a draft is the draft's reject (Android's `Reject.draft`), which leaves the sealed note alone.
+    @Test func aDraftRejectionGoesToTheDraft() throws {
+        let draft = SpeakerNaming.open(input(label: "Luca Bianchi", match: .auto(voice: luca.id, score: 0.86), draft: true))
+        let effects = SpeakerNaming.reduce(draft, .notThisPerson).effects
+        #expect(effects == [.reject(speakerID: "s3", voiceID: luca.id, voiceName: "Luca Bianchi", unenrol: false,
+                                    restorePlaceholder: true, draft: true), .close])
+        let commit = NamingCommit.plan(effects, noteID: UUID(), speaker: NoteSpeaker(id: "s3", name: "Luca Bianchi"),
+                                       print: nil, voices: [luca], voicesReadOnly: false)
+        #expect(commit.changes.isEmpty && commit.voices == [luca])
     }
 
     // ports: SpeakerNamingTest#theSamplePlaysOnlyWithAPlayer

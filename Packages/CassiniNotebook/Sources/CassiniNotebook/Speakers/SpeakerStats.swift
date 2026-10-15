@@ -1,3 +1,4 @@
+import CassiniCore
 import Foundation
 
 /// The "Play a sample" range of a speaker, in seconds of the note's audio.
@@ -69,6 +70,22 @@ public enum SpeakerStats {
                                turnCount: own.count, wordCount: own.reduce(0) { $0 + $1.words },
                                firstStart: own[0].start, sample: sample)
         }
+    }
+
+    /// The stats of every speaker of the format's `words` (canonical order, milliseconds), each word its own passage,
+    /// as Android's `SpeakerStats.of(words)`.
+    public static func of(words: [Word]) -> [SpeakerStat] {
+        of(words.map { word in
+            let start = Double(word.startMs) / 1000, end = Double(word.endMs) / 1000
+            return TranscriptSegment(text: word.text, start: start, end: end, speakerID: word.speaker,
+                                     words: [TimedWord(text: word.text, start: start, end: end)])
+        })
+    }
+
+    /// The stats of a draft: `merges` (`names.json`) applied with `SpeakerMerges.apply` first. Throws on a merge
+    /// cycle, as `SpeakerMerges` does.
+    public static func of(draft transcript: Transcript, merges: [String: String]) throws -> [SpeakerStat] {
+        of(words: try SpeakerMerges.apply(transcript, aliases: merges).words)
     }
 
     /// The stats of one speaker, or nil when the speaker says nothing in `transcript`.

@@ -199,6 +199,10 @@ Apple's recognizer. Android's pure decode rules (windows, quiet cuts, seam merge
 (CassiniInference) drives them over CassiniSherpa's `ParakeetDecoder` and `SileroDetector`. A build with
 `CASSINI_SHERPA_LOCAL=1` uses Ultra when its model is in Application Support/CassiniModels and the device passes
 `SpeechCapability`; Apple's recognizer stays as the fallback for devices that cannot hold Ultra (`AppleSpeechWindows`).
+The speaker package is under way: `CassiniSherpa` wraps Android's streaming Sortformer diarizer (`SortformerStream`,
+with save and restore of its state) and CAM++ extractor (`VoiceprintExtractor`), and the streaming rules
+(`TurnHistory`, `SpeakerBudget`, draft naming and draft stats) are in CassiniNotebook. The app still analyses speakers
+with FluidAudio until the next step replaces it.
 
 ```sh
 scripts/build-sherpa-xcframework.sh   # pinned sources -> .tools/sherpa/SherpaOnnxC.xcframework and a reproducible zip
@@ -206,16 +210,19 @@ scripts/verify-native-runtime.sh      # the lock (scripts/native-dependencies.js
 scripts/fetch-ci-models.py --dest .tools/models   # the pinned models, verified, in the app's layout
 scripts/sherpa-bench.sh               # simulator: Ultra decode vs Android's golden, memory and speed, and a real job
                                       # vs iOS's golden (CASSINI_PARAKEET_RECORD=1 records it)
+scripts/speaker-smoke.sh              # simulator smoke: Sortformer streaming + save/restore and CAM++ on two FLEURS voices
 ```
 
 `CASSINI_SHERPA_LOCAL=1` makes `Package.swift` link the two xcframeworks in the gitignored `.tools/sherpa` into
 `CassiniSherpa`, the only module that imports `SherpaOnnxC`. The binaries are iOS-only (`.when(platforms: [.iOS])`),
 so `swift test` on macOS links and downloads neither. Unlike Android's two ABIs, iOS builds only the device
 (`ios-arm64`) and the Apple-silicon simulator (`ios-arm64-simulator`) slices, so a build with the local runtime is
-arm64-only. `CassiniTests/SherpaBenchTests` and `CassiniTests/ParakeetJobTests` skip themselves unless that build
-runs with the models named in their environment. `ParakeetJobTests` compares a real job's words with
-`CassiniTests/Goldens/fleurs-it-short.ios.json`, recorded on the arm64 simulator: iOS keeps goldens of its own because
-ONNX Runtime's int8 kernels differ from those of Android's x86_64 emulator.
+arm64-only. `CassiniTests/SherpaBenchTests`, `CassiniTests/ParakeetJobTests` and `CassiniTests/SpeakerSmokeTests`
+skip themselves unless that build runs with the models named in their environment. `ParakeetJobTests` compares a real
+job's words with `CassiniTests/Goldens/fleurs-it-short.ios.json`, recorded on the arm64 simulator: iOS keeps goldens of
+its own because ONNX Runtime's int8 kernels differ from those of Android's x86_64 emulator.
+`scripts/fetch-speaker-fixture.py` mixes the speaker smoke test's two-speaker clip from public FLEURS audio (Android
+has no public meeting recording) into the gitignored `.tools/fixtures`.
 
 [Validation](docs/validation.md) lists what each tier covers, the test counts and the device checklist.
 [Architecture](docs/architecture.md) describes the modules, state ownership, startup, storage and the

@@ -4,8 +4,8 @@ import Foundation
 /// `NamingState` while the sheet is open, shows `ui` and `mergeUI`, and carries out the effects (`NamingCommit`).
 ///
 /// The save follows Android's `rememberVoice`: a confirmed voice that is no longer this speaker is unenrolled, a
-/// stale automatic match is cleared, then the print is enrolled into the bound or a new voice. iOS has no draft
-/// naming while a job runs, so only Android's sealed paths exist.
+/// stale automatic match is cleared, then the print is enrolled into the bound or a new voice. A draft (a running job,
+/// `NamingInput.draft`) saves and merges into the draft's names instead (`draftName`, `mergeDraft`).
 public enum SpeakerNaming {
     /// The longest name the field takes.
     public static let maxName = Limits.nameMaxLength
@@ -81,7 +81,8 @@ public enum SpeakerNaming {
         if case .confirmed = input.match { confirmed = true }
         let reject = NamingEffect.reject(speakerID: input.speakerID, voiceID: voice.id, voiceName: voice.name,
                                          unenrol: confirmed,
-                                         restorePlaceholder: input.namedLabel.map { NameMatch.same($0, voice.name) } ?? false)
+                                         restorePlaceholder: input.namedLabel.map { NameMatch.same($0, voice.name) } ?? false,
+                                         draft: input.draft)
         return NamingResult(nil, [reject, .close])
     }
 
@@ -93,14 +94,17 @@ public enum SpeakerNaming {
     private static func confirmMerge(_ state: NamingState) -> NamingResult {
         guard let id = state.merge?.target, let target = state.input.mergeTargets.first(where: { $0.speakerID == id })
         else { return NamingResult(state) }
-        return NamingResult(nil, [.merge(source: state.input.speakerID, target: target.speakerID), .close])
+        let source = state.input.speakerID
+        guard state.input.draft else { return NamingResult(nil, [.merge(source: source, target: target.speakerID), .close]) }
+        let label = DefaultLabels.isDefault(id: target.speakerID, label: target.name) ? nil : target.name
+        return NamingResult(nil, [.mergeDraft(source: source, target: target.speakerID, targetLabel: label), .close])
     }
 
     private static func save(_ state: NamingState) -> NamingResult {
         switch saveState(state) {
         case .disabled: return NamingResult(state)
         case .blockedByQuestion: return NamingResult(state, [.focusQuestion])
-        case .enabled: return NamingResult(nil, sealedSave(state) + [.close])
+        case .enabled: return NamingResult(nil, (state.input.draft ? draftSave(state) : sealedSave(state)) + [.close])
         }
     }
 
@@ -132,6 +136,26 @@ public enum SpeakerNaming {
         if effectiveRemember(state) { return .rememberVoice(speakerID: input.speakerID, voiceID: target, name: name) }
         if staleAuto { return .clearMatch(speakerID: input.speakerID) }
         return nil
+    }
+
+    /// Android's draft save (`DraftNames.rename` / `remember`, or `confirm` for a bound voice), then the saved voice's
+    /// rename when the rename-saved question was answered yes.
+    private static func draftSave(_ state: NamingState) -> [NamingEffect] {
+        let input = state.input
+        let name = state.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let previous = confirmedID(input)
+        let target = target(state, previous: previous, name: name)
+        let remember = effectiveRemember(state)
+        let voice: DraftVoice? = remember ? target.map(DraftVoice.saved) ?? .new : nil
+        let scores = NameMatch.scores(input.print, voices: input.voices)
+        let score = target.flatMap { id in scores[id] ?? (input.match.voiceID == id ? input.match.score : nil) } ?? 1
+        var effects: [NamingEffect] = [.draftName(speakerID: input.speakerID, name: name, voice: voice,
+                                                  confirm: remember && target != nil, score: score)]
+        if state.renameAnswer == true, let previous, let saved = input.voices.first(where: { $0.id == previous }),
+           saved.name != name {
+            effects.append(.renameVoice(previous, name: name))
+        }
+        return effects
     }
 
     /// The voice the speaker is saved as: the bound one, else the confirmed one if the rename was answered yes or
