@@ -17,6 +17,10 @@ Models/
 # Model weights stay out; the model code of the packages (CassiniEngine/Models) does not.
 !Packages/*/Sources/*/Models/
 !Packages/*/Tests/*/Models/
+# ...so weights are ignored by name wherever they land.
+*.onnx
+*.onnx.zst
+*.part
 /.test-cache/
 # Italian screenshots (scripts/screenshots.sh --locale it) are for review, not committed.
 docs/screenshots/it/
