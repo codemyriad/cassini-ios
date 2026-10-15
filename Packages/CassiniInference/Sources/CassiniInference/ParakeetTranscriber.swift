@@ -146,6 +146,10 @@ extension ParakeetTranscriber {
             }
             let total = reader.duration
             let resume = request.resume
+            // The diarizer lives on this thread with the recognizer and goes with it (Android releases both when the
+            // decode ends); its turns and clips stay for the voiceprints.
+            let speakers = request.speakers
+            defer { speakers?.close() }
             if let resume, !resume.recognition.valid { throw TranscriptionError.failed(.checkpointMismatch) }
             events(.progress(done: TimeInterval(resume?.recognition.doneMs ?? 0) / 1000, total: total))
 
@@ -155,7 +159,7 @@ extension ParakeetTranscriber {
             // Android's `IncrementalRecognizer.inferenceMs`: each window's decode once the recognizer is loaded (the
             // speech detector, the decoder calls and the word gate), not the reading or the model load.
             var inferenceNanoseconds: UInt64 = 0
-            let recognize = { (audio: PcmAudio, _: Int64) throws -> Transcript in
+            let recognize = { (audio: PcmAudio, startMs: Int64) throws -> Transcript in
                 try cancel.check()
                 guard ParakeetMemory.allows(availableBytes: availableMemory(), loaded: decoder != nil) else {
                     throw JobFailure.memory
@@ -169,8 +173,11 @@ extension ParakeetTranscriber {
                 let decoded = try ParakeetDecode.transcribe(audio, decoder: decoder!, detector: speech, policy: .wholeSpans,
                                                             cutting: DecodeCutting.cutting(detectorReady: speech != nil))
                 inferenceNanoseconds += DispatchTime.now().uptimeNanoseconds - began
-                // The words are one voice until the speaker step: no speaker id, as the checkpoint keeps them.
-                return Transcript(decoded.words.map { Word("", $0.startMs, $0.endMs, $0.text) })
+                let words = Transcript(decoded.words.map { Word("", $0.startMs, $0.endMs, $0.text) })
+                // Android's `onChunk`: the window's speakers, outside the decode time. Without them the words have no
+                // speaker id.
+                try cancel.check()
+                return try speakers?.window(audio, startMs: startMs, words: words) ?? words
             }
             func decodeMs() -> Int64 { Int64(inferenceNanoseconds / 1_000_000) }
 
@@ -203,7 +210,7 @@ extension ParakeetTranscriber {
                     reportedMs = transcript.doneMs
                     let state = transcript.checkpoint()
                     events(.window(TranscriptWindow(words: state.words, recognition: RecognitionCheckpoint(state),
-                                                    inferenceMs: decodeMs())))
+                                                    inferenceMs: decodeMs(), speakers: speakers?.checkpoint())))
                     events(.progress(done: TimeInterval(reportedMs) / 1000, total: total))
                 }
             }
@@ -220,7 +227,7 @@ extension ParakeetTranscriber {
             events(.progress(done: total, total: total))
             return TranscriptionResult(segments: TranscriptSegment.segments(of: words),
                                        segmentation: DecodeCutting.incrementalProvenance(detectorReady: speech != nil),
-                                       inferenceMs: decodeMs())
+                                       inferenceMs: decodeMs(), speakers: speakers?.checkpoint())
         }
 
         private func restored(_ resume: TranscriptResume, _ window: [Float],

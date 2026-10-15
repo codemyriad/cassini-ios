@@ -1,3 +1,4 @@
+import CassiniCore
 import Foundation
 import Testing
 @testable import CassiniNotebook
@@ -68,6 +69,13 @@ import Testing
         let passage = TranscriptSegment(text: "hello", start: 0.1, end: 0.5, words: [TimedWord(text: "hello", start: 0.1, end: 0.5)])
         let assigned = [first, later].map { SpeakerAttribution.assign([passage], turns: $0).first?.speakerID }
         #expect(assigned == ["diar_test_4", "diar_test_4"])
+        // As Android's test reads it: `Diarization.assign` with stable ids.
+        let word = Word("spk_1", 100, 500, "hello")
+        let once = Diarization.assign([word], turns: [DiarizerTurn(0, 1000, 3)], prefix: "diar_test_", stableIds: true)
+        let again = Diarization.assign([word], turns: [DiarizerTurn(0, 1000, 3), DiarizerTurn(1200, 2000, 0)],
+                                       prefix: "diar_test_", stableIds: true)
+        #expect(once.map(\.speaker) == ["diar_test_4"])
+        #expect(again.map(\.speaker) == once.map(\.speaker))
     }
 
     /// Android's `Voiceprints.normalised`: L2 over Double sums; a zero or non-finite norm gives nothing.

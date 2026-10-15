@@ -35,6 +35,9 @@ import CassiniNotebook
     @ObservationIgnored private let library: LibraryStore
     @ObservationIgnored private let settings: SettingsStore
     @ObservationIgnored private let clock: any AppClock
+    /// Whether the voiceprint model (CAM++) is installed, so a speaker without a print can be remembered once the next
+    /// analysis makes one ("Recognising voices isn't downloaded" otherwise). The app sets it from its analyzer.
+    @ObservationIgnored public var printsReady: @Sendable () async -> Bool = { false }
 
     public init(library: LibraryStore, settings: SettingsStore, clock: any AppClock) {
         self.library = library; self.settings = settings; self.clock = clock
@@ -53,7 +56,8 @@ import CassiniNotebook
 
     /// Saved voices as the screen lists them.
     public var summaries: [SavedVoiceSummary] {
-        SavedVoiceList.summaries(savedVoices, notes: library.notes, model: settings.speakerModelIdentity)
+        SavedVoiceList.summaries(savedVoices, notes: library.notes, model: VoiceprintModel.sha256,
+                                 dimension: VoiceprintModel.dimension)
     }
 
     public func voice(_ id: UUID?) -> SavedVoice? { id.flatMap { id in savedVoices.first { $0.id == id } } }
@@ -104,9 +108,10 @@ import CassiniNotebook
     public func applySpeakerAnalysis(_ analysis: SpeakerAnalysis, to id: UUID, generation: Int) async throws {
         await retryUnreadable()
         guard let note = library.note(id), note.trashedAt == nil else { return }
-        if let model = analysis.prints.first?.model { settings.speakerModelIdentity = model }
-        let (turns, prints) = SpeakerAttribution.namespaced(turns: analysis.turns, prints: analysis.prints,
-                                                             prefix: UUID().uuidString + "_")
+        // Streamed speakers have ids of their own run already, the words' ids; a whole-file analysis's get a namespace.
+        let attributed = analysis.transcript
+        let (turns, prints) = attributed != nil ? (analysis.turns, analysis.prints)
+            : SpeakerAttribution.namespaced(turns: analysis.turns, prints: analysis.prints, prefix: UUID().uuidString + "_")
         var matching = AnalysisMatches()
         if generation == settings.voicesGeneration, let store {
             let (earlier, count) = await store.printsForAnalysis(noteID: id)
@@ -124,10 +129,17 @@ import CassiniNotebook
         let stamp = VersionStamp(date: clock.now)
         let saved = await library.commit(id) { [matching] note in
             guard note.trashedAt == nil else { return }
-            matching.apply(to: &note, turns: turns, autoName: autoName, stamp: stamp)
+            matching.apply(to: &note, turns: turns, autoName: autoName, stamp: stamp,
+                           attributed: attributed.flatMap { Self.attributed($0, onto: note) })
         }
         guard saved != nil else { throw CocoaError(.fileWriteUnknown) }
         await refresh()
+    }
+
+    /// The streamed words with their speakers, as the note's passages: only while the note still holds those words
+    /// (the job saved them in one voice just before), else nil and the note attributes them itself.
+    nonisolated static func attributed(_ segments: [TranscriptSegment], onto note: Note) -> [TranscriptSegment]? {
+        ProvenanceRecord.fingerprint(of: segments) == ProvenanceRecord.fingerprint(of: note.transcript) ? segments : nil
     }
 
     // MARK: - Naming
@@ -137,7 +149,8 @@ import CassiniNotebook
         await retryUnreadable()
         guard let note = library.note(noteID), note.speaker(speakerID) != nil else { return nil }
         return NamingInput.of(note, speakerID: speakerID, print: await print(noteID: noteID, speakerID: speakerID),
-                              voices: savedVoices, voicesReadOnly: isReadOnly, currentModel: settings.speakerModelIdentity)
+                              voices: savedVoices, voicesReadOnly: isReadOnly, currentModel: VoiceprintModel.sha256,
+                              voiceModelReady: await printsReady())
     }
 
     /// Carries out the sheet's effects for one speaker: the note first, then the saved voices.
@@ -197,8 +210,10 @@ import CassiniNotebook
         for voice in written.forgotten { library.updateAll { $0.unlinkVoice(voice) } }
     }
 
+    /// The speaker's latest CAM++ print. A print of the FluidAudio builds (WeSpeaker) counts as none: it matches no
+    /// saved voice of this build, so the speaker cannot be remembered with it until it is identified again.
     private func print(noteID: UUID, speakerID: String) async -> SpeakerPrint? {
-        try? await store?.prints(noteID: noteID).last { $0.speakerID == speakerID }
+        try? await store?.prints(noteID: noteID).last { $0.speakerID == speakerID && $0.model == VoiceprintModel.sha256 }
     }
 
     // MARK: - Saved voices

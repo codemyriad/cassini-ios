@@ -2,6 +2,7 @@ import SwiftUI
 import CassiniEngine
 import CassiniInference
 import CassiniSherpa
+import CassiniNotebook
 #if DEBUG
 import CassiniEngineTesting
 #endif
@@ -74,11 +75,24 @@ import CassiniEngineTesting
         }
     }
 
+    /// Android's speaker pipeline (streaming Sortformer and CAM++) over the catalog's pinned files in `models`, which
+    /// the shared installer fetches with Range resume and the redirect policy (the diarizer as seekable Zstandard).
+    /// Without the native runtime the speaker models are unsupported.
+    static func speakerAnalyzer(models: URL = ModelCatalog.defaultRoot, defaults: UserDefaults = .standard,
+                                storage: any StorageProbe = FileSystemStorageProbe()) -> SpeakerAnalyzer {
+        let fetcher = NetworkModelFetcher(fetcher: ArtifactFetcher(transport: URLSessionTransport(), storage: storage),
+                                          decoder: ZstdDecompressor())
+        let repository = ModelRepository(root: models, consent: DefaultsModelConsent(defaults: defaults), fetcher: fetcher)
+        let installer = PinnedModelInstaller(models: repository, storage: storage, online: { NetworkPath.shared.isOnline })
+        return SpeakerAnalyzer(models: SpeakerModels(repository: repository, installer: installer),
+                               runtime: SherpaRuntime.speakers)
+    }
+
     static func live() -> AppEnvironment {
         AppEnvironment(
             root: URL.applicationSupportDirectory.appendingPathComponent("Cassini", isDirectory: true),
             defaults: .standard, clock: SystemClock(), locale: .autoupdatingCurrent, timeZone: .autoupdatingCurrent,
-            transcriber: speechTranscriber(), analyzer: SpeakerAnalyzer(storage: FileSystemStorageProbe()), capture: AVCaptureAdapter(),
+            transcriber: speechTranscriber(), analyzer: speakerAnalyzer(), capture: AVCaptureAdapter(),
             microphone: AVMicrophonePermission(), liveActivity: ActivityKitAdapter(), playback: AVPlaybackAdapter(), audio: LocalAudioProcessing(), storage: FileSystemStorageProbe(),
             background: UIKitBackgroundRunner(), notifier: UNNotifier())
     }
@@ -186,6 +200,26 @@ extension AppEnvironment {
     }
 }
 #endif
+
+/// The speech consent the model repository reads (`models.consentAt`, as `SettingsStore` writes it), before the stores
+/// exist. The speaker models have a consent of their own, which the job and the download screen check; their install
+/// is granted, so this only feeds the repository's status.
+struct DefaultsModelConsent: ModelConsentRecords, @unchecked Sendable {
+    let defaults: UserDefaults
+
+    func consentAt() async -> Date? {
+        (defaults.object(forKey: SettingsKeys.modelsConsentAt) as? NSNumber)
+            .map { Date(timeIntervalSince1970: Double($0.int64Value) / 1000) }
+    }
+
+    func recordConsent() async {
+        defaults.set(NSNumber(value: Int64((Date().timeIntervalSince1970 * 1000).rounded())), forKey: SettingsKeys.modelsConsentAt)
+    }
+
+    func recordDeclined() async {
+        defaults.set(NSNumber(value: Int64((Date().timeIntervalSince1970 * 1000).rounded())), forKey: SettingsKeys.modelsDeclinedAt)
+    }
+}
 
 extension EnvironmentValues {
     /// The clock dates are shown against.

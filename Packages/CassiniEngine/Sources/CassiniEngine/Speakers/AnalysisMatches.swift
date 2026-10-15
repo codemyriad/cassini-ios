@@ -41,8 +41,9 @@ public struct AnalysisMatches: Hashable, Sendable {
     }
 
     /// The note with the analysis put into it (`Note.applySpeakerAnalysis`).
-    public func apply(to note: inout Note, turns: [SpeakerTurn], autoName: Bool, stamp: VersionStamp) {
+    public func apply(to note: inout Note, turns: [SpeakerTurn], autoName: Bool, stamp: VersionStamp,
+                      attributed: [TranscriptSegment]? = nil) {
         note.applySpeakerAnalysis(turns: turns, matches: matches, voiceNames: voiceNames, localVoices: localVoices,
-                                  carriedLinks: carriedLinks, autoName: autoName, stamp: stamp)
+                                  carriedLinks: carriedLinks, autoName: autoName, stamp: stamp, attributed: attributed)
     }
 }

@@ -4,7 +4,7 @@ import Testing
 
 @Suite struct NameMatchTests {
     typealias F = VoiceFixtures
-    let suggest = VoiceThresholds.ios.suggest
+    let suggest = VoiceThresholds.campplus.suggest
 
     func voice(_ key: String, _ name: String, _ mean: [Float] = F.axis(0), model: String = F.model) -> SavedVoice {
         F.voice(key, name, mean, model: model)
@@ -101,11 +101,11 @@ import Testing
 
     // ports: NameMatchTest#likelyNeedsTheSuggestThreshold
     @Test func likelyNeedsTheSuggestThreshold() throws {
-        let anna = [voice("a", "Anna", F.near(0.65, 1))]
+        let anna = [voice("a", "Anna", F.near(0.50, 1))]
         let score = try #require(NameMatch.rank(F.print(F.axis(0)), voices: anna, model: nil, suggest: 1).first?.score)
         let at = NameMatch.rank(F.print(F.axis(0)), voices: anna, model: nil, suggest: score)
         #expect(try #require(at.first).likely)
-        let below = NameMatch.rank(F.print(F.axis(0)), voices: [voice("a", "Anna", F.near(0.64, 1))], model: nil, suggest: suggest)
+        let below = NameMatch.rank(F.print(F.axis(0)), voices: [voice("a", "Anna", F.near(0.49, 1))], model: nil, suggest: suggest)
         #expect(try !#require(below.first).likely)
     }
 

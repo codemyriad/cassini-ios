@@ -34,14 +34,16 @@ let package = Package(
         // The only importer of SherpaOnnxC; empty of native code unless CASSINI_SHERPA_LOCAL is set (see above).
         .library(name: "CassiniSherpa", targets: ["CassiniSherpa"])
     ],
-    dependencies: [.package(url: "https://github.com/FluidInference/FluidAudio.git", revision: "e560c6445ffdc42e60c7b282d162aae271f18e2a", traits: []),
+    // Zstandard decompresses the seekable .zst of the speaker model download (`ZstdDecompressor`); Android links
+    // zstd-jni with the same release.
+    dependencies: [.package(url: "https://github.com/facebook/zstd.git", revision: "f8745da6ff1ad1e7bab384bd1f9d742439278e99"),
         .package(url: "https://github.com/alta/swift-opus.git", revision: "6f3cb6bd3ffed1fe5f06d00a962d5c191a50daf8")],
     targets: [
         .testTarget(name: "CassiniAudioTests", dependencies: ["CassiniAudio", "CassiniCore"], path: "Packages/CassiniAudio/Tests/CassiniAudioTests"),
         .target(name: "COpusBridge", dependencies: [.product(name: "Copus", package: "swift-opus")]),
         .target(name: "CassiniAudio", dependencies: ["CassiniCore", "COpusBridge"], path: "Packages/CassiniAudio/Sources/CassiniAudio"),
-        .testTarget(name: "CassiniInferenceTests", dependencies: ["CassiniInference", "CassiniEngine", "CassiniEngineTesting", "CassiniNotebook"], path: "Packages/CassiniInference/Tests/CassiniInferenceTests"),
-        .target(name: "CassiniInference", dependencies: ["CassiniCore", "CassiniEngine", "CassiniNotebook", .product(name: "FluidAudio", package: "FluidAudio")], path: "Packages/CassiniInference/Sources/CassiniInference"),
+        .testTarget(name: "CassiniInferenceTests", dependencies: ["CassiniInference", "CassiniEngine", "CassiniEngineTesting", "CassiniNotebook", "CassiniCore", .product(name: "libzstd", package: "zstd")], path: "Packages/CassiniInference/Tests/CassiniInferenceTests"),
+        .target(name: "CassiniInference", dependencies: ["CassiniCore", "CassiniEngine", "CassiniNotebook", .product(name: "libzstd", package: "zstd")], path: "Packages/CassiniInference/Sources/CassiniInference"),
         .target(name: "CZlib", path: "Sources/CZlib", publicHeadersPath: ".", linkerSettings: [.linkedLibrary("z")]),
         .target(name: "CassiniCore", dependencies: ["CZlib"]),
         .testTarget(name: "CassiniCoreTests", dependencies: ["CassiniCore"]),
@@ -50,7 +52,7 @@ let package = Package(
                     resources: [.copy("Resources/export")]),
         .target(name: "CassiniEngine", dependencies: ["CassiniCore", "CassiniNotebook"], path: "Packages/CassiniEngine/Sources/CassiniEngine"),
         .target(name: "CassiniEngineTesting", dependencies: ["CassiniCore", "CassiniEngine", "CassiniNotebook"], path: "Packages/CassiniEngine/Sources/CassiniEngineTesting"),
-        .testTarget(name: "CassiniEngineTests", dependencies: ["CassiniEngine", "CassiniEngineTesting", "CassiniNotebook"], path: "Packages/CassiniEngine/Tests/CassiniEngineTests"),
+        .testTarget(name: "CassiniEngineTests", dependencies: ["CassiniCore", "CassiniEngine", "CassiniEngineTesting", "CassiniNotebook"], path: "Packages/CassiniEngine/Tests/CassiniEngineTests"),
         sherpaTarget,
         .testTarget(name: "CassiniSherpaTests", dependencies: ["CassiniSherpa", "CassiniEngine", "CassiniNotebook"], path: "Packages/CassiniSherpa/Tests/CassiniSherpaTests")
     ] + sherpaBinaries

@@ -145,6 +145,7 @@ final class WordsDecode: Sendable {
                 guard accept(total: s.checkpoint.totalMs, &s) else { return s.ended ?? .failed(.long) }
                 s.checkpoint.segments = transcription.segments
                 s.checkpoint.recognition = nil
+                if let speakers = transcription.speakers { s.checkpoint.speakers = speakers }
                 s.words = s.checkpoint.draftWords
                 if let inferenceMs = transcription.inferenceMs { s.decodeMs = inferenceMs }
             case .success(let transcription):
@@ -203,6 +204,7 @@ final class WordsDecode: Sendable {
         s.finalizedThisRun = true
         s.checkpoint.segments = TranscriptSegment.segments(of: window.words)
         s.checkpoint.recognition = window.recognition
+        if let speakers = window.speakers { s.checkpoint.speakers = speakers }
         s.words = s.checkpoint.draftWords
         s.decodeMs = window.inferenceMs
         let lastEnd = window.words.map(\.endMs).max() ?? 0

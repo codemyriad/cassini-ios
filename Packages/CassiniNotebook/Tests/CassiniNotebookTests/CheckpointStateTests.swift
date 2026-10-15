@@ -9,6 +9,10 @@ import CassiniNotebook
     static let ultra = CheckpointGoldenTests.ultra
     /// A window decoded to 2.898 s, read 0.1 s further.
     private static let recognition = RecognitionCheckpoint(start: 0, end: 46_368, position: 47_968)
+    /// The streaming speakers after that window: one slot heard, one second of its speech kept.
+    static let speakers = SpeakerCheckpoint(prefix: "P_", diarizer: DiarizerState(cache: [0.25, -1.5, .leastNonzeroMagnitude],
+                                                                                  elapsedMs: 41, turns: [DiarizerTurn(1_300, 2_900, 0)]),
+                                            clipSamples: 16_000, voiceClips: ["P_1": [PrintWindow(0, 16_000)]])
 
     private let segments = [
         TranscriptSegment(text: "La parte", start: 1.308, end: 1.788,
@@ -20,7 +24,7 @@ import CassiniNotebook
     private func state(signature: String = "4096:1700000000000") -> CheckpointState {
         CheckpointState(source: "audio.m4a", signature: signature, model: Self.ultra, segments: segments, doneMs: 2_898,
                         totalMs: 59_968, elapsedMs: 18_754, inferenceMs: 4_776, resumedFromMs: 0,
-                        recognition: Self.recognition)
+                        recognition: Self.recognition, speakers: Self.speakers)
     }
 
     private func expected(signature: String = "4096:1700000000000") -> CheckpointState.Expected {
@@ -179,5 +183,62 @@ import CassiniNotebook
         // Without word times a segment counts from its middle.
         #expect(TranscriptSegment(text: "a", start: 2, end: 3.5).resumed(after: 2_898) == nil)
         #expect(TranscriptSegment(text: "b", start: 2.5, end: 3.5).resumed(after: 2_898) != nil)
+    }
+
+    // ports: CheckpointStateTest#decodingRestoresEveryMemberBitForBit (its speaker members: Android's `diarizer`,
+    // `speakerPrefix`, `speakerFailure`, `clipSamples` and `voiceClips` as iOS's `speakers` member)
+    @Test func theStreamingSpeakersRoundTripExactly() throws {
+        let decoded = try CheckpointState.decode(state().encoded())
+        #expect(decoded.speakers == Self.speakers, "every float of the cache, bit for bit")
+        let json = try #require(try JSONSerialization.jsonObject(with: state().encoded()) as? [String: Any])
+        let speakers = try #require(json["speakers"] as? [String: Any])
+        #expect(Set(speakers.keys) == ["prefix", "failed", "diarizer", "clipSamples", "voiceClips"])
+        let diarizer = try #require(speakers["diarizer"] as? [String: Any])
+        #expect(Set(diarizer.keys) == ["cache", "elapsedMs", "turns"])
+        let cache = try #require(diarizer["cache"] as? String)
+        #expect(Data(base64Encoded: cache)?.count == 12, "three little-endian floats")
+        #expect(diarizer["turns"] as? [[Int]] == [[1_300, 2_900, 0]])
+        #expect((speakers["voiceClips"] as? [String: [[Int]]])?["P_1"] == [[0, 16_000]])
+        #expect(DiarizerState.floats(Data([0, 0, 0x80, 0x3F])) == [1], "little-endian")
+        #expect(DiarizerState.floats(Data([0, 0, 0x80])) == nil)
+    }
+
+    /// Speakers no run could have saved (clips past the clip file, a cache over the cap, a damaged cache) do not resume.
+    // ports: CheckpointStateTest#oversizedArraysAreRefused (the diarizer cache)
+    @Test func speakersNoRunCouldHaveSavedDoNotResume() throws {
+        var past = state()
+        past.speakers?.voiceClips = ["P_1": [PrintWindow(0, 16_001)]]
+        #expect(throws: CheckpointState.Mismatch.speakers) { try past.validate(expected()) }
+        var many = state()
+        many.speakers?.voiceClips = Dictionary(uniqueKeysWithValues: (0...SpeakerBudget.maxSpeakers).map { ("P_\($0)", [PrintWindow(0, 1)]) })
+        #expect(throws: CheckpointState.Mismatch.speakers) { try many.validate(expected()) }
+        try state().validate(expected())
+        #expect(throws: (any Error).self) {
+            try stored(state()) { json in
+                var speakers = json["speakers"] as? [String: Any] ?? [:]
+                var diarizer = speakers["diarizer"] as? [String: Any] ?? [:]
+                diarizer["cache"] = "AAA="
+                speakers["diarizer"] = diarizer
+                json["speakers"] = speakers
+            }
+        }
+        let big = DiarizerState(cache: [Float](repeating: 0, count: SpeakerBudget.diarizerStateFloats + 1), elapsedMs: 0, turns: [])
+        #expect(throws: (any Error).self) { try JSONDecoder().decode(DiarizerState.self, from: JSONEncoder().encode(big)) }
+    }
+
+    /// A version 2 file without the member (speakers off, or written before they streamed) still reads.
+    // ports: CheckpointStateTest#aJobWithoutEncoderOrDiarizerOmitsThem
+    @Test func aCheckpointWithoutSpeakersStillReads() throws {
+        let decoded = try stored(state()) { $0["speakers"] = nil }
+        #expect(decoded.speakers == nil)
+        #expect(decoded.segments == segments)
+    }
+
+    /// The draft words carry each passage's speaker id; a passage without one has none.
+    @Test func theDraftWordsKeepTheStreamedSpeakers() {
+        var checkpoint = state()
+        checkpoint.segments[1].speakerID = "P_1"
+        #expect(checkpoint.draftWords.map(\.speaker) == ["", "", "P_1"])
+        #expect(checkpoint.words.map(\.speaker) == ["", "", "P_1"])
     }
 }

@@ -400,7 +400,8 @@ import Testing
         note.duration = 40
         note.speakers?[0].match = .confirmed(voice: UUID(), score: 0.9)
         var provenance = TranscriptProvenance(language: "it-IT", inferenceMs: 4_000, resumedFromMs: 0,
-                                              speakerDiarization: .init(model: "m", modelSha256: nil, turnCount: 4, speakerCount: 3))
+                                              speakerDiarization: .init(backend: "b", model: "m", modelSha256: nil, turnCount: 4,
+                                                                        speakerCount: 3))
         #expect(DocumentInfoFacts.of(note, provenance: provenance, fileBytes: nil).namesFromVoices == 0,
                 "without x-speakerIdentification, as Android reads it")
         provenance.speakerIdentification = .init(model: "m", sha256: nil, dim: 256, autoThreshold: 0.85,

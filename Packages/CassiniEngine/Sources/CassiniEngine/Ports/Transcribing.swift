@@ -12,11 +12,19 @@ public struct TranscriptionRequest: Hashable, Sendable {
     public var resume: TranscriptResume?
     /// Whether a missing speech model may be downloaded.
     public var allowDownload: Bool
+    /// The streaming speakers a Parakeet run gives each window's words to, on its inference thread, before it
+    /// reports the window; nil when the run does not tell speakers apart as it goes. Apple Speech ignores it.
+    public var speakers: WindowSpeakers?
     public init(url: URL, language: String, startOffset: TimeInterval = 0, resume: TranscriptResume? = nil,
-                allowDownload: Bool) {
+                allowDownload: Bool, speakers: WindowSpeakers? = nil) {
         self.url = url; self.language = language; self.startOffset = startOffset; self.resume = resume
-        self.allowDownload = allowDownload
+        self.allowDownload = allowDownload; self.speakers = speakers
     }
+}
+
+extension WindowSpeakers: Hashable {
+    public static func == (lhs: WindowSpeakers, rhs: WindowSpeakers) -> Bool { lhs === rhs }
+    public func hash(into hasher: inout Hasher) { hasher.combine(ObjectIdentifier(self)) }
 }
 
 /// A Parakeet checkpoint to go on from: `IncrementalTranscript`'s window and every word so far.
@@ -33,8 +41,10 @@ public struct TranscriptWindow: Hashable, Sendable {
     public var recognition: RecognitionCheckpoint
     /// Milliseconds spent decoding windows since this run began, the model load left out.
     public var inferenceMs: Int64
-    public init(words: [Word], recognition: RecognitionCheckpoint, inferenceMs: Int64) {
-        self.words = words; self.recognition = recognition; self.inferenceMs = inferenceMs
+    /// The streaming speakers after this window (`WindowSpeakers.checkpoint`), saved with its words.
+    public var speakers: SpeakerCheckpoint?
+    public init(words: [Word], recognition: RecognitionCheckpoint, inferenceMs: Int64, speakers: SpeakerCheckpoint? = nil) {
+        self.words = words; self.recognition = recognition; self.inferenceMs = inferenceMs; self.speakers = speakers
     }
 }
 
@@ -58,8 +68,12 @@ public struct TranscriptionResult: Hashable, Sendable {
     public var segmentation: String?
     /// Parakeet's decode time this run, in milliseconds. Nil for Apple Speech, whose job counts the analyzer's time.
     public var inferenceMs: Int64?
-    public init(segments: [TranscriptSegment], segmentation: String? = nil, inferenceMs: Int64? = nil) {
+    /// The streaming speakers after the last window, when the run told them apart.
+    public var speakers: SpeakerCheckpoint?
+    public init(segments: [TranscriptSegment], segmentation: String? = nil, inferenceMs: Int64? = nil,
+                speakers: SpeakerCheckpoint? = nil) {
         self.segments = segments; self.segmentation = segmentation; self.inferenceMs = inferenceMs
+        self.speakers = speakers
     }
 }
 

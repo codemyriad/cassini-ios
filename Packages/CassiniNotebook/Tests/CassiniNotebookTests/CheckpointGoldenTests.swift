@@ -26,7 +26,8 @@ import CassiniNotebook
     // ports: CheckpointGoldenTest#theGoldenHasExactlyTheVersionOneMembers (adapted: iOS version 2)
     @Test func theGoldenHasExactlyTheVersionTwoMembers() throws {
         let json = try object(golden)
-        #expect(Set(json.allKeys.compactMap { $0 as? String }) == CheckpointState.keys)
+        #expect(Set(json.allKeys.compactMap { $0 as? String }) == CheckpointState.keys.subtracting(["speakers"]),
+                "a run that does not tell speakers apart as it goes writes no speakers")
         #expect(json["version"] as? Int == 2)
         #expect(json["model"] as? String == Self.ultra)
         let recognition = try #require(json["recognition"] as? NSDictionary)

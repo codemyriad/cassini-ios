@@ -71,7 +71,7 @@ public struct NamingInput: Hashable, Sendable {
     /// voices as they are now; nil when the note has no such speaker. Merge targets are the other speakers who say
     /// something. Remember works with a print of its own, or once an analysis has named its model.
     public static func of(_ note: Note, speakerID: String, print: SpeakerPrint?, voices: [SavedVoice],
-                          voicesReadOnly: Bool, currentModel: String?) -> NamingInput? {
+                          voicesReadOnly: Bool, currentModel: String?, voiceModelReady: Bool? = nil) -> NamingInput? {
         guard let index = note.speakers?.firstIndex(where: { $0.id == speakerID }),
               let speaker = note.speakers?[index] else { return nil }
         let stats = SpeakerStats.of(note.transcript)
@@ -85,7 +85,7 @@ public struct NamingInput: Hashable, Sendable {
         return NamingInput(
             speakerID: speakerID, label: speaker.name, ordinal: stat?.ordinal ?? index, speakingTime: stat?.speakingTime ?? 0,
             sample: stat?.sample, print: print, match: speaker.match, voices: voices, voicesReadOnly: voicesReadOnly,
-            voiceModelReady: print != nil || currentModel != nil, currentModel: currentModel,
+            voiceModelReady: print != nil || (voiceModelReady ?? (currentModel != nil)), currentModel: currentModel,
             mergeTargets: targets, versions: MergeVersions(shown: versions.shown, added: versions.added),
             canSample: note.audio.isPlayable)
     }

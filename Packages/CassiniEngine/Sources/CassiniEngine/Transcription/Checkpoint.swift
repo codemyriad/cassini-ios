@@ -10,6 +10,13 @@ public protocol CheckpointStoring: Sendable {
     /// Removes the note's job work (`work/`); nothing when there is none.
     func discard(_ noteID: UUID) throws
     func exists(_ noteID: UUID) -> Bool
+    /// Where a streaming job keeps the note's voice clips (`work/clips.pcm`), beside the checkpoint that counts them;
+    /// nil keeps them in memory.
+    func clipsURL(for noteID: UUID) -> URL?
+}
+
+extension CheckpointStoring {
+    public func clipsURL(for noteID: UUID) -> URL? { nil }
 }
 
 /// A checkpoint could not be written because the volume is (nearly) full: the job fails with `SPACE`, not `SAVE`.
@@ -43,9 +50,13 @@ public struct CheckpointFiles: CheckpointStoring {
         self.init(noteDirectory: { notes.directory(for: $0) })
     }
 
+    public static let clipsFilename = "clips.pcm"
+
     public func directory(for noteID: UUID) -> URL {
         noteDirectory(noteID).appendingPathComponent(Self.directoryName, isDirectory: true)
     }
+
+    public func clipsURL(for noteID: UUID) -> URL? { directory(for: noteID).appendingPathComponent(Self.clipsFilename) }
 
     public func load(_ noteID: UUID) throws -> CheckpointState? {
         let folder = directory(for: noteID)

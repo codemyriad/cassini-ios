@@ -9,7 +9,8 @@ import CassiniNotebook
         TranscriptSegment(text: "Again", start: 3, end: 4, words: [TimedWord(text: "Again", start: 3, end: 4)]),
     ]
     private let provenance = TranscriptProvenance(language: "en-US", inferenceMs: 1_200, resumedFromMs: 0,
-                                                  speakerDiarization: .init(model: "m", modelSha256: nil, turnCount: 9, speakerCount: 9))
+                                                  speakerDiarization: .init(backend: "b", model: "m", modelSha256: nil, turnCount: 9,
+                                                                            speakerCount: 9))
 
     @Test func theRecordDescribesTheWordsItWasMadeWith() {
         let record = ProvenanceRecord(provenance: provenance, transcript: words)
@@ -28,7 +29,7 @@ import CassiniNotebook
         let turns = [SpeakerTurn(speakerID: "x_a", start: 0, end: 0.9), SpeakerTurn(speakerID: "x_b", start: 0.9, end: 4)]
         let attributed = SpeakerAttribution.assign(words, turns: turns)
         #expect(attributed.count == 3, "the passages are split by speaker")
-        let diarization = TranscriptProvenance.SpeakerDiarization(model: "m", modelSha256: "s", turnCount: 2, speakerCount: 2)
+        let diarization = TranscriptProvenance.SpeakerDiarization(backend: "b", model: "m", modelSha256: "s", turnCount: 2, speakerCount: 2)
         record.addSpeakers(diarization, transcript: attributed)
         #expect(record.provenance(for: attributed)?.speakerDiarization == diarization)
 

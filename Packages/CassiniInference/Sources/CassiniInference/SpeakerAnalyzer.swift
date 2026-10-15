@@ -1,175 +1,169 @@
-import Foundation
-import CryptoKit
-import FluidAudio
+import AVFoundation
+import CassiniCore
 import CassiniEngine
 import CassiniNotebook
 
-/// FluidAudio's offline speaker pipeline, off the UI actor; it receives only local file URLs.
+/// Android's speaker pipeline over the native runtime (`SpeakerRuntime`, CassiniSherpa's in the app): streaming
+/// Sortformer and CAM++ from the catalog's pinned files (`SpeakerModels`).
 ///
-/// The models come from `SpeakerModelInstaller`, pinned to `SpeakerModelManifest.diarizer` and checked file by file.
-/// An analysis that arrives while another runs waits its turn; a request that arrives during an install joins it. The
-/// models are always loaded with FluidAudio offline, so a load never downloads on its own: downloads happen only in
-/// the installer, which opens the network through `ModelNetworkGate` while it fetches.
-public actor SpeakerAnalyzer: SpeakerAnalyzing {
-    public static let modelID = "pyannote-community-1-wespeaker-coreml-v1"
-    public static let manifest = SpeakerModelManifest.diarizer
-    /// The FluidAudio commit `Package.swift` pins (a test checks it against `Package.resolved`).
-    public static let fluidAudioRevision = "e560c6445ffdc42e60c7b282d162aae271f18e2a"
-    /// The `x-speakerDiarization` backend: the library at its commit, and how it runs.
-    public static let backend = "FluidAudio \(fluidAudioRevision.prefix(7)) offline diarizer "
-        + "(pyannote segmentation, WeSpeaker embeddings, VBx clustering), Core ML"
+/// - **During a Parakeet decode** the job asks for `streamingEngines()` and tells each window's speakers apart on the
+///   transcriber's inference thread (`WindowSpeakers`).
+/// - **After the words** (a speakers-only job, an Apple Speech transcription) `analyze` reads the whole file as 16 kHz
+///   mono floats in the job's 28 s windows with 2 s overlap, gives each window to the same `WindowSpeakers` with the
+///   transcript's words that fall in it, and makes a CAM++ print per speaker from the voice clips (kept in memory: at
+///   most 45 s per speaker). It runs on the speech inference thread, one native body at a time.
+/// - **Models.** Installed through the shared `PinnedModelInstaller` (Range resume, pinned SHA-256, the redirect
+///   policy); the diarizer comes as seekable Zstandard. A build without the native runtime reports them unsupported.
+public struct SpeakerAnalyzer: SpeakerAnalyzing {
+    public let models: SpeakerModels
+    private let runtime: SpeakerRuntime
+    private let thread: InferenceThread
+    private let availableMemory: @Sendable () -> Int64?
 
-    /// Loads the installed models from the models directory and analyses one local file with them.
-    public typealias Analysis = @Sendable (_ url: URL, _ models: URL,
-                                           _ progress: @escaping @Sendable (SpeakerAnalysisEvent) -> Void) async throws -> SpeakerAnalysis
-
-    public nonisolated let installer: SpeakerModelInstaller
-    private let analysis: Analysis
-    private var identity: String?
-    private var analyzing = false
-    private var queue: [CheckedContinuation<Void, Never>] = []
-
-    /// `directory` is where the models go (Application Support/CassiniModels, excluded from backups); `storage` tells the
-    /// free space there before a download.
-    public init(directory: URL = SpeakerAnalyzer.defaultDirectory, storage: any StorageProbe,
-                network: ModelNetworkGate = .fluidAudio) {
-        self.init(installer: SpeakerModelInstaller(manifest: Self.manifest, directory: directory, storage: storage,
-                                                   network: network, fetch: Self.fetchFromHub),
-                  network: network, analysis: Self.fluidAudioAnalysis(network: network))
+    public init(models: SpeakerModels, runtime: SpeakerRuntime,
+                availableMemory: @escaping @Sendable () -> Int64? = TranscriptionJob.availableMemory) {
+        self.init(models: models, runtime: runtime, availableMemory: availableMemory, thread: .speech)
     }
 
-    /// An analyzer over `installer` whose `analysis` does the work; tests pass a fake one.
-    public init(installer: SpeakerModelInstaller, network: ModelNetworkGate, analysis: @escaping Analysis) {
-        self.installer = installer
-        self.analysis = analysis
-        network.close()
+    init(models: SpeakerModels, runtime: SpeakerRuntime, availableMemory: @escaping @Sendable () -> Int64?,
+         thread: InferenceThread) {
+        self.models = models; self.runtime = runtime; self.availableMemory = availableMemory; self.thread = thread
     }
 
-    public static var defaultDirectory: URL {
-        URL.applicationSupportDirectory.appendingPathComponent("CassiniModels", isDirectory: true)
-    }
+    public var modelInstallBytes: Int64 { models.installBytes }
 
-    /// The free space an install of the models asks for, as the installer checks it.
-    public nonisolated var modelInstallBytes: Int64 { installer.manifest.requiredFreeBytes }
+    public func modelStatus() async -> ModelPartStatus { models.status(linked: runtime.linked) }
 
-    public var modelIdentity: String? {
-        get async {
-            if let identity { return identity }
-            guard await installer.status() == .ready, let fingerprint = try? Self.fingerprint(installer.directory) else {
-                return nil
-            }
-            identity = Self.modelID + ":" + fingerprint
-            return identity
-        }
-    }
-
-    public func modelStatus() async -> ModelPartStatus { await installer.status() }
-
-    public func refreshModelStatus() async -> ModelPartStatus {
-        let status = await installer.refresh()
-        if status != .ready { identity = nil }
-        return status
-    }
+    public func refreshModelStatus() async -> ModelPartStatus { await models.refresh(linked: runtime.linked) }
 
     public func installModels(progress: @escaping @Sendable (InstallProgress) -> Void) async throws {
-        try await installer.install(allowDownload: true, progress: progress)
+        guard runtime.linked else { return }
+        try await models.install(progress: progress)
     }
 
-    public func cancelModelInstall() async {
-        await installer.cancel()
+    public func cancelModelInstall() async { models.cancel() }
+
+    public func printsReady() async -> Bool { runtime.linked && models.printsReady }
+
+    public func streamingEngines() async -> (any SpeakerEngines)? {
+        guard runtime.linked, models.diarizerReady else { return nil }
+        return Engines(runtime: runtime, diarizer: models.diarizer, voiceprint: models.voiceprint, thread: thread)
     }
 
-    public func analyze(url: URL, allowDownload: Bool,
+    public func analyze(url: URL, words: [Word], allowDownload: Bool,
                         progress: @escaping @Sendable (SpeakerAnalysisEvent) -> Void) async throws -> SpeakerAnalysis {
-        progress(.preparingModels(.downloading(nil)))
-        try await installer.install(allowDownload: allowDownload) { progress(.preparingModels($0)) }
-        await takeTurn()
-        defer { endTurn() }
-        try Task.checkCancellation()
-        let started = ContinuousClock.now
-        var result = try await analysis(url, try Self.prepare(installer.directory), progress)
-        let elapsed = ContinuousClock.now - started
-        if let model = result.prints.first?.model { identity = model }
-        result.backend = result.backend ?? Self.backend
-        result.modelRevision = result.modelRevision ?? installer.manifest.revision
-        result.elapsedMs = result.elapsedMs ?? Int64((elapsed / .milliseconds(1)).rounded())
-        return result
-    }
-
-    /// FluidAudio's offline diarizer over the installed models.
-    private static func fluidAudioAnalysis(network: ModelNetworkGate) -> Analysis {
-        { url, directory, progress in
-            var config = OfflineDiarizerConfig.default
-            config.embedding.batchSize = 4
-            let manager = OfflineDiarizerManager(config: config)
-            // Installed and checked: the load reads the files only. With the network closed a damaged file fails the
-            // load instead of being fetched again behind the user's back.
-            network.close()
-            let models = try await OfflineDiarizerModels.load(from: directory)
-            try Task.checkCancellation()
-            let fingerprint = try Self.fingerprint(directory)
-            manager.initialize(models: models)
-            let result = try await manager.process(url, progressCallback: { count, total in
-                progress(.analyzing(Double(count) / Double(max(1, total))))
-            })
-            try Task.checkCancellation()
-            let turns = result.segments.map { SpeakerTurn(speakerID: $0.speakerId, start: Double($0.startTimeSeconds), end: Double($0.endTimeSeconds)) }
-            let database: [String: [Float]] = result.speakerDatabase ?? [:]
-            var prints: [SpeakerPrint] = []
-            for (id, vector) in database {
-                guard let normalized = VoiceMatcher.normalized(vector) else { continue }
-                // Only isolated speech counts toward eligibility for remembering a voice.
-                let seconds = SpeakerAttribution.isolatedSeconds(speakerID: id, turns: turns)
-                prints.append(SpeakerPrint(speakerID: id, model: Self.modelID + ":" + fingerprint, vector: normalized, speechSeconds: seconds))
-            }
-            return SpeakerAnalysis(turns: turns, prints: prints)
-        }
-    }
-
-    /// One analysis at a time, in the order they arrived.
-    private func takeTurn() async {
-        guard analyzing else {
-            analyzing = true
-            return
-        }
-        await withCheckedContinuation { queue.append($0) }
-    }
-
-    private func endTurn() {
-        if queue.isEmpty { analyzing = false } else { queue.removeFirst().resume() }
-    }
-
-    /// FluidAudio's download of the pinned revision into `directory/speaker-diarization`.
-    @Sendable private static func fetchFromHub(_ directory: URL, _ report: @escaping @Sendable (Double?) -> Void) async throws {
-        let directory = try prepare(directory)
-        try await ModelHub.download(.diarizer, to: directory, variant: "offline") { update in
-            // The download is the first half of FluidAudio's progress; the second is compiling, which a download
-            // alone skips.
-            if case .downloading = update.phase { report(min(update.fractionCompleted * 2, 1)) } else { report(nil) }
-        }
-    }
-
-    /// Creates the models directory, out of backups.
-    private static func prepare(_ directory: URL) throws -> URL {
-        var directory = directory
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        var values = URLResourceValues()
-        values.isExcludedFromBackup = true
-        try directory.setResourceValues(values)
-        return directory
-    }
-
-    private static func fingerprint(_ cache: URL) throws -> String {
-        var digest = SHA256()
-        for model in ["Embedding", "FBank", "PldaRho"] {
-            for file in ["model.mil", "weights/weight.bin"] {
-                let relative = "\(manifest.folder)/\(model).mlmodelc/\(file)"
-                digest.update(data: Data(relative.utf8))
-                let handle = try FileHandle(forReadingFrom: cache.appendingPathComponent(relative))
-                defer { try? handle.close() }
-                while let data = try handle.read(upToCount: 65_536), !data.isEmpty { try Task.checkCancellation(); digest.update(data: data) }
+        guard runtime.linked else { throw JobFailure.model }
+        if !models.diarizerReady || !models.printsReady {
+            // Without CAM++ the speakers are still told apart; without the diarizer nothing can be.
+            if allowDownload {
+                progress(.preparingModels(.downloading(nil)))
+                try await models.install { progress(.preparingModels($0)) }
+            } else if !models.diarizerReady {
+                throw SpeakerAnalysisError.needsConsent
             }
         }
-        return digest.finalize().map { String(format: "%02x", $0) }.joined()
+        guard let engines = await streamingEngines() else { throw JobFailure.model }
+        let printsReady = models.printsReady, memory = availableMemory
+        let cancel = CancelFlag()
+        return try await withTaskCancellationHandler {
+            try await thread.run {
+                try Self.wholeFile(url, words: words, engines: engines, printsReady: printsReady, memory: memory,
+                                   cancel: cancel, progress: progress)
+            }
+        } onCancel: {
+            cancel.set()
+        }
+    }
+
+    // MARK: - The whole file
+
+    static let format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: Double(CassiniNotebook.Limits.asrRate),
+                                      channels: 1, interleaved: false)!
+
+    /// The whole-file analysis, on the inference thread: windows as `IncrementalTranscript` cuts them (28 s, the last
+    /// 2 s carried into the next), each with the words that overlap it on its own clock.
+    static func wholeFile(_ url: URL, words: [Word], engines: any SpeakerEngines, printsReady: Bool,
+                          memory: @escaping @Sendable () -> Int64?, cancel: CancelFlag,
+                          progress: (SpeakerAnalysisEvent) -> Void) throws -> SpeakerAnalysis {
+        let reader: FileReader
+        do { reader = try FileReader(url: url, from: 0, to: format, downmix: true) } catch { throw JobFailure.open }
+        let totalSamples = max(1, Int64((reader.duration * Double(format.sampleRate)).rounded()))
+        let clips: MemoryClips? = printsReady ? MemoryClips() : nil
+        let speakers = try WindowSpeakers(engines: engines, clips: clips, prefix: "", availableMemory: memory)
+        defer { speakers.close() }
+        let windowSamples = IncrementalTranscript.windowSamples, overlap = IncrementalTranscript.overlapSamples
+        let rate = Int64(format.sampleRate)
+        let plain = words.map { Word("", $0.startMs, $0.endMs, $0.text) }
+        var window: [Float] = []
+        window.reserveCapacity(windowSamples)
+        var start: Int64 = 0
+        var decodedEnd: Int64 = 0
+        func process() throws {
+            try cancel.check()
+            let startMs = start * 1000 / rate
+            let audio = PcmAudio(window, sampleRate: Int(rate))
+            let endMs = startMs + audio.durationMs
+            let inside = plain.filter { $0.endMs > startMs && $0.startMs < endMs }.map {
+                Word("", max($0.startMs, startMs) - startMs, min($0.endMs, endMs) - startMs, $0.text)
+            }
+            _ = try speakers.window(audio, startMs: startMs, words: Transcript(inside))
+            decodedEnd = start + Int64(window.count)
+            progress(.analyzing(min(1, Double(decodedEnd) / Double(totalSamples))))
+        }
+        while let (buffer, _) = reader.nextBuffer() {
+            try cancel.check()
+            let count = Int(buffer.frameLength)
+            var samples = UnsafeBufferPointer(start: buffer.floatChannelData![0], count: count)[...]
+            while !samples.isEmpty {
+                let n = min(windowSamples - window.count, samples.count)
+                window.append(contentsOf: samples.prefix(n))
+                samples = samples.dropFirst(n)
+                if window.count == windowSamples {
+                    try process()
+                    window = Array(window.suffix(overlap))
+                    start += Int64(windowSamples - overlap)
+                }
+            }
+        }
+        guard reader.failure == nil, reader.reachedEnd else { throw JobFailure.open }
+        // An exact window end leaves just its overlap, which was analysed already.
+        if start + Int64(window.count) > decodedEnd, !window.isEmpty { try process() }
+        try cancel.check()
+        guard !(speakers.failed && speakers.turns.isEmpty) else { throw JobFailure.speakers }
+        var prints: [SpeakerPrint] = []
+        if let clips, !speakers.clipWindows.isEmpty, SpeakerMemory.allows(availableBytes: memory(), SpeakerMemory.beforePrintsBytes) {
+            // Best effort: without prints the speakers are still told apart, and nobody is named from a saved voice.
+            let made = try? CheckedPrints.check(engines.prints(clips, windows: speakers.clipWindows) { try cancel.check() })
+            try cancel.check()
+            prints = (made ?? [:]).sorted { $0.key < $1.key }.map {
+                SpeakerPrint(speakerID: $0.key, model: VoiceprintModel.sha256, vector: $0.value.vector,
+                             speechSeconds: $0.value.seconds)
+            }
+        }
+        return SpeakerAnalysis(turns: speakers.turns.map { $0.speakerTurn(prefix: "") }, prints: prints, transcript: nil,
+                               elapsedMs: speakers.elapsedMs, streaming: true, printsReady: printsReady)
+    }
+
+    // MARK: - Engines
+
+    /// The native models of the installed files, on the speech inference thread.
+    struct Engines: SpeakerEngines {
+        let runtime: SpeakerRuntime
+        let diarizer: URL
+        let voiceprint: URL
+        let thread: InferenceThread
+
+        func openDiarizer(restored: DiarizerState?) throws -> any StreamingDiarizer {
+            try runtime.makeDiarizer(diarizer, restored)
+        }
+
+        func prints(_ audio: any PcmSource, windows: [String: [PrintWindow]],
+                    active: () throws -> Void) throws -> [String: Voiceprint] {
+            try runtime.prints(voiceprint, audio, windows, active)
+        }
+
+        func run<Value: Sendable>(_ body: @escaping @Sendable () throws -> Value) async throws -> Value {
+            try await thread.run(body)
+        }
     }
 }

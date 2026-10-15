@@ -158,11 +158,13 @@ extension Note {
     /// `autoName` says, and links it to no saved voice, as Android stores such a match as none. An automatic match to
     /// a voice of `carriedLinks` (`carriedVoiceLinks`) names the speaker whatever `autoName` says too, and gives it the
     /// link it had: confirmed stays confirmed. Without a valid turn,
-    /// or when no passage gets a speaker, nothing but `speakerAnalysisFailure` changes.
+    /// or when no passage gets a speaker, nothing but `speakerAnalysisFailure` changes. `attributed` is the transcript
+    /// with its speakers when the job already gave each word one as it went (the streaming diarizer, Android's
+    /// `Diarization.assign` per window); it holds the note's words, and `turns` then only carry the exclusions.
     public mutating func applySpeakerAnalysis(turns: [SpeakerTurn], matches: [String: VoiceMatch], voiceNames: [UUID: String],
                                               localVoices: Set<UUID> = [], carriedLinks: [UUID: VoiceMatchState] = [:],
-                                              autoName: Bool, stamp: VersionStamp) {
-        let attributed = SpeakerAttribution.assign(transcript, turns: turns)
+                                              autoName: Bool, stamp: VersionStamp, attributed: [TranscriptSegment]? = nil) {
+        let attributed = attributed ?? SpeakerAttribution.assign(transcript, turns: turns)
         var order: [String] = []
         for segment in attributed { if let id = segment.speakerID, !order.contains(id) { order.append(id) } }
         guard SpeakerAttribution.canAttribute(turns), !order.isEmpty else {

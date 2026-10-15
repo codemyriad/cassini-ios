@@ -16,10 +16,11 @@ public struct CheckpointState: Hashable, Sendable {
     /// The version `encode` writes and `decode` reads.
     public static let version = 2
 
-    /// Every member `encode` writes; `recognition` only for a Parakeet run.
+    /// Every member `encode` writes; `recognition` only for a Parakeet run, `speakers` only for one that tells speakers
+    /// apart as it goes.
     public static let keys: Set<String> = [
         "version", "source", "signature", "model", "segments", "doneMs", "totalMs", "elapsedMs", "inferenceMs",
-        "resumedFromMs", "wordsComplete", "recognition",
+        "resumedFromMs", "wordsComplete", "recognition", "speakers",
     ]
 
     /// The note's audio file name.
@@ -46,13 +47,17 @@ public struct CheckpointState: Hashable, Sendable {
     public var wordsComplete: Bool
     /// Where a Parakeet run goes on from (`IncrementalTranscript`'s window); nil for Apple Speech.
     public var recognition: RecognitionCheckpoint?
+    /// The streaming speakers of a Parakeet run (Android's `diarizer`, `speakerPrefix`, `speakerFailure`,
+    /// `clipSamples` and `voiceClips` members); nil when the run does not tell speakers apart as it goes.
+    public var speakers: SpeakerCheckpoint?
 
     public init(source: String, signature: String, model: String, segments: [TranscriptSegment], doneMs: Int64,
                 totalMs: Int64, elapsedMs: Int64, inferenceMs: Int64 = 0, resumedFromMs: Int64 = 0,
-                wordsComplete: Bool = false, recognition: RecognitionCheckpoint? = nil) {
+                wordsComplete: Bool = false, recognition: RecognitionCheckpoint? = nil, speakers: SpeakerCheckpoint? = nil) {
         self.source = source; self.signature = signature; self.model = model; self.segments = segments
         self.doneMs = doneMs; self.totalMs = totalMs; self.elapsedMs = elapsedMs; self.inferenceMs = inferenceMs
         self.resumedFromMs = resumedFromMs; self.wordsComplete = wordsComplete; self.recognition = recognition
+        self.speakers = speakers
     }
 
     /// The `model` of an Apple Speech run in `language` (BCP-47): the words of another language do not resume.
@@ -77,6 +82,7 @@ public struct CheckpointState: Hashable, Sendable {
         case counters
         case wordsPastDone
         case recognition
+        case speakers
     }
 
     /// The rules a checkpoint must pass before a run resumes from it.
@@ -91,6 +97,7 @@ public struct CheckpointState: Hashable, Sendable {
         if let recognition {
             guard recognition.valid, recognition.doneMs <= doneMs else { throw .recognition }
         }
+        if let speakers, !speakers.valid { throw .speakers }
     }
 
     /// `length:mtime` (epoch milliseconds) of the file at `url`; `nil:nil` when it cannot be read.
@@ -104,11 +111,12 @@ public struct CheckpointState: Hashable, Sendable {
     /// Seconds on the recording clock as whole milliseconds, rounded to the nearest.
     public static func ms(_ seconds: TimeInterval) -> Int64 { Int64((seconds * 1000).rounded()) }
 
-    /// The draft words of the finalized segments: one voice, recording-clock times.
+    /// The draft words of the finalized segments, with the speaker each passage has (none on the Apple path),
+    /// recording-clock times.
     public var draftWords: [DraftWord] { segments.flatMap(\.draftWords) }
 
-    /// The words as the recognizer keeps them: no speaker, recording-clock milliseconds.
-    public var words: [Word] { draftWords.map { Word("", $0.startMs, $0.endMs, $0.text) } }
+    /// The words as the recognizer keeps them: the streaming speaker id or none, recording-clock milliseconds.
+    public var words: [Word] { draftWords.map { Word($0.speaker, $0.startMs, $0.endMs, $0.text) } }
 }
 
 /// The `recognition` member: where `IncrementalTranscript` stood at the checkpoint, in samples at the recognition rate
@@ -148,7 +156,7 @@ public struct RecognitionCheckpoint: Codable, Hashable, Sendable {
 extension CheckpointState: Codable {
     private enum CodingKeys: String, CodingKey {
         case version, source, signature, model, segments, doneMs, totalMs, elapsedMs, inferenceMs, resumedFromMs
-        case wordsComplete, recognition
+        case wordsComplete, recognition, speakers
     }
 
     public init(from decoder: any Decoder) throws {
@@ -166,6 +174,7 @@ extension CheckpointState: Codable {
         resumedFromMs = try c.decode(Int64.self, forKey: .resumedFromMs)
         wordsComplete = try c.decode(Bool.self, forKey: .wordsComplete)
         recognition = try c.decodeIfPresent(RecognitionCheckpoint.self, forKey: .recognition)
+        speakers = try c.decodeIfPresent(SpeakerCheckpoint.self, forKey: .speakers)
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -182,6 +191,7 @@ extension CheckpointState: Codable {
         try c.encode(resumedFromMs, forKey: .resumedFromMs)
         try c.encode(wordsComplete, forKey: .wordsComplete)
         try c.encodeIfPresent(recognition, forKey: .recognition)
+        try c.encodeIfPresent(speakers, forKey: .speakers)
     }
 
     /// Compact JSON with sorted members.
@@ -199,13 +209,15 @@ extension CheckpointState: Codable {
 // MARK: - Resume
 
 extension TranscriptSegment {
-    /// The draft words of the segment; a segment without word times is one word.
+    /// The draft words of the segment, with its speaker id (empty without one); a segment without word times is one
+    /// word.
     public var draftWords: [DraftWord] {
+        let speaker = speakerID ?? ""
         guard !words.isEmpty else {
-            return [DraftWord(speaker: "", startMs: CheckpointState.ms(start), endMs: CheckpointState.ms(end), text: text)]
+            return [DraftWord(speaker: speaker, startMs: CheckpointState.ms(start), endMs: CheckpointState.ms(end), text: text)]
         }
         return words.map { word in
-            DraftWord(speaker: "", startMs: CheckpointState.ms(word.start), endMs: CheckpointState.ms(word.end),
+            DraftWord(speaker: speaker, startMs: CheckpointState.ms(word.start), endMs: CheckpointState.ms(word.end),
                       text: word.text.trimmingCharacters(in: .whitespacesAndNewlines))
         }
     }

@@ -29,21 +29,18 @@ import CassiniNotebook
         "suggestThreshold": .double, "margin": .double, "speakersWithPrints": .int, "autoApplied": .int,
         "suggested": .int,
     ]
-    /// Not applicable on iOS (docs/differences.md, Provenance): Sortformer's parameters and its streaming cache.
-    static let omitted: Set<String> = ["x-incrementalDiarization"]
-    static let omittedDiarization: Set<String> = ["threshold", "minDurationOn", "minDurationOff"]
-
     static let device = RunDevice(model: "iPhone17,1", system: "iOS 26.0.1 (23A355)")
+    static let diarizationRevision = "f667ed73aee57d40cc39428eb768b4fd87a0a29e"
+    static let diarizationSha = "01d1f893f394cc0418ae78425d216ed62c334c0125e650135332a7a8e595f168"
 
-    /// A run as the job records it: the words, then the speaker step with its matches.
+    /// A run as the job records it: the words, then the speaker step with its matches (Sortformer and CAM++, as
+    /// Android's).
     static func run() -> TranscriptProvenance {
         var run = TranscriptProvenance.appleRun(language: "it-IT", inferenceMs: 4_000, resumedFromMs: 52_000,
                                                 model: "Apple SpeechTranscriber it-IT", device: device)
-        run.speakerDiarization = .init(identity: "pyannote-community-1-wespeaker-coreml-v1:abc123",
-                                       backend: "FluidAudio e560c64 offline diarizer", modelRevision: "df2625ac",
-                                       elapsedMs: 750, turnCount: 3, speakerCount: 2)
-        run.speakerIdentification = .init(identity: "pyannote-community-1-wespeaker-coreml-v1:abc123", dim: 256,
-                                          thresholds: .ios, speakersWithPrints: 2, autoApplied: 1, suggested: 1)
+        run.speakerDiarization = .sortformer(revision: diarizationRevision, sha256: diarizationSha, elapsedMs: 750,
+                                             turnCount: 3, speakerCount: 2, streaming: true)
+        run.speakerIdentification = .campplus(dim: 512, speakersWithPrints: 2, autoApplied: 1, suggested: 1)
         return run
     }
 
@@ -63,9 +60,9 @@ import CassiniNotebook
     // ports: TranscriptionJobTest#provenanceEqualsThe010Record (the key sets and types; iOS's values are its own)
     @Test func theRecordHasAndroidsKeysAndTypes() throws {
         let record = Self.run().record()
-        #expect(Self.kinds(record) == Self.android.filter { !Self.omitted.contains($0.key) })
+        #expect(Self.kinds(record) == Self.android)
         let diarization = try #require(record["x-speakerDiarization"]?.object)
-        #expect(Self.kinds(diarization) == Self.androidDiarization.filter { !Self.omittedDiarization.contains($0.key) })
+        #expect(Self.kinds(diarization) == Self.androidDiarization)
         let identification = try #require(record["x-speakerIdentification"]?.object)
         #expect(Self.kinds(identification) == Self.androidIdentification)
     }
@@ -80,21 +77,38 @@ import CassiniNotebook
         #expect(record["version"] == .string("Speech framework of iOS 26.0.1 (23A355)"))
         #expect(record["x-segmentation"] == .string(TranscriptProvenance.appleSegmentation))
         #expect(record["x-resumedFromMs"] == .int(52_000))
+        #expect(record["x-incrementalDiarization"]
+            == .string("28 s windows with 2 s overlap, persistent Sortformer speaker cache"))
         let diarization = try #require(record["x-speakerDiarization"]?.object)
-        #expect(diarization["model"] == .string("pyannote-community-1-wespeaker-coreml-v1"))
-        #expect(diarization["modelSha256"] == .string("abc123"))
-        #expect(diarization["modelRevision"] == .string("df2625ac"))
+        // Android's `SpeakerAttribution.record`, value for value.
+        #expect(diarization["backend"] == .string("sherpa-onnx 1.13.7 with Sortformer diarization, CPU, 2 threads"))
+        #expect(diarization["model"] == .string("nvidia/Nemotron-3-Diarization INT8"))
+        #expect(diarization["modelSha256"] == .string(Self.diarizationSha))
+        #expect(diarization["modelRevision"] == .string(Self.diarizationRevision))
+        #expect(diarization["threshold"] == .number("0.5"))
+        #expect(diarization["minDurationOn"] == .number("0.3"), "the shortest decimal, not the Float's")
+        #expect(diarization["minDurationOff"] == .number("0.5"))
         #expect(diarization["elapsedMs"] == .int(750))
         #expect(diarization["assignment"] == .string("largest union overlap; nearest turn in gaps; one speaker per word"),
-                "Android's rule, which SpeakerAttribution.assign follows")
+                "Android's rule, which Diarization.assign follows")
         #expect(diarization["sourceSeparation"] == .bool(false))
+        // Android's `JobProvenance.identification`.
         let identification = try #require(record["x-speakerIdentification"]?.object)
-        #expect(identification["sha256"] == .string("abc123"))
+        #expect(identification["model"] == .string("3dspeaker_speech_campplus_sv_en_voxceleb_16k"))
+        #expect(identification["sha256"] == .string("357a834f702b80161e5b981182c038e18553c1f2ca752ed6cec2052365d4129b"))
         #expect(identification["metric"] == .string("cosine"))
-        #expect(identification["autoThreshold"] == .number("0.85"), "the shortest decimal, not the Float's")
-        #expect(identification["suggestThreshold"] == .number("0.65"))
-        #expect(identification["margin"] == .number("0.12"))
-        #expect(identification["dim"] == .int(256))
+        #expect(identification["autoThreshold"] == .number("0.72"), "the shortest decimal, not the Float's")
+        #expect(identification["suggestThreshold"] == .number("0.5"))
+        #expect(identification["margin"] == .number("0.08"))
+        #expect(identification["dim"] == .int(512))
+    }
+
+    /// A whole-file analysis that did not stream has no `x-incrementalDiarization`, as Android's re-attribution.
+    @Test func onlyAStreamedAnalysisNamesItsWindows() {
+        var run = Self.run()
+        run.speakerDiarization = .sortformer(revision: Self.diarizationRevision, sha256: Self.diarizationSha,
+                                             elapsedMs: 1, turnCount: 1, speakerCount: 1, streaming: false)
+        #expect(run.record()["x-incrementalDiarization"] == nil)
     }
 
     /// `provenance.json` as builds before these members wrote it: it still reads, its old `sha` is the model's

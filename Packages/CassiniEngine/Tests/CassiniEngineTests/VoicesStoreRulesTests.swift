@@ -11,7 +11,7 @@ import CassiniNotebook
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     let suite = "cassini.tests.\(UUID().uuidString)"
     let clock = FakeClock(now: Date(timeIntervalSince1970: 1_000))
-    let print = SpeakerPrint(speakerID: "a", model: "test", vector: [1, 0], speechSeconds: 10)
+    let print = SpeakerPrint(speakerID: "a", model: VoiceprintModel.sha256, vector: [1, 0], speechSeconds: 10)
     let library: LibraryStore
     let settings: SettingsStore
     let voices: VoicesStore
@@ -57,6 +57,16 @@ import CassiniNotebook
         try await voices.store?.savePrints([print], noteID: note.id)
         let printed = try #require(await voices.namingInput(noteID: note.id, speakerID: "a"))
         #expect(printed.print == print && printed.voiceModelReady)
+
+        // A print of the FluidAudio builds (WeSpeaker) counts as none: no voice of CAM++ can take it.
+        let old = SpeakerPrint(speakerID: "b", model: "pyannote-community-1-wespeaker-coreml-v1:abc", vector: [1, 0],
+                               speechSeconds: 10)
+        try await voices.store?.savePrints([print, old], noteID: note.id)
+        let stale = try #require(await voices.namingInput(noteID: note.id, speakerID: "b"))
+        #expect(stale.print == nil && !stale.voiceModelReady)
+        voices.printsReady = { true }
+        #expect(await voices.namingInput(noteID: note.id, speakerID: "b")?.voiceModelReady == true,
+                "the voiceprint model is installed: the next analysis makes a print")
         #expect(await voices.namingInput(noteID: note.id, speakerID: "z") == nil)
         #expect(await voices.namingInput(noteID: UUID(), speakerID: "a") == nil)
     }
@@ -104,7 +114,7 @@ import CassiniNotebook
         let generation = settings.voicesGeneration
         _ = await voices.forgetEveryone()
         let analysis = SpeakerAnalysis(turns: [.init(speakerID: "late", start: 0, end: 12)],
-                                       prints: [.init(speakerID: "late", model: "test", vector: [1, 0], speechSeconds: 12)])
+                                       prints: [.init(speakerID: "late", model: VoiceprintModel.sha256, vector: [1, 0], speechSeconds: 12)])
         try await voices.applySpeakerAnalysis(analysis, to: note.id, generation: generation)
         #expect(library.note(note.id)?.speakers?.count == 1)
         #expect(try await voices.store?.prints(noteID: note.id) == [])

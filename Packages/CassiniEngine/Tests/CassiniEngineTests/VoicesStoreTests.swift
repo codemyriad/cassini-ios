@@ -52,7 +52,7 @@ import CassiniNotebook
 /// (Android `VoiceRepositoryTest` and `NoteViewModelTest`'s naming side). The analysis racing a Forget everyone
 /// through the queue stays a hosted test (`CassiniTests/VoicesStoreTests`).
 @MainActor @Suite(.serialized) struct VoicesStoreTests {
-    let print = SpeakerPrint(speakerID: "a", model: "test", vector: [1, 0], speechSeconds: 10)
+    let print = SpeakerPrint(speakerID: "a", model: VoiceprintModel.sha256, vector: [1, 0], speechSeconds: 10)
     let h = VoicesHarness()
 
     /// A note whose speaker "a" says two passages, with its print on disk.
@@ -354,7 +354,7 @@ import CassiniNotebook
         await h.start()
         let voices = h.voices
         try await voices.store?.savePrints([print], noteID: notes[0].id)
-        try await voices.store?.savePrints([SpeakerPrint(speakerID: "a", model: "test", vector: [0, 1], speechSeconds: 10)],
+        try await voices.store?.savePrints([SpeakerPrint(speakerID: "a", model: VoiceprintModel.sha256, vector: [0, 1], speechSeconds: 10)],
                                            noteID: notes[1].id)
 
         let luca = Task { try await remember("Luca", in: notes[0].id, voices: voices) }

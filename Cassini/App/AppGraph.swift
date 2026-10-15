@@ -36,6 +36,7 @@ import CassiniNotebook
         }
         library = LibraryStore(root: environment.root, errors: errors)
         voices = VoicesStore(library: library, settings: settings, clock: environment.clock)
+        voices.printsReady = { [analyzer = environment.analyzer] in await analyzer.printsReady() }
         playback = PlaybackStore(playback: environment.playback, library: library, preview: { note, position in
             var note = note
             note.playbackPosition = position

@@ -16,18 +16,29 @@ public struct TranscriptProvenance: Codable, Hashable, Sendable {
         "whole file streamed to SpeechAnalyzer in 1 s blocks, the analyzer finds its own segments; "
         + "a resume restarts 1 s before the checkpoint and drops the words that end at or before it"
 
-    /// The speaker step's record (`x-speakerDiarization`).
+    /// The speaker step's record (`x-speakerDiarization`), with `x-incrementalDiarization` beside it.
     public struct SpeakerDiarization: Codable, Hashable, Sendable {
-        public static let fluidAudio = "fluidaudio"
-        /// How the words get their speakers (`SpeakerAttribution.assign`): Android's rule, word for word.
+        /// How the words get their speakers (`Diarization.assign`, `SpeakerAttribution.assign`): Android's rule, word
+        /// for word.
         public static let assignmentRule = "largest union overlap; nearest turn in gaps; one speaker per word"
+        /// Android's `SpeakerAttribution.record` values for Sortformer.
+        public static let sortformerBackend = "sherpa-onnx 1.13.7 with Sortformer diarization, CPU, 2 threads"
+        public static let sortformerModel = "nvidia/Nemotron-3-Diarization INT8"
+        /// Android's `x-incrementalDiarization`: how the streaming diarizer reads the recording.
+        public static let incrementalWindows = "28 s windows with 2 s overlap, persistent Sortformer speaker cache"
 
         public var backend: String
         public var model: String
-        /// The Hugging Face revision the models were installed from, when the analysis tells it.
+        /// The revision the model was made from, when the analysis tells it.
         public var modelRevision: String?
-        /// The model fingerprint the voiceprints also carry (`modelSha256`; older builds stored it as `sha`).
+        /// The SHA-256 of the model file (`modelSha256`; older builds stored a fingerprint of FluidAudio's models
+        /// as `sha`).
         public var modelSha256: String?
+        /// Sortformer's activity threshold and minimum turn and gap (`Diarization`); nil in records of FluidAudio
+        /// builds, whose pipeline had none.
+        public var threshold: Double?
+        public var minDurationOn: Double?
+        public var minDurationOff: Double?
         /// Time spent in the analysis itself, without the model install; nil in records of older builds.
         public var elapsedMs: Int64?
         public var turnCount: Int
@@ -36,26 +47,40 @@ public struct TranscriptProvenance: Codable, Hashable, Sendable {
         public var assignment: String?
         /// Whether the speakers were separated from a mix before the analysis; iOS never does. Nil in older records.
         public var sourceSeparation: Bool?
+        /// `x-incrementalDiarization` of the record: how a streaming diarizer read the recording.
+        public var incremental: String?
 
-        public init(backend: String = fluidAudio, model: String, modelRevision: String? = nil, modelSha256: String?,
+        public init(backend: String, model: String, modelRevision: String? = nil, modelSha256: String?,
+                    threshold: Double? = nil, minDurationOn: Double? = nil, minDurationOff: Double? = nil,
                     elapsedMs: Int64? = nil, turnCount: Int, speakerCount: Int, assignment: String? = assignmentRule,
-                    sourceSeparation: Bool? = false) {
+                    sourceSeparation: Bool? = false, incremental: String? = nil) {
             self.backend = backend; self.model = model; self.modelRevision = modelRevision
-            self.modelSha256 = modelSha256; self.elapsedMs = elapsedMs; self.turnCount = turnCount
+            self.modelSha256 = modelSha256; self.threshold = threshold; self.minDurationOn = minDurationOn
+            self.minDurationOff = minDurationOff; self.elapsedMs = elapsedMs; self.turnCount = turnCount
             self.speakerCount = speakerCount; self.assignment = assignment; self.sourceSeparation = sourceSeparation
+            self.incremental = incremental
         }
 
-        /// From a `SpeakerAnalyzing.modelIdentity` of the form `model:sha256`.
-        public init(identity: String, backend: String = fluidAudio, modelRevision: String? = nil, elapsedMs: Int64? = nil,
-                    turnCount: Int, speakerCount: Int) {
-            let (model, sha) = TranscriptProvenance.split(identity)
-            self.init(backend: backend, model: model, modelRevision: modelRevision, modelSha256: sha,
-                      elapsedMs: elapsedMs, turnCount: turnCount, speakerCount: speakerCount)
+        /// The record of a Sortformer analysis, with Android's values (`SpeakerAttribution.record`): `revision` and
+        /// `sha256` are the pinned model's (`ModelCatalog.diarization*`), `turnCount` the turns and `speakerCount`
+        /// the speakers of the words. `streaming` adds `x-incrementalDiarization`.
+        public static func sortformer(revision: String, sha256: String, elapsedMs: Int64, turnCount: Int,
+                                      speakerCount: Int, streaming: Bool) -> SpeakerDiarization {
+            SpeakerDiarization(backend: sortformerBackend, model: sortformerModel, modelRevision: revision,
+                               modelSha256: sha256, threshold: decimal(Diarization.threshold),
+                               minDurationOn: decimal(Diarization.minDurationOn),
+                               minDurationOff: decimal(Diarization.minDurationOff), elapsedMs: elapsedMs,
+                               turnCount: turnCount, speakerCount: speakerCount,
+                               incremental: streaming ? incrementalWindows : nil)
         }
+
+        /// A Float written as its shortest decimal (0.3, not the Float's 0.30000001192…), as Android's `toDouble()`
+        /// of these constants serialises.
+        static func decimal(_ value: Float) -> Double { Double("\(value)") ?? Double(value) }
 
         private enum CodingKeys: String, CodingKey {
-            case backend, model, modelRevision, modelSha256, elapsedMs, turnCount, speakerCount, assignment
-            case sourceSeparation
+            case backend, model, modelRevision, modelSha256, threshold, minDurationOn, minDurationOff, elapsedMs
+            case turnCount, speakerCount, assignment, sourceSeparation, incremental
             /// What builds before the rename stored `modelSha256` as.
             case sha
         }
@@ -67,11 +92,15 @@ public struct TranscriptProvenance: Codable, Hashable, Sendable {
             modelRevision = try c.decodeIfPresent(String.self, forKey: .modelRevision)
             modelSha256 = try c.decodeIfPresent(String.self, forKey: .modelSha256)
                 ?? c.decodeIfPresent(String.self, forKey: .sha)
+            threshold = try c.decodeIfPresent(Double.self, forKey: .threshold)
+            minDurationOn = try c.decodeIfPresent(Double.self, forKey: .minDurationOn)
+            minDurationOff = try c.decodeIfPresent(Double.self, forKey: .minDurationOff)
             elapsedMs = try c.decodeIfPresent(Int64.self, forKey: .elapsedMs)
             turnCount = try c.decode(Int.self, forKey: .turnCount)
             speakerCount = try c.decode(Int.self, forKey: .speakerCount)
             assignment = try c.decodeIfPresent(String.self, forKey: .assignment)
             sourceSeparation = try c.decodeIfPresent(Bool.self, forKey: .sourceSeparation)
+            incremental = try c.decodeIfPresent(String.self, forKey: .incremental)
         }
 
         public func encode(to encoder: any Encoder) throws {
@@ -80,17 +109,24 @@ public struct TranscriptProvenance: Codable, Hashable, Sendable {
             try c.encode(model, forKey: .model)
             try c.encodeIfPresent(modelRevision, forKey: .modelRevision)
             try c.encodeIfPresent(modelSha256, forKey: .modelSha256)
+            try c.encodeIfPresent(threshold, forKey: .threshold)
+            try c.encodeIfPresent(minDurationOn, forKey: .minDurationOn)
+            try c.encodeIfPresent(minDurationOff, forKey: .minDurationOff)
             try c.encodeIfPresent(elapsedMs, forKey: .elapsedMs)
             try c.encode(turnCount, forKey: .turnCount)
             try c.encode(speakerCount, forKey: .speakerCount)
             try c.encodeIfPresent(assignment, forKey: .assignment)
             try c.encodeIfPresent(sourceSeparation, forKey: .sourceSeparation)
+            try c.encodeIfPresent(incremental, forKey: .incremental)
         }
 
         func record() -> JSONObject {
             var record = JSONObject([("backend", .string(backend)), ("model", .string(model))])
             if let modelRevision { record["modelRevision"] = .string(modelRevision) }
             if let modelSha256 { record["modelSha256"] = .string(modelSha256) }
+            if let threshold { record["threshold"] = .number("\(threshold)") }
+            if let minDurationOn { record["minDurationOn"] = .number("\(minDurationOn)") }
+            if let minDurationOff { record["minDurationOff"] = .number("\(minDurationOff)") }
             if let elapsedMs { record["elapsedMs"] = .int(elapsedMs) }
             record["turnCount"] = .int(turnCount)
             record["speakerCount"] = .int(speakerCount)
@@ -136,6 +172,17 @@ public struct TranscriptProvenance: Codable, Hashable, Sendable {
             self.init(model: model, sha256: sha, dim: dim, autoThreshold: Self.decimal(thresholds.automatic),
                       suggestThreshold: Self.decimal(thresholds.suggest), margin: Self.decimal(thresholds.margin),
                       speakersWithPrints: speakersWithPrints, autoApplied: autoApplied, suggested: suggested)
+        }
+
+        /// The record of CAM++ prints (`VoiceprintModel`), as Android's `JobProvenance.identification` writes it:
+        /// the model's name and SHA-256, the print length `dim` and Android's thresholds.
+        public static func campplus(dim: Int, speakersWithPrints: Int, autoApplied: Int, suggested: Int) -> SpeakerIdentification {
+            let thresholds = VoiceprintModel.thresholds
+            return SpeakerIdentification(model: VoiceprintModel.name, sha256: VoiceprintModel.sha256, dim: dim,
+                                         autoThreshold: decimal(thresholds.automatic),
+                                         suggestThreshold: decimal(thresholds.suggest), margin: decimal(thresholds.margin),
+                                         speakersWithPrints: speakersWithPrints, autoApplied: autoApplied,
+                                         suggested: suggested)
         }
 
         private static func decimal(_ value: Float) -> Double { Double("\(value)") ?? Double(value) }
@@ -226,7 +273,10 @@ public struct TranscriptProvenance: Codable, Hashable, Sendable {
         record["x-inferenceMs"] = .int(inferenceMs)
         if let segmentation { record["x-segmentation"] = .string(segmentation) }
         record["x-resumedFromMs"] = .int(resumedFromMs)
-        if let speakerDiarization { record["x-speakerDiarization"] = .object(speakerDiarization.record()) }
+        if let speakerDiarization {
+            record["x-speakerDiarization"] = .object(speakerDiarization.record())
+            if let incremental = speakerDiarization.incremental { record["x-incrementalDiarization"] = .string(incremental) }
+        }
         if let speakerIdentification { record["x-speakerIdentification"] = .object(speakerIdentification.record()) }
         return record
     }

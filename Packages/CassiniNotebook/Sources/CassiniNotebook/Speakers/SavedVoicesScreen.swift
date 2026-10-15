@@ -14,12 +14,16 @@ public struct SavedVoiceSummary: Hashable, Sendable, Identifiable {
 
 public enum SavedVoiceList {
     /// The saved voices sorted by notes, then confirmed seconds, then name.
-    public static func summaries(_ voices: [SavedVoice], notes: [Note], model: String?) -> [SavedVoiceSummary] {
+    public static func summaries(_ voices: [SavedVoice], notes: [Note], model: String?,
+                                 dimension: Int? = nil) -> [SavedVoiceSummary] {
         var counts: [UUID: Int] = [:]
         for note in notes where note.trashedAt == nil {
             for voice in Set((note.speakers ?? []).compactMap(\.linkedVoiceID)) { counts[voice, default: 0] += 1 }
         }
-        return voices.map { SavedVoiceSummary(voice: $0, notes: counts[$0.id] ?? 0, stale: VoiceStaleness.isStale($0, model: model)) }
+        return voices.map {
+            SavedVoiceSummary(voice: $0, notes: counts[$0.id] ?? 0,
+                              stale: VoiceStaleness.isStale($0, model: model, dimension: dimension))
+        }
             .sorted { a, b in
                 if a.notes != b.notes { return a.notes > b.notes }
                 if a.confirmedSeconds != b.confirmedSeconds { return a.confirmedSeconds > b.confirmedSeconds }

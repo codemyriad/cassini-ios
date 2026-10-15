@@ -1,3 +1,4 @@
+import CassiniCore
 import Foundation
 import Synchronization
 import Testing
@@ -19,6 +20,8 @@ extension TranscriptionJobTests {
         let analyzer: any SpeakerAnalyzing
         let host: FakeHost
         let limits: TranscriptionJob.Limits
+        /// The native budget the job holds; its own, so tests that run side by side do not wait for each other.
+        let budget = NativeBudget()
         /// Runs the job with this transcriber in place of `transcriber` (a Parakeet one, say).
         let engine: (any Transcribing)?
 
@@ -57,7 +60,7 @@ extension TranscriptionJobTests {
                  observe: @escaping @Sendable (JobEvent) -> Void = { _ in }) async -> (outcome: JobOutcome, events: [JobEvent]) {
             let ticking = FakeUptime()
             let job = TranscriptionJob(notes: notes, transcriber: engine ?? transcriber, analyzer: analyzer, checkpoints: checkpoints,
-                                       provenance: provenanceFiles, host: host, clock: FakeClock(), limits: limits,
+                                       provenance: provenanceFiles, host: host, clock: FakeClock(), limits: limits, budget: budget,
                                        uptimeMs: uptime ?? { ticking.next() }, availableMemory: { availableMemory })
             let record = Job(noteID: noteID, seq: 1, kind: kind, state: .running, language: language, enqueuedAt: Date())
             let events = Mutex<[JobEvent]>([])
@@ -175,6 +178,7 @@ extension TranscriptionJobTests {
         }
         func discard(_ noteID: UUID) throws { try files.discard(noteID) }
         func exists(_ noteID: UUID) -> Bool { files.exists(noteID) }
+        func clipsURL(for noteID: UUID) -> URL? { files.clipsURL(for: noteID) }
     }
 
     final class FakeHost: TranscriptionJobHost, @unchecked Sendable {
@@ -182,29 +186,36 @@ extension TranscriptionJobTests {
         private let settings: JobSettings
         private let notes: NoteStore
         private var _applied: [(noteID: UUID, generation: Int)] = []
+        private var _analyses: [SpeakerAnalysis] = []
         var failsApplying = false
 
         init(_ settings: JobSettings, notes: NoteStore) { self.settings = settings; self.notes = notes }
 
         var applied: [(noteID: UUID, generation: Int)] { lock.withLock { _applied } }
+        /// Every analysis the job gave the note, in order.
+        var analyses: [SpeakerAnalysis] { lock.withLock { _analyses } }
 
         func jobSettings() async -> JobSettings { settings }
         func applySpeakers(_ analysis: SpeakerAnalysis, to noteID: UUID, generation: Int) async throws {
             if lock.withLock({ failsApplying }) { throw CocoaError(.fileWriteUnknown) }
-            // As the app does: the words get the analysis's speakers.
-            _ = try await notes.mutate(noteID) { $0.transcript = SpeakerAttribution.assign($0.transcript, turns: analysis.turns) }
-            lock.withLock { _applied.append((noteID, generation)) }
+            // As the app does: the streamed words with their speakers, else the words get the analysis's turns.
+            _ = try await notes.mutate(noteID) { note in
+                note.transcript = analysis.transcript ?? SpeakerAttribution.assign(note.transcript, turns: analysis.turns)
+            }
+            lock.withLock {
+                _applied.append((noteID, generation))
+                _analyses.append(analysis)
+            }
         }
     }
 
     /// An analyzer whose model install fails with `failure`.
     struct InstallFailingAnalyzer: SpeakerAnalyzing {
         let failure: SpeakerAnalysisError
-        func analyze(url: URL, allowDownload: Bool,
+        func analyze(url: URL, words: [Word], allowDownload: Bool,
                      progress: @escaping @Sendable (SpeakerAnalysisEvent) -> Void) async throws -> SpeakerAnalysis {
             throw failure
         }
-        var modelIdentity: String? { get async { nil } }
         func modelStatus() async -> ModelPartStatus { .notDownloaded }
         func refreshModelStatus() async -> ModelPartStatus { .notDownloaded }
         func installModels(progress: @escaping @Sendable (InstallProgress) -> Void) async throws { throw failure }
@@ -214,11 +225,10 @@ extension TranscriptionJobTests {
 
     struct FailingAnalyzer: SpeakerAnalyzing {
         struct Failure: Error {}
-        func analyze(url: URL, allowDownload: Bool,
+        func analyze(url: URL, words: [Word], allowDownload: Bool,
                      progress: @escaping @Sendable (SpeakerAnalysisEvent) -> Void) async throws -> SpeakerAnalysis {
             throw Failure()
         }
-        var modelIdentity: String? { get async { "m:1" } }
         func modelStatus() async -> ModelPartStatus { .ready }
         func refreshModelStatus() async -> ModelPartStatus { .ready }
         func installModels(progress: @escaping @Sendable (InstallProgress) -> Void) async throws {}
