@@ -178,7 +178,7 @@ enum TestFixtures {
     private static func seedStatusJobs(into store: NoteStore, now: Date) async throws {
         let audio = store.directory(for: pausedID).appendingPathComponent("audio.wav")
         try CheckpointFiles(notes: store).save(CheckpointState(
-            source: "audio.wav", signature: CheckpointState.signature(of: audio), language: "en-US", segments: [],
+            source: "audio.wav", signature: CheckpointState.signature(of: audio), model: CheckpointState.appleModel(language: "en-US"), segments: [],
             doneMs: pausedDoneMs, totalMs: Int64(fixtureDuration * 1000), elapsedMs: 1_000), for: pausedID)
         try JobRepository(root: store.root).save([
             Job(noteID: pausedID, seq: 1, kind: .transcribe, state: .paused, pauseReason: .user, doneMs: pausedDoneMs,

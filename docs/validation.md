@@ -38,8 +38,11 @@ command below runs from the repository root, not from a folder under `Packages/`
   floor, finish, recovery, the screen model), the Note screen and Name a speaker models, saved voices and naming over
   real files, playback, trash and purge order, notices, import and export, model installs and consent, settings and
   licences, navigation and deep links.
-- **CassiniInference** (28). The file reader behind `AppleSpeechTranscriber`, the speaker model installer and manifest,
-  the licence assets, and the opt-in real-model test (below).
+- **CassiniInference**. The file reader behind both transcribers, `ParakeetTranscriber` over a fake native runtime
+  (windows on the inference thread, the detector and its fetch only online, consent and install, the pinned sizes and
+  marker, memory, resume, cancel), the speaker model installer and manifest, the licence assets, and the opt-in
+  real-model test (below). `CassiniTests/ParakeetJobTests` runs a real Ultra job on the simulator through
+  `scripts/sherpa-bench.sh`.
 - **CassiniAudio** (9). CAF repair, Opus encode and decode, and a portable document written over the app's own Opus.
 
 ### `app`: the hosted tests

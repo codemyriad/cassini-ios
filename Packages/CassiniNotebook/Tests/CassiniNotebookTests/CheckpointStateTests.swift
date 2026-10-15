@@ -1,9 +1,15 @@
+import CassiniCore
 import Foundation
 import Testing
 import CassiniNotebook
 
 /// checkpoint.json through its codec, and the rules a checkpoint must pass to resume.
 @Suite struct CheckpointStateTests {
+    /// `ModelCatalog.parakeetRevision` (CassiniEngine).
+    static let ultra = CheckpointGoldenTests.ultra
+    /// A window decoded to 2.898 s, read 0.1 s further.
+    private static let recognition = RecognitionCheckpoint(start: 0, end: 46_368, position: 47_968)
+
     private let segments = [
         TranscriptSegment(text: "La parte", start: 1.308, end: 1.788,
                           words: [TimedWord(text: "La", start: 1.308, end: 1.548), TimedWord(text: " parte", start: 1.548, end: 1.788)]),
@@ -12,12 +18,13 @@ import CassiniNotebook
     ]
 
     private func state(signature: String = "4096:1700000000000") -> CheckpointState {
-        CheckpointState(source: "audio.m4a", signature: signature, language: "it-IT", segments: segments, doneMs: 2_898,
-                        totalMs: 59_968, elapsedMs: 18_754, inferenceMs: 4_776, resumedFromMs: 0)
+        CheckpointState(source: "audio.m4a", signature: signature, model: Self.ultra, segments: segments, doneMs: 2_898,
+                        totalMs: 59_968, elapsedMs: 18_754, inferenceMs: 4_776, resumedFromMs: 0,
+                        recognition: Self.recognition)
     }
 
     private func expected(signature: String = "4096:1700000000000") -> CheckpointState.Expected {
-        .init(source: "audio.m4a", signature: signature, language: "it-IT")
+        .init(source: "audio.m4a", signature: signature, model: Self.ultra)
     }
 
     private func members(_ data: Data) throws -> Set<String> {
@@ -62,23 +69,72 @@ import CassiniNotebook
             change(&copy)
             #expect(throws: mismatch) { try copy.validate(expected()) }
         }
-        #expect(throws: CheckpointState.Mismatch.version(2)) { try stored(state()) { $0["version"] = 2 } }
+        #expect(throws: CheckpointState.Mismatch.version(3)) { try stored(state()) { $0["version"] = 3 } }
         #expect(throws: CheckpointState.Mismatch.version(0)) { try stored(state()) { $0["version"] = 0 } }
         #expect(throws: (any Error).self) { try stored(state()) { $0["segments"] = nil } }
         rejects(.source) { $0.source = "audio.wav" }
         rejects(.signature) { $0.signature = "1:2" }
-        rejects(.language) { $0.language = "en-US" }
+        rejects(.model) { $0.model = CheckpointState.appleModel(language: "it-IT") }
         let limit = Int64(Limits.maxTranscribeDuration * 1000)
         rejects(.counters) { $0.doneMs = -1 }
         rejects(.counters) { $0.doneMs = limit + 1; $0.totalMs = 0 }
         rejects(.counters) { $0.totalMs = 2_000 }
         rejects(.counters) { $0.elapsedMs = -1 }
         rejects(.counters) { $0.resumedFromMs = 3_000 }
-        rejects(.wordsPastDone) { $0.doneMs = 2_000 }
-        // An unknown total still resumes.
+        rejects(.wordsPastDone) { $0.doneMs = 2_000; $0.recognition = nil }
+        // IncrementalState's restore rules, and a window decoded past the checkpoint.
+        rejects(.recognition) { $0.recognition = RecognitionCheckpoint(start: -1, end: 0, position: 0) }
+        rejects(.recognition) { $0.recognition = RecognitionCheckpoint(start: 100, end: 50, position: 200) }
+        rejects(.recognition) { $0.recognition = RecognitionCheckpoint(start: 0, end: 300, position: 200) }
+        rejects(.recognition) {
+            $0.recognition = RecognitionCheckpoint(start: 0, end: 0, position: Int64(IncrementalTranscript.windowSamples) + 1)
+        }
+        rejects(.recognition) { $0.recognition = RecognitionCheckpoint(start: 0, end: 48_000, position: 48_000) }
+        // An unknown total still resumes, as does an Apple Speech checkpoint, which has no window.
         var unknown = state()
         unknown.totalMs = 0
         try unknown.validate(expected())
+        var apple = state()
+        apple.recognition = nil
+        apple.model = CheckpointState.appleModel(language: "it-IT")
+        try apple.validate(.init(source: "audio.m4a", signature: apple.signature, model: apple.model))
+    }
+
+    @Test func theRecognitionMemberHoldsTheWindowAndRestoresIt() throws {
+        let window: [Float] = (0..<1_600).map { Float($0) }
+        let state = IncrementalState(start: 16_000, end: 16_800, window: window, words: [Word("", 1_000, 1_040, "ciao")])
+        let recognition = RecognitionCheckpoint(state)
+        #expect(recognition == RecognitionCheckpoint(start: 16_000, end: 16_800, position: 17_600))
+        #expect(recognition.doneMs == 1_050)
+        #expect(recognition.state(window: window, words: state.words) == state)
+        var checkpoint = self.state()
+        checkpoint.recognition = recognition
+        #expect(try stored(checkpoint).recognition == recognition)
+        // An Apple Speech checkpoint writes none.
+        checkpoint.recognition = nil
+        #expect(try !members(checkpoint.encoded()).contains("recognition"))
+    }
+
+    @Test func wordsBecomeSegmentsAtASpeakerAPauseOrFortyFiveWords() {
+        let words = (0..<50).map { Word("", Int64($0) * 300, Int64($0) * 300 + 200, "w\($0)") }
+            + [Word("", 20_000, 20_400, "late"), Word("spk_2", 20_500, 20_900, "other")]
+        let segments = TranscriptSegment.segments(of: words) { $0 == "spk_2" ? "Anna" : nil }
+        #expect(segments.map(\.words.count) == [45, 5, 1, 1])
+        #expect(segments[0].text.hasPrefix("w0 w1 w2"))
+        #expect(segments[0].words[0].text == "w0 " && segments[0].words[44].text == "w44")
+        #expect(segments[0].speakerID == nil && segments[0].speaker == nil)
+        #expect(segments[3].speakerID == "spk_2" && segments[3].speaker == "Anna")
+        #expect(segments[2].start == 20 && segments[2].end == 20.4)
+        // The words come back as they went in.
+        let back = segments.flatMap(\.draftWords).map { Word($0.speaker.isEmpty ? "" : $0.speaker, $0.startMs, $0.endMs, $0.text) }
+        #expect(back.map(\.text) == words.map(\.text) && back.map(\.startMs) == words.map(\.startMs))
+    }
+
+    @Test func aParakeetCheckpointFollowsEachWindowAtMostEveryTenSeconds() {
+        #expect(!SpeechWindows.windowCheckpointDue(doneMs: 28_000, savedMs: 28_000, nowMs: 100_000, savedAt: nil))
+        #expect(SpeechWindows.windowCheckpointDue(doneMs: 28_000, savedMs: 0, nowMs: 100, savedAt: nil))
+        #expect(!SpeechWindows.windowCheckpointDue(doneMs: 54_000, savedMs: 28_000, nowMs: 9_999, savedAt: 0))
+        #expect(SpeechWindows.windowCheckpointDue(doneMs: 54_000, savedMs: 28_000, nowMs: 10_000, savedAt: 0))
     }
 
     // ports: CheckpointStateTest#aChangedSourceInvalidatesTheCheckpoint

@@ -1,28 +1,35 @@
+import CassiniCore
 import Foundation
 
-/// `work/checkpoint.json`: the finalized transcript of a stopped or interrupted job and what it was made from. A run
-/// resumes from `doneMs` only when the checkpoint still matches the note's audio and language (`validate`).
+/// `work/checkpoint.json`: the words of a stopped or interrupted job and what they were made from. A run resumes only
+/// when the checkpoint still matches the note's audio and the recognizer (`validate`).
 ///
 /// iOS writes its own members (Android's checkpoint also carries encoder, diarizer and voice-clip state, which iOS does
-/// not have): the source file name and signature, the language, the finalized segments with their words, and the
-/// numbers the progress card and the provenance need. Every time is milliseconds on the recording clock.
+/// not have): the source file name and signature, the recognizer (`model`), the words as segments, Parakeet's resume
+/// point (`recognition`) and the numbers the progress card and the provenance need. Every time is milliseconds on the
+/// recording clock.
+///
+/// Version 2 is the Parakeet Ultra file: `model` replaces version 1's `language`, and `recognition` is new. A version 1
+/// file (Apple Speech, before Ultra) is not read: its job fails with `CHECKPOINT_MISMATCH` and starts over, as Android
+/// does not resume a checkpoint of Parakeet v3 with Ultra.
 public struct CheckpointState: Hashable, Sendable {
     /// The version `encode` writes and `decode` reads.
-    public static let version = 1
+    public static let version = 2
 
-    /// Every member `encode` writes.
+    /// Every member `encode` writes; `recognition` only for a Parakeet run.
     public static let keys: Set<String> = [
-        "version", "source", "signature", "language", "segments", "doneMs", "totalMs", "elapsedMs", "inferenceMs",
-        "resumedFromMs", "wordsComplete",
+        "version", "source", "signature", "model", "segments", "doneMs", "totalMs", "elapsedMs", "inferenceMs",
+        "resumedFromMs", "wordsComplete", "recognition",
     ]
 
     /// The note's audio file name.
     public var source: String
     /// `length:mtime` of the source when the job began (`CheckpointState.signature(of:)`).
     public var signature: String
-    /// BCP-47.
-    public var language: String
-    /// Finalized results, in time order; none ends after `doneMs`.
+    /// The recognizer the words came from: Parakeet's model revision (Android's `model` member), or
+    /// `appleModel(language:)` for the Apple Speech fallback, whose words also depend on the language.
+    public var model: String
+    /// The words so far, in time order; none ends after `doneMs`.
     public var segments: [TranscriptSegment]
     /// Audio up to here is transcribed.
     public var doneMs: Int64
@@ -30,28 +37,34 @@ public struct CheckpointState: Hashable, Sendable {
     public var totalMs: Int64
     /// The jobs' running time so far, for the time-left estimate.
     public var elapsedMs: Int64
-    /// The time spent in the speech analyzer so far.
+    /// The time spent recognizing so far: for Parakeet each window's decode alone (Android's `recognition.inferenceMs`),
+    /// for Apple Speech the analyzer's running time.
     public var inferenceMs: Int64
     /// Where the latest run resumed; 0 when no run resumed.
     public var resumedFromMs: Int64
     /// Every word is final: a resumed run goes straight to the speaker step.
     public var wordsComplete: Bool
+    /// Where a Parakeet run goes on from (`IncrementalTranscript`'s window); nil for Apple Speech.
+    public var recognition: RecognitionCheckpoint?
 
-    public init(source: String, signature: String, language: String, segments: [TranscriptSegment], doneMs: Int64,
+    public init(source: String, signature: String, model: String, segments: [TranscriptSegment], doneMs: Int64,
                 totalMs: Int64, elapsedMs: Int64, inferenceMs: Int64 = 0, resumedFromMs: Int64 = 0,
-                wordsComplete: Bool = false) {
-        self.source = source; self.signature = signature; self.language = language; self.segments = segments
+                wordsComplete: Bool = false, recognition: RecognitionCheckpoint? = nil) {
+        self.source = source; self.signature = signature; self.model = model; self.segments = segments
         self.doneMs = doneMs; self.totalMs = totalMs; self.elapsedMs = elapsedMs; self.inferenceMs = inferenceMs
-        self.resumedFromMs = resumedFromMs; self.wordsComplete = wordsComplete
+        self.resumedFromMs = resumedFromMs; self.wordsComplete = wordsComplete; self.recognition = recognition
     }
+
+    /// The `model` of an Apple Speech run in `language` (BCP-47): the words of another language do not resume.
+    public static func appleModel(language: String) -> String { "\(TranscriptProvenance.appleSpeech) \(language)" }
 
     /// What a checkpoint must match to be resumed.
     public struct Expected: Hashable, Sendable {
         public var source: String
         public var signature: String
-        public var language: String
-        public init(source: String, signature: String, language: String) {
-            self.source = source; self.signature = signature; self.language = language
+        public var model: String
+        public init(source: String, signature: String, model: String) {
+            self.source = source; self.signature = signature; self.model = model
         }
     }
 
@@ -60,20 +73,24 @@ public struct CheckpointState: Hashable, Sendable {
         case version(Int)
         case source
         case signature
-        case language
+        case model
         case counters
         case wordsPastDone
+        case recognition
     }
 
     /// The rules a checkpoint must pass before a run resumes from it.
     public func validate(_ expected: Expected) throws(Mismatch) {
         guard source == expected.source else { throw .source }
         guard signature == expected.signature else { throw .signature }
-        guard language == expected.language else { throw .language }
+        guard model == expected.model else { throw .model }
         let limit = Int64(Limits.maxTranscribeDuration * 1000)
         guard (0...limit).contains(doneMs), (0...limit).contains(totalMs), totalMs == 0 || doneMs <= totalMs,
               elapsedMs >= 0, inferenceMs >= 0, (0...doneMs).contains(resumedFromMs) else { throw .counters }
         guard segments.allSatisfy({ Self.ms($0.end) <= doneMs }) else { throw .wordsPastDone }
+        if let recognition {
+            guard recognition.valid, recognition.doneMs <= doneMs else { throw .recognition }
+        }
     }
 
     /// `length:mtime` (epoch milliseconds) of the file at `url`; `nil:nil` when it cannot be read.
@@ -89,14 +106,49 @@ public struct CheckpointState: Hashable, Sendable {
 
     /// The draft words of the finalized segments: one voice, recording-clock times.
     public var draftWords: [DraftWord] { segments.flatMap(\.draftWords) }
+
+    /// The words as the recognizer keeps them: no speaker, recording-clock milliseconds.
+    public var words: [Word] { draftWords.map { Word("", $0.startMs, $0.endMs, $0.text) } }
+}
+
+/// The `recognition` member: where `IncrementalTranscript` stood at the checkpoint, in samples at the recognition rate
+/// (16 kHz) on the recording clock. Its window holds the samples `start..<position`, decoded up to `end`. Android stores
+/// the window's samples; iOS reads them again from the audio, which the signature says is unchanged, so the file
+/// stays small (`ParakeetTranscriber`).
+public struct RecognitionCheckpoint: Codable, Hashable, Sendable {
+    public var start: Int64
+    public var end: Int64
+    public var position: Int64
+
+    public init(start: Int64, end: Int64, position: Int64) { self.start = start; self.end = end; self.position = position }
+
+    /// Of a state that `IncrementalTranscript.checkpoint()` returned.
+    public init(_ state: IncrementalState) {
+        self.init(start: state.start, end: state.end, position: state.start + Int64(state.window.count))
+    }
+
+    /// Audio up to here is decoded.
+    public var doneMs: Int64 { end * 1000 / Int64(Limits.asrRate) }
+
+    /// `IncrementalState.validate`'s rules: `start <= end <= position`, a window of at most 28 s, within the longest
+    /// recording.
+    public var valid: Bool {
+        start >= 0 && start <= end && end <= position && position - start <= Int64(IncrementalTranscript.windowSamples)
+            && position <= Int64(Limits.maxSamples)
+    }
+
+    /// The state to restore: the window read again from the audio, and the checkpoint's words.
+    public func state(window: [Float], words: [Word]) -> IncrementalState {
+        IncrementalState(start: start, end: end, window: window, words: words)
+    }
 }
 
 // MARK: - JSON
 
 extension CheckpointState: Codable {
     private enum CodingKeys: String, CodingKey {
-        case version, source, signature, language, segments, doneMs, totalMs, elapsedMs, inferenceMs, resumedFromMs
-        case wordsComplete
+        case version, source, signature, model, segments, doneMs, totalMs, elapsedMs, inferenceMs, resumedFromMs
+        case wordsComplete, recognition
     }
 
     public init(from decoder: any Decoder) throws {
@@ -105,7 +157,7 @@ extension CheckpointState: Codable {
         guard version == Self.version else { throw Mismatch.version(version) }
         source = try c.decode(String.self, forKey: .source)
         signature = try c.decode(String.self, forKey: .signature)
-        language = try c.decode(String.self, forKey: .language)
+        model = try c.decode(String.self, forKey: .model)
         segments = try c.decode([TranscriptSegment].self, forKey: .segments)
         doneMs = try c.decode(Int64.self, forKey: .doneMs)
         totalMs = try c.decode(Int64.self, forKey: .totalMs)
@@ -113,6 +165,7 @@ extension CheckpointState: Codable {
         inferenceMs = try c.decode(Int64.self, forKey: .inferenceMs)
         resumedFromMs = try c.decode(Int64.self, forKey: .resumedFromMs)
         wordsComplete = try c.decode(Bool.self, forKey: .wordsComplete)
+        recognition = try c.decodeIfPresent(RecognitionCheckpoint.self, forKey: .recognition)
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -120,7 +173,7 @@ extension CheckpointState: Codable {
         try c.encode(Self.version, forKey: .version)
         try c.encode(source, forKey: .source)
         try c.encode(signature, forKey: .signature)
-        try c.encode(language, forKey: .language)
+        try c.encode(model, forKey: .model)
         try c.encode(segments, forKey: .segments)
         try c.encode(doneMs, forKey: .doneMs)
         try c.encode(totalMs, forKey: .totalMs)
@@ -128,6 +181,7 @@ extension CheckpointState: Codable {
         try c.encode(inferenceMs, forKey: .inferenceMs)
         try c.encode(resumedFromMs, forKey: .resumedFromMs)
         try c.encode(wordsComplete, forKey: .wordsComplete)
+        try c.encodeIfPresent(recognition, forKey: .recognition)
     }
 
     /// Compact JSON with sorted members.
@@ -170,5 +224,37 @@ extension TranscriptSegment {
         copy.text = kept.map { $0.text.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
             .joined(separator: " ")
         return copy
+    }
+
+    /// The most words one segment groups.
+    public static let maxGroupWords = 45
+    /// A pause longer than this starts a new segment.
+    public static let maxGroupGapMs: Int64 = 2_000
+
+    /// `words` as the note's segments: a new one at a change of speaker, a pause over 2 s, or after 45 words (the
+    /// grouping of an imported document). `label` names a speaker id; an empty id has no speaker.
+    public static func segments(of words: [Word], label: (String) -> String? = { _ in nil }) -> [TranscriptSegment] {
+        var segments: [TranscriptSegment] = []
+        var group: [Word] = []
+        func flush() {
+            guard let first = group.first else { return }
+            let timed = group.enumerated().map { index, word in
+                TimedWord(text: word.text + (index == group.count - 1 ? "" : " "),
+                          start: Double(word.startMs) / 1000, end: Double(word.endMs) / 1000)
+            }
+            segments.append(TranscriptSegment(
+                text: group.map(\.text).joined(separator: " "), start: Double(first.startMs) / 1000,
+                end: Double(group.map(\.endMs).max() ?? first.endMs) / 1000,
+                speaker: first.speaker.isEmpty ? nil : label(first.speaker) ?? first.speaker,
+                speakerID: first.speaker.isEmpty ? nil : first.speaker, words: timed))
+            group.removeAll(keepingCapacity: true)
+        }
+        for word in words {
+            if let previous = group.last, previous.speaker != word.speaker || group.count >= maxGroupWords
+                || word.startMs - previous.endMs > maxGroupGapMs { flush() }
+            group.append(word)
+        }
+        flush()
+        return segments
     }
 }

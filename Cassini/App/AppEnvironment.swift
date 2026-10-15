@@ -1,6 +1,7 @@
 import SwiftUI
 import CassiniEngine
 import CassiniInference
+import CassiniSherpa
 #if DEBUG
 import CassiniEngineTesting
 #endif
@@ -62,11 +63,22 @@ import CassiniEngineTesting
         return calendar
     }
 
+    /// Parakeet Ultra when this build links the native runtime, its model is installed under `models` and the device can
+    /// hold it (`SpeechCapability`); Apple Speech otherwise (decision D2). Chosen once at launch.
+    static func speechTranscriber(models: URL = ModelCatalog.defaultRoot,
+                                  physicalMemory: UInt64 = ProcessInfo.processInfo.physicalMemory) -> any Transcribing {
+        switch SpeechCapability.choose(linked: SherpaRuntime.isLinked, installed: ModelCatalog.parakeet.ready(in: models),
+                                       capable: SpeechCapability.parakeetCapable(physicalMemory: physicalMemory)) {
+        case .parakeet: ParakeetTranscriber(models: .init(root: models), runtime: SherpaRuntime.speech)
+        case .appleSpeech: AppleSpeechTranscriber()
+        }
+    }
+
     static func live() -> AppEnvironment {
         AppEnvironment(
             root: URL.applicationSupportDirectory.appendingPathComponent("Cassini", isDirectory: true),
             defaults: .standard, clock: SystemClock(), locale: .autoupdatingCurrent, timeZone: .autoupdatingCurrent,
-            transcriber: AppleSpeechTranscriber(), analyzer: SpeakerAnalyzer(storage: FileSystemStorageProbe()), capture: AVCaptureAdapter(),
+            transcriber: speechTranscriber(), analyzer: SpeakerAnalyzer(storage: FileSystemStorageProbe()), capture: AVCaptureAdapter(),
             microphone: AVMicrophonePermission(), liveActivity: ActivityKitAdapter(), playback: AVPlaybackAdapter(), audio: LocalAudioProcessing(), storage: FileSystemStorageProbe(),
             background: UIKitBackgroundRunner(), notifier: UNNotifier())
     }

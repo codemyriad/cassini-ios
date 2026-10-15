@@ -14,20 +14,40 @@ that were not ported, with the reason for each.
 
 ### Speech recognition
 
-- **Engine.** Android runs Parakeet over 28 s windows, with a streaming Sortformer diarizer. iOS gives the file to
-  Apple's `SpeechAnalyzer` / `SpeechTranscriber` one second at a time from the resume point
-  (`AppleSpeechTranscriber`). The reader pulls the audio, so a long file is never all in memory, and the analyzer finds
-  its own segments. On iOS a "window" is one finalized result, and `JobEvent.windowDone` follows the finalized audio.
-  A final result without words (silence) counts as an empty finalized segment, so long silences still advance
-  `doneMs` and the checkpoints. The block size and the resume point belong to this Apple path and live in
-  `AppleSpeechWindows` (iOS-only `AppleSpeechWindowsTests`), which stays as the fallback for devices that cannot hold
-  Parakeet Ultra. The checkpoint cadence (30 s of audio, at most every 10 s) is iOS's own and stays in `SpeechWindows`.
-- **Decode rules (ported, not yet used by the app).** Android's pure decode rules are ported one to one into
+- **Engine.** Both apps run Parakeet Ultra INT8 over 28 s windows. iOS's `ParakeetTranscriber` (CassiniInference)
+  is Android's `IncrementalRecognizer`: the file read as 16 kHz mono floats through `AVAudioConverter` (channels
+  averaged), `IncrementalTranscript` windows, each window decoded by `ParakeetDecode` (Android's
+  `Parakeet.transcribeWithDecoder`) with `DecodePolicy.wholeSpans` and SPEECH cutting when Silero VAD is installed,
+  QUIET otherwise. The native recognizer and detector are CassiniSherpa's `ParakeetDecoder` and `SileroDetector` over
+  sherpa-onnx's C API, behind the `SpeechDecoding`/`SpeechDetecting` ports, so the transcriber and the job are tested
+  on the host with fakes. Decodes run on one dedicated thread at `.userInitiated` (`InferenceThread`); the recognizer
+  is made with the first window and released when the words step ends, before the speaker step loads its models.
+  Differences:
+  - **Apple Speech fallback (decision D2, iOS only).** A device that cannot hold Ultra, a build without the native
+    runtime, or a device without the installed model keeps Apple's `SpeechAnalyzer` / `SpeechTranscriber`
+    (`AppleSpeechTranscriber`), with the speech language setting and its failure codes. `AppEnvironment` asks the pure
+    `SpeechCapability.choose(linked:installed:capable:)` once at launch. The capability rule (at least 5 GiB of
+    physical memory) is **provisional until the WP0 device gate**. Until the in-app download is wired (WP6), Ultra is
+    used only when its files are already in Application Support/CassiniModels. On the Apple path the file goes to the
+    analyzer one second at a time from the resume point; a "window" is one finalized result, and a final result
+    without words counts as an empty finalized segment so silences still advance `doneMs`. Its block size and resume
+    point live in `AppleSpeechWindows` (iOS-only `AppleSpeechWindowsTests`).
+  - **Memory.** Before the model loads and before each window the transcriber checks `os_proc_available_memory()`
+    against `ParakeetMemory` (1200 MiB before the load, 640 MiB before a window, from the simulator figures and
+    **provisional until the device gate**) and fails with `MEMORY` instead of being ended by iOS. Android pauses with
+    `MEMORY` on a Java `OutOfMemoryError`, which iOS cannot catch.
+  - **Cancellation** stops before the next native call: a flag the decoder checks before each recognizer call, set by
+    the task's cancellation handler (Android interrupts the thread). It ends `CANCELLED`, or paused when a pause asked
+    for it. A recognizer failure is the `JobFailure` itself (`TIMINGS`, `MODEL`, `MEMORY`).
+  - **Models.** The transcriber asks the installer for SPEECH when Ultra is missing (with consent) and, online, when
+    only the detector is missing (`ParakeetModels.request`, Android's `installModels`). Before any native object is
+    made, Ultra's files must have their pinned sizes and its marker, else `MODEL`.
+  - **Language.** Parakeet takes none: its jobs and checkpoints count the word body with `""`.
+- **Decode rules.** Android's pure decode rules are ported one to one into
   CassiniNotebook/Transcription with the same constants and algorithms: `SpeechWindows` (`DecodePolicy`, quiet
   pieces, split, fixed, padding, windows), `DecodeSession`, `WordGate`, `SeamMerge`, `IncrementalTranscript`,
-  `SpeechFeed`, `TokenWords`, `ProcessingSpeed`, and the cutting provenance strings (`DecodeCutting`, Android's
-  `Parakeet.Cutting`). The Parakeet transcriber that drives them comes later. The differences are of naming and
-  platform only:
+  `SpeechFeed`, `TokenWords`, `ProcessingSpeed`, `ParakeetDecode`, and the cutting provenance strings
+  (`DecodeCutting`, Android's `Parakeet.Cutting`). The differences are of naming and platform only:
   - Android's `TimedWord` (a word with its extension cap) is CassiniCore's `DecodedWord`, because the note model
     already has a `TimedWord`. `Span`, `Window` and `Chunk` are `SampleSpan`, `DecodeWindow` and `DecodeChunk`, so
     they do not clash with the standard library's `Span` or SwiftUI. Constants are lower camel case
@@ -38,9 +58,7 @@ that were not ported, with the reason for each.
     recording is its own copy and any other rate passes its 16 kHz copy (`copy16k`). Android's windowed-sinc
     `resampleTo16k` and `StreamingResampler` (`ResamplerTest`) are not ported.
   - `IncrementalTranscript(restored:)` throws `IncrementalState.Invalid` for a state no run could have saved, where
-    Android's `require` throws: the state comes from a checkpoint on disk. Its checkpoint.json codec arrives with
-    `CheckpointState` version 2, so `restoredBorrowedBufferTailContinuesWithoutRepeatingCompletedWindows` restores the
-    typed state without the JSON round trip for now.
+    Android's `require` throws: the state comes from a checkpoint on disk.
   - `TokenWords` throws `JobFailure.timings` (`JobFailure` is an `Error` on iOS) where Android throws `TIMINGS`.
   - `LongRunMeasurementTests#checkpointPathOfATenHourRun` measures iOS's own checkpoint path (the typed recognizer
     state and `CheckpointState.encoded()` of segments) instead of Android's three word-log variants, because iOS has
@@ -206,22 +224,32 @@ that were not ported, with the reason for each.
 
 ### Checkpoints
 
-- `work/checkpoint.json` uses iOS's own format (`CheckpointState`, version 1). It holds the source file name, a
-  `length:mtime` signature, the language, the finalized segments with their words, `doneMs`, `totalMs`, `elapsedMs`,
-  `inferenceMs`, `resumedFromMs` and `wordsComplete`. Android's encoder, diarizer, voice-clip and word-log members do
-  not exist on iOS. A checkpoint that cannot be read, or that does not match the audio, its signature or the language,
-  fails with `CHECKPOINT_MISMATCH`, and its `work/` is kept until Start over, as on Android.
+- `work/checkpoint.json` uses iOS's own format (`CheckpointState`, version 2). It holds the source file name, a
+  `length:mtime` signature, `model` (Android's member: Parakeet's revision, or `apple-speechtranscriber <language>` on
+  the Apple fallback), the words as segments, `doneMs`, `totalMs`, `elapsedMs`, `inferenceMs`, `resumedFromMs`,
+  `wordsComplete` and, for Parakeet, `recognition` (`start`, `end` and `position` of `IncrementalTranscript`'s window
+  in 16 kHz samples). Android's encoder, diarizer, voice-clip and word-log members do not exist on iOS, and Android's
+  `recognition.chunks.window` samples are not stored: a resumed iOS run reads the file again from its start and keeps
+  the window's samples as it passes them, which the signature says are the same, so it decodes exactly what an
+  uninterrupted run would and the file stays small. A checkpoint that cannot be read, of another version (version 1 is
+  the Apple Speech build before Ultra, as Android does not resume a Parakeet v3 checkpoint with Ultra), or that does
+  not match the audio, its signature or the model, fails with `CHECKPOINT_MISMATCH`, and its `work/` is kept until
+  Start over, as on Android.
 - Each write keeps the previous checkpoint as `checkpoint.json.bak`, and a load falls back to it. A failed write is
   `SPACE` when the volume is full or has under 64 MB free, else `SAVE`.
-- **When.** A checkpoint is written once 30 s more audio is final than the last one covered, and at most every 10 s of
-  running time. It is also written at a stop and when the words are complete. A process death loses at most one
-  interval.
-- **Times.** `elapsedMs` and `inferenceMs` count from the analyzer's first report, so a model download counts in
-  neither. On iOS they are the same number, because Apple's analyzer gives no finer split.
-- **Resume** starts the analyzer 1 s before `doneMs` and drops the words that end at or before it. A stop during the
-  speaker step keeps the complete checkpoint, and the resumed run goes straight to the speakers.
-- **Word body limit.** The limit is checked at each checkpoint, counting a 40-character speaker id per word. The job
-  fails with `LONG` at the checkpoint that passes the limit and keeps the one before it.
+- **When.** Parakeet writes one after each 28 s window, as Android does, but at most every 10 s of running time
+  (`SpeechWindows.windowCheckpointDue`), because iOS's checkpoint carries every word so far. Apple Speech writes one
+  once 30 s more audio is final than the last one covered, at most every 10 s. Both write at a stop and when the words
+  are complete. A process death loses at most one interval.
+- **Times.** `elapsedMs` counts from the recognizer's first report, so a model download is left out. For Parakeet
+  `inferenceMs` is each window's decode once the model is loaded (speech detector, decoder calls and word gate), split
+  from the elapsed time as Android's `IncrementalRecognizer` does; for Apple Speech the two are
+  the same number, because the analyzer gives no finer split.
+- **Resume.** Parakeet goes on from the checkpoint's window (Android's rule). Apple Speech starts the analyzer 1 s
+  before `doneMs` and drops the words that end at or before it. A stop during the speaker step keeps the complete
+  checkpoint, and the resumed run goes straight to the speakers.
+- **Word body limit.** Parakeet checks the limit at every window, as Android does; Apple Speech at each checkpoint.
+  Both count a 40-character speaker id per word, fail with `LONG` and keep the checkpoint before.
 
 ### Provenance
 
@@ -232,6 +260,11 @@ that were not ported, with the reason for each.
 - An export writes this record into each variant whose words are still the run's (`ExportProvenance`). Otherwise the
   variant gets `{engine: cassini-ios, kind: user-edited}`. A version made by a merge also gets `x-speakerMerges`,
   `x-speakerAssignmentEditedBy` and `x-derivedFromTranscript`, as Android's merged variant does.
+- **Parakeet runs** write Android's processing step (`TranscriptProvenance.parakeetRun`): `backend` "sherpa-onnx",
+  `engine` "Parakeet TDT", `model` "moondream/parakeet-ultra INT8", `version` "sherpa-onnx 1.13.7; model revision
+  <revision>", `source` "recording", `language` "", Android's `x-segmentation` string, `x-inferenceMs` (decode time)
+  and `x-resumedFromMs`. Only `device` differs (iOS's hardware model and OS). The goldens against Android's 0.1.0
+  record and the model names shown in the app follow in WP5; the Apple fallback writes the record below.
 - **Keys.** The record has Android's keys (`JobProvenance`, `SpeakerAttribution.record`) with iOS's values;
   `ProvenanceGoldenTests` pins the key sets and JSON types against Android's:
   - The processing step: `backend` "Apple Speech framework (SpeechAnalyzer, on-device)", `engine`
@@ -619,8 +652,23 @@ marked `// ports: <AndroidTest>#<name>`. Android's tests run at 16 and 48 kHz wh
 | `ProcessingSpeedTest` | `ProcessingSpeedTests` | 1 |
 | `LongRunMeasurementTest` (gated by `CASSINI_MEASURE`) | `LongRunMeasurementTests` | 2 |
 
-iOS-only: `DecodeConstantsTests` (every constant, the provenance strings, the restore and `TIMINGS` checks) and
-`AppleSpeechWindowsTests` (the Apple fallback's block reading and the checkpoint cadence).
+iOS-only: `DecodeConstantsTests` (every constant, the provenance strings, the restore and `TIMINGS` checks),
+`AppleSpeechWindowsTests` (the Apple fallback's block reading and the checkpoint cadence) and `ParakeetDecodeTests`
+(`Parakeet.transcribeWithDecoder`, which Android tests only through its job).
+
+## Test map: Parakeet adapter and job
+
+| Android | iOS suite | Notes |
+|---|---|---|
+| `ParakeetDecoderConfigTest` (2), `SileroDetectorConfigTest` (1) | `ParakeetDecoderConfigTests` (CassiniEngine) | Over the pure `ParakeetConfig`/`SileroConfig` that CassiniSherpa copies into the C structs; plus the `TIMINGS` rule, padding and cancel of `SpeechWordDecoder` |
+| `CheckpointGoldenTest` | `CheckpointGoldenTests` | A version 2 golden; `aChangedLanguageNoLongerMatches` became `aChangedModelNoLongerMatches`; `anAppleEraCheckpointIsNotResumedWithUltra` adapts `aCheckpointOfParakeetV3IsNotResumedWithUltra` |
+| `CheckpointStateTest` | `CheckpointStateTests` | The `recognition` member and its rules |
+| `TranscriptionJobTest` (windows, fsync, stop and resume, stop before the first window, body limit, mismatch, `OutOfMemoryError`) | `TranscriptionJobParakeetTests` | Over a scripted recognizer and the real `IncrementalTranscript`; the failure mapping (`MEMORY`, `TIMINGS`, `MODEL`, `CANCELLED`) |
+| `TranscriptionJobTest#aMissingSpeechDetectorIsFetchedAgainOnlyOnline` | `ParakeetTranscriberTests` (CassiniInference) | With the rest of the adapter: windows on the inference thread, consent and install, marker and sizes, memory, resume, cancel |
+| `DeviceSmokeTest` FLEURS golden | `ParakeetJobTests` (hosted, `scripts/sherpa-bench.sh`) | A real job on the arm64 simulator against iOS's own golden (`CassiniTests/Goldens/fleurs-it-short.ios.json`), because the int8 kernels differ from the x86_64 emulator's; on 2026-10-15 its text equalled Android's golden word for word |
+
+`Golden010`, the 0.1.0 provenance record, belongs to WP5 (provenance), with `provenanceEqualsThe010Record`. The job
+tests about the sealed document, the voice clips and live voice matching have no iOS counterpart (see below).
 
 ## Android tests without an iOS port
 

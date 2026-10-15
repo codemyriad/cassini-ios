@@ -240,4 +240,11 @@ public enum SpeechWindows {
         guard doneMs - savedMs >= checkpointMs else { return false }
         return savedAt.map { nowMs - $0 >= checkpointMinIntervalMs } ?? true
     }
+
+    /// Whether a checkpoint is due after a Parakeet window: Android saves one after every window that moved the decoded
+    /// audio on. iOS keeps `checkpointMinIntervalMs` between them, because its checkpoint carries every word so far.
+    public static func windowCheckpointDue(doneMs: Int64, savedMs: Int64, nowMs: Int64, savedAt: Int64?) -> Bool {
+        guard doneMs > savedMs else { return false }
+        return savedAt.map { nowMs - $0 >= checkpointMinIntervalMs } ?? true
+    }
 }

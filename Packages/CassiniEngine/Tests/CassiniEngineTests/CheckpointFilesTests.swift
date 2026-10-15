@@ -9,7 +9,7 @@ import CassiniNotebook
     private let segmentID = UUID()
 
     private func state(_ doneMs: Int64) -> CheckpointState {
-        CheckpointState(source: "audio.m4a", signature: "1:2", language: "en-US",
+        CheckpointState(source: "audio.m4a", signature: "1:2", model: CheckpointState.appleModel(language: "en-US"),
                         segments: [TranscriptSegment(id: segmentID, text: "Hello", start: 0, end: Double(doneMs) / 1000)],
                         doneMs: doneMs, totalMs: 90_000, elapsedMs: 10)
     }

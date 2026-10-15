@@ -13,7 +13,8 @@ let sherpaBinaries: [Target] = sherpaLocal ? [
 ] : []
 let sherpaTarget: Target = .target(
     name: "CassiniSherpa",
-    dependencies: sherpaLocal ? [.target(name: "SherpaOnnxC", condition: iOSOnly), .target(name: "onnxruntime", condition: iOSOnly)] : [],
+    dependencies: ["CassiniEngine", "CassiniNotebook"]
+        + (sherpaLocal ? [.target(name: "SherpaOnnxC", condition: iOSOnly), .target(name: "onnxruntime", condition: iOSOnly)] : []),
     path: "Packages/CassiniSherpa/Sources/CassiniSherpa",
     linkerSettings: sherpaLocal ? [.linkedLibrary("c++", .when(platforms: [.iOS])),
                                    .linkedFramework("CoreML", .when(platforms: [.iOS])),
@@ -40,7 +41,7 @@ let package = Package(
         .target(name: "COpusBridge", dependencies: [.product(name: "Copus", package: "swift-opus")]),
         .target(name: "CassiniAudio", dependencies: ["CassiniCore", "COpusBridge"], path: "Packages/CassiniAudio/Sources/CassiniAudio"),
         .testTarget(name: "CassiniInferenceTests", dependencies: ["CassiniInference", "CassiniEngine", "CassiniEngineTesting", "CassiniNotebook"], path: "Packages/CassiniInference/Tests/CassiniInferenceTests"),
-        .target(name: "CassiniInference", dependencies: ["CassiniEngine", "CassiniNotebook", .product(name: "FluidAudio", package: "FluidAudio")], path: "Packages/CassiniInference/Sources/CassiniInference"),
+        .target(name: "CassiniInference", dependencies: ["CassiniCore", "CassiniEngine", "CassiniNotebook", .product(name: "FluidAudio", package: "FluidAudio")], path: "Packages/CassiniInference/Sources/CassiniInference"),
         .target(name: "CZlib", path: "Sources/CZlib", publicHeadersPath: ".", linkerSettings: [.linkedLibrary("z")]),
         .target(name: "CassiniCore", dependencies: ["CZlib"]),
         .testTarget(name: "CassiniCoreTests", dependencies: ["CassiniCore"]),
@@ -51,6 +52,6 @@ let package = Package(
         .target(name: "CassiniEngineTesting", dependencies: ["CassiniCore", "CassiniEngine", "CassiniNotebook"], path: "Packages/CassiniEngine/Sources/CassiniEngineTesting"),
         .testTarget(name: "CassiniEngineTests", dependencies: ["CassiniEngine", "CassiniEngineTesting", "CassiniNotebook"], path: "Packages/CassiniEngine/Tests/CassiniEngineTests"),
         sherpaTarget,
-        .testTarget(name: "CassiniSherpaTests", dependencies: ["CassiniSherpa"], path: "Packages/CassiniSherpa/Tests/CassiniSherpaTests")
+        .testTarget(name: "CassiniSherpaTests", dependencies: ["CassiniSherpa", "CassiniEngine"], path: "Packages/CassiniSherpa/Tests/CassiniSherpaTests")
     ] + sherpaBinaries
 )

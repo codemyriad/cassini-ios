@@ -1,0 +1,140 @@
+{
+  "text" : "La parte settentrionale, conosciuta come catena della sentinella, vanta le montagne più alte dell'Antartide, il massiccio del Vinson, che raggiunge i 4892 metri con il monte Vinson.",
+  "words" : [
+    {
+      "endMs" : 1420,
+      "startMs" : 1180,
+      "text" : "La"
+    },
+    {
+      "endMs" : 1660,
+      "startMs" : 1420,
+      "text" : "parte"
+    },
+    {
+      "endMs" : 2760,
+      "startMs" : 1660,
+      "text" : "settentrionale,"
+    },
+    {
+      "endMs" : 3340,
+      "startMs" : 2780,
+      "text" : "conosciuta"
+    },
+    {
+      "endMs" : 3580,
+      "startMs" : 3340,
+      "text" : "come"
+    },
+    {
+      "endMs" : 4220,
+      "startMs" : 3580,
+      "text" : "catena"
+    },
+    {
+      "endMs" : 4460,
+      "startMs" : 4220,
+      "text" : "della"
+    },
+    {
+      "endMs" : 5470,
+      "startMs" : 4460,
+      "text" : "sentinella,"
+    },
+    {
+      "endMs" : 6060,
+      "startMs" : 5500,
+      "text" : "vanta"
+    },
+    {
+      "endMs" : 6140,
+      "startMs" : 6060,
+      "text" : "le"
+    },
+    {
+      "endMs" : 6700,
+      "startMs" : 6140,
+      "text" : "montagne"
+    },
+    {
+      "endMs" : 6860,
+      "startMs" : 6700,
+      "text" : "più"
+    },
+    {
+      "endMs" : 7180,
+      "startMs" : 6860,
+      "text" : "alte"
+    },
+    {
+      "endMs" : 8220,
+      "startMs" : 7180,
+      "text" : "dell'Antartide,"
+    },
+    {
+      "endMs" : 8540,
+      "startMs" : 8380,
+      "text" : "il"
+    },
+    {
+      "endMs" : 9340,
+      "startMs" : 8540,
+      "text" : "massiccio"
+    },
+    {
+      "endMs" : 9500,
+      "startMs" : 9340,
+      "text" : "del"
+    },
+    {
+      "endMs" : 10450,
+      "startMs" : 9580,
+      "text" : "Vinson,"
+    },
+    {
+      "endMs" : 10620,
+      "startMs" : 10460,
+      "text" : "che"
+    },
+    {
+      "endMs" : 11260,
+      "startMs" : 10620,
+      "text" : "raggiunge"
+    },
+    {
+      "endMs" : 11340,
+      "startMs" : 11260,
+      "text" : "i"
+    },
+    {
+      "endMs" : 13020,
+      "startMs" : 11420,
+      "text" : "4892"
+    },
+    {
+      "endMs" : 13420,
+      "startMs" : 13020,
+      "text" : "metri"
+    },
+    {
+      "endMs" : 13500,
+      "startMs" : 13420,
+      "text" : "con"
+    },
+    {
+      "endMs" : 13660,
+      "startMs" : 13500,
+      "text" : "il"
+    },
+    {
+      "endMs" : 14140,
+      "startMs" : 13660,
+      "text" : "monte"
+    },
+    {
+      "endMs" : 14892,
+      "startMs" : 14140,
+      "text" : "Vinson."
+    }
+  ]
+}

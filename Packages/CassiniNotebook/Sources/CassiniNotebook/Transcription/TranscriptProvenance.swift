@@ -196,6 +196,23 @@ public struct TranscriptProvenance: Codable, Hashable, Sendable {
                              resumedFromMs: resumedFromMs)
     }
 
+    /// The processing step's `backend` and `engine` of a Parakeet run, as Android writes them.
+    public static let sherpaBackend = "sherpa-onnx"
+    public static let parakeetEngine = "Parakeet TDT"
+    /// The sherpa-onnx release the native runtime is built from (scripts/native-dependencies.json).
+    public static let sherpaVersion = "1.13.7"
+
+    /// The record of a Parakeet run, with Android's values (`JobProvenance.recognition`) but `device`: `model` is
+    /// `<id> <precision>`, `revision` the model's pinned revision, `segmentation` how the audio was cut. The language
+    /// is empty: Parakeet does not say which one it heard.
+    public static func parakeetRun(model: String, revision: String, segmentation: String, inferenceMs: Int64,
+                                   resumedFromMs: Int64, device: RunDevice) -> TranscriptProvenance {
+        TranscriptProvenance(backend: sherpaBackend, engine: parakeetEngine, model: model, device: device.description,
+                             source: recordingSource, version: "sherpa-onnx \(sherpaVersion); model revision \(revision)",
+                             language: "", inferenceMs: inferenceMs, segmentation: segmentation,
+                             resumedFromMs: resumedFromMs)
+    }
+
     /// The record as an export writes it.
     public func record() -> JSONObject {
         var record = JSONObject()

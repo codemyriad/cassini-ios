@@ -1,16 +1,40 @@
+import CassiniCore
 import Foundation
 import CassiniNotebook
 
 public struct TranscriptionRequest: Hashable, Sendable {
     public var url: URL
-    /// BCP-47.
+    /// BCP-47, for Apple Speech; Parakeet ignores it.
     public var language: String
-    /// Where in the audio to begin, for a resumed job. Result times stay on the recording's clock.
+    /// Where in the audio Apple Speech begins, for a resumed job. Result times stay on the recording's clock.
     public var startOffset: TimeInterval
+    /// Where a resumed Parakeet run goes on from: the checkpoint's window and its words. Nil for a fresh run.
+    public var resume: TranscriptResume?
     /// Whether a missing speech model may be downloaded.
     public var allowDownload: Bool
-    public init(url: URL, language: String, startOffset: TimeInterval = 0, allowDownload: Bool) {
-        self.url = url; self.language = language; self.startOffset = startOffset; self.allowDownload = allowDownload
+    public init(url: URL, language: String, startOffset: TimeInterval = 0, resume: TranscriptResume? = nil,
+                allowDownload: Bool) {
+        self.url = url; self.language = language; self.startOffset = startOffset; self.resume = resume
+        self.allowDownload = allowDownload
+    }
+}
+
+/// A Parakeet checkpoint to go on from: `IncrementalTranscript`'s window and every word so far.
+public struct TranscriptResume: Hashable, Sendable {
+    public var recognition: RecognitionCheckpoint
+    public var words: [Word]
+    public init(recognition: RecognitionCheckpoint, words: [Word]) { self.recognition = recognition; self.words = words }
+}
+
+/// Parakeet after a 28 s window: every word so far on the recording clock (seams reconciled, not yet gated as a
+/// whole), where the run can go on from, and the decode time this run.
+public struct TranscriptWindow: Hashable, Sendable {
+    public var words: [Word]
+    public var recognition: RecognitionCheckpoint
+    /// Milliseconds spent decoding windows since this run began, the model load left out.
+    public var inferenceMs: Int64
+    public init(words: [Word], recognition: RecognitionCheckpoint, inferenceMs: Int64) {
+        self.words = words; self.recognition = recognition; self.inferenceMs = inferenceMs
     }
 }
 
@@ -23,12 +47,20 @@ public enum TranscriptionEvent: Hashable, Sendable {
     case finalized(TranscriptSegment)
     /// The words heard after the last finalized result so far; they may still change. Nil when there are none.
     case volatile(TranscriptSegment?)
+    /// Parakeet decoded a window; it replaces every word before it. Apple Speech never sends it.
+    case window(TranscriptWindow)
 }
 
 public struct TranscriptionResult: Hashable, Sendable {
-    /// In time order.
+    /// In time order. For Parakeet every word of the recording, which replaces what the windows said.
     public var segments: [TranscriptSegment]
-    public init(segments: [TranscriptSegment]) { self.segments = segments }
+    /// Parakeet's `x-segmentation`: how the recording was cut. Nil for Apple Speech.
+    public var segmentation: String?
+    /// Parakeet's decode time this run, in milliseconds. Nil for Apple Speech, whose job counts the analyzer's time.
+    public var inferenceMs: Int64?
+    public init(segments: [TranscriptSegment], segmentation: String? = nil, inferenceMs: Int64? = nil) {
+        self.segments = segments; self.segmentation = segmentation; self.inferenceMs = inferenceMs
+    }
 }
 
 public enum TranscriptionError: Error, Hashable {
@@ -40,6 +72,10 @@ public enum TranscriptionError: Error, Hashable {
 /// A transcriber that read its input to the end reports `.progress(done: total, total: total)` before it returns; one
 /// that cannot read the input to the end throws `TranscriptionError.failed(.open)` rather than returning what it has.
 public protocol Transcribing: Sendable {
+    /// The recognizer behind this transcriber: the job checks a checkpoint against it and writes its provenance.
+    var recognizer: SpeechRecognizer { get }
+    /// How a run would cut the recording now (Parakeet's `x-segmentation`); nil for Apple Speech.
+    func segmentation() async -> String?
     func transcribe(_ request: TranscriptionRequest,
                     events: @escaping @Sendable (TranscriptionEvent) -> Void) async throws -> TranscriptionResult
     func assetStatus(locale: Locale) async -> ModelPartStatus
@@ -55,6 +91,8 @@ public protocol Transcribing: Sendable {
 
 extension Transcribing {
     public func modelName(locale: Locale) async -> String? { nil }
+    public var recognizer: SpeechRecognizer { .appleSpeech }
+    public func segmentation() async -> String? { nil }
 }
 
 /// A language of speech the transcriber offers.

@@ -1,47 +1,16 @@
 import Foundation
+import CassiniEngine
+import CassiniNotebook
 #if canImport(SherpaOnnxC)
 import SherpaOnnxC
 #endif
-
-/// The files of an installed Parakeet TDT transducer: three ONNX graphs and the token table.
-public struct ParakeetFiles: Sendable, Equatable {
-    public let encoder: URL
-    public let decoder: URL
-    public let joiner: URL
-    public let tokens: URL
-
-    /// The INT8 export's file names inside `directory`.
-    public init(directory: URL) {
-        encoder = directory.appendingPathComponent("encoder.int8.onnx")
-        decoder = directory.appendingPathComponent("decoder.int8.onnx")
-        joiner = directory.appendingPathComponent("joiner.int8.onnx")
-        tokens = directory.appendingPathComponent("tokens.txt")
-    }
-
-    /// Whether every file exists. The native loader ends the process on a missing file instead of failing.
-    public func present() -> Bool {
-        [encoder, decoder, joiner, tokens].allSatisfy { url in
-            var directory: ObjCBool = false
-            return FileManager.default.fileExists(atPath: url.path, isDirectory: &directory) && !directory.boolValue
-        }
-    }
-}
-
-/// What one decode returns: the text and the per-token arrays (`tokens_arr`, `timestamps`, `durations`), in seconds
-/// from the start of the samples passed in.
-public struct DecodedTokens: Sendable, Equatable {
-    public let text: String
-    public let tokens: [String]
-    public let timestamps: [Float]
-    public let durations: [Float]
-}
 
 public enum SherpaError: Error, Equatable {
     /// This build does not link the native runtime (CASSINI_SHERPA_LOCAL was not set, or not an iOS build).
     case notLinked
     /// A model file is missing; the native loader would end the process.
     case missingFiles
-    /// The native recognizer could not be created.
+    /// The native recognizer or detector could not be created.
     case createFailed
 }
 
@@ -54,53 +23,77 @@ public enum SherpaRuntime {
         false
         #endif
     }
+
+    /// The native recognizer and detector for `ParakeetTranscriber`; both throw `notLinked` without the runtime.
+    public static let speech = SpeechRuntime(makeDecoder: { try ParakeetDecoder(config: $0) },
+                                             makeDetector: { try SileroDetector(config: $0) })
 }
 
-/// One native Parakeet recognizer over the sherpa-onnx C API, configured as Android's `ParakeetDecoder.config`: 16 kHz,
-/// 128 features, `nemo_transducer`, CPU with 2 threads, greedy search. Not thread-safe: one thread owns it.
-public final class ParakeetDecoder: @unchecked Sendable {
+/// Duplicates C strings that live until `body` returns: the create calls copy what they keep.
+func withCStrings<Result>(_ strings: [String], _ body: ([UnsafePointer<CChar>]) throws -> Result) rethrows -> Result {
+    let copies = strings.map { strdup($0)! }
+    defer { copies.forEach { free($0) } }
+    return try body(copies.map { UnsafePointer($0) })
+}
+
+/// Whether a file is there (and not a directory): the native loaders end the process on a missing file.
+func isFile(_ path: String) -> Bool {
+    var directory: ObjCBool = false
+    return FileManager.default.fileExists(atPath: path, isDirectory: &directory) && !directory.boolValue
+}
+
+/// One native Parakeet recognizer over the sherpa-onnx C API, configured by `ParakeetConfig` (Android's
+/// `ParakeetDecoder.config`). Not thread-safe: the thread that creates it decodes with it and releases it.
+public final class ParakeetDecoder: SpeechDecoding, @unchecked Sendable {
     #if canImport(SherpaOnnxC)
     private let recognizer: OpaquePointer
     #endif
 
     /// `debug` makes sherpa-onnx print the encoder's metadata to standard error while it loads.
-    public init(files: ParakeetFiles, threads: Int32 = 2, debug: Bool = false) throws {
+    public init(config: ParakeetConfig, debug: Bool = false) throws {
         #if canImport(SherpaOnnxC)
-        guard files.present() else { throw SherpaError.missingFiles }
-        // The C strings live until the create call returns.
-        let strings = [files.encoder.path, files.decoder.path, files.joiner.path, files.tokens.path,
-                       "cpu", "nemo_transducer", "greedy_search"].map { strdup($0)! }
-        defer { strings.forEach { free($0) } }
-        var config = SherpaOnnxOfflineRecognizerConfig()
-        config.feat_config.sample_rate = 16000
-        config.feat_config.feature_dim = 128
-        config.model_config.transducer.encoder = UnsafePointer(strings[0])
-        config.model_config.transducer.decoder = UnsafePointer(strings[1])
-        config.model_config.transducer.joiner = UnsafePointer(strings[2])
-        config.model_config.tokens = UnsafePointer(strings[3])
-        config.model_config.provider = UnsafePointer(strings[4])
-        config.model_config.model_type = UnsafePointer(strings[5])
-        config.model_config.num_threads = threads
-        config.model_config.debug = debug ? 1 : 0
-        config.decoding_method = UnsafePointer(strings[6])
-        guard let created = SherpaOnnxCreateOfflineRecognizer(&config) else { throw SherpaError.createFailed }
+        guard [config.encoder, config.decoder, config.joiner, config.tokens].allSatisfy(isFile) else {
+            throw SherpaError.missingFiles
+        }
+        let created = withCStrings([config.encoder, config.decoder, config.joiner, config.tokens, config.provider,
+                                    config.modelType, config.decodingMethod]) { strings -> OpaquePointer? in
+            var native = SherpaOnnxOfflineRecognizerConfig()
+            native.feat_config.sample_rate = config.sampleRate
+            native.feat_config.feature_dim = config.featureDim
+            native.model_config.transducer.encoder = strings[0]
+            native.model_config.transducer.decoder = strings[1]
+            native.model_config.transducer.joiner = strings[2]
+            native.model_config.tokens = strings[3]
+            native.model_config.provider = strings[4]
+            native.model_config.model_type = strings[5]
+            native.model_config.num_threads = config.numThreads
+            native.model_config.debug = debug ? 1 : 0
+            native.decoding_method = strings[6]
+            return SherpaOnnxCreateOfflineRecognizer(&native)
+        }
+        guard let created else { throw SherpaError.createFailed }
         recognizer = created
         #else
         throw SherpaError.notLinked
         #endif
     }
 
+    /// The installed files with the 0.1.0 configuration.
+    public convenience init(files: ParakeetFiles, debug: Bool = false) throws {
+        try self.init(config: ParakeetConfig(files), debug: debug)
+    }
+
     /// Decodes 16 kHz mono samples in one call.
-    public func decode(_ samples: [Float], sampleRate: Int32 = 16000) -> DecodedTokens {
+    public func decode(_ samples: [Float]) -> RecognizedTokens {
         #if canImport(SherpaOnnxC)
         let stream = SherpaOnnxCreateOfflineStream(recognizer)
         defer { SherpaOnnxDestroyOfflineStream(stream) }
         samples.withUnsafeBufferPointer { buffer in
-            SherpaOnnxAcceptWaveformOffline(stream, sampleRate, buffer.baseAddress, Int32(buffer.count))
+            SherpaOnnxAcceptWaveformOffline(stream, 16_000, buffer.baseAddress, Int32(buffer.count))
         }
         SherpaOnnxDecodeOfflineStream(recognizer, stream)
         guard let result = SherpaOnnxGetOfflineStreamResult(stream) else {
-            return DecodedTokens(text: "", tokens: [], timestamps: [], durations: [])
+            return RecognizedTokens(text: "", tokens: [], timestamps: [], durations: [])
         }
         defer { SherpaOnnxDestroyOfflineRecognizerResult(result) }
         let r = result.pointee
@@ -109,15 +102,97 @@ public final class ParakeetDecoder: @unchecked Sendable {
         let tokens = (0..<count).map { i in r.tokens_arr.flatMap { $0[i] }.map { String(cString: $0) } ?? "" }
         let timestamps = r.timestamps.map { Array(UnsafeBufferPointer(start: $0, count: count)) } ?? []
         let durations = r.durations.map { Array(UnsafeBufferPointer(start: $0, count: count)) } ?? []
-        return DecodedTokens(text: text, tokens: tokens, timestamps: timestamps, durations: durations)
+        return RecognizedTokens(text: text, tokens: tokens, timestamps: timestamps, durations: durations)
         #else
-        DecodedTokens(text: "", tokens: [], timestamps: [], durations: [])
+        RecognizedTokens(text: "", tokens: [], timestamps: [], durations: [])
         #endif
     }
 
     deinit {
         #if canImport(SherpaOnnxC)
         SherpaOnnxDestroyOfflineRecognizer(recognizer)
+        #endif
+    }
+}
+
+/// One native Silero detector over the sherpa-onnx C API, configured by `SileroConfig` (Android's `SileroDetector`)
+/// and fed by `SpeechFeed`. Not thread-safe: one thread owns it.
+public final class SileroDetector: SpeechDetecting, @unchecked Sendable {
+    #if canImport(SherpaOnnxC)
+    private let vad: OpaquePointer
+    #endif
+
+    public init(config: SileroConfig) throws {
+        #if canImport(SherpaOnnxC)
+        guard isFile(config.model) else { throw SherpaError.missingFiles }
+        let created = withCStrings([config.model, config.provider]) { strings -> OpaquePointer? in
+            var native = SherpaOnnxVadModelConfig()
+            native.silero_vad.model = strings[0]
+            native.silero_vad.threshold = config.threshold
+            native.silero_vad.min_silence_duration = config.minSilenceDuration
+            native.silero_vad.min_speech_duration = config.minSpeechDuration
+            native.silero_vad.window_size = config.windowSize
+            native.silero_vad.max_speech_duration = config.maxSpeechDuration
+            native.sample_rate = config.sampleRate
+            native.num_threads = config.numThreads
+            native.provider = strings[1]
+            native.debug = config.debug ? 1 : 0
+            return SherpaOnnxCreateVoiceActivityDetector(&native, config.bufferSeconds)
+        }
+        guard let created else { throw SherpaError.createFailed }
+        vad = created
+        #else
+        throw SherpaError.notLinked
+        #endif
+    }
+
+    public func reset() {
+        #if canImport(SherpaOnnxC)
+        SherpaOnnxVoiceActivityDetectorReset(vad)
+        #endif
+    }
+
+    public func acceptWaveform(_ window: [Float]) {
+        #if canImport(SherpaOnnxC)
+        window.withUnsafeBufferPointer { SherpaOnnxVoiceActivityDetectorAcceptWaveform(vad, $0.baseAddress, Int32($0.count)) }
+        #endif
+    }
+
+    public func empty() -> Bool {
+        #if canImport(SherpaOnnxC)
+        SherpaOnnxVoiceActivityDetectorEmpty(vad) != 0
+        #else
+        true
+        #endif
+    }
+
+    public func front() -> SpeechFeed.Segment {
+        #if canImport(SherpaOnnxC)
+        guard let segment = SherpaOnnxVoiceActivityDetectorFront(vad) else { return SpeechFeed.Segment(0, []) }
+        defer { SherpaOnnxDestroySpeechSegment(segment) }
+        let s = segment.pointee
+        let samples = s.samples.map { Array(UnsafeBufferPointer(start: $0, count: Int(max(0, s.n)))) } ?? []
+        return SpeechFeed.Segment(Int(s.start), samples)
+        #else
+        SpeechFeed.Segment(0, [])
+        #endif
+    }
+
+    public func pop() {
+        #if canImport(SherpaOnnxC)
+        SherpaOnnxVoiceActivityDetectorPop(vad)
+        #endif
+    }
+
+    public func flush() {
+        #if canImport(SherpaOnnxC)
+        SherpaOnnxVoiceActivityDetectorFlush(vad)
+        #endif
+    }
+
+    deinit {
+        #if canImport(SherpaOnnxC)
+        SherpaOnnxDestroyVoiceActivityDetector(vad)
         #endif
     }
 }

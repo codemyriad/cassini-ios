@@ -205,98 +205,13 @@ struct FileInput: AsyncSequence, Sendable {
     }
 }
 
-/// Reads and converts the blocks. Only the analyzer's single consumer of `FileInput` calls `next()`, one call at a
-/// time, so the AVFoundation objects inside are never used concurrently; `failure` and `reachedEnd` are read once the
-/// analyzer is done with the input.
-final class FileReader: @unchecked Sendable {
-    enum Failure: Error, Equatable {
-        case read(String)
-        /// The file ended before its length said.
-        case short
-        case convert
-    }
-
-    let startTime: TimeInterval
-    let duration: TimeInterval
-    private(set) var failure: Failure?
-    /// Every frame from the start offset was read and converted.
-    private(set) var reachedEnd = false
-    private let file: AVAudioFile
-    private let output: AVAudioFormat
-    private let converter: AVAudioConverter?
-    private let blockFrames: AVAudioFrameCount
-    private let startFrame: AVAudioFramePosition
-    private var first = true
-
-    init(url: URL, from offset: TimeInterval, to format: AVAudioFormat) throws {
-        file = try AVAudioFile(forReading: url)
-        let rate = file.processingFormat.sampleRate
-        duration = Double(file.length) / rate
-        startFrame = min(AppleSpeechWindows.frame(atMs: CheckpointState.ms(max(0, offset)), sampleRate: rate), file.length)
-        file.framePosition = startFrame
-        startTime = Double(startFrame) / rate
-        output = format
-        converter = file.processingFormat == format ? nil : AVAudioConverter(from: file.processingFormat, to: format)
-        blockFrames = AVAudioFrameCount(AppleSpeechWindows.samples(AppleSpeechWindows.blockMs, sampleRate: Int(rate)))
-    }
-
-    /// The next block; nil at the end of the file or after a failure. The first carries its time on the recording's
-    /// clock, so the results keep it.
+extension FileReader {
+    /// The next block as analyzer input; nil at the end of the file or after a failure. The first carries its time on
+    /// the recording's clock, so the results keep it.
     func next() -> AnalyzerInput? {
-        while failure == nil, !reachedEnd {
-            guard let buffer = read() else { continue }
-            guard buffer.frameLength > 0 else { continue }
-            defer { first = false }
-            let time = first ? CMTime(value: startFrame, timescale: CMTimeScale(file.processingFormat.sampleRate)) : nil
-            return AnalyzerInput(buffer: buffer, bufferStartTime: time)
-        }
-        return nil
-    }
-
-    /// One block in the output format, the converter's tail at the end of the file, or nil once it failed or ended.
-    private func read() -> AVAudioPCMBuffer? {
-        guard file.framePosition < file.length else {
-            reachedEnd = true
-            return converter.flatMap { drain($0) }
-        }
-        guard let block = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: blockFrames) else {
-            failure = .convert
-            return nil
-        }
-        do { try file.read(into: block, frameCount: blockFrames) } catch {
-            failure = .read(String(describing: error))
-            return nil
-        }
-        guard block.frameLength > 0 else { failure = .short; return nil }
-        guard let converter else { return block }
-        let ratio = output.sampleRate / block.format.sampleRate
-        let capacity = AVAudioFrameCount((Double(block.frameLength) * ratio).rounded(.up)) + 32
-        return convert(converter, block, capacity: capacity)
-    }
-
-    /// The frames the converter still holds once the input ended.
-    private func drain(_ converter: AVAudioConverter) -> AVAudioPCMBuffer? {
-        convert(converter, nil, capacity: AVAudioFrameCount(output.sampleRate))
-    }
-
-    /// Converts `block`, or flushes the converter when it is nil.
-    private func convert(_ converter: AVAudioConverter, _ block: AVAudioPCMBuffer?,
-                         capacity: AVAudioFrameCount) -> AVAudioPCMBuffer? {
-        guard let converted = AVAudioPCMBuffer(pcmFormat: output, frameCapacity: capacity) else {
-            failure = .convert
-            return nil
-        }
-        var consumed = false
-        var error: NSError?
-        let status = converter.convert(to: converted, error: &error) { _, inputStatus in
-            guard let block else { inputStatus.pointee = .endOfStream; return nil }
-            if consumed { inputStatus.pointee = .noDataNow; return nil }
-            consumed = true
-            inputStatus.pointee = .haveData
-            return block
-        }
-        guard status != .error, error == nil else { failure = .convert; return nil }
-        return converted
+        guard let (buffer, first) = nextBuffer() else { return nil }
+        let time = first ? CMTime(value: startFrame, timescale: CMTimeScale(sourceRate)) : nil
+        return AnalyzerInput(buffer: buffer, bufferStartTime: time)
     }
 }
 
