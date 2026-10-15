@@ -186,6 +186,9 @@ starts empty, and Release builds link no fakes.
 The move to Parakeet Ultra builds sherpa-onnx for iOS from the same fork and commit as Android (codemyriad/sherpa-onnx
 `dbbeef9c`, which carries the NeMo frontend of upstream #4024) against ONNX Runtime 1.27.1, with the C API and without
 TTS. It is not yet a release asset, so a normal build links no native code and the app still uses Apple's recognizer.
+Android's pure decode rules (windows, quiet cuts, seam merge, word gate, speech feed, incremental 28 s windows) are
+ported with their tests to CassiniNotebook/Transcription; the app does not use them yet. Apple's recognizer stays as the
+fallback for devices that cannot hold Ultra (`AppleSpeechWindows`).
 
 ```sh
 scripts/build-sherpa-xcframework.sh   # pinned sources -> .tools/sherpa/SherpaOnnxC.xcframework and a reproducible zip
