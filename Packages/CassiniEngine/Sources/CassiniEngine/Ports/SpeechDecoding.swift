@@ -108,8 +108,6 @@ public struct SpeechRuntime: Sendable {
 public final class SpeechWordDecoder: WordDecoder {
     private let recognizer: any SpeechDecoding
     private let cancelled: () -> Bool
-    /// Time spent in the recognizer, in nanoseconds.
-    public private(set) var decodeNanoseconds: UInt64 = 0
 
     public init(_ recognizer: any SpeechDecoding, cancelled: @escaping () -> Bool = { false }) {
         self.recognizer = recognizer; self.cancelled = cancelled
@@ -125,9 +123,7 @@ public final class SpeechWordDecoder: WordDecoder {
             padded.replaceSubrange(headPad..<(headPad + length), with: audio.samples[start..<(start + length)])
             samples = padded
         }
-        let began = DispatchTime.now().uptimeNanoseconds
         let result = try recognizer.decode(samples)
-        decodeNanoseconds += DispatchTime.now().uptimeNanoseconds - began
         try Self.requireTimings(result)
         return try TokenWords.timedWordsFromTokens(result.tokens, timestamps: result.timestamps, durations: result.durations)
     }

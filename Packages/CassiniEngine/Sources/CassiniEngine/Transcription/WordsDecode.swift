@@ -14,7 +14,7 @@ import CassiniNotebook
 /// Apple Speech sends finalized segments, which are added in order; a resumed run drops the words it already has.
 /// Parakeet sends a `TranscriptWindow` after each 28 s window holding every word so far and where to go on from, which
 /// replaces the checkpoint's words; a checkpoint follows each window (at most every 10 s), and the words must fit the
-/// word body at every window. Its inference time is the decoder's own, not the step's running time.
+/// word body at every window. Its inference time is the windows' decode alone, not the step's running time.
 final class WordsDecode: Sendable {
     enum Ending: Sendable {
         case complete(CheckpointState)
@@ -44,7 +44,7 @@ final class WordsDecode: Sendable {
         var wordsShown = false
         var emittedAt: Int64?
         var finalizedThisRun = false
-        /// Parakeet's decoder time this run, from its last window or its result.
+        /// Parakeet's decode time this run, from its last window or its result.
         var decodeMs: Int64 = 0
         var ended: Ending?
         var stopping = false
@@ -257,7 +257,7 @@ final class WordsDecode: Sendable {
         let analyzed = s.analyzerStartedAt.map { now - $0 } ?? 0
         var checkpoint = s.checkpoint
         checkpoint.elapsedMs = base.elapsedMs + analyzed
-        // Parakeet counts its decoder calls alone, as Android's `inferenceMs` does; Apple Speech its analyzer's time.
+        // Parakeet counts its windows' decode alone, as Android's `inferenceMs` does; Apple Speech its analyzer's time.
         checkpoint.inferenceMs = base.inferenceMs + (recognizer == .parakeet ? s.decodeMs : analyzed)
         checkpoint.wordsComplete = complete
         do {

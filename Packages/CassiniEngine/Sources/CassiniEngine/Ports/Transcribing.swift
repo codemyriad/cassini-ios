@@ -27,11 +27,11 @@ public struct TranscriptResume: Hashable, Sendable {
 }
 
 /// Parakeet after a 28 s window: every word so far on the recording clock (seams reconciled, not yet gated as a
-/// whole), where the run can go on from, and the decoder's time this run.
+/// whole), where the run can go on from, and the decode time this run.
 public struct TranscriptWindow: Hashable, Sendable {
     public var words: [Word]
     public var recognition: RecognitionCheckpoint
-    /// Milliseconds spent in the recognizer since this run began, the model load left out.
+    /// Milliseconds spent decoding windows since this run began, the model load left out.
     public var inferenceMs: Int64
     public init(words: [Word], recognition: RecognitionCheckpoint, inferenceMs: Int64) {
         self.words = words; self.recognition = recognition; self.inferenceMs = inferenceMs
@@ -56,7 +56,7 @@ public struct TranscriptionResult: Hashable, Sendable {
     public var segments: [TranscriptSegment]
     /// Parakeet's `x-segmentation`: how the recording was cut. Nil for Apple Speech.
     public var segmentation: String?
-    /// Parakeet's decoder time this run, in milliseconds. Nil for Apple Speech, whose job counts the analyzer's time.
+    /// Parakeet's decode time this run, in milliseconds. Nil for Apple Speech, whose job counts the analyzer's time.
     public var inferenceMs: Int64?
     public init(segments: [TranscriptSegment], segmentation: String? = nil, inferenceMs: Int64? = nil) {
         self.segments = segments; self.segmentation = segmentation; self.inferenceMs = inferenceMs

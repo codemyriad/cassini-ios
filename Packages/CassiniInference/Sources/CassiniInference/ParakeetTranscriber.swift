@@ -152,6 +152,9 @@ extension ParakeetTranscriber {
             // A detector that cannot be made leaves the run on quiet points.
             let speech: (any SpeechDetecting)? = detector.flatMap { try? runtime.makeDetector(SileroConfig(model: $0)) }
             var decoder: SpeechWordDecoder?
+            // Android's `IncrementalRecognizer.inferenceMs`: each window's decode once the recognizer is loaded (the
+            // speech detector, the decoder calls and the word gate), not the reading or the model load.
+            var inferenceNanoseconds: UInt64 = 0
             let recognize = { (audio: PcmAudio, _: Int64) throws -> Transcript in
                 try cancel.check()
                 guard ParakeetMemory.allows(availableBytes: availableMemory(), loaded: decoder != nil) else {
@@ -162,12 +165,14 @@ extension ParakeetTranscriber {
                         throw JobFailure.model
                     }
                 }
+                let began = DispatchTime.now().uptimeNanoseconds
                 let decoded = try ParakeetDecode.transcribe(audio, decoder: decoder!, detector: speech, policy: .wholeSpans,
                                                             cutting: DecodeCutting.cutting(detectorReady: speech != nil))
+                inferenceNanoseconds += DispatchTime.now().uptimeNanoseconds - began
                 // The words are one voice until the speaker step: no speaker id, as the checkpoint keeps them.
                 return Transcript(decoded.words.map { Word("", $0.startMs, $0.endMs, $0.text) })
             }
-            func decodeMs() -> Int64 { Int64((decoder?.decodeNanoseconds ?? 0) / 1_000_000) }
+            func decodeMs() -> Int64 { Int64(inferenceNanoseconds / 1_000_000) }
 
             var transcript: IncrementalTranscript?
             // Samples read so far at 16 kHz, and the window of a resumed run, collected while its start is read again.

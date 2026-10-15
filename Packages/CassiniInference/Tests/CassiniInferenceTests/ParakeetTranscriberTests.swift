@@ -193,6 +193,22 @@ import CassiniNotebook
         #expect(native.counts.detectors == 0)
     }
 
+    /// Android's `IncrementalRecognizer.inferenceMs`: the time of each window's decode, summed over the run.
+    @Test func theInferenceTimeIsEachWindowsDecode() async throws {
+        defer { try? FileManager.default.removeItem(at: folder) }
+        try install(ModelCatalog.parakeet)
+        try install(ModelCatalog.vad)
+        let url = try audio(seconds: 30)
+        let native = Native()
+        native.decodeDelay = 0.02
+        let (result, events) = try await run(transcriber(native), url)
+        let windowMs = try #require(events.windows.first?.inferenceMs)
+        let inferenceMs = try #require(result.inferenceMs)
+        #expect(windowMs >= 20)
+        #expect(inferenceMs >= windowMs + 20, "the last window adds its own")
+        #expect(inferenceMs >= Int64(native.counts.decodes) * 20)
+    }
+
     // ports: TranscriptionJobTest#aMissingSpeechDetectorIsFetchedAgainOnlyOnline
     @Test func aMissingSpeechDetectorIsFetchedAgainOnlyOnline() async throws {
         defer { try? FileManager.default.removeItem(at: folder) }

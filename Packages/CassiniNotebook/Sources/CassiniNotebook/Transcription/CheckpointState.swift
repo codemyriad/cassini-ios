@@ -37,7 +37,7 @@ public struct CheckpointState: Hashable, Sendable {
     public var totalMs: Int64
     /// The jobs' running time so far, for the time-left estimate.
     public var elapsedMs: Int64
-    /// The time spent recognizing so far: for Parakeet the decoder calls alone (Android's `recognition.inferenceMs`),
+    /// The time spent recognizing so far: for Parakeet each window's decode alone (Android's `recognition.inferenceMs`),
     /// for Apple Speech the analyzer's running time.
     public var inferenceMs: Int64
     /// Where the latest run resumed; 0 when no run resumed.

@@ -242,7 +242,8 @@ that were not ported, with the reason for each.
   once 30 s more audio is final than the last one covered, at most every 10 s. Both write at a stop and when the words
   are complete. A process death loses at most one interval.
 - **Times.** `elapsedMs` counts from the recognizer's first report, so a model download is left out. For Parakeet
-  `inferenceMs` is the decoder calls alone, split from the elapsed time as Android does; for Apple Speech the two are
+  `inferenceMs` is each window's decode once the model is loaded (speech detector, decoder calls and word gate), split
+  from the elapsed time as Android's `IncrementalRecognizer` does; for Apple Speech the two are
   the same number, because the analyzer gives no finer split.
 - **Resume.** Parakeet goes on from the checkpoint's window (Android's rule). Apple Speech starts the analyzer 1 s
   before `doneMs` and drops the words that end at or before it. A stop during the speaker step keeps the complete
@@ -261,7 +262,7 @@ that were not ported, with the reason for each.
   `x-speakerAssignmentEditedBy` and `x-derivedFromTranscript`, as Android's merged variant does.
 - **Parakeet runs** write Android's processing step (`TranscriptProvenance.parakeetRun`): `backend` "sherpa-onnx",
   `engine` "Parakeet TDT", `model` "moondream/parakeet-ultra INT8", `version` "sherpa-onnx 1.13.7; model revision
-  <revision>", `source` "recording", `language` "", Android's `x-segmentation` string, `x-inferenceMs` (decoder time)
+  <revision>", `source` "recording", `language` "", Android's `x-segmentation` string, `x-inferenceMs` (decode time)
   and `x-resumedFromMs`. Only `device` differs (iOS's hardware model and OS). The goldens against Android's 0.1.0
   record and the model names shown in the app follow in WP5; the Apple fallback writes the record below.
 - **Keys.** The record has Android's keys (`JobProvenance`, `SpeakerAttribution.record`) with iOS's values;
