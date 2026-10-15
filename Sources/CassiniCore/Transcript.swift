@@ -108,7 +108,7 @@ public struct Transcript: Hashable, Sendable {
                 pieceEnd = max(pieceEnd, end)
                 // Punctuation can be stamped at the NEXT acoustic onset. Preserve its text,
                 // but do not stretch the previous word across the intervening silence.
-                if piece.contains(where: { $0.isLetter || $0.isNumber }) {
+                if piece.unicodeScalars.contains(where: isLetterOrDigit) {
                     spoken = true
                     speechEnd = max(speechEnd, end)
                 }
@@ -116,5 +116,14 @@ public struct Transcript: Hashable, Sendable {
         }
         flush()
         return words
+    }
+
+    /// Android's `Char.isLetterOrDigit`: a letter (category L) or a decimal digit (Nd), so a lone "²", "½" or "Ⅻ" is
+    /// not speech. Swift's `Character.isNumber` would count it.
+    static func isLetterOrDigit(_ scalar: Unicode.Scalar) -> Bool {
+        switch scalar.properties.generalCategory {
+        case .uppercaseLetter, .lowercaseLetter, .titlecaseLetter, .modifierLetter, .otherLetter, .decimalNumber: true
+        default: false
+        }
     }
 }

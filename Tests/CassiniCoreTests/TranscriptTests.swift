@@ -76,6 +76,16 @@ import Testing
         #expect(throws: CassiniError.self) { try Transcript.fromTokens(["▁ciao", "▁ciao"], timestamps: [1, 0.5], durations: [0.1, 0.1]) }
     }
 
+    /// iOS only: Android decides speech with `isLetterOrDigit`, so a superscript, fraction or Roman numeral piece is a
+    /// mark and does not stretch the word's end, though it still raises the cap.
+    @Test func onlyLettersAndDecimalDigitsAreSpeech() throws {
+        let words = try Transcript.timedWordsFromTokens(["▁m", "²", "▁Ⅻ", "▁3", "½"], timestamps: [1, 3, 4, 5, 6],
+                                                        durations: [0.2, 0.1, 0.1, 0.1, 0.1])
+        #expect(words.map(\.word.text) == ["m²", "Ⅻ", "3½"])
+        #expect(words.map(\.word.endMs) == [1200, 4000, 5100])
+        #expect(words.map(\.capMs) == [3100, 4000, 6100])
+    }
+
     @Test func theBodyIsCompactJsonAndALanguageIsKeptWhenKnown() {
         let transcript = Transcript([Word("spk_1", 0, 20, "Ciao")], language: "it")
         #expect(transcript.json() == #"{"format":"cassini.words.v1","language":"it","wordCount":1,"items":[{"speaker":"spk_1","startMs":0,"endMs":20,"text":"Ciao"}]}"#)
