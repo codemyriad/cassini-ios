@@ -189,7 +189,9 @@ TTS. Like Android it has speaker diarization on and applies Android's `scripts/s
 streaming Sortformer diarizer and the CAM++ speaker-embedding extractor are in the build;
 `scripts/streaming-diarization-c-api.patch` (iOS only) puts the streaming calls into the C API, because Android's
 patch adds them only to JNI. It is not yet a release asset, so a normal build links no native code and the app still
-uses Apple's recognizer.
+uses Apple's recognizer. Android's pure decode rules (windows, quiet cuts, seam merge, word gate, speech feed,
+incremental 28 s windows) are ported with their tests to CassiniNotebook/Transcription; the app does not use them yet.
+Apple's recognizer stays as the fallback for devices that cannot hold Ultra (`AppleSpeechWindows`).
 
 ```sh
 scripts/build-sherpa-xcframework.sh   # pinned sources -> .tools/sherpa/SherpaOnnxC.xcframework and a reproducible zip

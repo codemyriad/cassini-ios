@@ -19,9 +19,32 @@ that were not ported, with the reason for each.
   (`AppleSpeechTranscriber`). The reader pulls the audio, so a long file is never all in memory, and the analyzer finds
   its own segments. On iOS a "window" is one finalized result, and `JobEvent.windowDone` follows the finalized audio.
   A final result without words (silence) counts as an empty finalized segment, so long silences still advance
-  `doneMs` and the checkpoints. Android's `SpeechWindowsTest` arithmetic (fixed windows, overlap, VAD split, padding)
-  belongs to Parakeet, so it is not ported. iOS's `SpeechWindowsTests` cover what iOS runs: the block size, the resume
-  point and the checkpoint interval.
+  `doneMs` and the checkpoints. The block size and the resume point belong to this Apple path and live in
+  `AppleSpeechWindows` (iOS-only `AppleSpeechWindowsTests`), which stays as the fallback for devices that cannot hold
+  Parakeet Ultra. The checkpoint cadence (30 s of audio, at most every 10 s) is iOS's own and stays in `SpeechWindows`.
+- **Decode rules (ported, not yet used by the app).** Android's pure decode rules are ported one to one into
+  CassiniNotebook/Transcription with the same constants and algorithms: `SpeechWindows` (`DecodePolicy`, quiet
+  pieces, split, fixed, padding, windows), `DecodeSession`, `WordGate`, `SeamMerge`, `IncrementalTranscript`,
+  `SpeechFeed`, `TokenWords`, `ProcessingSpeed`, and the cutting provenance strings (`DecodeCutting`, Android's
+  `Parakeet.Cutting`). The Parakeet transcriber that drives them comes later. The differences are of naming and
+  platform only:
+  - Android's `TimedWord` (a word with its extension cap) is CassiniCore's `DecodedWord`, because the note model
+    already has a `TimedWord`. `Span`, `Window` and `Chunk` are `SampleSpan`, `DecodeWindow` and `DecodeChunk`, so
+    they do not clash with the standard library's `Span` or SwiftUI. Constants are lower camel case
+    (`MAX_SAFE_MS` is `maxSafeMs`); `DecodeConstantsTests` pins each to Android's value.
+  - Cancellation is the task's (`Task.checkCancellation()`, `CancellationError`) where Android checks the thread's
+    interrupt flag and throws `CANCELLED`.
+  - `SpeechFeed.scan` does not resample. iOS reads every recording at 16 kHz through `AVAudioConverter`, so a 16 kHz
+    recording is its own copy and any other rate passes its 16 kHz copy (`copy16k`). Android's windowed-sinc
+    `resampleTo16k` and `StreamingResampler` (`ResamplerTest`) are not ported.
+  - `IncrementalTranscript(restored:)` throws `IncrementalState.Invalid` for a state no run could have saved, where
+    Android's `require` throws: the state comes from a checkpoint on disk. Its checkpoint.json codec arrives with
+    `CheckpointState` version 2, so `restoredBorrowedBufferTailContinuesWithoutRepeatingCompletedWindows` restores the
+    typed state without the JSON round trip for now.
+  - `TokenWords` throws `JobFailure.timings` (`JobFailure` is an `Error` on iOS) where Android throws `TIMINGS`.
+  - `LongRunMeasurementTests#checkpointPathOfATenHourRun` measures iOS's own checkpoint path (the typed recognizer
+    state and `CheckpointState.encoded()` of segments) instead of Android's three word-log variants, because iOS has
+    no word log. `CASSINI_MEASURE_HOURS` shortens it.
 - **Speech language.** Apple's models are per language, so iOS asks for a speech language in Settings ("· Installed"
   marks the ones on the device). Android recognises any language on its own. A language that Apple does not offer
   counts as nothing to download, and the job fails with `UNSUPPORTED_LANGUAGE` rather than waiting for a consent that
@@ -553,6 +576,25 @@ These have no Android counterpart; they are what App Store Connect reads from th
   raises the limit on devices that allow it. Android has no equivalent.
 - **App Privacy answers.** "Data Not Collected", no tracking. Model downloads send no user data.
 
+## Test map: decode rules
+
+Each Android test below has an iOS test of the same name in `Packages/CassiniNotebook/Tests/CassiniNotebookTests`,
+marked `// ports: <AndroidTest>#<name>`. Android's tests run at 16 and 48 kHz where they do; so do the ports.
+
+| Android (core/src/test/.../asr, .../checkpoint) | iOS suite | Tests |
+|---|---|---|
+| `SpeechWindowsTest` | `SpeechWindowsTests` | 17 |
+| `DecodeSessionTest` | `DecodeSessionTests` | 7 |
+| `WordGateTest` (including the three `TokenWords` cases) | `WordGateTests` | 20 |
+| `SeamMergeTest` | `SeamMergeTests` | 26 |
+| `IncrementalTranscriptTest` | `IncrementalTranscriptTests` | 5 |
+| `SpeechFeedTest` | `SpeechFeedTests` | 8 |
+| `ProcessingSpeedTest` | `ProcessingSpeedTests` | 1 |
+| `LongRunMeasurementTest` (gated by `CASSINI_MEASURE`) | `LongRunMeasurementTests` | 2 |
+
+iOS-only: `DecodeConstantsTests` (every constant, the provenance strings, the restore and `TIMINGS` checks) and
+`AppleSpeechWindowsTests` (the Apple fallback's block reading and the checkpoint cadence).
+
 ## Android tests without an iOS port
 
 - **`NoteViewModelTest#theExportAfterProcessDeathStillRuns`.** Android exports through a file picker, so the export
@@ -562,7 +604,9 @@ These have no Android counterpart; they are what App Store Connect reads from th
 - **Room, SQLite and the sealed document:** `sqliteHasFts4WithUnicode61AndRemoveDiacritics`,
   `replacingTheCacheKeepsTheFtsDocid`, the adopt and marker cases of the queue and job tests, and `CheckpointData` and
   the word log.
-- **Parakeet and streaming diarization:** `SpeechWindowsTest`, `TurnHistoryTest`, and the draft-naming cases of
+- **Resampling:** `ResamplerTest`. iOS converts to 16 kHz with `AVAudioConverter` (see
+  [Speech recognition](#speech-recognition)).
+- **Parakeet and streaming diarization:** `TurnHistoryTest`, and the draft-naming cases of
   `SpeakerNamingTest`, `SpeakerStatsTest`, `ProgressTrackerTest` and `SheetBehaviourTest`.
 - **Android platform:** foreground-service types, a refused service start, the ongoing-notification tests,
   `belowApi33OnlyTheMicrophoneIsAsked`, `TrashViewModelTest#backCloses`, `LicensesBackTo`, the AAC file-limit tests,

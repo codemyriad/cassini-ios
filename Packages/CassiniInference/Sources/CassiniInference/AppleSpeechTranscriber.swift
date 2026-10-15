@@ -232,12 +232,12 @@ final class FileReader: @unchecked Sendable {
         file = try AVAudioFile(forReading: url)
         let rate = file.processingFormat.sampleRate
         duration = Double(file.length) / rate
-        startFrame = min(SpeechWindows.frame(atMs: CheckpointState.ms(max(0, offset)), sampleRate: rate), file.length)
+        startFrame = min(AppleSpeechWindows.frame(atMs: CheckpointState.ms(max(0, offset)), sampleRate: rate), file.length)
         file.framePosition = startFrame
         startTime = Double(startFrame) / rate
         output = format
         converter = file.processingFormat == format ? nil : AVAudioConverter(from: file.processingFormat, to: format)
-        blockFrames = AVAudioFrameCount(SpeechWindows.samples(SpeechWindows.blockMs, sampleRate: Int(rate)))
+        blockFrames = AVAudioFrameCount(AppleSpeechWindows.samples(AppleSpeechWindows.blockMs, sampleRate: Int(rate)))
     }
 
     /// The next block; nil at the end of the file or after a failure. The first carries its time on the recording's
