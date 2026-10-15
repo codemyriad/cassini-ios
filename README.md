@@ -115,6 +115,9 @@ This is a working iOS app, not yet an App Store release.
   readable and the original is kept, with an explanation in place of the player.
 - Apple manages its speech models. iOS does not report their size before the download, so the download screen and
   Settings use an estimate.
+- The build carries what App Store Connect asks for: privacy manifests for the app and the Live Activity extension,
+  `ITSAppUsesNonExemptEncryption` set to false, and the increased-memory-limit entitlement. The App Privacy answers
+  are "Data Not Collected" with no tracking. A public privacy policy URL is still needed before a submission.
 - A real device is still needed to validate recognition, model downloads, long background capture and transcription,
   Bluetooth routes, the Live Activity and thermal behaviour. [Validation](docs/validation.md) has the checklist.
 
@@ -144,7 +147,8 @@ This is a working iOS app, not yet an App Store release.
 - **Platform.** The app language is set in the Settings app. iOS has no system Back, so the back button carries the
   title of the screen below. The iPad has a split view. Rename is a sheet. Notifications are silent results with
   hidden-preview text. The warm iOS palette and system fonts stay, with contrast checked by tests. Content width is
-  capped at Android's 560 pt.
+  capped at Android's 560 pt. The App Store build declares its privacy manifests, export compliance and memory
+  entitlement.
 
 ## Verify
 

@@ -37,6 +37,8 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.codemyriad.cassini
         INFOPLIST_FILE: Cassini/Resources/Info.plist
+        # A higher memory limit where the device allows it, for the on-device models.
+        CODE_SIGN_ENTITLEMENTS: Cassini/Cassini.entitlements
         MARKETING_VERSION: '0.1.0'
         CURRENT_PROJECT_VERSION: '1'
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
