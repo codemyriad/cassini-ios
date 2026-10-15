@@ -43,6 +43,10 @@ public enum SherpaError: Error, Equatable {
     case missingFiles
     /// The native recognizer could not be created.
     case createFailed
+    /// The audio is not 16 kHz, or a streaming chunk is longer than 28 s.
+    case invalidAudio
+    /// A saved Sortformer cache does not fit the model or is over `SpeakerBudget.diarizerStateFloats`.
+    case restoreFailed
 }
 
 /// Whether this build links the sherpa-onnx C API.

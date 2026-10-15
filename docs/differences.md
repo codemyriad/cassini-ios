@@ -622,6 +622,35 @@ marked `// ports: <AndroidTest>#<name>`. Android's tests run at 16 and 48 kHz wh
 iOS-only: `DecodeConstantsTests` (every constant, the provenance strings, the restore and `TIMINGS` checks) and
 `AppleSpeechWindowsTests` (the Apple fallback's block reading and the checkpoint cadence).
 
+## Test map: speakers
+
+The streaming diarizer's pure rules, ported ahead of the switch from FluidAudio to Sortformer and CAM++, in
+`Packages/CassiniNotebook/Tests/CassiniNotebookTests`, marked `// ports: <AndroidTest>#<name>`.
+
+| Android | iOS suite | Tests |
+|---|---|---|
+| `TurnHistoryTest` | `TurnHistoryTests` | 3 |
+| `SpeakerBudgetTest` (the bound of both patches: the JNI's and the iOS C API's) | `SpeakerBudgetTests` | 1 |
+| `VoiceClipCacheTest#speakerSlotsKeepTheirIdsWhenTheOrderWithinAChunkChanges` (slot n is `<prefix><n + 1>`) | `SpeakerBudgetTests` | 1 |
+| `SpeakerStatsTest`: `aDraftAppliesItsMergesFirst`, `withoutMergesTheDraftOverloadMatchesThePlainOne` | `SpeakerStatsTests` | 2 |
+| `SpeakerNamingTest`: `aDraftMergeChangesTheDraftWithTheTargetsName`, `aDraftSaveRenamesAndRemembersANewOrBoundVoice` | `SpeakerNamingTests` | 2 |
+
+iOS-only: `SpeakerBudgetTests` also pins Android's figures and `Diarization`'s settings, the filtering of a chunk's
+segments (finite, slots 0..7, milliseconds cut toward zero and held to the chunk), and `Voiceprints.normalised`;
+`CassiniSherpaTests` pins `SortformerConfig` and `VoiceprintConfig` against Android's settings. The native wrappers
+run in `CassiniTests/SpeakerSmokeTests` (`scripts/speaker-smoke.sh`, env-gated, arm64 simulator): streaming
+Sortformer over a 45.4 s mix of two FLEURS speakers (A, B, A) in the job's 28 s windows finds two speakers with A's
+slot in both of A's spans; a diarizer restored from the state saved after the first window saves the same floats and
+then returns the same turns as the original; an oversized or foreign state is refused; the whole-recording call
+agrees; and CAM++ gives 512-dimension unit prints, the two speakers' cosine below Android's 0.72.
+
+Differences in the wrappers: Android's draft `DraftName` effect carries the Remember choice as `""` (a new voice) or
+a voice id; iOS uses `DraftVoice.new` or `.saved(id)`. The draft merge sheet has no version line (Android's `sealed`
+is null; iOS sets `MergeUI.draft`). A chunk or recording that is not 16 kHz, or a chunk longer than 28 s, throws
+`SherpaError.invalidAudio` where Android's `require` throws; cancellation is Swift task cancellation, checked around
+each native call where Android checks the thread's interrupt. `NativeBudget` (Android's one-native-model-at-a-time
+lock) has no iOS counterpart yet.
+
 ## Android tests without an iOS port
 
 - **`NoteViewModelTest#theExportAfterProcessDeathStillRuns`.** Android exports through a file picker, so the export
@@ -633,8 +662,15 @@ iOS-only: `DecodeConstantsTests` (every constant, the provenance strings, the re
   the word log.
 - **Resampling:** `ResamplerTest`. iOS converts to 16 kHz with `AVAudioConverter` (see
   [Speech recognition](#speech-recognition)).
-- **Parakeet and streaming diarization:** `TurnHistoryTest`, and the draft-naming cases of
-  `SpeakerNamingTest`, `SpeakerStatsTest`, `ProgressTrackerTest` and `SheetBehaviourTest`.
+- **Streaming diarization, until FluidAudio is replaced:** the draft cases of `ProgressTrackerTest`
+  (`draftAppliesMergesAndLabelPrecedence`, `suggestionsOnlyForPlaceholderSpeakersWithALiveSuggestedMatch`,
+  `noSuggestionsOnceNamingIsClosed`, `aRestoredDiarizerKeepsMatchingPossibleAfterAnEarlierFailure`) and of
+  `SheetBehaviourTest`, `VoiceClipCacheTest#longMeetingsKeepOnlyTheBoundedSpeakerSampleBudget`, the three
+  window-cutting cases of `VoiceprintSelectionTest`, `VoiceStalenessTest#thePinnedDimensionIs512` and
+  `DiarizationTest#wordOrderAndTimingArePreservedIncludingOverlappingTurns`. They need the draft path, the voice-clip
+  cache and CAM++ in the job, which come with the step that replaces FluidAudio. `TurnHistoryTest`,
+  `SpeakerBudgetTest`, `VoiceClipCacheTest#speakerSlotsKeepTheirIdsWhenTheOrderWithinAChunkChanges` and the draft
+  cases of `SpeakerNamingTest` and `SpeakerStatsTest` are ported (see [Test map: speakers](#test-map-speakers)).
 - **Android platform:** foreground-service types, a refused service start, the ongoing-notification tests,
   `belowApi33OnlyTheMicrophoneIsAsked`, `TrashViewModelTest#backCloses`, `LicensesBackTo`, the AAC file-limit tests,
   and the platform Opus encoder half of `PortableDocumentTest`.

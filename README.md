@@ -195,19 +195,26 @@ patch adds them only to JNI. It is not yet a release asset, so a normal build li
 uses Apple's recognizer. Android's pure decode rules (windows, quiet cuts, seam merge, word gate, speech feed,
 incremental 28 s windows) are ported with their tests to CassiniNotebook/Transcription; the app does not use them yet.
 Apple's recognizer stays as the fallback for devices that cannot hold Ultra (`AppleSpeechWindows`).
+The speaker package is under way: `CassiniSherpa` wraps Android's streaming Sortformer diarizer (`SortformerStream`,
+with save and restore of its state) and CAM++ extractor (`VoiceprintExtractor`), and the streaming rules
+(`TurnHistory`, `SpeakerBudget`, draft naming and draft stats) are in CassiniNotebook. The app still analyses speakers
+with FluidAudio until the next step replaces it.
 
 ```sh
 scripts/build-sherpa-xcframework.sh   # pinned sources -> .tools/sherpa/SherpaOnnxC.xcframework and a reproducible zip
 scripts/verify-native-runtime.sh      # the lock (scripts/native-dependencies.json) against Package.swift and the build
 scripts/sherpa-bench.sh               # simulator spike: Ultra decode vs Android's golden, memory and speed
+scripts/speaker-smoke.sh              # simulator smoke: Sortformer streaming + save/restore and CAM++ on two FLEURS voices
 ```
 
 `CASSINI_SHERPA_LOCAL=1` makes `Package.swift` link the two xcframeworks in the gitignored `.tools/sherpa` into
 `CassiniSherpa`, the only module that imports `SherpaOnnxC`. The binaries are iOS-only (`.when(platforms: [.iOS])`),
 so `swift test` on macOS links and downloads neither. Unlike Android's two ABIs, iOS builds only the device
 (`ios-arm64`) and the Apple-silicon simulator (`ios-arm64-simulator`) slices, so a build with the local runtime is
-arm64-only. `CassiniTests/SherpaBenchTests` skips itself unless that build runs with the models named in its
-environment.
+arm64-only. `CassiniTests/SherpaBenchTests` and `CassiniTests/SpeakerSmokeTests` skip themselves unless that build
+runs with the models named in their environment. `scripts/fetch-ci-models.py --dest .tools/models` fetches the pinned
+models; `scripts/fetch-speaker-fixture.py` mixes the smoke test's two-speaker clip from public FLEURS audio (Android
+has no public meeting recording) into the gitignored `.tools/fixtures`.
 
 [Validation](docs/validation.md) lists what each tier covers, the test counts and the device checklist.
 [Architecture](docs/architecture.md) describes the modules, state ownership, startup, storage and the
