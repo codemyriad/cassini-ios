@@ -419,7 +419,7 @@ import CassiniEngineTesting
     /// A checkpoint of `note`'s audio, as a paused job leaves it.
     private func checkpoint(of note: Note, in test: TestGraph, language: String) -> CheckpointState {
         CheckpointState(source: "audio.caf", signature: CheckpointState.signature(of: audioURL(note, in: test)),
-                        language: language, segments: [], doneMs: 0, totalMs: 2_000, elapsedMs: 1_000)
+                        model: CheckpointState.appleModel(language: language), segments: [], doneMs: 0, totalMs: 2_000, elapsedMs: 1_000)
     }
 
     /// A checkpoint that holds the first second of `note`'s words.

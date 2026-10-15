@@ -33,9 +33,9 @@ struct LongRunMeasurementTests {
             let doneSamples = doneMs * Int64(Limits.asrRate) / 1000
             let state = IncrementalState(start: doneSamples - Int64(LongRun.overlapSamples), end: doneSamples,
                                          window: (0..<LongRun.overlapSamples).map { Float($0) / 1e5 }, words: words)
-            let checkpoint = CheckpointState(source: "capture.m4a", signature: "\(duration * 6):1", language: "",
+            let checkpoint = CheckpointState(source: "capture.m4a", signature: "\(duration * 6):1", model: "b86784a3a5356cbd126f710b61cd90c5fe5898f1",
                                              segments: run.segments(state.words), doneMs: doneMs, totalMs: duration,
-                                             elapsedMs: doneMs / 8)
+                                             elapsedMs: doneMs / 8, recognition: RecognitionCheckpoint(state))
             let bytes = try checkpoint.encoded().count
             nanos += DispatchTime.now().uptimeNanoseconds - started
             written += bytes

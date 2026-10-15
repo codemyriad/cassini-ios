@@ -64,7 +64,7 @@ import CassiniNotebook
         // iOS took the background time back from a Transcribe again after its first second.
         let audio = test.root.appendingPathComponent(note.id.uuidString).appendingPathComponent("audio.caf")
         let checkpoints = CheckpointFiles(noteDirectory: { [root = test.root] in root.appendingPathComponent($0.uuidString) })
-        try checkpoints.save(CheckpointState(source: "audio.caf", signature: CheckpointState.signature(of: audio), language: language,
+        try checkpoints.save(CheckpointState(source: "audio.caf", signature: CheckpointState.signature(of: audio), model: CheckpointState.appleModel(language: language),
                                              segments: [TranscriptSegment(text: "Hello", start: 0, end: 0.8,
                                                                           words: [.init(text: "Hello", start: 0, end: 0.8)])],
                                              doneMs: 1_000, totalMs: 2_000, elapsedMs: 1_000), for: note.id)

@@ -131,8 +131,10 @@ This is a working iOS app, not yet an App Store release.
   own thresholds (0.85 automatic, 0.65 suggest, 0.12 margin, 6 s of speech) and keeps automatic naming off by default.
   The two apps' voiceprints are not compatible. The move to Parakeet Ultra has begun: the pinned model catalog, plan, redirect
   policy, fetcher and installer are ported with Android's tests, behind an `HTTPTransport` port over a data-task
-  `URLSession` that never follows a redirect itself, but the app does not use them yet. Devices that cannot hold Ultra
-  keep Apple Speech.
+  `URLSession` that never follows a redirect itself, but the app does not use them yet. The Parakeet transcriber and
+  the job are in place (`ParakeetTranscriber`, checkpoint version 2): a build with the native runtime transcribes with
+  Ultra when its model is installed and the device has the memory (a provisional rule until a device is measured), and
+  falls back to Apple Speech otherwise. Devices that cannot hold Ultra keep Apple Speech.
 - **Storage model.** A note is a `note.json` beside its audio. The portable Cassini document is sealed only at export,
   with the run's provenance under Android's keys, less the four that describe Sortformer. Android keeps the transcript
   in a sealed document and a Room catalogue. The queue is `jobs.json`, and checkpoints use iOS's own format. Search
@@ -191,23 +193,29 @@ The move to Parakeet Ultra builds sherpa-onnx for iOS from the same fork and com
 TTS. Like Android it has speaker diarization on and applies Android's `scripts/streaming-diarization.patch`, so the
 streaming Sortformer diarizer and the CAM++ speaker-embedding extractor are in the build;
 `scripts/streaming-diarization-c-api.patch` (iOS only) puts the streaming calls into the C API, because Android's
-patch adds them only to JNI. It is not yet a release asset, so a normal build links no native code and the app still
-uses Apple's recognizer. Android's pure decode rules (windows, quiet cuts, seam merge, word gate, speech feed,
-incremental 28 s windows) are ported with their tests to CassiniNotebook/Transcription; the app does not use them yet.
-Apple's recognizer stays as the fallback for devices that cannot hold Ultra (`AppleSpeechWindows`).
+patch adds them only to JNI. It is not yet a release asset, so a normal build links no native code and the app uses
+Apple's recognizer. Android's pure decode rules (windows, quiet cuts, seam merge, word gate, speech feed, incremental
+28 s windows) are ported with their tests to CassiniNotebook/Transcription, and `ParakeetTranscriber`
+(CassiniInference) drives them over CassiniSherpa's `ParakeetDecoder` and `SileroDetector`. A build with
+`CASSINI_SHERPA_LOCAL=1` uses Ultra when its model is in Application Support/CassiniModels and the device passes
+`SpeechCapability`; Apple's recognizer stays as the fallback for devices that cannot hold Ultra (`AppleSpeechWindows`).
 
 ```sh
 scripts/build-sherpa-xcframework.sh   # pinned sources -> .tools/sherpa/SherpaOnnxC.xcframework and a reproducible zip
 scripts/verify-native-runtime.sh      # the lock (scripts/native-dependencies.json) against Package.swift and the build
-scripts/sherpa-bench.sh               # simulator spike: Ultra decode vs Android's golden, memory and speed
+scripts/fetch-ci-models.py --dest .tools/models   # the pinned models, verified, in the app's layout
+scripts/sherpa-bench.sh               # simulator: Ultra decode vs Android's golden, memory and speed, and a real job
+                                      # vs iOS's golden (CASSINI_PARAKEET_RECORD=1 records it)
 ```
 
 `CASSINI_SHERPA_LOCAL=1` makes `Package.swift` link the two xcframeworks in the gitignored `.tools/sherpa` into
 `CassiniSherpa`, the only module that imports `SherpaOnnxC`. The binaries are iOS-only (`.when(platforms: [.iOS])`),
 so `swift test` on macOS links and downloads neither. Unlike Android's two ABIs, iOS builds only the device
 (`ios-arm64`) and the Apple-silicon simulator (`ios-arm64-simulator`) slices, so a build with the local runtime is
-arm64-only. `CassiniTests/SherpaBenchTests` skips itself unless that build runs with the models named in its
-environment.
+arm64-only. `CassiniTests/SherpaBenchTests` and `CassiniTests/ParakeetJobTests` skip themselves unless that build
+runs with the models named in their environment. `ParakeetJobTests` compares a real job's words with
+`CassiniTests/Goldens/fleurs-it-short.ios.json`, recorded on the arm64 simulator: iOS keeps goldens of its own because
+ONNX Runtime's int8 kernels differ from those of Android's x86_64 emulator.
 
 [Validation](docs/validation.md) lists what each tier covers, the test counts and the device checklist.
 [Architecture](docs/architecture.md) describes the modules, state ownership, startup, storage and the

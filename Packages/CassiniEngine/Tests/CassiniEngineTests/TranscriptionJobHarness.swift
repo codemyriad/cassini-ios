@@ -19,6 +19,8 @@ extension TranscriptionJobTests {
         let analyzer: any SpeakerAnalyzing
         let host: FakeHost
         let limits: TranscriptionJob.Limits
+        /// Runs the job with this transcriber in place of `transcriber` (a Parakeet one, say).
+        let engine: (any Transcribing)?
 
         var applied: [(noteID: UUID, generation: Int)] { host.applied }
 
@@ -26,7 +28,7 @@ extension TranscriptionJobTests {
              speechStatus: ModelPartStatus = .ready, analyzer: any SpeakerAnalyzing = FakeAnalyzer(),
              settings: JobSettings = JobSettings(allowSpeechDownload: true, identifySpeakers: true,
                                                  allowSpeakerDownload: true, voicesGeneration: 7),
-             limits: TranscriptionJob.Limits = .init()) async throws {
+             limits: TranscriptionJob.Limits = .init(), engine: (any Transcribing)? = nil) async throws {
             root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
             notes = try NoteStore(root: root)
             var note = Note(id: noteID, title: "Riunione", audioFilename: "audio.m4a")
@@ -42,6 +44,7 @@ extension TranscriptionJobTests {
             self.analyzer = analyzer
             host = FakeHost(settings, notes: notes)
             self.limits = limits
+            self.engine = engine
         }
 
         func note() async -> Note? { await notes.note(noteID) }
@@ -53,7 +56,7 @@ extension TranscriptionJobTests {
                  uptime: (@Sendable () -> Int64)? = nil, availableMemory: Int64? = nil,
                  observe: @escaping @Sendable (JobEvent) -> Void = { _ in }) async -> (outcome: JobOutcome, events: [JobEvent]) {
             let ticking = FakeUptime()
-            let job = TranscriptionJob(notes: notes, transcriber: transcriber, analyzer: analyzer, checkpoints: checkpoints,
+            let job = TranscriptionJob(notes: notes, transcriber: engine ?? transcriber, analyzer: analyzer, checkpoints: checkpoints,
                                        provenance: provenanceFiles, host: host, clock: FakeClock(), limits: limits,
                                        uptimeMs: uptime ?? { ticking.next() }, availableMemory: { availableMemory })
             let record = Job(noteID: noteID, seq: 1, kind: kind, state: .running, language: language, enqueuedAt: Date())

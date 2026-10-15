@@ -10,6 +10,11 @@ import CassiniNotebook
 /// sink may call back into the decode (a stop, say) without deadlocking; one that does has its own events sent after
 /// the ones before. A checkpoint is written under the lock, so the next result waits for the `fsync`: that keeps every
 /// decision about the next checkpoint on what is on disk.
+///
+/// Apple Speech sends finalized segments, which are added in order; a resumed run drops the words it already has.
+/// Parakeet sends a `TranscriptWindow` after each 28 s window holding every word so far and where to go on from, which
+/// replaces the checkpoint's words; a checkpoint follows each window (at most every 10 s), and the words must fit the
+/// word body at every window. Its inference time is the decoder's own, not the step's running time.
 final class WordsDecode: Sendable {
     enum Ending: Sendable {
         case complete(CheckpointState)
@@ -39,6 +44,8 @@ final class WordsDecode: Sendable {
         var wordsShown = false
         var emittedAt: Int64?
         var finalizedThisRun = false
+        /// Parakeet's decoder time this run, from its last window or its result.
+        var decodeMs: Int64 = 0
         var ended: Ending?
         var stopping = false
         var task: Task<TranscriptionResult, any Error>?
@@ -58,14 +65,18 @@ final class WordsDecode: Sendable {
     private let events: @Sendable (JobEvent) -> Void
     private let uptimeMs: @Sendable () -> Int64
     private let base: CheckpointState
+    private let recognizer: SpeechRecognizer
+    /// The language the word body is counted with: the job's for Apple Speech, `""` for Parakeet.
+    private let language: String
 
-    init(base: CheckpointState, noteID: UUID, resumeDoneMs: Int64, limits: TranscriptionJob.Limits,
-         checkpoints: any CheckpointStoring, stop: StopSignal, events: @escaping @Sendable (JobEvent) -> Void,
-         uptimeMs: @escaping @Sendable () -> Int64) {
+    init(base: CheckpointState, noteID: UUID, resumeDoneMs: Int64, recognizer: SpeechRecognizer = .appleSpeech,
+         language: String = "", limits: TranscriptionJob.Limits, checkpoints: any CheckpointStoring, stop: StopSignal,
+         events: @escaping @Sendable (JobEvent) -> Void, uptimeMs: @escaping @Sendable () -> Int64) {
         var resumed = base
         if resumeDoneMs > 0 { resumed.resumedFromMs = resumeDoneMs }
         self.base = base
         self.noteID = noteID; self.resumeDoneMs = resumeDoneMs; self.limits = limits; self.checkpoints = checkpoints
+        self.recognizer = recognizer; self.language = recognizer.usesLanguage ? language : ""
         self.stop = stop; self.events = events; self.uptimeMs = uptimeMs
         state = Mutex(State(checkpoint: resumed, savedMs: base.doneMs, words: base.draftWords, progressMs: base.doneMs,
                             shownMs: base.doneMs))
@@ -95,6 +106,8 @@ final class WordsDecode: Sendable {
             case .volatile(let segment):
                 s.volatile = segment.map { $0.draftWords.filter { $0.endMs > s.checkpoint.doneMs } } ?? []
                 emit(&s, force: false)
+            case .window(let window):
+                windowDone(window, &s)
             }
         }
     }
@@ -116,11 +129,24 @@ final class WordsDecode: Sendable {
                 return .needsConsent
             case .failure(TranscriptionError.failed(.download(let error))):
                 return .downloadFailed(DownloadFailure(error: error, part: .speech))
+            case .failure(TranscriptionError.failed(.cancelled)), .failure(JobFailure.cancelled):
+                if let request = stop.request { requestStop(request, &s); return s.ended ?? .stopped(request) }
+                return .stopped(.cancel)
             case .failure(TranscriptionError.failed(let failure)):
+                return .failed(failure)
+            case .failure(let failure as JobFailure):
+                // The decode rules and the Parakeet adapter throw the failure itself (`TIMINGS`, `MEMORY`, `MODEL`).
                 return .failed(failure)
             case .failure(let error):
                 if let request = stop.request { requestStop(request, &s); return s.ended ?? .stopped(request) }
                 return error is CancellationError ? .stopped(.cancel) : .failed(.unknown)
+            case .success(let transcription) where recognizer == .parakeet:
+                // Every word of the recording, gated as a whole: it replaces the windows' words.
+                guard accept(total: s.checkpoint.totalMs, &s) else { return s.ended ?? .failed(.long) }
+                s.checkpoint.segments = transcription.segments
+                s.checkpoint.recognition = nil
+                s.words = s.checkpoint.draftWords
+                if let inferenceMs = transcription.inferenceMs { s.decodeMs = inferenceMs }
             case .success(let transcription):
                 if !s.finalizedThisRun {
                     for segment in transcription.segments { finalize(segment, &s) }
@@ -170,6 +196,31 @@ final class WordsDecode: Sendable {
         emit(&s, force: false)
     }
 
+    /// A Parakeet window: its words replace the checkpoint's (a resumed run's include the restored ones), and the run
+    /// can go on from its recognition state.
+    private func windowDone(_ window: TranscriptWindow, _ s: inout State) {
+        guard accept(total: s.checkpoint.totalMs, &s) else { return }
+        s.finalizedThisRun = true
+        s.checkpoint.segments = TranscriptSegment.segments(of: window.words)
+        s.checkpoint.recognition = window.recognition
+        s.words = s.checkpoint.draftWords
+        s.decodeMs = window.inferenceMs
+        let lastEnd = window.words.map(\.endMs).max() ?? 0
+        s.checkpoint.doneMs = max(s.checkpoint.doneMs, window.recognition.doneMs, lastEnd)
+        s.progressMs = max(s.progressMs, s.checkpoint.doneMs)
+        // A stop is honoured at the window boundary.
+        if let request = stop.request { requestStop(request, &s); return }
+        // Android counts the words at every window, not only at a checkpoint.
+        guard fits(s) else { end(.failed(.long), &s); return }
+        let now = uptimeMs()
+        if SpeechWindows.windowCheckpointDue(doneMs: s.checkpoint.doneMs, savedMs: s.savedMs, nowMs: now, savedAt: s.savedAt),
+           let failure = save(&s, complete: false) {
+            end(.failed(failure), &s)
+            return
+        }
+        emit(&s, force: false)
+    }
+
     /// False, and the step ends with `LONG`, when the audio is longer than the limit.
     private func accept(total: Int64, _ s: inout State) -> Bool {
         guard total <= limits.maxDurationMs else { end(.failed(.long), &s); return false }
@@ -194,7 +245,7 @@ final class WordsDecode: Sendable {
     }
 
     private func fits(_ s: State) -> Bool {
-        TranscriptBudget.fits(s.checkpoint.segments, language: s.checkpoint.language, maxBytes: limits.maxBodyBytes)
+        TranscriptBudget.fits(s.checkpoint.segments, language: language, maxBytes: limits.maxBodyBytes)
     }
 
     /// Writes the checkpoint; `checkpointed` follows only once it is on disk. Nil when saved, else the failure:
@@ -206,7 +257,8 @@ final class WordsDecode: Sendable {
         let analyzed = s.analyzerStartedAt.map { now - $0 } ?? 0
         var checkpoint = s.checkpoint
         checkpoint.elapsedMs = base.elapsedMs + analyzed
-        checkpoint.inferenceMs = base.inferenceMs + analyzed
+        // Parakeet counts its decoder calls alone, as Android's `inferenceMs` does; Apple Speech its analyzer's time.
+        checkpoint.inferenceMs = base.inferenceMs + (recognizer == .parakeet ? s.decodeMs : analyzed)
         checkpoint.wordsComplete = complete
         do {
             try checkpoints.save(checkpoint, for: noteID)

@@ -89,7 +89,7 @@ extension TranscriptionJobTests {
         // ports: TranscriptionJobTest#aCheckpointThatNoLongerMatchesFailsTheJob
         @Test func aCheckpointThatNoLongerMatchesFailsTheJob() async throws {
             let h = try await Harness()
-            try h.files.save(CheckpointState(source: "audio.m4a", signature: "1:2", language: "it-IT", segments: [],
+            try h.files.save(CheckpointState(source: "audio.m4a", signature: "1:2", model: CheckpointState.appleModel(language: "it-IT"), segments: [],
                                              doneMs: 0, totalMs: 70_000, elapsedMs: 0), for: h.noteID)
             #expect(await h.run().outcome == .failed(.checkpointMismatch))
             #expect(h.transcriber.starts.isEmpty)

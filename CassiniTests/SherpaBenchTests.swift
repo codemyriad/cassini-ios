@@ -213,7 +213,7 @@ final class SherpaBenchTests: XCTestCase {
 
     /// Words from the token arrays: a token that starts with "▁" or a space begins a word (a simplified TokenWords for
     /// the spike; WP2 ports Android's).
-    private func timedWords(_ result: DecodedTokens) -> [(word: String, start: Float, end: Float)] {
+    private func timedWords(_ result: RecognizedTokens) -> [(word: String, start: Float, end: Float)] {
         var out: [(word: String, start: Float, end: Float)] = []
         for i in result.tokens.indices {
             let token = result.tokens[i]

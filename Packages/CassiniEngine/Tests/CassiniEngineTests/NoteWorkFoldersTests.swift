@@ -17,7 +17,7 @@ import CassiniNotebook
     }
 
     private func checkpoint(of audio: URL, doneMs: Int64) -> CheckpointState {
-        CheckpointState(source: audio.lastPathComponent, signature: CheckpointState.signature(of: audio), language: "en-US",
+        CheckpointState(source: audio.lastPathComponent, signature: CheckpointState.signature(of: audio), model: CheckpointState.appleModel(language: "en-US"),
                         segments: [TranscriptSegment(text: "Hello there", start: 0, end: 1,
                                                      words: [.init(text: "Hello", start: 0, end: 0.5),
                                                              .init(text: " there", start: 0.5, end: 1)])],

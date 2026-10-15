@@ -110,29 +110,9 @@ public struct PortableTranscript: Hashable, Sendable {
         }
     }
 
-    /// Words grouped into segments: a new one at a change of speaker, a pause over 2 s, or after 45 words.
+    /// Words grouped into segments (`TranscriptSegment.segments(of:label:)`), named by the manifest's labels.
     private static func segments(_ transcript: Transcript, _ document: CassiniDocument) -> [TranscriptSegment] {
-        var segments: [TranscriptSegment] = []
-        var group: [Word] = []
-        func flush() {
-            guard let first = group.first else { return }
-            let words = group.enumerated().map { index, word in
-                TimedWord(text: word.text + (index == group.count - 1 ? "" : " "),
-                          start: Double(word.startMs) / 1000, end: Double(word.endMs) / 1000)
-            }
-            segments.append(TranscriptSegment(
-                text: group.map(\.text).joined(separator: " "), start: Double(first.startMs) / 1000,
-                end: Double(group.map(\.endMs).max() ?? first.endMs) / 1000,
-                speaker: document.speakerLabel(first.speaker) ?? first.speaker, speakerID: first.speaker, words: words))
-            group.removeAll(keepingCapacity: true)
-        }
-        for word in transcript.words {
-            if let previous = group.last,
-               previous.speaker != word.speaker || group.count >= 45 || word.startMs - previous.endMs > 2000 { flush() }
-            group.append(word)
-        }
-        flush()
-        return segments
+        TranscriptSegment.segments(of: transcript.words) { document.speakerLabel($0) }
     }
 }
 

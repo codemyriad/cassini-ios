@@ -54,7 +54,7 @@ import CassiniNotebook
         let first = try #require(h.checkpoints.saved.first)
         #expect(first.source == "audio.m4a")
         #expect(first.signature == CheckpointState.signature(of: h.audioURL))
-        #expect(first.language == "it-IT")
+        #expect(first.model == CheckpointState.appleModel(language: "it-IT"))
     }
 
     // ports: TranscriptionJobTest#withoutAContainerDurationTheRowsDurationIsTheTotal

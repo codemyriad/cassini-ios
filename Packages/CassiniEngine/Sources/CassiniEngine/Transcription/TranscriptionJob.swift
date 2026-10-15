@@ -28,16 +28,20 @@ public protocol TranscriptionJobHost: Sendable {
     func applySpeakers(_ analysis: SpeakerAnalysis, to noteID: UUID, generation: Int) async throws
 }
 
-/// One run of one job: the words with Apple's speech analyzer, read from where the last checkpoint stopped, then the
-/// speakers from the whole file.
+/// One run of one job: the words with Parakeet Ultra (or, on a device that cannot hold it, Apple's speech analyzer),
+/// read from where the last checkpoint stopped, then the speakers from the whole file.
 ///
 /// - **Limits.** Audio over 36 h fails with `LONG` before any work; words that outgrow the word body of a Cassini
 ///   document fail with `LONG` at the checkpoint that passes it, keeping the one before; audio under 200 ms fails with
 ///   `SHORT`.
-/// - **Checkpoints.** Finalized results are saved to `work/checkpoint.json` once 30 s more audio is final (and at most
-///   every 10 s), at a stop and when the words are complete; `JobEvent.checkpointed` follows each save that is on disk.
-///   A run resumes 1 s before the checkpoint and drops the words it already has. A checkpoint that no longer matches the
-///   audio or the language fails with `CHECKPOINT_MISMATCH`.
+/// - **Checkpoints.** Parakeet saves `work/checkpoint.json` after each 28 s window (at most every 10 s) and resumes
+///   from the window it saved; Apple Speech saves its finalized results once 30 s more audio is final (and at most every
+///   10 s), resumes 1 s before the checkpoint and drops the words it already has. Both save at a stop and when the words
+///   are complete; `JobEvent.checkpointed` follows each save that is on disk. A checkpoint that no longer matches the
+///   audio or the recognizer (an Apple-era version 1 file, another language for Apple Speech) fails with
+///   `CHECKPOINT_MISMATCH`.
+/// - **Failures.** A recognizer that throws a `JobFailure` (`TIMINGS`, `MEMORY`, `MODEL`) fails with it; a cancellation
+///   (`CancellationError`, `CANCELLED`) ends cancelled unless a pause asked for it.
 /// - **Stop.** A pause keeps every finalized result (a stop before the first leaves no checkpoint); a cancel keeps
 ///   nothing new and the coordinator discards the work. A stop is noticed at the next result, or within 50 ms.
 /// - **Speakers.** After the words are in the note, the speaker step analyses the whole file. A failure leaves every
@@ -120,19 +124,24 @@ public struct TranscriptionJob: TranscriptionJobRunning {
         guard knownMs <= limits.maxDurationMs else { return .failed(.long) }
         guard knownMs == 0 || knownMs >= limits.minDurationMs else { return .failed(.short) }
         let settings = await host.jobSettings()
-        let language = job.language.isEmpty ? note.language : job.language
+        let recognizer = transcriber.recognizer
+        // Parakeet hears the language; only the Apple Speech fallback is given one.
+        let language = recognizer.usesLanguage ? (job.language.isEmpty ? note.language : job.language) : ""
         let transcribes = job.kind != .speakersOnly
 
         var checkpoint: CheckpointState?
         if transcribes {
             let expected = CheckpointState.Expected(source: note.audioFilename, signature: CheckpointState.signature(of: url),
-                                                    language: language)
+                                                    model: recognizer.checkpointModel(language: language))
             do {
+                // A checkpoint of another version (Apple Speech before Ultra) or recognizer does not resume.
                 checkpoint = try checkpoints.load(job.noteID)
                 try checkpoint?.validate(expected)
             } catch {
                 return .failed(.checkpointMismatch)
             }
+            // A Parakeet checkpoint goes on from its window; one without it (none was written) starts over.
+            if recognizer == .parakeet, checkpoint?.wordsComplete == false, checkpoint?.recognition == nil { checkpoint = nil }
             if checkpoint?.wordsComplete != true {
                 switch await transcriber.assetStatus(locale: Locale(identifier: language)) {
                 case .unsupported: return .failed(.unsupportedLanguage)
@@ -151,14 +160,14 @@ public struct TranscriptionJob: TranscriptionJobRunning {
         events(.started(JobStart(totalMs: totalMs, restored: restored, speakers: speakers, prints: speakers,
                                  lowMemory: MemoryPreflight.lowMemory(durationMs: totalMs, availableBytes: availableMemory()))))
         var context = Context(noteID: job.noteID, url: url, source: note.audioFilename, language: language,
-                              knownMs: knownMs, settings: settings, stop: stop, events: events)
+                              recognizer: recognizer, knownMs: knownMs, settings: settings, stop: stop, events: events)
         context.signature = CheckpointState.signature(of: url)
 
         if transcribes {
             var words = checkpoint
             if words?.wordsComplete != true {
                 switch await decodeWords(context, from: checkpoint) {
-                case .complete(let state): words = state
+                case .complete(let state, let segmentation): words = state; context.segmentation = segmentation
                 case .ended(let outcome): return outcome
                 }
             }
@@ -192,23 +201,30 @@ public struct TranscriptionJob: TranscriptionJobRunning {
     // MARK: - Words
 
     private enum WordsResult {
-        case complete(CheckpointState)
+        /// The words, and how the recognizer cut the recording (Parakeet's `x-segmentation`).
+        case complete(CheckpointState, segmentation: String?)
         case ended(JobOutcome)
     }
 
     private func decodeWords(_ context: Context, from checkpoint: CheckpointState?) async -> WordsResult {
         let resumeDoneMs = checkpoint?.doneMs ?? 0
-        let startMs = resumeDoneMs > 0 ? AppleSpeechWindows.resumeStartMs(doneMs: resumeDoneMs) : 0
+        let parakeet = context.recognizer == .parakeet
+        // Apple Speech starts again 1 s before the checkpoint; Parakeet reads up to its window and goes on from there.
+        let startMs = resumeDoneMs == 0 ? 0
+            : parakeet ? (checkpoint?.recognition?.start ?? 0) * 1000 / Int64(CassiniNotebook.Limits.asrRate)
+            : AppleSpeechWindows.resumeStartMs(doneMs: resumeDoneMs)
         let decode = WordsDecode(
             base: checkpoint ?? CheckpointState(source: context.source, signature: context.signature,
-                                                language: context.language, segments: [], doneMs: 0,
-                                                totalMs: context.knownMs, elapsedMs: 0),
-            noteID: context.noteID, resumeDoneMs: resumeDoneMs, limits: limits, checkpoints: checkpoints,
+                                                model: context.recognizer.checkpointModel(language: context.language),
+                                                segments: [], doneMs: 0, totalMs: context.knownMs, elapsedMs: 0),
+            noteID: context.noteID, resumeDoneMs: resumeDoneMs, recognizer: context.recognizer,
+            language: context.language, limits: limits, checkpoints: checkpoints,
             stop: context.stop, events: context.events, uptimeMs: uptimeMs)
         context.events(.stageChanged(.reading, startMs: 0, endMs: startMs))
         context.events(.stageChanged(.preparing))
+        let resume = parakeet ? checkpoint?.recognition.map { TranscriptResume(recognition: $0, words: checkpoint?.words ?? []) } : nil
         let request = TranscriptionRequest(url: context.url, language: context.language,
-                                           startOffset: TimeInterval(startMs) / 1000,
+                                           startOffset: parakeet ? 0 : TimeInterval(startMs) / 1000, resume: resume,
                                            allowDownload: context.settings.allowSpeechDownload)
         let transcriber = transcriber
         let task = Task { try await transcriber.transcribe(request) { decode.handle($0) } }
@@ -217,7 +233,7 @@ public struct TranscriptionJob: TranscriptionJobRunning {
         let result = await task.result
         watch.cancel()
         switch decode.finish(result) {
-        case .complete(let state): return .complete(state)
+        case .complete(let state): return .complete(state, segmentation: try? result.get().segmentation)
         case .stopped(let request): return .ended(Self.outcome(of: request))
         case .failed(let failure): return .ended(.failed(failure))
         case .downloadFailed(let failure): return .ended(.downloadFailed(failure))
@@ -231,11 +247,20 @@ public struct TranscriptionJob: TranscriptionJobRunning {
     private func saveTranscript(_ words: CheckpointState, resumed: Bool, _ context: Context) async -> Bool {
         let segments = words.segments
         if resumed, provenance.load(context.noteID)?.describes(segments) == true { return true }
-        let model = await transcriber.modelName(locale: Locale(identifier: words.language))
-        let record = ProvenanceRecord(
-            provenance: .appleRun(language: words.language, inferenceMs: words.inferenceMs,
-                                  resumedFromMs: words.resumedFromMs, model: model, device: device()),
-            transcript: segments)
+        let run: TranscriptProvenance
+        switch context.recognizer {
+        case .parakeet:
+            // A run that resumed with every word already decoded asks the transcriber how it cuts the audio.
+            let segmentation = if let known = context.segmentation { known } else { await transcriber.segmentation() }
+            run = .parakeetRun(model: "\(ModelCatalog.parakeetModelID) \(ModelCatalog.parakeetPrecision)",
+                               revision: ModelCatalog.parakeetRevision, segmentation: segmentation ?? "",
+                               inferenceMs: words.inferenceMs, resumedFromMs: words.resumedFromMs, device: device())
+        case .appleSpeech:
+            let model = await transcriber.modelName(locale: Locale(identifier: context.language))
+            run = .appleRun(language: context.language, inferenceMs: words.inferenceMs, resumedFromMs: words.resumedFromMs,
+                            model: model, device: device())
+        }
+        let record = ProvenanceRecord(provenance: run, transcript: segments)
         let date = clock.now, before = UUID(), after = UUID()
         do {
             let saved = try await notes.mutate(context.noteID) { note in
@@ -361,18 +386,22 @@ public struct TranscriptionJob: TranscriptionJobRunning {
         let noteID: UUID
         let url: URL
         let source: String
+        /// BCP-47 for Apple Speech; `""` for Parakeet.
         let language: String
+        let recognizer: SpeechRecognizer
         let knownMs: Int64
         let settings: JobSettings
         let stop: StopSignal
         let events: @Sendable (JobEvent) -> Void
         var signature = ""
         var totalMs: Int64 = 0
+        var segmentation: String?
 
-        init(noteID: UUID, url: URL, source: String, language: String, knownMs: Int64, settings: JobSettings,
-             stop: StopSignal, events: @escaping @Sendable (JobEvent) -> Void) {
+        init(noteID: UUID, url: URL, source: String, language: String, recognizer: SpeechRecognizer, knownMs: Int64,
+             settings: JobSettings, stop: StopSignal, events: @escaping @Sendable (JobEvent) -> Void) {
             self.noteID = noteID; self.url = url; self.source = source; self.language = language
-            self.knownMs = knownMs; self.settings = settings; self.stop = stop; self.events = events
+            self.recognizer = recognizer; self.knownMs = knownMs; self.settings = settings; self.stop = stop
+            self.events = events
         }
     }
 }
