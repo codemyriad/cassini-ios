@@ -167,10 +167,14 @@ import Testing
     @Test func emergencySplitCutsAt55SecondsWithoutOverlap() throws {
         for sr in rates {
             let safe = 55 * sr
-            let dense = try #require(SpeechWindows.windows(120 * sr, sampleRate: sr, vadSegment: false).first)
+            func single(_ windows: [DecodeWindow]) throws -> DecodeWindow {
+                #expect(windows.count == 1)
+                return try #require(windows.first)
+            }
+            let dense = try single(SpeechWindows.windows(120 * sr, sampleRate: sr, vadSegment: false))
             #expect(dense.chunks == [DecodeChunk(S(0, safe), 0, 0), DecodeChunk(S(safe, 2 * safe), 0, 0), DecodeChunk(S(2 * safe, 120 * sr), 0, 0)])
-            #expect(SpeechWindows.windows(60 * sr, sampleRate: sr, vadSegment: false).first?.chunks.last == DecodeChunk(S(safe, 60 * sr), 0, sr / 2))
-            let reference = try #require(SpeechWindows.windows(120 * sr, sampleRate: sr, vadSegment: true, policy: .parakeetV3Reference).first)
+            #expect(try single(SpeechWindows.windows(60 * sr, sampleRate: sr, vadSegment: false)).chunks.last == DecodeChunk(S(safe, 60 * sr), 0, sr / 2))
+            let reference = try single(SpeechWindows.windows(120 * sr, sampleRate: sr, vadSegment: true, policy: .parakeetV3Reference))
             #expect(reference.chunks.map(\.span) == [S(0, safe), S(safe, 2 * safe), S(2 * safe, 120 * sr)])
             #expect(reference.chunks.allSatisfy { $0.headPad == 0 && $0.tailPad == 0 })
         }
