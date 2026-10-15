@@ -60,6 +60,8 @@ public struct NamingCommit: Hashable, Sendable {
                 commit.changes.append(.merge(source: source, target: target, stamp: stamp))
             case .playRange, .focusQuestion, .close:
                 break
+            case .mergeDraft, .draftName:
+                break // A draft's names, not the sealed note: the draft path carries these out.
             }
         }
         commit.voicesChanged = commit.voices != voices

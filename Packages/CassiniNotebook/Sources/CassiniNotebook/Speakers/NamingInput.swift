@@ -20,6 +20,9 @@ public struct MergeTarget: Hashable, Sendable, Identifiable {
 ///   changed, `voiceModelReady` whether recognising voices is installed.
 /// - `mergeTargets` are the other speakers of the shown transcript; `versions` the version numbers a merge shows.
 /// - `canSample` is false when the note's audio cannot play.
+/// - `draft` is true while the job runs or is paused (naming open): the save goes to the draft's names, not the note.
+///   A draft speaker has no `print` yet; `willHavePrint` says it gets one at the end of the job (the voiceprint model
+///   is installed), and its `speakingTime` stands for the print's speech.
 /// The version numbers a merge shows: "This adds version `added`; version `shown` stays available."
 public struct MergeVersions: Hashable, Sendable {
     public var shown: Int
@@ -43,16 +46,23 @@ public struct NamingInput: Hashable, Sendable {
     public var mergeTargets: [MergeTarget]
     public var versions: MergeVersions
     public var canSample: Bool
+    public var draft: Bool
+    public var willHavePrint: Bool
 
     public init(speakerID: String, label: String, ordinal: Int = 0, speakingTime: Double = 0, sample: SampleWindow? = nil,
                 print: SpeakerPrint? = nil, match: VoiceMatchState = .unmatched, voices: [SavedVoice] = [],
                 voicesReadOnly: Bool = false, voiceModelReady: Bool = true, currentModel: String? = nil,
-                mergeTargets: [MergeTarget] = [], versions: MergeVersions = MergeVersions(shown: 1, added: 2), canSample: Bool = true) {
+                mergeTargets: [MergeTarget] = [], versions: MergeVersions = MergeVersions(shown: 1, added: 2), canSample: Bool = true,
+                draft: Bool = false, willHavePrint: Bool = false) {
         self.speakerID = speakerID; self.label = label; self.ordinal = ordinal; self.speakingTime = speakingTime
         self.sample = sample; self.print = print; self.match = match; self.voices = voices
         self.voicesReadOnly = voicesReadOnly; self.voiceModelReady = voiceModelReady; self.currentModel = currentModel
         self.mergeTargets = mergeTargets; self.versions = versions; self.canSample = canSample
+        self.draft = draft; self.willHavePrint = willHavePrint
     }
+
+    /// A print exists for the same-person question and the Remember switch.
+    public var hasPrint: Bool { draft ? willHavePrint : print != nil }
 
     /// The stored name, or nil for a placeholder speaker.
     public var namedLabel: String? { DefaultLabels.isDefault(id: speakerID, label: label) ? nil : label }

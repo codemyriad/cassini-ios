@@ -1,8 +1,9 @@
+import CassiniCore
 import Foundation
 import Testing
 @testable import CassiniNotebook
 
-/// Android's SpeakerStatsTest in seconds. iOS has no draft names to merge first, so the two draft tests have no port.
+/// Android's SpeakerStatsTest in seconds; the draft cases read the format's words in milliseconds, as Android's.
 @Suite struct SpeakerStatsTests {
     /// One passage per word, as Android's words.
     func w(_ speaker: String, _ start: Double, _ end: Double, _ text: String = "parola") -> TranscriptSegment {
@@ -67,6 +68,28 @@ import Testing
         let stat = try stat("a", [w("a", 0, 0.4), w("a", 0.5, 0.9), w("a", 1.0, 1.4)])
         #expect(stat.speakingTime == 1.4)
         #expect(stat.sample == SampleWindow(start: 0, end: 1.4))
+    }
+
+    // ports: SpeakerStatsTest#aDraftAppliesItsMergesFirst
+    @Test func aDraftAppliesItsMergesFirst() throws {
+        let transcript = Transcript([Word("x1", 0, 1000, "parola"), Word("x2", 1100, 1500, "parola"),
+                                     Word("x3", 1600, 2000, "parola"), Word("x1", 2100, 2500, "parola")])
+        let stats = try SpeakerStats.of(draft: transcript, merges: ["x2": "x1"])
+        #expect(stats.map(\.speakerID) == ["x1", "x3"])
+        let x1 = stats[0]
+        // x1 and the merged x2 form one turn 0..1500, then x1 again 2100..2500.
+        #expect(x1.turnCount == 2)
+        #expect(x1.wordCount == 3)
+        #expect(abs(x1.speakingTime - (1.5 + 0.4)) < 1e-9)
+        #expect(x1.sample == SampleWindow(start: 0, end: 1.5))
+        #expect(stats[1].ordinal == 1)
+    }
+
+    // ports: SpeakerStatsTest#withoutMergesTheDraftOverloadMatchesThePlainOne
+    @Test func withoutMergesTheDraftOverloadMatchesThePlainOne() throws {
+        let words = [Word("a", 0, 1000, "parola"), Word("b", 1000, 3000, "parola"), Word("a", 3000, 3500, "parola")]
+        #expect(SpeakerStats.of(words: words) == (try SpeakerStats.of(draft: Transcript(words), merges: [:])))
+        #expect(SpeakerStats.of(words: words).map(\.speakerID) == ["a", "b"])
     }
 
     /// iOS: a passage without a speaker belongs to nobody but ends the turn before it.
