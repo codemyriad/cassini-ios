@@ -231,6 +231,11 @@ its own because ONNX Runtime's int8 kernels differ from those of Android's x86_6
 `scripts/fetch-speaker-fixture.py` mixes the speaker smoke test's two-speaker clip from public FLEURS audio (Android
 has no public meeting recording) into the gitignored `.tools/fixtures`.
 
+The locked build (`sherpa-onnx-ios` `1.13.7-dbbeef9c-ios.2`) predates the move to `io.codemyriad` and still names its
+framework `app.codemyriad.sherpa-onnx`; `scripts/build-sherpa-xcframework.sh` now writes `io.codemyriad.sherpa-onnx`.
+The next native rebuild therefore changes the zip's checksum: give it the next version (`ios.3`) and its `sha256` in
+`scripts/native-dependencies.json`.
+
 [Validation](docs/validation.md) lists what each tier covers, the test counts and the device checklist.
 [Architecture](docs/architecture.md) describes the modules, state ownership, startup, storage and the
 transcription lifecycle.

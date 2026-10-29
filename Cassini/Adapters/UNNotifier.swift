@@ -21,7 +21,7 @@ extension UNUserNotificationCenter: UserNotificationCenter {
 /// result replaces the older one. They are silent and grouped in one thread; with previews hidden the Lock Screen shows
 /// the category's placeholder, which never names the note. Permission is asked once.
 struct UNNotifier: Notifier {
-    static let thread = "app.codemyriad.cassini.results"
+    static let thread = "io.codemyriad.cassini.results"
 
     let center: any UserNotificationCenter
 

@@ -185,7 +185,7 @@ MAP
 <plist version="1.0">
 <dict>
   <key>CFBundleIdentifier</key>
-  <string>app.codemyriad.sherpa-onnx</string>
+  <string>io.codemyriad.sherpa-onnx</string>
   <key>CFBundleName</key>
   <string>SherpaOnnxC</string>
   <key>CFBundlePackageType</key>

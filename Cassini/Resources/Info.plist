@@ -32,7 +32,7 @@
 	<array>
 		<dict>
 			<key>CFBundleURLName</key>
-			<string>app.codemyriad.cassini</string>
+			<string>io.codemyriad.cassini</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>cassini</string>
@@ -46,7 +46,7 @@
 	</array>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
-		<string>app.codemyriad.cassini.transcription.*</string>
+		<string>io.codemyriad.cassini.transcription.*</string>
 	</array>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>

@@ -379,7 +379,7 @@ test_on() {
     lease "$udid"
     # xcodebuild replaces an installed app while it starts the tests, and a launch that meets the replacement fails
     # or hangs. Without an installed app (or a left-over Live Activity of it) there is nothing to replace.
-    for app in app.codemyriad.cassini app.codemyriad.CassiniUITests.xctrunner; do
+    for app in io.codemyriad.cassini io.codemyriad.CassiniUITests.xctrunner; do
         xcrun simctl terminate "$udid" "$app" > /dev/null 2>&1 || true
         xcrun simctl uninstall "$udid" "$app" > /dev/null 2>&1 || true
     done

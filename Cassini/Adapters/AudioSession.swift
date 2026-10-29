@@ -4,7 +4,7 @@ import AVFoundation
 /// were asked for. `setActive` can block for hundreds of milliseconds (a Bluetooth route), and iOS warns that calling it
 /// on the main thread can make the UI unresponsive.
 enum AudioSession {
-    private static let queue = DispatchQueue(label: "app.codemyriad.cassini.audio-session", qos: .userInitiated)
+    private static let queue = DispatchQueue(label: "io.codemyriad.cassini.audio-session", qos: .userInitiated)
 
     /// Activates the session for playback of spoken audio (its category set first, when it changed); `done` runs on the
     /// main actor with the error, if any.

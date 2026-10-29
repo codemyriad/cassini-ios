@@ -436,7 +436,7 @@ stricter or looser than the spec.
 ## Transcription
 
 - **Background time.** Android runs the drain in a foreground service with an ongoing notification. iOS holds one
-  `BGContinuedProcessingTask` for the whole drain (`app.codemyriad.cassini.transcription.queue`). It is asked for at
+  `BGContinuedProcessingTask` for the whole drain (`io.codemyriad.cassini.transcription.queue`). It is asked for at
   the drain's first claim, from the screen. The system shows "Transcribing “title”" with the job's progress and a Stop
   button, and each next job only changes the title. iOS grants this request only while Cassini is on the screen. A
   drain that starts in the background, or a refused request, falls back to the finite time of

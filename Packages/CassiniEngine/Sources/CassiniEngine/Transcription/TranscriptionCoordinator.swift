@@ -72,7 +72,7 @@ public final class TranscriptionCoordinator {
     /// Notes waiting for their job to end on their way to Recently Deleted (`trash(_:then:)`); they cannot be queued
     /// meanwhile.
     @ObservationIgnored var trashing: Set<UUID> = []
-    @ObservationIgnored let log = Logger(subsystem: "app.codemyriad.cassini", category: "queue")
+    @ObservationIgnored let log = Logger(subsystem: "io.codemyriad.cassini", category: "queue")
 
     /// How an interrupted job ends: `discard` (Start over) drops its work, `keep` pauses it with its progress, and
     /// `restore` (Cancel of a download) puts the note back to its state from before.

@@ -1,6 +1,6 @@
 name: Cassini
 options:
-  bundleIdPrefix: app.codemyriad
+  bundleIdPrefix: io.codemyriad
   deploymentTarget:
     iOS: '26.0'
 packages:
@@ -38,7 +38,7 @@ targets:
         product: CassiniEngineTesting
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: app.codemyriad.cassini
+        PRODUCT_BUNDLE_IDENTIFIER: io.codemyriad.cassini
         INFOPLIST_FILE: Cassini/Resources/Info.plist
         # A higher memory limit where the device allows it, for the on-device models.
         CODE_SIGN_ENTITLEMENTS: Cassini/Cassini.entitlements
@@ -60,7 +60,7 @@ targets:
         product: CassiniNotebook
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: app.codemyriad.cassini.activity
+        PRODUCT_BUNDLE_IDENTIFIER: io.codemyriad.cassini.activity
         INFOPLIST_FILE: CassiniActivity/Info.plist
         MARKETING_VERSION: '0.1.0'
         CURRENT_PROJECT_VERSION: '1'

@@ -6,7 +6,7 @@ How to build Cassini for TestFlight and the App Store, and what is still missing
 
 | | App | Live Activity extension |
 |---|---|---|
-| Bundle ID | `app.codemyriad.cassini` | `app.codemyriad.cassini.activity` |
+| Bundle ID | `io.codemyriad.cassini` | `io.codemyriad.cassini.activity` |
 | Version | `MARKETING_VERSION` 0.1.0 | 0.1.0 |
 | Build | `CURRENT_PROJECT_VERSION` 1 | 1 |
 
@@ -45,7 +45,9 @@ Never commit archives, exported `.ipa` files, certificates, provisioning profile
 3. A signed archive (Xcode Organizer, or `xcodebuild archive` without `CODE_SIGNING_ALLOWED=NO`) validates with no
    ITMS-91053 (missing required-reason API) warning. After the native runtime is linked, check the app binary's imports
    again (`nm -u`) against `Cassini/Resources/PrivacyInfo.xcprivacy`.
-4. The App Store Connect record exists for `app.codemyriad.cassini`.
+4. The App Store Connect record exists for `io.codemyriad.cassini` (SKU `cassini`). An earlier record for
+   `app.codemyriad.cassini` (SKU `cassini-ios`, TestFlight build 0.1.0 (1)) is retired: never upload to it. Builds
+   for the new record start at build number 2, so they are not confused with that build 1.
 
 ## App Store Connect answers
 
