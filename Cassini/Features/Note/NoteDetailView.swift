@@ -76,7 +76,7 @@ struct NoteDetailView: View {
         let subtitle = NoteSubtitle.of(note, mode: mode, now: clock.now, calendar: calendar)
         return Group {
             if case .processing = mode {
-                ProcessingBody(noteID: noteID, cache: cache) {
+                ProcessingBody(model: model, cache: cache) {
                     NoteHeader(note: note, subtitle: subtitle)
                     NoteSectionView(section: .card, note: note, mode: mode, model: model)
                 } banners: {
@@ -84,7 +84,7 @@ struct NoteDetailView: View {
                 }
             } else {
                 NoteReadingScroll(note: note, mode: mode, transcript: transcript, subtitle: subtitle, matches: matches,
-                                  current: current, savedDraft: model.savedDraft, model: model, cache: cache,
+                                  current: current, model: model, cache: cache,
                                   actions: transcriptActions, suggestion: { suggestionCard($0, in: transcript) })
             }
         }

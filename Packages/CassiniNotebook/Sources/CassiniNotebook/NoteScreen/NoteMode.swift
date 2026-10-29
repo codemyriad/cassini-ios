@@ -107,9 +107,11 @@ public enum ReadOnlyReason: Codable, Hashable, Sendable {
     case jobPending
     /// "Fix the transcript first: Transcribe again": a document whose trust is not verified.
     case trust
+    /// "Saving — you can rename when it's done": the job closed the draft's naming to put the names into the note.
+    case saving
 
     /// The reason for `note` with its `job`, or nil when the transcript can be changed. A job waiting for consent does
-    /// not count. Speakers are named only after a job on iOS, so there is no draft naming to close (Android SAVING).
+    /// not count. The draft's own naming is gated by the job (`saving`), not by this.
     public static func of(_ note: Note, job: Job?) -> ReadOnlyReason? {
         if let job, job.state != .needsConsent { return .jobPending }
         if let document = note.document, document.state != .ok { return .trust }

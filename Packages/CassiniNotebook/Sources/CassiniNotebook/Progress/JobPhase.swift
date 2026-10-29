@@ -86,23 +86,47 @@ public struct RunningProgress: Hashable, Sendable {
     }
 }
 
-/// The draft transcript of a running job. Speakers are told apart only after the words on iOS, so every draft word is
-/// one voice.
+/// The draft transcript of a running job (Android's `DraftState`). The tracker gives the words as the job made them;
+/// `DraftView.build` applies the draft's names (`DraftNames`): the merges, each speaker's label, which labels came from
+/// an automatic live match, and the "Is this Luca?" cards.
 public struct DraftState: Hashable, Sendable {
     public var words: [DraftWord]
     /// Words that end after this may still change; `Int64.max` once the words are final.
     public var tentativeFromMs: Int64
-    /// Always false on iOS: speakers are named once the job is done.
+    /// The speakers can still be named in the draft: until the job closes naming after the words.
     public var namingOpen: Bool
+    /// Each shown speaker's label: the user's name, else an automatic live match's name, else the placeholder
+    /// ("Speaker N", numbered by first word).
+    public var labels: [String: String]
+    /// The speakers whose label is an automatic live match's name ("auto" badge).
+    public var automatic: Set<String>
+    /// "Is this Luca?" for placeholder speakers with a live suggestion, in the order of their latest turn.
+    public var suggestions: [DraftSuggestion]
 
-    public init(words: [DraftWord], tentativeFromMs: Int64, namingOpen: Bool = false) {
+    public init(words: [DraftWord], tentativeFromMs: Int64, namingOpen: Bool = false, labels: [String: String] = [:],
+                automatic: Set<String> = [], suggestions: [DraftSuggestion] = []) {
         self.words = words; self.tentativeFromMs = tentativeFromMs; self.namingOpen = namingOpen
+        self.labels = labels; self.automatic = automatic; self.suggestions = suggestions
     }
 
     public static let empty = DraftState(words: [], tentativeFromMs: 0)
 
     /// Whether `word` may still change.
     public func isTentative(_ word: DraftWord) -> Bool { word.endMs > tentativeFromMs }
+}
+
+/// A draft's "Is this Luca?" (Android's `VoiceSuggestion`): the speaker, the saved voice, its name and live score, and
+/// the start of the speaker's latest turn, where the card goes.
+public struct DraftSuggestion: Hashable, Sendable {
+    public var speakerID: String
+    public var voiceID: UUID
+    public var name: String
+    public var score: Float
+    public var atMs: Int64
+
+    public init(speakerID: String, voiceID: UUID, name: String, score: Float, atMs: Int64) {
+        self.speakerID = speakerID; self.voiceID = voiceID; self.name = name; self.score = score; self.atMs = atMs
+    }
 }
 
 extension TimeLeft {

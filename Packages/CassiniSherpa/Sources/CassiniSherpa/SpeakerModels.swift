@@ -1,3 +1,4 @@
+import CassiniEngine
 import CassiniNotebook
 import Foundation
 #if canImport(SherpaOnnxC)
@@ -29,34 +30,16 @@ public struct VoiceprintConfig: Sendable, Equatable {
     public init(model: URL) { self.model = model }
 }
 
-/// What a `SortformerStream` saves into a checkpoint (Android's `diarizer` member): the native speaker cache, the
-/// diarizer's own time and the turns so far on the recording clock.
-public struct SortformerState: Hashable, Sendable {
-    public var cache: [Float]
-    public var elapsedMs: Int64
-    public var turns: [DiarizerTurn]
-    public init(cache: [Float], elapsedMs: Int64, turns: [DiarizerTurn]) {
-        self.cache = cache; self.elapsedMs = elapsedMs; self.turns = turns
-    }
-}
+/// What a `SortformerStream` saves into a checkpoint (Android's `diarizer` member).
+public typealias SortformerState = DiarizerState
 
-/// A speaker's L2-normalised CAM++ print and the seconds of speech behind it.
-public struct Voiceprint: Hashable, Sendable {
-    public var vector: [Float]
-    public var seconds: Double
-    public init(vector: [Float], seconds: Double) { self.vector = vector; self.seconds = seconds }
-}
-
-/// Audio a voiceprint is read from, by sample (Android's `PcmSource`), so the voice-clip cache can stay on disk.
-public protocol PcmSource {
-    var sampleRate: Int { get }
-    var sampleCount: Int { get }
-    func read(_ start: Int, _ count: Int) throws -> [Float]
-}
-
-extension PcmAudio: PcmSource {
-    public var sampleCount: Int { samples.count }
-    public func read(_ start: Int, _ count: Int) throws -> [Float] { Array(samples[start..<(start + count)]) }
+extension SherpaRuntime {
+    /// Streaming Sortformer and CAM++ for the speaker step (`SpeakerAnalyzer`); both throw `notLinked` without the
+    /// runtime.
+    public static let speakers = SpeakerRuntime(
+        linked: isLinked,
+        makeDiarizer: { try SortformerStream(model: $0, restored: $1) },
+        prints: { try VoiceprintExtractor.compute(model: $0, audio: $1, windows: $2, active: $3) })
 }
 
 private func fileExists(_ url: URL) -> Bool {
@@ -69,7 +52,7 @@ private func fileExists(_ url: URL) -> Bool {
 /// `init(model:restored:)` are the checkpoint's `diarizer` member; the native cache is capped at
 /// `SpeakerBudget.diarizerStateFloats` floats. Not thread-safe: one thread owns it. Cancellation throws
 /// `CancellationError` before and after each native call, which itself always runs to its end.
-public final class SortformerStream: @unchecked Sendable {
+public final class SortformerStream: StreamingDiarizer, @unchecked Sendable {
     /// The longest chunk `process` takes: IncrementalTranscript's 28 s window.
     public static let maxChunkMs: Int64 = 28_000
 
@@ -225,7 +208,7 @@ public final class SortformerStream: @unchecked Sendable {
 /// speaker from all of its windows, L2-normalised, with the seconds of audio behind it. `active` throws to cancel and
 /// is called between native calls.
 public enum VoiceprintExtractor {
-    public static func compute(model: URL, audio: some PcmSource, windows: [String: [PrintWindow]],
+    public static func compute(model: URL, audio: any PcmSource, windows: [String: [PrintWindow]],
                                active: () throws -> Void) throws -> [String: Voiceprint] {
         if windows.isEmpty { return [:] }
         try active()

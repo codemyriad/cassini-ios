@@ -1,20 +1,20 @@
 {
-  "originHash" : "bea3b78f8ebf7a4cbb281745493007e1f2574b815658c16a509ca3ba9389885e",
+  "originHash" : "1669766810d9b16f534365931f4cb5a1d1f690ebfb859855a95fb4379e392ae7",
   "pins" : [
-    {
-      "identity" : "fluidaudio",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/FluidInference/FluidAudio.git",
-      "state" : {
-        "revision" : "e560c6445ffdc42e60c7b282d162aae271f18e2a"
-      }
-    },
     {
       "identity" : "swift-opus",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/alta/swift-opus.git",
       "state" : {
         "revision" : "6f3cb6bd3ffed1fe5f06d00a962d5c191a50daf8"
+      }
+    },
+    {
+      "identity" : "zstd",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/facebook/zstd.git",
+      "state" : {
+        "revision" : "f8745da6ff1ad1e7bab384bd1f9d742439278e99"
       }
     }
   ],

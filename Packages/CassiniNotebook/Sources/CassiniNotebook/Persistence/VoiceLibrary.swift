@@ -24,8 +24,9 @@ public enum VoiceLibraryError: Error, Hashable, Sendable {
 /// A file this Cassini cannot use is never deleted: a newer one is left alone, an unparseable one is renamed
 /// `<name>.corrupt-<epoch ms>`. Not thread-safe: `VoiceStore` serialises access.
 public final class VoiceLibrary {
-    /// A print needs this much isolated speech to be remembered or matched (iOS threshold; Android uses 4 s).
-    public static let minimumRememberSeconds: Double = 6
+    /// A print needs this much speech behind it to be remembered or matched: Android's 4 s (`MIN_REMEMBER_MS`, and
+    /// `Voiceprints.minSecondsPerSpeaker`, below which a speaker gets no print).
+    public static let minimumRememberSeconds: Double = 4
 
     public let folder: URL
     private let now: () -> Date

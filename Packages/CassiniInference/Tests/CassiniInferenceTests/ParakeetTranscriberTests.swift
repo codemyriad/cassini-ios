@@ -5,6 +5,7 @@ import Synchronization
 import Testing
 import CassiniEngine
 import CassiniNotebook
+import CassiniEngineTesting
 @testable import CassiniInference
 
 /// `ParakeetTranscriber` over a fake native runtime and generated audio: a 16 kHz float WAV with word `wN` as a burst of
@@ -353,5 +354,43 @@ import CassiniNotebook
         try await Task.sleep(for: .milliseconds(500))
         #expect(native.counts.decodes == decodes, "nothing decodes after the cancel")
         #expect(decodes < 3)
+    }
+
+    /// The streaming speakers of a run: each window's words go to them after the decode, on the speech thread with the
+    /// recognizer; each window reports their state with its words, the result the last state, and the diarizer goes
+    /// when the run ends (Android's `onChunk`).
+    @Test func eachWindowsWordsGetTheirSpeakersOnTheSpeechThread() async throws {
+        defer { try? FileManager.default.removeItem(at: folder) }
+        try install(ModelCatalog.parakeet)
+        let url = try audio(seconds: 70)
+        let threads = Mutex<Set<String>>([])
+        let engines = FakeSpeakerEngines { startMs, durationMs in
+            threads.withLock { $0.insert(Thread.current.name ?? "") }
+            // Slot 2 until 35 s, slot 5 after it.
+            let change = 35_000 - startMs
+            return [DiarizerTurn(0, min(max(change, 0), durationMs), 2), DiarizerTurn(max(change, 0), durationMs, 5)]
+                .filter { $0.endMs > $0.startMs }
+        }
+        let speakers = try WindowSpeakers(engines: engines, clips: MemoryClips(), prefix: "P_")
+        let events = Events()
+        let result = try await transcriber(Native()).transcribe(
+            TranscriptionRequest(url: url, language: "", allowDownload: true, speakers: speakers)) { events.add($0) }
+        let words = result.segments.flatMap(\.draftWords)
+        #expect(words.map(\.text) == (0..<70).map { "w\($0)" })
+        #expect(words.prefix(35).allSatisfy { $0.speaker == "P_3" } && words.suffix(35).allSatisfy { $0.speaker == "P_6" })
+        #expect(events.windows.first?.words.allSatisfy { $0.speaker == "P_3" } == true, "the first window's words")
+        #expect(events.windows.compactMap(\.speakers?.diarizer?.cache) == [[1], [2]])
+        #expect(result.speakers?.diarizer?.cache == [3], "the last window too")
+        #expect((result.speakers?.clipSamples ?? 0) > 0)
+        #expect(threads.withLock { $0 } == ["Cassini speech"])
+        #expect(engines.opened.count == 1)
+        #expect(speakers.turns.map(\.speaker).uniqued() == [2, 5], "the turns stay once the diarizer is released")
+    }
+}
+
+private extension Array where Element: Hashable {
+    func uniqued() -> [Element] {
+        var seen: Set<Element> = []
+        return filter { seen.insert($0).inserted }
     }
 }

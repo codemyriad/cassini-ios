@@ -40,8 +40,8 @@ enum TestFixtures {
     static let recordingAnalysis = SpeakerAnalysis(
         turns: [SpeakerTurn(speakerID: "s1", start: 0, end: 6), SpeakerTurn(speakerID: "s2", start: 6, end: 14),
                 SpeakerTurn(speakerID: "s1", start: 14, end: 24)],
-        prints: [SpeakerPrint(speakerID: "s1", model: "fake-model", vector: [1, 0, 0], speechSeconds: 16),
-                 SpeakerPrint(speakerID: "s2", model: "fake-model", vector: [0, 1, 0], speechSeconds: 8)])
+        prints: [SpeakerPrint(speakerID: "s1", model: VoiceprintModel.sha256, vector: [1, 0, 0], speechSeconds: 16),
+                 SpeakerPrint(speakerID: "s2", model: VoiceprintModel.sha256, vector: [0, 1, 0], speechSeconds: 8)])
 
     /// What the processing seed's frozen job has finalized by 62 %: the start of a planning call.
     static let processingDraft: [TranscriptSegment] = [
@@ -265,7 +265,7 @@ enum TestFixtures {
     }
 
     private static func voicePrint(_ speaker: String, _ vector: [Float], seconds: Double) -> SpeakerPrint {
-        SpeakerPrint(speakerID: speaker, model: "fake-model", vector: vector, speechSeconds: seconds)
+        SpeakerPrint(speakerID: speaker, model: VoiceprintModel.sha256, vector: vector, speechSeconds: seconds)
     }
 
     private static func writeSilence(to url: URL) throws {

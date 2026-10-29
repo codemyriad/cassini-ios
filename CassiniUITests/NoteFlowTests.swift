@@ -5,7 +5,8 @@ import XCTest
 /// a word tap seeks there and plays, Transcribe again adds version 2 to Versions, and the transcript and the Cassini
 /// document export through the share sheet.
 ///
-/// iOS differences: the fake returns the fixture's three passages at once, so the progress card is not waited for.
+/// iOS differences: the fake returns the fixture's three passages at once, so the progress card is not waited for;
+/// `--speakers-ready` installs the fake speaker models, as Android's run has its models installed.
 /// Android's `variants = 1` after the first Transcribe is checked as no version chip (the chip shows from version 2).
 /// A note transcribed on iOS is not sealed into a Cassini document until it is exported, so it has no trust chip and
 /// "Verified" is not checked here (an imported document's trust is, in `DocumentTrustTests`). The fixture's
@@ -20,11 +21,13 @@ final class NoteFlowTests: XCTestCase {
     // ports: NoteFlowTest#transcribeReadSeekVersionsAndExports
     @MainActor func testTranscribeReadSeekVersionsAndExports() {
         let app = XCUIApplication()
-        app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed-test-data", "--open-fixture", Self.walk]
+        app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed-test-data", "--speakers-ready",
+                               "--open-fixture", Self.walk]
         app.launchAndWait()
         XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 15))
 
-        // Transcribe from the Audio only banner.
+        // Transcribe from the Audio only banner. The words come in one voice; the speaker step gives the three
+        // passages their two speakers.
         let transcribe = app.buttons["Transcribe"].firstMatch
         XCTAssertTrue(transcribe.waitForExistence(within: 5))
         transcribe.tap()

@@ -1,3 +1,4 @@
+import Foundation
 import Synchronization
 import Testing
 import CassiniNotebook
@@ -64,8 +65,8 @@ import CassiniNotebook
         #expect(t.progress?.words == 28)
     }
 
-    // ports: ProgressTrackerTest#refreshPublishesTheNamesAtOnce (adapted: iOS has no draft names; a refresh publishes
-    // the latest draft at once)
+    // ports: ProgressTrackerTest#refreshPublishesTheNamesAtOnce (adapted: iOS applies the draft names where the draft
+    // is shown, `DraftView`, so they need no publish; a refresh publishes the latest draft at once)
     @Test func aRefreshPublishesTheDraftAtOnce() {
         var t = Tracked()
         t.send(started(totalMs: 70_000))
@@ -411,6 +412,86 @@ import CassiniNotebook
         t.tick()
         #expect(t.draft?.tentativeFromMs == .max)
         #expect(t.draft?.namingOpen == false)
+    }
+
+    // ports: ProgressTrackerTest#draftAppliesMergesAndLabelPrecedence (the names applied by `DraftView`)
+    @Test func draftAppliesMergesAndLabelPrecedence() throws {
+        var t = Tracked()
+        let names = DraftNames(labels: ["c": "Carla"], merges: ["d": "b"], automatic: ["b": "Bruno"])
+        t.send(started(totalMs: 70_000))
+        let spoken = [("a", 0, "uno"), ("d", 1_000, "due"), ("c", 2_000, "tre"), ("e", 3_000, "quattro"), ("b", 4_000, "cinque")]
+            .map { DraftWord(speaker: $0.0, startMs: Int64($0.1), endMs: Int64($0.1) + 500, text: $0.2) }
+        t.send(.windowDone(doneMs: 28_000, totalMs: 70_000, words: spoken))
+        t.tick()
+        let draft = DraftView.build(try #require(t.draft), names: names, voiceNames: [:])
+        #expect(draft.words.map(\.speaker) == ["a", "b", "c", "e", "b"])
+        #expect(draft.labels == ["a": "Speaker 1", "b": "Bruno", "c": "Carla", "e": "Speaker 4"])
+        #expect(draft.automatic == ["b"])
+        #expect(draft.tentativeFromMs == 26_000)
+        #expect(draft.namingOpen)
+    }
+
+    // ports: ProgressTrackerTest#suggestionsOnlyForPlaceholderSpeakersWithALiveSuggestedMatch
+    @Test func suggestionsOnlyForPlaceholderSpeakersWithALiveSuggestedMatch() throws {
+        var t = Tracked()
+        let luca = UUID(), ada = UUID(), deleted = UUID()
+        let voices = [luca: "Luca", ada: "Ada", UUID(): "Gone"]
+        var names = DraftNames(labels: ["named": "Nora"], automatic: ["auto": "Ada"], live: [
+            "a": LiveMatch(luca, 0.61, .suggested), "named": LiveMatch(luca, 0.62, .suggested),
+            "auto": LiveMatch(ada, 0.9, .auto), "confirmed": LiveMatch(ada, 0.7, .confirmed),
+            "rejected": LiveMatch(luca, 0.6, .suggested), "missing": LiveMatch(deleted, 0.6, .suggested),
+        ], rejected: ["rejected": [luca]])
+        t.send(started(totalMs: 70_000))
+        let speakers = ["a", "named", "auto", "confirmed", "rejected", "missing", "a", "b", "a"]
+        let spoken = speakers.enumerated().map {
+            DraftWord(speaker: $0.element, startMs: Int64($0.offset) * 1000, endMs: Int64($0.offset) * 1000 + 500,
+                      text: "w\($0.offset)")
+        }
+        t.send(.windowDone(doneMs: 28_000, totalMs: 70_000, words: spoken))
+        t.tick()
+        let draft = try #require(t.draft)
+        // Speaker a's latest turn starts at 8 s; the other speakers have a label, an automatic name, a confirmed match,
+        // a rejected voice or a voice that no longer exists.
+        #expect(DraftView.build(draft, names: names, voiceNames: voices).suggestions
+                == [DraftSuggestion(speakerID: "a", voiceID: luca, name: "Luca", score: 0.61, atMs: 8_000)])
+        // A merge into a: the turn at 6 s and 7 s is a's too, starting at 6 s.
+        names.merges = ["b": "a"]
+        #expect(DraftView.build(draft, names: names, voiceNames: voices).suggestions.map(\.atMs) == [6_000])
+        // "Not Luca" removes the card.
+        names = names.reject("a", voice: luca, voiceName: "Luca")
+        #expect(DraftView.build(draft, names: names, voiceNames: voices).suggestions.isEmpty)
+    }
+
+    // ports: ProgressTrackerTest#noSuggestionsOnceNamingIsClosed
+    @Test func noSuggestionsOnceNamingIsClosed() throws {
+        var t = Tracked()
+        let luca = UUID()
+        let names = DraftNames(live: ["a": LiveMatch(luca, 0.6, .suggested)])
+        t.send(started(totalMs: 70_000))
+        t.send(.windowDone(doneMs: 28_000, totalMs: 70_000, words: words(0, 28)))
+        t.tick()
+        #expect(DraftView.build(try #require(t.draft), names: names, voiceNames: [luca: "Luca"]).suggestions.count == 1)
+        t.send(.namingClosed(matching: true))
+        t.tick()
+        let closed = DraftView.build(try #require(t.draft), names: names, voiceNames: [luca: "Luca"])
+        #expect(closed.suggestions.isEmpty)
+        #expect(!closed.namingOpen)
+    }
+
+    // ports: CheckpointRepositoryTest#draftTreatsAStoredPlaceholderAsNoName (iOS applies the names in `DraftView`)
+    @Test func theDraftTreatsAStoredPlaceholderAsNoName() throws {
+        var t = Tracked()
+        t.send(started(totalMs: 70_000))
+        let spoken = ["S1", "S2", "S3"].enumerated().map {
+            DraftWord(speaker: $0.element, startMs: Int64($0.offset) * 1000, endMs: Int64($0.offset) * 1000 + 500, text: "w")
+        }
+        t.send(.windowDone(doneMs: 28_000, totalMs: 70_000, words: spoken))
+        t.tick()
+        // As a names.json written elsewhere could hold them: placeholders are not names.
+        let names = DraftNames(labels: ["S1": "Speaker 1", "S2": "Voce 2", "S3": "Anna"], automatic: ["S1": "Luca"])
+        let draft = DraftView.build(try #require(t.draft), names: names, voiceNames: [:])
+        #expect(draft.labels == ["S1": "Luca", "S2": "Speaker 2", "S3": "Anna"])
+        #expect(draft.automatic == ["S1"])
     }
 
     @Test func volatileWordsReplaceTheDraftUntilTheNextResult() {

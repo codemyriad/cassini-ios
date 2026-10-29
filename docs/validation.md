@@ -72,21 +72,17 @@ End to end on the simulator, through UI-test launches with named seeds, a fixed 
 
 ### Real-model check (opt-in)
 
-`ModelTests.realSpeakerModelRunsAndReusesOfflineCache` runs FluidAudio's speaker models on a real recording. It is
-skipped unless `CASSINI_SPEAKER_AUDIO` names a file. The first run downloads the models, and a second analysis then
-runs with downloads disabled. On 12 October 2026 it found four speakers in the AMI ES2004a meeting (17 minutes 29
-seconds), with 256-dimensional embeddings. `CASSINI_EXPECTED_SPEAKERS=4` asserts that count. Without it, the test
-asserts only `CASSINI_MIN_SPEAKERS` (default 1). It also passed on a short Italian FLEURS recording. A two-minute
-excerpt of the same meeting found only one speaker. This is a smoke test of real inference and of offline cache
-reuse. It is not a diarization-error-rate benchmark or a voice-matching calibration.
+`CassiniTests/SpeakerJobTests` runs a real job with Parakeet Ultra, streaming Sortformer and CAM++ on the arm64
+simulator, over a two-speaker FLEURS mix (A, B, A). It tells the speakers apart window by window, saves A as a voice
+from its CAM++ print, and checks that Transcribe again names A with Android's thresholds. It is skipped unless the
+build links the native runtime and the environment names the models and the mix; `scripts/speaker-smoke.sh` fetches
+both and runs it with `CassiniTests/SpeakerSmokeTests`, which check the wrappers on their own. This is a smoke test of
+real inference, not a diarization-error-rate benchmark or a voice-matching calibration. Model weights and recordings
+are never committed.
 
 ```sh
-CASSINI_SPEAKER_AUDIO=/path/to/ES2004a.Mix-Headset.wav CASSINI_EXPECTED_SPEAKERS=4 \
-swift test --filter CassiniInferenceTests.realSpeakerModelRunsAndReusesOfflineCache
+scripts/speaker-smoke.sh
 ```
-
-The recording comes from the [FluidInference AMI mirror](https://huggingface.co/datasets/FluidInference/ami-corpus-mirror/blob/main/sdm/ES2004a.Mix-Headset.wav).
-Model weights and recordings are never committed.
 
 ### Release build
 

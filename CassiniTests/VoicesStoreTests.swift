@@ -10,7 +10,7 @@ import CassiniEngineTesting
     /// An analysis that began before Forget everyone keeps no voiceprints, even though it finishes after it.
     func testASpeakerAnalysisThatStartedBeforeForgetEveryoneKeepsNoVoiceprints() async throws {
         let late = SpeakerAnalysis(turns: [.init(speakerID: "late", start: 0, end: 12)],
-                                   prints: [.init(speakerID: "late", model: "test", vector: [1, 0], speechSeconds: 12)])
+                                   prints: [.init(speakerID: "late", model: VoiceprintModel.sha256, vector: [1, 0], speechSeconds: 12)])
         let analyzer = FakeAnalyzer(analysis: late, suspends: true)
         let test = TestGraph(analyzer: analyzer); defer { test.tearDown() }
         var note = Note(title: "Conversation", audioFilename: "audio.caf")

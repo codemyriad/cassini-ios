@@ -18,8 +18,9 @@ import CassiniNotebook
 extension AppGraph {
     static func noteScreens(library: LibraryStore, voices: VoicesStore, processing: ProcessingStore,
                             playback: PlaybackStore, recording: RecordingStore, exports: ExportStore,
-                            trash: TrashService, router: Router, errors: ErrorPresenter) -> NoteScreens {
-        NoteScreens(ports: .init(
+                            trash: TrashService, router: Router, errors: ErrorPresenter,
+                            settings: SettingsStore) -> NoteScreens {
+        var ports = NoteScreenModel.Ports(
             note: { library.note($0) }, job: { processing.state.jobs[$0] },
             update: { _ = library.update($0, $1) }, commit: { await library.commit($0, $1) },
             markMoment: { library.markMoment($0, at: $1) },
@@ -49,7 +50,25 @@ extension AppGraph {
             trash: { _ = await trash.requestTrash($0) },
             session: { router.session($0) }, isOpen: { router.isOpen($0) }, markStarted: { router.markStarted($0) },
             openModelDownload: { router.offerModelDownload(for: $0) },
-            present: { errors.present($0.message) }))
+            present: { errors.present($0.message) })
+        if let drafts = processing.drafts {
+            ports.draftNames = { drafts.changes($0) }
+            ports.draftNamingOpen = { drafts.isOpen($0) }
+            ports.changeDraft = { noteID, effects in
+                let generation = settings.voicesGeneration
+                let changed = drafts.mutateIfOpen(noteID) { $0.applying(effects, generation: generation) }
+                // "Also rename Luca everywhere?" answered yes: the saved voice is renamed now; names in notes stay.
+                for case .renameVoice(let voice, let name) in effects where changed { _ = await voices.rename(voice, name: name) }
+                return changed
+            }
+        }
+        ports.runningDraft = { id in
+            guard case .transcribing(_, let draft)? = processing.progress.phase(for: id) else { return nil }
+            return draft
+        }
+        ports.savedVoices = { voices.savedVoices }
+        ports.voicesReadOnly = { voices.isReadOnly }
+        return NoteScreens(ports: ports)
     }
 }
 

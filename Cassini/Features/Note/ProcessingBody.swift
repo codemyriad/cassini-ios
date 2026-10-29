@@ -7,7 +7,7 @@ import CassiniNotebook
 /// otherwise (a short window, a large text size) the top scrolls with the draft. New draft text scrolls the end of the
 /// draft into view while it sticks to the end (`DraftFollow`); only the list scrolls, so a fixed card stays in view.
 struct ProcessingBody<Top: View, Banners: View>: View {
-    let noteID: UUID
+    let model: NoteScreenModel
     let cache: TranscriptCache
     @ViewBuilder let top: () -> Top
     @ViewBuilder let banners: () -> Banners
@@ -31,7 +31,7 @@ struct ProcessingBody<Top: View, Banners: View>: View {
                 VStack(alignment: .leading, spacing: Spacing.section) {
                     if !pinned { topContent }
                     banners()
-                    RunningDraft(noteID: noteID, cache: cache)
+                    RunningDraft(model: model, cache: cache)
                 }
                 .padding(.horizontal, Spacing.gutter).padding(.top, pinned ? 0 : Spacing.gutter).padding(.bottom, Spacing.gutter)
                 .readableWidth()

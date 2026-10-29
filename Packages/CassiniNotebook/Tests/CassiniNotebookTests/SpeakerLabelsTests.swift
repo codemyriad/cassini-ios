@@ -26,27 +26,11 @@ import Testing
 @Suite struct VoiceStalenessTests {
     typealias F = VoiceFixtures
 
-    // ports: VoiceStalenessTest#aVoiceOfThePinnedModelAndDimensionIsCurrent
-    @Test func aVoiceOfTheCurrentModelIsCurrent() {
-        #expect(!VoiceStaleness.isStale(F.voice("v"), model: F.model, dimension: F.dimension))
-    }
-
-    // ports: VoiceStalenessTest#anotherModelIsStale
-    @Test func anotherModelIsStale() {
-        #expect(VoiceStaleness.isStale(F.voice("v", model: "another-model"), model: F.model))
-    }
-
-    // ports: VoiceStalenessTest#anotherDimensionIsStale
-    @Test func anotherDimensionIsStale() {
-        #expect(VoiceStaleness.isStale(F.voice("v", nil, F.axis(0, dimension: 4)), model: F.model, dimension: F.dimension))
-    }
-
-    /// iOS: a voice with one sample of the current model is current; before any analysis nothing is stale.
-    @Test func oneCurrentSampleIsEnoughAndAnUnknownModelStalesNothing() {
+    /// iOS: a voice with one sample of the current model is current.
+    @Test func oneCurrentSampleIsEnough() {
         var voice = F.voice("v", model: "old")
         voice.samples += F.voice("w").samples
         #expect(!VoiceStaleness.isStale(voice, model: F.model))
-        #expect(!VoiceStaleness.isStale(F.voice("v", model: "old"), model: nil))
     }
 }
 

@@ -16,8 +16,8 @@
 #   CASSINI_ANDROID             the cassini-android checkout with the fixtures and goldens (default ~/dev/cassini-android,
 #                               the plan's baseline at main, then ../cassini-android beside the main checkout)
 #   CASSINI_BENCH_LONG_SECONDS  the long run in 28 s windows (default 3600; 0 skips it)
-#   CASSINI_BENCH_FLUIDAUDIO    1 runs FluidAudio's speakers afterwards in the same process (downloads its models into
-#                               the simulator; default 0)
+#   CASSINI_BENCH_SPEAKERS      the speaker-models directory: with Ultra still loaded, stream 60 s through Sortformer
+#                               and make a CAM++ print (default <model root>/speaker-models when installed; none skips)
 #   CASSINI_IPHONE              the device type to clone (default "iPhone 17")
 # Writes .tools/bench/<time>.json and the xcodebuild log beside it. The simulator clone is
 # ts-<worktree directory>-bench, so scripts/test.sh clean removes it with this worktree's other clones.
@@ -34,6 +34,11 @@ for candidate in "$root/.tools/models" "$root/.tools/ci-models"; do
 done
 [ -n "$model_root" ] || { echo "error: no models; run scripts/fetch-ci-models.py --dest .tools/models" >&2; exit 1; }
 models=${CASSINI_PARAKEET_MODELS:-$model_root/parakeet-ultra}
+speakers=${CASSINI_BENCH_SPEAKERS:-}
+if [ -z "$speakers" ] && [ -f "$model_root/speaker-models/verified" ] && [ -f "$model_root/speaker-models/verified-voiceprint" ]; then
+    speakers=$model_root/speaker-models
+fi
+[ "$speakers" = none ] && speakers=""
 case "${CASSINI_BENCH_ONLY:-}" in
     bench) only=(-only-testing:CassiniTests/SherpaBenchTests) ;;
     job) only=(-only-testing:CassiniTests/ParakeetJobTests) ;;
@@ -88,7 +93,7 @@ TEST_RUNNER_CASSINI_PARAKEET_RECORD="${CASSINI_PARAKEET_RECORD:-0}" \
 TEST_RUNNER_CASSINI_PARAKEET_AUDIO="$audio" \
 TEST_RUNNER_CASSINI_PARAKEET_GOLDEN="$golden" \
 TEST_RUNNER_CASSINI_BENCH_LONG_SECONDS="${CASSINI_BENCH_LONG_SECONDS:-3600}" \
-TEST_RUNNER_CASSINI_BENCH_FLUIDAUDIO="${CASSINI_BENCH_FLUIDAUDIO:-0}" \
+TEST_RUNNER_CASSINI_BENCH_SPEAKERS="$speakers" \
 TEST_RUNNER_CASSINI_BENCH_OUT="$out/$stamp.json" \
 xcodebuild test-without-building -xctestrun "$xctestrun" -destination "platform=iOS Simulator,id=$udid" \
     "${only[@]}" -resultBundlePath "$out/$stamp.xcresult" > "$log" 2>&1 || rc=$?

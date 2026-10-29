@@ -65,7 +65,8 @@ public enum NameMatch {
     /// stale voices alphabetically without a score. Without a print: current voices, then stale voices, each
     /// alphabetical; `model` is then the current model, for staleness. Only the first row can be "Likely", and only
     /// when its score is at least `suggest`.
-    public static func rank(_ print: SpeakerPrint?, voices: [SavedVoice], model: String?, suggest: Float) -> [Ranked] {
+    public static func rank(_ print: SpeakerPrint?, voices: [SavedVoice], model: String = VoiceprintModel.sha256,
+                            suggest: Float) -> [Ranked] {
         let model = print?.model ?? model
         let dimension = print?.vector.count
         let stale = voices.filter { VoiceStaleness.isStale($0, model: model, dimension: dimension) }

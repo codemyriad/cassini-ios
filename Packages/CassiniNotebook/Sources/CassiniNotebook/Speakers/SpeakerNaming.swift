@@ -189,7 +189,7 @@ public enum SpeakerNaming {
     }
 
     static func rankedVoices(_ input: NamingInput) -> [NameMatch.Ranked] {
-        NameMatch.rank(input.print, voices: input.voices, model: input.currentModel, suggest: VoiceThresholds.ios.suggest)
+        NameMatch.rank(input.print, voices: input.voices, model: input.currentModel, suggest: VoiceThresholds.campplus.suggest)
     }
 }
 

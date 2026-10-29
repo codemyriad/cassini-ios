@@ -4,7 +4,7 @@ import Testing
 
 @Suite struct NameMatchTests {
     typealias F = VoiceFixtures
-    let suggest = VoiceThresholds.ios.suggest
+    let suggest = VoiceThresholds.campplus.suggest
 
     func voice(_ key: String, _ name: String, _ mean: [Float] = F.axis(0), model: String = F.model) -> SavedVoice {
         F.voice(key, name, mean, model: model)
@@ -90,7 +90,7 @@ import Testing
             voice("tie2", "Carla", F.near(0.30, 3)),
             voice("old2", "Aldo", F.axis(0, dimension: 4)),
         ]
-        let rows = NameMatch.rank(F.print(F.axis(0)), voices: voices, model: nil, suggest: suggest)
+        let rows = NameMatch.rank(F.print(F.axis(0)), voices: voices, suggest: suggest)
         #expect(rows.map(\.voice.id) == ["top", "low", "tie2", "old2", "old"].map(F.id))
         #expect(rows.map(\.stale) == [false, false, false, true, true])
         #expect(abs(try #require(rows[0].score) - 0.70) < 1e-5)
@@ -101,18 +101,18 @@ import Testing
 
     // ports: NameMatchTest#likelyNeedsTheSuggestThreshold
     @Test func likelyNeedsTheSuggestThreshold() throws {
-        let anna = [voice("a", "Anna", F.near(0.65, 1))]
-        let score = try #require(NameMatch.rank(F.print(F.axis(0)), voices: anna, model: nil, suggest: 1).first?.score)
-        let at = NameMatch.rank(F.print(F.axis(0)), voices: anna, model: nil, suggest: score)
+        let anna = [voice("a", "Anna", F.near(0.50, 1))]
+        let score = try #require(NameMatch.rank(F.print(F.axis(0)), voices: anna, suggest: 1).first?.score)
+        let at = NameMatch.rank(F.print(F.axis(0)), voices: anna, suggest: score)
         #expect(try #require(at.first).likely)
-        let below = NameMatch.rank(F.print(F.axis(0)), voices: [voice("a", "Anna", F.near(0.64, 1))], model: nil, suggest: suggest)
+        let below = NameMatch.rank(F.print(F.axis(0)), voices: [voice("a", "Anna", F.near(0.49, 1))], suggest: suggest)
         #expect(try !#require(below.first).likely)
     }
 
     // ports: NameMatchTest#atMostOneRowIsLikely
     @Test func atMostOneRowIsLikely() {
         let voices = [voice("a", "Anna", F.near(0.90, 1)), voice("b", "Bruno", F.near(0.80, 2))]
-        #expect(NameMatch.rank(F.print(F.axis(0)), voices: voices, model: nil, suggest: suggest).filter(\.likely).count == 1)
+        #expect(NameMatch.rank(F.print(F.axis(0)), voices: voices, suggest: suggest).filter(\.likely).count == 1)
     }
 
     // ports: NameMatchTest#withoutAPrintTheListIsAlphabeticalAndNothingIsLikely
@@ -125,6 +125,6 @@ import Testing
 
     // ports: NameMatchTest#noVoicesNoRows
     @Test func noVoicesNoRows() {
-        #expect(NameMatch.rank(F.print(F.axis(0)), voices: [], model: nil, suggest: suggest).isEmpty)
+        #expect(NameMatch.rank(F.print(F.axis(0)), voices: [], suggest: suggest).isEmpty)
     }
 }

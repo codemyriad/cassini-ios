@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 import Observation
 import CassiniNotebook
 
@@ -35,6 +36,13 @@ import CassiniNotebook
     @ObservationIgnored private let library: LibraryStore
     @ObservationIgnored private let settings: SettingsStore
     @ObservationIgnored private let clock: any AppClock
+    /// Whether the voiceprint model (CAM++) is installed, so a speaker without a print can be remembered once the next
+    /// analysis makes one ("Recognising voices isn't downloaded" otherwise). The app sets it from its analyzer.
+    @ObservationIgnored public var printsReady: @Sendable () async -> Bool = { false }
+    /// The draft names of running and paused jobs, which Forget and Forget everyone scrub too.
+    @ObservationIgnored public var drafts: DraftNamesStore?
+    /// The saved voices for a running job's live matching, readable from any thread.
+    public nonisolated let liveVoices = LiveVoices()
 
     public init(library: LibraryStore, settings: SettingsStore, clock: any AppClock) {
         self.library = library; self.settings = settings; self.clock = clock
@@ -53,7 +61,8 @@ import CassiniNotebook
 
     /// Saved voices as the screen lists them.
     public var summaries: [SavedVoiceSummary] {
-        SavedVoiceList.summaries(savedVoices, notes: library.notes, model: settings.speakerModelIdentity)
+        SavedVoiceList.summaries(savedVoices, notes: library.notes, model: VoiceprintModel.sha256,
+                                 dimension: VoiceprintModel.dimension)
     }
 
     public func voice(_ id: UUID?) -> SavedVoice? { id.flatMap { id in savedVoices.first { $0.id == id } } }
@@ -78,6 +87,7 @@ import CassiniNotebook
     public func refresh() async {
         guard let store else { return }
         snapshot = await store.snapshot()
+        liveVoices.set(snapshot.isReadOnly ? [] : snapshot.voices, generation: settings.voicesGeneration)
     }
 
     /// Reads the saved voices again when the last read failed for a passing reason, before they are used.
@@ -104,9 +114,12 @@ import CassiniNotebook
     public func applySpeakerAnalysis(_ analysis: SpeakerAnalysis, to id: UUID, generation: Int) async throws {
         await retryUnreadable()
         guard let note = library.note(id), note.trashedAt == nil else { return }
-        if let model = analysis.prints.first?.model { settings.speakerModelIdentity = model }
-        let (turns, prints) = SpeakerAttribution.namespaced(turns: analysis.turns, prints: analysis.prints,
-                                                             prefix: UUID().uuidString + "_")
+        // Streamed speakers have ids of their own run already, the words' ids; a whole-file analysis's get a namespace.
+        let attributed = analysis.transcript
+        let (turns, prints) = attributed != nil ? (analysis.turns, analysis.prints)
+            : SpeakerAttribution.namespaced(turns: analysis.turns, prints: analysis.prints, prefix: UUID().uuidString + "_")
+        // The draft's "Not Luca" answers, and the voices confirmed for another speaker, are never matched.
+        let excluded = analysis.names?.excluded(Set(prints.map(\.speakerID)).union(turns.map(\.speakerID))) ?? [:]
         var matching = AnalysisMatches()
         if generation == settings.voicesGeneration, let store {
             let (earlier, count) = await store.printsForAnalysis(noteID: id)
@@ -115,19 +128,51 @@ import CassiniNotebook
             if kept, generation == settings.voicesGeneration {
                 matching = AnalysisMatches.of(note, turns: turns, prints: prints, savedVoices: savedVoices,
                                               earlierPrints: earlier,
-                                              trashed: Set(library.notes.filter { $0.trashedAt != nil }.map(\.id)))
+                                              trashed: Set(library.notes.filter { $0.trashedAt != nil }.map(\.id)),
+                                              excluded: excluded)
             }
         }
         // Forget everyone that began since the matches were worked out drops them: its links are gone already.
         if generation != settings.voicesGeneration { matching = AnalysisMatches() }
         let autoName = settings.automaticallyNameVoices
         let stamp = VersionStamp(date: clock.now)
+        let names = analysis.names
+        let labels = names?.labels ?? [:]
         let saved = await library.commit(id) { [matching] note in
             guard note.trashedAt == nil else { return }
-            matching.apply(to: &note, turns: turns, autoName: autoName, stamp: stamp)
+            matching.apply(to: &note, turns: turns, autoName: autoName, stamp: stamp,
+                           attributed: attributed.flatMap { Self.attributed($0, onto: note) }, excluded: excluded,
+                           labels: labels)
         }
         guard saved != nil else { throw CocoaError(.fileWriteUnknown) }
         await refresh()
+        if let names { await enrol(names, noteID: id, generation: generation) }
+    }
+
+    /// The draft's Remember choices once the note holds its speakers (Android's adopt): each speaker with a name and a
+    /// print is enrolled into its saved voice, or a new one, and confirmed. A choice made before Forget everyone, or
+    /// for a voice forgotten since, enrols nothing; a speaker with too little speech keeps its name only.
+    private func enrol(_ names: DraftNames, noteID: UUID, generation: Int) async {
+        guard names.generation == generation, generation == settings.voicesGeneration else { return }
+        for (speaker, voice) in names.remembered.sorted(by: { $0.key < $1.key }) {
+            guard let label = names.labels[speaker]?.trimmingCharacters(in: .whitespacesAndNewlines), !label.isEmpty
+            else { continue }
+            let voiceID: UUID?
+            switch voice {
+            case .new: voiceID = nil
+            case .saved(let id):
+                guard self.voice(id) != nil else { continue }
+                voiceID = id
+            }
+            try? await perform([.rememberVoice(speakerID: speaker, voiceID: voiceID, name: label)], noteID: noteID,
+                               speakerID: speaker)
+        }
+    }
+
+    /// The streamed words with their speakers, as the note's passages: only while the note still holds those words
+    /// (the job saved them in one voice just before), else nil and the note attributes them itself.
+    nonisolated static func attributed(_ segments: [TranscriptSegment], onto note: Note) -> [TranscriptSegment]? {
+        ProvenanceRecord.fingerprint(of: segments) == ProvenanceRecord.fingerprint(of: note.transcript) ? segments : nil
     }
 
     // MARK: - Naming
@@ -137,7 +182,7 @@ import CassiniNotebook
         await retryUnreadable()
         guard let note = library.note(noteID), note.speaker(speakerID) != nil else { return nil }
         return NamingInput.of(note, speakerID: speakerID, print: await print(noteID: noteID, speakerID: speakerID),
-                              voices: savedVoices, voicesReadOnly: isReadOnly, currentModel: settings.speakerModelIdentity)
+                              voices: savedVoices, voicesReadOnly: isReadOnly, voiceModelReady: await printsReady())
     }
 
     /// Carries out the sheet's effects for one speaker: the note first, then the saved voices.
@@ -194,9 +239,13 @@ import CassiniNotebook
             await library.commit(noteID) { $0.apply(current) }
         }
         await refresh()
-        for voice in written.forgotten { library.updateAll { $0.unlinkVoice(voice) } }
+        for voice in written.forgotten {
+            library.updateAll { $0.unlinkVoice(voice) }
+            drafts?.mutateAll { $0.forgetting(voice) }
+        }
     }
 
+    /// The speaker's latest print.
     private func print(noteID: UUID, speakerID: String) async -> SpeakerPrint? {
         try? await store?.prints(noteID: noteID).last { $0.speakerID == speakerID }
     }
@@ -217,6 +266,7 @@ import CassiniNotebook
         library.updateAll { $0.unlinkVoice(id) }
         let outcome = await store.forget(id)
         await refresh()
+        if outcome == .done { drafts?.mutateAll { $0.forgetting(id) } }
         return outcome
     }
 
@@ -229,6 +279,8 @@ import CassiniNotebook
         // A forget that failed keeps the voices, so the notes keep their links to them.
         if outcome == .done { library.updateAll { $0.reconcileVoices([]) } }
         await refresh()
+        let generation = settings.voicesGeneration
+        drafts?.mutateAll { $0.forgettingEveryone(generation: generation) }
         return outcome
     }
 
@@ -260,7 +312,25 @@ import CassiniNotebook
             throw Unavailable()
         }
         await refresh()
-        for voice in forgotten { library.updateAll { $0.unlinkVoice(voice) } }
+        for voice in forgotten {
+            library.updateAll { $0.unlinkVoice(voice) }
+            drafts?.mutateAll { $0.forgetting(voice) }
+        }
+    }
+}
+
+/// The saved voices as the last refresh read them, with the Forget everyone generation then, for a job's live
+/// matching on its inference thread.
+public final class LiveVoices: Sendable {
+    private let state = Mutex<(voices: [SavedVoice], generation: Int)>(([], 0))
+
+    public init() {}
+
+    func set(_ voices: [SavedVoice], generation: Int) { state.withLock { $0 = (voices, generation) } }
+
+    /// The voices while `generation` is current; none once Forget everyone moved past it.
+    public func voices(generation: Int) -> [SavedVoice] {
+        state.withLock { $0.generation == generation ? $0.voices : [] }
     }
 }
 

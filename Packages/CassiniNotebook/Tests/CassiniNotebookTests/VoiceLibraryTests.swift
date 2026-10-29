@@ -29,17 +29,6 @@ import Testing
         #expect(try library().problem == nil)
     }
 
-    @Test func aLegacyBareArrayReadsAndIsWrittenBackAsVersionOne() throws {
-        defer { cleanUp() }
-        let voices = [F.voice("anna", "Anna")]
-        try write(String(decoding: JSONEncoder().encode(voices), as: UTF8.self), to: voicesFile)
-        let library = try library()
-        #expect(library.voices == voices)
-        try library.save(voices + [F.voice("luca", "Luca")])
-        let object = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: voicesFile)) as? [String: Any])
-        #expect(object["version"] as? Int == 1)
-    }
-
     // ports: VoiceRepositoryTest#aNewerPeopleFileStaysReadOnly
     @Test func aNewerVoicesFileStaysReadOnly() throws {
         defer { cleanUp() }

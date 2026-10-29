@@ -38,7 +38,7 @@ struct LicensesView: View {
 
     /// The bundled files, read off the main actor.
     @Sendable private static func text(_ entry: LicenseEntry) async throws -> String {
-        let texts = LicenseTexts(downloads: SpeakerAnalyzer.manifest.downloads) { name in
+        let texts = LicenseTexts(downloads: SpeakerModels.downloads) { name in
             let parts = name.split(separator: ".", maxSplits: 1).map(String.init)
             guard let url = Bundle.main.url(forResource: parts[0], withExtension: parts.count > 1 ? parts[1] : nil) else {
                 throw CocoaError(.fileReadNoSuchFile)
