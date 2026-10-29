@@ -77,11 +77,14 @@ public enum SpeechFeed {
     /// word stamped inside that padding as a zero-length word at the end, as the desktop does.
     ///
     /// Android resamples here with its own windowed-sinc resampler. iOS reads every recording at 16 kHz through
-    /// `AVAudioConverter`, so `audio` at 16 kHz is its own copy and any other rate needs `copy16k`.
+    /// `AVAudioConverter`, so `audio` at 16 kHz is its own copy and any other rate needs `copy16k`. `copy16k` is
+    /// also how the detector gets its high-passed input (`SpeechInputFilter`), as long as `audio` at 16 kHz.
     @discardableResult
     public static func scan(_ stream: any Stream, _ audio: PcmAudio, copy16k: [Float]? = nil,
                             onSpan: (SampleSpan) throws -> Void) throws -> Int64 {
         precondition(copy16k != nil || audio.sampleRate == sampleRate, "A recording not at 16 kHz needs its 16 kHz copy")
+        precondition(audio.sampleRate != sampleRate || copy16k.map { $0.count == audio.samples.count } ?? true,
+                     "A 16 kHz copy of a 16 kHz recording has its length")
         let padding = try feed(stream, copy16k ?? audio.samples) { segment in
             if let span = recordingSpan(start: segment.startSample, length: segment.samples.count, rate: audio.sampleRate,
                                         recordingLength: audio.samples.count) {

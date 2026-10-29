@@ -43,6 +43,21 @@ that were not ported, with the reason for each.
     only the detector is missing (`ParakeetModels.request`, Android's `installModels`). Before any native object is
     made, Ultra's files must have their pinned sizes and its marker, else `MODEL`.
   - **Language.** Parakeet takes none: its jobs and checkpoints count the word body with `""`.
+  - **DC-robust speech detection (D26.1, ahead of Android).** Silero has no DC handling of its own, and a microphone
+    with an ADC offset changes what it finds. The detector hears the track through `SpeechInputFilter`: WebRTC APM's
+    2nd-order Butterworth 100 Hz high-pass (`silero-input-hpf-butter2-100hz-v1`), with the spec's exact binary64
+    coefficients, scalar Double arithmetic and the denormal guard. `ParakeetTranscriber` filters the samples once as it
+    reads them (`SpeechInput`), so the filter's state runs on across the 28 s windows and their 2 s overlap is
+    filtered once. A resumed run starts the filter from zero at its restored window. The spec allows that: no priming,
+    and zero-state steps never made a segment. The recognizer, the word gate, the speakers' input and the recording
+    stay raw. On the shared vector `dc-quiet-jfk-v1`, at iOS's 0.18 threshold, the offset makes Silero find spans the
+    control does not have; the desktop's 0.5 finds none. Filtered, the vector's spans equal the control's
+    (`CassiniTests/DCVectorTests`). Parakeet hears no words at that vector's level (34 LSB) even without an offset. At
+    the failing microphone's own level (JFK at 1/8 over the same offset), the filtered spans and Parakeet's words equal
+    those without the offset. Android has not landed D26.1 yet; its section of the spec asks for the same filter.
+    The provenance's segmentation text stays Android's word for word, and changes with Android's when it lands D26.1.
+    iOS has no structured field for the stage: every provenance field is one of the format's. The stage's name lives
+    in `SpeechInputFilter.stage`.
 - **Decode rules.** Android's pure decode rules are ported one to one into
   CassiniNotebook/Transcription with the same constants and algorithms: `SpeechWindows` (`DecodePolicy`, quiet
   pieces, split, fixed, padding, windows), `DecodeSession`, `WordGate`, `SeamMerge`, `IncrementalTranscript`,
@@ -394,6 +409,12 @@ stricter or looser than the spec.
   `audio.m4a` at Finish. Android captures Opus or AAC. The format chip reads "PCM 48 kHz". If compression fails, the
   CAF stays the recording, the notice REC_COMPRESSION_FAILED ("Saved in its original quality") shows, and the CAF is
   transcribed.
+- **Levels (D26.1).** The note's stored waveform measures AC level (`AudioInspection.acLevel`, the mean taken off each
+  sampled window), so a microphone's DC offset draws silence as silence. **The live meter does not yet:** it is
+  `AVAudioRecorder`'s `averagePower`, which measures the raw level and does not expose the samples, so an offset raises
+  it. The spec asks the same of Android, whose meter (`OpusCapture`) is to take each frame's mean off once it lands
+  D26.1. Measuring AC live needs the capture moved to an `AVAudioEngine` tap; that is left for later. iOS has no
+  silent-microphone check for it to affect.
 - **No file-size limit.** CAF has 64-bit chunk sizes and no MP4 index, so Android's 1 GiB AAC limit,
   `FileLimitNear`, `StoppedAtFileLimit` and REC_STOPPED_FILE_LIMIT do not exist.
 - **The storage floor counts the finish.** Recording stops just below 200 MiB **plus** the room the M4A copy needs
@@ -646,14 +667,23 @@ marked `// ports: <AndroidTest>#<name>`. Android's tests run at 16 and 48 kHz wh
 |---|---|---|
 | `SpeechWindowsTest` | `SpeechWindowsTests` | 17 |
 | `DecodeSessionTest` | `DecodeSessionTests` | 7 |
-| `WordGateTest` (including the three `TokenWords` cases) | `WordGateTests` | 20 |
+| `WordGateTest` (including the three `TokenWords` cases) | `WordGateTests` | 20, and 4 iOS-only |
 | `SeamMergeTest` | `SeamMergeTests` | 26 |
 | `IncrementalTranscriptTest` | `IncrementalTranscriptTests` | 5 |
 | `SpeechFeedTest` | `SpeechFeedTests` | 8 |
 | `ProcessingSpeedTest` | `ProcessingSpeedTests` | 1 |
 | `LongRunMeasurementTest` (gated by `CASSINI_MEASURE`) | `LongRunMeasurementTests` | 2 |
 
-iOS-only: `DecodeConstantsTests` (every constant, the provenance strings, the restore and `TIMINGS` checks),
+The word gate measures AC level (D26.1): it takes off the DC, the mean of at least 1 s around the word
+(`WordGate.dcContextMs`), so an offset is not sound while a click of a few samples cannot move it. A DC under
+half of `minActive` (`minDC`, 8 LSB) is left on: alone it cannot make a silent sample active, and speech's own mean
+over a second stays under it, so a recording without an offset is gated exactly as Android gates it
+(`aDCOffsetIsSilence`, `speechOverADCOffsetIsGatedAsWithoutIt`, `aClickAfterAWordDoesNotExtendIt`,
+`aFewClickSamplesAreNotAWord`). Android's fixtures are kept, except the two that make the whole recording one steady
+level (0.01 and 0.1), which is all DC: there the level alternates in sign, with the same magnitude.
+
+iOS-only: `SpeechInputFilterTests` (D26.1's high-pass bit for bit against the spec's reference loop, its state across
+calls, reset, the denormal guard and the windowed track), `DecodeConstantsTests` (every constant, the provenance strings, the restore and `TIMINGS` checks),
 `AppleSpeechWindowsTests` (the Apple fallback's block reading and the checkpoint cadence) and `ParakeetDecodeTests`
 (`Parakeet.transcribeWithDecoder`, which Android tests only through its job).
 
@@ -666,6 +696,7 @@ iOS-only: `DecodeConstantsTests` (every constant, the provenance strings, the re
 | `CheckpointStateTest` | `CheckpointStateTests` | The `recognition` member and its rules |
 | `TranscriptionJobTest` (windows, fsync, stop and resume, stop before the first window, body limit, mismatch, `OutOfMemoryError`) | `TranscriptionJobParakeetTests` | Over a scripted recognizer and the real `IncrementalTranscript`; the failure mapping (`MEMORY`, `TIMINGS`, `MODEL`, `CANCELLED`) |
 | `TranscriptionJobTest#aMissingSpeechDetectorIsFetchedAgainOnlyOnline` | `ParakeetTranscriberTests` (CassiniInference) | With the rest of the adapter: windows on the inference thread, consent and install, marker and sizes, memory, resume, cancel |
+| — (D26.1) | `DCVectorTests` (hosted, `scripts/sherpa-bench.sh`) | The shared `dc-quiet-jfk-v1` vector and JFK at the failing microphone's level through the real Silero and Ultra, with and without the offset |
 | `DeviceSmokeTest` FLEURS golden | `ParakeetJobTests` (hosted, `scripts/sherpa-bench.sh`) | A real job on the arm64 simulator against iOS's own golden (`CassiniTests/Goldens/fleurs-it-short.ios.json`), because the int8 kernels differ from the x86_64 emulator's; on 2026-10-15 its text equalled Android's golden word for word |
 
 `Golden010`, the 0.1.0 provenance record, belongs to WP5 (provenance), with `provenanceEqualsThe010Record`. The job

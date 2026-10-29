@@ -2,7 +2,9 @@ import CassiniCore
 import Testing
 @testable import CassiniNotebook
 
-/// Android's WordGateTest, one to one, at 16 and 48 kHz. The token cases run `TokenWords`, as Android's do.
+/// Android's WordGateTest, one to one, at 16 and 48 kHz. The token cases run `TokenWords`, as Android's do. The gate
+/// measures AC level (D26.1), so where Android's fixture is one steady level over the whole recording, which is all DC,
+/// the level alternates in sign here (`steady`): the same magnitude, with no DC for the gate to take off.
 @Suite struct WordGateTests {
     let rates = [16_000, 48_000]
 
@@ -31,6 +33,9 @@ import Testing
     func fill(_ samples: inout [Float], _ sampleRate: Int, _ fromMs: Int, _ toMs: Int, _ value: Float) {
         for i in (fromMs * sampleRate / 1000)..<(toMs * sampleRate / 1000) { samples[i] = value }
     }
+
+    /// `count` samples of `value` alternating in sign.
+    func steady(_ value: Float, count: Int) -> [Float] { (0..<count).map { $0 % 2 == 0 ? value : -value } }
 
     // ports: WordGateTest#clampKeepsBoundaryTokensWithinDecoderPadding
     @Test func clampKeepsBoundaryTokensWithinDecoderPadding() {
@@ -114,7 +119,7 @@ import Testing
     // ports: WordGateTest#gateRejectsMalformedTimestamps
     @Test func gateRejectsMalformedTimestamps() {
         for rate in rates {
-            let samples = [Float](repeating: 0.1, count: rate)
+            let samples = steady(0.1, count: rate)
             let words = [timed("max", .max, .max), timed("min", .min, .min), timed("reversed", 800, 700)]
             #expect(WordGate.filterWordsByEnergy(samples, sampleRate: rate, words: words).isEmpty)
         }
@@ -123,7 +128,7 @@ import Testing
     // ports: WordGateTest#finalizeClampsBeforeTheGate
     @Test func finalizeClampsBeforeTheGate() {
         for rate in rates {
-            let samples = [Float](repeating: 0.01, count: rate)
+            let samples = steady(0.01, count: rate)
             let words = [timed("straddles", 900, 1100), timed("boundary", 1000, 1200),
                          timed("inside-vad-padding", 1032, 1100), timed("beyond-vad-padding", 1033, 1100)]
             let want = [word("straddles", 900, 1000), word("boundary", 1000, 1000), word("inside-vad-padding", 1000, 1000)]
@@ -254,5 +259,60 @@ import Testing
         #expect(got[0].extentCapMs == 9080)
         #expect(got[1].extentCapMs == got[1].word.endMs)
         #expect(got[1].capMs == 9000)
+    }
+
+    /// The real failing microphone's offset, -2060 of 32768 (D26.1).
+    static let offset: Float = -2060.0 / 32768
+
+    func offset(_ samples: [Float], by dc: Float = offset) -> [Float] { samples.map { $0 + dc } }
+
+    /// A DC offset on its own is silence: no word in it passes, and none reaches into it. Measured raw, every sample
+    /// would be active and both words would pass, the capped one extended to its cap.
+    @Test func aDCOffsetIsSilence() {
+        for rate in rates {
+            let samples = offset([Float](repeating: 0, count: 3 * rate))
+            #expect(WordGate.filterWordsByEnergy(samples, sampleRate: rate, words: [timed("hallucinated", 1000, 1150),
+                                                                                   timed("capped.", 2000, 2100, 2800)]).isEmpty,
+                    "\(rate) Hz")
+        }
+    }
+
+    /// Speech over an offset is gated and extended as it is without one.
+    @Test func speechOverADCOffsetIsGatedAsWithoutIt() {
+        for rate in rates {
+            let words = [timed("Okay.", 1000, 1150, 2500), timed("silent", 2700, 2800), timed("capped", 3000, 3150, 3400)]
+            let clean = activeAudio(rate, 4000, (1000, 1150), (1210, 1450), (2400, 2600), (3000, 3500))
+            let want = [word("Okay.", 1000, 1450), word("capped", 3000, 3400)]
+            #expect(WordGate.filterWordsByEnergy(clean, sampleRate: rate, words: words) == want, "\(rate) Hz")
+            for dc: Float in [Self.offset, 4000.0 / 32768] {
+                #expect(WordGate.filterWordsByEnergy(offset(clean, by: dc), sampleRate: rate, words: words) == want, "\(rate) Hz, \(dc)")
+            }
+        }
+    }
+
+    /// The DC comes from at least `dcContextMs` around the word, so a click cannot move it: a lone tap after a capped
+    /// word does not stretch the word over it (a 10 ms window's own mean would make the whole window active).
+    @Test func aClickAfterAWordDoesNotExtendIt() {
+        for rate in rates {
+            #expect(WordGate.dcContextMs == 1000)
+            #expect(WordGate.minDC == WordGate.minActive / 2)
+            var samples = activeAudio(rate, 3000, (1000, 1150))
+            samples[1300 * rate / 1000] = 0.3
+            #expect(WordGate.filterWordsByEnergy(samples, sampleRate: rate, words: [timed("Okay.", 1000, 1150, 2000)]) ==
+                    [word("Okay.", 1000, 1150)], "\(rate) Hz")
+            #expect(WordGate.wordEndOverContinuingAudio(samples, sampleRate: rate, timed: timed("Okay.", 1000, 1150, 2000),
+                                                        audioEndMs: 3000) == 1150, "\(rate) Hz")
+        }
+    }
+
+    /// A few full-scale samples stay a click, also in the short window at the end of the recording.
+    @Test func aFewClickSamplesAreNotAWord() {
+        for rate in rates {
+            var samples = [Float](repeating: 0, count: 3 * rate)
+            for i in 0..<4 { samples[1950 * rate / 1000 + i] = 1 }
+            samples[2950 * rate / 1000] = 1
+            let words = [timed("click", 2000, 2100), timed("end", 3000, 3000)]
+            #expect(WordGate.filterWordsByEnergy(samples, sampleRate: rate, words: words).isEmpty, "\(rate) Hz")
+        }
     }
 }

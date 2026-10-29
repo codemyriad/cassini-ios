@@ -9,15 +9,28 @@ import CassiniEngineTesting
 @testable import CassiniInference
 
 /// `ParakeetTranscriber` over a fake native runtime and generated audio: a 16 kHz float WAV with word `wN` as a burst of
-/// value (N + 1) / 100 a quarter second into second N. The fake recognizer turns each burst into a timed token; the fake
-/// detector finds each burst. The model files are sparse files of the pinned sizes with their markers.
+/// magnitude (N + 1) / 100, alternating in sign, a quarter second into second N. The fake recognizer turns each burst
+/// into a timed token; the fake detector finds each burst in what it hears, the high-passed track (D26.1), which keeps
+/// such a burst and would take a steady one away. The model files are sparse files of the pinned sizes with their
+/// markers.
 @Suite(.serialized) struct ParakeetTranscriberTests {
     private let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     private var root: URL { folder.appendingPathComponent("models", isDirectory: true) }
 
     // MARK: - Fixtures
 
-    private func audio(seconds: Int, name: String = "audio.wav") throws -> URL {
+    /// The samples of `audio(seconds:offset:)`.
+    static func samples(seconds: Int, offset: Float = 0) -> [Float] {
+        var samples = [Float](repeating: offset, count: seconds * Limits.asrRate)
+        for n in 0..<seconds {
+            let start = n * Limits.asrRate + Limits.asrRate / 4
+            for i in start..<(start + Limits.asrRate * 3 / 10) { samples[i] = offset + (i % 2 == 0 ? 1 : -1) * Float(n + 1) / 100 }
+        }
+        return samples
+    }
+
+    /// With an `offset`, every sample carries that DC, as from a microphone with an ADC offset.
+    private func audio(seconds: Int, offset: Float = 0, name: String = "audio.wav") throws -> URL {
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let url = folder.appendingPathComponent(name)
         let rate = Double(Limits.asrRate)
@@ -27,11 +40,7 @@ import CassiniEngineTesting
         let buffer = try #require(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frames))
         buffer.frameLength = frames
         let samples = buffer.floatChannelData![0]
-        for i in 0..<Int(frames) { samples[i] = 0 }
-        for n in 0..<seconds {
-            let start = n * Limits.asrRate + Limits.asrRate / 4
-            for i in start..<(start + Limits.asrRate * 3 / 10) { samples[i] = Float(n + 1) / 100 }
-        }
+        for (i, sample) in Self.samples(seconds: seconds, offset: offset).enumerated() { samples[i] = sample }
         try file.write(from: buffer)
         return url
     }
@@ -54,10 +63,14 @@ import CassiniEngineTesting
     final class Native: @unchecked Sendable {
         let lock = NSLock()
         var loads = 0, detectors = 0, decodes = 0
+        /// What the detectors heard, one entry for each reset: a window's input.
+        var heard: [[Float]] = []
         var threads: Set<String> = []
         var failsLoading = false
         /// Each decode waits this long first.
         var decodeDelay: TimeInterval = 0
+        /// Off, the recognizer hears no words: for audio whose bursts it cannot read, such as audio with an offset.
+        var hearsWords = true
 
         func record(_ body: (Native) -> Void) { lock.withLock { body(self) } }
         var counts: (loads: Int, detectors: Int, decodes: Int) { lock.withLock { (loads, detectors, decodes) } }
@@ -69,7 +82,7 @@ import CassiniEngineTesting
                 return Recognizer(self)
             }, makeDetector: { [self] _ in
                 record { $0.detectors += 1 }
-                return Detector()
+                return Detector(self)
             })
         }
     }
@@ -81,13 +94,16 @@ import CassiniEngineTesting
             native.record { $0.decodes += 1; $0.threads.insert(Thread.current.name ?? "") }
             let delay = native.lock.withLock { native.decodeDelay }
             if delay > 0 { Thread.sleep(forTimeInterval: delay) }
+            guard native.lock.withLock({ native.hearsWords }) else {
+                return RecognizedTokens(text: "", tokens: [], timestamps: [], durations: [])
+            }
             var tokens: [String] = [], timestamps: [Float] = [], durations: [Float] = []
             var p = 0
             while p < samples.count {
-                let value = samples[p]
+                let value = abs(samples[p])
                 if value == 0 { p += 1; continue }
                 let first = p
-                while p < samples.count && samples[p] == value { p += 1 }
+                while p < samples.count && abs(samples[p]) == value { p += 1 }
                 tokens.append("▁w\(Int((value * 100).rounded()) - 1)")
                 timestamps.append(Float(first) / Float(Limits.asrRate))
                 durations.append(Float(p - first) / Float(Limits.asrRate))
@@ -97,14 +113,20 @@ import CassiniEngineTesting
     }
 
     final class Detector: SpeechDetecting {
+        let native: Native
         private var fed: [Float] = []
         private var segments: [SpeechFeed.Segment] = []
         private var open: Int?
-        func reset() { fed = []; segments = []; open = nil }
+        init(_ native: Native) { self.native = native }
+        func reset() {
+            fed = []; segments = []; open = nil
+            native.record { $0.heard.append([]) }
+        }
         func acceptWaveform(_ window: [Float]) {
             let start = fed.count
             fed += window
-            let speech = window.contains { $0 != 0 }
+            native.record { $0.heard[$0.heard.count - 1] += window }
+            let speech = window.contains { abs($0) >= 0.001 }
             if speech, open == nil { open = start }
             if !speech, let first = open { segments.append(.init(first, Array(fed[first..<start]))); open = nil }
         }
@@ -313,6 +335,45 @@ import CassiniEngineTesting
         #expect(resumedEvents.windows.map(\.recognition) == Array(events.windows.dropFirst()).map(\.recognition))
         guard case .progress(let done, _) = try #require(resumedEvents.all.first) else { Issue.record("no progress"); return }
         #expect(done == 28, "a resumed run starts from its checkpoint")
+    }
+
+    /// D26.1: the detector hears the track through one `SpeechInputFilter` run in reading order, so each window's
+    /// input, the 2 s it shares with the window before included, is a stretch of that one filtered track. A resumed
+    /// run's filter starts from zero at its restored window and runs on the same way from there. The recording
+    /// carries the failing microphone's offset, so a filter started afresh at a window would differ.
+    @Test func theDetectorHearsTheTrackHighPassedOnceAcrossWindows() async throws {
+        defer { try? FileManager.default.removeItem(at: folder) }
+        try install(ModelCatalog.parakeet)
+        try install(ModelCatalog.vad)
+        let offset: Float = -2060.0 / 32768
+        let url = try audio(seconds: 70, offset: offset)
+        let raw = Self.samples(seconds: 70, offset: offset)
+        let window = IncrementalTranscript.windowSamples, step = window - IncrementalTranscript.overlapSamples
+        func expected(from start: Int, _ heard: [[Float]]) -> [[Float]] {
+            var filter = SpeechInputFilter()
+            let track = [Float](repeating: 0, count: start) + filter(raw[start...])
+            return heard.indices.map { n in
+                let first = start + n * step, last = min(first + window, raw.count)
+                // SpeechFeed zero-pads the last 512-sample frame.
+                return Array(track[first..<last]) + [Float](repeating: 0, count: heard[n].count - (last - first))
+            }
+        }
+        let native = Native()
+        native.hearsWords = false
+        let (_, events) = try await run(transcriber(native), url)
+        let heard = native.lock.withLock { native.heard }
+        #expect(heard.count == 3)
+        #expect(heard == expected(from: 0, heard))
+        var fresh = SpeechInputFilter()
+        #expect(Array(heard[1].prefix(512)) != fresh(raw[step..<(step + 512)]), "a window's filter carries the state of the one before")
+
+        let first = try #require(events.windows.first)
+        let resumedNative = Native()
+        resumedNative.hearsWords = false
+        _ = try await run(transcriber(resumedNative), url, resume: TranscriptResume(recognition: first.recognition, words: first.words))
+        let resumedHeard = resumedNative.lock.withLock { resumedNative.heard }
+        #expect(resumedHeard.count == 2, "the resumed run's two windows")
+        #expect(resumedHeard == expected(from: Int(first.recognition.start), resumedHeard))
     }
 
     @Test func aCheckpointPastTheEndOfTheAudioIsNotResumed() async throws {

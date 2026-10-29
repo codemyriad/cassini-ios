@@ -159,6 +159,9 @@ extension ParakeetTranscriber {
             // Android's `IncrementalRecognizer.inferenceMs`: each window's decode once the recognizer is loaded (the
             // speech detector, the decoder calls and the word gate), not the reading or the model load.
             var inferenceNanoseconds: UInt64 = 0
+            // What the detector hears (D26.1): the track high-passed once in reading order, so the filter runs on
+            // across windows and their overlap. A resumed run's track starts at its restored window.
+            var input: SpeechInput?
             let recognize = { (audio: PcmAudio, startMs: Int64) throws -> Transcript in
                 try cancel.check()
                 guard ParakeetMemory.allows(availableBytes: availableMemory(), loaded: decoder != nil) else {
@@ -170,9 +173,14 @@ extension ParakeetTranscriber {
                     }
                 }
                 let began = DispatchTime.now().uptimeNanoseconds
-                let decoded = try ParakeetDecode.transcribe(audio, decoder: decoder!, detector: speech, policy: .wholeSpans,
+                let start = startMs * Int64(Limits.asrRate) / 1000
+                let detectorInput = speech.map { _ in Self.detectorInput(input, from: start, audio) }
+                let decoded = try ParakeetDecode.transcribe(audio, decoder: decoder!, detector: speech,
+                                                            detectorInput: detectorInput, policy: .wholeSpans,
                                                             cutting: DecodeCutting.cutting(detectorReady: speech != nil))
                 inferenceNanoseconds += DispatchTime.now().uptimeNanoseconds - began
+                // The next window starts at this one's overlap.
+                input?.discard(before: start + Int64(audio.samples.count - IncrementalTranscript.overlapSamples))
                 let words = Transcript(decoded.words.map { Word("", $0.startMs, $0.endMs, $0.text) })
                 // Android's `onChunk`: the window's speakers, outside the decode time. Without them the words have no
                 // speaker id.
@@ -185,6 +193,7 @@ extension ParakeetTranscriber {
             // Samples read so far at 16 kHz, and the window of a resumed run, collected while its start is read again.
             var position: Int64 = 0
             var window: [Float] = []
+            if speech != nil { input = SpeechInput(start: resume?.recognition.start ?? 0) }
             if resume == nil { transcript = try IncrementalTranscript(recognize: recognize) }
             var reportedMs = resume?.recognition.doneMs ?? 0
             while let (buffer, _) = reader.nextBuffer() {
@@ -200,10 +209,12 @@ extension ParakeetTranscriber {
                     position += Int64(need)
                     offset = need
                     guard position == resume.recognition.position else { continue }
+                    input?.append(window)
                     transcript = try restored(resume, window, recognize)
                 }
                 guard let transcript, offset < count else { continue }
                 let rest = offset == 0 ? samples : Array(samples[offset...])
+                input?.append(rest)
                 try transcript.accept(rest, count: rest.count)
                 position += Int64(rest.count)
                 if transcript.doneMs > reportedMs {
@@ -220,6 +231,7 @@ extension ParakeetTranscriber {
             if transcript == nil, let resume {
                 // The file ended exactly at the checkpoint's position.
                 guard position == resume.recognition.position else { throw TranscriptionError.failed(.open) }
+                input?.append(window)
                 transcript = try restored(resume, window, recognize)
             }
             guard let transcript else { throw TranscriptionError.failed(.open) }
@@ -228,6 +240,14 @@ extension ParakeetTranscriber {
             return TranscriptionResult(segments: TranscriptSegment.segments(of: words),
                                        segmentation: DecodeCutting.incrementalProvenance(detectorReady: speech != nil),
                                        inferenceMs: decodeMs(), speakers: speakers?.checkpoint())
+        }
+
+        /// The detector's input for the window of `audio` at `start`: the track's filtered samples, which it always
+        /// holds; a window it does not hold is filtered on its own from zero state.
+        static func detectorInput(_ input: SpeechInput?, from start: Int64, _ audio: PcmAudio) -> [Float] {
+            if let held = input?.window(from: start, count: audio.samples.count) { return held }
+            var filter = SpeechInputFilter()
+            return filter(audio.samples)
         }
 
         private func restored(_ resume: TranscriptResume, _ window: [Float],
