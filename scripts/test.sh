@@ -377,7 +377,11 @@ build_for_testing() {
         rc=0; run_limited "$logs/resolve.log" 600 "${resolve[@]}" || rc=$?
     fi
     if [ "$rc" != 0 ]; then
-        tail -40 "$logs/resolve.log" >&2; echo "see $logs/resolve.log" >&2; return 1
+        tail -40 "$logs/resolve.log" >&2; echo "see $logs/resolve.log" >&2
+        # Both hangs seen so far waited on a file claim of an Xcode app whose main thread had stopped responding.
+        [ "$rc" = 124 ] && pgrep -x Xcode > /dev/null &&
+            echo "Xcode is open: when it has stopped responding it holds the project's file claims; quit it and run again" >&2
+        return 1
     fi
     step_end
 
