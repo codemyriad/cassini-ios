@@ -8,7 +8,7 @@ How to build Cassini for TestFlight and the App Store, and what is still missing
 |---|---|---|
 | Bundle ID | `io.codemyriad.cassini` | `io.codemyriad.cassini.activity` |
 | Version | `MARKETING_VERSION` 0.1.0 | 0.1.0 |
-| Build | `CURRENT_PROJECT_VERSION` 1 | 1 |
+| Build | `CURRENT_PROJECT_VERSION` 2 | 2 |
 
 Both are set in `project.yml`, and the app and the extension must carry the same version and build. Raise the build
 number for every upload; App Store Connect refuses a build number it has already seen for that version.
