@@ -24,5 +24,7 @@ Models/
 /.test-cache/
 # Italian screenshots (scripts/screenshots.sh --locale it) are for review, not committed.
 docs/screenshots/it/
-# The native runtime build (scripts/build-sherpa-xcframework.sh) and its downloads.
-.tools/
+# The native runtime build (scripts/build-sherpa-xcframework.sh) and its downloads; also a link to another checkout's.
+.tools
+# Archives and exported .ipa files (docs/distribution.md).
+/build/
