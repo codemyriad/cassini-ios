@@ -87,11 +87,50 @@ summary() {
 
 die() { echo "error: $*" >&2; exit 1; }
 
-# A step's output goes to its log; on failure the tail is shown.
+# $1 and every process it started, deepest first, so none is left behind when its parent goes.
+process_tree() {
+    local child
+    for child in $(pgrep -P "$1" 2>/dev/null); do process_tree "$child"; done
+    echo "$1"
+}
+
+# Ends the processes $2... with signal $1.
+signal_all() { local sig="$1"; shift; for pid in "$@"; do kill -"$sig" "$pid" 2>/dev/null || true; done; }
+
+# Ends process $1 and everything it started: TERM, then KILL for what is still there five seconds later.
+end_tree() {
+    local pid="$1" pids
+    pids=$(process_tree "$pid")
+    # shellcheck disable=SC2086
+    signal_all TERM $pids
+    for _ in 1 2 3 4 5; do kill -0 "$pid" 2>/dev/null || break; sleep 1; done
+    # shellcheck disable=SC2086
+    signal_all KILL $pids
+    wait "$pid" 2>/dev/null || true
+}
+
+# Runs the command after $2 with its output in $1, ending it once it has run $2 seconds: a step that hangs fails the
+# run instead of holding it (once xcodebuild -resolvePackageDependencies deadlocked and held a run for two hours).
+# Returns the command's status, or 124 when it was ended.
+run_limited() {
+    local log="$1" limit="$2" pid waited=0; shift 2
+    "$@" > "$log" 2>&1 & pid=$!
+    while kill -0 "$pid" 2>/dev/null; do
+        if [ $waited -ge "$limit" ]; then
+            echo "test.sh: still running after ${limit}s; ended" >> "$log"
+            end_tree "$pid"
+            return 124
+        fi
+        sleep 1; waited=$(( waited + 1 ))
+    done
+    wait "$pid"
+}
+
+# A step's output goes to its log; on failure the tail is shown. $2 is its time limit in seconds (run_limited).
 run_logged() {
-    local log="$1"; shift
-    if ! "$@" > "$log" 2>&1; then
-        grep -E "error:|failed|FAILED|\*\* " "$log" | tail -40 >&2 || tail -40 "$log" >&2
+    local log="$1" limit="$2"; shift 2
+    if ! run_limited "$log" "$limit" "$@"; then
+        grep -E "error:|failed|FAILED|\*\* |^test\.sh: " "$log" | tail -40 >&2 || tail -40 "$log" >&2
         echo "see $log" >&2
         return 1
     fi
@@ -259,7 +298,7 @@ save_swiftpm() {
 
 check_strings() {
     step_start "string catalogs"
-    run_logged "$logs/check-strings.log" "$root/scripts/check-strings.sh"
+    run_logged "$logs/check-strings.log" 300 "$root/scripts/check-strings.sh"
     step_end
 }
 
@@ -271,7 +310,7 @@ swift_test() {
     # The checkouts are saved whatever the tests did; the tests' failure is the function's, also where it is called
     # as `swift_test || rc=$?`, which turns errexit off inside it.
     local rc=0
-    run_logged "$logs/swift-test.log" swift test ${filter:+--filter "$filter"} || rc=$?
+    run_logged "$logs/swift-test.log" 1800 swift test ${filter:+--filter "$filter"} || rc=$?
     save_swiftpm
     return "$rc"
 }
@@ -319,19 +358,32 @@ build_for_testing() {
     while IFS= read -r line; do flags+=("$line"); done < <(xcode_flags)
 
     step_start "xcodegen"
-    (cd "$root" && run_logged "$logs/xcodegen.log" xcodegen generate --quiet)
+    (cd "$root" && run_logged "$logs/xcodegen.log" 300 xcodegen generate --quiet)
     step_end
 
     step_start "resolve packages"
-    # One resolve at a time per package set: worktrees share the checkouts.
+    # One resolve at a time per package set: worktrees share the checkouts. A resolve takes seconds once the
+    # checkouts exist; the limit covers a first clone and waiting for another worktree's resolve. A resolve that
+    # deadlocked once went through at once when run again, so an ended one gets one more try.
     mkdir -p "$(packages_dir)"
-    run_logged "$logs/resolve.log" /usr/bin/lockf "$(packages_dir).lock" \
-        xcodebuild -resolvePackageDependencies -project "$root/Cassini.xcodeproj" -scheme Cassini \
-        -derivedDataPath "$derived" -clonedSourcePackagesDirPath "$(packages_dir)" -onlyUsePackageVersionsFromResolvedFile
+    local resolve=(/usr/bin/lockf "$(packages_dir).lock"
+        xcodebuild -resolvePackageDependencies -project "$root/Cassini.xcodeproj" -scheme Cassini
+        -derivedDataPath "$derived" -clonedSourcePackagesDirPath "$(packages_dir)" -onlyUsePackageVersionsFromResolvedFile)
+    local rc=0
+    run_limited "$logs/resolve.log" 600 "${resolve[@]}" || rc=$?
+    if [ "$rc" = 124 ]; then
+        mv "$logs/resolve.log" "$logs/resolve-attempt-1.log"
+        echo "  resolve packages: still running after 600s; trying once more"
+        rc=0; run_limited "$logs/resolve.log" 600 "${resolve[@]}" || rc=$?
+    fi
+    if [ "$rc" != 0 ]; then
+        tail -40 "$logs/resolve.log" >&2; echo "see $logs/resolve.log" >&2; return 1
+    fi
     step_end
 
     step_start "build for testing"
-    run_logged "$logs/build.log" xcodebuild build-for-testing "${flags[@]}" \
+    # An incremental build takes seconds and a clean one minutes.
+    run_logged "$logs/build.log" 2400 xcodebuild build-for-testing "${flags[@]}" \
         -destination 'generic/platform=iOS Simulator' \
         CODE_SIGNING_ALLOWED=NO COMPILER_INDEX_STORE_ENABLE=NO ONLY_ACTIVE_ARCH=YES ARCHS=arm64
     step_end
@@ -352,19 +404,23 @@ PY
 }
 
 # Runs "$@" with its output in $1. When no test has started $2 seconds in (the test host or runner never came up),
-# ends it and returns 124. Once a test runs, xcodebuild's own per-test time limit applies.
+# ends it and returns 124. Once a test runs, xcodebuild's own per-test time limit applies, and the whole run is ended
+# $3 seconds in, returning 125.
 run_watched() {
-    local log="$1" limit="$2" pid waited=0; shift 2
+    local log="$1" limit="$2" total="$3" pid waited=0 started=0; shift 3
     "$@" > "$log" 2>&1 & pid=$!
     while kill -0 "$pid" 2>/dev/null; do
-        if grep -q "^Test Case '" "$log" 2>/dev/null; then wait "$pid"; return; fi
-        if [ $waited -ge "$limit" ]; then
+        if [ $started = 0 ] && grep -q "^Test Case '" "$log" 2>/dev/null; then started=1; fi
+        if [ $started = 0 ] && [ $waited -ge "$limit" ]; then
             echo "test.sh: no test started within ${limit}s; ending xcodebuild" >> "$log"
-            pkill -TERM -P "$pid" 2>/dev/null || true; kill -TERM "$pid" 2>/dev/null || true
-            for _ in 1 2 3 4 5; do kill -0 "$pid" 2>/dev/null || break; sleep 1; done
-            kill -KILL "$pid" 2>/dev/null || true
-            wait "$pid" 2>/dev/null || true
+            end_tree "$pid"
             return 124
+        fi
+        # Each test has its own allowance; this catches xcodebuild itself hanging between or after tests.
+        if [ $waited -ge "$total" ]; then
+            echo "test.sh: still running after ${total}s; ending xcodebuild" >> "$log"
+            end_tree "$pid"
+            return 125
         fi
         sleep 1; waited=$(( waited + 1 ))
     done
@@ -385,8 +441,9 @@ test_on() {
     done
     # The hosted tests start within seconds and the UI runner within a minute; a run that has not started by then
     # is stuck (once, the hosted tests hung for five minutes before xcodebuild gave up).
-    local limit=90; [ "$target" = CassiniUITests ] && limit=180
-    run_watched "$log" "$limit" xcodebuild test-without-building \
+    # A whole run: the hosted tests take about a minute, a UI shard about twenty.
+    local limit=90 total=900; [ "$target" = CassiniUITests ] && limit=180 total=3600
+    run_watched "$log" "$limit" "$total" xcodebuild test-without-building \
         -xctestrun "${xctestrun%.xctestrun}.only-$target.xctestrun" \
         -destination "platform=iOS Simulator,id=$udid" \
         -resultBundlePath "$bundle" -collect-test-diagnostics never -parallel-testing-enabled NO \
