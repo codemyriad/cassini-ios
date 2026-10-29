@@ -122,6 +122,7 @@ extension AppEnvironment {
                   openFixture: fixture(in: arguments), modelsMissing: arguments.contains("--models-missing"),
                   modelDownloading: arguments.contains("--model-downloading"),
                   draftGrowing: arguments.contains("--draft-growing"),
+                  speakersReady: arguments.contains("--speakers-ready"),
                   notificationsDenied: arguments.contains("--notifications-denied"),
                   heldCapture: arguments.contains("--capture-held"), region: value(after: "-AppleLocale", in: arguments),
                   inProcess: inProcess, token: token)
@@ -133,11 +134,13 @@ extension AppEnvironment {
     /// the processing seed's job stays in its speech model download at 46 %, and with `draftGrowing` (`--draft-growing`)
     /// its draft grows by a sentence every half second. `heldCapture` (`--capture-held`) starts the recording seed's
     /// capture 24 minutes in and holds it after 7 s of speech-like levels, with 64 GiB free, for the screenshots. Speaker models are installed on the recording and processing seeds
-    /// only; the processing seed's job has measured its pace, so its card shows a time left.
+    /// only, or on any seed with `speakersReady` (`--speakers-ready`), whose speaker step finds the fixture's two voices
+    /// taking turns; the processing seed's job has measured its pace, so its card shows a time left.
     /// Notifications are never asked for and count as allowed, so no banner says they are off, unless
     /// `notificationsDenied` (`--notifications-denied`) turns them off.
     static func uiTesting(reset: Bool, seed: Seed?, openFixture: OpenFixture? = nil,
                           modelsMissing: Bool = false, modelDownloading: Bool = false, draftGrowing: Bool = false,
+                          speakersReady: Bool = false,
                           notificationsDenied: Bool = false, heldCapture: Bool = false, region: String? = nil,
                           inProcess: Bool = false, token: String = "") -> AppEnvironment {
         let storage = UITestStorage.generation(reset: reset, inProcess: inProcess)
@@ -161,7 +164,7 @@ extension AppEnvironment {
         // The recording seed tells the speakers apart, as a walk from recording to naming needs; the processing seed's
         // job has its speaker step ahead.
         let analyzer = switch seed {
-        case .recording: FakeAnalyzer(analysis: TestFixtures.recordingAnalysis)
+        case .recording, _ where speakersReady && !modelsMissing: FakeAnalyzer(analysis: TestFixtures.recordingAnalysis)
         case .processing where !modelsMissing: FakeAnalyzer()
         default: FakeAnalyzer(modelIdentity: nil)
         }
