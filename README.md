@@ -209,7 +209,9 @@ Speakers run on the same runtime: `CassiniSherpa` wraps Android's streaming Sort
 with save and restore of its state) and CAM++ extractor (`VoiceprintExtractor`); the streaming rules (`TurnHistory`,
 `SpeakerBudget`, `Diarization`, the voice-clip cache, `DraftNames` and draft stats) are in CassiniNotebook, and the
 job (`WindowSpeakers`, `LiveMatching`, `DraftNamesStore`) in CassiniEngine. Without the native runtime there is no
-speaker step.
+speaker step. The speech detector hears the recording through WebRTC's 100 Hz high-pass (`SpeechInputFilter`,
+decision D26.1), so a microphone's DC offset does not change what it finds; the recognizer and the speakers get the
+samples raw ([differences](docs/differences.md#speech-recognition)).
 
 ```sh
 scripts/build-sherpa-xcframework.sh   # pinned sources -> .tools/sherpa/SherpaOnnxC.xcframework and a reproducible zip

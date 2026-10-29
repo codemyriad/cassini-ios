@@ -19,12 +19,20 @@ public struct AudioInspection: Sendable {
                 file.framePosition = min(file.length - 1, AVAudioFramePosition(Double(index) / Double(count) * Double(file.length)))
                 try file.read(into: buffer, frameCount: capacity)
                 guard let channel = buffer.floatChannelData?[0], buffer.frameLength > 0 else { levels.append(0.1); continue }
-                var sum: Float = 0
-                for sample in 0..<Int(buffer.frameLength) { sum += channel[sample] * channel[sample] }
-                levels.append(min(1, max(0.04, sqrt(sum / Float(buffer.frameLength)) * 4)))
+                levels.append(min(1, max(0.04, acLevel(UnsafeBufferPointer(start: channel, count: Int(buffer.frameLength))) * 4)))
             }
             return AudioInspection(duration: duration, waveform: levels)
         }.value
+    }
+
+    /// The RMS of `samples` with their mean taken off (D26.1): a microphone's DC offset is not sound.
+    /// `sqrt(max(0, mean(x²) − mean(x)²))`, as the shared meters measure it.
+    static func acLevel(_ samples: UnsafeBufferPointer<Float>) -> Float {
+        guard !samples.isEmpty else { return 0 }
+        var sum = 0.0, squares = 0.0
+        for sample in samples { sum += Double(sample); squares += Double(sample) * Double(sample) }
+        let mean = sum / Double(samples.count)
+        return Float(max(0, squares / Double(samples.count) - mean * mean).squareRoot())
     }
 }
 

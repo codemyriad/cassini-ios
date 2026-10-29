@@ -11,6 +11,10 @@ extension Word {
 /// recording clock, synthetic padding is clipped off, and the energy gate decides against the
 /// speaker's own samples both whether a word is real and how far it reaches. Samples are at the
 /// recording's own rate, so every duration here is converted with that rate, never with 16 kHz.
+///
+/// The gate measures AC level (D26.1): it takes the DC off before measuring. A microphone with an offset as small as
+/// `minActive` would otherwise make every sample of the recording active. The DC is the mean of at least
+/// `dcContextMs` around the word, so a click of a few samples cannot move it far enough to make silence active.
 public enum WordGate {
     /// -60 dBFS peak, -80 dBFS RMS and 5 ms at or above -66 dBFS: rejects silence and lone clicks, keeps quiet acknowledgements.
     public static let minPeak: Float = 0.001
@@ -24,6 +28,12 @@ public enum WordGate {
     public static let scanWindowMs: Int64 = 10
     /// A silence shorter than this is a closure inside the word; a longer one is the next turn's pause.
     public static let gapToleranceMs: Int64 = postMarginMs
+    /// The least audio the DC is measured over: a full-scale sample moves its mean by under a tenth of `minActive`.
+    public static let dcContextMs: Int64 = 1000
+    /// A smaller DC is left on: on its own it cannot make a silent sample active, and speech's own mean over a second
+    /// stays under it (FLEURS-it short: at most 1.7e-4). So a recording without an offset is gated exactly as Android
+    /// gates it, and an offset from 8 LSB up is taken off.
+    public static let minDC: Float = minActive / 2
 
     /// Removes decoder head padding, then puts words and their caps on the recording clock.
     public static func offsetDecoderWords(_ words: [DecodedWord], offsetMs: Int64, headPaddingMs: Int64) -> [DecodedWord] {
@@ -90,11 +100,12 @@ public enum WordGate {
                 let start = Int(startMs * rate / 1000)
                 let end = Int(min(Int64(buffer.count), (endMs * rate + 999) / 1000))
                 if end <= start { return nil }
+                let dc = dc(buffer, start, end, sampleRate: sampleRate)
                 var peak: Float = 0
                 var squareSum = 0.0
                 var active = 0
                 for i in start..<end {
-                    let sample = buffer[i]
+                    let sample = buffer[i] - dc
                     squareSum += Double(sample) * Double(sample)
                     let magnitude = sample < 0 ? -sample : sample
                     if magnitude >= minActive { active += 1 }
@@ -102,7 +113,8 @@ public enum WordGate {
                 }
                 let meanSquare = squareSum / Double(end - start)
                 guard peak >= minPeak, meanSquare >= minRms * minRms, active >= minimumActiveSamples else { return nil }
-                return word.with(endMs: wordEndOverContinuingAudio(buffer, sampleRate: sampleRate, timed: timed, audioEndMs: audioEndMs))
+                return word.with(endMs: wordEndOverContinuingAudio(buffer, sampleRate: sampleRate, timed: timed, audioEndMs: audioEndMs,
+                                                                   dc: dc))
             }
         }
     }
@@ -112,11 +124,19 @@ public enum WordGate {
     /// window: never past the cap, so never past the punctuation-inclusive end, and never before the
     /// word's own end, so no speech is cut. Silence right after the word leaves its end alone.
     public static func wordEndOverContinuingAudio(_ samples: [Float], sampleRate: Int, timed: DecodedWord, audioEndMs: Int64) -> Int64 {
-        samples.withUnsafeBufferPointer { wordEndOverContinuingAudio($0, sampleRate: sampleRate, timed: timed, audioEndMs: audioEndMs) }
+        samples.withUnsafeBufferPointer { buffer in
+            guard sampleRate > 0, !buffer.isEmpty else { return timed.word.endMs }
+            let rate = Int64(sampleRate)
+            let from = Int(min(max(0, timed.word.endMs) * rate / 1000, Int64(buffer.count - 1)))
+            let to = Int(min(max(0, min(timed.extentCapMs, audioEndMs)) * rate / 1000, Int64(buffer.count)))
+            return wordEndOverContinuingAudio(buffer, sampleRate: sampleRate, timed: timed, audioEndMs: audioEndMs,
+                                              dc: dc(buffer, from, max(from + 1, to), sampleRate: sampleRate))
+        }
     }
 
+    /// The scan with the DC `dc` taken off every sample: the word's, measured once over at least `dcContextMs`.
     private static func wordEndOverContinuingAudio(_ samples: UnsafeBufferPointer<Float>, sampleRate: Int, timed: DecodedWord,
-                                                   audioEndMs: Int64) -> Int64 {
+                                                   audioEndMs: Int64, dc: Float) -> Int64 {
         let end = timed.word.endMs
         let capMs = min(timed.extentCapMs, audioEndMs)
         if capMs <= end || sampleRate <= 0 { return end }
@@ -132,7 +152,7 @@ public enum WordGate {
             if start < 0 || start >= stop { break }
             var active = 0
             for i in Int(start)..<Int(stop) {
-                let sample = samples[i]
+                let sample = samples[i] - dc
                 if (sample < 0 ? -sample : sample) >= minActive { active += 1 }
             }
             if active >= minimumActiveSamples {
@@ -144,5 +164,24 @@ public enum WordGate {
         }
         if lastActiveMs < 0 { return end }
         return max(min(lastActiveMs, capMs), end)
+    }
+
+    /// The DC around `samples[start..<end]`: the mean of that stretch widened evenly to at least `dcContextMs`, kept
+    /// inside the samples (all of them when they are shorter), or 0 when it is under `minDC`.
+    private static func dc(_ samples: UnsafeBufferPointer<Float>, _ start: Int, _ end: Int, sampleRate: Int) -> Float {
+        let context = Int(Int64(sampleRate) * dcContextMs / 1000)
+        var from = start, to = end
+        if to - from < context {
+            let widen = context - (to - from)
+            from -= widen / 2
+            to += widen - widen / 2
+            if from < 0 { to -= from; from = 0 }
+            if to > samples.count { from -= to - samples.count; to = samples.count }
+            from = max(0, from)
+        }
+        var sum = 0.0
+        for i in from..<to { sum += Double(samples[i]) }
+        let mean = Float(sum / Double(to - from))
+        return abs(mean) < minDC ? 0 : mean
     }
 }

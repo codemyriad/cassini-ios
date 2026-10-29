@@ -20,7 +20,10 @@ public enum ParakeetDecode {
     /// windows for FIXED, or not at all for WHOLE (audio up to `DecodeCutting.wholeMaxMs`, else `LONG`). `onProgress`
     /// runs on the calling thread after each decode, at most once a second; its words are provisional, because seams
     /// can still drop a duplicate and the energy gate runs once at the end. A decoder error ends the decode.
+    /// `detectorInput` is what the detector hears instead of `audio`'s samples: the same stretch at 16 kHz through
+    /// `SpeechInputFilter` (D26.1); the decoder and the gate always get `audio` raw.
     public static func transcribe(_ audio: PcmAudio, decoder: any WordDecoder, detector: (any SpeechFeed.Stream)?,
+                                  detectorInput: [Float]? = nil,
                                   policy: DecodePolicy = .wholeSpans, cutting: DecodeCutting,
                                   nanoTime: () -> UInt64 = { DispatchTime.now().uptimeNanoseconds },
                                   onProgress: (Progress) throws -> Void = { _ in }) throws -> Transcript {
@@ -53,7 +56,7 @@ public enum ParakeetDecode {
         switch cutting {
         case .speech:
             guard let detector else { preconditionFailure("SPEECH cutting needs the speech detector") }
-            paddedTailMs = try SpeechFeed.scan(detector, audio) { span in try session.speech(span, onDecoded: report) }
+            paddedTailMs = try SpeechFeed.scan(detector, audio, copy16k: detectorInput) { span in try session.speech(span, onDecoded: report) }
         case .quiet:
             try session.speech(SampleSpan(0, audio.samples.count), onDecoded: report)
         case .fixed, .whole:
