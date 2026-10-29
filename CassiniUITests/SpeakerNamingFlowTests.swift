@@ -40,6 +40,10 @@ final class SpeakerNamingFlowTests: XCTestCase {
     }
 
     /// Typing a saved voice's first name asks whether it is the same person; Save waits for the answer.
+    ///
+    /// The waits are long because a search of the whole screen by label (`element(_:containing:)`) can take more than
+    /// five seconds on a busy machine: a run once got a single look, just before the question appeared, and failed with
+    /// the question on the screen. So the test waits for the question's own button, then reads its words.
     @MainActor func testAFirstNameOfASavedVoiceAsksTheSamePersonQuestion() {
         let app = launchSpeakersSeed()
         app.buttons["speakersButton"].tap()
@@ -50,16 +54,19 @@ final class SpeakerNamingFlowTests: XCTestCase {
         XCTAssertTrue(field.waitForExistence(within: 5))
         field.tap()
         field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 10) + "Sam")
-        XCTAssertTrue(element(app, containing: "is already a saved voice").waitForExistence(within: 5))
+        let samePerson = app.buttons["questionYes"]
+        XCTAssertTrue(samePerson.waitForExistence(within: 20), "the field holds \(String(describing: field.value))")
+        XCTAssertTrue(element(app, containing: "“Sam Rivera” is already a saved voice.").waitForExistence(within: 20))
 
         app.buttons["saveSpeakerName"].tap()
         XCTAssertTrue(field.exists, "Save waits until the question is answered")
-        app.buttons["questionYes"].tap()
+        samePerson.tap()
+        XCTAssertTrue(field.wait(until: NSPredicate(format: "value == %@", "Sam Rivera"), within: 20))
         XCTAssertEqual(field.value as? String, "Sam Rivera")
         app.buttons["saveSpeakerName"].tap()
 
-        XCTAssertTrue(app.textFields["speakerNameField"].waitForNonExistence(within: 5), "Save closes the sheet")
-        XCTAssertTrue(element(app, containing: "Sam Rivera").waitForExistence(within: 5))
+        XCTAssertTrue(app.textFields["speakerNameField"].waitForNonExistence(within: 20), "Save closes the sheet")
+        XCTAssertTrue(element(app, containing: "Sam Rivera").waitForExistence(within: 20))
     }
 
     /// Without consent for the speaker models, Identify speakers opens the model download screen, which asks for those
