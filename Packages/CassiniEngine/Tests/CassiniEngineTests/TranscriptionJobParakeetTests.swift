@@ -100,12 +100,12 @@ import CassiniNotebook
     }
 
     // ports: CheckpointGoldenTest#aCheckpointOfParakeetV3IsNotResumedWithUltra (the job)
-    @Test func anAppleEraOrAppleFallbackCheckpointIsNotResumedWithUltra() async throws {
+    @Test func aParakeetV3OrAppleFallbackCheckpointIsNotResumedWithUltra() async throws {
         let (h, transcriber) = try await harness()
-        let folder = h.files.directory(for: h.noteID)
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let appleEra = #"{"version":1,"source":"audio.m4a","signature":"\#(CheckpointState.signature(of: h.audioURL))","language":"it-IT","segments":[],"doneMs":0,"totalMs":70000,"elapsedMs":0,"inferenceMs":0,"resumedFromMs":0,"wordsComplete":false}"#
-        try Data(appleEra.utf8).write(to: folder.appendingPathComponent(CheckpointFiles.filename))
+        // Parakeet TDT 0.6B v3's revision, Android's model before Ultra.
+        try h.files.save(CheckpointState(source: "audio.m4a", signature: CheckpointState.signature(of: h.audioURL),
+                                         model: "2bda32ec70b097a55adaa07d9a7173915b43cc78", segments: [], doneMs: 0,
+                                         totalMs: 70_000, elapsedMs: 0), for: h.noteID)
         #expect(await h.run().outcome == .failed(.checkpointMismatch))
         #expect(transcriber.requests.isEmpty)
 
@@ -194,16 +194,21 @@ final class WindowedTranscriber: Transcribing, @unchecked Sendable {
                     events: @escaping @Sendable (TranscriptionEvent) -> Void) async throws -> TranscriptionResult {
         lock.withLock { _requests.append(request) }
         var windows = 0
+        // As `ParakeetTranscriber`: each window's words go to the streaming speakers after the decode, and the
+        // diarizer goes when the run ends.
+        let speakers = request.speakers
+        defer { speakers?.close() }
         let recognize = { [self] (audio: PcmAudio, offsetMs: Int64) throws -> Transcript in
             beforeWindow(windows)
             if let failure, failure.window == windows { throw failure.error }
             windows += 1
             let endMs = offsetMs + audio.durationMs
-            return Transcript((0..<70).compactMap { n -> Word? in
+            let words = Transcript((0..<70).compactMap { n -> Word? in
                 let start = Int64(n) * 1000
                 guard start >= offsetMs, start + 800 <= endMs else { return nil }
                 return Word("", start - offsetMs, start + 800 - offsetMs, "w\(n)")
             })
+            return try speakers?.window(audio, startMs: offsetMs, words: words) ?? words
         }
         let transcript: IncrementalTranscript
         var position = 0
@@ -231,13 +236,13 @@ final class WindowedTranscriber: Transcribing, @unchecked Sendable {
                 reported = transcript.doneMs
                 let state = transcript.checkpoint()
                 events(.window(TranscriptWindow(words: state.words, recognition: RecognitionCheckpoint(state),
-                                                inferenceMs: Int64(windows) * 100)))
+                                                inferenceMs: Int64(windows) * 100, speakers: speakers?.checkpoint())))
                 events(.progress(done: TimeInterval(reported) / 1000, total: total))
             }
         }
         let words = try transcript.finish().words
         events(.progress(done: total, total: total))
         return TranscriptionResult(segments: TranscriptSegment.segments(of: words), segmentation: Self.segmentation,
-                                   inferenceMs: Int64(windows) * 100)
+                                   inferenceMs: Int64(windows) * 100, speakers: speakers?.checkpoint())
     }
 }

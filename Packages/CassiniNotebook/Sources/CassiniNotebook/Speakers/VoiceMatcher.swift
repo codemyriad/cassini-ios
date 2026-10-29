@@ -9,9 +9,21 @@ public struct VoiceThresholds: Hashable, Sendable {
         self.automatic = automatic; self.suggest = suggest; self.margin = margin
     }
 
-    /// For the iOS embedding model (FluidAudio). Deliberately higher than Android's CAM++ values (0.72, 0.50, 0.08),
-    /// which must never be reused here.
-    public static let ios = VoiceThresholds(automatic: 0.85, suggest: 0.65, margin: 0.12)
+    /// Android's values for CAM++ (`Voiceprints.THRESHOLDS`), measured with its VoiceprintCalibrationTest: the same
+    /// person in different recordings scores 0.40–0.87 (median 0.72), different people −0.04–0.70 (median 0.37), and a
+    /// stranger still reaches 0.70, so automatic naming stays above that; a suggestion sits under the lowest right
+    /// identification (0.52).
+    public static let campplus = VoiceThresholds(automatic: 0.72, suggest: 0.50, margin: 0.08)
+}
+
+/// The voiceprint model every print and saved voice sample names: CAM++ (`3dspeaker_speech_campplus_sv_en_voxceleb_16k`,
+/// `ModelCatalog.voiceprintModel`), identified by the SHA-256 of its file as Android's `JobProvenance.PRINT_MODEL`, so
+/// prints of both apps are of one model. A print has `dimension` values.
+public enum VoiceprintModel {
+    public static let name = "3dspeaker_speech_campplus_sv_en_voxceleb_16k"
+    public static let sha256 = "357a834f702b80161e5b981182c038e18553c1f2ca752ed6cec2052365d4129b"
+    public static let dimension = 512
+    public static let thresholds = VoiceThresholds.campplus
 }
 
 /// The best saved voice for a speaker: its score, and whether it is strong enough to name the speaker by itself.
@@ -43,7 +55,7 @@ public enum VoiceMatcher {
     /// assignment and before the rival check. A match is automatic only when no other voice for this speaker and no
     /// other speaker for this voice comes within `margin`.
     public static func match(prints: [SpeakerPrint], voices: [SavedVoice], excluded: [String: Set<UUID>] = [:],
-                             thresholds: VoiceThresholds = .ios) -> [String: VoiceMatch] {
+                             thresholds: VoiceThresholds = .campplus) -> [String: VoiceMatch] {
         var scores: [(speaker: String, voice: UUID, score: Float)] = []
         for print in prints where print.speechSeconds >= VoiceLibrary.minimumRememberSeconds {
             for voice in voices where !(excluded[print.speakerID]?.contains(voice.id) ?? false) {

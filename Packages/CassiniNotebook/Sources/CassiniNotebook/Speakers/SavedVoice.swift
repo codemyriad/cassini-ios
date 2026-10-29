@@ -60,11 +60,9 @@ public struct SavedVoice: Codable, Identifiable, Hashable, Sendable {
 
 /// Whether a saved voice can still be compared with new prints: it is stale when none of its samples was made with the
 /// current model (Android: another model or dimension than the pinned one). Saved voices then says "Name them again in
-/// a note to keep recognising them", and the Name a speaker sheet lists the voice last, without a score. While the
-/// current model is not known (no analysis ran yet), nothing is stale.
+/// a note to keep recognising them", and the Name a speaker sheet lists the voice last, without a score.
 public enum VoiceStaleness {
-    public static func isStale(_ voice: SavedVoice, model: String?, dimension: Int? = nil) -> Bool {
-        guard let model else { return false }
-        return voice.usableSamples(model: model, dimension: dimension).isEmpty
+    public static func isStale(_ voice: SavedVoice, model: String = VoiceprintModel.sha256, dimension: Int? = nil) -> Bool {
+        voice.usableSamples(model: model, dimension: dimension).isEmpty
     }
 }

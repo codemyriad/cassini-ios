@@ -19,7 +19,8 @@ import Foundation
 ///   saving is left.
 /// - Battery: hidden without a reading, Plugged in while charging, Measuring until 120 s and a 0.5 % drop, else the
 ///   projection at the finish. Read every 10 s.
-/// - Draft: every word so far; words ending after the job's tentative point may still change until the words are final.
+/// - Draft: every word so far, with the speaker ids the job gave them; words ending after the job's tentative point may
+///   still change until the words are final. Naming is open until `namingClosed` (`DraftView` applies the names).
 public struct ProgressTracker: Sendable {
     public typealias BatterySource = @Sendable (_ elapsedMs: Int64) -> BatteryProjection.Reading?
 
@@ -156,7 +157,8 @@ public struct ProgressTracker: Sendable {
         guard var current = run, !stopping || done else { return }
         let progress = progress(&current, at: nowMs, done: done)
         let decoded = current.decoded || done
-        let draft = DraftState(words: current.words, tentativeFromMs: decoded ? .max : current.tentativeFromMs)
+        let draft = DraftState(words: current.words, tentativeFromMs: decoded ? .max : current.tentativeFromMs,
+                               namingOpen: !decoded)
         run = current
         phase = .transcribing(progress, draft)
     }

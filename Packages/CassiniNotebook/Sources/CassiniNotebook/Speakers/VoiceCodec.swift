@@ -12,8 +12,7 @@ private struct VoiceFileVersion: Decodable {
     var version: Int
 }
 
-/// `voices.json`, version 1: `{"version": 1, "voices": [SavedVoice]}`. Before the version field the file was a bare
-/// array of voices, which still reads. Also the enrolment arithmetic, without the file.
+/// `voices.json`, version 1: `{"version": 1, "voices": [SavedVoice]}`. Also the enrolment arithmetic, without the file.
 public enum VoiceCodec {
     public static let version = 1
 
@@ -25,7 +24,6 @@ public enum VoiceCodec {
     /// Throws `UnsupportedVoiceFileVersion` for another version, and a decoding error for anything unparseable.
     public static func decode(_ data: Data) throws -> [SavedVoice] {
         let decoder = JSONDecoder()
-        if let legacy = try? decoder.decode([SavedVoice].self, from: data) { return legacy }
         let found = try decoder.decode(VoiceFileVersion.self, from: data).version
         guard found == version else { throw UnsupportedVoiceFileVersion(found: found, supported: version) }
         return try decoder.decode(Envelope.self, from: data).voices
@@ -77,8 +75,7 @@ public enum VoiceCodec {
 }
 
 /// `PrivateVoices/<note id>.json`, version 1: `{"version": 1, "prints": [SpeakerPrint]}`, the prints of every speaker
-/// analysis of one note. Before the version field the file was a bare array of prints, which still reads. Matches are
-/// not here: on iOS they are part of the note's speakers.
+/// analysis of one note. Matches are not here: on iOS they are part of the note's speakers.
 public enum NoteVoiceCodec {
     public static let version = 1
 
@@ -100,7 +97,6 @@ public enum NoteVoiceCodec {
     /// Throws `UnsupportedVoiceFileVersion` for another version, and a decoding error for anything unparseable.
     public static func decode(_ data: Data) throws -> [SpeakerPrint] {
         let decoder = JSONDecoder()
-        if let legacy = try? decoder.decode([SpeakerPrint].self, from: data) { return legacy }
         let found = try decoder.decode(VoiceFileVersion.self, from: data).version
         guard found == version else { throw UnsupportedVoiceFileVersion(found: found, supported: version) }
         return try decoder.decode(Envelope.self, from: data).prints

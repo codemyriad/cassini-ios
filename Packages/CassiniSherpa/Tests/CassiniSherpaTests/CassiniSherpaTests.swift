@@ -62,3 +62,20 @@ import CassiniSherpa
     #expect(try VoiceprintExtractor.compute(model: URL(fileURLWithPath: "/nonexistent.onnx"),
                                             audio: PcmAudio([], sampleRate: 16_000), windows: [:]) {}.isEmpty)
 }
+
+// ports: SortformerStreamTest#invalidNativeConfigurationIsRejectedBeforeLoadingModels
+@Test func invalidNativeConfigurationIsRejectedBeforeLoadingModels() {
+    for threads: Int32 in [0, -1] {
+        #expect(throws: SherpaError.invalidAudio) {
+            try SortformerStream.turns(PcmAudio([0], sampleRate: 16_000), model: URL(fileURLWithPath: ""), threads: threads)
+        }
+    }
+}
+
+/// The speaker runtime the app's `SpeakerAnalyzer` uses says whether it is linked, and throws without it.
+@Test func theSpeakerRuntimeSaysWhetherItIsLinked() {
+    #expect(SherpaRuntime.speakers.linked == SherpaRuntime.isLinked)
+    #if os(macOS)
+    #expect(throws: SherpaError.notLinked) { try SherpaRuntime.speakers.makeDiarizer(URL(fileURLWithPath: "/m"), nil) }
+    #endif
+}

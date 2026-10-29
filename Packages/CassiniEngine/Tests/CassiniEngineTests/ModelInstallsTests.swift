@@ -1,3 +1,4 @@
+import CassiniCore
 import Foundation
 import Synchronization
 import Testing
@@ -299,12 +300,11 @@ private final class ScriptedAnalyzer: SpeakerAnalyzing {
         if let error { waiter?.resume(throwing: error) } else { waiter?.resume() }
     }
 
-    func analyze(url: URL, allowDownload: Bool,
+    func analyze(url: URL, words: [Word], allowDownload: Bool,
                  progress: @escaping @Sendable (SpeakerAnalysisEvent) -> Void) async throws -> SpeakerAnalysis {
         SpeakerAnalysis(turns: [], prints: [])
     }
 
-    var modelIdentity: String? { get async { nil } }
     func modelStatus() async -> ModelPartStatus { state.withLock { $0.status } }
     func refreshModelStatus() async -> ModelPartStatus { state.withLock { $0.status } }
 

@@ -20,15 +20,18 @@ import CassiniNotebook
     @ObservationIgnored private let checkpoints: any CheckpointStoring
     @ObservationIgnored private let analyzer: any SpeakerAnalyzing
     @ObservationIgnored private let notices: NoticeCenter
+    /// The draft names of running and paused jobs; nil without a library.
+    @ObservationIgnored let drafts: DraftNamesStore?
 
     init(coordinator: TranscriptionCoordinator?, progress: JobProgress, checkpoints: any CheckpointStoring,
-         models: ModelInstalls, analyzer: any SpeakerAnalyzing, notices: NoticeCenter) {
+         models: ModelInstalls, analyzer: any SpeakerAnalyzing, notices: NoticeCenter, drafts: DraftNamesStore? = nil) {
         self.coordinator = coordinator
         self.progress = progress
         self.checkpoints = checkpoints
         self.models = models
         self.analyzer = analyzer
         self.notices = notices
+        self.drafts = drafts
     }
 
     var state: ProcessingState { coordinator?.state ?? ProcessingState() }

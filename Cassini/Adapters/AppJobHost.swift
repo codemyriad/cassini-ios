@@ -1,5 +1,6 @@
 import Foundation
 import CassiniEngine
+import CassiniNotebook
 
 /// What a transcription job needs from the app: its settings when it starts, and the voices to match speakers with.
 @MainActor final class AppJobHost: TranscriptionJobHost {
@@ -10,7 +11,13 @@ import CassiniEngine
 
     func jobSettings() async -> JobSettings {
         JobSettings(allowSpeechDownload: settings.downloadsAllowed, identifySpeakers: settings.identifySpeakers,
-                    allowSpeakerDownload: settings.speakerDownloadsAllowed, voicesGeneration: settings.voicesGeneration)
+                    allowSpeakerDownload: settings.speakerDownloadsAllowed, voicesGeneration: settings.voicesGeneration,
+                    automaticallyNameVoices: settings.automaticallyNameVoices)
+    }
+
+    func liveVoices(generation: Int) async -> @Sendable () -> [SavedVoice] {
+        let live = voices.liveVoices
+        return { live.voices(generation: generation) }
     }
 
     func applySpeakers(_ analysis: SpeakerAnalysis, to noteID: UUID, generation: Int) async throws {

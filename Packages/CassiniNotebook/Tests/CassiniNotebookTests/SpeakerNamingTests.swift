@@ -99,7 +99,7 @@ import Testing
 
     // ports: SpeakerNamingTest#rememberIsDisabledWithTooLittleSpeechOrWithoutTheModel
     @Test func rememberIsDisabledWithTooLittleSpeechOrWithoutTheModel() {
-        #expect(SpeakerNaming.ui(SpeakerNaming.open(input(seconds: 5))).rememberReason == .tooLittleSpeech)
+        #expect(SpeakerNaming.ui(SpeakerNaming.open(input(seconds: 2))).rememberReason == .tooLittleSpeech)
         let noModel = SpeakerNaming.ui(SpeakerNaming.open(input(modelReady: false)))
         #expect(noModel.rememberReason == .noModel)
         #expect(!noModel.remember)

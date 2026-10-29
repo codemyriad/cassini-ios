@@ -7,7 +7,7 @@ import UIKit
 /// suite, not in the next test's.
 enum UITestStorage {
     static let base = URL.applicationSupportDirectory.appendingPathComponent("CassiniUITests", isDirectory: true)
-    private static let suitePrefix = "app.codemyriad.cassini.ui-tests"
+    private static let suitePrefix = "io.codemyriad.cassini.ui-tests"
     private static var pointer: URL { base.appendingPathComponent("current") }
 
     /// The generation to use. A reset on a fresh process removes every generation; a reset inside the running app

@@ -42,6 +42,34 @@ import CassiniNotebook
         for event in events { model.send(event) { [actions] in actions.record($0) } }
     }
 
+    // ports: NoteViewModelTest#aDraftSpeakerIsNamedThroughTheDraftNames
+    @Test func aDraftSpeakerIsNamedThroughTheDraftNames() async throws {
+        fake.job = Job(noteID: screen.noteID, seq: 1, kind: .transcribe, state: .running, enqueuedAt: Date())
+        fake.speakerModelsReady = true
+        fake.runningDraft = DraftState(words: [DraftWord(speaker: "s1", startMs: 0, endMs: 5_000, text: "Lunga"),
+                                               DraftWord(speaker: "s2", startMs: 5_000, endMs: 6_000, text: "frase")],
+                                       tentativeFromMs: 6_000, namingOpen: true)
+        screen.speakerTapped("s1")
+        #expect(screen.sheet == .naming("s1", draft: nil), "the draft opens Name a speaker while the job runs")
+        let model = screen.naming("s1")
+        await model.open(draft: nil) { [actions] in actions.record($0) }
+        let sheet = SpeakerNaming.ui(try #require(model.state))
+        #expect(sheet.draft)
+        #expect(!sheet.canSample, "a running job holds the audio: no sample plays")
+        send(model, .nameChanged("Luca"), .save)
+        await model.settle()
+        #expect(fake.draftWrites == [[.draftName(speakerID: "s1", name: "Luca", voice: .new, confirm: false, score: 1)]])
+        #expect(fake.namingWrites.isEmpty, "a draft never rewrites the note")
+        #expect(fake.draftNames.labels == ["s1": "Luca"] && fake.draftNames.remembered == ["s1": .new])
+
+        // Once the job closed naming to save the note, the screen says why.
+        screen.sheet = nil
+        fake.draftNamingOpen = false
+        screen.speakerTapped("s1")
+        #expect(screen.screen.dialog == .readOnly(.saving))
+        #expect(screen.sheet == nil)
+    }
+
     // ports: NoteViewModelTest#theNameSheetAsksAboutTheSamePersonThenEnrolsANewVoice
     @Test func theNameSheetAsksAboutTheSamePersonThenEnrolsANewVoice() async throws {
         let model = await open()

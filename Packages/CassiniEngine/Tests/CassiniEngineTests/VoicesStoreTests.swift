@@ -52,7 +52,7 @@ import CassiniNotebook
 /// (Android `VoiceRepositoryTest` and `NoteViewModelTest`'s naming side). The analysis racing a Forget everyone
 /// through the queue stays a hosted test (`CassiniTests/VoicesStoreTests`).
 @MainActor @Suite(.serialized) struct VoicesStoreTests {
-    let print = SpeakerPrint(speakerID: "a", model: "test", vector: [1, 0], speechSeconds: 10)
+    let print = SpeakerPrint(speakerID: "a", model: VoiceprintModel.sha256, vector: [1, 0], speechSeconds: 10)
     let h = VoicesHarness()
 
     /// A note whose speaker "a" says two passages, with its print on disk.
@@ -181,6 +181,91 @@ import CassiniNotebook
         #expect(library.note(other.id)?.transcript.first?.speaker == "Alex")
         #expect(library.note(other.id)?.speakers?.first?.match.voiceID == yes.voiceID)
         #expect(voices.savedVoices.first?.samples.count == 2)
+    }
+
+    /// A streaming run's draft names go into the note with its speakers (Android's adopt): a "Not Alex" is never
+    /// matched, the user's name wins over a match to someone else, a stored placeholder is no name, and a Remember
+    /// choice enrols the speaker's print once the note holds it.
+    @Test func theDraftNamesGoIntoTheNoteWithTheSpeakers() async throws {
+        defer { h.tearDown() }
+        let source = try await namedNote()
+        let voices = h.voices, library = h.library
+        try await remember("Alex", in: source.id, voices: voices)
+        let alex = try #require(voices.savedVoices.first?.id)
+        h.settings.automaticallyNameVoices = true
+        var target = Note(title: "Streamed")
+        target.transcript = [.init(text: "Uno", start: 0, end: 10), .init(text: "Due", start: 10, end: 20),
+                             .init(text: "Tre", start: 20, end: 30)]
+        try await library.insert(target)
+        var streamed = target.transcript
+        for (index, id) in ["a", "b", "c"].enumerated() { streamed[index].speakerID = id }
+        // a and c sound like Alex; b is someone else.
+        let prints = [SpeakerPrint(speakerID: "a", model: VoiceprintModel.sha256, vector: [1, 0], speechSeconds: 10),
+                      SpeakerPrint(speakerID: "b", model: VoiceprintModel.sha256, vector: [0, 1], speechSeconds: 10),
+                      SpeakerPrint(speakerID: "c", model: VoiceprintModel.sha256, vector: [1, 0], speechSeconds: 10)]
+        let names = DraftNames(labels: ["b": "Bruno", "c": "Speaker 3"], remembered: ["b": .new],
+                               generation: h.settings.voicesGeneration, rejected: ["a": [alex]])
+        let analysis = SpeakerAnalysis(turns: ["a", "b", "c"].enumerated().map {
+            .init(speakerID: $0.element, start: Double($0.offset) * 10, end: Double($0.offset) * 10 + 10)
+        }, prints: prints, transcript: streamed, names: names)
+
+        try await voices.applySpeakerAnalysis(analysis, to: target.id, generation: h.settings.voicesGeneration)
+
+        let note = try #require(library.note(target.id))
+        let speakers = Dictionary(uniqueKeysWithValues: (note.speakers ?? []).map { ($0.id, $0) })
+        #expect(speakers["a"]?.match == .unmatched, "Not Alex")
+        #expect(speakers["a"]?.excludedVoiceIDs == [alex])
+        #expect(speakers["a"]?.name == "Speaker 1")
+        #expect(speakers["c"]?.match.voiceID == alex, "a stored placeholder is no name: the match names c")
+        let bruno = try #require(voices.savedVoices.first { $0.name == "Bruno" })
+        #expect(speakers["b"]?.name == "Bruno")
+        #expect(speakers["b"]?.linkedVoiceID == bruno.id, "Remember made Bruno's voice from b's print")
+        #expect(bruno.samples.map(\.print.vector) == [[0, 1]])
+        #expect(note.transcript.map(\.speaker) == ["Speaker 1", "Bruno", "Alex"])
+    }
+
+    @Test func aDraftNameWinsOverAMatchToSomeoneElse() async throws {
+        defer { h.tearDown() }
+        let source = try await namedNote()
+        let voices = h.voices, library = h.library
+        try await remember("Alex", in: source.id, voices: voices)
+        h.settings.automaticallyNameVoices = true
+        var target = Note(title: "Streamed")
+        target.transcript = [.init(text: "Uno", start: 0, end: 10)]
+        try await library.insert(target)
+        var streamed = target.transcript
+        streamed[0].speakerID = "a"
+        let analysis = SpeakerAnalysis(turns: [.init(speakerID: "a", start: 0, end: 10)], prints: [print],
+                                       transcript: streamed,
+                                       names: DraftNames(labels: ["a": "Chiara"], generation: h.settings.voicesGeneration))
+
+        try await voices.applySpeakerAnalysis(analysis, to: target.id, generation: h.settings.voicesGeneration)
+
+        let speaker = try #require(library.note(target.id)?.speakers?.first)
+        #expect(speaker.name == "Chiara")
+        #expect(speaker.match == .unmatched)
+        #expect(voices.savedVoices.map(\.name) == ["Alex"], "nothing to enrol without a Remember choice")
+    }
+
+    @Test func aRememberChoiceFromBeforeForgetEveryoneEnrolsNothing() async throws {
+        defer { h.tearDown() }
+        _ = try await namedNote()
+        let library = h.library
+        var target = Note(title: "Streamed")
+        target.transcript = [.init(text: "Uno", start: 0, end: 10)]
+        try await library.insert(target)
+        var streamed = target.transcript
+        streamed[0].speakerID = "a"
+        let generation = h.settings.voicesGeneration
+        let analysis = SpeakerAnalysis(turns: [.init(speakerID: "a", start: 0, end: 10)], prints: [print],
+                                       transcript: streamed,
+                                       names: DraftNames(labels: ["a": "Chiara"], remembered: ["a": .new],
+                                                         generation: generation - 1))
+
+        try await h.voices.applySpeakerAnalysis(analysis, to: target.id, generation: generation)
+
+        #expect(library.note(target.id)?.speakers?.first?.name == "Chiara")
+        #expect(h.voices.savedVoices.isEmpty)
     }
 
     /// Acceptance: a note save failure leaves no orphan voice.
@@ -354,7 +439,7 @@ import CassiniNotebook
         await h.start()
         let voices = h.voices
         try await voices.store?.savePrints([print], noteID: notes[0].id)
-        try await voices.store?.savePrints([SpeakerPrint(speakerID: "a", model: "test", vector: [0, 1], speechSeconds: 10)],
+        try await voices.store?.savePrints([SpeakerPrint(speakerID: "a", model: VoiceprintModel.sha256, vector: [0, 1], speechSeconds: 10)],
                                            noteID: notes[1].id)
 
         let luca = Task { try await remember("Luca", in: notes[0].id, voices: voices) }

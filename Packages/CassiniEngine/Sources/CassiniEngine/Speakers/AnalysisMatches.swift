@@ -22,9 +22,11 @@ public struct AnalysisMatches: Hashable, Sendable {
     }
 
     /// `prints` and `turns` are the new analysis's; `earlierPrints` the prints the note had before it; `trashed` the
-    /// notes in Recently Deleted.
+    /// notes in Recently Deleted; `excluded` voices never matched with a speaker besides those the note carries (the
+    /// draft's rejections).
     public static func of(_ note: Note, turns: [SpeakerTurn], prints: [SpeakerPrint], savedVoices: [SavedVoice],
-                          earlierPrints: [SpeakerPrint], trashed: Set<UUID>) -> AnalysisMatches {
+                          earlierPrints: [SpeakerPrint], trashed: Set<UUID>,
+                          excluded: [String: Set<UUID>] = [:]) -> AnalysisMatches {
         let links = note.carriedVoiceLinks
         let saved = savedVoices.map { voice in
             var copy = voice
@@ -35,14 +37,18 @@ public struct AnalysisMatches: Hashable, Sendable {
         let local = note.localVoices(prints: earlierPrints, savedVoiceIDs: Set(savedVoices.map(\.id)))
         let voices = saved + local
         return AnalysisMatches(
-            matches: VoiceMatcher.match(prints: prints, voices: voices, excluded: note.carriedExclusions(for: turns)),
+            matches: VoiceMatcher.match(prints: prints, voices: voices,
+                                        excluded: note.carriedExclusions(for: turns).merging(excluded) { $0.union($1) }),
             voiceNames: Dictionary(voices.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first }),
             localVoices: Set(local.map(\.id)), carriedLinks: links)
     }
 
     /// The note with the analysis put into it (`Note.applySpeakerAnalysis`).
-    public func apply(to note: inout Note, turns: [SpeakerTurn], autoName: Bool, stamp: VersionStamp) {
+    public func apply(to note: inout Note, turns: [SpeakerTurn], autoName: Bool, stamp: VersionStamp,
+                      attributed: [TranscriptSegment]? = nil, excluded: [String: Set<UUID>] = [:],
+                      labels: [String: String] = [:]) {
         note.applySpeakerAnalysis(turns: turns, matches: matches, voiceNames: voiceNames, localVoices: localVoices,
-                                  carriedLinks: carriedLinks, autoName: autoName, stamp: stamp)
+                                  carriedLinks: carriedLinks, autoName: autoName, stamp: stamp, attributed: attributed,
+                                  excluded: excluded, labels: labels)
     }
 }

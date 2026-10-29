@@ -15,8 +15,8 @@ Cassini (app: composition, adapters, views) ────────────
   │            │              │                            │           intents, compiled into both targets)
   ▼            ▼              ▼                            ▼
 CassiniInference   CassiniAudio    CassiniEngineTesting (fakes of the ports; empty in Release)
-  │ Apple Speech,    │ CAF repair,    │
-  │ FluidAudio       │ libopus        │
+  │ Parakeet, Apple  │ CAF repair,    │
+  │ Speech, speakers │ libopus        │
   ▼                  │                ▼
 CassiniEngine ◀──────┼──────── stores, coordinators, screen models, ports
   │                  │
@@ -37,7 +37,7 @@ build for the UI-test launches, and is empty in Release, where every source is c
 | `CassiniEngine` | The stateful parts, which work through ports: `NoteStore` and `JobStore` (actors), `LibraryStore`, `VoicesStore`, `SettingsStore`, the `TranscriptionCoordinator` and the `TranscriptionJob`, `RecordingController`, `PlaybackController`, `TrashService`, `NoticeCenter`, `ModelInstalls`, `ImportService` and `ExportService`, the screen models (`LibraryScreenModel`, `NoteScreenModel`, `NameSpeakerModel`, `RecordingScreenModel`, `SettingsModel`,
 `ModelDownloadModel`, `LicensesModel`), navigation (`Route`, `ScreenStack`, `DeepLinks`) and `Startup`. |
 | `CassiniEngineTesting` | Fakes of every port (`FakeTranscriber`, `FakeAnalyzer`, `FakeCapture`, `FakeClock`, …). Each source is under `#if DEBUG`, so a Release build links an empty module. |
-| `CassiniInference` | The adapters to the recognition engines: `ParakeetTranscriber` (Parakeet Ultra over the `SpeechDecoding`/`SpeechDetecting` ports, on its own inference thread), `AppleSpeechTranscriber` (`SpeechAnalyzer`, the fallback on devices that cannot hold Ultra) and `SpeakerAnalyzer` with `SpeakerModelInstaller`, `SpeakerModelManifest` and `ModelNetworkGate` (FluidAudio). |
+| `CassiniInference` | The adapters to the recognition engines: `ParakeetTranscriber` (Parakeet Ultra over the `SpeechDecoding`/`SpeechDetecting` ports, on its own inference thread), `AppleSpeechTranscriber` (`SpeechAnalyzer`, the fallback on devices that cannot hold Ultra) and `SpeakerAnalyzer` (Android's streaming Sortformer and CAM++ over the native runtime, from the pinned catalog through `PinnedModelInstaller`), with `ZstdDecompressor` for the diarizer's seekable Zstandard download. |
 | `CassiniSherpa` | The only importer of the sherpa-onnx C API (`SherpaOnnxC`, iOS only, linked with `CASSINI_SHERPA_LOCAL=1`): `ParakeetDecoder` and `SileroDetector`, which conform to CassiniEngine's ports, and `SherpaRuntime.speech`, the factory the app passes to `ParakeetTranscriber`. Without the runtime its objects throw `notLinked`. |
 | `CassiniAudio` | Audio work that needs AVFoundation or libopus: inspection, CAF repair and Opus encode and decode (through `COpusBridge`). |
 | `Cassini` (app) | `AppEnvironment`, `AppGraph` (which binds each screen model's `Ports` to the stores, e.g. `NoteScreens`), the `Router`, the adapters (`AVCaptureAdapter`, `AVPlaybackAdapter`, `ActivityKitAdapter`, `UNNotifier`, `UIKitBackgroundRunner`, …), the thin app stores (`ProcessingStore`, `RecordingStore`, `PlaybackStore`, `ImportStore`, `ExportStore`, `NoticesStore`), the views and the string catalogs. |
@@ -121,6 +121,8 @@ continues after the screen locks.
     playback.caf                the decoded copy of imported Opus
     provenance.json             the latest on-device run's record
     work/checkpoint.json(.bak)  saved progress of a stopped or interrupted transcription
+    work/clips.pcm              the voice clips of a streaming run (up to 45 s per speaker), counted by the checkpoint
+    work/names.json             the draft's speaker names (Android's format), while the job runs or is paused
 ```
 
 Every metadata file is written through `DurableFile`. It writes a temporary file, flushes it with `F_FULLFSYNC`,
@@ -141,7 +143,11 @@ Preferences are in `UserDefaults`, under Android's key names (`SettingsKeys`).
 3. **Run.** `TranscriptionJob` reads any checkpoint (`NoteWorkFolders`), checks it against the audio's `length:mtime`
    signature and the language, and resumes 1 s before `doneMs`. It feeds Apple's analyzer, writes a checkpoint every
    30 s of finalized audio (at most every 10 s of running time), then saves the words to `note.json`. The speaker
-   step runs after that, with FluidAudio, and the provenance record is written.
+   step depends on the recognizer: a Parakeet run tells each window's speakers apart as it decodes
+   (`WindowSpeakers`: streaming Sortformer, then CAM++ prints of the voice clips after the words), with the draft's
+   names in `work/names.json` (`DraftNamesStore`, live voice matching after each window); an Apple Speech run and a
+   speakers-only job stream the whole file through the same `WindowSpeakers` after the words. The job closes naming,
+   puts the speakers and the draft's names into the note, and writes the provenance record.
 4. **Stop and keep progress, or iOS taking the time back.** The job pauses with its checkpoint saved, and the row
    becomes `paused` (`user` or `system`). A `system` pause holds the queue until the user continues. Resume claims the
    job again from its checkpoint.
@@ -171,5 +177,5 @@ controls. Starting a recording closes the player.
 ## Build
 
 `project.yml` (XcodeGen) defines the app, the `CassiniActivity` extension, the hosted tests and the UI tests. The
-packages come from the root `Package.swift`. `Package.resolved` pins FluidAudio and swift-opus. `scripts/test.sh`
+packages come from the root `Package.swift`. `Package.resolved` pins Zstandard and swift-opus. `scripts/test.sh`
 builds once into `DerivedData.noindex` and runs the tiers. [Validation](validation.md) describes them.

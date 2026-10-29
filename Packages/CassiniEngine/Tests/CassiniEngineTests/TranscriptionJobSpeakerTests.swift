@@ -35,14 +35,15 @@ extension TranscriptionJobTests {
             let analysis = SpeakerAnalysis(
                 turns: [.init(speakerID: "a", start: 0, end: 30), .init(speakerID: "b", start: 30, end: 70),
                         .init(speakerID: "a", start: 70, end: 71)],
-                prints: [SpeakerPrint(speakerID: "a", model: "pyannote-community-1:abc123", vector: [1, 0], speechSeconds: 30)],
-                backend: "FluidAudio test", modelRevision: "rev1", elapsedMs: 640)
+                prints: [SpeakerPrint(speakerID: "a", model: VoiceprintModel.sha256, vector: [1, 0], speechSeconds: 30)],
+                elapsedMs: 640)
             let h = try await Harness(analyzer: FakeAnalyzer(analysis: analysis))
             #expect(await h.run().outcome == .done)
             let provenance = try #require(h.provenance(of: await h.note()))
             let record = provenance.record()
             #expect(record.keys == ["backend", "engine", "model", "device", "source", "version", "language", "x-inferenceMs",
-                                    "x-segmentation", "x-resumedFromMs", "x-speakerDiarization", "x-speakerIdentification"])
+                                    "x-segmentation", "x-resumedFromMs", "x-speakerDiarization", "x-incrementalDiarization",
+                                    "x-speakerIdentification"])
             #expect(record["engine"]?.string == "apple-speechtranscriber")
             #expect(record["backend"]?.string == TranscriptProvenance.appleSpeechBackend)
             #expect(record["model"]?.string == "Fake SpeechTranscriber it-IT", "what the transcriber names its model")
@@ -51,18 +52,19 @@ extension TranscriptionJobTests {
             #expect(record["language"]?.string == "it-IT")
             #expect(record["x-segmentation"]?.string == TranscriptProvenance.appleSegmentation)
             let diarization = try #require(record["x-speakerDiarization"]?.object)
-            #expect(diarization.keys == ["backend", "model", "modelRevision", "modelSha256", "elapsedMs", "turnCount",
-                                         "speakerCount", "assignment", "sourceSeparation"])
-            #expect(diarization["backend"]?.string == "FluidAudio test")
-            #expect(diarization["model"]?.string == "pyannote-community-1")
-            #expect(diarization["modelSha256"]?.string == "abc123")
-            #expect(diarization["modelRevision"]?.string == "rev1")
+            #expect(diarization.keys == ["backend", "model", "modelRevision", "modelSha256", "threshold", "minDurationOn",
+                                         "minDurationOff", "elapsedMs", "turnCount", "speakerCount", "assignment",
+                                         "sourceSeparation"])
+            #expect(diarization["backend"]?.string == TranscriptProvenance.SpeakerDiarization.sortformerBackend)
+            #expect(diarization["model"]?.string == "nvidia/Nemotron-3-Diarization INT8")
+            #expect(diarization["modelSha256"]?.string == ModelCatalog.diarizationModel.sha256)
+            #expect(diarization["modelRevision"]?.string == ModelCatalog.diarizationSourceRevision)
             #expect(diarization["elapsedMs"] == .int(640))
             #expect(diarization["sourceSeparation"] == .bool(false))
             #expect(provenance.speakerDiarization?.turnCount == 3)
-            #expect(provenance.speakerDiarization?.speakerCount == 2)
+            #expect(provenance.speakerDiarization?.speakerCount == 2, "the speakers of the words, as Android counts them")
             let identification = try #require(provenance.speakerIdentification)
-            #expect(identification.model == "pyannote-community-1" && identification.sha256 == "abc123")
+            #expect(identification.model == VoiceprintModel.name && identification.sha256 == VoiceprintModel.sha256)
             #expect(identification.dim == 2 && identification.speakersWithPrints == 1)
             #expect(identification.autoApplied == 0 && identification.suggested == 0, "the fake host matches nobody")
             #expect(h.applied.map(\.generation) == [7])
@@ -88,10 +90,15 @@ extension TranscriptionJobTests {
             #expect(identification.speakersWithPrints == 3)
             #expect(identification.autoApplied == 2)
             #expect(identification.suggested == 1)
-            #expect(identification.dim == 3 && identification.model == "m" && identification.sha256 == "sha")
-            #expect(identification.autoThreshold == 0.85 && identification.suggestThreshold == 0.65
-                    && identification.margin == 0.12)
-            #expect(TranscriptionJob.identification(SpeakerAnalysis(turns: [], prints: []), note) == nil, "no prints")
+            #expect(identification.dim == 3 && identification.model == VoiceprintModel.name
+                    && identification.sha256 == VoiceprintModel.sha256)
+            #expect(identification.autoThreshold == 0.72 && identification.suggestThreshold == 0.5
+                    && identification.margin == 0.08, "Android's thresholds")
+            #expect(TranscriptionJob.identification(SpeakerAnalysis(turns: [], prints: []), note) == nil,
+                    "no voiceprint model")
+            // ports: JobProvenance#identification (the record is written while the model ran, even without prints)
+            let none = try #require(TranscriptionJob.identification(SpeakerAnalysis(turns: [], prints: [], printsReady: true), note))
+            #expect(none.speakersWithPrints == 0 && none.dim == 512)
         }
 
         @Test func withoutTheSpeakerStepTheWordsAreSavedAlone() async throws {

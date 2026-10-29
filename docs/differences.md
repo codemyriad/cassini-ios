@@ -74,7 +74,7 @@ that were not ported, with the reason for each.
   free" figure use an estimate per part: 512 MiB for the speech model (`ModelDownloadPlan.speechInstallBytes`) and the pinned
   files plus 32 MiB for the speaker models. DL_NO_SPACE quotes the plan's figure. When there is no figure, its body
   reads "Free some space and try again." and never "0 MB".
-- **Download progress.** Apple's assets and FluidAudio both report only a fraction, not bytes. `DownloadProgress`
+- **Download progress.** Apple's assets report only a fraction, not bytes. `DownloadProgress`
   therefore carries per-mille counts, and the download banner has no byte counts. Apple install errors map to
   `NO_CONNECTION` (URL connectivity errors), `NOT_ENOUGH_STORAGE` (out of space) or `INSTALL`. Apple gives no
   "free about N MB" figure for its own downloads.
@@ -91,11 +91,11 @@ that were not ported, with the reason for each.
   the 500 ms tail, gives "4.892" where the golden has "4892" and otherwise matches it word for word (with the tail it
   also gives "raggiun" for "raggiunge"; the goldens decode VAD spans, which the spike does not), so iOS will keep
   goldens of its own.
-- **Pinned model downloads (in progress, not yet used by the app).** `CassiniEngine/Models` ports Android's
+- **Pinned model downloads.** `CassiniEngine/Models` ports Android's
   `ModelCatalog`, `ModelPart` rules, `ModelPlan`, `RedirectPolicy`, `ArtifactFetcher`, `ModelInstaller`,
   `ModelRepository` and `ModelInstallOwner` (as `PinnedModelInstaller`) with the same pins, URLs, directories,
-  markers, figures (640 + 62 + 28 = 730 MiB, about 860 MiB free) and tests. The catalog already lists Android's
-  speaker models (Nemotron Sortformer and CAM++) for the speaker package; until it lands, and on devices that keep
+  markers, figures (640 + 62 + 28 = 730 MiB, about 860 MiB free) and tests. The app installs Android's speaker models
+  (Nemotron Sortformer and CAM++) through it. Until the speech download is wired (WP6), and on devices that keep
   Apple Speech because they cannot hold Ultra (a platform constraint), the Model download screen shows
   `ModelDownloadPlan`'s figures. The differences that remain:
   - **Transport.** `ArtifactFetcher` talks to an `HTTPTransport` port. The app's adapter, `URLSessionTransport`, is
@@ -111,53 +111,58 @@ that were not ported, with the reason for each.
   - **Stopped by the system.** `PinnedModelInstaller.stopDownloads()` stands for the end of the
     `BGContinuedProcessingTask`, as Android's for the foreground service's time-out.
   - **Compressed downloads.** The diarizer is seekable Zstandard, which Apple's Compression framework does not read.
-    `ArtifactFetcher.fetchCompressed` takes a `Decompressing` port; the decoder comes with the speaker package, and
+    `ArtifactFetcher.fetchCompressed` takes a `Decompressing` port, which the app fills with `ZstdDecompressor`
+    (CassiniInference, `ZstdModelTest` ported as `ZstdDecompressorTests`).
     `aCompressedDownloadChecksOnceFromZeroToItsSize` runs with a stand-in format.
   - **Consent** follows Android (`models.consentAt`, or Parakeet installed), plus the Apple Speech rule on fallback
     devices (assets installed, or not offered for the language).
-  - `ModelInstallOwnerTest` is ported twice while FluidAudio stays: `SpeakerModelInstallerTests` for its speaker
-    models, `PinnedModelInstallerTests` for the pinned ones.
+  - `ModelInstallOwnerTest` is ported as `PinnedModelInstallerTests`.
 
 ### Speaker analysis
 
-- **Pipeline.** Android uses Sortformer and CAM++. iOS uses FluidAudio's offline pyannote community-1 segmentation,
-  WeSpeaker embeddings and VBx clustering on Core ML (`SpeakerAnalyzer`, CassiniInference). This pipeline needs the
-  whole file, so it runs after the words are saved in the note. As a result there are no live speakers in the draft,
-  no draft naming (`DraftNames`, `names.json`), no live voice suggestions and no draft merges. The draft has one voice,
-  and naming opens after the job. When the speaker step fails, every word stays in one voice
-  (`speakerAnalysisFailure = SPEAKERS`, "All words shown as one voice"). Unlike Android, there is no partial
-  diarization to keep. A step that finds nobody shows the iOS notice "No speakers were detected".
+- **Pipeline.** Both apps use streaming Sortformer (NVIDIA Nemotron-3-Diarization INT8) and CAM++ on sherpa-onnx. A
+  Parakeet run tells each 28 s window's speakers apart as it decodes (`WindowSpeakers`, Android's
+  `TranscriptionJob.onWindow`): `Diarization.assign` gives each word its slot's id, and the voice-clip cache keeps up
+  to 45 s of each speaker in `work/clips.pcm`. After the words, a CAM++ print is made for each speaker from its
+  clips, with the draft's merges applied, and the prints are matched with the saved voices. When the diarizer fails,
+  the later windows get one voice, as on Android. `NativeBudget` (Android's) lets one job's native models load at a
+  time, so a job whose predecessor still holds them shows "Finishing the previous note…". The differences:
+  - **After the words.** An Apple Speech transcription (on the fallback devices) and a speakers-only job stream the
+    whole file through the same `WindowSpeakers` after the words (`SpeakerAnalyzer.analyze`). That draft has one
+    voice, so it has no draft naming.
+  - **Memory.** Before the diarizer loads, `os_proc_available_memory()` must leave 400 MiB, and 200 MiB before the
+    prints (`SpeakerMemory`, provisional until the device gate). Below that the speakers fail (one voice) rather than
+    the job. Android catches an `OutOfMemoryError` instead.
+- **Draft naming** follows Android's `names.json`. The format and the reducers are Android's `CheckpointNames`
+  (`DraftNames`), and one owner per note serves both the job and the Note screen (`DraftNamesStore`, Android's
+  `NamesStore` and `NamingGate`). After each window, a speaker with at least 4 s of clips, and 10 s more than at its
+  last try, is matched live with the saved voices (`LiveMatching`). The job closes naming once the words are done, and
+  then puts the merges, the labels, the "Not X" answers and the Remember choices into the note with the speakers. The
+  differences:
+  - **Automatic naming.** While "Name strong matches automatically" is off (see below), a strong live match is offered
+    as "Is this Luca?" and does not name the speaker.
+  - **Saved voices only.** Live matching compares against the saved voices. Android also lets the note's own voices
+    of an earlier run compete, then drops their matches from the live state (`noteLocalVoicesAreNoLiveMatch`). On iOS
+    those voices take part only in the matching after the words.
+  - **A failed write.** When `names.json` cannot be written, iOS keeps the names in memory and writes them again at
+    the next change. Android fails the job with `SAVE` if the names cannot be written when it starts.
+  - **No coordinator in between.** The Note screen changes the draft's names through the store (`mutateIfOpen`),
+    which applies a change and writes the file under one lock.
 - **Words in a gap** between turns go to the nearest turn, as on Android. A speaker's overlapping turns count once.
   Without a valid turn the transcript stays as it is, and the note records `speakerAnalysisFailure = .empty`.
-- **Voiceprints are not compatible.** Android's CAM++ voiceprints and iOS's WeSpeaker embeddings come from different
-  models, and neither app imports the other's.
-- **Matching thresholds.** These come from iOS's own embedding model: automatic naming at 0.85, suggestions at 0.65,
-  and a 0.12 margin over the next candidate (`VoiceThresholds.ios`). Each print and each sample needs 6 s of isolated
-  speech. Android uses 0.72, 0.50 and 0.08, with 4 s. "Likely" needs the suggestion threshold. Remember needs 6 s
-  ("Too little speech to remember this voice."). The thresholds have not been calibrated on a representative iPhone
-  corpus.
+- **Voiceprints** are Android's: CAM++ prints of 512 values, tagged with the model's SHA-256, matched with Android's
+  thresholds (0.72 automatic, 0.50 suggest, 0.08 margin) and its 4 s minimum, which Remember needs too. Voices saved
+  by iOS builds before this one hold WeSpeaker embeddings from FluidAudio. They are stale, and the person is named
+  again in a note, as Android does for prints of another model.
 - **Automatic naming is opt-in.** Settings has "Name strong matches automatically", off by default. While it is off, a
   suggestion reads "Is this Luca?", and the Remember subtitle says "Future notes will suggest Luca" instead of Android's
   "will name Luca automatically".
-- **Staleness is per model.** A saved voice is stale when none of its samples came from the current speaker model
-  (`settings.speakerModelIdentity`: the model plus a fingerprint of its weights). Before any analysis, nothing is
-  stale. Android also checks the pinned dimension (512).
-- **Speaker model install.** The install fetches the revision that FluidAudio pins, using FluidAudio's
-  `ModelHub.download`. Each file is checked against the checked-in `SpeakerModelManifest.diarizer` (21 files, with
-  size and SHA-256) and the `.fluidaudio-revision` marker. A mismatch is `FILE_CHECK_FAILED`, and the folder is removed
-  for the next try. Before a download, only what FluidAudio would wrongly keep is removed: files with the wrong size or
-  hash, or the whole folder when its marker names another revision. FluidAudio's `.partial` files stay, so an
-  interrupted install resumes.
-- **One install, joined.** `SpeakerAnalyzer` never answers "busy". An analysis that arrives during another one waits
-  its turn, and every request made during an install joins that install (`SpeakerModelInstaller`).
-- **FluidAudio's offline switch** (`ModelHub.offlineMode`) is process-wide. `ModelNetworkGate` keeps it on. It turns
-  it off only while at least one permitted download is running, and it counts those downloads, so a request that joins
-  or ends never turns the switch back on during another download. Analyses load the models with the switch on, so a
-  damaged file fails the load instead of being downloaded again without consent.
-- **Redirects.** FluidAudio builds its own `URLSession`s and exposes no session delegate, so Cassini cannot restrict
-  the redirects of its downloads. Integrity rests on the pinned revision and the hash check of every file. Cassini's
-  own downloads (the pinned models) follow `RedirectPolicy`, whose test is ported.
-  `Privacy.txt` lists the hosts the downloads normally use.
+- **Speaker model install.** The speaker models come from the pinned catalog through the shared
+  `PinnedModelInstaller`, as on Android: the diarizer as seekable Zstandard from `dist.gocassini.com`, unpacked by
+  `ZstdDecompressor` (facebook/zstd 1.5.7, the release that zstd-jni bundles), and CAM++ from the sherpa-onnx
+  release on GitHub. Each file is checked against its pinned size and SHA-256, every redirect follows
+  `RedirectPolicy`, and a request made during an install joins it. A build without the native runtime reports the
+  speaker models as unsupported and has no speaker step.
 - **Offline errors.** iOS has no reachability check. URL Loading already reports an offline device as
   `notConnectedToInternet` (or `timedOut`, `cannotFindHost`, `dataNotAllowed`), and these map to `NO_CONNECTION`.
   `networkConnectionLost` and HTTP errors map to `INTERRUPTED`.
@@ -274,27 +279,22 @@ that were not ported, with the reason for each.
     the OS build stands in for it; there is no `model revision` as in Android's `version`.
   - `x-inferenceMs`, `x-resumedFromMs`, and `x-segmentation`, which describes what iOS runs: the whole file streamed
     to the analyzer in 1 s blocks, the analyzer finding its own segments, and a resume 1 s before the checkpoint.
-  - `x-speakerDiarization`: `backend` (FluidAudio at its pinned commit, offline diarizer on Core ML), `model`
-    (`pyannote-community-1-wespeaker-coreml-v1`), `modelRevision` (the pinned FluidInference revision),
-    `modelSha256`, `elapsedMs` (the analysis without the model install), `turnCount`, `speakerCount`, `assignment`
-    (Android's string: `SpeakerAttribution.assign` follows the same rule; a passage without word times counts as one
-    word) and `sourceSeparation: false`. `modelSha256` is the fingerprint the voiceprints carry: a SHA-256 over the
-    embedding, filterbank and PLDA models' `model.mil` and `weight.bin` with their paths, not the digest of one
-    weights file as on Android, because iOS's diarizer is a bundle of four Core ML models. Records of earlier builds
-    stored it as `sha`, which still reads.
-  - `x-speakerIdentification`, counts only: `model`, `sha256`, `dim` (the print length), `metric: cosine`, the iOS
-    thresholds as `autoThreshold`, `suggestThreshold` and `margin`, `speakersWithPrints`, `autoApplied` (speakers the
-    analysis named from a saved voice) and `suggested` (speakers only offered one). With automatic naming off, a strong
-    match is offered, so it counts as suggested. Document info's "N names from saved voices" reads `autoApplied`, as
-    on Android.
+  - `x-speakerDiarization` is Android's Sortformer record: `backend` "sherpa-onnx 1.13.7 with Sortformer
+    diarization, CPU, 2 threads", `model` "nvidia/Nemotron-3-Diarization INT8", `modelRevision`, `modelSha256` (the
+    model file's), Sortformer's `threshold`, `minDurationOn` and `minDurationOff`, `elapsedMs` (the analysis without
+    the model install), `turnCount`, `speakerCount`, `assignment` (Android's string) and `sourceSeparation: false`,
+    with Android's `x-incrementalDiarization` beside it when the speakers were streamed. A record written by a build
+    that used FluidAudio keeps its words' members, but its speaker record no longer reads, so an export of that note
+    leaves `x-speakerDiarization` and `x-speakerIdentification` out.
+  - `x-speakerIdentification`, counts only, as Android's `JobProvenance.identification`: `model`, `sha256` and `dim`
+    of CAM++, `metric: cosine`, Android's thresholds as `autoThreshold`, `suggestThreshold` and `margin`,
+    `speakersWithPrints`, `autoApplied` (speakers the analysis named from a saved voice) and `suggested` (speakers
+    only offered one). With automatic naming off, a strong match is offered, so it counts as suggested. Document
+    info's "N names from saved voices" reads `autoApplied`, as on Android.
   - A re-attribution (Identify speakers again over a version that already had speakers) also writes
     `x-derivedFromTranscript`, the variant it started from, and, when that variant is one of a verified imported
     document's, that document's `provenance.attribution` as `x-sourceAttribution`, as Android's
     `SpeakerAttribution.record` does. A first analysis is sealed into its transcription, so it has neither.
-- **Not applicable on iOS.** `x-speakerDiarization.threshold`, `minDurationOn` and `minDurationOff` are Sortformer's
-  post-processing parameters, and `x-incrementalDiarization` describes Sortformer's streaming windows and speaker
-  cache. FluidAudio's offline pipeline has neither, so iOS leaves the four keys out instead of writing values that
-  would mean something else.
 - **Older records.** A `provenance.json` written before these members existed still reads and exports. The export
   leaves out what that build did not record (the processing step, `x-segmentation`, `elapsedMs`, `modelRevision`,
   `assignment`, `sourceSeparation` and `x-speakerIdentification`) rather than guessing it, so Document info shows no
@@ -436,7 +436,7 @@ stricter or looser than the spec.
 ## Transcription
 
 - **Background time.** Android runs the drain in a foreground service with an ongoing notification. iOS holds one
-  `BGContinuedProcessingTask` for the whole drain (`app.codemyriad.cassini.transcription.queue`). It is asked for at
+  `BGContinuedProcessingTask` for the whole drain (`io.codemyriad.cassini.transcription.queue`). It is asked for at
   the drain's first claim, from the screen. The system shows "Transcribing “title”" with the job's progress and a Stop
   button, and each next job only changes the title. iOS grants this request only while Cassini is on the screen. A
   drain that starts in the background, or a refused request, falls back to the finite time of
@@ -469,9 +469,10 @@ stricter or looser than the spec.
   Matching). When the speaker step will run, the words fill the bar to 85 % and the speakers fill it from 85 % to 99 %.
   The headlines are Android's, plus "Finding speakers". During the words, the time left counts the words plus the
   measured finalization. The speaker step extrapolates from its own progress.
-- **Read-only gate.** Any job row, except one waiting for consent, makes the transcript read-only, as on Android. iOS
-  has no draft naming, so Android's SAVING reason and the draft's renamable headers do not exist. While the gate is
-  closed, the suggestion cards are hidden, and every sheet of the Note screen follows it through `NoteScreenModel`: the
+- **Read-only gate.** Any job row, except one waiting for consent, makes the transcript read-only, as on Android. The
+  draft of a Parakeet run has its own gate, as on Android: its speaker headers open Name a speaker and its "Is this
+  Luca?" cards answer while the job lets the draft be named, and once the job closes naming a tap says "Saving — you
+  can rename when it's done" (Android's SAVING). While the transcript's gate is closed, its suggestion cards are hidden, and every sheet of the Note screen follows it through `NoteScreenModel`: the
   Speakers list's speakers and Add a speaker are disabled, Identify speakers waits, Edit passage is locked, and an open
   Name a speaker sheet saves nothing.
 - **The progress card's footnote** reads "Transcription runs on this device. If iOS stops it in the background, your
@@ -479,7 +480,7 @@ stricter or looser than the spec.
   progress shows only here." variant. iOS shows a running drain's progress in its own continued-processing UI whatever
   the notification permission is, and may end that time (see "When iOS takes the time back" above), so neither of
   Android's lines holds.
-- **The draft** shows Apple's volatile results as words that may still change. It follows its end as on Android: the
+- **The draft** shows Apple's volatile results (on the fallback devices) as words that may still change. It follows its end as on Android: the
   header and the progress card stay fixed above it while 160 pt are left for the draft.
 - **Recently Deleted.** A queued job of a note moved to Recently Deleted is removed from the queue right after the
   trash, in the queue's serial section, not in the same transaction. The launch repair finishes a trash that Cassini
@@ -624,7 +625,7 @@ These features exist only on iOS. They were kept by decision.
 These have no Android counterpart; they are what App Store Connect reads from the build.
 
 - **Privacy manifests.** `Cassini/Resources/PrivacyInfo.xcprivacy` declares no tracking, no collected data, and the
-  required-reason APIs the code and FluidAudio call: UserDefaults (CA92.1, the app's settings), disk space (E174.1,
+  required-reason APIs the code calls: UserDefaults (CA92.1, the app's settings), disk space (E174.1,
   the checks before recording, a checkpoint and a model install; 85F4.1, "Space for about N more" on the recording
   screen), file timestamps (C617.1, sizes and dates of files in the app container) and system boot time (35F9.1,
   `ProcessInfo.systemUptime` timing the playback position saves). The Live Activity extension links CassiniNotebook
@@ -668,12 +669,14 @@ iOS-only: `DecodeConstantsTests` (every constant, the provenance strings, the re
 | `DeviceSmokeTest` FLEURS golden | `ParakeetJobTests` (hosted, `scripts/sherpa-bench.sh`) | A real job on the arm64 simulator against iOS's own golden (`CassiniTests/Goldens/fleurs-it-short.ios.json`), because the int8 kernels differ from the x86_64 emulator's; on 2026-10-15 its text equalled Android's golden word for word |
 
 `Golden010`, the 0.1.0 provenance record, belongs to WP5 (provenance), with `provenanceEqualsThe010Record`. The job
-tests about the sealed document, the voice clips and live voice matching have no iOS counterpart (see below).
+tests about the sealed document have no iOS counterpart (see below); those about the voice clips and live voice
+matching are in the [speakers test map](#test-map-speakers).
 
 ## Test map: speakers
 
-The streaming diarizer's pure rules, ported ahead of the switch from FluidAudio to Sortformer and CAM++, in
-`Packages/CassiniNotebook/Tests/CassiniNotebookTests`, marked `// ports: <AndroidTest>#<name>`.
+Android's streaming speaker rules and draft naming, marked `// ports: <AndroidTest>#<name>`. The pure rules are in
+`Packages/CassiniNotebook/Tests/CassiniNotebookTests`, the stores and the job in
+`Packages/CassiniEngine/Tests/CassiniEngineTests`.
 
 | Android | iOS suite | Tests |
 |---|---|---|
@@ -682,6 +685,15 @@ The streaming diarizer's pure rules, ported ahead of the switch from FluidAudio 
 | `VoiceClipCacheTest#speakerSlotsKeepTheirIdsWhenTheOrderWithinAChunkChanges` (slot n is `<prefix><n + 1>`) | `SpeakerBudgetTests` | 1 |
 | `SpeakerStatsTest`: `aDraftAppliesItsMergesFirst`, `withoutMergesTheDraftOverloadMatchesThePlainOne` | `SpeakerStatsTests` | 2 |
 | `SpeakerNamingTest`: `aDraftMergeChangesTheDraftWithTheTargetsName`, `aDraftSaveRenamesAndRemembersANewOrBoundVoice` | `SpeakerNamingTests` | 2 |
+| `CheckpointNamesTest` (all but `noteLocalVoicesAreNoLiveMatch`, see below) | `DraftNamesTests`, plus the Forget reducers | 29 |
+| `ProgressTrackerTest`: `draftAppliesMergesAndLabelPrecedence`, `suggestionsOnlyForPlaceholderSpeakersWithALiveSuggestedMatch`, `noSuggestionsOnceNamingIsClosed`; `CheckpointRepositoryTest#draftTreatsAStoredPlaceholderAsNoName` | `ProgressTrackerTests` (over `DraftView`) | 4 |
+| `NamesStoreTest` (eight cases), `CheckpointRepositoryTest#discardDeletesTheWorkDirectoryAndTheNamesInMemory`, `ProcessingCoordinatorTest#aDraftConfirmRacingTheJobsLiveUpdatesLosesNeither`, and the naming gate | `DraftNamesStoreTests` | 11 |
+| `TranscriptionJobTest`: `aRejectedVoiceIsNeverSuggestedAgain`, `labelsFollowDraftNameThenAutoMatchThenPlaceholder`, `forgetEveryoneDuringTheRunDropsTheSavedVoices` | `TranscriptionJobLiveNamesTests` | 6 |
+| `NoteViewModelTest#aDraftSpeakerIsNamedThroughTheDraftNames` | `NameSpeakerModelTests` | 1 |
+
+How the draft's names go into the note (Android's adopt) is covered by `VoicesStoreTests`: a "Not X" is never
+matched, the user's name wins over a match to someone else, a stored placeholder is no name, and a Remember choice
+enrols the print, unless Forget everyone came after it.
 
 iOS-only: `SpeakerBudgetTests` also pins Android's figures and `Diarization`'s settings, the filtering of a chunk's
 segments (finite, slots 0..7, milliseconds cut toward zero and held to the chunk), and `Voiceprints.normalised`;
@@ -698,8 +710,7 @@ is null; iOS sets `MergeUI.draft`). A draft "Not X" is `reject(…, draft: true)
 the draft path, as Android's `Reject.draft`. A chunk that is not 16 kHz or is longer than 28 s throws
 `SherpaError.invalidAudio` where Android's `require` throws; a whole recording that is not 16 kHz also throws it,
 where Android resamples (iOS's decoder already yields 16 kHz); cancellation is Swift task cancellation, checked around
-each native call where Android checks the thread's interrupt. `NativeBudget` (Android's one-native-model-at-a-time
-lock) has no iOS counterpart yet.
+each native call where Android checks the thread's interrupt.
 
 ## Android tests without an iOS port
 
@@ -712,15 +723,17 @@ lock) has no iOS counterpart yet.
   the word log.
 - **Resampling:** `ResamplerTest`. iOS converts to 16 kHz with `AVAudioConverter` (see
   [Speech recognition](#speech-recognition)).
-- **Streaming diarization, until FluidAudio is replaced:** the draft cases of `ProgressTrackerTest`
-  (`draftAppliesMergesAndLabelPrecedence`, `suggestionsOnlyForPlaceholderSpeakersWithALiveSuggestedMatch`,
-  `noSuggestionsOnceNamingIsClosed`, `aRestoredDiarizerKeepsMatchingPossibleAfterAnEarlierFailure`) and of
-  `SheetBehaviourTest`, `VoiceClipCacheTest#longMeetingsKeepOnlyTheBoundedSpeakerSampleBudget`, the three
-  window-cutting cases of `VoiceprintSelectionTest`, `VoiceStalenessTest#thePinnedDimensionIs512` and
-  `DiarizationTest#wordOrderAndTimingArePreservedIncludingOverlappingTurns`. They need the draft path, the voice-clip
-  cache and CAM++ in the job, which come with the step that replaces FluidAudio. `TurnHistoryTest`,
-  `SpeakerBudgetTest`, `VoiceClipCacheTest#speakerSlotsKeepTheirIdsWhenTheOrderWithinAChunkChanges` and the draft
-  cases of `SpeakerNamingTest` and `SpeakerStatsTest` are ported (see [Test map: speakers](#test-map-speakers)).
+- **Draft naming, where iOS differs** (see [Speaker analysis](#speaker-analysis)):
+  `CheckpointNamesTest#noteLocalVoicesAreNoLiveMatch` (live matching compares against the saved voices only),
+  `TranscriptionJobTest#aNamesWriteFailureAtTheStartIsASaveFailureNotAnOpenOne` (a failed `names.json` write keeps the
+  names in memory), and `NamesStoreTest#aChangeToAReleasedDraftIsNotWritten` and
+  `aLateWriteNeverStoresAnOlderValue`: `DraftNamesStore` applies a change and writes the file under one lock, so a
+  release or another write cannot come between them. `NamesStoreTest#aChangeAfterAdoptDoesNotCreateWork` is ported as
+  `aChangeAfterTheJobIsDoneDoesNotCreateWork`, because iOS has no adopt step. The adopt cases
+  (`TranscriptionJobTest#aCrashAfterTheMarkerLeavesAnAdoptableState`, `ReconcileOnStartTest#anAdoptedNoteForgetsItsDraftNames`
+  and `theAdopterAloneForgetsTheDraftNames`) belong to the sealed document below.
+- **`ProgressTrackerTest#aRestoredDiarizerKeepsMatchingPossibleAfterAnEarlierFailure`.** iOS has one Speakers &
+  matching step (`speakersSkipped`) and no separate matching-skipped flag.
 - **Android platform:** foreground-service types, a refused service start, the ongoing-notification tests,
   `belowApi33OnlyTheMicrophoneIsAsked`, `TrashViewModelTest#backCloses`, `LicensesBackTo`, the AAC file-limit tests,
   and the platform Opus encoder half of `PortableDocumentTest`.

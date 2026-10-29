@@ -158,18 +158,23 @@ extension Note {
     /// `autoName` says, and links it to no saved voice, as Android stores such a match as none. An automatic match to
     /// a voice of `carriedLinks` (`carriedVoiceLinks`) names the speaker whatever `autoName` says too, and gives it the
     /// link it had: confirmed stays confirmed. Without a valid turn,
-    /// or when no passage gets a speaker, nothing but `speakerAnalysisFailure` changes.
+    /// or when no passage gets a speaker, nothing but `speakerAnalysisFailure` changes. `attributed` is the transcript
+    /// with its speakers when the job already gave each word one as it went (the streaming diarizer, Android's
+    /// `Diarization.assign` per window); it holds the note's words, and `turns` then only carry the exclusions.
+    /// `excluded` adds voices a speaker must never be matched to (a draft's "Not Luca"), and `labels` are names the user
+    /// gave in the draft: they win over a match's name, and a match to a voice of another name is dropped.
     public mutating func applySpeakerAnalysis(turns: [SpeakerTurn], matches: [String: VoiceMatch], voiceNames: [UUID: String],
                                               localVoices: Set<UUID> = [], carriedLinks: [UUID: VoiceMatchState] = [:],
-                                              autoName: Bool, stamp: VersionStamp) {
-        let attributed = SpeakerAttribution.assign(transcript, turns: turns)
+                                              autoName: Bool, stamp: VersionStamp, attributed: [TranscriptSegment]? = nil,
+                                              excluded extra: [String: Set<UUID>] = [:], labels: [String: String] = [:]) {
+        let attributed = attributed ?? SpeakerAttribution.assign(transcript, turns: turns)
         var order: [String] = []
         for segment in attributed { if let id = segment.speakerID, !order.contains(id) { order.append(id) } }
         guard SpeakerAttribution.canAttribute(turns), !order.isEmpty else {
             speakerAnalysisFailure = .empty
             return
         }
-        let excluded = carriedExclusions(for: turns)
+        let excluded = carriedExclusions(for: turns).merging(extra) { $0.union($1) }
         let analyzed = order.enumerated().map { offset, id in
             var speaker = NoteSpeaker(id: id, name: DefaultLabels.placeholder(offset + 1))
             speaker.excludedVoiceIDs = (excluded[id] ?? []).sorted { $0.uuidString < $1.uuidString }
@@ -187,6 +192,18 @@ extension Note {
                 speaker.match = .suggested(voice: match.voiceID, score: match.score)
             }
             return speaker
+        }.map { speaker -> NoteSpeaker in
+            guard let label = labels[speaker.id]?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !DefaultLabels.isDefault(id: speaker.id, label: label) else {
+                return speaker
+            }
+            var named = speaker
+            named.name = String(label.prefix(Limits.nameMaxLength))
+            if let voice = named.match.voiceID, !named.match.isRejection,
+               !(voiceNames[voice].map { NameMatch.same($0, label) } ?? false) {
+                named.match = .unmatched
+            }
+            return named
         }
         if let sealed = attributableInPlace {
             // A transcription and its speakers are one version, as Android seals them.

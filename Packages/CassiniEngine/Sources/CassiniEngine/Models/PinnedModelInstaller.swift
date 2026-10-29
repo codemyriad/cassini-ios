@@ -81,10 +81,12 @@ public final class PinnedModelInstaller: Sendable {
     public var lastOutcome: InstallOutcome? { fields.withLock { $0.lastOutcome } }
 
     /// Installs the missing models of `parts`, or joins the install of the same parts that runs now. Cancelling the
-    /// caller stops its wait; the install goes on while another caller waits.
-    public func install(_ parts: Set<ModelPart>,
+    /// caller stops its wait; the install goes on while another caller waits. `granted` says the caller has its
+    /// consent already (the speaker models, which have a consent of their own on iOS); otherwise the install asks
+    /// `ModelRepository.consented()`.
+    public func install(_ parts: Set<ModelPart>, granted: Bool = false,
                         onProgress: @escaping @Sendable (DownloadProgress) -> Void = { _ in }) async throws -> InstallOutcome {
-        try await install(parts, onProgress, standalone: false)
+        try await install(parts, onProgress, standalone: false, granted: granted)
     }
 
     /// The download from Settings or a banner, with no note: installs `parts` in the background and shows its
@@ -94,7 +96,7 @@ public final class PinnedModelInstaller: Sendable {
         return fields.withLock { fields in
             let task = Task {
                 // A cancelled download keeps its .part files; there is nothing more to do.
-                _ = try? await self.install(parts, { _ in }, standalone: true)
+                _ = try? await self.install(parts, { _ in }, standalone: true, granted: false)
                 self.fields.withLock { _ = $0.downloads.removeValue(forKey: id) }
             }
             fields.downloads[id] = task
@@ -136,7 +138,7 @@ public final class PinnedModelInstaller: Sendable {
     }
 
     private func install(_ parts: Set<ModelPart>, _ onProgress: @escaping @Sendable (DownloadProgress) -> Void,
-                         standalone: Bool) async throws -> InstallOutcome {
+                         standalone: Bool, granted: Bool) async throws -> InstallOutcome {
         precondition(!parts.isEmpty, "No model part to install")
         while true {
             try Task.checkCancellation()
@@ -144,7 +146,7 @@ public final class PinnedModelInstaller: Sendable {
             do {
                 return try await withTaskCancellationHandler {
                     try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<InstallOutcome, any Error>) in
-                        attach(id, parts, onProgress, standalone, continuation)
+                        attach(id, parts, onProgress, standalone, granted, continuation)
                     }
                 } onCancel: {
                     self.leave(id)
@@ -160,7 +162,8 @@ public final class PinnedModelInstaller: Sendable {
     /// current install is being cancelled (its fetch can block until the read timeout, and a new install must not fetch
     /// the same files at the same time).
     private func attach(_ id: UUID, _ parts: Set<ModelPart>, _ listener: @escaping @Sendable (DownloadProgress) -> Void,
-                        _ standalone: Bool, _ continuation: CheckedContinuation<InstallOutcome, any Error>) {
+                        _ standalone: Bool, _ granted: Bool,
+                        _ continuation: CheckedContinuation<InstallOutcome, any Error>) {
         enum Attached { case joined(Status), started(Task<InstallOutcome, any Error>, Int, Status), busy(Int), left }
         let attached: Attached = fields.withLock { fields in
             if fields.left.remove(id) != nil { return .left }
@@ -169,7 +172,7 @@ public final class PinnedModelInstaller: Sendable {
             if fields.current == nil {
                 fields.installs += 1
                 let number = fields.installs
-                let task = Task(executorPreference: executor) { try await self.run(number, parts) }
+                let task = Task(executorPreference: executor) { try await self.run(number, parts, granted: granted) }
                 fields.current = Install(number: number, parts: parts, task: task)
                 started = (task, number)
             }
@@ -237,14 +240,14 @@ public final class PinnedModelInstaller: Sendable {
     }
 
     /// The install task: Android's `ModelInstallOwner.run`.
-    private func run(_ number: Int, _ parts: Set<ModelPart>) async throws -> InstallOutcome {
+    private func run(_ number: Int, _ parts: Set<ModelPart>, granted: Bool) async throws -> InstallOutcome {
         let ordered = ModelPart.allCases.filter(parts.contains)
         // A new install drops the failure an earlier one left in the status.
         for part in ordered { models.clearProgress(part) }
         do {
             try Task.checkCancellation()
             let store = RepositoryModelStore(models: models, storage: storage, online: online,
-                                             consented: await models.consented())
+                                             consented: granted ? true : await models.consented())
             let outcome = try await ModelInstaller(store: store).install(parts) { progress in
                 self.models.publishProgress(progress.part, Self.statusOf(progress))
                 self.report(number, progress)

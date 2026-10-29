@@ -14,9 +14,9 @@ import CassiniEngine
 /// What the work starts from its handler (the paused job's write) is best-effort; the queue's stored `system` hold lets
 /// the launch repair finish it when Cassini is killed while suspended.
 @MainActor final class UIKitBackgroundRunner: BackgroundRunner {
-    /// Matches `BGTaskSchedulerPermittedIdentifiers` (`app.codemyriad.cassini.transcription.*`). One identifier
+    /// Matches `BGTaskSchedulerPermittedIdentifiers` (`io.codemyriad.cassini.transcription.*`). One identifier
     /// serves every drain: at most one continued task is held at a time.
-    static let identifier = "app.codemyriad.cassini.transcription.queue"
+    static let identifier = "io.codemyriad.cassini.transcription.queue"
 
     private typealias Expiry = @MainActor () -> Void
 

@@ -37,7 +37,8 @@ On iPad the Library stays beside the note, in landscape and in portrait:
 
 Speech recognition and speaker analysis run on the device. Cassini does not upload audio, transcripts or
 voiceprints. It has no accounts, no analytics and no advertising. The network is used only to download models, and
-only after you agree: Apple's speech model for your language, and the speaker models from Hugging Face. Voiceprints
+only after you agree: Apple's speech model for your language, and the speaker models from Cassini's model host
+(`dist.gocassini.com`) and GitHub. Voiceprints
 stay in the app's private storage, are excluded from backups, and are never written into a document or an export.
 System backups may include recordings and transcripts.
 
@@ -54,8 +55,8 @@ xcodegen generate
 
 Open `Cassini.xcodeproj`, select the **Cassini** scheme, and run it on an iPhone or iPad simulator or device. For a
 device, choose your development team under Signing & Capabilities. No API keys or backend are needed. The pinned Swift
-packages are FluidAudio (Core ML speaker diarization) and swift-opus (libopus), and `Package.resolved` records their
-exact revisions.
+packages are Zstandard (it unpacks the compressed speaker model) and swift-opus (libopus), and `Package.resolved`
+records their exact revisions.
 
 ## What works
 
@@ -75,9 +76,11 @@ exact revisions.
   checkpoint. The progress card shows the stages, the percent, the time left, a battery projection and the draft so
   far. Transcription continues in the background with a system progress indicator, and a notification says when a
   note is done or iOS paused it.
-- **Speakers.** After the words, an offline Core ML pipeline tells the speakers apart (pyannote community-1
-  segmentation, WeSpeaker embeddings, VBx clustering). You can name a speaker across all their passages, play a sample
-  of their voice, merge two speakers, or reassign a passage.
+- **Speakers.** As Android does, streaming Sortformer tells the speakers apart window by window while the words are
+  decoded, and CAM++ makes a voiceprint for each speaker. The draft shows the speakers as they appear: you can name or
+  merge them before the job is done, and a saved voice is suggested in the draft ("Is this Luca?"). Afterwards you
+  can name a speaker across all their passages, play a sample of their voice, merge two speakers, or reassign a
+  passage.
 - **Saved voices.** Cassini can remember a named voice, suggest it in later notes ("Is this Sam Rivera?"), and keep
   names over a Transcribe again. Automatic naming is optional and off by default. You can rename or forget a saved
   voice, forget everyone, or erase all voice data.
@@ -107,8 +110,8 @@ TestFlight still need.
 
 - Recognition quality is Apple's, and it depends on the device and the language. The simulator screenshots and tests
   use fake transcription, so they say nothing about accuracy.
-- The voice-matching thresholds come from the iOS embedding model but have not been calibrated on a representative
-  set of iPhone recordings. Review automatically named speakers.
+- The speaker pipeline's memory needs (Ultra and Sortformer loaded together) have been measured on the simulator only.
+  Review automatically named speakers.
 - iOS grants continued background processing only to a drain that starts while Cassini is on the screen. Otherwise
   transcription gets the short background time iOS allows. When iOS ends that time, the job pauses with its progress
   kept, and resumes when you continue.
@@ -126,25 +129,27 @@ TestFlight still need.
 
 [docs/differences.md](docs/differences.md) describes each difference in detail. In summary:
 
-- **Engines and thresholds.** iOS uses Apple's `SpeechTranscriber` for words, where Android uses Parakeet. It uses
-  FluidAudio's offline pyannote, WeSpeaker and VBx pipeline for speakers, where Android uses streaming Sortformer and
-  CAM++. The speech language is chosen in Settings, because Apple's models are per language. Voice matching uses its
-  own thresholds (0.85 automatic, 0.65 suggest, 0.12 margin, 6 s of speech) and keeps automatic naming off by default.
-  The two apps' voiceprints are not compatible. The move to Parakeet Ultra has begun: the pinned model catalog, plan, redirect
+- **Engines and thresholds.** iOS uses Apple's `SpeechTranscriber` for words, where Android uses Parakeet. Speakers
+  use Android's streaming Sortformer and CAM++ with Android's thresholds (0.72 automatic, 0.50 suggest, 0.08 margin,
+  4 s of speech), so the voiceprints are Android's; voices saved by earlier iOS builds are named again. iOS keeps
+  automatic naming off by default. The speech language is chosen in Settings, because Apple's models are per
+  language. The move to Parakeet Ultra has begun: the pinned model catalog, plan, redirect
   policy, fetcher and installer are ported with Android's tests, behind an `HTTPTransport` port over a data-task
   `URLSession` that never follows a redirect itself, but the app does not use them yet. The Parakeet transcriber and
   the job are in place (`ParakeetTranscriber`, checkpoint version 2): a build with the native runtime transcribes with
   Ultra when its model is installed and the device has the memory (a provisional rule until a device is measured), and
   falls back to Apple Speech otherwise. Devices that cannot hold Ultra keep Apple Speech.
 - **Storage model.** A note is a `note.json` beside its audio. The portable Cassini document is sealed only at export,
-  with the run's provenance under Android's keys, less the four that describe Sortformer. Android keeps the transcript
+  with the run's provenance under Android's keys. Android keeps the transcript
   in a sealed document and a Room catalogue. The queue is `jobs.json`, and checkpoints use iOS's own format. Search
   uses an in-memory index instead of FTS4. Saved voices keep one sample per note instead of a running mean.
 - **Recording.** iOS captures PCM CAF and compresses it to M4A, so there is no 1 GiB AAC limit, and the storage floor
   includes the room for that compression. The audio session does not mix with other apps, so a call pauses the
   recording. Losing the input pauses it too. A Live Activity replaces Android's ongoing notification, and recovery
   repairs CAF files.
-- **Transcription.** Speakers are told apart after the words, so the draft has no live speakers and no draft naming.
+- **Transcription.** A Parakeet run tells speakers apart as it decodes, as on Android. On the Apple Speech fallback,
+  and for Identify speakers, the same streaming pipeline runs over the whole file after the words, so that draft has
+  one voice.
   Android's foreground service becomes a `BGContinuedProcessingTask`. When iOS takes the time back, the queue is held
   and "Paused by iOS" is shown. The stepper reads Words, then Speakers & matching.
 - **iOS extras.** Stars, bookmarks, playback speed, lock-screen controls, passage editing, JSON export, the Speakers
@@ -200,10 +205,11 @@ Apple's recognizer. Android's pure decode rules (windows, quiet cuts, seam merge
 (CassiniInference) drives them over CassiniSherpa's `ParakeetDecoder` and `SileroDetector`. A build with
 `CASSINI_SHERPA_LOCAL=1` uses Ultra when its model is in Application Support/CassiniModels and the device passes
 `SpeechCapability`; Apple's recognizer stays as the fallback for devices that cannot hold Ultra (`AppleSpeechWindows`).
-The speaker package is under way: `CassiniSherpa` wraps Android's streaming Sortformer diarizer (`SortformerStream`,
-with save and restore of its state) and CAM++ extractor (`VoiceprintExtractor`), and the streaming rules
-(`TurnHistory`, `SpeakerBudget`, draft naming and draft stats) are in CassiniNotebook. The app still analyses speakers
-with FluidAudio until the next step replaces it.
+Speakers run on the same runtime: `CassiniSherpa` wraps Android's streaming Sortformer diarizer (`SortformerStream`,
+with save and restore of its state) and CAM++ extractor (`VoiceprintExtractor`); the streaming rules (`TurnHistory`,
+`SpeakerBudget`, `Diarization`, the voice-clip cache, `DraftNames` and draft stats) are in CassiniNotebook, and the
+job (`WindowSpeakers`, `LiveMatching`, `DraftNamesStore`) in CassiniEngine. Without the native runtime there is no
+speaker step.
 
 ```sh
 scripts/build-sherpa-xcframework.sh   # pinned sources -> .tools/sherpa/SherpaOnnxC.xcframework and a reproducible zip
@@ -224,6 +230,11 @@ job's words with `CassiniTests/Goldens/fleurs-it-short.ios.json`, recorded on th
 its own because ONNX Runtime's int8 kernels differ from those of Android's x86_64 emulator.
 `scripts/fetch-speaker-fixture.py` mixes the speaker smoke test's two-speaker clip from public FLEURS audio (Android
 has no public meeting recording) into the gitignored `.tools/fixtures`.
+
+The locked build (`sherpa-onnx-ios` `1.13.7-dbbeef9c-ios.2`) predates the move to `io.codemyriad` and still names its
+framework `app.codemyriad.sherpa-onnx`; `scripts/build-sherpa-xcframework.sh` now writes `io.codemyriad.sherpa-onnx`.
+The next native rebuild therefore changes the zip's checksum: give it the next version (`ios.3`) and its `sha256` in
+`scripts/native-dependencies.json`.
 
 [Validation](docs/validation.md) lists what each tier covers, the test counts and the device checklist.
 [Architecture](docs/architecture.md) describes the modules, state ownership, startup, storage and the

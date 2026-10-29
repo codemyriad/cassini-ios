@@ -87,29 +87,26 @@ struct FollowChipHost: View {
     }
 }
 
-/// The draft of the running job, as it grows; "Words may still change" while it does. `ProcessingBody` follows its
-/// end as the list grows.
+/// The draft of the running job, as it grows, with its names; "Words may still change" while it does.
+/// `ProcessingBody` follows its end as the list grows.
 struct RunningDraft: View {
-    let noteID: UUID
+    let model: NoteScreenModel
     let cache: TranscriptCache
-    @Environment(JobProgress.self) private var progress
-
-    private var draft: DraftState? {
-        guard case .transcribing(_, let draft)? = progress.phase(for: noteID) else { return nil }
-        return draft
-    }
 
     var body: some View {
-        if let draft, !draft.words.isEmpty {
-            DraftSection(transcript: cache.draft(draft), changing: true)
+        if let draft = model.shownDraft, !draft.words.isEmpty {
+            DraftSection(draft: draft, transcript: cache.draft(draft), changing: true, model: model)
         }
     }
 }
 
-/// "Draft transcript" and its paragraphs, read-only.
+/// "Draft transcript" and its paragraphs. While the job lets the draft be named, a speaker's header opens Name a
+/// speaker and the "Is this Luca?" cards answer in the draft's names.
 struct DraftSection: View {
+    let draft: DraftState
     let transcript: NoteTranscript
     let changing: Bool
+    let model: NoteScreenModel
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -121,7 +118,13 @@ struct DraftSection: View {
                         .padding(.horizontal, 8).padding(.vertical, 3).background(Color.ink.opacity(0.06), in: Capsule())
                 }
             }
-            TranscriptList(transcript: transcript, style: .draft, renamable: false)
+            TranscriptList(transcript: transcript, style: .draft, renamable: draft.namingOpen,
+                           actions: TranscriptActions(nameSpeaker: { model.speakerTapped($0) }),
+                           suggestion: { turn in
+                               guard draft.namingOpen, let suggestion = turn.suggestion else { return nil }
+                               let ordinal = transcript.speakers.firstIndex(of: suggestion.speakerID) ?? 0
+                               return AnyView(SuggestionCard(suggestion: suggestion, ordinal: ordinal, model: model))
+                           })
         }
         .accessibilityIdentifier("draftTranscript")
     }
@@ -144,8 +147,6 @@ struct DraftSection: View {
     var shownSealed: NoteTranscript { sealedValue }
     private var draftKey: DraftState?
     private var draftValue = NoteTranscript.empty
-    private var savedKey: [DraftWord]?
-    private var savedValue = NoteTranscript.empty
     private var hitsKey: (NoteTranscript, String)?
     private var hitsValue: [TranscriptMatch] = []
 
@@ -158,21 +159,15 @@ struct DraftSection: View {
         return sealedValue
     }
 
+    /// The draft with its names; a stopped job's (`tentativeFromMs` at its end) is all settled.
     func draft(_ draft: DraftState) -> NoteTranscript {
         if draft != draftKey {
             draftKey = draft
-            draftValue = NoteTranscripts.draft(draft.words, tentativeFromMs: draft.tentativeFromMs)
+            draftValue = NoteTranscripts.draft(draft.words, tentativeFromMs: draft.tentativeFromMs == .max ? nil : draft.tentativeFromMs,
+                                               labels: draft.labels, automatic: draft.automatic,
+                                               suggestions: draft.suggestions)
         }
         return draftValue
-    }
-
-    /// A stopped job's saved words: all settled.
-    func saved(_ words: [DraftWord]) -> NoteTranscript {
-        if words != savedKey {
-            savedKey = words
-            savedValue = NoteTranscripts.draft(words, tentativeFromMs: nil)
-        }
-        return savedValue
     }
 
     func matches(_ transcript: NoteTranscript, query: String) -> [TranscriptMatch] {

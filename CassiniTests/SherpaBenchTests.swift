@@ -2,6 +2,7 @@ import XCTest
 import AVFoundation
 import CassiniEngine
 import CassiniInference
+import CassiniNotebook
 import CassiniSherpa
 
 /// The WP0 spike: a real Parakeet Ultra decode through the sherpa-onnx C API, with memory and speed. Opt-in and
@@ -15,7 +16,8 @@ import CassiniSherpa
 ///   CASSINI_PARAKEET_AUDIO      the FLEURS-it short clip, 16 kHz mono WAV
 ///   CASSINI_PARAKEET_GOLDEN     Android's fleurs-it-short.txt golden
 ///   CASSINI_BENCH_LONG_SECONDS  length of the long run in 28 s windows (default 0: skipped)
-///   CASSINI_BENCH_FLUIDAUDIO=1  afterwards, run FluidAudio's speaker pipeline in the same process
+///   CASSINI_BENCH_SPEAKERS      the speaker-models directory: with the recognizer still loaded, stream 60 s through
+///                               Sortformer and make a CAM++ print, as a job holds both
 ///   CASSINI_BENCH_OUT           a file to write the measurements to as JSON
 final class SherpaBenchTests: XCTestCase {
     private static let rate = 16_000
@@ -111,32 +113,32 @@ final class SherpaBenchTests: XCTestCase {
         report["afterDecodesFootprintMiB"] = mib(afterDecodes.footprintBytes)
         report["peakMiB"] = mib(afterDecodes.peakFootprintBytes)
 
-        // FluidAudio after the decoder is released, in the same process, as the job runs them.
+        // Streaming Sortformer with the recognizer still loaded, as a job holds both while it decodes (Android's
+        // rule), then CAM++ over 45 s of the clip: the memory of the whole speaker pipeline on top of Ultra.
+        if let speakerModels = environment["CASSINI_BENCH_SPEAKERS"].map({ URL(fileURLWithPath: $0) }) {
+            let started = Date()
+            let clip = repeated(fleurs, seconds: 60)
+            let diarizer = try SortformerStream(model: speakerModels.appendingPathComponent("nemotron-3-diarization.int8.onnx"))
+            var start = 0
+            while start < clip.count {
+                let end = min(clip.count, start + IncrementalTranscript.windowSamples)
+                try diarizer.process(PcmAudio(Array(clip[start..<end]), sampleRate: Self.rate), startMs: Int64(start) * 1000 / Int64(Self.rate))
+                if end == clip.count { break }
+                start += IncrementalTranscript.windowSamples - IncrementalTranscript.overlapSamples
+            }
+            let streamed = MemorySample.now()
+            let prints = try VoiceprintExtractor.compute(
+                model: speakerModels.appendingPathComponent("voiceprint-campplus.onnx"),
+                audio: PcmAudio(clip, sampleRate: Self.rate), windows: ["s": [PrintWindow(0, 45 * Self.rate)]]) {}
+            let printed = MemorySample.now()
+            report["speakers"] = ["seconds": Date().timeIntervalSince(started), "slots": Set(diarizer.turns.map(\.speaker)).count,
+                                  "stateFloats": diarizer.saveState().count, "printDim": prints["s"]?.vector.count ?? 0,
+                                  "withDiarizerFootprintMiB": mib(streamed.footprintBytes),
+                                  "afterPrintsFootprintMiB": mib(printed.footprintBytes),
+                                  "peakMiB": mib(printed.peakFootprintBytes)] as [String: Any]
+        }
         _ = consume decoder
         report["afterReleaseFootprintMiB"] = mib(MemorySample.now().footprintBytes)
-        if environment["CASSINI_BENCH_FLUIDAUDIO"] == "1" {
-            let clip = FileManager.default.temporaryDirectory.appendingPathComponent("bench-60s.wav")
-            try writeWav(repeated(fleurs, seconds: 60), to: clip)
-            let analyzer = SpeakerAnalyzer(directory: FileManager.default.temporaryDirectory
-                .appendingPathComponent("bench-fluidaudio", isDirectory: true), storage: Unlimited())
-            let started = Date()
-            let semaphore = DispatchSemaphore(value: 0)
-            nonisolated(unsafe) var outcome: Result<Int, any Error> = .success(0)
-            Task.detached {
-                do { outcome = .success(Set(try await analyzer.analyze(url: clip, allowDownload: true) { _ in }.turns.map(\.speakerID)).count) }
-                catch { outcome = .failure(error) }
-                semaphore.signal()
-            }
-            semaphore.wait()
-            let sample = MemorySample.now()
-            switch outcome {
-            case .success(let speakers):
-                report["fluidAudio"] = ["seconds": Date().timeIntervalSince(started), "speakers": speakers,
-                                        "footprintMiB": mib(sample.footprintBytes), "peakMiB": mib(sample.peakFootprintBytes)] as [String: Any]
-            case .failure(let error):
-                report["fluidAudio"] = ["error": String(describing: error)]
-            }
-        }
 
         let json = try JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys])
         let text = String(decoding: json, as: UTF8.self)
@@ -174,16 +176,6 @@ final class SherpaBenchTests: XCTestCase {
         let buffer = try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(file.length)))
         try file.read(into: buffer)
         return Array(UnsafeBufferPointer(start: buffer.floatChannelData![0], count: Int(buffer.frameLength)))
-    }
-
-    private func writeWav(_ samples: [Float], to url: URL) throws {
-        try? FileManager.default.removeItem(at: url)
-        let format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: Double(Self.rate), channels: 1, interleaved: false)!
-        let file = try AVAudioFile(forWriting: url, settings: format.settings)
-        let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(samples.count))!
-        buffer.frameLength = AVAudioFrameCount(samples.count)
-        samples.withUnsafeBufferPointer { buffer.floatChannelData![0].update(from: $0.baseAddress!, count: samples.count) }
-        try file.write(from: buffer)
     }
 
     private func repeated(_ clip: [Float], seconds: Int) -> [Float] {
@@ -268,6 +260,3 @@ final class SherpaBenchTests: XCTestCase {
     }
 }
 
-private struct Unlimited: StorageProbe {
-    func availableBytes(at url: URL) -> Int64 { .max }
-}

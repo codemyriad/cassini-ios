@@ -2,13 +2,16 @@
 # The speaker package's smoke test on a simulator: builds the app and its hosted tests with CASSINI_SHERPA_LOCAL=1
 # (the runtime from scripts/build-sherpa-xcframework.sh), then runs CassiniTests/SpeakerSmokeTests: streaming
 # Sortformer over a two-speaker FLEURS mix in the job's 28 s windows, a save and restore of its state between windows,
-# the whole-recording call, and CAM++ prints of each speaker. Simulator figures are not device measurements.
+# the whole-recording call, and CAM++ prints of each speaker; then CassiniTests/SpeakerJobTests, a real job with
+# Parakeet Ultra, streaming Sortformer and CAM++ on the same mix, and Transcribe again naming the speaker saved from
+# it (when Ultra and the speech detector are beside the speaker models). Simulator figures are not device measurements.
 #
 #   scripts/speaker-smoke.sh
 #
 # Environment:
 #   CASSINI_SPEAKER_MODELS  the speaker-models directory (default .tools/models/speaker-models, which
-#                           scripts/fetch-ci-models.py --dest .tools/models fills)
+#                           scripts/fetch-ci-models.py --dest .tools/models fills); its parent is the job's model root
+#   CASSINI_SPEAKER_JOB     0 skips the end-to-end job
 #   CASSINI_ANDROID         the cassini-android checkout with fixtures/audio/fleurs-it-short.wav (default
 #                           ~/dev/cassini-android, then ../cassini-android beside the main checkout)
 #   CASSINI_IPHONE          the device type to clone (default "iPhone 17")
@@ -67,15 +70,25 @@ print(sorted(rs, key=lambda r: [int(x) for x in r["version"].split(".")])[-1]["i
 fi
 xcrun simctl bootstatus "$udid" -b > /dev/null
 
-echo "==> SpeakerSmokeTests on $name ($udid)"
+# The end-to-end job needs Parakeet Ultra and its detector beside the speaker models (CASSINI_SPEAKER_JOB=0 skips it).
+model_root=$(dirname "$models")
+only=(-only-testing:CassiniTests/SpeakerSmokeTests)
+if [ "${CASSINI_SPEAKER_JOB:-1}" != 0 ] && [ -f "$model_root/parakeet-ultra/verified" ] && [ -f "$model_root/vad/verified" ]; then
+    only+=(-only-testing:CassiniTests/SpeakerJobTests)
+fi
+echo "==> ${only[*]#-only-testing:} on $name ($udid)"
 xctestrun=$(ls -t "$derived"/Build/Products/Cassini_*.xctestrun | head -1)
 rc=0
 TEST_RUNNER_CASSINI_SPEAKER_MODELS="$models" \
 TEST_RUNNER_CASSINI_SPEAKER_AUDIO="$audio" \
 TEST_RUNNER_CASSINI_SPEAKER_OUT="$out/$stamp.json" \
+TEST_RUNNER_CASSINI_PARAKEET_MODEL_ROOT="$model_root" \
+TEST_RUNNER_CASSINI_SPEAKER_JOB_OUT="$out/$stamp.job.json" \
 xcodebuild test-without-building -xctestrun "$xctestrun" -destination "platform=iOS Simulator,id=$udid" \
-    -only-testing:CassiniTests/SpeakerSmokeTests -resultBundlePath "$out/$stamp.xcresult" > "$log" 2>&1 || rc=$?
+    "${only[@]}" -resultBundlePath "$out/$stamp.xcresult" > "$log" 2>&1 || rc=$?
 grep -E "Test Case .*(passed|failed|skipped)|error:" "$log" | head -20
 [ -s "$out/$stamp.json" ] || sed -n '/CASSINI_SPEAKERS_BEGIN/,/CASSINI_SPEAKERS_END/p' "$log" | sed '1d;$d' > "$out/$stamp.json" || true
+[ -s "$out/$stamp.job.json" ] || sed -n '/CASSINI_SPEAKER_JOB_BEGIN/,/CASSINI_SPEAKER_JOB_END/p' "$log" | sed '1d;$d' > "$out/$stamp.job.json" || true
+[ -s "$out/$stamp.job.json" ] && echo "job: $out/$stamp.job.json"
 echo "results: $out/$stamp.json (log $log)"
 exit $rc

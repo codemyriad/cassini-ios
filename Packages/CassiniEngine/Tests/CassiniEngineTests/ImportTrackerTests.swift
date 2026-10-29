@@ -159,7 +159,9 @@ private actor Gate {
     private func runRecord(_ note: Note) -> ProvenanceRecord {
         var record = ProvenanceRecord(provenance: TranscriptProvenance(language: "en-US", inferenceMs: 1_500, resumedFromMs: 600),
                                       transcript: note.transcript)
-        record.addSpeakers(.init(model: "diarizer", modelSha256: "abc", turnCount: 2, speakerCount: 2), transcript: note.transcript)
+        record.addSpeakers(.sortformer(revision: "r", sha256: "abc", elapsedMs: 1, turnCount: 2, speakerCount: 2,
+                                       streaming: true),
+                           transcript: note.transcript)
         return record
     }
 
@@ -179,7 +181,7 @@ private actor Gate {
         #expect(record["x-inferenceMs"] == .int(1_500))
         #expect(record["x-resumedFromMs"] == .int(600))
         let diarization = try #require(record["x-speakerDiarization"]?.object)
-        #expect(diarization["model"] == .string("diarizer"))
+        #expect(diarization["model"] == .string(TranscriptProvenance.SpeakerDiarization.sortformerModel))
         #expect(diarization["turnCount"] == .int(2))
         #expect(record["x-speakerMerges"] == nil)
     }
@@ -257,7 +259,9 @@ private actor Gate {
         let turns = [SpeakerTurn(speakerID: "x_a", start: 0, end: 1.1), SpeakerTurn(speakerID: "x_b", start: 1.1, end: 2)]
         note.applySpeakerAnalysis(turns: turns, matches: [:], voiceNames: [:], autoName: false, stamp: VersionStamp(date: Date()))
         #expect(note.versions?.last?.attributedFrom == imported.id)
-        record.addSpeakers(.init(model: "diarizer", modelSha256: "abc", turnCount: 2, speakerCount: 2), transcript: note.transcript)
+        record.addSpeakers(.sortformer(revision: "r", sha256: "abc", elapsedMs: 1, turnCount: 2, speakerCount: 2,
+                                       streaming: true),
+                           transcript: note.transcript)
 
         let output = try await PortableExportService(audio: FakeAudioProcessing(), provenance: FakeProvenance([note.id: record]))
             .export(note, original: original, playable: original, into: folder, filename: "Two")

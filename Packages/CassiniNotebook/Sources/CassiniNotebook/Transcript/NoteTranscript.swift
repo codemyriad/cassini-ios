@@ -182,27 +182,51 @@ public enum NoteTranscripts {
         }
     }
 
-    /// The draft of a running or stopped job: placeholders numbered by first word, and `tentativeFromMs`: words that
-    /// end after it may still change (nil for a stopped draft, whose words are all settled).
-    public static func draft(_ words: [DraftWord], tentativeFromMs: Int64?) -> NoteTranscript {
+    /// The draft of a running or stopped job: each speaker's `labels` (placeholders numbered by first word without
+    /// one), the "auto" badge for the `automatic` ones, the `suggestions` cards, each above the first paragraph of its
+    /// speaker's latest turn, and `tentativeFromMs`: words that end after it may still change (nil for a stopped
+    /// draft, whose words are all settled). A word without a speaker id (Apple Speech, or no speakers told apart) has
+    /// no speaker.
+    public static func draft(_ words: [DraftWord], tentativeFromMs: Int64?, labels: [String: String] = [:],
+                             automatic: Set<String> = [], suggestions: [DraftSuggestion] = []) -> NoteTranscript {
         let transcriptWords = words.map {
-            TranscriptWord(speaker: $0.speaker, start: Double($0.startMs) / 1000, end: Double($0.endMs) / 1000, text: $0.text)
+            TranscriptWord(speaker: $0.speaker.isEmpty ? nil : $0.speaker, start: Double($0.startMs) / 1000,
+                           end: Double($0.endMs) / 1000, text: $0.text)
         }
         let order = orderOfAppearance(transcriptWords)
-        let numbers = Dictionary(order.enumerated().map { ($1, $0 + 1) }, uniquingKeysWith: { first, _ in first })
+        var names: [String: SpeakerName] = [:]
+        for (ordinal, id) in order.enumerated() { names[id] = name(label: labels[id], id: id, ordinal: ordinal) }
+        let tints = SpeakerTint.assign(order) { names[$0]?.isNamed != true }
         let built = build(transcriptWords) { speaker, _ in
-            Template(name: .placeholder(speaker.flatMap { numbers[$0] } ?? 1), tint: .amber)
+            guard let speaker else { return Template(name: .unknown, tint: .amber) }
+            let name = names[speaker] ?? .placeholder(1)
+            return Template(name: name, tint: tints[speaker] ?? .amber, auto: automatic.contains(speaker) && name.isNamed)
         }
-        guard let tentativeFromMs else { return built }
+        let cards = Dictionary(suggestions.map { ($0.speakerID, $0) }, uniquingKeysWith: { first, _ in first })
+        let placed = NoteTranscript(turns: built.turns.enumerated().map { index, turn in
+            // A card goes above the paragraph where its speaker's latest turn begins.
+            guard let id = turn.speakerID, let card = cards[id], !turn.name.isNamed, ms(turn.start) == card.atMs,
+                  index == 0 || built.turns[index - 1].speakerID != id else { return turn }
+            let number: Int = if case .placeholder(let n) = turn.name { n } else { 1 }
+            return turn.with(suggestion: SpeakerSuggestion(
+                speakerID: id, label: DefaultLabels.placeholder(number), voiceID: card.voiceID, voiceName: card.name,
+                score: card.score, segmentID: draftSegment, start: turn.start))
+        })
+        guard let tentativeFromMs else { return placed }
         let tentativeFrom = Double(tentativeFromMs) / 1000
         var position = 0
-        let turns = built.turns.map { turn -> NoteTurn in
+        let turns = placed.turns.map { turn -> NoteTurn in
             defer { position += turn.words.count }
             let unsettled = (0..<turn.words.count).first { transcriptWords[position + $0].end > tentativeFrom }
             return turn.with(unsettledFrom: unsettled)
         }
         return NoteTranscript(turns: turns)
     }
+
+    /// The `segmentID` of a draft's suggestion cards: a draft has no passages yet.
+    public static let draftSegment = UUID(uuid: (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
+
+    private static func ms(_ seconds: TimeInterval) -> Int64 { Int64((seconds * 1000).rounded()) }
 
     // MARK: Building
 
@@ -270,6 +294,11 @@ extension NoteTurn {
     }
 
     func with(unsettledFrom: Int?) -> NoteTurn {
+        NoteTurn(id: id, speakerID: speakerID, name: name, tint: tint, start: start, auto: auto, words: words,
+                 text: text, offsets: offsets, unsettledFrom: unsettledFrom, suggestion: suggestion, passages: passages)
+    }
+
+    func with(suggestion: SpeakerSuggestion?) -> NoteTurn {
         NoteTurn(id: id, speakerID: speakerID, name: name, tint: tint, start: start, auto: auto, words: words,
                  text: text, offsets: offsets, unsettledFrom: unsettledFrom, suggestion: suggestion, passages: passages)
     }

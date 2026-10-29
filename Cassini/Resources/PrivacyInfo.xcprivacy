@@ -31,7 +31,7 @@
 			</array>
 		</dict>
 		<!-- Sizes and dates of files in the app container: checkpoint and playback signatures, the sweep of stale
-		     temporary files, recovered recordings, the document info size, and FluidAudio's model cache. -->
+		     temporary files, recovered recordings, the document info size, and the model files' sizes. -->
 		<dict>
 			<key>NSPrivacyAccessedAPIType</key>
 			<string>NSPrivacyAccessedAPICategoryFileTimestamp</string>

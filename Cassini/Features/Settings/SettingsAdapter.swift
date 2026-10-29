@@ -29,7 +29,8 @@ import CassiniNotebook
     func size(of part: ModelPart) -> ModelSize {
         switch part {
         case .speech: .managedBySystem
-        case .speakers: .bytes(SpeakerAnalyzer.manifest.totalBytes)
+        // The diarizer and CAM++ download together: their bytes over the network.
+        case .speakers: .bytes(ModelCatalog.speakerBytes + ModelCatalog.voiceprintBytes)
         case .voices: .includedWith(.speakers)
         }
     }
