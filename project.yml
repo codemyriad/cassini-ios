@@ -11,7 +11,7 @@ settings:
     SWIFT_VERSION: '6.0'
     TARGETED_DEVICE_FAMILY: '1,2'
     CODE_SIGN_STYLE: Automatic
-    DEVELOPMENT_TEAM: ''
+    DEVELOPMENT_TEAM: '4LS8W738Y3'
 targets:
   Cassini:
     type: application

@@ -13,9 +13,10 @@ How to build Cassini for TestFlight and the App Store, and what is still missing
 Both are set in `project.yml`, and the app and the extension must carry the same version and build. Raise the build
 number for every upload; App Store Connect refuses a build number it has already seen for that version.
 
-Signing is automatic (`CODE_SIGN_STYLE: Automatic`), and `DEVELOPMENT_TEAM` is empty until Codemyriad's Apple Developer
-organization membership is active. Then set it to the team ID in `project.yml`, run `xcodegen generate`, and register
-both bundle IDs.
+Signing is automatic (`CODE_SIGN_STYLE: Automatic`). Codemyriad OU's team ID, `4LS8W738Y3`, is set in
+`project.yml` and inherited by the app and Live Activity extension. Run `xcodegen generate` after changing it.
+Sign in to the organization's Apple Account in Xcode on the build Mac; automatic provisioning still needs access
+to that account and its signing certificates. Register both bundle IDs, or let Xcode register them during provisioning.
 
 ## Checking a build without signing
 
