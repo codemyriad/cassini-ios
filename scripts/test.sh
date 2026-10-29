@@ -31,7 +31,8 @@
 # Builds go to <worktree>/DerivedData.noindex (DerivedData links to it; Spotlight skips a .noindex directory), which
 # persists between runs so later builds are incremental. Package checkouts are shared between worktrees under the
 # cache, one directory per Package.resolved: Xcode's directly, SwiftPM's as a copy-on-write seed for a worktree without
-# .build/. Logs and result bundles are in DerivedData/test-logs (the run before in DerivedData/test-logs.previous).
+# .build/. Logs and result bundles are in DerivedData/test-logs (the run before in DerivedData/test-logs.previous, and
+# the five newest failed runs in DerivedData/test-logs.failed).
 # The UI shards are balanced by each test's measured time averaged with the one stored before, kept in the cache
 # (scripts/ui-test-durations.tsv when the cache has none).
 set -euo pipefail
@@ -61,7 +62,14 @@ if [ -d "$root/DerivedData" ] && [ ! -L "$root/DerivedData" ] && [ ! -e "$derive
 fi
 mkdir -p "$cache" "$derived" "$leases"
 [ -e "$root/DerivedData" ] || ln -s "$(basename "$derived")" "$root/DerivedData"
-# The previous run's logs stay beside this run's.
+# The previous run's logs stay beside this run's. A failed run's logs (marked FAILED by summary) then move to
+# test-logs.failed/<when it failed>, which keeps the five newest: a flaky failure is not lost to the next two runs.
+failed_logs="$logs.failed"
+if [ -e "$logs.previous/FAILED" ]; then
+    mkdir -p "$failed_logs"
+    mv "$logs.previous" "$failed_logs/$(date -r "$logs.previous/FAILED" +%Y%m%d-%H%M%S)"
+    ls -1 "$failed_logs" | sort -r | tail -n +6 | while read -r old; do rm -rf "${failed_logs:?}/$old"; done
+fi
 if [ -d "$logs" ]; then rm -rf "$logs.previous"; mv "$logs" "$logs.previous"; fi
 mkdir -p "$logs"
 
@@ -81,7 +89,10 @@ summary() {
     printf '\n%-34s %6s\n' "step" "time"
     printf '%s' "$timings"
     printf '%-34s %5ss\n' "total" "$(( $(date +%s) - started_all ))"
-    if [ $rc -eq 0 ]; then echo "PASSED ($tier)"; else echo "FAILED ($tier), logs in $logs"; fi
+    if [ $rc -eq 0 ]; then echo "PASSED ($tier)"; else
+        echo "$tier exit $rc" > "$logs/FAILED"
+        echo "FAILED ($tier), logs in $logs (kept in $failed_logs after the next run)"
+    fi
     if [ "$keep_sims" = "0" ]; then shutdown_clones; fi
 }
 
@@ -726,7 +737,7 @@ extra_xcodebuild_from_extra() {
 case "$tier" in
     clean) delete_clones; echo "deleted the $prefix-* clones"; exit 0 ;;
     fast|app|ui|all|changed|build) ;;
-    *) sed -n '2,36p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+    *) sed -n '2,37p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac
 
 extra_xcodebuild_from_extra
