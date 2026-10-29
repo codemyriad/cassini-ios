@@ -177,7 +177,7 @@ extension ParakeetTranscriber {
                 // Android's `onChunk`: the window's speakers, outside the decode time. Without them the words have no
                 // speaker id.
                 try cancel.check()
-                return try speakers?.window(audio, startMs: startMs, words: words) ?? words
+                return try speakers?.window(audio, startMs: startMs, words: words) { try cancel.check() } ?? words
             }
             func decodeMs() -> Int64 { Int64(inferenceNanoseconds / 1_000_000) }
 

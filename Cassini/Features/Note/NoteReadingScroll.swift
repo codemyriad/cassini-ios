@@ -12,7 +12,6 @@ struct NoteReadingScroll: View {
     let subtitle: NoteSubtitle?
     let matches: [TranscriptMatch]
     let current: Int
-    let savedDraft: [DraftWord]
     let model: NoteScreenModel
     let cache: TranscriptCache
     let actions: TranscriptActions
@@ -39,8 +38,8 @@ struct NoteReadingScroll: View {
                     if mode.hasPlayer, !note.bookmarks.isEmpty {
                         BookmarksSection(note: note, isExpanded: $model.showBookmarks, model: model)
                     }
-                    if mode.showsDraft, !savedDraft.isEmpty {
-                        DraftSection(transcript: cache.saved(savedDraft), changing: false)
+                    if mode.showsDraft, let draft = model.shownDraft, !draft.words.isEmpty {
+                        DraftSection(draft: draft, transcript: cache.draft(draft), changing: false, model: model)
                     }
                     if note.saysNoSpeech(in: mode) {
                         NoSpeechState()

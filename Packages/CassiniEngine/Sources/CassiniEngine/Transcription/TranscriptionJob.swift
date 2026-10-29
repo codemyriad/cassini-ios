@@ -15,10 +15,14 @@ public struct JobSettings: Hashable, Sendable {
     public var allowSpeakerDownload: Bool
     /// The Forget everyone generation when the job began; voiceprints are kept only while it is current.
     public var voicesGeneration: Int
+    /// "Name strong matches automatically": a live match names a draft speaker only when it is on.
+    public var automaticallyNameVoices: Bool
 
-    public init(allowSpeechDownload: Bool, identifySpeakers: Bool, allowSpeakerDownload: Bool, voicesGeneration: Int = 0) {
+    public init(allowSpeechDownload: Bool, identifySpeakers: Bool, allowSpeakerDownload: Bool, voicesGeneration: Int = 0,
+                automaticallyNameVoices: Bool = false) {
         self.allowSpeechDownload = allowSpeechDownload; self.identifySpeakers = identifySpeakers
         self.allowSpeakerDownload = allowSpeakerDownload; self.voicesGeneration = voicesGeneration
+        self.automaticallyNameVoices = automaticallyNameVoices
     }
 }
 
@@ -27,6 +31,13 @@ public protocol TranscriptionJobHost: Sendable {
     func jobSettings() async -> JobSettings
     /// Gives the note the analysed speakers and their matches; throws when the note could not be saved.
     func applySpeakers(_ analysis: SpeakerAnalysis, to noteID: UUID, generation: Int) async throws
+    /// The saved voices as they are whenever it is called, from any thread, for live matching: none once Forget
+    /// everyone moved past `generation`.
+    func liveVoices(generation: Int) async -> @Sendable () -> [SavedVoice]
+}
+
+extension TranscriptionJobHost {
+    public func liveVoices(generation: Int) async -> @Sendable () -> [SavedVoice] { { [] } }
 }
 
 /// One run of one job: the words with Parakeet Ultra (or, on a device that cannot hold it, Apple's speech analyzer),
@@ -56,6 +67,11 @@ public protocol TranscriptionJobHost: Sendable {
 /// - **Speakers after the words.** A speakers-only job (Identify speakers), an Apple Speech transcription, and a
 ///   Parakeet run resumed from a checkpoint that did not stream speakers analyse the whole file after the words are in
 ///   the note (`SpeakerAnalyzing.analyze`). A failure leaves every word one voice and the job still succeeds.
+/// - **Draft names (Android's `names.json`).** A streaming run opens naming (`DraftNamesStore`); a fresh one starts
+///   with no names. Each window ends with a round of live voice matching (`LiveMatching`). Once the words are done the
+///   job closes naming and puts the names into the note with the speakers: the draft merges, the user's labels, the
+///   rejected voices (never matched) and the Remember choices (enrolled once the note is saved). A run that closed
+///   naming and does not finish opens it again.
 /// - **Provenance.** The run's record goes to the `ProvenanceStoring` with the words it describes (`ProvenanceRecord`),
 ///   not into the note. A speakers-only job adds its speaker record when the note still holds the run's words.
 /// - **Work.** A transcribing job removes `work/` once the note is saved; a speakers-only job never touches it, so a
@@ -84,19 +100,22 @@ public struct TranscriptionJob: TranscriptionJobRunning {
     private let uptimeMs: @Sendable () -> Int64
     private let availableMemory: @Sendable () -> Int64?
     private let device: @Sendable () -> RunDevice
+    private let drafts: DraftNamesStore?
 
     /// `availableMemory` is the memory left to Cassini, for the memory check at the start (`MemoryPreflight`) and the
     /// speaker models' (`SpeakerMemory`); `device` the device and OS the provenance names; `budget` the native budget
-    /// the decode and the speaker models hold.
+    /// the decode and the speaker models hold; `drafts` the draft names (nil: the draft has no names).
     public init(notes: NoteStore, transcriber: any Transcribing, analyzer: any SpeakerAnalyzing,
                 checkpoints: any CheckpointStoring, provenance: any ProvenanceStoring, host: any TranscriptionJobHost,
                 clock: any AppClock, limits: Limits = Limits(), budget: NativeBudget = .shared,
+                drafts: DraftNamesStore? = nil,
                 uptimeMs: @escaping @Sendable () -> Int64 = TranscriptionJob.uptimeMs,
                 availableMemory: @escaping @Sendable () -> Int64? = TranscriptionJob.availableMemory,
                 device: @escaping @Sendable () -> RunDevice = RunDevice.current) {
         self.notes = notes; self.transcriber = transcriber; self.analyzer = analyzer; self.checkpoints = checkpoints
         self.provenance = provenance; self.host = host; self.clock = clock; self.limits = limits; self.budget = budget
         self.uptimeMs = uptimeMs; self.availableMemory = availableMemory; self.device = device
+        self.drafts = drafts
     }
 
     /// `os_proc_available_memory()`: what Cassini can still allocate before iOS ends it; nil where the system does not
@@ -120,6 +139,14 @@ public struct TranscriptionJob: TranscriptionJobRunning {
             await pipeline(job, stop: stop, events: events)
         } onCancel: {
             stop.stop(.cancel)
+        }
+        if let drafts, job.kind != .speakersOnly {
+            // The names went into the note, or the work goes: the next use reads names.json again. A run that stops
+            // keeps them, open for naming.
+            switch outcome {
+            case .done, .cancelled: drafts.release(job.noteID)
+            default: drafts.open(job.noteID)
+            }
         }
         events(.ended(outcome))
         return outcome
@@ -175,6 +202,15 @@ public struct TranscriptionJob: TranscriptionJobRunning {
         case .plan(let value): plan = value
         case .ended(let outcome): return outcome
         }
+        if case .streaming = plan, let drafts {
+            // Every streaming run starts with naming open; a fresh one with no names (there are no words to name yet).
+            drafts.open(job.noteID)
+            if checkpoint == nil {
+                drafts.mutate(job.noteID) { _ in DraftNames(generation: settings.voicesGeneration) }
+            }
+            context.live = await host.liveVoices(generation: settings.voicesGeneration)
+        }
+        context.drafts = drafts
         let decodes = transcribes && checkpoint?.wordsComplete != true
         // The decode holds the native budget from before the run starts, so a job that waits for the previous one's
         // models to go shows "Finishing the previous note…".
@@ -210,6 +246,7 @@ public struct TranscriptionJob: TranscriptionJobRunning {
                 budget.release()
                 released = true
             }
+            if streamed != nil { streamed?.names = drafts?.close(job.noteID) }
             events(.namingClosed(matching: plan.runs && plan.printsReady))
             guard let words, await saveTranscript(words, resumed: checkpoint?.wordsComplete == true, context) else {
                 return .failed(.save)
@@ -395,9 +432,14 @@ public struct TranscriptionJob: TranscriptionJobRunning {
             guard case .streaming(let engines, let printsReady) = self else { return nil }
             let events = context.events
             let failure: @Sendable () -> Void = { events(.speakersUnavailable) }
+            let live = context.drafts.map {
+                LiveMatching(noteID: context.noteID, drafts: $0, voices: context.live,
+                             autoName: context.settings.automaticallyNameVoices)
+            }
             if printsReady, let clips = context.openClips(keeping: restored?.clipSamples ?? 0, fresh: restored == nil),
                let speakers = try? WindowSpeakers(engines: engines, clips: clips, restored: restored,
-                                                  availableMemory: context.availableMemory, onFailure: failure) {
+                                                  availableMemory: context.availableMemory, live: live,
+                                                  onFailure: failure) {
                 return (speakers, engines, true)
             }
             var withoutClips = restored
@@ -457,6 +499,8 @@ public struct TranscriptionJob: TranscriptionJobRunning {
         let windows: [String: [PrintWindow]]
         let engines: any SpeakerEngines
         let printsReady: Bool
+        /// The draft names, closed once the words are done.
+        var names: DraftNames?
 
         init(window: WindowSpeakers, engines: any SpeakerEngines, printsReady: Bool) {
             turns = window.turns; prefix = window.prefix; failed = window.failed; elapsedMs = window.elapsedMs
@@ -485,10 +529,13 @@ public struct TranscriptionJob: TranscriptionJobRunning {
             return nil
         }
         events(.stageChanged(.matching))
+        // The draft merges: one print per shown speaker, from the clips of every speaker merged into it.
+        let names = streamed.names ?? .empty
+        let windows = names.merged(streamed.windows)
         var prints: [SpeakerPrint] = []
-        if streamed.printsReady, let clips = streamed.clips, !streamed.windows.isEmpty {
+        if streamed.printsReady, let clips = streamed.clips, !windows.isEmpty {
             if let request = await takeBudget(context) { return Self.outcome(of: request) }
-            let engines = streamed.engines, windows = streamed.windows, memory = availableMemory
+            let engines = streamed.engines, memory = availableMemory
             let made = try? await engines.run { () throws -> [String: Voiceprint] in
                 guard SpeakerMemory.allows(availableBytes: memory(), SpeakerMemory.beforePrintsBytes) else { return [:] }
                 return try CheckedPrints.check(engines.prints(clips, windows: windows) { try Task.checkCancellation() })
@@ -500,9 +547,19 @@ public struct TranscriptionJob: TranscriptionJobRunning {
                              speechSeconds: $0.value.seconds)
             }
         }
-        let analysis = SpeakerAnalysis(turns: streamed.turns.map { $0.speakerTurn(prefix: streamed.prefix) }, prints: prints,
-                                       transcript: context.attributed, elapsedMs: streamed.elapsedMs, streaming: true,
-                                       printsReady: streamed.printsReady)
+        let turns = streamed.turns.map { turn in
+            var shown = turn.speakerTurn(prefix: streamed.prefix)
+            shown.speakerID = names.resolve(shown.speakerID)
+            return shown
+        }
+        let transcript = context.attributed?.map { segment in
+            var shown = segment
+            shown.speakerID = segment.speakerID.map(names.resolve)
+            return shown
+        }
+        let analysis = SpeakerAnalysis(turns: turns, prints: prints, transcript: transcript, elapsedMs: streamed.elapsedMs,
+                                       streaming: true, printsReady: streamed.printsReady,
+                                       names: streamed.names)
         return await applyAnalysis(analysis, context)
     }
 
@@ -644,6 +701,9 @@ public struct TranscriptionJob: TranscriptionJobRunning {
         var attributed: [TranscriptSegment]?
         var availableMemory: @Sendable () -> Int64? = { nil }
         var clipsURL: URL?
+        /// The draft names, and the saved voices for live matching.
+        var drafts: DraftNamesStore?
+        var live: @Sendable () -> [SavedVoice] = { [] }
 
         init(noteID: UUID, url: URL, source: String, language: String, recognizer: SpeechRecognizer, knownMs: Int64,
              settings: JobSettings, stop: StopSignal, events: @escaping @Sendable (JobEvent) -> Void) {

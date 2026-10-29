@@ -24,6 +24,8 @@ extension TranscriptionJobTests {
         let budget = NativeBudget()
         /// Runs the job with this transcriber in place of `transcriber` (a Parakeet one, say).
         let engine: (any Transcribing)?
+        /// The draft names, as the app gives every job.
+        let drafts: DraftNamesStore
 
         var applied: [(noteID: UUID, generation: Int)] { host.applied }
 
@@ -48,6 +50,7 @@ extension TranscriptionJobTests {
             host = FakeHost(settings, notes: notes)
             self.limits = limits
             self.engine = engine
+            drafts = DraftNamesStore(notes: notes)
         }
 
         func note() async -> Note? { await notes.note(noteID) }
@@ -61,7 +64,8 @@ extension TranscriptionJobTests {
             let ticking = FakeUptime()
             let job = TranscriptionJob(notes: notes, transcriber: engine ?? transcriber, analyzer: analyzer, checkpoints: checkpoints,
                                        provenance: provenanceFiles, host: host, clock: FakeClock(), limits: limits, budget: budget,
-                                       uptimeMs: uptime ?? { ticking.next() }, availableMemory: { availableMemory })
+                                       drafts: drafts, uptimeMs: uptime ?? { ticking.next() },
+                                       availableMemory: { availableMemory })
             let record = Job(noteID: noteID, seq: 1, kind: kind, state: .running, language: language, enqueuedAt: Date())
             let events = Mutex<[JobEvent]>([])
             let outcome = await job.run(record, stop: stop) { event in
@@ -187,15 +191,32 @@ extension TranscriptionJobTests {
         private let notes: NoteStore
         private var _applied: [(noteID: UUID, generation: Int)] = []
         private var _analyses: [SpeakerAnalysis] = []
+        private var _voices: [SavedVoice] = []
+        private var _generation: Int
         var failsApplying = false
 
-        init(_ settings: JobSettings, notes: NoteStore) { self.settings = settings; self.notes = notes }
+        init(_ settings: JobSettings, notes: NoteStore) {
+            self.settings = settings; self.notes = notes; _generation = settings.voicesGeneration
+        }
+
+        /// The saved voices live matching sees, while the Forget everyone generation is `generation`.
+        var voices: [SavedVoice] {
+            get { lock.withLock { _voices } }
+            set { lock.withLock { _voices = newValue } }
+        }
+        var generation: Int {
+            get { lock.withLock { _generation } }
+            set { lock.withLock { _generation = newValue } }
+        }
 
         var applied: [(noteID: UUID, generation: Int)] { lock.withLock { _applied } }
         /// Every analysis the job gave the note, in order.
         var analyses: [SpeakerAnalysis] { lock.withLock { _analyses } }
 
         func jobSettings() async -> JobSettings { settings }
+        func liveVoices(generation: Int) async -> @Sendable () -> [SavedVoice] {
+            { [self] in lock.withLock { _generation == generation ? _voices : [] } }
+        }
         func applySpeakers(_ analysis: SpeakerAnalysis, to noteID: UUID, generation: Int) async throws {
             if lock.withLock({ failsApplying }) { throw CocoaError(.fileWriteUnknown) }
             // As the app does: the streamed words with their speakers, else the words get the analysis's turns.

@@ -11,6 +11,7 @@ import CassiniNotebook
 ///   (`<prefix>1`): the windows before keep their speakers, as on Android. `onFailure` is called once.
 /// - **Memory.** Before the diarizer loads, `os_proc_available_memory()` must leave `SpeakerMemory.beforeDiarizerBytes`;
 ///   below it the speakers fail (one voice) rather than the job.
+/// - **Live matching.** With `live`, each window ends with a round of live voice matching (`LiveMatching`), best effort.
 /// - **Checkpoint.** `checkpoint()` flushes the clips to disk and returns the state to save with the window's words;
 ///   a run restored from it goes on with the same slots, turns, clips and prefix.
 /// - **Thread.** Every call but the read-only properties after the decode runs on the inference thread, where the
@@ -22,6 +23,7 @@ public final class WindowSpeakers: @unchecked Sendable {
     private let cache: VoiceClipCache?
     private let availableMemory: @Sendable () -> Int64?
     private let onFailure: @Sendable () -> Void
+    private let live: LiveMatching?
     private let lock = NSLock()
     private var diarizer: (any StreamingDiarizer)?
     private var restored: DiarizerState?
@@ -31,9 +33,10 @@ public final class WindowSpeakers: @unchecked Sendable {
     /// speaker state; its clips must be in `clips`.
     public init(engines: any SpeakerEngines, clips: (any ClipStore)?, restored: SpeakerCheckpoint? = nil,
                 prefix: String = WindowSpeakers.freshPrefix(),
-                availableMemory: @escaping @Sendable () -> Int64? = { nil },
+                availableMemory: @escaping @Sendable () -> Int64? = { nil }, live: LiveMatching? = nil,
                 onFailure: @escaping @Sendable () -> Void = {}) throws(VoiceClipCache.Invalid) {
         self.engines = engines
+        self.live = live
         self.clips = clips
         self.prefix = restored?.prefix ?? prefix
         self.availableMemory = availableMemory
@@ -62,8 +65,10 @@ public final class WindowSpeakers: @unchecked Sendable {
     /// The clips' audio, for the voiceprints after the decode.
     public var clipAudio: (any ClipStore)? { clips }
 
-    /// The words of one window that starts at `startMs`, on the window's clock, with their speakers.
-    public func window(_ audio: PcmAudio, startMs: Int64, words: Transcript) throws -> Transcript {
+    /// The words of one window that starts at `startMs`, on the window's clock, with their speakers. `active` throws
+    /// to stop between native calls.
+    public func window(_ audio: PcmAudio, startMs: Int64, words: Transcript,
+                       active: () throws -> Void = {}) throws -> Transcript {
         try lock.withLock {
             if failure { return oneVoice(words) }
             do {
@@ -72,6 +77,7 @@ public final class WindowSpeakers: @unchecked Sendable {
                 let assigned = found.isEmpty ? oneVoice(words).words
                     : Diarization.assign(words.words, turns: found, prefix: prefix, stableIds: true)
                 try cache?.accept(audio, turns: found, words: assigned, startMs: startMs)
+                matchLive(active)
                 return Transcript(assigned, language: words.language)
             } catch is CancellationError {
                 throw CancellationError()
@@ -103,6 +109,14 @@ public final class WindowSpeakers: @unchecked Sendable {
             restored = diarizer.state
             self.diarizer = nil
         }
+    }
+
+    /// A round of live matching. A failure leaves the draft names as they are; a stop ends the round, and the decode
+    /// sees it at its next check.
+    private func matchLive(_ active: () throws -> Void) {
+        guard let live, let clips, let cache,
+              SpeakerMemory.allows(availableBytes: availableMemory(), SpeakerMemory.beforePrintsBytes) else { return }
+        try? live.round(windows: cache.windows, clips: clips, engines: engines, active: active)
     }
 
     private func open() throws -> any StreamingDiarizer {

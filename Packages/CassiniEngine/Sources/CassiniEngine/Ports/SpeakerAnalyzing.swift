@@ -19,11 +19,14 @@ public struct SpeakerAnalysis: Hashable, Sendable {
     /// The voiceprint model was there to make prints, even when no speaker had enough speech for one
     /// (`x-speakerIdentification` is written).
     public var printsReady: Bool
+    /// The draft names of a streaming run, as naming closed: their merges are applied to `turns`, `prints` and
+    /// `transcript` already; the labels, rejections and Remember choices go into the note with them.
+    public var names: DraftNames?
 
     public init(turns: [SpeakerTurn], prints: [SpeakerPrint], transcript: [TranscriptSegment]? = nil,
-                elapsedMs: Int64? = nil, streaming: Bool = true, printsReady: Bool? = nil) {
+                elapsedMs: Int64? = nil, streaming: Bool = true, printsReady: Bool? = nil, names: DraftNames? = nil) {
         self.turns = turns; self.prints = prints; self.transcript = transcript; self.elapsedMs = elapsedMs
-        self.streaming = streaming; self.printsReady = printsReady ?? !prints.isEmpty
+        self.streaming = streaming; self.printsReady = printsReady ?? !prints.isEmpty; self.names = names
     }
 }
 

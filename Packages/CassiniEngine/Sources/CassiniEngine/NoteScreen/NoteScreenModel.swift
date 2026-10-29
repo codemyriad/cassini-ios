@@ -1,3 +1,4 @@
+import CassiniCore
 import Foundation
 import Observation
 import CassiniNotebook
@@ -89,6 +90,19 @@ public final class NoteScreenModel {
         public var openModelDownload: @MainActor (UUID) -> Void
         public var present: @MainActor (NoteProblem) -> Void
 
+        // The draft's names
+        /// The note's draft names now and after every change (`DraftNamesStore.changes`).
+        public var draftNames: @MainActor (UUID) -> AsyncStream<DraftNames> = { _ in AsyncStream { $0.finish() } }
+        /// Whether the job lets the draft's speakers be named now.
+        public var draftNamingOpen: @MainActor (UUID) -> Bool = { _ in false }
+        /// Carries out the draft effects of Name a speaker or a suggestion card; false when naming closed meanwhile.
+        public var changeDraft: @MainActor (UUID, [NamingEffect]) async -> Bool = { _, _ in false }
+        /// The running job's draft as its tracker has it, nil without one.
+        public var runningDraft: @MainActor (UUID) -> DraftState? = { _ in nil }
+        /// The saved voices, and whether they can be changed now.
+        public var savedVoices: @MainActor () -> [SavedVoice] = { [] }
+        public var voicesReadOnly: @MainActor () -> Bool = { true }
+
         public init(note: @escaping @MainActor (UUID) -> Note?, job: @escaping @MainActor (UUID) -> Job?,
                     update: @escaping @MainActor (UUID, @escaping @Sendable (inout Note) -> Void) -> Void,
                     commit: @escaping @MainActor (UUID, @escaping @Sendable (inout Note) -> Void) async -> Note?,
@@ -160,6 +174,9 @@ public final class NoteScreenModel {
     public private(set) var savedDraft: [DraftWord] = []
     /// The speaker models are installed: Transcribe again says "Speaker names carry over."
     public private(set) var speakerModelsReady = false
+    /// The draft's names (`names.json`), while the screen is shown.
+    public private(set) var draftNames = DraftNames.empty
+    @ObservationIgnored private var namesTask: Task<Void, Never>?
     /// This screen, as the owner of the player.
     @ObservationIgnored public let playerOwner = PlaybackOwner()
     @ObservationIgnored let ports: Ports
@@ -238,7 +255,13 @@ public final class NoteScreenModel {
 
     /// A speaker header, a speaker of the Speakers list or a suggestion card's header: Name a speaker, unless the
     /// transcript is read-only (then the screen says why).
-    public func speakerTapped(_ speakerID: String) { run(screen.speakerTapped(speakerID, readOnly: readOnly)) }
+    public func speakerTapped(_ speakerID: String) {
+        if isDraftSpeaker(speakerID) {
+            run(screen.speakerTapped(speakerID, readOnly: ports.draftNamingOpen(noteID) ? nil : .saving))
+        } else {
+            run(screen.speakerTapped(speakerID, readOnly: readOnly))
+        }
+    }
     public func versionsTapped() { run(screen.versionsTapped(readOnly: readOnly)) }
     public func speakersTapped() { run(screen.speakersTapped(readOnly: readOnly)) }
     public func editPassage(_ segmentID: UUID) { run(screen.editPassage(segmentID, readOnly: readOnly)) }
@@ -335,8 +358,19 @@ public final class NoteScreenModel {
         return saved?.holds(revised) == true ? .saved : .changed
     }
 
-    /// "Yes, Luca" or "Not Luca" on a suggestion card; nothing while the transcript is read-only.
+    /// "Yes, Luca" or "Not Luca" on a suggestion card; nothing while the transcript is read-only. A draft's card answers
+    /// in the draft's names (Android's `DraftNames.confirm` and `reject`), while its naming is open.
     public func answer(_ suggestion: SpeakerSuggestion, yes: Bool) async {
+        if suggestion.segmentID == NoteTranscripts.draftSegment {
+            guard ports.draftNamingOpen(noteID) else { return }
+            let effect: NamingEffect = yes
+                ? .draftName(speakerID: suggestion.speakerID, name: suggestion.voiceName, voice: .saved(suggestion.voiceID),
+                             confirm: true, score: suggestion.score)
+                : .reject(speakerID: suggestion.speakerID, voiceID: suggestion.voiceID, voiceName: suggestion.voiceName,
+                          unenrol: false, restorePlaceholder: false, draft: true)
+            _ = await ports.changeDraft(noteID, [effect])
+            return
+        }
         guard readOnly == nil else { return }
         do throws(VoicesStore.SaveFailure) {
             try await ports.answerSuggestion(suggestion, noteID, yes)
@@ -345,11 +379,58 @@ public final class NoteScreenModel {
         }
     }
 
-    /// The model of Name a speaker for one of the note's speakers.
+    /// The model of Name a speaker for one of the note's speakers, or one of the draft's: its saves then go to the
+    /// draft's names, and are refused once the job closed naming.
     public func naming(_ speakerID: String) -> NameSpeakerModel {
-        NameSpeakerModel(noteID: noteID, speakerID: speakerID, ports: .init(
-            input: ports.namingInput, perform: ports.performNaming,
-            readOnly: { [weak self] in self?.readOnly }))
+        guard isDraftSpeaker(speakerID) else {
+            return NameSpeakerModel(noteID: noteID, speakerID: speakerID, ports: .init(
+                input: ports.namingInput, perform: ports.performNaming,
+                readOnly: { [weak self] in self?.readOnly }))
+        }
+        let change = ports.changeDraft, open = ports.draftNamingOpen
+        return NameSpeakerModel(noteID: noteID, speakerID: speakerID, ports: .init(
+            input: { [weak self] _, id in await self?.draftInput(id) },
+            perform: { effects, noteID, _ throws(VoicesStore.SaveFailure) in _ = await change(noteID, effects) },
+            readOnly: { [noteID] in open(noteID) ? nil : .saving }))
+    }
+
+    // MARK: The draft
+
+    /// The draft the screen shows, with its names: the running job's, or the saved progress of a stopped or failed one.
+    /// Nil without one.
+    public var shownDraft: DraftState? {
+        let voiceNames = Dictionary(ports.savedVoices().map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
+        if let running = ports.runningDraft(noteID) {
+            return DraftView.build(running, names: draftNames, voiceNames: voiceNames)
+        }
+        guard !savedDraft.isEmpty else { return nil }
+        let saved = DraftState(words: savedDraft, tentativeFromMs: .max, namingOpen: ports.draftNamingOpen(noteID))
+        return DraftView.build(saved, names: draftNames, voiceNames: voiceNames)
+    }
+
+    /// Whether `speakerID` is a speaker of the draft on screen.
+    private func isDraftSpeaker(_ speakerID: String) -> Bool {
+        !speakerID.isEmpty && shownDraft?.words.contains { $0.speaker == speakerID } == true
+    }
+
+    /// What Name a speaker knows about a draft speaker (Android's `draftInput`): its numbers from the draft's words
+    /// (merges applied), its label, its live match, the other draft speakers to merge into, and a print to come once
+    /// the voiceprint model is installed.
+    func draftInput(_ speakerID: String) async -> NamingInput? {
+        guard let draft = shownDraft else { return nil }
+        let stats = SpeakerStats.of(words: draft.words.map { Word($0.speaker, $0.startMs, $0.endMs, $0.text) })
+        guard let stat = stats.first(where: { $0.speakerID == speakerID }) else { return nil }
+        func label(_ stat: SpeakerStat) -> String { draft.labels[stat.speakerID] ?? DefaultLabels.placeholder(stat.ordinal + 1) }
+        let targets = stats.filter { $0.speakerID != speakerID && $0.wordCount > 0 }.map {
+            MergeTarget(speakerID: $0.speakerID, name: label($0), ordinal: $0.ordinal, speakingTime: $0.speakingTime)
+        }
+        let ready = await ports.speakerModelsReady()
+        // A running job holds the audio: no sample plays until it stops.
+        let canSample = ports.runningDraft(noteID) == nil && note?.audio.isPlayable == true
+        return NamingInput(speakerID: speakerID, label: label(stat), ordinal: stat.ordinal, speakingTime: stat.speakingTime,
+                           sample: stat.sample, print: nil, match: draftNames.match(speakerID),
+                           voices: ports.savedVoices(), voicesReadOnly: ports.voicesReadOnly(), voiceModelReady: ready,
+                           mergeTargets: targets, canSample: canSample, draft: true, willHavePrint: ready)
     }
 
     // MARK: Opening
@@ -379,6 +460,12 @@ public final class NoteScreenModel {
         updatePlayer()
         runStart(start)
         Task { speakerModelsReady = await ports.speakerModelsReady() }
+        if namesTask == nil {
+            let names = ports.draftNames(noteID)
+            namesTask = Task { [weak self] in
+                for await value in names { self?.draftNames = value }
+            }
+        }
     }
 
     /// Runs the Library's start action once for the screen: the router remembers that it ran, and a route restored
@@ -425,5 +512,7 @@ public final class NoteScreenModel {
         visible = false
         ports.leavePlayer(playerOwner)
         resumeFollow?.cancel()
+        namesTask?.cancel()
+        namesTask = nil
     }
 }

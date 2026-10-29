@@ -15,7 +15,8 @@ struct TranscriptActions {
 ///
 /// Reading: the header is a 44 pt button that opens Name a speaker; each word is a link that plays from it; the word
 /// being played is drawn inverted; search hits are highlighted, the current one in semibold. Draft: plain text in a
-/// lighter colour, the words that may still change lighter again, and a header that is only a label.
+/// lighter colour, the words that may still change lighter again, and a header that opens Name a speaker while the job
+/// lets the draft be named (else it is only a label).
 ///
 /// VoiceOver reads the paragraph as one element whose default action plays it from its start, with no stop per word.
 /// The view is `Equatable` over what it draws, so a new playback position redraws only the paragraphs that hold the
@@ -44,7 +45,7 @@ struct TurnView: View, Equatable {
         let _ = RenderProbe.rendered(turn.id)
         #endif
         VStack(alignment: .leading, spacing: 2) {
-            TurnHeader(turn: turn, button: style == .reading && renamable && turn.speakerID != nil) {
+            TurnHeader(turn: turn, button: renamable && turn.speakerID != nil) {
                 if let id = turn.speakerID { actions.nameSpeaker(id) }
             }
             paragraph

@@ -64,7 +64,8 @@ import CassiniNotebook
                                            recording: recording, trash: trash)
         libraryScreen.connect(router: router, errors: errors)
         noteScreens = Self.noteScreens(library: library, voices: voices, processing: processing, playback: playback,
-                                       recording: recording, exports: exports, trash: trash, router: router, errors: errors)
+                                       recording: recording, exports: exports, trash: trash, router: router, errors: errors,
+                                       settings: settings)
         processing.modelDownload = ModelDownloadAdapter(
             settings: settings, processing: processing, transcriber: environment.transcriber,
             analyzer: environment.analyzer, storage: environment.storage, notices: noticeCenter,
@@ -98,13 +99,16 @@ import CassiniNotebook
                                    settings: SettingsStore, notices: NoticeCenter) -> ProcessingStore {
         let progress = JobProgress(battery: UIDeviceBattery(), onFinalization: { [settings] in settings.recordFinalization($0) })
         let checkpoints: any CheckpointStoring = library.noteStore.map { CheckpointFiles(notes: $0) } ?? NoLibraryWork()
+        let drafts = library.noteStore.map { DraftNamesStore(notes: $0) }
+        voices.drafts = drafts
         let coordinator = library.noteStore.map { notes in
             let job = TranscriptionJob(notes: notes, transcriber: environment.transcriber, analyzer: environment.analyzer,
                                        checkpoints: checkpoints, provenance: ProvenanceFiles(notes: notes),
-                                       host: AppJobHost(settings: settings, voices: voices), clock: environment.clock)
+                                       host: AppJobHost(settings: settings, voices: voices), clock: environment.clock,
+                                       drafts: drafts)
             let parts = TranscriptionCoordinator.Parts(
                 jobs: JobStore(repository: JobRepository(root: environment.root)), notes: notes, runner: job,
-                checkpoints: NoteWorkFolders(notes: notes),
+                checkpoints: NoteWorkFolders(notes: notes, drafts: drafts),
                 consent: .recorded(settings: settings, speech: environment.transcriber, speakers: environment.analyzer,
                                   parakeetReady: { [models = environment.models] in ModelCatalog.parakeet.ready(in: models) }),
                 notifier: environment.notifier, background: environment.background, clock: environment.clock,
@@ -116,7 +120,7 @@ import CassiniNotebook
         let models = ModelInstalls(transcriber: environment.transcriber, analyzer: environment.analyzer,
                                    clock: environment.clock, job: progress) { [settings] in settings.speechLanguage }
         return ProcessingStore(coordinator: coordinator, progress: progress, checkpoints: checkpoints, models: models,
-                               analyzer: environment.analyzer, notices: notices)
+                               analyzer: environment.analyzer, notices: notices, drafts: drafts)
     }
 
     /// The Library over the notes, the queue and the recorder.

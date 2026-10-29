@@ -1044,6 +1044,23 @@
         }
       }
     },
+    "Saving — you can rename when it’s done": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saving — you can rename when it’s done"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Salvataggio — potrai rinominare alla fine"
+          }
+        }
+      }
+    },
     "Search in transcript": {
       "extractionState": "manual",
       "localizations": {

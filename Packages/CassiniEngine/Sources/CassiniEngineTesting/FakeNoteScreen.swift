@@ -26,6 +26,12 @@ import CassiniNotebook
     public var namingInput: NamingInput?
     /// Scripted failure of the naming writes.
     public var namingFailure: VoicesStore.SaveFailure?
+    /// The running job's draft, and whether its naming is open.
+    public var runningDraft: DraftState?
+    public var draftNamingOpen = true
+    /// The draft names the screen observes, and the draft effects it asked for.
+    public var draftNames = DraftNames.empty
+    public private(set) var draftWrites: [[NamingEffect]] = []
     /// Holds the naming writes until `releaseNaming()`.
     public var holdsNaming = false
     private var namingRelease: CheckedContinuation<Void, Never>?
@@ -38,7 +44,7 @@ import CassiniNotebook
         namingRelease = nil
     }
 
-    public lazy var ports = NoteScreenModel.Ports(
+    public lazy var ports: NoteScreenModel.Ports = withDraft(NoteScreenModel.Ports(
         note: { [unowned self] id in note?.id == id ? note : nil }, job: { [unowned self] _ in job },
         update: { [unowned self] id, change in
             calls.append("update")
@@ -108,6 +114,25 @@ import CassiniNotebook
             session.started = true
         },
         openModelDownload: { [unowned self] _ in calls.append("openModelDownload") },
-        present: { [unowned self] problem in problems.append(problem) })
+        present: { [unowned self] problem in problems.append(problem) }))
+
+    private func withDraft(_ base: NoteScreenModel.Ports) -> NoteScreenModel.Ports {
+        var ports = base
+        ports.runningDraft = { [unowned self] _ in runningDraft }
+        ports.draftNamingOpen = { [unowned self] _ in draftNamingOpen }
+        ports.voicesReadOnly = { false }
+        ports.draftNames = { [unowned self] _ in
+            let names = draftNames
+            return AsyncStream { $0.yield(names) }
+        }
+        ports.changeDraft = { [unowned self] _, effects in
+            guard draftNamingOpen else { return false }
+            calls.append("changeDraft")
+            draftWrites.append(effects)
+            draftNames = draftNames.applying(effects, generation: 0)
+            return true
+        }
+        return ports
+    }
 }
 #endif

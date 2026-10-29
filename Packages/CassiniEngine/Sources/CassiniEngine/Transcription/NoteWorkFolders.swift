@@ -6,11 +6,13 @@ import CassiniNotebook
 public struct NoteWorkFolders: JobCheckpoints {
     public let files: CheckpointFiles
     private let root: URL
+    private let drafts: DraftNamesStore?
 
-    /// The work folders of `notes`' notes.
-    public init(notes: NoteStore) {
+    /// The work folders of `notes`' notes; `drafts` forgets a note's draft names once its work is discarded.
+    public init(notes: NoteStore, drafts: DraftNamesStore? = nil) {
         files = CheckpointFiles(notes: notes)
         root = notes.root
+        self.drafts = drafts
     }
 
     /// The numbers of the note's checkpoint. One that cannot be read, or that no longer fits the note's audio file
@@ -25,7 +27,10 @@ public struct NoteWorkFolders: JobCheckpoints {
         return .saved(doneMs: checkpoint.doneMs, totalMs: checkpoint.totalMs, words: checkpoint.draftWords.count)
     }
 
-    public func discard(_ noteID: UUID) async throws { try files.discard(noteID) }
+    public func discard(_ noteID: UUID) async throws {
+        try files.discard(noteID)
+        drafts?.release(noteID)
+    }
 
     /// Every note folder under the root with a `work/` folder, whether or not its note can be read.
     public func notesWithWork() async -> Set<UUID> {

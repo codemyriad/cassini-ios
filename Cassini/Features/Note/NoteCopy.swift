@@ -42,6 +42,7 @@ enum NoteCopy {
         switch reason {
         case .jobPending: String(localized: "Wait until transcription finishes", table: "Note")
         case .trust: String(localized: "Fix the transcript first: Transcribe again", table: "Note")
+        case .saving: String(localized: "Saving — you can rename when it’s done", table: "Note")
         }
     }
 
