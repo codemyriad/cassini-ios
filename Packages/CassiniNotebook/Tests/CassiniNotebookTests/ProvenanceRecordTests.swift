@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 import CassiniNotebook
 
@@ -45,6 +46,24 @@ import CassiniNotebook
         var other = attributed
         other[0].speakerID = "y_a"
         #expect(record.provenance(for: other)?.speakerDiarization == nil)
+    }
+
+    /// A `provenance.json` of a build that told speakers apart with FluidAudio: its speaker record has none of
+    /// Sortformer's members, so it no longer reads, but the words' record still does.
+    @Test func aRecordOfAFluidAudioBuildKeepsItsWordsRecord() throws {
+        var record = ProvenanceRecord(provenance: provenance, transcript: words)
+        record.addSpeakers(.sortformer(revision: "r", sha256: "s", elapsedMs: 1, turnCount: 1, speakerCount: 1,
+                                       streaming: false), transcript: words)
+        var json = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(record)) as? [String: Any])
+        json["speakerDiarization"] = ["backend": "fluidaudio", "model": "pyannote-community-1-wespeaker-coreml-v1",
+                                      "sha": "abc", "turnCount": 2, "speakerCount": 2]
+        json["speakerIdentification"] = ["model": "wespeaker", "dim": 256, "metric": "cosine", "autoThreshold": 0.85,
+                                         "suggestThreshold": 0.65, "margin": 0.12, "speakersWithPrints": 2,
+                                         "autoApplied": 0, "suggested": 1]
+        let old = try JSONDecoder().decode(ProvenanceRecord.self, from: JSONSerialization.data(withJSONObject: json))
+        #expect(old.provenance(for: words)?.inferenceMs == 1_200)
+        #expect(old.speakerDiarization == nil && old.speakerIdentification == nil)
+        #expect(old.provenance(for: words)?.speakerDiarization == nil)
     }
 
     @Test func theFingerprintIgnoresPassagesAndSpeakersButNotTimes() {

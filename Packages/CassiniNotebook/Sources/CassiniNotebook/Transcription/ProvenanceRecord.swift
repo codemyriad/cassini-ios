@@ -28,6 +28,22 @@ public struct ProvenanceRecord: Codable, Hashable, Sendable {
         words = Self.fingerprint(of: transcript)
     }
 
+    private enum CodingKeys: String, CodingKey {
+        case provenance, words, speakerDiarization, speakerIdentification, speakerIDs
+    }
+
+    /// A speaker record that no longer reads (one of a build that told speakers apart with FluidAudio, which has none
+    /// of Sortformer's members) is left out; the words' record still holds.
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        provenance = try c.decode(TranscriptProvenance.self, forKey: .provenance)
+        words = try c.decode(String.self, forKey: .words)
+        speakerDiarization = try? c.decodeIfPresent(TranscriptProvenance.SpeakerDiarization.self, forKey: .speakerDiarization)
+        speakerIdentification = speakerDiarization == nil ? nil
+            : try? c.decodeIfPresent(TranscriptProvenance.SpeakerIdentification.self, forKey: .speakerIdentification)
+        speakerIDs = speakerDiarization == nil ? nil : try c.decodeIfPresent([String].self, forKey: .speakerIDs)
+    }
+
     /// Whether `transcript` holds the words this run made.
     public func describes(_ transcript: [TranscriptSegment]) -> Bool { words == Self.fingerprint(of: transcript) }
 
