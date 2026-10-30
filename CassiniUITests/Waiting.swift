@@ -28,12 +28,15 @@ extension XCUIElement {
 extension XCUIElement {
     /// Taps a menu item once it has stopped moving. A context menu or a pull-down menu still animates in when the app's
     /// own animations are off, and a tap that lands while it does is dropped on a busy machine ("Failed to tap", or a
-    /// tap that does nothing). Waits for the item to be hittable at the same frame twice in a row, then taps.
-    @MainActor func tapWhenSettled(within timeout: TimeInterval = 5) {
+    /// tap that does nothing). An open menu is also rebuilt whenever what it shows changes (a running job's note, at
+    /// each result), and for a moment the item has no point to tap: reading `isHittable` then fails the test ("Failed
+    /// to determine hittability… Activation point invalid"). So the wait reads snapshots, which only throw, until the
+    /// item is on the screen at the same frame twice in a row, then taps it.
+    @MainActor func tapWhenSettled(within timeout: TimeInterval = 10) {
+        let screen = XCUIApplication().frame
         var last: CGRect?
         _ = poll(within: timeout) {
-            guard exists, isHittable else { last = nil; return false }
-            let frame = self.frame
+            guard let frame = (try? snapshot())?.frame.intersection(screen), !frame.isEmpty else { last = nil; return false }
             defer { last = frame }
             return frame == last
         }
