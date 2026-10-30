@@ -6,12 +6,17 @@ How to build Cassini for TestFlight and the App Store, and what is still missing
 
 | | App | Live Activity extension |
 |---|---|---|
+| Name | "Cassini talk" (`CFBundleDisplayName`, D45) | "Cassini talk" |
 | Bundle ID | `io.codemyriad.cassini` | `io.codemyriad.cassini.activity` |
 | Version | `MARKETING_VERSION` 0.1.0 | 0.1.0 |
 | Build | `CURRENT_PROJECT_VERSION` 2 | 2 |
 
 Both are set in `project.yml`, and the app and the extension must carry the same version and build. Raise the build
 number for every upload; App Store Connect refuses a build number it has already seen for that version.
+
+The home-screen name is set in the two `Info.plist` files, and the screens that name the product (the Library's
+wordmark, About, Now Playing) use `ProductName.full`; running sentences keep "Cassini". The App Store Connect record's
+name is changed in App Store Connect by Silvio, and the bundle IDs stay as they are (D-891).
 
 Signing is automatic (`CODE_SIGN_STYLE: Automatic`). Codemyriad OU's team ID, `4LS8W738Y3`, is set in
 `project.yml` and inherited by the app and Live Activity extension. Run `xcodegen generate` after changing it.

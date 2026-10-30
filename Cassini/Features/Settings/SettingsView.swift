@@ -212,14 +212,14 @@ struct SettingsRowLabel: View {
     }
 }
 
-/// "Cassini 0.1.0 — turns speech into searchable, timed text on your device." and the notices link.
+/// "Cassini talk 0.1.0 — turns speech into searchable, timed text on your device." and the notices link.
 private struct AboutCard: View {
     let version: String
     let openNotices: () -> Void
 
     /// The name and version in bold ink, then the tagline.
     private var tagline: AttributedString {
-        var name = AttributedString("Cassini \(version)")
+        var name = AttributedString("\(ProductName.full) \(version)")
         name.inlinePresentationIntent = .stronglyEmphasized
         name.foregroundColor = Color.ink
         return name + AttributedString(" ")

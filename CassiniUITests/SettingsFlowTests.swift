@@ -46,7 +46,7 @@ final class SettingsFlowTests: XCTestCase {
         XCTAssertTrue(voices.label.contains("None yet"), voices.label)
         // With its value: on iPad the library's toolbar beside Settings has a Recently Deleted button too.
         XCTAssertTrue(row(app, startingWith: "Recently Deleted,").label.contains("Empty"))
-        let version = element(app, startingWith: "Cassini 0.1.0")
+        let version = element(app, startingWith: "Cassini talk 0.1.0")
         reveal(version, in: app)
     }
 
@@ -73,7 +73,7 @@ final class SettingsFlowTests: XCTestCase {
         reveal(notices, in: app)
         notices.tap()
         XCTAssertTrue(app.navigationBars["Source code and notices"].waitForExistence(within: 5))
-        for title in ["Cassini", "Third-party notices", "Model notices", "Where the models come from", "Privacy",
+        for title in ["Cassini talk", "Third-party notices", "Model notices", "Where the models come from", "Privacy",
                       "Source code on GitHub"] {
             XCTAssertTrue(row(app, startingWith: title).exists, "\(title) row")
         }
@@ -83,11 +83,11 @@ final class SettingsFlowTests: XCTestCase {
         app.navigationBars["Privacy"].buttons.element(boundBy: 0).tap()
         XCTAssertTrue(app.navigationBars["Source code and notices"].waitForExistence(within: 5))
 
-        row(app, startingWith: "Cassini").tap()
-        XCTAssertTrue(app.navigationBars["Cassini"].waitForExistence(within: 5))
+        row(app, startingWith: "Cassini talk").tap()
+        XCTAssertTrue(app.navigationBars["Cassini talk"].waitForExistence(within: 5))
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "GNU GENERAL PUBLIC LICENSE")).firstMatch
             .waitForExistence(within: 5))
-        app.navigationBars["Cassini"].buttons.element(boundBy: 0).tap()
+        app.navigationBars["Cassini talk"].buttons.element(boundBy: 0).tap()
         XCTAssertTrue(app.navigationBars["Source code and notices"].waitForExistence(within: 5))
         app.navigationBars["Source code and notices"].buttons.element(boundBy: 0).tap()
         XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(within: 5))
