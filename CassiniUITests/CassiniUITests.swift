@@ -161,10 +161,10 @@ final class CassiniUITests: XCTestCase {
         let couldNotStart = app.staticTexts["Couldn’t start the microphone"]
         // Pause shows, disabled, while the microphone starts: wait until it can pause or the screen says it could not.
         // The permission alert is answered here too: the monitor above only runs when the test touches the app.
-        // Answering it took 4 to 7 s of an 8 s wait in passing runs (springboard is slow to look at), so a busy machine
-        // gets 30.
+        // Answering it took 4 to 7 s in passing runs (springboard is slow to look at), and on a busy machine the
+        // microphone can take about 30 s to fail to start, so the wait is a minute.
         let allow = XCUIApplication(bundleIdentifier: "com.apple.springboard").alerts.buttons["Allow"]
-        XCTAssertTrue(poll(within: 30) {
+        XCTAssertTrue(poll(within: 60) {
             if allow.exists { allow.tap() }
             return (pause.exists && pause.isEnabled) || couldNotStart.exists
         }, "Allow \(allow.exists), Pause \(pause.exists) enabled \(pause.exists && pause.isEnabled), "
