@@ -132,7 +132,7 @@ import CassiniNotebook
     private func updateNowPlaying() {
         guard player != nil else { return }
         MPNowPlayingInfoCenter.default().nowPlayingInfo = [MPMediaItemPropertyTitle: title,
-            MPMediaItemPropertyArtist: "Cassini", MPMediaItemPropertyPlaybackDuration: duration,
+            MPMediaItemPropertyArtist: ProductName.full, MPMediaItemPropertyPlaybackDuration: duration,
             MPNowPlayingInfoPropertyElapsedPlaybackTime: position, MPNowPlayingInfoPropertyPlaybackRate: isPlaying ? rate : 0]
     }
 }

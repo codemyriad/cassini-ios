@@ -1,5 +1,12 @@
 import SwiftUI
 
+/// The product's name wherever the app names itself (the shared catalogue's `app.name`, D45): the Library's wordmark,
+/// About, the app's own licence and Now Playing. The same in every language. Running sentences keep the short form
+/// "Cassini" ("Open Cassini to resume."), and the home-screen name is CFBundleDisplayName in the Info.plists.
+enum ProductName {
+    static let full = "Cassini talk"
+}
+
 struct OrbitMark: View {
     var size: CGFloat = 36
     var body: some View {

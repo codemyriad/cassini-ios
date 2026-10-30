@@ -75,7 +75,7 @@ private struct LicenseTextPane: View {
 extension LicenseEntry {
     var title: String {
         switch self {
-        case .cassini: "Cassini"
+        case .cassini: ProductName.full
         case .thirdParty: String(localized: "Third-party notices", table: "Settings")
         case .models: String(localized: "Model notices", table: "Settings")
         case .modelSources: String(localized: "Where the models come from", table: "Settings")

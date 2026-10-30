@@ -40,4 +40,13 @@ import Testing
     @Test func theAppUsesNoNonExemptEncryption() {
         #expect(Bundle.main.object(forInfoDictionaryKey: "ITSAppUsesNonExemptEncryption") as? Bool == false)
     }
+
+    /// The home-screen name is the product's (D45), and so is the Live Activity extension's.
+    @Test func theAppAndItsExtensionAreNamedCassiniTalk() throws {
+        #expect(Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String == "Cassini talk")
+        #expect(ProductName.full == "Cassini talk")
+        let plugins = try #require(Bundle.main.builtInPlugInsURL)
+        let activity = try #require(Bundle(url: plugins.appendingPathComponent("CassiniActivity.appex")))
+        #expect(activity.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String == "Cassini talk")
+    }
 }
