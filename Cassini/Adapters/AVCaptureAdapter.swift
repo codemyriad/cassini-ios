@@ -63,7 +63,13 @@ import CassiniNotebook
                 AVSampleRateKey: 48_000, AVNumberOfChannelsKey: 1, AVLinearPCMBitDepthKey: 16,
                 AVLinearPCMIsFloatKey: false, AVLinearPCMIsBigEndianKey: false])
             capture.isMeteringEnabled = true; capture.delegate = self
-            guard capture.record() else { throw AudioError.startFailed }
+            guard capture.record() else {
+                // A record() that fails can leave the recorder's audio queue running, and its input callback reads the
+                // recorder: released unstopped, the recorder ended the app (EXC_BAD_ACCESS in
+                // AudioRecorderAQInputCallback, seen when record() gave up after about 30 s on a busy simulator).
+                capture.delegate = nil; capture.stop()
+                throw AudioError.startFailed
+            }
             recorder = capture; isPaused = false
             let meterTimer = Timer(timeInterval: 0.1, repeats: true) { [weak self] _ in
                 MainActor.assumeIsolated { self?.tick() }
