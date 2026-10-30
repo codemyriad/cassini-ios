@@ -4,18 +4,61 @@ import CassiniAudio
 import CassiniEngine
 import CassiniNotebook
 
+/// What the adapter uses of `AVAudioRecorder`, so a test can give it a recorder whose `record()` fails.
+protocol CaptureRecorder: AnyObject {
+    var delegate: (any AVAudioRecorderDelegate)? { get set }
+    var isMeteringEnabled: Bool { get set }
+    var currentTime: TimeInterval { get }
+    var url: URL { get }
+    func record() -> Bool
+    func pause()
+    func stop()
+    func updateMeters()
+    func averagePower(forChannel channelNumber: Int) -> Float
+}
+
+extension AVAudioRecorder: CaptureRecorder {}
+
+/// The shared audio session as the adapter uses it; `live` is the device's.
+@MainActor struct CaptureSession {
+    var requestPermission: @MainActor () async -> Bool
+    /// Sets the category and activates the session; throws `AudioError.noInput` when there is no input to record from.
+    var prepare: @MainActor () async throws -> Void
+    /// Activates the session as it is set up, to resume.
+    var activate: @MainActor () async throws -> Void
+    var deactivate: @MainActor () -> Void
+
+    static let live = CaptureSession(
+        requestPermission: { await AVAudioApplication.requestRecordPermission() },
+        prepare: {
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetoothHFP])
+            guard session.isInputAvailable else { throw AudioError.noInput }
+            try await AudioSession.activate()
+            // A simulator on a Mac without a microphone reports an input but has no channels; recording from it ends
+            // the app inside Core Audio.
+            guard session.inputNumberOfChannels > 0 else { throw AudioError.noInput }
+        },
+        activate: { try await AudioSession.activate() },
+        deactivate: { AudioSession.deactivate() })
+}
+
 /// The microphone through `AVAudioRecorder`, writing 48 kHz 16-bit mono PCM into CAF. The session does not mix with
 /// other apps, so a call interrupts (and pauses) the recording.
 @MainActor final class AVCaptureAdapter: NSObject, AudioCapture, AVAudioRecorderDelegate {
     let events: AsyncStream<CaptureEvent>
     private let continuation: AsyncStream<CaptureEvent>.Continuation
-    private var recorder: AVAudioRecorder?
+    private let session: CaptureSession
+    private let makeRecorder: @MainActor (URL) throws -> any CaptureRecorder
+    private var recorder: (any CaptureRecorder)?
     private var timer: Timer?
     private var observers: [NSObjectProtocol] = []
     private var isPaused = false
 
-    override init() {
+    init(session: CaptureSession = .live, makeRecorder: @escaping @MainActor (URL) throws -> any CaptureRecorder = AVCaptureAdapter.pcmRecorder) {
         (events, continuation) = AsyncStream.makeStream(of: CaptureEvent.self)
+        self.session = session
+        self.makeRecorder = makeRecorder
         super.init()
         let center = NotificationCenter.default
         observers.append(center.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: .main) { [weak self] notification in
@@ -49,19 +92,10 @@ import CassiniNotebook
 
     func start(url: URL) async throws -> CaptureFormat {
         guard recorder == nil else { throw AudioError.busy }
-        guard await AVAudioApplication.requestRecordPermission() else { throw AudioError.microphoneDenied }
-        let session = AVAudioSession.sharedInstance()
+        guard await session.requestPermission() else { throw AudioError.microphoneDenied }
         do {
-            try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetoothHFP])
-            guard session.isInputAvailable else { throw AudioError.noInput }
-            try await AudioSession.activate()
-            // A simulator on a Mac without a microphone reports an input but has no channels; recording from it ends
-            // the app inside Core Audio.
-            guard session.inputNumberOfChannels > 0 else { throw AudioError.noInput }
-            // PCM in CAF stays readable if the process dies before stop() can finalize it.
-            let capture = try AVAudioRecorder(url: url, settings: [AVFormatIDKey: kAudioFormatLinearPCM,
-                AVSampleRateKey: 48_000, AVNumberOfChannelsKey: 1, AVLinearPCMBitDepthKey: 16,
-                AVLinearPCMIsFloatKey: false, AVLinearPCMIsBigEndianKey: false])
+            try await session.prepare()
+            let capture = try makeRecorder(url)
             capture.isMeteringEnabled = true; capture.delegate = self
             guard capture.record() else {
                 // A record() that fails can leave the recorder's audio queue running, and its input callback reads the
@@ -78,9 +112,15 @@ import CassiniNotebook
             RunLoop.main.add(meterTimer, forMode: .common)
             return .pcm48kMono
         } catch {
-            AudioSession.deactivate()
+            session.deactivate()
             throw (error as? AudioError) ?? .startFailed
         }
+    }
+
+    /// The device's recorder. PCM in CAF stays readable if the process dies before stop() can finalize it.
+    static func pcmRecorder(url: URL) throws -> any CaptureRecorder {
+        try AVAudioRecorder(url: url, settings: [AVFormatIDKey: kAudioFormatLinearPCM, AVSampleRateKey: 48_000,
+            AVNumberOfChannelsKey: 1, AVLinearPCMBitDepthKey: 16, AVLinearPCMIsFloatKey: false, AVLinearPCMIsBigEndianKey: false])
     }
 
     func pause() {
@@ -95,7 +135,7 @@ import CassiniNotebook
         isPaused = false
         Task { [weak self] in
             let error: (any Error)?
-            do { try await AudioSession.activate(); error = nil } catch let failure { error = failure }
+            do { try await self?.session.activate(); error = nil } catch let failure { error = failure }
             guard let self, let recorder = self.recorder, !self.isPaused else { return }
             if error != nil || !recorder.record() { self.pauseAndReport(.interrupted) }
         }
@@ -104,7 +144,7 @@ import CassiniNotebook
     func stop() async throws -> CaptureResult {
         let duration = recorder?.currentTime ?? 0
         recorder?.stop(); timer?.invalidate(); timer = nil; recorder = nil; isPaused = false
-        AudioSession.deactivate()
+        session.deactivate()
         return CaptureResult(duration: duration)
     }
 
