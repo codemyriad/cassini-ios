@@ -61,7 +61,8 @@ struct NameSpeakerSheet: View {
         } message: { Text(model.failure?.message ?? "") }
     }
 
-    /// This speaker's label in the reader's language (`NoteCopy.speakerLabel`).
+    /// This speaker's label as stored (D47), or "Speaker N" in the app's language when it has none
+    /// (`NoteCopy.speakerLabel`).
     private func shown(_ label: String) -> String {
         NoteCopy.speakerLabel(label, id: speakerID, ordinal: state?.input.ordinal ?? 0)
     }

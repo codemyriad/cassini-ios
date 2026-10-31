@@ -1,10 +1,10 @@
 import Foundation
 
-/// A speaker's label as the transcript shows it: a name verbatim, a placeholder number the app shows as "Speaker 3",
-/// or nobody for passages without a speaker. The stored label is not changed.
+/// A speaker's label as the transcript shows it: a name, an unnamed speaker's placeholder with its number ("Speaker 3",
+/// or "Voce 3" as an Italian app wrote it), each as stored (D47), or nobody for passages without a speaker.
 public enum SpeakerName: Hashable, Sendable {
     case named(String)
-    case placeholder(Int)
+    case placeholder(Int, label: String)
     case unknown
 
     public var isNamed: Bool { if case .named = self { true } else { false } }
@@ -143,12 +143,16 @@ public enum NoteTranscripts {
 
     private static let sentenceEnds: Set<Character> = [".", "?", "!", "…", "。", "？", "！"]
 
-    /// The name a speaker shows: the label, or "Speaker N" from its placeholder number (`ordinal + 1` without one).
+    /// The name a speaker shows: its label as stored, a placeholder in whichever language it was written in (D47). A
+    /// speaker without a label (none, blank, or its id) is "Speaker `ordinal + 1`" in the app's language.
     public static func name(label: String?, id: String, ordinal: Int) -> SpeakerName {
-        guard let label, !DefaultLabels.isDefault(id: id, label: label) else {
-            return .placeholder(label.flatMap(DefaultLabels.placeholderNumber) ?? ordinal + 1)
-        }
+        if let label, let number = DefaultLabels.placeholderNumber(label) { return .placeholder(number, label: label) }
+        guard let label, !DefaultLabels.isDefault(id: id, label: label) else { return unlabeled(ordinal + 1) }
         return .named(label)
+    }
+
+    private static func unlabeled(_ number: Int) -> SpeakerName {
+        .placeholder(number, label: DefaultLabels.placeholder(number))
     }
 
     /// The shown transcript of `note`, with its speakers, the saved `voices` (for the "auto" badge) and the
@@ -171,7 +175,7 @@ public enum NoteTranscripts {
         var suggested = Set<String>()
         return build(words) { speaker, first in
             guard let speaker else { return Template(name: .unknown, tint: .amber) }
-            let name = names[speaker] ?? .placeholder(1)
+            let name = names[speaker] ?? unlabeled(1)
             var auto = false
             if case .auto(let voice, _) = speakers[speaker]?.match, case .named(let label) = name,
                let voiceName = voiceNames[voice] {
@@ -199,7 +203,7 @@ public enum NoteTranscripts {
         let tints = SpeakerTint.assign(order) { names[$0]?.isNamed != true }
         let built = build(transcriptWords) { speaker, _ in
             guard let speaker else { return Template(name: .unknown, tint: .amber) }
-            let name = names[speaker] ?? .placeholder(1)
+            let name = names[speaker] ?? unlabeled(1)
             return Template(name: name, tint: tints[speaker] ?? .amber, auto: automatic.contains(speaker) && name.isNamed)
         }
         let cards = Dictionary(suggestions.map { ($0.speakerID, $0) }, uniquingKeysWith: { first, _ in first })
@@ -207,9 +211,9 @@ public enum NoteTranscripts {
             // A card goes above the paragraph where its speaker's latest turn begins.
             guard let id = turn.speakerID, let card = cards[id], !turn.name.isNamed, ms(turn.start) == card.atMs,
                   index == 0 || built.turns[index - 1].speakerID != id else { return turn }
-            let number: Int = if case .placeholder(let n) = turn.name { n } else { 1 }
+            let label = if case .placeholder(_, let label) = turn.name { label } else { DefaultLabels.placeholder(1) }
             return turn.with(suggestion: SpeakerSuggestion(
-                speakerID: id, label: DefaultLabels.placeholder(number), voiceID: card.voiceID, voiceName: card.name,
+                speakerID: id, label: label, voiceID: card.voiceID, voiceName: card.name,
                 score: card.score, segmentID: draftSegment, start: turn.start))
         })
         guard let tentativeFromMs else { return placed }

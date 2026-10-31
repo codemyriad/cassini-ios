@@ -8,6 +8,9 @@ import Testing
         #expect(DefaultLabels.isDefault(id: "spk_1", label: "Speaker 1"))
         #expect(DefaultLabels.isDefault(id: "spk_1", label: "Speaker 12"))
         #expect(DefaultLabels.isDefault(id: "spk_1", label: "Voce 2"))
+        for word in ["Intervenant", "Hablante", "Locutor", "Orador"] {
+            #expect(DefaultLabels.isDefault(id: "spk_1", label: "\(word) 2"), "\(word)")
+        }
         #expect(DefaultLabels.isDefault(id: "diar_x_1", label: "diar_x_1"))
         #expect(DefaultLabels.isDefault(id: "spk_1", label: ""))
         #expect(DefaultLabels.isDefault(id: "spk_1", label: "  "))
@@ -15,9 +18,15 @@ import Testing
         #expect(DefaultLabels.placeholder(3) == "Speaker 3")
     }
 
+    /// D47: a placeholder is written in the user's language, with the glossary's "Speaker {n}"; English in any other.
+    @Test func thePlaceholderIsWrittenInTheAppsLanguage() {
+        let written = ["en", "it", "fr", "es", "pt-BR", "pt-PT", "de"].map { DefaultLabels.placeholder(3, language: $0) }
+        #expect(written == ["Speaker 3", "Voce 3", "Intervenant 3", "Hablante 3", "Locutor 3", "Orador 3", "Speaker 3"])
+    }
+
     // ports: DefaultLabelsTest#namesAreNotDefault
     @Test func namesAreNotDefault() {
-        for name in ["Ada Example", "Speaker Ada", "Speaker", "Voce", "speaker 1", "Relatore 1"] {
+        for name in ["Ada Example", "Speaker Ada", "Speaker", "Voce", "speaker 1", "Relatore 1", "Orador Ana", "Locutor"] {
             #expect(!DefaultLabels.isDefault(id: "spk_1", label: name), "\(name)")
         }
     }
