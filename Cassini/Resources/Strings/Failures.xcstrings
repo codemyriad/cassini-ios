@@ -10,10 +10,34 @@
             "value": "Apple’s on-device speech model does not support this language. Choose another language in Settings."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El modelo de voz de Apple en el dispositivo no admite este idioma. Elige otro idioma en Ajustes."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le modèle vocal d’Apple sur l’appareil ne prend pas en charge cette langue. Choisissez une autre langue dans Réglages."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Il modello vocale di Apple sul dispositivo non supporta questa lingua. Scegli un’altra lingua in Impostazioni."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O modelo de fala da Apple neste dispositivo não é compatível com este idioma. Escolha outro idioma em Ajustes."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O modelo de voz da Apple no dispositivo não suporta este idioma. Escolha outro idioma nas Definições."
           }
         }
       }
@@ -27,10 +51,34 @@
             "value": "Audio decoding stalled. Try another file."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La decodificación del audio se detuvo. Prueba con otro archivo."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le décodage de l’audio s’est bloqué. Essayez un autre fichier."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "La lettura dell’audio si è bloccata. Prova un altro file."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A decodificação do áudio travou. Tente outro arquivo."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A leitura do áudio bloqueou. Experimente outro ficheiro."
           }
         }
       }
@@ -38,10 +86,34 @@
     "Choose at least 200 milliseconds of audio.": {
       "extractionState": "manual",
       "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elige al menos 200 milisegundos de audio."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choisissez au moins 200 millisecondes d’audio."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Scegli almeno 200 millisecondi di audio."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escolha pelo menos 200 milissegundos de áudio."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escolha pelo menos 200 milissegundos de áudio."
           }
         }
       }
@@ -55,10 +127,34 @@
             "value": "Could not read this audio. The original file has been kept."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo leer este audio. Se conservó el archivo original."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossible de lire cet audio. Le fichier d’origine a été conservé."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Impossibile leggere l’audio. Il file originale è stato conservato."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não foi possível ler este áudio. O arquivo original foi mantido."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não foi possível ler este áudio. O ficheiro original foi mantido."
           }
         }
       }
@@ -66,10 +162,34 @@
     "Could not save changes: %@": {
       "extractionState": "manual",
       "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudieron guardar los cambios: %@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossible de sauvegarder les modifications : %@"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Impossibile salvare le modifiche: %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não foi possível salvar as alterações: %@"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não foi possível guardar as alterações: %@"
           }
         }
       }
@@ -83,10 +203,34 @@
             "value": "Could not save the model. Free some space and retry."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo guardar el modelo. Libera espacio e inténtalo de nuevo."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossible de sauvegarder le modèle. Libérez de l’espace et réessayez."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Impossibile salvare il modello. Libera spazio e riprova."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não foi possível salvar o modelo. Libere espaço e tente novamente."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não foi possível guardar o modelo. Liberte espaço e tente novamente."
           }
         }
       }
@@ -100,10 +244,34 @@
             "value": "Model download failed. Check your connection and retry."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo descargar el modelo. Revisa tu conexión e inténtalo de nuevo."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Échec du téléchargement du modèle. Vérifiez votre connexion et réessayez."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Download non riuscito. Controlla la connessione e riprova."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Falha no download do modelo. Verifique sua conexão e tente novamente."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Falha na transferência do modelo. Verifique a ligação e tente novamente."
           }
         }
       }
@@ -117,10 +285,34 @@
             "value": "Model verification failed. Please download it again."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo verificar el modelo. Descárgalo de nuevo."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Échec de la vérification du modèle. Téléchargez-le à nouveau."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Verifica del modello non riuscita. Scaricalo di nuovo."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Falha na verificação do modelo. Baixe-o de novo."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Falha na verificação do modelo. Transfira-o novamente."
           }
         }
       }
@@ -134,10 +326,34 @@
             "value": "No speakers were detected. You can assign passages manually."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se detectaron hablantes. Puedes asignar los fragmentos manualmente."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucun intervenant n’a été détecté. Vous pouvez attribuer les passages manuellement."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Non sono state rilevate voci. Puoi assegnare i passaggi a mano."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nenhum locutor foi detectado. Você pode atribuir os trechos manualmente."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não foram detetados oradores. Pode atribuir os trechos manualmente."
           }
         }
       }
@@ -151,10 +367,34 @@
             "value": "Not enough memory. Try a shorter clip and close other apps."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Memoria insuficiente. Prueba con un clip más corto y cierra otras apps."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mémoire insuffisante. Essayez un extrait plus court et fermez les autres apps."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Memoria insufficiente. Prova una clip più breve e chiudi altre app."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Memória insuficiente. Tente um clipe mais curto e feche outros apps."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Memória insuficiente. Experimente um excerto mais curto e feche outras aplicações."
           }
         }
       }
@@ -162,7 +402,31 @@
     "OK": {
       "extractionState": "manual",
       "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OK"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OK"
+          }
+        },
         "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OK"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OK"
+          }
+        },
+        "pt-PT": {
           "stringUnit": {
             "state": "translated",
             "value": "OK"
@@ -179,10 +443,34 @@
             "value": "On-device transcription is unavailable on this device. Your audio can still be played or exported."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La transcripción no está disponible en este dispositivo. Aún puedes reproducir o exportar el audio."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La transcription n’est pas disponible sur cet appareil. Vous pouvez toujours écouter ou exporter l’audio."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "La trascrizione non è disponibile su questo dispositivo. Puoi comunque ascoltare o esportare l’audio."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A transcrição não está disponível neste dispositivo. Você ainda pode reproduzir ou exportar o áudio."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A transcrição não está disponível neste dispositivo. O áudio ainda pode ser reproduzido ou exportado."
           }
         }
       }
@@ -191,10 +479,34 @@
       "comment": "Opens this app's page in Settings",
       "extractionState": "manual",
       "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abrir Ajustes"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ouvrir les réglages"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Apri le impostazioni"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abrir Ajustes"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abrir Definições"
           }
         }
       }
@@ -208,10 +520,34 @@
             "value": "Operation cancelled."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Operación cancelada."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opération annulée."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Operazione annullata."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Operação cancelada."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Operação cancelada."
           }
         }
       }
@@ -225,10 +561,34 @@
             "value": "Playback is unavailable for this file."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La reproducción no está disponible para este archivo."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lecture impossible pour ce fichier."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Riproduzione non disponibile per questo file."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A reprodução não está disponível para este arquivo."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A reprodução não está disponível para este ficheiro."
           }
         }
       }
@@ -242,10 +602,34 @@
             "value": "Saved progress no longer matches the audio. Start over to transcribe it again."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El progreso guardado ya no coincide con el audio. Empieza de nuevo para volver a transcribirlo."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La progression sauvegardée ne correspond plus à l’audio. Recommencez pour le transcrire à nouveau."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "I progressi salvati non corrispondono più all’audio. Ricomincia per trascriverlo di nuovo."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O progresso salvo não corresponde mais ao áudio. Recomece para transcrevê-lo de novo."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O progresso guardado já não corresponde ao áudio. Recomece para o transcrever novamente."
           }
         }
       }
@@ -254,10 +638,34 @@
       "comment": "Title of an app-wide error alert",
       "extractionState": "manual",
       "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Algo requiere atención"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un point est à vérifier"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Qualcosa richiede attenzione"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Algo precisa de atenção"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Algo requer atenção"
           }
         }
       }
@@ -271,10 +679,34 @@
             "value": "Something went wrong. Please try again."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Algo salió mal. Inténtalo de nuevo."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un problème est survenu. Réessayez."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Qualcosa non ha funzionato. Riprova."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Algo deu errado. Tente novamente."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Algo correu mal. Tente novamente."
           }
         }
       }
@@ -288,10 +720,34 @@
             "value": "Speaker analysis could not finish. Your transcript is saved. You can retry from Speakers."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El análisis de hablantes no pudo terminar. Tu transcripción está guardada. Puedes volver a intentarlo desde Hablantes."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’analyse des intervenants n’a pas pu aboutir. Votre transcription est sauvegardée. Vous pouvez réessayer depuis Intervenants."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "L’analisi delle voci non è terminata. La trascrizione è salvata. Puoi riprovare da Voci."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não foi possível concluir a análise de locutores. Sua transcrição está salva. Você pode tentar novamente em Locutores."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não foi possível concluir a análise de oradores. A transcrição está guardada. Pode tentar novamente em Oradores."
           }
         }
       }
@@ -305,10 +761,34 @@
             "value": "The audio of this document could not be checked, so a new version cannot be added."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo verificar el audio de este documento, así que no se puede añadir una nueva versión."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’audio de ce document n’a pas pu être vérifié, donc aucune nouvelle version ne peut être ajoutée."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Non è stato possibile verificare l’audio di questo documento, quindi non si può aggiungere una nuova versione."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não foi possível verificar o áudio deste documento, então não é possível adicionar uma nova versão."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não foi possível verificar o áudio deste documento, por isso não é possível adicionar uma nova versão."
           }
         }
       }
@@ -322,10 +802,34 @@
             "value": "The system cannot reserve another speech language. Try a language already installed on this device."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El sistema no puede reservar otro idioma de voz. Prueba con un idioma ya instalado en este dispositivo."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le système ne peut pas réserver une autre langue parlée. Essayez une langue déjà installée sur cet appareil."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Il sistema non può riservare un’altra lingua vocale. Prova una lingua già installata su questo dispositivo."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O sistema não pode reservar outro idioma de fala. Tente um idioma já instalado neste dispositivo."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O sistema não consegue reservar outro idioma de fala. Experimente um idioma já instalado neste dispositivo."
           }
         }
       }
@@ -339,10 +843,34 @@
             "value": "The transcript could not be saved."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo guardar la transcripción."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossible de sauvegarder la transcription."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Impossibile salvare la trascrizione."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não foi possível salvar a transcrição."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não foi possível guardar a transcrição."
           }
         }
       }
@@ -356,10 +884,34 @@
             "value": "This audio could not be opened. Try M4A, WAV, MP3, AIFF, or CAF."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo abrir este audio. Prueba con M4A, WAV, MP3, AIFF o CAF."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossible d’ouvrir cet audio. Essayez M4A, WAV, MP3, AIFF ou CAF."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Impossibile aprire l’audio. Prova M4A, WAV, MP3, AIFF o CAF."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não foi possível abrir este áudio. Tente M4A, WAV, MP3, AIFF ou CAF."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não foi possível abrir este áudio. Experimente M4A, WAV, MP3, AIFF ou CAF."
           }
         }
       }
@@ -373,10 +925,34 @@
             "value": "This device cannot play the imported Opus container. Its verified transcript is available, and the original Cassini document is preserved for sharing."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este dispositivo no puede reproducir el contenedor Opus importado. Su transcripción verificada está disponible y el documento Cassini original se conserva para compartirlo."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cet appareil ne peut pas lire le conteneur Opus importé. Sa transcription vérifiée est disponible, et le document Cassini d’origine est conservé pour le partage."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Questo dispositivo non può riprodurre il contenitore Opus importato. La trascrizione verificata è disponibile e il documento Cassini originale è conservato per la condivisione."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este dispositivo não consegue reproduzir o contêiner Opus importado. A transcrição verificada está disponível, e o documento Cassini original foi preservado para compartilhamento."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este dispositivo não consegue reproduzir o contentor Opus importado. A transcrição verificada está disponível e o documento Cassini original é mantido para partilha."
           }
         }
       }
@@ -390,10 +966,34 @@
             "value": "This device has no Opus encoder. It can open existing documents, but cannot create new Cassini files."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este dispositivo no tiene un codificador Opus. Puede abrir documentos existentes, pero no crear nuevos archivos Cassini."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cet appareil n’a pas d’encodeur Opus. Il peut ouvrir des documents existants, mais pas créer de nouveaux fichiers Cassini."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Questo dispositivo non ha un codificatore Opus. Può aprire documenti esistenti, ma non creare nuovi file Cassini."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este dispositivo não tem um codificador Opus. Ele pode abrir documentos existentes, mas não criar novos arquivos Cassini."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este dispositivo não tem codificador Opus. Pode abrir documentos existentes, mas não criar novos ficheiros Cassini."
           }
         }
       }
@@ -407,10 +1007,34 @@
             "value": "This document cannot take a new transcript."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este documento no admite una nueva transcripción."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce document ne peut pas recevoir de nouvelle transcription."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Questo documento non può avere una nuova trascrizione."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este documento não pode receber uma nova transcrição."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este documento não pode receber uma nova transcrição."
           }
         }
       }
@@ -424,10 +1048,34 @@
             "value": "This document has a newer Cassini format, so a new version cannot be added here."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este documento tiene un formato Cassini más reciente, así que aquí no se puede añadir una nueva versión."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce document utilise un format Cassini plus récent, donc aucune nouvelle version ne peut être ajoutée ici."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Questo documento ha un formato Cassini più recente, quindi qui non si può aggiungere una nuova versione."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este documento tem um formato Cassini mais recente, então não é possível adicionar uma nova versão aqui."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este documento tem um formato Cassini mais recente, por isso não é possível adicionar aqui uma nova versão."
           }
         }
       }
@@ -441,10 +1089,34 @@
             "value": "This file is too large. Choose a file under 4 GB."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este archivo es demasiado grande. Elige un archivo de menos de 4 GB."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce fichier est trop volumineux. Choisissez un fichier de moins de 4 Go."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Il file è troppo grande. Scegli un file sotto i 4 GB."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este arquivo é grande demais. Escolha um arquivo com menos de 4 GB."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este ficheiro é demasiado grande. Escolha um ficheiro com menos de 4 GB."
           }
         }
       }
@@ -452,10 +1124,34 @@
     "This note’s details are not supported or are damaged. Its files have been kept.": {
       "extractionState": "manual",
       "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Los detalles de esta nota no son compatibles o están dañados. Se conservaron sus archivos."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les détails de cette note ne sont pas pris en charge ou sont endommagés. Ses fichiers ont été conservés."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "I dettagli di questa nota non sono supportati o sono danneggiati. I suoi file sono stati conservati."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Os detalhes desta nota não são compatíveis ou estão danificados. Os arquivos dela foram mantidos."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Os detalhes desta nota não são suportados ou estão danificados. Os ficheiros foram mantidos."
           }
         }
       }
@@ -463,10 +1159,34 @@
     "This recording contains no audio samples.": {
       "extractionState": "manual",
       "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esta grabación no contiene muestras de audio."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cet enregistrement ne contient aucun échantillon audio."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "La registrazione non contiene campioni audio."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esta gravação não contém amostras de áudio."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esta gravação não contém amostras de áudio."
           }
         }
       }
@@ -474,10 +1194,34 @@
     "This recording is too long to transcribe: one transcript holds up to 36 hours of audio and about 16 hours of speech. You can still play it, and share the audio file with Share original audio.": {
       "extractionState": "manual",
       "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esta grabación es demasiado larga para transcribirla: una transcripción admite hasta 36 horas de audio y unas 16 horas de habla. Aún puedes reproducirla y compartir el archivo de audio con Compartir audio original."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cet enregistrement est trop long pour être transcrit : une transcription contient au maximum 36 heures d’audio et environ 16 heures de parole. Vous pouvez toujours l’écouter, et partager le fichier audio avec Partager l’audio d’origine."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Questa registrazione è troppo lunga da trascrivere: una trascrizione contiene fino a 36 ore di audio e circa 16 ore di parlato. Puoi comunque ascoltarla e condividere il file audio con Condividi l’audio originale."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esta gravação é longa demais para transcrever: uma transcrição comporta até 36 horas de áudio e cerca de 16 horas de fala. Você ainda pode reproduzi-la e compartilhar o arquivo de áudio com Compartilhar áudio original."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esta gravação é demasiado longa para transcrever: uma transcrição comporta até 36 horas de áudio e cerca de 16 horas de fala. Pode ainda reproduzi-la e partilhar o ficheiro de áudio com Partilhar áudio original."
           }
         }
       }
@@ -491,10 +1235,34 @@
             "value": "Transcription was interrupted. Keep Cassini open, then tap Transcribe to start again."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La transcripción se interrumpió. Mantén Cassini abierto y luego toca Transcribir para empezar de nuevo."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La transcription a été interrompue. Gardez Cassini ouvert, puis touchez Transcrire pour recommencer."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "La trascrizione è stata interrotta. Tieni aperto Cassini, poi tocca Trascrivi per ricominciare."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A transcrição foi interrompida. Mantenha o Cassini aberto e toque em Transcrever para começar de novo."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A transcrição foi interrompida. Mantenha o Cassini aberto e toque em Transcrever para recomeçar."
           }
         }
       }
@@ -508,10 +1276,34 @@
             "value": "Use a 16-bit PCM WAV, or try M4A, MP3, AIFF, or CAF."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usa un WAV PCM de 16 bits, o prueba con M4A, MP3, AIFF o CAF."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Utilisez un WAV PCM 16 bits, ou essayez M4A, MP3, AIFF ou CAF."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Usa un WAV PCM a 16 bit, oppure M4A, MP3, AIFF o CAF."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use um WAV PCM de 16 bits ou tente M4A, MP3, AIFF ou CAF."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use um WAV PCM de 16 bits ou experimente M4A, MP3, AIFF ou CAF."
           }
         }
       }
@@ -525,10 +1317,34 @@
             "value": "Word timing could not be read. Try transcribing again."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudieron leer los tiempos de las palabras. Vuelve a transcribir."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossible de lire le minutage des mots. Essayez de transcrire à nouveau."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Impossibile leggere i tempi delle parole. Prova a trascrivere di nuovo."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não foi possível ler a marcação de tempo das palavras. Tente transcrever de novo."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não foi possível ler os tempos das palavras. Experimente transcrever novamente."
           }
         }
       }
@@ -542,10 +1358,34 @@
             "value": "Your device is running low on storage. Free up space, then try again."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tu dispositivo se está quedando sin espacio. Libera espacio e inténtalo de nuevo."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Votre appareil manque d’espace de stockage. Libérez de l’espace, puis réessayez."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Lo spazio sul dispositivo sta finendo. Libera spazio e riprova."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O armazenamento do seu dispositivo está acabando. Libere espaço e tente novamente."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O dispositivo tem pouco armazenamento. Liberte espaço e tente novamente."
           }
         }
       }

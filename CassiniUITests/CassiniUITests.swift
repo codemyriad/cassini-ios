@@ -55,11 +55,15 @@ final class CassiniUITests: XCTestCase {
         title.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
         title.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 100))
         title.typeText("A saved conversation")
+        XCTAssertTrue(title.waitForValue("A saved conversation"), "the field holds \(String(describing: title.value))")
         app.buttons["Save"].tap()
-        XCTAssertEqual(app.staticTexts["noteTitle"].label, "A saved conversation")
+        let noteTitle = app.staticTexts["noteTitle"]
+        XCTAssertTrue(noteTitle.wait(until: NSPredicate(format: "label == %@", "A saved conversation"), within: 5),
+                      "the title reads \(noteTitle.label)")
         app.terminate()
         let reopened = launch(seed: false, reset: false)
-        XCTAssertTrue(reopened.buttons.matching(NSPredicate(format: "label CONTAINS %@", "A saved conversation")).firstMatch.exists)
+        XCTAssertTrue(reopened.buttons.matching(NSPredicate(format: "label CONTAINS %@", "A saved conversation")).firstMatch
+            .waitForExistence(within: 5))
     }
     // ports: TranscriptSemanticsTest#thePlayerButtonsAreDescribedAndBigEnough
     // ports: TranscriptSemanticsTest#theSliderIsPositionWithTenSecondSteps (label and value; the steps are in PlaybackSkipTests)
@@ -198,6 +202,7 @@ final class CassiniUITests: XCTestCase {
         let field = app.textFields["speakerNameField"]
         XCTAssertTrue(field.waitForExistence(within: 5))
         field.tap(); field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 30)); field.typeText("Alice")
+        XCTAssertTrue(field.waitForValue("Alice"), "the field holds \(String(describing: field.value))")
         app.buttons["saveSpeakerName"].tap()
         XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Alice")).firstMatch.waitForExistence(within: 5))
         capture("Speakers")

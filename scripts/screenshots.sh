@@ -2,15 +2,15 @@
 # Takes the README's screenshots (CassiniUITests/ScreenshotTests) and saves them under docs/screenshots/.
 #
 #   scripts/screenshots.sh                 every shot: iPhone 17 and iPad Pro 13-inch (M5), light and dark, English
-#   scripts/screenshots.sh --locale it     the same in Italian, under docs/screenshots/it/
+#   scripts/screenshots.sh --locale it     the same in Italian, under docs/screenshots/it/ (also fr, es, pt-BR and pt-PT)
 #   scripts/screenshots.sh --device iphone|ipad --appearance light|dark
 #                                          only that device or appearance (stale files are then left alone)
 #   scripts/screenshots.sh --no-build      use the last `scripts/test.sh build`
 #   scripts/screenshots.sh -- <xcodebuild arguments>, e.g. -- -only-testing:CassiniUITests/ScreenshotTests/test03Transcribing
 #
 # It builds through `scripts/test.sh build` and runs the tests on simulator clones of its own (<prefix>-shots-iphone and
-# <prefix>-shots-ipad, which `scripts/test.sh clean` deletes). The device gets the appearance and the region (en_US or
-# it_IT), and its status bar is pinned: 9:41, a full battery that is not charging, full Wi-Fi and cellular bars. An
+# <prefix>-shots-ipad, which `scripts/test.sh clean` deletes). The device gets the appearance and the region (en_US, it_IT,
+# fr_FR, es_ES, pt_BR or pt_PT), and its status bar is pinned: 9:41, a full battery that is not charging, full Wi-Fi and cellular bars. An
 # iPad's status bar also shows the date, 8 October, but with the wrong weekday ("Sun"): the simulator's home screen
 # shows the override's Thursday, an app's status bar does not, and --time takes only ISO dates. The tests launch the app with the UI-test clock, named seeds and the same language and region, and
 # attach each shot under the name it is saved as. The attachments are exported from the result bundle with
@@ -20,7 +20,7 @@
 #
 #   docs/screenshots/{light,dark}/NN-name.png        iPhone
 #   docs/screenshots/ipad/{light,dark}/NN-name.png   iPad, the split view in landscape and portrait
-#   docs/screenshots/it/...                          the same layout for --locale it
+#   docs/screenshots/<locale>/...                    the same layout for --locale it, fr, es, pt-BR or pt-PT
 #
 # Environment: CASSINI_IPHONE / CASSINI_IPAD device types (default "iPhone 17", "iPad Pro 13-inch (M5)"),
 # CASSINI_SIM_PREFIX as for scripts/test.sh, CASSINI_KEEP_SIMS=1 to leave the clones booted.
@@ -47,8 +47,9 @@ while [ $# -gt 0 ]; do
 done
 case "$locale" in
     en) region=en_US out="$root/docs/screenshots" ;;
-    it) region=it_IT out="$root/docs/screenshots/it" ;;
-    *) echo "error: --locale is en or it" >&2; exit 2 ;;
+    it|fr|es) region="${locale}_$(echo "$locale" | tr a-z A-Z)" out="$root/docs/screenshots/$locale" ;;
+    pt-BR|pt-PT) region="${locale/-/_}" out="$root/docs/screenshots/$locale" ;;
+    *) echo "error: --locale is en, it, fr, es, pt-BR or pt-PT" >&2; exit 2 ;;
 esac
 # Every screenshot test, unless the extra arguments pick some (two -only-testing would run both).
 only=(-only-testing:CassiniUITests/ScreenshotTests)
@@ -157,7 +158,7 @@ done
 
 # A full run that succeeded, every shot taken, leaves only the shots it took.
 if [ "$full" = 1 ] && [ "$failed" = 0 ]; then
-    skip=(); [ "$locale" = en ] && skip=(-not -path "$out/it/*")
+    skip=(); [ "$locale" = en ] && for other in it fr es pt-BR pt-PT; do skip+=(-not -path "$out/$other/*"); done
     find "$out" -name '*.png' ${skip[@]+"${skip[@]}"} | while read -r file; do
         grep -qxF "$file" "$written" || { rm "$file"; echo "removed stale ${file#$root/}"; }
     done

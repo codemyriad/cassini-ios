@@ -41,33 +41,33 @@ final class AccessibilityAuditTests: XCTestCase {
         let app = launch(["--seed", "recording"] + extra)
         XCTAssertTrue(app.buttons["recordButton"].waitForExistence(within: 15))
         app.buttons["recordButton"].tap()
-        XCTAssertTrue(app.buttons["Pause recording"].waitForEnabled(within: 8))
+        XCTAssertTrue(app.buttons["pauseResumeRecording"].waitForEnabled(within: 8))
         return app
     }
 
     @MainActor private func settings(_ extra: [String] = []) -> XCUIApplication {
         let app = library(extra)
-        app.buttons["Settings"].tap()
-        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(within: 5))
+        app.buttons["settingsButton"].tap()
+        XCTAssertTrue(app.buttons["appLanguageRow"].waitForExistence(within: 5))
         return app
     }
 
     @MainActor private func trash(_ extra: [String] = []) -> XCUIApplication {
         let app = launch(["--seed", "trash"] + extra)
-        XCTAssertTrue(app.buttons["Recently Deleted"].waitForExistence(within: 15))
-        app.buttons["Recently Deleted"].tap()
+        XCTAssertTrue(app.buttons["recentlyDeletedButton"].waitForExistence(within: 15))
+        app.buttons["recentlyDeletedButton"].tap()
         XCTAssertTrue(app.staticTexts["Old interview draft"].waitForExistence(within: 5))
         return app
     }
 
     @MainActor private func savedVoices(_ extra: [String] = []) -> XCUIApplication {
         let app = launch(["--seed", "voices"] + extra)
-        XCTAssertTrue(app.buttons["Settings"].waitForExistence(within: 15))
-        app.buttons["Settings"].tap()
+        XCTAssertTrue(app.buttons["settingsButton"].waitForExistence(within: 15))
+        app.buttons["settingsButton"].tap()
         let row = app.buttons["savedVoicesRow"]
         for _ in 0..<6 where !row.isHittable { app.swipeUp() }
         row.tap()
-        XCTAssertTrue(app.buttons["Options for Alex Moreau"].waitForExistence(within: 5))
+        XCTAssertTrue(app.staticTexts["Alex Moreau"].waitForExistence(within: 5))
         return app
     }
 
@@ -149,6 +149,28 @@ final class AccessibilityAuditTests: XCTestCase {
         for (name, open) in screens {
             let app = open(Self.largestText)
             audit(app, screen: "largest-\(name)", .textClipped)
+            app.terminate()
+        }
+    }
+
+    // MARK: Long languages
+
+    /// French and Brazilian Portuguese, the longest of the app's languages (D50), at the default text size: no text is
+    /// cut on any of the six screens. The screens are found by identifier and by the fixtures' names, which no language
+    /// changes.
+    @MainActor func testNoTextIsClippedInFrench() { auditClipping(language: "fr", region: "fr_FR") }
+    @MainActor func testNoTextIsClippedInBrazilianPortuguese() { auditClipping(language: "pt-BR", region: "pt_BR") }
+
+    @MainActor private func auditClipping(language: String, region: String) {
+        let screens: [(String, @MainActor ([String]) -> XCUIApplication)] = [
+            ("library", library), ("note", note), ("recording", recording), ("settings", settings), ("trash", trash),
+            ("savedVoices", savedVoices)]
+        for (name, open) in screens {
+            let app = open(["-AppleLanguages", "(\(language))", "-AppleLocale", region])
+            if name == "library" {
+                XCTAssertNotEqual(app.buttons["settingsButton"].label, "Settings", "the app is not in \(language)")
+            }
+            audit(app, screen: "\(language)-\(name)", .textClipped)
             app.terminate()
         }
     }

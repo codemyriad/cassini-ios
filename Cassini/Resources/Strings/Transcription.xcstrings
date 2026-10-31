@@ -10,10 +10,34 @@
             "value": "Cassini can’t play this audio, so there is nothing to transcribe."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cassini no puede reproducir este audio, así que no hay nada que transcribir."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cassini ne peut pas lire cet audio, donc il n’y a rien à transcrire."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Cassini non riesce a riprodurre questo audio, quindi non c’è niente da trascrivere."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O Cassini não consegue reproduzir este áudio, então não há nada para transcrever."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O Cassini não consegue reproduzir este áudio, por isso não há nada para transcrever."
           }
         }
       }
@@ -27,10 +51,34 @@
             "value": "Cassini needs a one-time download. After that, recognising words and telling voices apart happen on this device, even offline. Your audio stays here."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cassini necesita una única descarga. Después, reconoce las palabras y distingue las voces en este dispositivo, incluso sin conexión. Tu audio se queda aquí."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cassini a besoin d’un téléchargement unique. Ensuite, la reconnaissance des mots et la distinction des voix se font sur cet appareil, même hors ligne. Votre audio reste ici."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Cassini ha bisogno di un unico download. Dopo, il riconoscimento delle parole e la distinzione delle voci avvengono su questo dispositivo, anche offline. Il tuo audio resta qui."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O Cassini precisa de um download único. Depois disso, o reconhecimento de palavras e a distinção entre vozes acontecem neste dispositivo, mesmo offline. Seu áudio fica aqui."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O Cassini precisa de uma transferência única. Depois disso, o reconhecimento de palavras e a distinção de vozes acontecem neste dispositivo, mesmo sem ligação. O áudio fica aqui."
           }
         }
       }
@@ -44,10 +92,34 @@
             "value": "Download"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Descargar"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Télécharger"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Scarica"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baixar"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transferir"
           }
         }
       }
@@ -61,10 +133,34 @@
             "value": "Download and identify speakers"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Descargar e identificar hablantes"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Télécharger et identifier les intervenants"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Scarica e riconosci le voci"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baixar e identificar locutores"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transferir e identificar oradores"
           }
         }
       }
@@ -78,10 +174,34 @@
             "value": "Download and transcribe"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Descargar y transcribir"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Télécharger et transcrire"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Scarica e trascrivi"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baixar e transcrever"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transferir e transcrever"
           }
         }
       }
@@ -95,10 +215,34 @@
             "value": "Needs about %@ free while installing. Each file is checked before it is used."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Necesita unos %@ libres durante la instalación. Cada archivo se verifica antes de usarse."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nécessite environ %@ d’espace libre pendant l’installation. Chaque fichier est vérifié avant utilisation."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Servono circa %@ liberi durante l’installazione. Ogni file viene verificato prima dell’uso."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Precisa de cerca de %@ livres durante a instalação. Cada arquivo é verificado antes de ser usado."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Precisa de cerca de %@ livres durante a instalação. Cada ficheiro é verificado antes de ser usado."
           }
         }
       }
@@ -112,10 +256,34 @@
             "value": "Not now — keep the audio"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ahora no — conservar el audio"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plus tard — garder l’audio"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Non ora — tieni l’audio"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agora não — manter o áudio"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agora não — manter o áudio"
           }
         }
       }
@@ -129,10 +297,34 @@
             "value": "Recognising saved voices"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reconocimiento de voces guardadas"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reconnaissance des voix mémorisées"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Riconoscimento delle voci salvate"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reconhecimento de vozes salvas"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reconhecimento de vozes guardadas"
           }
         }
       }
@@ -146,10 +338,34 @@
             "value": "Restore this recording from Recently Deleted to transcribe it."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restaura esta grabación desde Eliminado recientemente para transcribirla."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restaurez cet enregistrement depuis Suppressions récentes pour le transcrire."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Ripristina questa registrazione da Eliminati di recente per trascriverla."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restaure esta gravação de Apagados para transcrevê-la."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recupere esta gravação de Apagados para a transcrever."
           }
         }
       }
@@ -163,10 +379,34 @@
             "value": "Speech recognition"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reconocimiento de voz"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reconnaissance vocale"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Riconoscimento vocale"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reconhecimento de fala"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reconhecimento de fala"
           }
         }
       }
@@ -180,10 +420,34 @@
             "value": "Telling speakers apart"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Separación de hablantes"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Distinction des intervenants"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Distinzione delle voci"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Separação de locutores"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Separação de oradores"
           }
         }
       }
@@ -197,10 +461,34 @@
             "value": "The transcription queue was saved by a newer version of Cassini, or can’t be read. Update Cassini to transcribe."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La cola de transcripción la guardó una versión más reciente de Cassini o no se puede leer. Actualiza Cassini para transcribir."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La file de transcription a été sauvegardée par une version plus récente de Cassini, ou est illisible. Mettez à jour Cassini pour transcrire."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "La coda di trascrizione è stata salvata da una versione più recente di Cassini, o non si può leggere. Aggiorna Cassini per trascrivere."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A fila de transcrição foi salva por uma versão mais recente do Cassini ou não pode ser lida. Atualize o Cassini para transcrever."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A fila de transcrição foi guardada por uma versão mais recente do Cassini ou não pode ser lida. Atualize o Cassini para transcrever."
           }
         }
       }
@@ -214,10 +502,34 @@
             "value": "This recording is still being saved. Try again in a moment."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esta grabación aún se está guardando. Inténtalo de nuevo en un momento."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cet enregistrement est encore en cours de sauvegarde. Réessayez dans un instant."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Questa registrazione è ancora in salvataggio. Riprova tra un momento."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esta gravação ainda está sendo salva. Tente novamente em instantes."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esta gravação ainda está a ser guardada. Tente novamente daqui a pouco."
           }
         }
       }
@@ -231,10 +543,34 @@
             "value": "This recording no longer exists."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esta grabación ya no existe."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cet enregistrement n’existe plus."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Questa registrazione non esiste più."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esta gravação não existe mais."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esta gravação já não existe."
           }
         }
       }
@@ -248,10 +584,34 @@
             "value": "This recording was saved by a newer version of Cassini. Update Cassini to transcribe it."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esta grabación la guardó una versión más reciente de Cassini. Actualiza Cassini para transcribirla."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cet enregistrement a été sauvegardé par une version plus récente de Cassini. Mettez à jour Cassini pour le transcrire."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Questa registrazione è stata salvata da una versione più recente di Cassini. Aggiorna Cassini per trascriverla."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esta gravação foi salva por uma versão mais recente do Cassini. Atualize o Cassini para transcrevê-la."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esta gravação foi guardada por uma versão mais recente do Cassini. Atualize o Cassini para a transcrever."
           }
         }
       }
@@ -265,10 +625,34 @@
             "value": "Transcribe on this device"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcribir en este dispositivo"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcrire sur cet appareil"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Trascrivi su questo dispositivo"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcrever neste dispositivo"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcrever neste dispositivo"
           }
         }
       }
@@ -282,10 +666,34 @@
             "value": "Transcribing “%@”"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcribiendo “%@”"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcription de « %@ »"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Trascrizione di “%@”"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcrevendo “%@”"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A transcrever «%@»"
           }
         }
       }
@@ -299,10 +707,34 @@
             "value": "Where the models come from · Privacy"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "De dónde vienen los modelos · Privacidad"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Provenance des modèles · Confidentialité"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Da dove vengono i modelli · Privacy"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "De onde vêm os modelos · Privacidade"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "De onde vêm os modelos · Privacidade"
           }
         }
       }
@@ -316,10 +748,34 @@
             "value": "Your audio stays on this device"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tu audio se queda en este dispositivo"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Votre audio reste sur cet appareil"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Il tuo audio resta su questo dispositivo"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seu áudio fica neste dispositivo"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O áudio fica neste dispositivo"
           }
         }
       }

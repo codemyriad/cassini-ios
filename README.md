@@ -100,8 +100,12 @@ records their exact revisions.
 - **Settings** for the app language (in the Settings app), the speech language, automatic transcription, speaker
   identification and automatic naming. The on-device model rows show their status, with Download and Cancel. Your
   library's totals and the licences are there too.
-- **English and Italian.** Light and dark appearance, Dynamic Type up to the largest accessibility sizes, VoiceOver,
-  and a split view on iPad and on large iPhones in landscape.
+- **Six languages:** English, Italian, French, Spanish, and Brazilian and European Portuguese (D50).
+  - Cassini follows the system's language. A regional variant reads as its language (fr-CA as French), and a bare
+    `pt` as Brazilian Portuguese. pt-PT and the other Portuguese regions read as European Portuguese, and any other
+    language as English.
+  - Light and dark appearance, Dynamic Type up to the largest accessibility sizes, VoiceOver, and a split view on iPad
+    and on large iPhones in landscape.
 
 ## Current boundaries
 
@@ -183,8 +187,8 @@ when that is unset.
 
 `scripts/screenshots.sh` takes the screenshots above. It runs `CassiniUITests/ScreenshotTests` on its own iPhone 17
 and iPad Pro 13-inch (M5) clones, in light and dark, with the status bar pinned to 9:41. It then exports the named
-attachments from the result bundle and saves them, scaled down, under `docs/screenshots/`. `--locale it` takes the
-same set in Italian under `docs/screenshots/it/`, which is not committed. `--device` and `--appearance` take a
+attachments from the result bundle and saves them, scaled down, under `docs/screenshots/`. `--locale it` (or `fr`,
+`es`, `pt-BR`, `pt-PT`) takes the same set in that language under `docs/screenshots/<locale>/`, which is not committed. `--device` and `--appearance` take a
 subset. `scripts/render-icon.swift` draws the app icon (`swift scripts/render-icon.swift` from the repository root).
 
 UI-test launches (`--ui-testing`, Debug builds only) use a library and preferences of their own, a clock fixed at

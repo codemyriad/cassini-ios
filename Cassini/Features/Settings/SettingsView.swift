@@ -80,12 +80,15 @@ private struct SettingsForm: View {
 }
 
 /// iOS sets the app's language in the Settings app; the row shows it and opens Cassini's page there.
-private struct AppLanguageSection: View {
+struct AppLanguageSection: View {
     let open: () -> Void
 
-    private var current: String {
-        let code = Bundle.main.preferredLocalizations.first ?? "en"
-        return Locale(identifier: code).localizedString(forLanguageCode: code)?.localizedCapitalized ?? code
+    private var current: String { Self.name(of: Bundle.main.preferredLocalizations.first ?? "en") }
+
+    /// A language in its own words, with the region where the app has two variants: "Français", "Português (Brasil)",
+    /// "Português (Portugal)".
+    nonisolated static func name(of code: String) -> String {
+        Locale(identifier: code).localizedString(forIdentifier: code)?.localizedCapitalized ?? code
     }
 
     var body: some View {
@@ -101,6 +104,7 @@ private struct AppLanguageSection: View {
                 }
             }
             .accessibilityHint(Text("Opens Cassini in the Settings app", tableName: "Settings"))
+            .accessibilityIdentifier("appLanguageRow")
         } header: {
             Text("App language", tableName: "Settings").foregroundStyle(Color.muted)
         } footer: {

@@ -10,10 +10,34 @@
             "value": "%@ · Installed"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ · Instalado"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ · Installée"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "%@ · Installata"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ · Instalado"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ · Instalado"
           }
         }
       }
@@ -24,6 +48,54 @@
         "en": {
           "variations": {
             "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld note"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld notes"
+                }
+              }
+            }
+          }
+        },
+        "es": {
+          "variations": {
+            "plural": {
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld notas"
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld nota"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld notas"
+                }
+              }
+            }
+          }
+        },
+        "fr": {
+          "variations": {
+            "plural": {
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld notes"
+                }
+              },
               "one": {
                 "stringUnit": {
                   "state": "translated",
@@ -62,6 +134,54 @@
               }
             }
           }
+        },
+        "pt-BR": {
+          "variations": {
+            "plural": {
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld notas"
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld nota"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld notas"
+                }
+              }
+            }
+          }
+        },
+        "pt-PT": {
+          "variations": {
+            "plural": {
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld notas"
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld nota"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld notas"
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -81,6 +201,54 @@
                 "stringUnit": {
                   "state": "translated",
                   "value": "%lld people"
+                }
+              }
+            }
+          }
+        },
+        "es": {
+          "variations": {
+            "plural": {
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld personas"
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld persona"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld personas"
+                }
+              }
+            }
+          }
+        },
+        "fr": {
+          "variations": {
+            "plural": {
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld personnes"
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld personne"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld personnes"
                 }
               }
             }
@@ -109,6 +277,54 @@
               }
             }
           }
+        },
+        "pt-BR": {
+          "variations": {
+            "plural": {
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld pessoas"
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld pessoa"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld pessoas"
+                }
+              }
+            }
+          }
+        },
+        "pt-PT": {
+          "variations": {
+            "plural": {
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld pessoas"
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld pessoa"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld pessoas"
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -121,10 +337,34 @@
             "value": "A new language applies to the next transcription."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un idioma nuevo se aplica a partir de la próxima transcripción."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Une nouvelle langue s’applique à la prochaine transcription."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Una nuova lingua vale dalla prossima trascrizione."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Um novo idioma vale a partir da próxima transcrição."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Um novo idioma aplica-se a partir da próxima transcrição."
           }
         }
       }
@@ -138,10 +378,34 @@
             "value": "About"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Información"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "À propos"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Informazioni"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sobre"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Acerca de"
           }
         }
       }
@@ -155,10 +419,34 @@
             "value": "App language"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Idioma de la app"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Langue de l’app"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Lingua dell’app"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Idioma do app"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Idioma da aplicação"
           }
         }
       }
@@ -172,10 +460,34 @@
             "value": "Audio duration"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Duración del audio"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Durée de l’audio"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Durata dell’audio"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Duração do áudio"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Duração do áudio"
           }
         }
       }
@@ -189,10 +501,34 @@
             "value": "Checking files"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verificando archivos"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vérification des fichiers"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Verifica dei file"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verificando arquivos"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A verificar ficheiros"
           }
         }
       }
@@ -206,10 +542,34 @@
             "value": "Comes with telling speakers apart"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Incluido con la separación de hablantes"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inclus avec la distinction des intervenants"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Incluso con la distinzione delle voci"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vem com a separação de locutores"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Incluído com a separação de oradores"
           }
         }
       }
@@ -223,10 +583,34 @@
             "value": "Download failed — tries again next time"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Error en la descarga — se reintentará la próxima vez"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Échec du téléchargement — nouvel essai la prochaine fois"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Download non riuscito — riprova la prossima volta"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Falha no download — nova tentativa da próxima vez"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Falha na transferência — tenta novamente da próxima vez"
           }
         }
       }
@@ -240,10 +624,34 @@
             "value": "Downloading %lld%%"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Descargando %lld %%"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Téléchargement, %lld %%"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Download %lld%%"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baixando %lld%%"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A transferir %lld%%"
           }
         }
       }
@@ -257,10 +665,34 @@
             "value": "Downloads with next transcription"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se descarga con la próxima transcripción"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se télécharge à la prochaine transcription"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Si scarica con la prossima trascrizione"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Será baixado na próxima transcrição"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transferido na próxima transcrição"
           }
         }
       }
@@ -274,10 +706,34 @@
             "value": "Empty"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vacío"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vide"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Vuoto"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vazio"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vazio"
           }
         }
       }
@@ -291,10 +747,34 @@
             "value": "Free software under GPLv3."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Software libre bajo licencia GPLv3."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Logiciel libre sous licence GPLv3."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Software libero con licenza GPLv3."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Software livre sob a GPLv3."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Software livre com licença GPLv3."
           }
         }
       }
@@ -308,10 +788,34 @@
             "value": "Identify speakers after transcription"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Identificar hablantes tras la transcripción"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Distinguer les intervenants après la transcription"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Riconosci chi parla dopo la trascrizione"
+            "value": "Distingui le voci dopo la trascrizione"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Identificar locutores após a transcrição"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Identificar oradores após a transcrição"
           }
         }
       }
@@ -325,10 +829,34 @@
             "value": "Libraries Cassini uses and their licences"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bibliotecas que usa Cassini y sus licencias"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Composants utilisés par Cassini et leurs licences"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Le librerie che Cassini usa e le loro licenze"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bibliotecas que o Cassini usa e suas licenças"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bibliotecas que o Cassini usa e respetivas licenças"
           }
         }
       }
@@ -342,10 +870,34 @@
             "value": "Licences of the speech and voice models"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Licencias de los modelos de voz"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Licences des modèles vocaux"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Licenze dei modelli vocali"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Licenças dos modelos de fala e de voz"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Licenças dos modelos de fala e de voz"
           }
         }
       }
@@ -359,10 +911,34 @@
             "value": "Managed by iOS"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gestionado por iOS"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Géré par iOS"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Gestito da iOS"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gerenciado pelo iOS"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gerido pelo iOS"
           }
         }
       }
@@ -376,10 +952,34 @@
             "value": "Matches can be wrong; check the names. Only voices you save are used to recognise people."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Las coincidencias pueden fallar: revisa los nombres. Solo las voces que guardas se usan para reconocer a las personas."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les correspondances peuvent être erronées ; vérifiez les noms. Seules les voix que vous mémorisez servent à reconnaître les personnes."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Le corrispondenze possono sbagliare: controlla i nomi. Solo le voci che salvi servono a riconoscere le persone."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "As correspondências podem estar erradas; confira os nomes. Só as vozes que você salva são usadas para reconhecer pessoas."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "As correspondências podem estar erradas: verifique os nomes. Só as vozes que guardar são usadas para reconhecer pessoas."
           }
         }
       }
@@ -393,10 +993,34 @@
             "value": "Model notices"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avisos de los modelos"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mentions des modèles"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Avvisi dei modelli"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avisos dos modelos"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avisos dos modelos"
           }
         }
       }
@@ -410,10 +1034,34 @@
             "value": "Name strong voice matches automatically"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nombrar automáticamente las voces muy parecidas"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nommer automatiquement les voix très ressemblantes"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Dai il nome alle voci molto simili in automatico"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nomear automaticamente vozes muito parecidas"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nomear automaticamente vozes muito semelhantes"
           }
         }
       }
@@ -427,10 +1075,34 @@
             "value": "None yet"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ninguna todavía"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucune pour l’instant"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Ancora nessuna"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nenhuma ainda"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ainda nenhuma"
           }
         }
       }
@@ -444,10 +1116,34 @@
             "value": "Not available"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No disponible"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non disponible"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Non disponibile"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Indisponível"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Indisponível"
           }
         }
       }
@@ -461,10 +1157,34 @@
             "value": "Not downloaded"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sin descargar"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non téléchargé"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Non scaricato"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não baixado"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não transferido"
           }
         }
       }
@@ -478,10 +1198,34 @@
             "value": "Notes in Recently Deleted are not counted. They are deleted for good after 30 days."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se cuentan las notas de Eliminado recientemente. Se eliminan para siempre tras 30 días."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les notes dans Suppressions récentes ne sont pas comptées. Elles sont supprimées définitivement après 30 jours."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Le note in Eliminati di recente non sono contate. Vengono eliminate definitivamente dopo 30 giorni."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "As notas em Apagados não são contadas. Elas são excluídas para sempre após 30 dias."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "As notas em Apagados não são contadas. São eliminadas definitivamente após 30 dias."
           }
         }
       }
@@ -495,10 +1239,34 @@
             "value": "On-device models"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modelos en el dispositivo"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modèles sur l’appareil"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Modelli sul dispositivo"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modelos no dispositivo"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modelos no dispositivo"
           }
         }
       }
@@ -512,10 +1280,34 @@
             "value": "Opens Cassini in the Settings app"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abre Cassini en la app Ajustes"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ouvre Cassini dans l’app Réglages"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Apre Cassini nell’app Impostazioni"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abre o Cassini no app Ajustes"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abre o Cassini na aplicação Definições"
           }
         }
       }
@@ -529,10 +1321,34 @@
             "value": "Opens the model download"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abre la descarga de los modelos"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ouvre le téléchargement des modèles"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Apre il download dei modelli"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abre o download dos modelos"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abre a transferência dos modelos"
           }
         }
       }
@@ -546,10 +1362,34 @@
             "value": "Privacy"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Privacidad"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Confidentialité"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Privacy"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Privacidade"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Privacidade"
           }
         }
       }
@@ -563,7 +1403,31 @@
             "value": "Ready"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Listo"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prêt"
+          }
+        },
         "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pronto"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pronto"
+          }
+        },
+        "pt-PT": {
           "stringUnit": {
             "state": "translated",
             "value": "Pronto"
@@ -580,10 +1444,34 @@
             "value": "Recently Deleted"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminado recientemente"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Suppressions récentes"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Eliminati di recente"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apagados"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apagados"
           }
         }
       }
@@ -597,10 +1485,34 @@
             "value": "Recognising saved voices"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reconocimiento de voces guardadas"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reconnaissance des voix mémorisées"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Riconoscimento delle voci salvate"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reconhecimento de vozes salvas"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reconhecimento de vozes guardadas"
           }
         }
       }
@@ -614,10 +1526,34 @@
             "value": "Recordings"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Grabaciones"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enregistrements"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Registrazioni"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gravações"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gravações"
           }
         }
       }
@@ -631,10 +1567,34 @@
             "value": "Saved voices"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voces guardadas"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voix mémorisées"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Voci salvate"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vozes salvas"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vozes guardadas"
           }
         }
       }
@@ -648,10 +1608,34 @@
             "value": "Settings"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajustes"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réglages"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Impostazioni"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajustes"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Definições"
           }
         }
       }
@@ -665,10 +1649,34 @@
             "value": "Source code and notices"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Código fuente y avisos"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Code source et mentions"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Codice sorgente e avvisi"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Código-fonte e avisos"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Código-fonte e avisos"
           }
         }
       }
@@ -682,10 +1690,34 @@
             "value": "Source code on GitHub"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Código fuente en GitHub"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Code source sur GitHub"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Codice sorgente su GitHub"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Código-fonte no GitHub"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Código-fonte no GitHub"
           }
         }
       }
@@ -699,10 +1731,34 @@
             "value": "Speakers"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hablantes"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Intervenants"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Voci"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Locutores"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oradores"
           }
         }
       }
@@ -716,10 +1772,34 @@
             "value": "Speech language"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Idioma hablado"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Langue parlée"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Lingua del parlato"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Idioma da fala"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Idioma da fala"
           }
         }
       }
@@ -733,10 +1813,34 @@
             "value": "Speech recognition"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reconocimiento de voz"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reconnaissance vocale"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Riconoscimento vocale"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reconhecimento de fala"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reconhecimento de fala"
           }
         }
       }
@@ -750,10 +1854,34 @@
             "value": "Telling speakers apart"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Separación de hablantes"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Distinction des intervenants"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Distinzione delle voci"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Separação de locutores"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Separação de oradores"
           }
         }
       }
@@ -767,10 +1895,34 @@
             "value": "The language of speech is chosen separately, under Transcription."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El idioma hablado se elige aparte, en Transcripción."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La langue parlée se choisit à part, dans Transcription."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "La lingua del parlato si sceglie a parte, in Trascrizione."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O idioma da fala é escolhido à parte, em Transcrição."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O idioma da fala escolhe-se à parte, em Transcrição."
           }
         }
       }
@@ -784,10 +1936,34 @@
             "value": "The servers Cassini downloads models from"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Los servidores de los que Cassini descarga los modelos"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les serveurs d’où Cassini télécharge les modèles"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "I server da cui Cassini scarica i modelli"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Os servidores de onde o Cassini baixa os modelos"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Os servidores de onde o Cassini transfere os modelos"
           }
         }
       }
@@ -801,10 +1977,34 @@
             "value": "Third-party notices"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avisos de terceros"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mentions de tiers"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Avvisi di terze parti"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avisos de terceiros"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avisos de terceiros"
           }
         }
       }
@@ -818,10 +2018,34 @@
             "value": "Transcribe after recording or import"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcribir después de grabar o importar"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcrire après l’enregistrement ou l’importation"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Trascrivi dopo la registrazione o l’importazione"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcrever após gravar ou importar"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcrever após gravar ou importar"
           }
         }
       }
@@ -835,10 +2059,34 @@
             "value": "Transcription"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcripción"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcription"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Trascrizione"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcrição"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcrição"
           }
         }
       }
@@ -852,10 +2100,34 @@
             "value": "Transcription runs on this device. Audio never leaves it."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La transcripción se hace en este dispositivo. El audio nunca sale de él."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La transcription s’effectue sur cet appareil. L’audio ne le quitte jamais."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "La trascrizione avviene su questo dispositivo. L’audio non lo lascia mai."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A transcrição acontece neste dispositivo. O áudio nunca sai dele."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A transcrição é feita neste dispositivo. O áudio nunca sai dele."
           }
         }
       }
@@ -869,10 +2141,34 @@
             "value": "What Cassini keeps on this device and what it sends"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Qué guarda Cassini en este dispositivo y qué envía"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce que Cassini conserve sur cet appareil et ce qu’il envoie"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Cosa Cassini conserva su questo dispositivo e cosa invia"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O que o Cassini guarda neste dispositivo e o que envia"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O que o Cassini guarda neste dispositivo e o que envia"
           }
         }
       }
@@ -886,10 +2182,34 @@
             "value": "Where the models come from"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "De dónde vienen los modelos"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Provenance des modèles"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Da dove vengono i modelli"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "De onde vêm os modelos"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "De onde vêm os modelos"
           }
         }
       }
@@ -903,10 +2223,34 @@
             "value": "Your library"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tu biblioteca"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Votre bibliothèque"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "La tua libreria"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sua biblioteca"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A sua biblioteca"
           }
         }
       }
@@ -920,10 +2264,34 @@
             "value": "— turns speech into searchable, timed text on your device."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "— convierte el habla en texto con marcas de tiempo que puedes buscar, en tu dispositivo."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "— transforme la parole en texte horodaté et facile à rechercher, sur votre appareil."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "— trasforma il parlato in testo ricercabile e con i tempi, sul tuo dispositivo."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "— transforma a fala em texto pesquisável e com marcação de tempo, no seu dispositivo."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "— transforma a fala em texto pesquisável e com tempos, no seu dispositivo."
           }
         }
       }

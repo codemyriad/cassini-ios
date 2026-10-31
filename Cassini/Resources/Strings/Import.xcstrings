@@ -10,10 +10,34 @@
             "value": "Audio changed"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio modificado"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio modifié"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Audio cambiato"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Áudio alterado"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Áudio alterado"
           }
         }
       }
@@ -27,10 +51,34 @@
             "value": "Can’t read transcript"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcripción ilegible"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcription illisible"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Trascrizione illeggibile"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcrição ilegível"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcrição ilegível"
           }
         }
       }
@@ -44,10 +92,34 @@
             "value": "Imported audio"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio importado"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio importé"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Audio importato"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Áudio importado"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Áudio importado"
           }
         }
       }
@@ -61,10 +133,34 @@
             "value": "Newer format"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Formato más reciente"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Format plus récent"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Formato più recente"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Formato mais recente"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Formato mais recente"
           }
         }
       }
@@ -78,10 +174,34 @@
             "value": "Not verified"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sin verificar"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non vérifiée"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Non verificata"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não verificada"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não verificada"
           }
         }
       }
@@ -95,10 +215,34 @@
             "value": "Verified"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verificada"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vérifiée"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Verificata"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verificada"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verificada"
           }
         }
       }

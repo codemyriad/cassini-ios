@@ -22,8 +22,12 @@ Models/
 *.onnx.zst
 *.part
 /.test-cache/
-# Italian screenshots (scripts/screenshots.sh --locale it) are for review, not committed.
+# Screenshots in the other languages (scripts/screenshots.sh --locale it|fr|es|pt-BR|pt-PT) are for review, not committed.
 docs/screenshots/it/
+docs/screenshots/fr/
+docs/screenshots/es/
+docs/screenshots/pt-BR/
+docs/screenshots/pt-PT/
 # The native runtime build (scripts/build-sherpa-xcframework.sh) and its downloads; also a link to another checkout's.
 .tools
 # Archives and exported .ipa files (docs/distribution.md).
