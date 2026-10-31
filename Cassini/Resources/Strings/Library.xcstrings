@@ -11,10 +11,34 @@
             "value": "%@ %@"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, %@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ à %@"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "%@ alle %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ às %@"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ às %@"
           }
         }
       }
@@ -29,7 +53,31 @@
             "value": "%@, %@"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, %@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, %@"
+          }
+        },
         "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, %@"
+          }
+        },
+        "pt-PT": {
           "stringUnit": {
             "state": "translated",
             "value": "%@, %@"
@@ -59,6 +107,54 @@
             }
           }
         },
+        "es": {
+          "variations": {
+            "plural": {
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld más en la cola"
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld más en la cola"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld más en la cola"
+                }
+              }
+            }
+          }
+        },
+        "fr": {
+          "variations": {
+            "plural": {
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld autres en attente"
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld autre en attente"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld autres en attente"
+                }
+              }
+            }
+          }
+        },
         "it": {
           "variations": {
             "plural": {
@@ -82,6 +178,54 @@
               }
             }
           }
+        },
+        "pt-BR": {
+          "variations": {
+            "plural": {
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "mais %lld na fila"
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "mais %lld na fila"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "mais %lld na fila"
+                }
+              }
+            }
+          }
+        },
+        "pt-PT": {
+          "variations": {
+            "plural": {
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "mais %lld na fila"
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "mais %lld na fila"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "mais %lld na fila"
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -95,10 +239,34 @@
             "value": "A little more present."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un poco más presente."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un peu plus présents."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Un po’ più presenti."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Um pouco mais presente."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Um pouco mais presente."
           }
         }
       }
@@ -113,10 +281,34 @@
             "value": "Adds version %lld."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Añade la versión %lld."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajoute la version %lld."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Aggiunge la versione %lld."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adiciona a versão %lld."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adiciona a versão %lld."
           }
         }
       }
@@ -131,10 +323,34 @@
             "value": "All"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Todas"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toutes"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Tutte"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Todas"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Todas"
           }
         }
       }
@@ -149,10 +365,34 @@
             "value": "Audio only"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Solo audio"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio seul"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Solo audio"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Só áudio"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Só áudio"
           }
         }
       }
@@ -167,10 +407,34 @@
             "value": "Cancel"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancelar"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Annuler"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Annulla"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancelar"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancelar"
           }
         }
       }
@@ -185,10 +449,34 @@
             "value": "Can’t play"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No reproducible"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lecture impossible"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Non riproducibile"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não reproduzível"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não reproduzível"
           }
         }
       }
@@ -203,10 +491,34 @@
             "value": "Can’t read transcript"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcripción ilegible"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcription illisible"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Trascrizione illeggibile"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcrição ilegível"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcrição ilegível"
           }
         }
       }
@@ -221,10 +533,34 @@
             "value": "Checking files — %lld%%"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verificando archivos — %lld %%"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vérification des fichiers — %lld %%"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Verifica dei file — %lld%%"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verificando arquivos — %lld%%"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A verificar ficheiros — %lld%%"
           }
         }
       }
@@ -233,10 +569,34 @@
       "comment": "The detail column of the split view before a note is open",
       "extractionState": "manual",
       "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elige una grabación"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choisissez un enregistrement"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Scegli una registrazione"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escolha uma gravação"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escolha uma gravação"
           }
         }
       }
@@ -251,10 +611,34 @@
             "value": "Clear search"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Borrar búsqueda"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Effacer la recherche"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Cancella la ricerca"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Limpar busca"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Limpar pesquisa"
           }
         }
       }
@@ -269,10 +653,34 @@
             "value": "Couldn’t transcribe"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo transcribir"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Échec de la transcription"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Trascrizione non riuscita"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Falha na transcrição"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Falha na transcrição"
           }
         }
       }
@@ -287,10 +695,34 @@
             "value": "Dismiss notice"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cerrar aviso"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fermer l’avis"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Chiudi l’avviso"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fechar aviso"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fechar aviso"
           }
         }
       }
@@ -305,10 +737,34 @@
             "value": "Document info"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Información del documento"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Infos sur le document"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Informazioni sul documento"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Informações do documento"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Informações do documento"
           }
         }
       }
@@ -323,10 +779,34 @@
             "value": "Downloading models"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Descargando modelos"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Téléchargement des modèles"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Download dei modelli"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baixando modelos"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A transferir modelos"
           }
         }
       }
@@ -341,10 +821,34 @@
             "value": "Downloading speaker separation — %lld%%"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Descargando separación de hablantes — %lld %%"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Téléchargement de la distinction des intervenants — %lld %%"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Download della distinzione delle voci — %lld%%"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baixando separação de locutores — %lld%%"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A transferir separação de oradores — %lld%%"
           }
         }
       }
@@ -359,10 +863,34 @@
             "value": "Downloading speech recognition — %lld%%"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Descargando reconocimiento de voz — %lld %%"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Téléchargement de la reconnaissance vocale — %lld %%"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Download del riconoscimento vocale — %lld%%"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baixando reconhecimento de fala — %lld%%"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A transferir reconhecimento de fala — %lld%%"
           }
         }
       }
@@ -377,10 +905,34 @@
             "value": "Downloading voice recognition — %lld%%"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Descargando reconocimiento de voces — %lld %%"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Téléchargement de la reconnaissance des voix — %lld %%"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Download del riconoscimento delle voci — %lld%%"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baixando reconhecimento de vozes — %lld%%"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A transferir reconhecimento de vozes — %lld%%"
           }
         }
       }
@@ -395,10 +947,34 @@
             "value": "Earlier versions can’t be kept because the audio changed."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Las versiones anteriores no se pueden conservar porque el audio cambió."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les versions précédentes ne peuvent pas être conservées, car l’audio a changé."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Le versioni precedenti non si possono conservare perché l’audio è cambiato."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não é possível manter as versões anteriores porque o áudio mudou."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não é possível manter as versões anteriores porque o áudio mudou."
           }
         }
       }
@@ -413,10 +989,34 @@
             "value": "Enter a title."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escribe un título."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saisissez un titre."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Inserisci un titolo."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Digite um título."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Introduza um título."
           }
         }
       }
@@ -431,10 +1031,34 @@
             "value": "Export"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exportar"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exporter"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Esporta"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exportar"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exportar"
           }
         }
       }
@@ -449,10 +1073,34 @@
             "value": "Getting ready to transcribe %@"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preparando la transcripción de %@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Préparation de la transcription de %@"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Preparazione per trascrivere %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preparando para transcrever %@"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A preparar a transcrição de %@"
           }
         }
       }
@@ -467,10 +1115,34 @@
             "value": "Import audio"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Importar audio"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Importer un audio"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Importa audio"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Importar áudio"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Importar áudio"
           }
         }
       }
@@ -485,10 +1157,34 @@
             "value": "Keep the conversation. Find the important parts."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Conserva la conversación. Encuentra lo importante."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gardez la conversation. Retrouvez l’essentiel."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Conserva la conversazione. Ritrova i punti importanti."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Guarde a conversa. Encontre as partes importantes."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Guarde a conversa. Encontre o que importa."
           }
         }
       }
@@ -503,10 +1199,34 @@
             "value": "Keep your favorites close."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ten tus favoritas a mano."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gardez vos notes favorites à portée de main."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Tieni vicine le tue preferite."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mantenha suas favoritas por perto."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tenha as favoritas por perto."
           }
         }
       }
@@ -521,10 +1241,34 @@
             "value": "Newer format"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Formato más reciente"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Format plus récent"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Formato più recente"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Formato mais recente"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Formato mais recente"
           }
         }
       }
@@ -539,10 +1283,34 @@
             "value": "Notes"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notas"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notes"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Note"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notas"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notas"
           }
         }
       }
@@ -557,10 +1325,34 @@
             "value": "Open note"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abrir nota"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ouvre la note"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Apri la nota"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abre a nota"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abrir nota"
           }
         }
       }
@@ -575,10 +1367,34 @@
             "value": "Open settings"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abrir Ajustes"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ouvre les réglages"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Apri le impostazioni"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abre os Ajustes"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abrir Definições"
           }
         }
       }
@@ -593,10 +1409,34 @@
             "value": "Paused at %@"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pausada en %@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En pause à %@"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "In pausa a %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pausada em %@"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pausada aos %@"
           }
         }
       }
@@ -604,10 +1444,34 @@
     "Pick a recording in your library to read and listen.": {
       "extractionState": "manual",
       "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elige una grabación de tu biblioteca para leerla y escucharla."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choisissez un enregistrement dans votre bibliothèque pour le lire et l’écouter."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Scegli una registrazione nella libreria per leggerla e ascoltarla."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escolha uma gravação na sua biblioteca para ler e ouvir."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escolha uma gravação na biblioteca para a ler e ouvir."
           }
         }
       }
@@ -622,10 +1486,34 @@
             "value": "Queued"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En cola"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En attente"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "In coda"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Na fila"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Na fila"
           }
         }
       }
@@ -640,10 +1528,34 @@
             "value": "Record"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Grabar"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enregistrer"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Registra"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gravar"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gravar"
           }
         }
       }
@@ -658,10 +1570,34 @@
             "value": "Record a new note"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Grabar una nota nueva"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enregistrer une nouvelle note"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Registra una nuova nota"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gravar uma nova nota"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gravar uma nova nota"
           }
         }
       }
@@ -676,10 +1612,34 @@
             "value": "Recording"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Grabando"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enregistrement en cours"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Registrazione in corso"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gravando"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A gravar"
           }
         }
       }
@@ -694,10 +1654,34 @@
             "value": "Recording paused · %@"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Grabación en pausa · %@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enregistrement en pause · %@"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Registrazione in pausa · %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gravação em pausa · %@"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gravação em pausa · %@"
           }
         }
       }
@@ -712,10 +1696,34 @@
             "value": "Recording · %@"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Grabando · %@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enregistrement · %@"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Registrazione · %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gravando · %@"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A gravar · %@"
           }
         }
       }
@@ -730,10 +1738,34 @@
             "value": "Remove from queue"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quitar de la cola"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retirer de la file d’attente"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Togli dalla coda"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remover da fila"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remover da fila"
           }
         }
       }
@@ -748,10 +1780,34 @@
             "value": "Remove star"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quitar de favoritas"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retirer des favoris"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Togli dai preferiti"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remover estrela"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remover estrela"
           }
         }
       }
@@ -766,10 +1822,34 @@
             "value": "Rename"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Renombrar"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Renommer"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Rinomina"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Renomear"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mudar o nome"
           }
         }
       }
@@ -784,10 +1864,34 @@
             "value": "Resume"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reanudar"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reprendre"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Riprendi"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retomar"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retomar"
           }
         }
       }
@@ -802,10 +1906,34 @@
             "value": "Resume transcribing %@"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reanudar la transcripción de %@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reprendre la transcription de %@"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Riprendi la trascrizione di %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retomar a transcrição de %@"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retomar a transcrição de %@"
           }
         }
       }
@@ -820,10 +1948,34 @@
             "value": "Return to recording"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Volver a la grabación"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Revenir à l’enregistrement"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Torna alla registrazione"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voltar à gravação"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voltar à gravação"
           }
         }
       }
@@ -838,10 +1990,34 @@
             "value": "Save"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Guardar"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enregistrer"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Salva"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Salvar"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Guardar"
           }
         }
       }
@@ -850,10 +2026,34 @@
       "comment": "Library search field placeholder where no longer one fits on one line",
       "extractionState": "manual",
       "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Buscar"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rechercher"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Cerca"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Buscar"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pesquisar"
           }
         }
       }
@@ -862,10 +2062,34 @@
       "comment": "Library search field placeholder where the long one does not fit on one line (the iPad sidebar)",
       "extractionState": "manual",
       "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Buscar en títulos y transcripciones"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Titres et transcriptions"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Cerca titoli e trascrizioni"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Buscar em títulos e transcrições"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pesquisar títulos e transcrições"
           }
         }
       }
@@ -880,10 +2104,34 @@
             "value": "Search titles and what was said"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Buscar en títulos y en lo que se dijo"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rechercher titres et paroles"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Cerca nei titoli e in ciò che è stato detto"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Buscar nos títulos e no que foi dito"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pesquisar títulos e o que foi dito"
           }
         }
       }
@@ -898,10 +2146,34 @@
             "value": "Settings"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajustes"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réglages"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Impostazioni"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajustes"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Definições"
           }
         }
       }
@@ -916,10 +2188,34 @@
             "value": "Speaker names carry over."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se conservan los nombres de los hablantes."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les noms des intervenants sont conservés."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "I nomi delle voci vengono mantenuti."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Os nomes dos locutores são mantidos."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Os nomes dos oradores mantêm-se."
           }
         }
       }
@@ -934,10 +2230,34 @@
             "value": "Star"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Añadir a favoritas"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajouter aux favoris"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Aggiungi ai preferiti"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adicionar estrela"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adicionar estrela"
           }
         }
       }
@@ -952,10 +2272,34 @@
             "value": "Star a note to find it here."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Añade una nota a favoritas para encontrarla aquí."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajoutez une note aux favoris pour la retrouver ici."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Aggiungi una nota ai preferiti per trovarla qui."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Marque uma nota com estrela para encontrá-la aqui."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adicione uma estrela a uma nota para a encontrar aqui."
           }
         }
       }
@@ -970,10 +2314,34 @@
             "value": "Starred"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Favoritas"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Favorites"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Preferite"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Com estrela"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Com estrela"
           }
         }
       }
@@ -988,10 +2356,34 @@
             "value": "Start over"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Empezar de nuevo"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recommencer"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Ricomincia"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recomeçar"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recomeçar"
           }
         }
       }
@@ -1006,10 +2398,34 @@
             "value": "Start over?"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Empezar de nuevo?"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recommencer ?"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Ricominciare?"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recomeçar?"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recomeçar?"
           }
         }
       }
@@ -1024,10 +2440,34 @@
             "value": "Stop and keep progress"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Detener y conservar el progreso"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arrêter et garder la progression"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Ferma e conserva i progressi"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parar e manter o progresso"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parar e manter o progresso"
           }
         }
       }
@@ -1042,10 +2482,34 @@
             "value": "Tap to return"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toca para volver"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Touchez pour revenir"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Tocca per tornare"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toque para voltar"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toque para voltar"
           }
         }
       }
@@ -1060,10 +2524,34 @@
             "value": "The draft so far is discarded. Your recording is kept."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se descarta el borrador hecho hasta ahora. Tu grabación se conserva."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le brouillon actuel est supprimé. Votre enregistrement est conservé."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "La bozza fin qui viene scartata. La registrazione resta."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O rascunho até aqui é descartado. Sua gravação continua salva."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O rascunho até agora é descartado. A gravação é mantida."
           }
         }
       }
@@ -1078,10 +2566,34 @@
             "value": "This file can’t take a new version here."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aquí este archivo no admite una nueva versión."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce fichier ne peut pas recevoir de nouvelle version ici."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Questo file non può avere una nuova versione qui."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este arquivo não pode receber uma nova versão aqui."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este ficheiro não pode receber uma nova versão aqui."
           }
         }
       }
@@ -1096,10 +2608,34 @@
             "value": "Title"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Título"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Titre"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Titolo"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Título"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Título"
           }
         }
       }
@@ -1114,10 +2650,34 @@
             "value": "Today"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hoy"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aujourd’hui"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Oggi"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hoje"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hoje"
           }
         }
       }
@@ -1132,10 +2692,34 @@
             "value": "Transcribe"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcribir"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcrire"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Trascrivi"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcrever"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcrever"
           }
         }
       }
@@ -1150,10 +2734,34 @@
             "value": "Transcribe again"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Volver a transcribir"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcrire à nouveau"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Trascrivi di nuovo"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcrever de novo"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcrever novamente"
           }
         }
       }
@@ -1168,10 +2776,34 @@
             "value": "Transcribe again?"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Volver a transcribir?"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcrire à nouveau ?"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Trascrivere di nuovo?"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcrever de novo?"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcrever novamente?"
           }
         }
       }
@@ -1186,10 +2818,34 @@
             "value": "Transcribed"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcrita"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcrite"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Trascritta"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcrita"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcrita"
           }
         }
       }
@@ -1204,10 +2860,34 @@
             "value": "Transcribed on this device. Audio never leaves it."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcrito en este dispositivo. El audio nunca sale de él."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcription sur cet appareil. L’audio ne le quitte jamais."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Trascritto su questo dispositivo. L’audio non lo lascia mai."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcrito neste dispositivo. O áudio nunca sai dele."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcrição feita neste dispositivo. O áudio nunca sai dele."
           }
         }
       }
@@ -1222,10 +2902,34 @@
             "value": "Transcribing"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcribiendo"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcription en cours"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "In trascrizione"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcrevendo"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A transcrever"
           }
         }
       }
@@ -1240,10 +2944,34 @@
             "value": "Transcribing %@"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcribiendo %@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcription de %@"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Trascrizione di %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcrevendo %@"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A transcrever %@"
           }
         }
       }
@@ -1258,10 +2986,34 @@
             "value": "Try again"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reintentar"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réessayer"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Riprova"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tentar novamente"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tentar novamente"
           }
         }
       }
@@ -1276,10 +3028,34 @@
             "value": "Try transcribing %@ again"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reintentar la transcripción de %@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réessayer de transcrire %@"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Riprova a trascrivere %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tentar transcrever %@ novamente"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tentar transcrever %@ novamente"
           }
         }
       }
@@ -1294,10 +3070,34 @@
             "value": "Yesterday"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ayer"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hier"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Ieri"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ontem"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ontem"
           }
         }
       }
@@ -1312,10 +3112,34 @@
             "value": "Your notes can’t be opened"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pueden abrir tus notas"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossible d’ouvrir vos notes"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Impossibile aprire le note"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não é possível abrir suas notas"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não é possível abrir as notas"
           }
         }
       }
@@ -1330,10 +3154,34 @@
             "value": "today"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "hoy"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "aujourd’hui"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "oggi"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "hoje"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "hoje"
           }
         }
       }
@@ -1348,10 +3196,34 @@
             "value": "yesterday"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ayer"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "hier"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "ieri"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ontem"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ontem"
           }
         }
       }
@@ -1373,6 +3245,54 @@
                 "stringUnit": {
                   "state": "translated",
                   "value": "· %lld speakers"
+                }
+              }
+            }
+          }
+        },
+        "es": {
+          "variations": {
+            "plural": {
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "· %lld hablantes"
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "· %lld hablante"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "· %lld hablantes"
+                }
+              }
+            }
+          }
+        },
+        "fr": {
+          "variations": {
+            "plural": {
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "· %lld intervenants"
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "· %lld intervenant"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "· %lld intervenants"
                 }
               }
             }
@@ -1401,6 +3321,54 @@
               }
             }
           }
+        },
+        "pt-BR": {
+          "variations": {
+            "plural": {
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "· %lld locutores"
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "· %lld locutor"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "· %lld locutores"
+                }
+              }
+            }
+          }
+        },
+        "pt-PT": {
+          "variations": {
+            "plural": {
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "· %lld oradores"
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "· %lld orador"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "· %lld oradores"
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -1414,10 +3382,34 @@
             "value": "· No speech"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "· Sin palabras"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "· Aucune parole"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "· Nessun parlato"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "· Sem fala"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "· Sem fala"
           }
         }
       }
@@ -1432,10 +3424,34 @@
             "value": "· Resume"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "· Reanudar"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "· Reprendre"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "· Riprendi"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "· Retomar"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "· Retomar"
           }
         }
       }
@@ -1450,10 +3466,34 @@
             "value": "· Try again"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "· Reintentar"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "· Réessayer"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "· Riprova"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "· Tentar novamente"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "· Tentar novamente"
           }
         }
       }

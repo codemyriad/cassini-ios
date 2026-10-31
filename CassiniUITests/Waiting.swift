@@ -23,6 +23,13 @@ extension XCUIElement {
     @MainActor func wait(until predicate: NSPredicate, within timeout: TimeInterval) -> Bool {
         poll(within: timeout) { exists ? predicate.evaluate(with: self) : predicate.evaluate(with: ["exists": false]) }
     }
+
+    /// Waits until this field holds `text`. Typed keys reach the app after `typeText` returns, seconds later on a busy
+    /// machine, so a button tapped or read before then sees what the field held so far: a disabled Save, or a title
+    /// cut short.
+    @MainActor func waitForValue(_ text: String, within timeout: TimeInterval = 10) -> Bool {
+        wait(until: NSPredicate(format: "value == %@", text), within: timeout)
+    }
 }
 
 extension XCUIElement {

@@ -527,8 +527,11 @@ These features exist only on iOS. They were kept by decision.
   speakers are one version, as on Android; Identify speakers on a transcript that has speakers already adds a version
   with the new ones, so the earlier attribution stays available. While a job is pending for the note, the list's
   speakers and Add a speaker are disabled, as the transcript's read-only rule asks.
-- **"Recently Deleted"** instead of "Trash", as in Photos and Notes. The rest of the copy is Android's, and the Italian
-  is "Eliminati di recente".
+- **"Recently Deleted"** instead of "Trash", as in Photos and Notes. The rest of the copy is Android's.
+  - Each language names the place the way Apple does: "Eliminati di recente", "Suppressions récentes" and "Eliminado
+    recientemente".
+  - Both Portugueses use the short "Apagados". "Apagados recentemente" did not fit beside the screen's Empty button at
+    larger text sizes (`testNoTextIsClippedInBrazilianPortuguese`).
 - **Forget all voice data** in Saved voices. It is offered when nobody is saved but notes still hold voiceprints, and
   also for a damaged list, so there is always a way back.
 - **Settings sections** for Transcription (the speech language, and "Transcribe after recording or import", on by
@@ -573,8 +576,10 @@ These features exist only on iOS. They were kept by decision.
 
 ### Language and copy
 
-- **App language.** iOS sets an app's language in the Settings app, so the row shows the current language and opens
-  Cassini's page there. Android has a Phone / English / Italiano control.
+- **App language.** iOS sets an app's language in the Settings app, so the row shows the current language in its own
+  words ("Português (Brasil)") and opens Cassini's page there. Android has a Phone / English / Italiano control.
+  Without a choice there, Cassini follows the system's language (D50.1), using Foundation's matching:
+  `LocalizationTests` checks that `pt` reads as pt-BR, pt-AO as pt-PT, es-MX as es and de as English.
 - **Copy.** Android's English is used, with "device" for "phone" ("Remember this voice on this device", "Transcribe on
   this device", "Voiceprints stay on this device"), because Cassini also runs on iPad. Dates have Android's forms
   (`DateLabels`): "Monday 5 Oct" in the Library and on the Note screen, "Deleted 2 Oct", "8 Oct, 9:41 AM", the year
@@ -589,9 +594,9 @@ These features exist only on iOS. They were kept by decision.
   INTERRUPTED, UNSUPPORTED_LANGUAGE, RESERVATION_LIMIT and CHECKPOINT_MISMATCH exist only on iOS.
 - **No NO_ENCODER banner.** libopus is built into Cassini (`CassiniAudio`), so the encoder is always there.
 - **String check.** Android lint fails on missing translations. iOS has `scripts/check-strings.sh`, which runs in
-  `scripts/test.sh fast`. It fails on an Italian value that is missing, new, `needs_review` or empty, on a plural that
-  lacks its `one`, `many` and `other` forms, on placeholders that differ from the English, on stale or missing keys,
-  and on literals outside any table.
+  `scripts/test.sh fast`. It fails on a value in any of the five translations that is missing, new, `needs_review` or
+  empty, on a plural without its language's CLDR categories, on arguments that differ from the English, on a dropped
+  "Cassini", on stale or missing keys, and on literals outside any table.
 
 ### Notifications and deep links
 

@@ -19,9 +19,15 @@ command below runs from the repository root, not from a folder under `Packages/`
 
 ### `fast`: the string catalogs and the package tests
 
-- **String catalogs.** `scripts/check-strings.sh` fails on an Italian value that is missing, new, `needs_review` or
-  empty, on a plural that lacks a form, on placeholders that differ from the English, on stale or missing keys, and on
-  any literal on screen that is not in a table.
+- **String catalogs.** `scripts/check-strings.sh` covers the string tables and the permission prompts
+  (`InfoPlist.xcstrings`). It fails on:
+  - an Italian, French, Spanish, Brazilian or European Portuguese value that is missing, new, `needs_review` or empty;
+  - a plural without exactly its language's CLDR categories;
+  - arguments that differ from the English in number or type. A translation may reorder them with `%1$@`. A `one` form
+    may drop the count only where `one` means 1 alone, which excludes French and Brazilian Portuguese, where it also
+    covers 0;
+  - a translation that drops "Cassini";
+  - stale or missing keys, and any literal on screen that is not in a table.
 - **CassiniCore** (85). The format's own tests, and the published cassini-format conformance vectors. Set
   `CASSINI_CONFORMANCE` to a checkout's `spec/conformance`, or keep `../cassini-format` beside the repository, which
   `scripts/test.sh` finds. With `CASSINI_CONFORMANCE_REQUIRED=1`, which `scripts/test-remote.sh` sets, missing vectors

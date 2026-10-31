@@ -22,6 +22,54 @@
             }
           }
         },
+        "es": {
+          "variations": {
+            "plural": {
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Quedan %lld días"
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Queda %lld día"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Quedan %lld días"
+                }
+              }
+            }
+          }
+        },
+        "fr": {
+          "variations": {
+            "plural": {
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld jours restants"
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld jour restant"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld jours restants"
+                }
+              }
+            }
+          }
+        },
         "it": {
           "variations": {
             "plural": {
@@ -41,6 +89,54 @@
                 "stringUnit": {
                   "state": "translated",
                   "value": "%lld giorni rimasti"
+                }
+              }
+            }
+          }
+        },
+        "pt-BR": {
+          "variations": {
+            "plural": {
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld dias restantes"
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld dia restante"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld dias restantes"
+                }
+              }
+            }
+          }
+        },
+        "pt-PT": {
+          "variations": {
+            "plural": {
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Faltam %lld dias"
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Falta %lld dia"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Faltam %lld dias"
                 }
               }
             }
@@ -69,6 +165,54 @@
             }
           }
         },
+        "es": {
+          "variations": {
+            "plural": {
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "No se pudieron eliminar %lld notas. Siguen en Eliminado recientemente."
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "No se pudo eliminar %lld nota. Sigue en Eliminado recientemente."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "No se pudieron eliminar %lld notas. Siguen en Eliminado recientemente."
+                }
+              }
+            }
+          }
+        },
+        "fr": {
+          "variations": {
+            "plural": {
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Impossible de supprimer %lld notes. Elles restent dans Suppressions récentes."
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Impossible de supprimer %lld note. Elle reste dans Suppressions récentes."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Impossible de supprimer %lld notes. Elles restent dans Suppressions récentes."
+                }
+              }
+            }
+          }
+        },
         "it": {
           "variations": {
             "plural": {
@@ -92,6 +236,54 @@
               }
             }
           }
+        },
+        "pt-BR": {
+          "variations": {
+            "plural": {
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Não foi possível excluir %lld notas. Elas continuam em Apagados."
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Não foi possível excluir %lld nota. Ela continua em Apagados."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Não foi possível excluir %lld notas. Elas continuam em Apagados."
+                }
+              }
+            }
+          }
+        },
+        "pt-PT": {
+          "variations": {
+            "plural": {
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Não foi possível eliminar %lld notas. Ficam em Apagados."
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Não foi possível eliminar %lld nota. Fica em Apagados."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Não foi possível eliminar %lld notas. Ficam em Apagados."
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -104,10 +296,34 @@
             "value": "Cancel"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancelar"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Annuler"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Annulla"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancelar"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancelar"
           }
         }
       }
@@ -121,10 +337,34 @@
             "value": "Delete"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminar"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supprimer"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Elimina"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Excluir"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminar"
           }
         }
       }
@@ -145,6 +385,54 @@
                 "stringUnit": {
                   "state": "translated",
                   "value": "Delete %lld notes for good?"
+                }
+              }
+            }
+          }
+        },
+        "es": {
+          "variations": {
+            "plural": {
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "¿Eliminar %lld notas para siempre?"
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "¿Eliminar %lld nota para siempre?"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "¿Eliminar %lld notas para siempre?"
+                }
+              }
+            }
+          }
+        },
+        "fr": {
+          "variations": {
+            "plural": {
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Supprimer définitivement %lld notes ?"
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Supprimer définitivement %lld note ?"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Supprimer définitivement %lld notes ?"
                 }
               }
             }
@@ -173,6 +461,54 @@
               }
             }
           }
+        },
+        "pt-BR": {
+          "variations": {
+            "plural": {
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Excluir %lld notas para sempre?"
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Excluir %lld nota para sempre?"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Excluir %lld notas para sempre?"
+                }
+              }
+            }
+          }
+        },
+        "pt-PT": {
+          "variations": {
+            "plural": {
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Eliminar %lld notas definitivamente?"
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Eliminar %lld nota definitivamente?"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Eliminar %lld notas definitivamente?"
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -185,10 +521,34 @@
             "value": "Delete now"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminar ahora"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supprimer maintenant"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Elimina ora"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Excluir agora"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminar agora"
           }
         }
       }
@@ -202,10 +562,34 @@
             "value": "Delete “%@” for good?"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Eliminar “%@” para siempre?"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supprimer définitivement « %@ » ?"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Eliminare “%@” per sempre?"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Excluir “%@” para sempre?"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminar «%@» definitivamente?"
           }
         }
       }
@@ -219,10 +603,34 @@
             "value": "Deleted %@"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminada el %@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supprimée le %@"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Eliminata %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Excluída em %@"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminada a %@"
           }
         }
       }
@@ -236,10 +644,34 @@
             "value": "Deleted today"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminada hoy"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supprimée aujourd’hui"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Eliminata oggi"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Excluída hoje"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminada hoje"
           }
         }
       }
@@ -253,10 +685,34 @@
             "value": "Deleted yesterday"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminada ayer"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supprimée hier"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Eliminata ieri"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Excluída ontem"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminada ontem"
           }
         }
       }
@@ -270,10 +726,34 @@
             "value": "Empty"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vaciar"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vider"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Svuota"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esvaziar"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esvaziar"
           }
         }
       }
@@ -287,10 +767,34 @@
             "value": "Its audio, transcripts and voiceprints from this note are deleted. This can’t be undone."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se eliminarán su audio, sus transcripciones y las huellas de voz de esta nota. No se puede deshacer."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Son audio, ses transcriptions et les empreintes vocales de cette note sont supprimés. Cette action est irréversible."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "L’audio, le trascrizioni e le impronte vocali di questa nota vengono eliminati. Non si può annullare."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O áudio, as transcrições e as impressões de voz desta nota serão excluídos. Não é possível desfazer."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O áudio, as transcrições e as impressões vocais desta nota são eliminados. Não é possível desfazer."
           }
         }
       }
@@ -304,10 +808,34 @@
             "value": "Kept for 30 days, then deleted."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se conserva durante 30 días y luego se elimina."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Conservée 30 jours, puis supprimée."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Conservata per 30 giorni, poi eliminata."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mantida por 30 dias e depois excluída."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mantida durante 30 dias e depois eliminada."
           }
         }
       }
@@ -321,10 +849,34 @@
             "value": "Move to Recently Deleted"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mover a Eliminado recientemente"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Déplacer vers Suppressions récentes"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Sposta in Eliminati di recente"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mover para Apagados"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mover para Apagados"
           }
         }
       }
@@ -338,10 +890,34 @@
             "value": "Notes here are deleted for good after 30 days, with their audio, transcripts and voiceprints from those notes."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Las notas de aquí se eliminan para siempre tras 30 días, junto con su audio, sus transcripciones y las huellas de voz de esas notas."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les notes présentes ici sont supprimées définitivement après 30 jours, avec leur audio, leurs transcriptions et leurs empreintes vocales."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Le note qui vengono eliminate per sempre dopo 30 giorni, con il loro audio, le trascrizioni e le impronte vocali di quelle note."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "As notas aqui são excluídas para sempre após 30 dias, com o áudio, as transcrições e as impressões de voz delas."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "As notas aqui são eliminadas definitivamente após 30 dias, com o respetivo áudio, transcrições e impressões vocais."
           }
         }
       }
@@ -355,10 +931,34 @@
             "value": "Notes you delete stay here for 30 days."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Las notas que eliminas se quedan aquí durante 30 días."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les notes que vous supprimez restent ici 30 jours."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Le note che elimini restano qui per 30 giorni."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "As notas que você exclui ficam aqui por 30 dias."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "As notas que eliminar ficam aqui durante 30 dias."
           }
         }
       }
@@ -372,10 +972,34 @@
             "value": "Recently Deleted"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminado recientemente"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Suppressions récentes"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Eliminati di recente"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apagados"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apagados"
           }
         }
       }
@@ -389,10 +1013,34 @@
             "value": "Recently Deleted is empty"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminado recientemente está vacío"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucune suppression récente"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Eliminati di recente è vuoto"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apagados está vazio"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apagados está vazio"
           }
         }
       }
@@ -406,10 +1054,34 @@
             "value": "Restore"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restaurar"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restaurer"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Ripristina"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restaurar"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recuperar"
           }
         }
       }
@@ -423,10 +1095,34 @@
             "value": "Saved voices could not be read, so nothing was deleted. Their files are kept."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudieron leer las voces guardadas, así que no se eliminó nada. Sus archivos se conservan."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossible de lire les voix mémorisées, donc rien n’a été supprimé. Leurs fichiers sont conservés."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Non è stato possibile leggere le voci salvate, quindi non è stato eliminato nulla. I loro file sono conservati."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não foi possível ler as vozes salvas, então nada foi excluído. Os arquivos delas foram mantidos."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não foi possível ler as vozes guardadas, por isso nada foi eliminado. Os ficheiros são mantidos."
           }
         }
       }
@@ -440,10 +1136,34 @@
             "value": "Stop transcription and move to Recently Deleted?"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Detener la transcripción y mover a Eliminado recientemente?"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arrêter la transcription et déplacer vers Suppressions récentes ?"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Fermare la trascrizione e spostare in Eliminati di recente?"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parar a transcrição e mover para Apagados?"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parar a transcrição e mover para Apagados?"
           }
         }
       }
@@ -457,10 +1177,34 @@
             "value": "Their audio, transcripts and voiceprints are deleted. This can’t be undone."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se eliminarán su audio, sus transcripciones y sus huellas de voz. No se puede deshacer."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leur audio, leurs transcriptions et leurs empreintes vocales sont supprimés. Cette action est irréversible."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "L’audio, le trascrizioni e le impronte vocali vengono eliminati. Non si può annullare."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O áudio, as transcrições e as impressões de voz serão excluídos. Não é possível desfazer."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O áudio, as transcrições e as impressões vocais são eliminados. Não é possível desfazer."
           }
         }
       }
@@ -474,10 +1218,34 @@
             "value": "Undo"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deshacer"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Annuler"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Annulla"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Desfazer"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Desfazer"
           }
         }
       }
@@ -491,10 +1259,34 @@
             "value": "“%@” could not be deleted. It stays in Recently Deleted."
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo eliminar “%@”. Sigue en Eliminado recientemente."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossible de supprimer « %@ ». La note reste dans Suppressions récentes."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Non è stato possibile eliminare “%@”. Resta in Eliminati di recente."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não foi possível excluir “%@”. Ela continua em Apagados."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não foi possível eliminar «%@». Fica em Apagados."
           }
         }
       }
@@ -508,10 +1300,34 @@
             "value": "“%@” moved to Recently Deleted"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@” movida a Eliminado recientemente"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "« %@ » déplacée vers Suppressions récentes"
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "“%@” spostata in Eliminati di recente"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@” movida para Apagados"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "«%@» movida para Apagados"
           }
         }
       }
