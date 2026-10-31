@@ -16,6 +16,24 @@ final class SpeakerNamingFlowTests: XCTestCase {
         app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", text)).firstMatch
     }
 
+    /// D47: a placeholder is written in the app's language and every screen shows it as stored. The seed writes the
+    /// second speaker's placeholder with the app in Italian, so the note holds "Voce 2"; opened in English it still
+    /// reads "Voce 2" (seeded in English it would read "Speaker 2").
+    @MainActor func testAPlaceholderWrittenInItalianShowsAsStored() {
+        let italian = XCUIApplication()
+        italian.launchArguments = ["--ui-testing", "--reset-test-data", "--seed", "speakers",
+                                   "-AppleLanguages", "(it)", "-AppleLocale", "it_IT"]
+        italian.launchAndWait(fresh: true)
+        XCTAssertTrue(italian.textFields["librarySearch"].waitForExistence(within: 15))
+        italian.terminate()
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing", "--open-fixture", "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA"]
+        app.launchAndWait(fresh: true)
+        XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 15))
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Voce 2, at")).firstMatch
+            .waitForExistence(within: 5), "the placeholder written in Italian, shown as stored")
+    }
+
     // ports: SpeakerNamingFlowTest#aSavedVoiceIsSuggestedInTheDraftAndYesNamesTheSpeaker
     /// iOS suggests after the analysis rather than in a draft; Yes names the speaker and Saved voices counts the note.
     @MainActor func testASavedVoiceIsSuggestedAndYesNamesTheSpeaker() {

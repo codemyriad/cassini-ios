@@ -221,8 +221,11 @@ that were not ported, with the reason for each.
   the screen names it in the reader's language. For builds before the change, each version also stores its English
   `name`. An unknown kind written by a newer build is kept, written back, and shown as "From a newer Cassini". Android's
   variants carry no display name.
-- **Speaker placeholders.** Notes store "Speaker N" (or "Voce N" from an Italian build), as Android does. Every screen
-  names them in the reader's language.
+- **Speaker placeholders (D47).** A placeholder is written in the app's language when the speakers are told apart:
+  "Speaker N", "Voce N", "Intervenant N", "Hablante N", "Locutor N" or "Orador N" (`DefaultLabels.words`, the
+  glossary's "Speaker {n}"). Every screen shows it as stored, in whichever language wrote it. A speaker with no label
+  reads "Speaker N" in the app's language. Every language's word counts as a placeholder, not a name. Android still
+  shows its placeholders in the reader's language.
 - **Durable writes.** `note.json`, `jobs.json`, the voice files, the provenance record and the checkpoints are all
   written through `DurableFile`. It writes `<name>.tmp`, flushes it with `F_FULLFSYNC`, renames it over the target and
   then flushes the directory, as Android's `NoteFiles` does.

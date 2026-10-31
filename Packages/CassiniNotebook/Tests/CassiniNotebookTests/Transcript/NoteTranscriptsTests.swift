@@ -13,7 +13,7 @@ import Testing
         #expect(turns.map(\.id) == ["w0", "w2", "w3", "w4"])
         #expect(turns.map(\.speakerID) == ["a", "b", "c", "a"])
         #expect(turns[0].name == .named("Giulia"))
-        #expect(turns[1].name == .placeholder(2))
+        #expect(turns[1].name == .placeholder(2, label: "Speaker 2"))
         // Placeholders are amber and take no slot: Giulia blue, Paolo teal.
         #expect(turns.map(\.tint) == [.blue, .amber, .teal, .blue])
         #expect(turns[0].text == "Ciao a tutti.")
@@ -72,6 +72,16 @@ import Testing
         #expect(transcript.wordStart(WordRef(turnID: "w4", index: 1)) == 3.5)
     }
 
+    /// D47: a placeholder shows as it was written, in its own language, and a speaker without a label gets one in the
+    /// app's language. Android still shows its placeholders in the reader's language.
+    @Test func aPlaceholderShowsAsStored() {
+        #expect(NoteTranscripts.name(label: "Voce 2", id: "b", ordinal: 0) == .placeholder(2, label: "Voce 2"))
+        #expect(NoteTranscripts.name(label: "Intervenant 3", id: "c", ordinal: 1) == .placeholder(3, label: "Intervenant 3"))
+        #expect(NoteTranscripts.name(label: "b", id: "b", ordinal: 1) == .placeholder(2, label: DefaultLabels.placeholder(2)))
+        #expect(NoteTranscripts.name(label: nil, id: "b", ordinal: 3) == .placeholder(4, label: DefaultLabels.placeholder(4)))
+        #expect(NoteTranscripts.name(label: "Giulia", id: "a", ordinal: 0) == .named("Giulia"))
+    }
+
     // ports: NoteTranscriptsTest#oneLongSpeakerIsSplitIntoParagraphs
     @Test func oneLongSpeakerIsSplitIntoParagraphs() {
         let long = (0..<450).map { i in F.W("a", i * 100, i * 100 + 90, i == 129 ? "end." : "w\(i)") }
@@ -87,7 +97,7 @@ import Testing
         let words = F.words.map { DraftWord(speaker: $0.speaker!, startMs: Int64($0.startMs), endMs: Int64($0.endMs), text: $0.text) }
         let draft = NoteTranscripts.draft(words, tentativeFromMs: 3_600)
         let turns = draft.turns
-        #expect(turns.map(\.name) == [.placeholder(1), .placeholder(2), .placeholder(3), .placeholder(1)])
+        #expect(turns.map(\.name) == [1, 2, 3, 1].map { .placeholder($0, label: "Speaker \($0)") })
         #expect(turns.allSatisfy { $0.tint == .amber && !$0.auto && $0.suggestion == nil })
         #expect(turns[3].unsettledFrom == 1, "quindi ends after 3.6 s")
         #expect(turns[0].unsettledFrom == nil)
