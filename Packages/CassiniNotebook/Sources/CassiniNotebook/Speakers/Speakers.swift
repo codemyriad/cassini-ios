@@ -44,7 +44,8 @@ extension Note {
     /// Keeps the transcript and speakers as a version, unless the selected version already holds them. A caller whose
     /// change may run again passes the version's `id` and `date`, so that the rerun makes the same version. The
     /// transcript counts as an edited copy of the selected version, so the new version keeps that version's merge
-    /// (`speakerMerges`, `derivedFrom`) and re-attribution (`attributedFrom`) for the export's provenance.
+    /// (`speakerMerges`, `derivedFrom`) and re-attribution (`attributedFrom`) for the export's provenance. The version
+    /// keeps the note's `language`, the language of the words it holds.
     public mutating func saveCurrentVersion(_ kind: TranscriptVersionKind, id versionID: UUID = UUID(), date: Date = Date()) {
         saveCurrentVersion(kind, id: versionID, date: date, editedFrom: selectedVersionID)
     }
@@ -54,7 +55,7 @@ extension Note {
         guard !transcript.isEmpty else { return }
         guard shownVersionIndex == nil else { return }
         var history = versions ?? []
-        var version = TranscriptVersion(kind: kind, segments: transcript, speakers: speakers ?? [])
+        var version = TranscriptVersion(kind: kind, segments: transcript, speakers: speakers ?? [], language: language)
         version.id = versionID; version.createdAt = date
         if let source = base.flatMap({ id in history.first { $0.id == id } }) {
             version.speakerMerges = source.speakerMerges
@@ -68,7 +69,7 @@ extension Note {
     public mutating func selectVersion(_ id: UUID) {
         saveCurrentVersion(.previous)
         guard let version = versions?.first(where: { $0.id == id }) else { return }
-        transcript = version.segments; speakers = version.speakers; selectedVersionID = id
+        transcript = version.segments; speakers = version.speakers; language = version.language; selectedVersionID = id
     }
 
     /// The version numbers a merge shows: the one shown now and the one it adds ("This adds version 3; version 2

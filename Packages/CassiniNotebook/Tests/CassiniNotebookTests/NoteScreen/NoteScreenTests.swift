@@ -398,6 +398,7 @@ import Testing
     @Test func documentInfoReadsTheFactsOfTheNoteAndItsRun() {
         var note = F.weeklySync
         note.duration = 40
+        note.language = "it-IT"
         note.speakers?[0].match = .confirmed(voice: UUID(), score: 0.9)
         var provenance = TranscriptProvenance(language: "it-IT", inferenceMs: 4_000, resumedFromMs: 0,
                                               speakerDiarization: .sortformer(revision: "r", sha256: "s", elapsedMs: 1,
@@ -417,5 +418,14 @@ import Testing
         #expect(info.language == "it-IT")
         let bare = DocumentInfoFacts.of(note, provenance: nil, fileBytes: nil)
         #expect(bare.model == nil && bare.realtimeFactor == nil && bare.speakersToldApart == nil)
+    }
+
+    /// Document info shows a language only when it is known (D53.2): Parakeet's `und`, an empty one and an earlier
+    /// Mac's `auto` show none. Android shows it only when known too (`NoteViewModel`).
+    @Test(arguments: ["", "und", "auto"])
+    func documentInfoShowsNoUnknownLanguage(_ stored: String) {
+        var note = F.weeklySync
+        note.language = stored
+        #expect(DocumentInfoFacts.of(note, provenance: nil, fileBytes: nil).language == nil)
     }
 }

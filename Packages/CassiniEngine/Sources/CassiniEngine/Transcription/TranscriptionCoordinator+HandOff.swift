@@ -15,7 +15,7 @@ extension TranscriptionCoordinator {
         guard let note = await parts.notes.note(noteID), note.duration <= Limits.maxTranscribeDuration else {
             return .audioOnly
         }
-        let language = EnqueueRules.language(for: .transcribe, speechLanguage: settings.speechLanguage) ?? note.language
+        let language = EnqueueRules.language(for: .transcribe, speechLanguage: settings.speechLanguage) ?? ""
         guard await parts.consent.allows(.transcribe, language) else {
             return settings.modelsDeclinedAt == nil ? .askConsent : .audioOnly
         }

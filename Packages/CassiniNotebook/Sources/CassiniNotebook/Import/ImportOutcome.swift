@@ -41,14 +41,13 @@ public struct ImportedAudio: Hashable, Sendable {
 /// Builds the note of an import (Android `ImportRepository.insert` and `DocumentRepository.catalogueDocument`).
 public enum ImportedNote {
     public static func make(id: UUID, displayName: String?, fallbackTitle: String, sha256: String, importedAt: Date,
-                            language: String, audio: ImportedAudio, document: PortableTranscript? = nil) -> Note {
+                            audio: ImportedAudio, document: PortableTranscript? = nil) -> Note {
         var note = Note(id: id, title: ImportTitles.title(displayName: displayName, fallback: fallbackTitle),
                         createdAt: importedAt, audioFilename: audio.filename)
         note.originalAudioFilename = audio.originalFilename
         note.duration = audio.duration
         note.waveform = audio.waveform
         note.audio = audio.state
-        note.language = language
         note.origin = .imported
         note.sourceSha256 = sha256
         guard let document else { return note }

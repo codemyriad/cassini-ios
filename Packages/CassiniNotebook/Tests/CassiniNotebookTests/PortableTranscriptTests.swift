@@ -202,6 +202,7 @@ struct PortableConformanceImportTests {
         #expect(!FileManager.default.fileExists(atPath: directory.appendingPathComponent("out.opus").path))
     }
 
+    /// The note's language goes into the variant as it is: no `Locale` rewriting (D53.2).
     @Test func aRenamedVerifiedSourceGetsTheNewTitleTag() throws {
         let directory = try PortableFixtures.temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -216,7 +217,7 @@ struct PortableConformanceImportTests {
         #expect(exported.state == .ok)
         #expect(exported.title == "New title")
         #expect(exported.variants.count == 2)
-        #expect(exported.selected()?.transcript?.language == "en-US")
+        #expect(exported.selected()?.transcript?.language == "en_US")
         #expect(exported.comments.filter { $0.uppercased().hasPrefix("TITLE=") } == ["TITLE=New title"])
     }
 
@@ -333,17 +334,18 @@ struct PortableConformanceImportTests {
 @Suite struct ImportedNoteTests {
     private let audio = ImportedAudio(filename: "source.m4a", duration: 12, waveform: [0.5])
 
+    /// A plain import has no words, so no language: never the Settings one (D53.2).
     @Test func aPlainImportIsTitledByItsNameAndWaitsForATranscript() {
         let id = UUID(), date = Date(timeIntervalSince1970: 1_000)
         let note = ImportedNote.make(id: id, displayName: "memo.m4a", fallbackTitle: "Imported audio", sha256: "abc",
-                                     importedAt: date, language: "en-US", audio: audio)
+                                     importedAt: date, audio: audio)
         #expect(note.id == id)
         #expect(note.title == "memo")
         #expect(note.createdAt == date)
         #expect(note.origin == .imported)
         #expect(note.sourceSha256 == "abc")
         #expect(note.status == .audioOnly)
-        #expect(note.language == "en-US")
+        #expect(note.language == "")
         #expect(note.document == nil)
         #expect(ImportedNote.wantsTranscription(note))
     }
@@ -352,7 +354,7 @@ struct PortableConformanceImportTests {
         let bytes = try PortableFixtures.document([Word("S1", 0, 500, "ciao")], title: "  Seduta del consiglio ")
         let portable = try #require(PortableTranscript(CassiniDocument.read(bytes)))
         let note = ImportedNote.make(id: UUID(), displayName: "export.opus", fallbackTitle: "Imported audio", sha256: "s",
-                                     importedAt: Date(timeIntervalSince1970: 0), language: "en-US", audio: audio, document: portable)
+                                     importedAt: Date(timeIntervalSince1970: 0), audio: audio, document: portable)
         #expect(note.title == "Seduta del consiglio")
         #expect(note.createdAt == portable.createdAt)
         #expect(note.duration == 1)
@@ -371,7 +373,7 @@ struct PortableConformanceImportTests {
         }
         let portable = try #require(PortableTranscript(CassiniDocument.read(newer)))
         let note = ImportedNote.make(id: UUID(), displayName: "x.opus", fallbackTitle: "F", sha256: "s", importedAt: Date(),
-                                     language: "", audio: audio, document: portable)
+                                     audio: audio, document: portable)
         #expect(note.document?.state == .unknownFormat)
         #expect(note.title == "x")
         #expect(note.transcript.isEmpty)

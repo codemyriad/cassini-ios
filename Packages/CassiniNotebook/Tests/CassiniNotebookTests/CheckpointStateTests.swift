@@ -43,6 +43,14 @@ import CassiniNotebook
         return try CheckpointState.decode(JSONSerialization.data(withJSONObject: json))
     }
 
+    /// An Apple Speech checkpoint names the language it was asked for, which a resume must use again; Parakeet's none.
+    @Test func anAppleCheckpointNamesTheLanguageItBeganIn() {
+        var apple = state()
+        apple.model = CheckpointState.appleModel(language: "it-IT")
+        #expect(apple.appleLanguage == "it-IT")
+        #expect(state().appleLanguage == nil)
+    }
+
     // ports: CheckpointStateTest#encodingWritesExactlyTheVersionTwoMembers (adapted: iOS members)
     @Test func encodingWritesExactlyTheMembers() throws {
         let data = try state().encoded()

@@ -58,21 +58,23 @@ extension TranscriptionCoordinatorTests {
             #expect(await h.job(long) == nil)
         }
 
-        @Test func speakersOnlyNeverChangesTheLanguage() async throws {
+        /// The note's language is the language of the words it shows (D53.2): queueing never sets it, whatever Settings
+        /// say; only a finished run does. A speakers-only job decodes nothing and takes no language.
+        @Test func queueingNeverChangesTheNotesLanguage() async throws {
             let h = try QueueHarness(); defer { h.tearDown() }
             try await h.start()
             let a = try await h.note("A")
             try await h.notes.mutate(a) { $0.language = "en-US" }
             h.settings.speechLanguage = "it-IT"
             await h.coordinator.transcribe(a, kind: .speakersOnly)
-            #expect(try await h.run(0).job.language == "en-US")
+            #expect(try await h.run(0).job.language == "")
             #expect(await h.notes.note(a)?.language == "en-US")
             try await h.run(0).finish(.done)
             await h.coordinator.awaitIdle()
 
             await h.coordinator.transcribe(a, kind: .transcribeAgain)
             #expect(try await h.run(1).job.language == "it-IT")
-            #expect(await h.notes.note(a)?.language == "it-IT")
+            #expect(await h.notes.note(a)?.language == "en-US")
         }
 
         /// The windowed job's checkpoint must match the job's language, so saved progress resumes in the language it began
@@ -92,13 +94,25 @@ extension TranscriptionCoordinatorTests {
             h.settings.speechLanguage = "en-US"
             await h.coordinator.transcribe(a)
             #expect(try await h.run(1).job.language == "it-IT")
-            #expect(await h.notes.note(a)?.language == "it-IT")
             try await h.run(1).finish(.paused(.user))
             await h.coordinator.awaitIdle()
 
             await h.coordinator.startOver(a)
             #expect(try await h.run(2).job.language == "en-US")
-            #expect(await h.notes.note(a)?.language == "en-US")
+            #expect(await h.notes.note(a)?.language == "", "the note has no words yet, so no language")
+        }
+
+        /// Saved progress whose job is gone (a rebuilt queue) resumes in the language its checkpoint began in, never in
+        /// the note's, which is the language of the words it shows.
+        @Test func savedProgressWithoutAJobResumesInItsCheckpointsLanguage() async throws {
+            let h = try QueueHarness(); defer { h.tearDown() }
+            try await h.start()
+            let a = try await h.note("A")
+            try await h.notes.mutate(a) { $0.language = TranscriptLanguage.undetermined }
+            h.checkpoints.save(a, .saved(doneMs: 1_000, totalMs: 60_000, words: 1), language: "it-IT")
+            h.settings.speechLanguage = "en-US"
+            await h.coordinator.transcribe(a)
+            #expect(try await h.run(0).job.language == "it-IT")
         }
 
         @Test func theRunningJobsProgressIsTold() async throws {

@@ -27,6 +27,10 @@ public struct NoteWorkFolders: JobCheckpoints {
         return .saved(doneMs: checkpoint.doneMs, totalMs: checkpoint.totalMs, words: checkpoint.draftWords.count)
     }
 
+    public func language(of noteID: UUID) async -> String? {
+        (try? files.load(noteID))??.appleLanguage
+    }
+
     public func discard(_ noteID: UUID) async throws {
         try files.discard(noteID)
         drafts?.release(noteID)

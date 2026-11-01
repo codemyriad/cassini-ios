@@ -60,6 +60,12 @@ public struct CheckpointState: Hashable, Sendable {
     /// The `model` of an Apple Speech run in `language` (BCP-47): the words of another language do not resume.
     public static func appleModel(language: String) -> String { "\(TranscriptProvenance.appleSpeech) \(language)" }
 
+    /// The language an Apple Speech checkpoint was asked for (`appleModel(language:)`); nil for Parakeet's.
+    public var appleLanguage: String? {
+        let prefix = Self.appleModel(language: "")
+        return model.hasPrefix(prefix) ? String(model.dropFirst(prefix.count)) : nil
+    }
+
     /// What a checkpoint must match to be resumed.
     public struct Expected: Hashable, Sendable {
         public var source: String

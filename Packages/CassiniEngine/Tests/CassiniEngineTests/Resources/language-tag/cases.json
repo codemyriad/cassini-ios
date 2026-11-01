@@ -1,0 +1,173 @@
+{
+  "version": 1,
+  "decision": "D53.2 Q2",
+  "writer": [
+    {
+      "id": "parakeet-fresh",
+      "description": "Parakeet reports no language; the speech-language picker says it-IT and is ignored.",
+      "origin": { "run": { "engine": "parakeet", "picker": "it-IT" } },
+      "derivation": "fresh",
+      "expect": { "body": "und", "descriptor": "und", "provenance": "und" }
+    },
+    {
+      "id": "parakeet-passage-edit",
+      "description": "A hand edit keeps the words' language; its step is no recognizer run, so it has no language member.",
+      "origin": { "run": { "engine": "parakeet", "picker": "it-IT" } },
+      "derivation": "passageEdit",
+      "expect": { "body": "und", "descriptor": "und", "provenance": null }
+    },
+    {
+      "id": "parakeet-merge",
+      "description": "A merge keeps the words and the run's step, with its language.",
+      "origin": { "run": { "engine": "parakeet", "picker": "it-IT" } },
+      "derivation": "merge",
+      "expect": { "body": "und", "descriptor": "und", "provenance": "und" }
+    },
+    {
+      "id": "parakeet-reassign",
+      "description": "Speakers told apart again over the same words keep the run's step, with its language.",
+      "origin": { "run": { "engine": "parakeet", "picker": "it-IT" } },
+      "derivation": "reassign",
+      "expect": { "body": "und", "descriptor": "und", "provenance": "und" }
+    },
+    {
+      "id": "apple-fresh-resolved-locale",
+      "description": "Apple Speech runs the supported locale equivalent to the request: the locale that ran is written.",
+      "origin": { "run": { "engine": "appleSpeech", "picker": "en-IT", "ranLocale": "en-GB" } },
+      "derivation": "fresh",
+      "expect": { "body": "en-GB", "descriptor": "en-GB", "provenance": "en-GB" }
+    },
+    {
+      "id": "apple-passage-edit",
+      "origin": { "run": { "engine": "appleSpeech", "picker": "en-IT", "ranLocale": "en-GB" } },
+      "derivation": "passageEdit",
+      "expect": { "body": "en-GB", "descriptor": "en-GB", "provenance": null }
+    },
+    {
+      "id": "apple-merge",
+      "origin": { "run": { "engine": "appleSpeech", "picker": "en-IT", "ranLocale": "en-GB" } },
+      "derivation": "merge",
+      "expect": { "body": "en-GB", "descriptor": "en-GB", "provenance": "en-GB" }
+    },
+    {
+      "id": "apple-reassign",
+      "origin": { "run": { "engine": "appleSpeech", "picker": "en-IT", "ranLocale": "en-GB" } },
+      "derivation": "reassign",
+      "expect": { "body": "en-GB", "descriptor": "en-GB", "provenance": "en-GB" }
+    },
+    {
+      "id": "apple-bare-request-gets-region",
+      "description": "A bare request runs a regional locale; the region is kept (pt-BR and pt-PT are different models).",
+      "origin": { "run": { "engine": "appleSpeech", "picker": "it", "ranLocale": "it-IT" } },
+      "derivation": "fresh",
+      "expect": { "body": "it-IT", "descriptor": "it-IT", "provenance": "it-IT" }
+    },
+    {
+      "id": "apple-pt-br",
+      "origin": { "run": { "engine": "appleSpeech", "picker": "pt-BR", "ranLocale": "pt-BR" } },
+      "derivation": "fresh",
+      "expect": { "body": "pt-BR", "descriptor": "pt-BR", "provenance": "pt-BR" }
+    },
+    {
+      "id": "apple-earlier-run",
+      "description": "A later run over the same recording (Parakeet, und) makes another variant; this one keeps its own run's language in all three places.",
+      "origin": { "run": { "engine": "appleSpeech", "picker": "it", "ranLocale": "it-IT" }, "laterRun": { "engine": "parakeet", "picker": "it" } },
+      "derivation": "fresh",
+      "expect": { "body": "it-IT", "descriptor": "it-IT", "provenance": "it-IT" }
+    },
+    {
+      "id": "parakeet-earlier-run-merge",
+      "description": "A merge made from an earlier Parakeet run's variant after a later Apple Speech run keeps und and the earlier run's step.",
+      "origin": { "run": { "engine": "parakeet", "picker": "it-IT" }, "laterRun": { "engine": "appleSpeech", "picker": "en-IT", "ranLocale": "en-GB" } },
+      "derivation": "merge",
+      "expect": { "body": "und", "descriptor": "und", "provenance": "und" }
+    },
+    {
+      "id": "whistle-detected",
+      "description": "Whistle writes the language it detected, as it reports it.",
+      "origin": { "run": { "engine": "whistle", "ranLocale": "en" } },
+      "derivation": "fresh",
+      "expect": { "body": "en", "descriptor": "en", "provenance": "en" }
+    },
+    {
+      "id": "whistle-not-detected",
+      "description": "No detection is und, never auto.",
+      "origin": { "run": { "engine": "whistle" } },
+      "derivation": "fresh",
+      "expect": { "body": "und", "descriptor": "und", "provenance": "und" }
+    },
+    {
+      "id": "imported-absent",
+      "origin": { "imported": { "stored": null } },
+      "derivation": "fresh",
+      "expect": { "body": "", "descriptor": "", "provenance": null }
+    },
+    {
+      "id": "imported-empty",
+      "origin": { "imported": { "stored": "" } },
+      "derivation": "fresh",
+      "expect": { "body": "", "descriptor": "", "provenance": null }
+    },
+    {
+      "id": "imported-und",
+      "origin": { "imported": { "stored": "und" } },
+      "derivation": "fresh",
+      "expect": { "body": "und", "descriptor": "und", "provenance": null }
+    },
+    {
+      "id": "imported-auto",
+      "description": "An earlier Mac build's auto is kept as stored, not turned into und.",
+      "origin": { "imported": { "stored": "auto" } },
+      "derivation": "fresh",
+      "expect": { "body": "auto", "descriptor": "auto", "provenance": null }
+    },
+    {
+      "id": "imported-bare",
+      "origin": { "imported": { "stored": "it" } },
+      "derivation": "fresh",
+      "expect": { "body": "it", "descriptor": "it", "provenance": null }
+    },
+    {
+      "id": "imported-pt-br",
+      "origin": { "imported": { "stored": "pt-BR" } },
+      "derivation": "fresh",
+      "expect": { "body": "pt-BR", "descriptor": "pt-BR", "provenance": null }
+    },
+    {
+      "id": "imported-not-bcp47",
+      "description": "No Locale rewriting: en_US stays en_US.",
+      "origin": { "imported": { "stored": "en_US" } },
+      "derivation": "fresh",
+      "expect": { "body": "en_US", "descriptor": "en_US", "provenance": null }
+    },
+    {
+      "id": "imported-auto-passage-edit",
+      "origin": { "imported": { "stored": "auto" } },
+      "derivation": "passageEdit",
+      "expect": { "body": "auto", "descriptor": "auto", "provenance": null }
+    },
+    {
+      "id": "imported-bare-merge",
+      "origin": { "imported": { "stored": "it" } },
+      "derivation": "merge",
+      "expect": { "body": "it", "descriptor": "it", "provenance": null }
+    },
+    {
+      "id": "imported-und-reassign",
+      "origin": { "imported": { "stored": "und" } },
+      "derivation": "reassign",
+      "expect": { "body": "und", "descriptor": "und", "provenance": null }
+    }
+  ],
+  "reader": [
+    { "id": "absent", "stored": null, "known": false, "display": null },
+    { "id": "empty", "stored": "", "known": false, "display": null },
+    { "id": "und", "stored": "und", "known": false, "display": null },
+    { "id": "auto", "stored": "auto", "known": false, "display": null },
+    { "id": "und-uppercase", "stored": "UND", "known": false, "display": null },
+    { "id": "auto-capitalized", "stored": "Auto", "known": false, "display": null },
+    { "id": "regional", "stored": "it-IT", "known": true, "display": "it-IT" },
+    { "id": "regional-pt", "stored": "pt-BR", "known": true, "display": "pt-BR" },
+    { "id": "bare", "stored": "it", "known": true, "display": "it" }
+  ]
+}

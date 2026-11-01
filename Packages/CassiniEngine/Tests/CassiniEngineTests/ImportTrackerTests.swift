@@ -88,7 +88,7 @@ private actor Gate {
 
     private func transcribed(_ title: String) -> Note {
         var note = Note(title: title)
-        note.language = "en_US"
+        note.language = "en-US"
         note.transcript = [TranscriptSegment(text: "Hello there", start: 0, end: 1.5, speaker: "Alex", speakerID: "a")]
         note.speakers = [NoteSpeaker(id: "a", name: "Alex")]
         return note

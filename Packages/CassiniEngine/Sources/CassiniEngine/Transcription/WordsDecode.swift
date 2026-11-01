@@ -66,7 +66,7 @@ final class WordsDecode: Sendable {
     private let uptimeMs: @Sendable () -> Int64
     private let base: CheckpointState
     private let recognizer: SpeechRecognizer
-    /// The language the word body is counted with: the job's for Apple Speech, `""` for Parakeet.
+    /// The language the word body is counted with: the one the run's words are written with.
     private let language: String
 
     init(base: CheckpointState, noteID: UUID, resumeDoneMs: Int64, recognizer: SpeechRecognizer = .appleSpeech,
@@ -76,7 +76,7 @@ final class WordsDecode: Sendable {
         if resumeDoneMs > 0 { resumed.resumedFromMs = resumeDoneMs }
         self.base = base
         self.noteID = noteID; self.resumeDoneMs = resumeDoneMs; self.limits = limits; self.checkpoints = checkpoints
-        self.recognizer = recognizer; self.language = recognizer.usesLanguage ? language : ""
+        self.recognizer = recognizer; self.language = language
         self.stop = stop; self.events = events; self.uptimeMs = uptimeMs
         state = Mutex(State(checkpoint: resumed, savedMs: base.doneMs, words: base.draftWords, progressMs: base.doneMs,
                             shownMs: base.doneMs))

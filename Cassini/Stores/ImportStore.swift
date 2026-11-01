@@ -42,13 +42,12 @@ import CassiniNotebook
     /// Imports `url` and returns the outcome; nil when the import was cancelled or failed unexpectedly.
     @discardableResult
     func importFile(_ url: URL, opensNote: Bool) -> Task<ImportOutcome?, Never> {
-        let language = settings.speechLanguage
         let fallbackTitle = String(localized: "Imported audio", table: "Import")
         let running = tracker.start(displayName: Self.displayName(of: url)) { [service, library, ready] in
             await ready()
             try Task.checkCancellation()
             guard let service, await library.loadFailure == nil else { return .rejected(.cannotSave) }
-            return try await service.importFile(url, language: language, fallbackTitle: fallbackTitle)
+            return try await service.importFile(url, fallbackTitle: fallbackTitle)
         }
         return Task {
             let outcome = await running.value

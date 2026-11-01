@@ -9,6 +9,8 @@ public struct TranscriptVersion: Identifiable, Hashable, Sendable {
     public var createdAt: Date = Date()
     public var segments: [TranscriptSegment]
     public var speakers: [NoteSpeaker]
+    /// The language of its words, as `Note.language` holds it for the shown transcript.
+    public var language = ""
     /// The speaker aliases (`source -> target`) of the merge that made this version; an export writes them as
     /// `x-speakerMerges`, as Android records a merged variant.
     public var speakerMerges: [String: String]?
@@ -17,8 +19,8 @@ public struct TranscriptVersion: Identifiable, Hashable, Sendable {
     /// The version a later speaker analysis gave new speakers to make this one (Identify speakers again):
     /// `x-derivedFromTranscript` beside `x-speakerDiarization` in an export, as Android records a re-attribution.
     public var attributedFrom: UUID?
-    public init(kind: TranscriptVersionKind, segments: [TranscriptSegment], speakers: [NoteSpeaker]) {
-        self.kind = kind; self.segments = segments; self.speakers = speakers
+    public init(kind: TranscriptVersionKind, segments: [TranscriptSegment], speakers: [NoteSpeaker], language: String = "") {
+        self.kind = kind; self.segments = segments; self.speakers = speakers; self.language = language
     }
 }
 
@@ -107,7 +109,7 @@ public enum TranscriptVersionKind: Hashable, Sendable {
 
 extension TranscriptVersion: Codable {
     private enum CodingKeys: String, CodingKey {
-        case id, kind, name, portableID, createdAt, segments, speakers, speakerMerges, derivedFrom, attributedFrom
+        case id, kind, name, portableID, createdAt, segments, speakers, language, speakerMerges, derivedFrom, attributedFrom
     }
 
     public init(from decoder: any Decoder) throws {
@@ -122,6 +124,7 @@ extension TranscriptVersion: Codable {
         createdAt = try c.decode(Date.self, forKey: .createdAt)
         segments = try c.decode([TranscriptSegment].self, forKey: .segments)
         speakers = try c.decode([NoteSpeaker].self, forKey: .speakers)
+        language = try c.decodeIfPresent(String.self, forKey: .language) ?? ""
         speakerMerges = try c.decodeIfPresent([String: String].self, forKey: .speakerMerges)
         derivedFrom = try c.decodeIfPresent(UUID.self, forKey: .derivedFrom)
         attributedFrom = try c.decodeIfPresent(UUID.self, forKey: .attributedFrom)
@@ -136,6 +139,7 @@ extension TranscriptVersion: Codable {
         try c.encode(createdAt, forKey: .createdAt)
         try c.encode(segments, forKey: .segments)
         try c.encode(speakers, forKey: .speakers)
+        if !language.isEmpty { try c.encode(language, forKey: .language) }
         try c.encodeIfPresent(speakerMerges, forKey: .speakerMerges)
         try c.encodeIfPresent(derivedFrom, forKey: .derivedFrom)
         try c.encodeIfPresent(attributedFrom, forKey: .attributedFrom)

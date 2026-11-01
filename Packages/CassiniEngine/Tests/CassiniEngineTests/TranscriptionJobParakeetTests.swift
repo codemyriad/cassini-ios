@@ -48,7 +48,7 @@ import CassiniNotebook
         #expect(record.model == "moondream/parakeet-ultra INT8")
         #expect(record.version == "sherpa-onnx 1.13.7; model revision \(ModelCatalog.parakeetRevision)")
         #expect(record.source == "recording")
-        #expect(record.language == "")
+        #expect(record.language == "und", "Parakeet does not say which language it heard (D53.2)")
         #expect(record.segmentation == WindowedTranscriber.segmentation)
         #expect(record.resumedFromMs == 0)
         // Three decodes of 100 ms each; the job's own clock (10 s a read) is not the inference time.
@@ -120,10 +120,45 @@ import CassiniNotebook
     // ports: TranscriptionJobTest#wordsThatOutgrowTheWordBodyFailAtTheWindowThatPassesTheLimit
     @Test func wordsThatOutgrowTheWordBodyFailAtTheWindowThatPassesTheLimit() async throws {
         let firstWindow = TranscriptSegment.segments(of: (0..<28).map { Word("", Int64($0) * 1000, Int64($0) * 1000 + 800, "w\($0)") })
-        let limit = TranscriptBudget.bytes(firstWindow) + 10
+        // The body is counted with the language it is written with: `und` for Parakeet (D53.2).
+        let limit = TranscriptBudget.bytes(firstWindow, language: TranscriptLanguage.undetermined) + 10
         let (h, _) = try await harness(limits: .init(maxBodyBytes: limit))
         #expect(await h.run().outcome == .failed(.long))
         #expect(h.checkpoints.saved.map(\.doneMs) == [28_000], "the window before the limit stays")
+    }
+
+    /// The word body is counted with `und`, the language it is written with: a limit one byte under the first window's
+    /// `und` body fails at that window, which counting with `""` (17 bytes fewer) would let through.
+    @Test func aParakeetBodyIsCountedWithTheUndItIsWrittenWith() async throws {
+        let firstWindow = TranscriptSegment.segments(of: (0..<28).map { Word("", Int64($0) * 1000, Int64($0) * 1000 + 800, "w\($0)") })
+        let limit = TranscriptBudget.bytes(firstWindow, language: TranscriptLanguage.undetermined) - 1
+        #expect(TranscriptBudget.bytes(firstWindow) <= limit, "without the language the window would fit")
+        let (h, _) = try await harness(limits: .init(maxBodyBytes: limit))
+        #expect(await h.run().outcome == .failed(.long))
+        #expect(h.checkpoints.saved.isEmpty, "the first window already passes the limit")
+    }
+
+    // ports: TranscriptionJobTest#theRecognizersLanguageIsWrittenAlikeInBodyDescriptorAndProvenance
+    @Test func theRecognizersLanguageIsWrittenAlikeInBodyDescriptorAndProvenance() async throws {
+        // D53.2: a Parakeet run writes "und" in all three places, never "" or a missing key.
+        let (h, _) = try await harness()
+        defer { try? FileManager.default.removeItem(at: h.root) }
+        #expect(await h.run(language: "it-IT").outcome == .done)
+        let note = try #require(await h.note())
+        #expect(note.language == "und")
+        let folder = h.root.appendingPathComponent("export", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let output = try await PortableExportService(audio: FakeAudioProcessing(duration: 70, opensAnyFile: true),
+                                                     provenance: h.provenanceFiles)
+            .export(note, original: h.audioURL, playable: h.audioURL, into: folder, filename: "export")
+        let document = CassiniDocument.read(output)
+        let id = try #require(document.defaultId)
+        let variant = try #require(document.variants.first { $0.id == id })
+        let body = try #require(variant.body)
+        #expect(try JSON.parseObject(body)["language"]?.string == "und")
+        #expect(try Transcript.fromJSON(body).language == "und")
+        #expect(variant.descriptor["language"]?.string == "und")
+        #expect(document.manifest?["provenance"]?.object?["speechToText"]?.object?[id]?.object?["language"]?.string == "und")
     }
 
     // ports: JobFailureTest (the recognizer's failures) and TranscriptionJobTest#javaOutOfMemoryPausesWithMemoryAndKeepsTheCheckpoint
@@ -182,6 +217,8 @@ final class WindowedTranscriber: Transcribing, @unchecked Sendable {
     var blockDelay: Duration?
     /// Thrown in place of the window at this index.
     var failure: (window: Int, error: any Error)?
+    /// What the words start with: `w` hears "w0", "w1", …
+    var word = "w"
     let totalSamples = 70 * Limits.asrRate
 
     var recognizer: SpeechRecognizer { .parakeet }
@@ -206,7 +243,7 @@ final class WindowedTranscriber: Transcribing, @unchecked Sendable {
             let words = Transcript((0..<70).compactMap { n -> Word? in
                 let start = Int64(n) * 1000
                 guard start >= offsetMs, start + 800 <= endMs else { return nil }
-                return Word("", start - offsetMs, start + 800 - offsetMs, "w\(n)")
+                return Word("", start - offsetMs, start + 800 - offsetMs, "\(word)\(n)")
             })
             return try speakers?.window(audio, startMs: offsetMs, words: words) ?? words
         }

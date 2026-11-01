@@ -6,40 +6,33 @@ import CassiniNotebook
 /// Touches: `parts.jobs`, `parts.notes` and `parts.checkpoints` (writes), `trashed` (an enqueue takes the note out),
 /// `refresh()`.
 extension TranscriptionCoordinator {
-    /// The language a job is queued with, and whether the note takes it too (only for the transcribe kinds).
-    struct Language {
-        var job: String
-        var setsNote: Bool
-        var forNote: String? { setsNote ? job : nil }
-    }
-
-    /// The Settings language for the transcribe kinds, except that saved progress resumes in the language it began
-    /// in (its job's, else the note's), which its checkpoint must match; a speakers-only job keeps the note's.
-    func language(for noteID: UUID, kind: JobKind, note: Note) async -> Language {
-        guard let spoken = EnqueueRules.language(for: kind, speechLanguage: settings.speechLanguage) else {
-            return Language(job: note.language, setsNote: false)
-        }
+    /// The language a job is queued with: the Settings language for the transcribe kinds, except that saved progress
+    /// resumes in the language it began in (its job's, else its checkpoint's), which the checkpoint must match. Nil for
+    /// a speakers-only job, which decodes nothing and keeps its job's. The note's language is never read or set here:
+    /// it is the language of the words it shows, which only a finished run changes (`TranscriptLanguage`).
+    func language(for noteID: UUID, kind: JobKind) async -> String? {
+        guard let spoken = EnqueueRules.language(for: kind, speechLanguage: settings.speechLanguage) else { return nil }
         if case .saved = await parts.checkpoints.status(of: noteID) {
-            let jobLanguage = await parts.jobs.job(noteID)?.language ?? ""
-            let began = jobLanguage.isEmpty ? note.language : jobLanguage
-            if !began.isEmpty { return Language(job: began, setsNote: false) }
+            let job = await parts.jobs.job(noteID)?.language ?? ""
+            let began = job.isEmpty ? await parts.checkpoints.language(of: noteID) : job
+            if let began, !began.isEmpty { return began }
         }
-        return Language(job: spoken, setsNote: true)
+        return spoken
     }
 
-    func enqueue(_ noteID: UUID, kind: JobKind, language: Language) async -> TranscribeOutcome {
+    func enqueue(_ noteID: UUID, kind: JobKind, language: String?) async -> TranscribeOutcome {
         let existing = await parts.jobs.job(noteID)
         if let existing, existing.state == .queued || existing.state == .running { return .queued(changed: false) }
-        guard await write({ try await $0.enqueue(noteID, kind: kind, language: language.job, now: self.parts.clock.now) }) != nil else {
+        guard await write({ try await $0.enqueue(noteID, kind: kind, language: language, now: self.parts.clock.now) }) != nil else {
             return .queued(changed: false)
         }
         trashed.remove(noteID)
-        await mirror(noteID, language: language.forNote)
+        await mirror(noteID)
         await refresh()
         return .queued(changed: true)
     }
 
-    func needConsent(_ noteID: UUID, kind: JobKind, language: Language) async -> TranscribeOutcome {
+    func needConsent(_ noteID: UUID, kind: JobKind, language: String?) async -> TranscribeOutcome {
         let now = parts.clock.now
         switch await parts.jobs.job(noteID)?.state {
         case .running:
@@ -47,9 +40,9 @@ extension TranscriptionCoordinator {
         case .queued:
             await write { try await $0.transition(noteID, now: now) { $0.state = .needsConsent } }
         default:
-            await write { try await $0.enqueue(noteID, kind: kind, language: language.job, now: now, waitingForConsent: true) }
+            await write { try await $0.enqueue(noteID, kind: kind, language: language, now: now, waitingForConsent: true) }
         }
-        await mirror(noteID, language: language.forNote)
+        await mirror(noteID)
         await refresh()
         return .needsConsent
     }
@@ -81,16 +74,14 @@ extension TranscriptionCoordinator {
         await write { try await $0.remove(noteID) }
     }
 
-    /// Brings the note's stored status in line with its job. `language` is set on the note for the transcribe kinds;
-    /// `closedDuringJob` marks a note that says it was transcribing although no job remains (an older version's queue).
-    func mirror(_ noteID: UUID, _ known: Job?? = nil, language: String? = nil, clearingFailure: Bool = false,
+    /// Brings the note's stored status in line with its job. `closedDuringJob` marks a note that says it was transcribing although no job remains (an older version's queue).
+    func mirror(_ noteID: UUID, _ known: Job?? = nil, clearingFailure: Bool = false,
                         closedDuringJob: Bool = false) async {
         let job: Job? = if let known { known } else { await parts.jobs.job(noteID) }
         do {
             try await parts.notes.mutate(noteID) { note in
                 let wasWorking = note.status == .queued || note.status == .transcribing
                 note.status = .mirroring(job, hasTranscript: !note.transcript.isEmpty)
-                if let language { note.language = language }
                 switch job?.state {
                 case .failed: note.failure = job?.failure
                 case .queued, .running: note.failure = nil

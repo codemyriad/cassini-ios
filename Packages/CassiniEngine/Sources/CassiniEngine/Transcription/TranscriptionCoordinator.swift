@@ -117,8 +117,8 @@ public final class TranscriptionCoordinator {
         guard let note = await parts.notes.note(noteID) else { return .refused(.noNote) }
         if let refusal = EnqueueRules.refusal(for: note) { return .refused(refusal) }
         guard await parts.jobs.isWritable else { return .refused(.queueUnavailable) }
-        let language = await language(for: noteID, kind: kind, note: note)
-        guard await parts.consent.allows(kind, language.job) else {
+        let language = await language(for: noteID, kind: kind)
+        guard await parts.consent.allows(kind, language ?? "") else {
             return await lock.run { await needConsent(noteID, kind: kind, language: language) }
         }
         let resume = await parts.jobs.job(noteID)?.state == .paused

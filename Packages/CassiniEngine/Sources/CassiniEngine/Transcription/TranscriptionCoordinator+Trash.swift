@@ -29,26 +29,27 @@ extension TranscriptionCoordinator {
         return TrashedJob(state: job.state, kind: job.kind)
     }
 
-    /// Undo and Restore: a job that was queued when the note was trashed is queued again at the back, and the queue
-    /// starts as after a Transcribe.
+    /// Undo and Restore: a job that was queued when the note was trashed is queued again at the back, in the language
+    /// its saved progress began in (else the Settings one), and the queue starts as after a Transcribe.
     public func restore(_ noteID: UUID, trashedJob: TrashedJob?) async {
         trashed.remove(noteID)
         await readiness.wait()
-        guard let trashedJob, trashedJob.state == .queued, let note = await parts.notes.note(noteID) else {
+        guard let trashedJob, trashedJob.state == .queued, await parts.notes.note(noteID) != nil else {
             await refresh()
             return
         }
+        let language = await language(for: noteID, kind: trashedJob.kind) ?? ""
         let requeued = await lock.run {
             let checkpoint = await parts.checkpoints.status(of: noteID)
             let job = await write {
-                try await $0.requeueAtBack(noteID, kind: trashedJob.kind, language: note.language,
+                try await $0.requeueAtBack(noteID, kind: trashedJob.kind, language: language,
                                            checkpoint: checkpoint, now: parts.clock.now)
             }
             await mirror(noteID)
             await refresh()
             return job != nil
         }
-        if requeued, await parts.consent.allows(trashedJob.kind, note.language), settings.queueHold == nil { drain() }
+        if requeued, await parts.consent.allows(trashedJob.kind, language), settings.queueHold == nil { drain() }
     }
 
     /// The first step of a permanent delete: stops the job if it runs, then removes it.

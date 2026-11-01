@@ -146,7 +146,9 @@ TestFlight still need.
   Ultra when its model is installed and the device has the memory (a provisional rule until a device is measured), and
   falls back to Apple Speech otherwise. Devices that cannot hold Ultra keep Apple Speech.
 - **Storage model.** A note is a `note.json` beside its audio. The portable Cassini document is sealed only at export,
-  with the run's provenance under Android's keys. Android keeps the transcript
+  with the run's provenance under Android's keys. Each variant carries the language of the run that made its words
+  (D53.2): `und` for Parakeet, as Android writes, the locale that ran for Apple Speech, never the Settings language.
+  Android keeps the transcript
   in a sealed document and a Room catalogue. The queue is `jobs.json`, and checkpoints use iOS's own format. Search
   uses an in-memory index instead of FTS4. Saved voices keep one sample per note instead of a running mean.
 - **Recording.** iOS captures PCM CAF and compresses it to M4A, so there is no 1 GiB AAC limit, and the storage floor

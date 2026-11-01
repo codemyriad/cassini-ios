@@ -20,7 +20,7 @@ public struct PortableTranscript: Hashable, Sendable {
     public let createdAt: Date?
     /// `meeting.durationMs`, in seconds.
     public let duration: TimeInterval?
-    /// The language of the selected transcript; empty when there is none.
+    /// The language of the selected transcript as stored (`TranscriptLanguage`); empty when there is none.
     public let language: String
     public let versions: [TranscriptVersion]
     public let selectedVersionID: UUID?
@@ -72,7 +72,7 @@ public struct PortableTranscript: Hashable, Sendable {
                     continue
                 }
                 var version = TranscriptVersion(kind: .imported, segments: Self.segments(transcript, document),
-                                                speakers: Self.speakers(transcript, document))
+                                                speakers: Self.speakers(transcript, document), language: transcript.language)
                 version.portableID = variant.id
                 versions.append(version)
                 // The default when it decodes, else the first variant that does.
@@ -132,14 +132,15 @@ extension PortableTranscript {
     /// keeps every earlier variant and gets the note's title and speaker names. Any other source is sealed afresh over
     /// the same audio: it keeps its foreign tags and, from an unverified or stale manifest, its private `x` data,
     /// unknown members, meeting id and meeting details verbatim (`CassiniDocument.seal`), but none of its variants.
-    /// `processing` is the variant's provenance record (`ExportProvenance`). `source` is the document at `opus` when the
+    /// The variant's language is the note's as it is (`TranscriptLanguage`): the run's, or an imported variant's value as
+    /// stored. `processing` is the variant's provenance record (`ExportProvenance`). `source` is the document at `opus` when the
     /// caller has read (and verified) it already. Returns the new variant's id. The source is never changed.
     @discardableResult
     public static func export(note: Note, opus: URL, destination: URL,
                               processing: JSONObject = ExportProvenance.userEdited,
                               source known: CassiniDocument? = nil) throws -> String? {
         let source = known ?? CassiniDocument.read(opus)
-        let transcript = Transcript(words(of: note), language: Note.bcp47(note.language))
+        let transcript = Transcript(words(of: note), language: note.language)
         guard !transcript.words.isEmpty else { throw PortableExportError.noTranscript }
         guard WordBodyBudget.fits(transcript.words, language: transcript.language) else { throw PortableExportError.tooLong }
         let labels = Dictionary((note.speakers ?? []).map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })

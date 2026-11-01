@@ -152,6 +152,23 @@ import CassiniNotebook
         #expect(same == wholeProvenance)
     }
 
+    /// A job without a language (a rebuilt queue's) resumes Apple Speech's saved progress in the language it began in,
+    /// never in the note's: the checkpoint's.
+    @Test func aJobWithoutALanguageResumesInTheCheckpointsLanguage() async throws {
+        let h = try await Harness()
+        let stop = StopSignal()
+        h.transcriber.beforeSegment = { index in if index == 7 { stop.stop(.pause(.user)) } }
+        #expect(await h.run(language: "fr-FR", stop: stop).outcome == .paused(.user))
+        #expect(h.checkpoints.saved.last?.model == CheckpointState.appleModel(language: "fr-FR"))
+
+        h.transcriber.beforeSegment = { _ in }
+        #expect(await h.run(language: "").outcome == .done)
+        #expect(h.transcriber.starts == [0, 39], "it went on from the checkpoint")
+        let note = try #require(await h.note())
+        #expect(note.language == "fr-FR")
+        #expect(h.provenance(of: note)?.language == "fr-FR")
+    }
+
     // ports: TranscriptionJobTest#cancelInsideASlowNativeCallKeepsThePreviousCheckpointAndReleasesHandles
     @Test func aCancelEndsCancelledAndLeavesTheEarlierCheckpointToTheCoordinator() async throws {
         let h = try await Harness()

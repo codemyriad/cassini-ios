@@ -17,7 +17,7 @@ import CassiniNotebook
         #expect(created.audio == .live)
         #expect(created.audioFilename == "capture.caf")
         #expect(created.origin == .recorded)
-        #expect(created.language == "en-US")
+        #expect(created.language == "", "a recording has no words, so no language, whatever Settings say")
         #expect(h.activity.started.map(\.noteID) == [active.noteID])
         h.capture.elapsed = 61
 
