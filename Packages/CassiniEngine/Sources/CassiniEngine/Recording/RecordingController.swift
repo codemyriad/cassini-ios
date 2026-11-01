@@ -185,7 +185,6 @@ public final class RecordingController {
             let defaultTitle = parts.defaultTitle(now)
             var note = Note(title: defaultTitle, createdAt: now, audioFilename: Self.captureFilename)
             note.status = .recording; note.audio = .live; note.origin = .recorded
-            note.language = parts.settings.speechLanguage
             try await parts.notes.create(note)
             created = note.id
             guard let url = await parts.notes.captureURL(for: note) else { throw CocoaError(.fileNoSuchFile) }

@@ -17,7 +17,9 @@ public struct Note: Identifiable, Hashable, Sendable {
     public var isFavorite = false
     public var trashedAt: Date?
     public var playbackPosition: Double = 0
-    /// BCP-47 (`en-US`), or empty when no language was chosen.
+    /// The language of the shown transcript as the run that made its words wrote it (`TranscriptLanguage`): a BCP-47
+    /// tag such as `it-IT`, `und` for a recognizer that does not say, an imported variant's value as stored, or empty
+    /// without words. Each kept version holds its own; selecting one brings its language back.
     public var language = ""
     public var audio: AudioState = .plain
     public var origin: NoteOrigin = .recorded
@@ -71,7 +73,7 @@ extension Note: Codable {
         isFavorite = try c.decodeIfPresent(Bool.self, forKey: .isFavorite) ?? false
         trashedAt = try c.decodeIfPresent(Date.self, forKey: .trashedAt)
         playbackPosition = try c.decodeIfPresent(Double.self, forKey: .playbackPosition) ?? 0
-        language = Self.bcp47(try c.decodeIfPresent(String.self, forKey: .language) ?? "")
+        language = try c.decodeIfPresent(String.self, forKey: .language) ?? ""
         originalAudioFilename = try c.decodeIfPresent(String.self, forKey: .originalAudioFilename)
         speakers = try c.decodeIfPresent([NoteSpeaker].self, forKey: .speakers)
         versions = try c.decodeIfPresent([TranscriptVersion].self, forKey: .versions)
@@ -135,11 +137,6 @@ extension Note: Codable {
         try c.encodeIfPresent(speakers, forKey: .speakers)
         try c.encodeIfPresent(versions, forKey: .versions)
         try c.encodeIfPresent(selectedVersionID, forKey: .selectedVersionID)
-    }
-
-    /// Schema 1 stored `Locale.identifier` (`en_US`); schema 2 stores BCP-47 (`en-US`).
-    static func bcp47(_ identifier: String) -> String {
-        identifier.isEmpty ? "" : Locale(identifier: identifier).identifier(.bcp47)
     }
 
     /// Schema 1 stored the failure as English text; the messages Cassini wrote map to their codes.

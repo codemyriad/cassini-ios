@@ -119,7 +119,7 @@ continues after the screen locks.
     capture.caf | audio.m4a     the recording (PCM while capturing, M4A after Finish)
     source.<ext>                an imported file; document.opus for an imported Cassini document
     playback.caf                the decoded copy of imported Opus
-    provenance.json             the latest on-device run's record
+    provenance.json             each on-device run's record, oldest first
     work/checkpoint.json(.bak)  saved progress of a stopped or interrupted transcription
     work/clips.pcm              the voice clips of a streaming run (up to 45 s per speaker), counted by the checkpoint
     work/names.json             the draft's speaker names (Android's format), while the job runs or is paused

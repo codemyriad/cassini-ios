@@ -96,7 +96,7 @@ import CassiniNotebook
         try await store.mutate(id) { $0.isFavorite = true }
         let object = try JSONSerialization.jsonObject(with: Data(contentsOf: folder.appendingPathComponent("note.json"))) as? [String: Any]
         #expect(object?["schemaVersion"] as? Int == 2)
-        #expect(object?["language"] as? String == "it-IT")
+        #expect(object?["language"] as? String == "it_IT", "kept as stored (D53.2)")
         #expect(object?["failure"] as? String == "INTERRUPTED")
         #expect(object?["failureMessage"] == nil)
     }

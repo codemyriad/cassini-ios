@@ -143,7 +143,7 @@ public struct TranscriptProvenance: Codable, Hashable, Sendable {
     public var device: String?
     public var source: String?
     public var version: String?
-    /// BCP-47.
+    /// The run's language (`TranscriptLanguage.ofRun`): BCP-47, `und` when the recognizer does not say.
     public var language: String
     /// Time spent in the speech analyzer, over every run of the job.
     public var inferenceMs: Int64
@@ -167,8 +167,9 @@ public struct TranscriptProvenance: Codable, Hashable, Sendable {
     }
 
     /// The record of a run of Apple's recognizer on `device`: the processing step with iOS's values, then the run's
-    /// own members. `model` is what the transcriber names its model (nil leaves the key out); `system` the OS and its
-    /// build, which carries the speech framework.
+    /// own members. `language` is the run's (`TranscriptLanguage.ofRun`), the locale that ran rather than the one asked
+    /// for; `model` is what the transcriber names its model (nil leaves the key out); `system` the OS and its build,
+    /// which carries the speech framework.
     public static func appleRun(language: String, inferenceMs: Int64, resumedFromMs: Int64, model: String?,
                                    device: RunDevice) -> TranscriptProvenance {
         TranscriptProvenance(backend: appleSpeechBackend, model: model, device: device.description,
@@ -185,12 +186,13 @@ public struct TranscriptProvenance: Codable, Hashable, Sendable {
 
     /// The record of a Parakeet run, with Android's values (`JobProvenance.recognition`) but `device`: `model` is
     /// `<id> <precision>`, `revision` the model's pinned revision, `segmentation` how the audio was cut. The language
-    /// is empty: Parakeet does not say which one it heard.
+    /// is `und`: Parakeet does not say which one it heard (D53.2).
     public static func parakeetRun(model: String, revision: String, segmentation: String, inferenceMs: Int64,
                                    resumedFromMs: Int64, device: RunDevice) -> TranscriptProvenance {
         TranscriptProvenance(backend: sherpaBackend, engine: parakeetEngine, model: model, device: device.description,
                              source: recordingSource, version: "sherpa-onnx \(sherpaVersion); model revision \(revision)",
-                             language: "", inferenceMs: inferenceMs, segmentation: segmentation,
+                             language: TranscriptLanguage.ofRun(reported: nil), inferenceMs: inferenceMs,
+                             segmentation: segmentation,
                              resumedFromMs: resumedFromMs)
     }
 

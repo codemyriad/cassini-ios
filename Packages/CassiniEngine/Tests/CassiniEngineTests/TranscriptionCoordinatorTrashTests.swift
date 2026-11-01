@@ -31,7 +31,7 @@ extension TranscriptionCoordinatorTests {
             await h.coordinator.transcribe(running)
             await h.coordinator.transcribe(queued)
             let first = try await h.run(0)
-            h.checkpoints.save(queued, .saved(doneMs: 28_000, totalMs: 60_000, words: 40))
+            h.checkpoints.save(queued, .saved(doneMs: 28_000, totalMs: 60_000, words: 40), language: "it-IT")
             let trashed = h.coordinator.moveToTrash(queued)
             try await h.notes.mutate(queued) { $0.trashedAt = Date() }
             try await h.waitUntil("the queued job left the queue") { await h.job(queued) == nil }
@@ -40,10 +40,12 @@ extension TranscriptionCoordinatorTests {
             #expect(h.runner.runs.count == 1)
 
             try await h.notes.mutate(queued) { $0.trashedAt = nil }
+            h.settings.speechLanguage = "en-US"
             await h.coordinator.restore(queued, trashedJob: trashed)
             let restored = try await h.run(1)
             #expect(restored.noteID == queued)
             #expect(restored.job.doneMs == 28_000, "the job takes the numbers of its saved progress")
+            #expect(restored.job.language == "it-IT", "and the language that progress began in, which it must match")
         }
 
         // ports: ProcessingCoordinatorTest#trashStopsARunningJobAndKeepsItsProgress

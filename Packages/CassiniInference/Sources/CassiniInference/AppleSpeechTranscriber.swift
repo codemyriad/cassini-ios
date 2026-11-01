@@ -92,6 +92,11 @@ public actor AppleSpeechTranscriber: Transcribing {
         return "Apple SpeechTranscriber \(supported.identifier(.bcp47))"
     }
 
+    /// The locale `supportedLocale(equivalentTo:)` picks for `requested`, the one a run transcribes in.
+    public func runLanguage(requested: String) async -> String? {
+        await SpeechTranscriber.supportedLocale(equivalentTo: Locale(identifier: requested))?.identifier(.bcp47)
+    }
+
     public func speechLanguages() async -> [SpeechLanguage] {
         let installed = Set(await SpeechTranscriber.installedLocales.map { $0.identifier(.bcp47) })
         return await SpeechTranscriber.supportedLocales.map { locale in

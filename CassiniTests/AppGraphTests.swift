@@ -221,8 +221,7 @@ import CassiniEngineTesting
         let graph = test.graph
         graph.settings.recordConsent()
         graph.settings.identifySpeakers = false
-        graph.library.update(note.id) { $0.language = "it-IT" }
-        await graph.library.settle() // The queue reads the stored note.
+        await graph.library.settle()
         let checkpoints = CheckpointFiles(notes: try XCTUnwrap(graph.library.noteStore))
         var paused = checkpoint(of: note, in: test, language: "it-IT")
         paused.segments = [words[0]]
@@ -233,7 +232,7 @@ import CassiniEngineTesting
         await graph.processing.transcribe(note.id)
         await graph.processing.coordinator?.awaitIdle()
         await waitUntil { graph.library.note(note.id)?.status == .ready }
-        XCTAssertEqual(graph.library.note(note.id)?.language, "it-IT")
+        XCTAssertEqual(graph.library.note(note.id)?.language, "it-IT", "the run's language, from its checkpoint (D53.2)")
         XCTAssertEqual(graph.library.note(note.id)?.transcript.map(\.text), ["Ciao", "a tutti"])
         XCTAssertFalse(checkpoints.exists(note.id))
     }

@@ -101,10 +101,18 @@ public protocol Transcribing: Sendable {
     func speechLanguages() async -> [SpeechLanguage]
     /// The speech model that transcribes `locale` here, as the provenance's `model` names it; nil when unknown.
     func modelName(locale: Locale) async -> String?
+    /// The BCP-47 tag of the language a run asked for `requested` transcribes in (Apple Speech's equivalent supported
+    /// locale, such as `it-IT` for `it`); nil when the recognizer does not say which language it heard (Parakeet).
+    /// The run's words are written in it (`TranscriptLanguage.ofRun`).
+    func runLanguage(requested: String) async -> String?
 }
 
 extension Transcribing {
     public func modelName(locale: Locale) async -> String? { nil }
+    /// The requested language for a recognizer that is given one, else nil.
+    public func runLanguage(requested: String) async -> String? {
+        recognizer.usesLanguage && !requested.isEmpty ? requested : nil
+    }
     public var recognizer: SpeechRecognizer { .appleSpeech }
     public func segmentation() async -> String? { nil }
 }

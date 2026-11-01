@@ -16,7 +16,8 @@ public enum SpeechRecognizer: String, Hashable, Sendable {
         }
     }
 
-    /// Whether the recognizer takes a language. Parakeet hears it: its jobs, transcripts and budget count `""`.
+    /// Whether the recognizer takes a language. Parakeet hears it: its jobs and checkpoints carry `""`, and its words
+    /// are written as `und` (`TranscriptLanguage`).
     public var usesLanguage: Bool { self == .appleSpeech }
 }
 

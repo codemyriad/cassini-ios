@@ -19,7 +19,7 @@ import Testing
                      {"id":"c","name":"Kim","suggestedVoiceID":"\#(voice)"},
                      {"id":"d","name":"Lee"}]}
         """#)
-        #expect(note.language == "en-US")
+        #expect(note.language == "en_US", "the language is kept as stored, never rewritten through Locale (D53.2)")
         #expect(note.failure == .audio)
         #expect(note.audio == .unplayable(.unsupportedFormat))
         #expect(note.origin == .imported)

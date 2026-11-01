@@ -101,3 +101,51 @@ import Testing
     #expect(note.text == "Original")
     #expect(note.versions?.last?.segments.first?.text == "Edited")
 }
+
+/// D53.2: a version keeps the language of its words. A merge and a passage edit keep the language of the words they
+/// came from; selecting a version brings its language back; the language survives a save and a reload.
+@Test func eachVersionKeepsTheLanguageOfItsWords() throws {
+    var note = Note(title: "Languages")
+    note.transcript = [.init(text: "Ciao", start: 0, end: 1, speakerID: "a"), .init(text: "a tutti", start: 1, end: 2, speakerID: "b")]
+    note.speakers = [NoteSpeaker(id: "a", name: "A"), NoteSpeaker(id: "b", name: "B")]
+    note.language = "it-IT"
+    note.saveCurrentVersion(.transcription)
+    let apple = try #require(note.selectedVersionID)
+
+    note.mergeSpeaker("b", into: "a")
+    #expect(note.language == "it-IT")
+    #expect(note.versions?.last?.language == "it-IT", "a merge keeps the language of the words it came from")
+    let original = try #require(note.transcript.last)
+    note.revisePassage(original, to: original.revised(text: "a tutti voi", speakerID: "a", speakers: note.speakers ?? []),
+                       stamp: VersionStamp(date: Date()))
+    #expect(note.versions?.last?.kind == .editedPassages)
+    #expect(note.versions?.last?.language == "it-IT", "a passage edit keeps it too")
+
+    // A later Parakeet run: its words are `und`.
+    note.saveCurrentVersion(.previous)
+    note.transcript = [.init(text: "Hello", start: 0, end: 1)]
+    note.speakers = []
+    note.language = TranscriptLanguage.undetermined
+    note.selectedVersionID = nil
+    note.saveCurrentVersion(.transcription)
+    let parakeet = try #require(note.selectedVersionID)
+    #expect(note.versions?.last?.language == "und")
+
+    note.selectVersion(apple)
+    #expect(note.language == "it-IT")
+    note.selectVersion(parakeet)
+    #expect(note.language == "und")
+
+    let decoded = try JSONDecoder().decode(Note.self, from: JSONEncoder().encode(note))
+    #expect(decoded.versions?.map(\.language) == note.versions?.map(\.language))
+    #expect(decoded.language == "und")
+}
+
+/// A version without a stored language (written before versions had one) reads as unknown: no migration (D51).
+@Test func aVersionWithoutALanguageReadsAsUnknown() throws {
+    let version = TranscriptVersion(kind: .transcription, segments: [.init(text: "x", start: 0, end: 1)], speakers: [])
+    let data = try JSONEncoder().encode(version)
+    let object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    #expect(object["language"] == nil, "an empty language is left out")
+    #expect(try JSONDecoder().decode(TranscriptVersion.self, from: data).language == "")
+}

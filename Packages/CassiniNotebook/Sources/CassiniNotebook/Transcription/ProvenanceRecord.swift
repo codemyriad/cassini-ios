@@ -1,12 +1,13 @@
 import CryptoKit
 import Foundation
 
-/// The provenance of the latest on-device run, with what it describes: the words it made and, after its speaker step,
-/// the speakers it gave them. Kept beside the note (`provenance.json`), not in it, so the note model stays as WP0 froze
-/// it; an export asks `provenance(for:)` with the note's current transcript.
+/// The provenance of an on-device run, with what it describes: the words it made and, after its speaker step, the
+/// speakers it gave them. A note's runs are kept beside it (`provenance.json`), not in it, so the note model stays as
+/// WP0 froze it; an export asks the newest record that made a version's words (`newest(describing:in:)`), so each
+/// version keeps its own run's record, language included (D53.2), after later runs.
 ///
-/// The record describes a transcript only while it holds the words the run made, so selecting another version, an edit
-/// of a passage or an import that replaces the words leaves an export without it. Speaker attribution, renames and
+/// The record describes a transcript only while it holds the words the run made, so an edit of a passage or an import
+/// that replaces the words leaves an export without it. Speaker attribution, renames and
 /// merges keep the words; the speaker record holds while every speaker id in the transcript is one the analysis gave
 /// (a merge only removes ids), and is left out once the speakers come from somewhere else.
 public struct ProvenanceRecord: Codable, Hashable, Sendable {
@@ -42,6 +43,17 @@ public struct ProvenanceRecord: Codable, Hashable, Sendable {
         speakerIdentification = speakerDiarization == nil ? nil
             : try? c.decodeIfPresent(TranscriptProvenance.SpeakerIdentification.self, forKey: .speakerIdentification)
         speakerIDs = speakerDiarization == nil ? nil : try c.decodeIfPresent([String].self, forKey: .speakerIDs)
+    }
+
+    /// `records` (oldest first) with `record` kept as the newest. It replaces a record of the same words: the speaker
+    /// step adding to its run, or a run that made the same words again.
+    public static func keeping(_ record: ProvenanceRecord, in records: [ProvenanceRecord]) -> [ProvenanceRecord] {
+        records.filter { $0.words != record.words } + [record]
+    }
+
+    /// The newest of `records` (oldest first) that made `transcript`'s words.
+    public static func newest(describing transcript: [TranscriptSegment], in records: [ProvenanceRecord]) -> ProvenanceRecord? {
+        records.last { $0.describes(transcript) }
     }
 
     /// Whether `transcript` holds the words this run made.

@@ -79,7 +79,7 @@ public enum Reconcile {
     /// note with saved progress (`checkpoints` holds `.saved`) that exists, is not in Recently Deleted and is not being
     /// recorded gets a job paused by the user with its checkpoint's numbers, in note-id order, so its `work/` is owned
     /// and kept at the next launch, and Resume goes on from it (as Android's catalogue rebuild turns such work into a
-    /// paused job). The job's language is empty: the run takes the note's.
+    /// paused job). The job's language is empty: a Resume and the run take the checkpoint's.
     public static func rebuilt(work: Set<UUID>, checkpoints: [UUID: CheckpointStatus], trashed: Set<UUID>,
                                existing: Set<UUID>, activeNoteID: UUID?, now: Date) -> [Job] {
         let resumable = work.intersection(existing).subtracting(trashed).filter { id in

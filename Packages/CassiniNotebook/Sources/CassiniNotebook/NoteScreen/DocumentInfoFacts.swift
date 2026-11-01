@@ -8,7 +8,7 @@ public struct DocumentInfoFacts: Hashable, Sendable {
     public var duration: TimeInterval
     public var versions: Int
     public var speakers: Int
-    /// BCP-47; nil when no language was chosen.
+    /// The shown transcript's language as stored; nil when it is not known (`TranscriptLanguage.known`).
     public var language: String?
     /// "Transcribed on this device in 2 min · 11× realtime": the analyzer's time and the audio over it.
     public var processingMs: Int64?
@@ -41,7 +41,7 @@ public struct DocumentInfoFacts: Hashable, Sendable {
         return DocumentInfoFacts(
             trust: DocumentTrust.of(note), title: note.title, createdAt: note.createdAt, duration: note.duration,
             versions: note.versionCount, speakers: speakers.count,
-            language: (provenance?.language).flatMap { $0.isEmpty ? nil : $0 } ?? (note.language.isEmpty ? nil : note.language),
+            language: TranscriptLanguage.known(note.language),
             processingMs: processing,
             realtimeFactor: processing.map { note.duration * 1000 / Double($0) },
             model: provenance.map { modelName($0.engine) },

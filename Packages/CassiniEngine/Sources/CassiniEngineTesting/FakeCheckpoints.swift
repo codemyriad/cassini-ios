@@ -7,6 +7,7 @@ import CassiniEngine
 public final class FakeCheckpoints: JobCheckpoints {
     private struct State {
         var statuses: [UUID: CheckpointStatus] = [:]
+        var languages: [UUID: String] = [:]
         var work: Set<UUID> = []
         var discarded: [UUID] = []
         var held: Set<UUID> = []
@@ -15,10 +16,12 @@ public final class FakeCheckpoints: JobCheckpoints {
 
     public init() {}
 
-    /// The note has a `work/` directory with `status` in it.
-    public func save(_ noteID: UUID, _ status: CheckpointStatus) {
-        state.withLock { $0.statuses[noteID] = status; $0.work.insert(noteID) }
+    /// The note has a `work/` directory with `status` in it, begun in `language` (Apple Speech's).
+    public func save(_ noteID: UUID, _ status: CheckpointStatus, language: String? = nil) {
+        state.withLock { $0.statuses[noteID] = status; $0.languages[noteID] = language; $0.work.insert(noteID) }
     }
+
+    public func language(of noteID: UUID) async -> String? { state.withLock { $0.languages[noteID] } }
 
     /// The note has a `work/` directory without saved progress.
     public func addWork(_ noteID: UUID) { state.withLock { _ = $0.work.insert(noteID) } }
@@ -38,6 +41,7 @@ public final class FakeCheckpoints: JobCheckpoints {
     public func discard(_ noteID: UUID) async throws {
         state.withLock {
             $0.statuses[noteID] = nil
+            $0.languages[noteID] = nil
             $0.work.remove(noteID)
             $0.discarded.append(noteID)
         }

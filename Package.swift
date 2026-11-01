@@ -52,7 +52,8 @@ let package = Package(
                     resources: [.copy("Resources/export")]),
         .target(name: "CassiniEngine", dependencies: ["CassiniCore", "CassiniNotebook"], path: "Packages/CassiniEngine/Sources/CassiniEngine"),
         .target(name: "CassiniEngineTesting", dependencies: ["CassiniCore", "CassiniEngine", "CassiniNotebook"], path: "Packages/CassiniEngine/Sources/CassiniEngineTesting"),
-        .testTarget(name: "CassiniEngineTests", dependencies: ["CassiniCore", "CassiniEngine", "CassiniEngineTesting", "CassiniNotebook"], path: "Packages/CassiniEngine/Tests/CassiniEngineTests"),
+        .testTarget(name: "CassiniEngineTests", dependencies: ["CassiniCore", "CassiniEngine", "CassiniEngineTesting", "CassiniNotebook"], path: "Packages/CassiniEngine/Tests/CassiniEngineTests",
+                    resources: [.copy("Resources/language-tag")]),
         sherpaTarget,
         .testTarget(name: "CassiniSherpaTests", dependencies: ["CassiniSherpa", "CassiniEngine", "CassiniNotebook"], path: "Packages/CassiniSherpa/Tests/CassiniSherpaTests")
     ] + sherpaBinaries

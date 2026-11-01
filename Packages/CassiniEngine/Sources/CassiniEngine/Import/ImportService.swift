@@ -31,9 +31,10 @@ public struct ImportService: Sendable {
         self.notes = notes; self.files = files; self.audio = audio; self.storage = storage; self.clock = clock
     }
 
-    /// Imports `url` as a new note in `language` (a document's own language wins); `fallbackTitle` names a file
-    /// without a usable name. Throws only `CancellationError`, and then leaves nothing behind.
-    public func importFile(_ url: URL, language: String, fallbackTitle: String) async throws -> ImportOutcome {
+    /// Imports `url` as a new note, in the language of the document's selected variant (none for plain audio);
+    /// `fallbackTitle` names a file without a usable name. Throws only `CancellationError`, and then leaves nothing
+    /// behind.
+    public func importFile(_ url: URL, fallbackTitle: String) async throws -> ImportOutcome {
         let id = UUID()
         let folder = notes.directory(for: id)
         do {
@@ -43,7 +44,7 @@ public struct ImportService: Sendable {
         }
         let outcome: ImportOutcome
         do {
-            outcome = try await stage(url, as: id, in: folder, language: language, fallbackTitle: fallbackTitle)
+            outcome = try await stage(url, as: id, in: folder, fallbackTitle: fallbackTitle)
         } catch {
             await discard(id, folder)
             throw error
@@ -52,7 +53,7 @@ public struct ImportService: Sendable {
         return outcome
     }
 
-    private func stage(_ url: URL, as id: UUID, in folder: URL, language: String, fallbackTitle: String) async throws -> ImportOutcome {
+    private func stage(_ url: URL, as id: UUID, in folder: URL, fallbackTitle: String) async throws -> ImportOutcome {
         let staging = folder.appendingPathComponent(Self.stagingFilename)
         let copied: ImportedFile
         do {
@@ -78,8 +79,8 @@ public struct ImportService: Sendable {
             return .rejected(storageFailure(bytes: copied.byteCount))
         }
         let note = ImportedNote.make(id: id, displayName: copied.displayName, fallbackTitle: fallbackTitle,
-                                     sha256: copied.sha256, importedAt: clock.now, language: language,
-                                     audio: staged.audio, document: staged.document)
+                                     sha256: copied.sha256, importedAt: clock.now, audio: staged.audio,
+                                     document: staged.document)
         try Task.checkCancellation()
         do {
             if let existing = try await notes.insert(note, unlessLiveSourceIs: copied.sha256) { return .existing(existing) }

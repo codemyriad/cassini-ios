@@ -42,7 +42,9 @@ that were not ported, with the reason for each.
   - **Models.** The transcriber asks the installer for SPEECH when Ultra is missing (with consent) and, online, when
     only the detector is missing (`ParakeetModels.request`, Android's `installModels`). Before any native object is
     made, Ultra's files must have their pinned sizes and its marker, else `MODEL`.
-  - **Language.** Parakeet takes none: its jobs and checkpoints count the word body with `""`.
+  - **Language.** Parakeet takes none: its jobs and checkpoints carry `""`. Its words are written, and their body
+    counted at every window, with `und` (see "Transcript language" below). Android counts its decoded windows with
+    `""` and stamps `und` only on the finished transcript, so iOS's per-window check is 17 bytes stricter.
   - **DC-robust speech detection (D26.1, ahead of Android).** Silero has no DC handling of its own, and a microphone
     with an ADC offset changes what it finds. The detector hears the track through `SpeechInputFilter`: WebRTC APM's
     2nd-order Butterworth 100 Hz high-pass (`silero-input-hpf-butter2-100hz-v1`), with the spec's exact binary64
@@ -274,24 +276,56 @@ that were not ported, with the reason for each.
 - **Word body limit.** Parakeet checks the limit at every window, as Android does; Apple Speech at each checkpoint.
   Both count a 40-character speaker id per word, fail with `LONG` and keep the checkpoint before.
 
+### Transcript language (D53 item 3, D53.2 Q2)
+
+- A variant's language is the language of the recognizer run that made its words, written the same in the word body,
+  the transcript descriptor and the processing step. It never comes from the speech language in Settings, which only
+  picks the locale Apple Speech is asked for. The shared cases are coordination
+  `ux-draft/library-vectors/language-tag`, copied into `CassiniEngineTests/Resources/language-tag` with its SHA-256
+  pinned (`LanguageTagVectorTests`); the rule is `TranscriptLanguage`.
+- **Parakeet** reports no language, so its words are `und` in all three places, as Android writes since b61ef49
+  (`TranscriptionJobTest#theRecognizersLanguageIsWrittenAlikeInBodyDescriptorAndProvenance`, ported).
+- **Apple Speech** (iOS only) writes the BCP-47 tag of the locale that actually ran, the one
+  `supportedLocale(equivalentTo:)` picks for the request (`Transcribing.runLanguage`): a request for `it` writes
+  `it-IT`, never the requested tag.
+- **Versions.** `note.language` is the language of the words shown. Each kept version stores its own, a passage edit,
+  merge or re-attribution keeps the language of the words it came from, and selecting a version brings its language
+  back; the export seals each version in its own, and the JSON export of a version names that version's language.
+  Each run's provenance record is kept (see "Provenance"), so a variant from an earlier run keeps its run's language in
+  its step after a later run. Queueing a job, starting a recording and importing plain audio no
+  longer set it, and the queue no longer reads it: saved progress resumes in the language its job, else its
+  checkpoint (`CheckpointState.appleLanguage`), began in, so a rebuilt queue and a Restore from Recently Deleted keep
+  it.
+- **Imported variants** keep their stored value verbatim, with no `Locale` rewriting: `""`, `und`, `auto` and a
+  non-BCP-47 `en_US` stay as stored, in the note and in an export. A note no longer rewrites its stored language when
+  it loads (D51: no migration of schema 1's `en_US`). An export seals imported words as a new variant whose step is
+  `user-edited`, with no `language`; Android copies the source's step. Neither app writes a language into a step of a
+  run it did not make, which the shared cases pin (`provenance: null`).
+- **Reading.** Absent, `""`, `und` and an earlier Mac build's `auto` all mean unknown; `und` and `auto` match in any
+  case, as Android's `Transcript.knownLanguage` matches `und`. Android does not know `auto`. Document info shows a
+  language only when it is known, as Android does. iOS leaves an unknown language out of the body and the descriptor; Android
+  writes `""` in the descriptor. The format reads both the same.
+
 ### Provenance
 
-- Android writes the run record into the sealed document at the end of a job. iOS has no sealed document. It keeps the
-  latest on-device run's record beside the note, in `<note>/provenance.json`, together with a SHA-256 of the words it
-  describes. The words' members are recorded when the words are saved, the speaker members when the speaker step has
+- Android writes the run record into the sealed document at the end of a job. iOS has no sealed document. It keeps
+  each on-device run's record beside the note, in `<note>/provenance.json` (oldest first), together with a SHA-256 of
+  the words it describes. A run that makes exactly the words of an earlier one replaces that run's record. The words' members are recorded when the words are saved, the speaker members when the speaker step has
   put its speakers into the note.
-- An export writes this record into each variant whose words are still the run's (`ExportProvenance`). Otherwise the
+- An export writes into each variant the record of the newest run that made its words (`ExportProvenance`). Otherwise the
   variant gets `{engine: cassini-ios, kind: user-edited}`. A version made by a merge also gets `x-speakerMerges`,
   `x-speakerAssignmentEditedBy` and `x-derivedFromTranscript`, as Android's merged variant does.
 - **Parakeet runs** write Android's processing step (`TranscriptProvenance.parakeetRun`): `backend` "sherpa-onnx",
   `engine` "Parakeet TDT", `model` "moondream/parakeet-ultra INT8", `version` "sherpa-onnx 1.13.7; model revision
-  <revision>", `source` "recording", `language` "", Android's `x-segmentation` string, `x-inferenceMs` (decode time)
+  <revision>", `source` "recording", `language` "und" (D53.2), Android's `x-segmentation`
+  string, `x-inferenceMs` (decode time)
   and `x-resumedFromMs`. Only `device` differs (iOS's hardware model and OS). The goldens against Android's 0.1.0
   record and the model names shown in the app follow in WP5; the Apple fallback writes the record below.
 - **Keys.** The record has Android's keys (`JobProvenance`, `SpeakerAttribution.record`) with iOS's values;
   `ProvenanceGoldenTests` pins the key sets and JSON types against Android's:
   - The processing step: `backend` "Apple Speech framework (SpeechAnalyzer, on-device)", `engine`
-    `apple-speechtranscriber`, `model` "Apple SpeechTranscriber <locale>" (the locale whose assets ran), `device` the
+    `apple-speechtranscriber`, `model` "Apple SpeechTranscriber <locale>" (the locale whose assets ran), `language`
+    that locale's tag (see "Transcript language"), `device` the
     hardware model and OS ("iPhone17,1, iOS 26.0.1 (23A355)"; Android writes "Android CPU"), `source` "recording" as on
     Android, and `version` "Speech framework of <OS and build>". Apple names no speech model version or revision, so
     the OS build stands in for it; there is no `model revision` as in Android's `version`.
@@ -313,12 +347,14 @@ that were not ported, with the reason for each.
     `x-derivedFromTranscript`, the variant it started from, and, when that variant is one of a verified imported
     document's, that document's `provenance.attribution` as `x-sourceAttribution`, as Android's
     `SpeakerAttribution.record` does. A first analysis is sealed into its transcription, so it has neither.
-- **Older records.** A `provenance.json` written before these members existed still reads and exports. The export
-  leaves out what that build did not record (the processing step, `x-segmentation`, `elapsedMs`, `modelRevision`,
-  `assignment`, `sourceSeparation` and `x-speakerIdentification`) rather than guessing it, so Document info shows no
-  names from saved voices for such a note.
-- **One speaker record.** Only the latest speaker analysis's record is kept. A version of an earlier analysis keeps the
-  words' members and loses `x-speakerDiarization` and `x-speakerIdentification` once a later analysis replaces them.
+- **Older records.** `provenance.json` holds a list of run records since D53.2. The single record an earlier build
+  wrote is not read (D51: no migration), so such a note's variants are sealed `user-edited` until it is transcribed
+  again. A record without the later members still reads and exports; the export leaves out what was not recorded (the
+  processing step, `x-segmentation`, `elapsedMs`, `modelRevision`, `assignment`, `sourceSeparation` and
+  `x-speakerIdentification`) rather than guessing it, so Document info shows no names from saved voices for it.
+- **One speaker record per run.** Each run's record keeps only its latest speaker analysis. A version of an earlier
+  analysis of the same words keeps the words' members and loses `x-speakerDiarization` and `x-speakerIdentification`
+  once a later analysis replaces them.
 
 ### Saved voices
 
@@ -595,7 +631,8 @@ These features exist only on iOS. They were kept by decision.
   Save only for a changed name, where Android uses its rename dialog.
 - **Versions** rows read Android's "Transcribed 8 Oct, 15:40 · 4,812 words" and "Speakers merged · from version 1 ·
   8 Oct, 16:02". A version kind Android does not have (Edited passages, Previous transcript, …) shows its name, its date
-  and its word count. No language is added: iOS versions do not record one.
+  and its word count. Each iOS version records its language (D53.2), but the row does not show it yet; Android adds
+  " · Italian" when it is known.
 - **The Undo snackbar** stays 10 s, and 30 s while VoiceOver runs. iOS has no recommended-timeout setting. The message
   is also announced, and Undo is both a button and an action of the message.
 - **Header.** The iOS wordmark and the serif headline stay. The headline reads "Notes" at accessibility text sizes.

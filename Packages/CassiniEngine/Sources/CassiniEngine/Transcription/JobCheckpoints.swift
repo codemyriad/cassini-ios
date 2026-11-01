@@ -19,6 +19,13 @@ public protocol JobCheckpoints: Sendable {
     func discard(_ noteID: UUID) async throws
     /// Notes that have a `work/` directory.
     func notesWithWork() async -> Set<UUID>
+    /// The speech language the note's saved progress began in (`CheckpointState.appleLanguage`); nil without saved
+    /// progress or for a recognizer that is given none.
+    func language(of noteID: UUID) async -> String?
+}
+
+extension JobCheckpoints {
+    public func language(of noteID: UUID) async -> String? { nil }
 }
 
 extension Job {

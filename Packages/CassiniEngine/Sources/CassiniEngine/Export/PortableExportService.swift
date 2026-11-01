@@ -3,7 +3,8 @@ import CassiniCore
 import CassiniNotebook
 
 /// Writes a note as a Cassini document: its audio as Ogg Opus with every transcript version made on this device added
-/// as a variant, the note's own transcript last and default.
+/// as a variant, the note's own transcript last and default. Each variant carries its own version's language: the
+/// run's that made its words, or an imported variant's as stored (`TranscriptLanguage`).
 ///
 /// The audio is the imported Ogg Opus when the note has one, else the playable file encoded to Opus. What the export
 /// keeps of an imported document depends on how that document reads now, verified once per export:
@@ -22,7 +23,7 @@ public struct PortableExportService: Sendable {
     private let audio: any AudioProcessing
     private let provenance: any ProvenanceStoring
 
-    /// `provenance` holds the latest on-device run's record, which each variant whose words are the run's carries.
+    /// `provenance` holds the note's on-device runs' records; each variant whose words a run made carries that run's.
     public init(audio: any AudioProcessing, provenance: any ProvenanceStoring) {
         self.audio = audio
         self.provenance = provenance
@@ -51,13 +52,14 @@ public struct PortableExportService: Sendable {
             }
             let verified = state == .ok
             var variants = verified ? Self.keptVariants(of: note) : [:]
-            let run = provenance.load(note.id)
+            let runs = provenance.records(note.id)
             let audit = verified ? Self.attributionAudit(of: note, original: original) : nil
             var versions = Self.versionsToSeal(of: note)
             var current = note.versions?.first { $0.id == note.selectedVersionID }
                 ?? TranscriptVersion(kind: .editedTranscript, segments: note.transcript, speakers: note.speakers ?? [])
             current.segments = note.transcript
             current.speakers = note.speakers ?? []
+            current.language = note.language
             // An imported version is sealed again only over audio that vouches for it; otherwise the newest version
             // made here is the default.
             if !verified, note.showsImportedVersion, let last = versions.popLast() { current = last }
@@ -65,13 +67,13 @@ public struct PortableExportService: Sendable {
                 try Task.checkCancellation()
                 let next = work.appendingPathComponent("version-\(index).opus")
                 variants[version.id] = try await Self.seal(Self.showing(version, of: note), opus, next,
-                                                           Self.record(version, run, variants, note, audit), source)
+                                                           Self.record(version, runs, variants, note, audit), source)
                 opus = next
                 source = nil
             }
             try Task.checkCancellation()
             _ = try await Self.seal(Self.showing(current, of: note), opus, output,
-                                    Self.record(current, run, variants, note, audit), source)
+                                    Self.record(current, runs, variants, note, audit), source)
             return output
         } catch {
             try? FileManager.default.removeItem(at: output)
@@ -87,11 +89,12 @@ public struct PortableExportService: Sendable {
         }
     }
 
-    /// `note` showing `version`'s transcript and speakers.
+    /// `note` showing `version`'s transcript and speakers, in the version's language.
     private static func showing(_ version: TranscriptVersion, of note: Note) -> Note {
         var snapshot = note
         snapshot.transcript = version.segments
         snapshot.speakers = version.speakers
+        snapshot.language = version.language
         return snapshot
     }
 
@@ -102,13 +105,15 @@ public struct PortableExportService: Sendable {
         return ids
     }
 
-    /// The provenance record of `version`: the run's while it holds the run's words; for a re-attribution, the
+    /// The provenance record of `version`: the newest run's of `runs` that made its words, with that run's language; for
+    /// a re-attribution, the
     /// variant its source version became and, when that source is a variant of the verified document, the document's
     /// attribution audit; and its merge, which names the variant its source version became.
-    private static func record(_ version: TranscriptVersion, _ run: ProvenanceRecord?, _ variants: [UUID: String],
+    private static func record(_ version: TranscriptVersion, _ runs: [ProvenanceRecord], _ variants: [UUID: String],
                                _ note: Note, _ audit: JSONObject?) -> JSONObject {
         let source = version.attributedFrom.flatMap { id in note.versions?.first { $0.id == id } }
-        return ExportProvenance.record(run: run?.provenance(for: version.segments), merges: version.speakerMerges,
+        let run = ProvenanceRecord.newest(describing: version.segments, in: runs)?.provenance(for: version.segments)
+        return ExportProvenance.record(run: run, merges: version.speakerMerges,
                                        derivedFrom: version.derivedFrom.flatMap { variants[$0] },
                                        attributedFrom: version.attributedFrom.flatMap { variants[$0] },
                                        sourceAttribution: source?.portableID == nil ? nil : audit)

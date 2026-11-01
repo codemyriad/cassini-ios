@@ -117,7 +117,7 @@ private final class ImportHarness: Sendable {
     }
 
     func run(_ url: URL, _ service: ImportService? = nil) async throws -> ImportOutcome {
-        try await (service ?? importer()).importFile(url, language: "en-US", fallbackTitle: ImportTitles.fallbackTitle)
+        try await (service ?? importer()).importFile(url, fallbackTitle: ImportTitles.fallbackTitle)
     }
 
     func input(_ bytes: [UInt8], _ name: String) throws -> URL {
@@ -175,7 +175,7 @@ private func sha256(_ url: URL) throws -> String {
         #expect(note.createdAt == h.clock.now)
         #expect(note.status == .audioOnly)
         #expect(note.waveform == [0.5, 0.5])
-        #expect(note.language == "en-US")
+        #expect(note.language == "", "audio without words has no language, whatever Settings say (D53.2)")
         #expect(try Data(contentsOf: h.store.audioURL(for: note)) == Data(ImportFixtures.m4a))
         #expect(try Data(contentsOf: url) == Data(ImportFixtures.m4a))
     }

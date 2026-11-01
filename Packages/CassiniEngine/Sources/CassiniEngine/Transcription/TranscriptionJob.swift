@@ -164,8 +164,10 @@ public struct TranscriptionJob: TranscriptionJobRunning {
         guard knownMs == 0 || knownMs >= limits.minDurationMs else { return .failed(.short) }
         let settings = await host.jobSettings()
         let recognizer = transcriber.recognizer
-        // Parakeet hears the language; only the Apple Speech fallback is given one.
-        let language = recognizer.usesLanguage ? (job.language.isEmpty ? note.language : job.language) : ""
+        // Parakeet hears the language; only the Apple Speech fallback is given one: the job's, else the one its saved
+        // progress began in (a rebuilt queue's job has none), never the note's, which is the language of its words.
+        let language = !recognizer.usesLanguage ? ""
+            : job.language.isEmpty ? ((try? checkpoints.load(job.noteID))??.appleLanguage ?? "") : job.language
         let transcribes = job.kind != .speakersOnly
 
         var checkpoint: CheckpointState?
@@ -195,6 +197,9 @@ public struct TranscriptionJob: TranscriptionJobRunning {
         var context = Context(noteID: job.noteID, url: url, source: note.audioFilename, language: language,
                               recognizer: recognizer, knownMs: knownMs, settings: settings, stop: stop, events: events)
         context.signature = CheckpointState.signature(of: url)
+        if transcribes {
+            context.wordsLanguage = TranscriptLanguage.ofRun(reported: await transcriber.runLanguage(requested: language))
+        }
         context.availableMemory = availableMemory
         context.clipsURL = checkpoints.clipsURL(for: job.noteID)
         let plan: SpeakerPlan
@@ -326,7 +331,7 @@ public struct TranscriptionJob: TranscriptionJobRunning {
                                                 model: context.recognizer.checkpointModel(language: context.language),
                                                 segments: [], doneMs: 0, totalMs: context.knownMs, elapsedMs: 0),
             noteID: context.noteID, resumeDoneMs: resumeDoneMs, recognizer: context.recognizer,
-            language: context.language, limits: limits, checkpoints: checkpoints,
+            language: context.wordsLanguage, limits: limits, checkpoints: checkpoints,
             stop: context.stop, events: context.events, uptimeMs: uptimeMs)
         context.events(.stageChanged(.reading, startMs: 0, endMs: startMs))
         context.events(.stageChanged(.preparing))
@@ -362,6 +367,7 @@ public struct TranscriptionJob: TranscriptionJobRunning {
             return plain
         }
         if resumed, provenance.load(context.noteID)?.describes(segments) == true { return true }
+        let language = context.wordsLanguage
         let run: TranscriptProvenance
         switch context.recognizer {
         case .parakeet:
@@ -372,7 +378,7 @@ public struct TranscriptionJob: TranscriptionJobRunning {
                                inferenceMs: words.inferenceMs, resumedFromMs: words.resumedFromMs, device: device())
         case .appleSpeech:
             let model = await transcriber.modelName(locale: Locale(identifier: context.language))
-            run = .appleRun(language: context.language, inferenceMs: words.inferenceMs, resumedFromMs: words.resumedFromMs,
+            run = .appleRun(language: language, inferenceMs: words.inferenceMs, resumedFromMs: words.resumedFromMs,
                             model: model, device: device())
         }
         let record = ProvenanceRecord(provenance: run, transcript: segments)
@@ -381,6 +387,7 @@ public struct TranscriptionJob: TranscriptionJobRunning {
             let saved = try await notes.mutate(context.noteID) { note in
                 note.saveCurrentVersion(.previous, id: before, date: date)
                 note.transcript = segments
+                note.language = language
                 note.speakers = []
                 note.selectedVersionID = nil
                 note.saveCurrentVersion(.transcription, id: after, date: date)
@@ -637,8 +644,8 @@ public struct TranscriptionJob: TranscriptionJobRunning {
     /// `SpeakerAttribution.record` for Sortformer), with the counts of its matches (`x-speakerIdentification`) when the
     /// voiceprint model ran.
     private func recordSpeakers(_ analysis: SpeakerAnalysis, _ context: Context) async {
-        guard let note = await notes.note(context.noteID), var record = provenance.load(context.noteID),
-              record.describes(note.transcript), !analysis.turns.isEmpty else { return }
+        guard let note = await notes.note(context.noteID), var record = provenance.record(of: note.transcript, in: context.noteID),
+              !analysis.turns.isEmpty else { return }
         let speakers = Set(note.transcript.compactMap(\.speakerID)).count
         guard speakers > 0 else { return }
         let diarization = TranscriptProvenance.SpeakerDiarization.sortformer(
@@ -687,8 +694,10 @@ public struct TranscriptionJob: TranscriptionJobRunning {
         let noteID: UUID
         let url: URL
         let source: String
-        /// BCP-47 for Apple Speech; `""` for Parakeet.
+        /// The language the recognizer is asked for: BCP-47 for Apple Speech; `""` for Parakeet.
         let language: String
+        /// The language the run's words are written with (D53.2): the locale Apple Speech runs in, `und` for Parakeet.
+        var wordsLanguage = TranscriptLanguage.undetermined
         let recognizer: SpeechRecognizer
         let knownMs: Int64
         let settings: JobSettings

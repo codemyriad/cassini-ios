@@ -90,6 +90,19 @@ struct TranscriptExportsTests {
         #expect((json?["transcript"] as? [[String: Any]])?.first?["text"] as? String == "Vecchio")
     }
 
+    /// The JSON of a version that is not shown names that version's language, not the shown words' (D53.2).
+    @Test func aVersionExportsItsOwnLanguage() throws {
+        var source = note([TranscriptSegment(text: "Nuovo", start: 0, end: 1, speakerID: "S1")])
+        source.language = "und"
+        let version = TranscriptVersion(kind: .imported, segments: [TranscriptSegment(text: "Vecchio", start: 1, end: 2, speakerID: "S1")],
+                                        speakers: [], language: "it-IT")
+        source.versions = [version]
+        let json = try JSONSerialization.jsonObject(with: TranscriptExports.data(source, format: .json, version: version, texts: texts)) as? [String: Any]
+        #expect(json?["language"] as? String == "it-IT")
+        let shown = try JSONSerialization.jsonObject(with: TranscriptExports.data(source, format: .json, texts: texts)) as? [String: Any]
+        #expect(shown?["language"] as? String == "und")
+    }
+
     @Test func aFinishedTranscriptWithoutWordsWritesTheEmptyText() throws {
         let text = String(decoding: try TranscriptExports.data(note([]), format: .text, texts: texts), as: UTF8.self)
         #expect(text == "Consegna: giovedì?\nsub 12500 0\n\nNo words were found in this recording.\n")

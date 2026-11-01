@@ -58,11 +58,13 @@ extension TranscriptionJobTests {
         /// What an export would write for `note`.
         func provenance(of note: Note?) -> TranscriptProvenance? { note.flatMap(provenanceFiles.provenance(for:)) }
 
+        /// Runs a job over the note; `using` runs it with that transcriber in place of the harness's (a later run of
+        /// another recognizer, say).
         func run(kind: JobKind = .transcribe, language: String = "it-IT", stop: StopSignal = StopSignal(),
-                 uptime: (@Sendable () -> Int64)? = nil, availableMemory: Int64? = nil,
+                 uptime: (@Sendable () -> Int64)? = nil, availableMemory: Int64? = nil, using: (any Transcribing)? = nil,
                  observe: @escaping @Sendable (JobEvent) -> Void = { _ in }) async -> (outcome: JobOutcome, events: [JobEvent]) {
             let ticking = FakeUptime()
-            let job = TranscriptionJob(notes: notes, transcriber: engine ?? transcriber, analyzer: analyzer, checkpoints: checkpoints,
+            let job = TranscriptionJob(notes: notes, transcriber: using ?? engine ?? transcriber, analyzer: analyzer, checkpoints: checkpoints,
                                        provenance: provenanceFiles, host: host, clock: FakeClock(), limits: limits, budget: budget,
                                        drafts: drafts, uptimeMs: uptime ?? { ticking.next() },
                                        availableMemory: { availableMemory })
@@ -92,6 +94,9 @@ extension TranscriptionJobTests {
     /// Emits `script` from the request's start offset: each result whose end is after it, then its progress.
     final class ScriptedTranscriber: Transcribing, @unchecked Sendable {
         func modelName(locale: Locale) async -> String? { "Fake SpeechTranscriber \(locale.identifier(.bcp47))" }
+        /// The locale Apple Speech's `supportedLocale(equivalentTo:)` would pick; nil runs the requested one.
+        var ranLocale: String?
+        func runLanguage(requested: String) async -> String? { ranLocale ?? requested }
 
         /// 14 results of 5 s, one word a second ("w0" at 0–0.8 s).
         static let seventySeconds: [TranscriptSegment] = (0..<14).map { index in
