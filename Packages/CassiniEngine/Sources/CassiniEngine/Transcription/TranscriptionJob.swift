@@ -373,7 +373,7 @@ public struct TranscriptionJob: TranscriptionJobRunning {
         case .parakeet:
             // A run that resumed with every word already decoded asks the transcriber how it cuts the audio.
             let segmentation = if let known = context.segmentation { known } else { await transcriber.segmentation() }
-            run = .parakeetRun(model: "\(ModelCatalog.parakeetModelID) \(ModelCatalog.parakeetPrecision)",
+            run = .parakeetRun(model: ModelCatalog.parakeetProvenanceModel,
                                revision: ModelCatalog.parakeetRevision, segmentation: segmentation ?? "",
                                inferenceMs: words.inferenceMs, resumedFromMs: words.resumedFromMs, device: device())
         case .appleSpeech:

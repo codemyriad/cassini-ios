@@ -10,7 +10,8 @@ import CassiniNotebook
 
 /// `SpeakerAnalyzer` over a fake native runtime: the whole-file analysis of a speakers-only job or an Apple Speech
 /// transcription (streaming Sortformer in the job's 28 s windows, then CAM++ from the clips), the engines a Parakeet
-/// run streams with, and the models' status. The model files are sparse files of the pinned sizes with their markers.
+/// run streams with, and the models' status. The model files are sparse files of the pinned sizes in their revision
+/// directories; the per-session check passes unless a test says otherwise.
 @Suite(.serialized) struct SpeakerAnalyzerTests {
     private let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     private var root: URL { folder.appendingPathComponent("models", isDirectory: true) }
@@ -30,8 +31,16 @@ import CassiniNotebook
         func availableBytes(at url: URL) -> Int64 { .max }
     }
 
-    private func analyzer(_ engines: FakeSpeakerEngines, linked: Bool = true) -> SpeakerAnalyzer {
-        let repository = ModelRepository(root: root, consent: Consent(), fetcher: Unused())
+    /// A verifier that has checked every model already, as after an install in this session.
+    private func checked() -> ModelVerifier {
+        let verifier = ModelVerifier { _, _, _ in "" }
+        for model in ModelCatalog.all { verifier.markVerified(model, in: root) }
+        return verifier
+    }
+
+    private func analyzer(_ engines: FakeSpeakerEngines, linked: Bool = true,
+                          verifier: ModelVerifier? = nil) -> SpeakerAnalyzer {
+        let repository = ModelRepository(root: root, consent: Consent(), fetcher: Unused(), verifier: verifier ?? checked())
         let installer = PinnedModelInstaller(models: repository, storage: Unlimited(), online: { true })
         let runtime = SpeakerRuntime(linked: linked, makeDiarizer: { _, restored in try engines.openDiarizer(restored: restored) },
                                      prints: { _, audio, windows, active in try engines.prints(audio, windows: windows, active: active) })
@@ -49,7 +58,7 @@ import CassiniNotebook
             try handle.truncate(atOffset: UInt64(artifact.size))
             try handle.close()
         }
-        try Data(model.markerValue.utf8).write(to: directory.appendingPathComponent(model.markerFile))
+        try Data("notices".utf8).write(to: directory.appendingPathComponent(ModelDescriptor.noticeFile))
     }
 
     /// `seconds` of quiet 16 kHz audio.
@@ -117,6 +126,101 @@ import CassiniNotebook
         await #expect(throws: SpeakerAnalysisError.needsConsent) {
             try await speakers.analyze(url: try audio(seconds: 30), words: words, allowDownload: false) { _ in }
         }
+    }
+
+    /// D16 §4 for the speaker models: hashed once a session, on the speech thread (never on the cooperative pool). A
+    /// diarizer that fails its check is removed: the streaming run gets no engines (every word one voice, and the next
+    /// run downloads it again), and a whole-file analysis fails with File check failed, whose Download again installs
+    /// it. A CAM++ that fails is removed and the speakers are still told apart.
+    @Test func aDiarizerThatFailsItsCheckGivesNoEngines() async throws {
+        defer { try? FileManager.default.removeItem(at: folder) }
+        try install(ModelCatalog.diarization)
+        try install(ModelCatalog.voiceprint)
+        let threads = Mutex<Set<String>>([])
+        let bad = ModelVerifier { _, _, _ in
+            threads.withLock { _ = $0.insert(Thread.current.name ?? "") }
+            return "not the pin"
+        }
+        let speakers = analyzer(FakeSpeakerEngines(turns: Self.twoSpeakers), verifier: bad)
+        #expect(await speakers.streamingEngines() == nil)
+        #expect(threads.withLock { $0 } == ["Cassini speech"])
+        #expect(!ModelCatalog.diarization.ready(in: root))
+        #expect(!FileManager.default.fileExists(atPath: ModelCatalog.diarization.directory(in: root).path),
+                "the revision is removed")
+        #expect(ModelCatalog.voiceprint.ready(in: root), "CAM++ is checked only with a diarizer that passed")
+
+        try install(ModelCatalog.diarization)
+        await #expect(throws: SpeakerAnalysisError.download(.fileCheckFailed, requiredFreeBytes: 0)) {
+            try await speakers.analyze(url: try audio(seconds: 30), words: words, allowDownload: false) { _ in }
+        }
+        #expect(!ModelCatalog.diarization.ready(in: root))
+    }
+
+    @Test func aVoiceprintModelThatFailsItsCheckIsRemovedAndTheSpeakersAreStillToldApart() async throws {
+        defer { try? FileManager.default.removeItem(at: folder) }
+        try install(ModelCatalog.diarization)
+        try install(ModelCatalog.voiceprint)
+        let pins = Dictionary(uniqueKeysWithValues: ModelCatalog.all.flatMap(\.artifacts).map { ($0.name, $0.sha256) })
+        let hashed = Mutex(0)
+        let verifier = ModelVerifier { file, _, _ in
+            hashed.withLock { $0 += 1 }
+            return file.lastPathComponent == ModelCatalog.voiceprintModel.name ? "" : pins[file.lastPathComponent] ?? ""
+        }
+        let speakers = analyzer(FakeSpeakerEngines(turns: Self.twoSpeakers), verifier: verifier)
+        #expect(await speakers.streamingEngines() != nil)
+        #expect(await speakers.printsReady() == false)
+        #expect(!ModelCatalog.voiceprint.ready(in: root))
+        #expect(hashed.withLock { $0 } == 2)
+        // Checked once a session: the next run hashes nothing.
+        #expect(await speakers.streamingEngines() != nil)
+        #expect(hashed.withLock { $0 } == 2)
+    }
+
+    /// A file that cannot be read (EIO, EACCES) is never loaded unchecked and retires nothing: a diarizer gives no
+    /// engines and fails the analysis with MODEL, not File check failed, whose Download again could not help (the
+    /// files are still installed).
+    @Test func aDiarizerThatCannotBeReadFailsWithModelAndStaysInstalled() async throws {
+        defer { try? FileManager.default.removeItem(at: folder) }
+        try install(ModelCatalog.diarization)
+        try install(ModelCatalog.voiceprint)
+        let unreadable = ModelVerifier { _, _, _ in throw POSIXError(.EIO) }
+        let engines = FakeSpeakerEngines(turns: Self.twoSpeakers)
+        let speakers = analyzer(engines, verifier: unreadable)
+        #expect(await speakers.streamingEngines() == nil)
+        await #expect(throws: JobFailure.model) {
+            try await speakers.analyze(url: try audio(seconds: 30), words: words, allowDownload: true) { _ in }
+        }
+        #expect(engines.opened.isEmpty, "nothing loads")
+        #expect(ModelCatalog.diarization.ready(in: root) && ModelCatalog.voiceprint.ready(in: root))
+    }
+
+    /// A CAM++ that cannot be read is left out until a check reads it: the speakers are told apart and nobody is named,
+    /// and nothing is removed.
+    @Test func aVoiceprintModelThatCannotBeReadIsLeftOutAndKept() async throws {
+        defer { try? FileManager.default.removeItem(at: folder) }
+        try install(ModelCatalog.diarization)
+        try install(ModelCatalog.voiceprint)
+        let pins = Dictionary(uniqueKeysWithValues: ModelCatalog.all.flatMap(\.artifacts).map { ($0.name, $0.sha256) })
+        let unreadable = Mutex(true)
+        let verifier = ModelVerifier { file, _, _ in
+            if file.lastPathComponent == ModelCatalog.voiceprintModel.name, unreadable.withLock({ $0 }) {
+                throw POSIXError(.EACCES)
+            }
+            return pins[file.lastPathComponent] ?? ""
+        }
+        let engines = FakeSpeakerEngines(turns: Self.twoSpeakers)
+        let speakers = analyzer(engines, verifier: verifier)
+        #expect(await speakers.streamingEngines() != nil)
+        #expect(await speakers.printsReady() == false, "a Parakeet run collects no clips for it")
+        let analysis = try await speakers.analyze(url: try audio(seconds: 70), words: words, allowDownload: false) { _ in }
+        #expect(analysis.turns.map(\.speakerID).uniqued() == ["1", "2"])
+        #expect(analysis.prints.isEmpty && !analysis.printsReady)
+        #expect(engines.printRequests.isEmpty, "CAM++ never loads unchecked")
+        #expect(ModelCatalog.voiceprint.ready(in: root), "nothing is removed")
+
+        unreadable.withLock { $0 = false }
+        #expect(await speakers.streamingEngines() != nil)
+        #expect(await speakers.printsReady())
     }
 
     @Test func aDiarizerThatFailsAtTheFirstWindowFailsTheAnalysis() async throws {

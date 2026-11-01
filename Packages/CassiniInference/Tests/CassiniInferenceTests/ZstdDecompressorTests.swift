@@ -46,7 +46,7 @@ import libzstd
         let source = try write(seekable(payload))
         try ArtifactFetcher.decompress(source, artifact, into: folder, decoder: ZstdDecompressor())
         #expect(try Data(contentsOf: folder.appendingPathComponent(artifact.name)) == payload)
-        #expect(!FileManager.default.fileExists(atPath: folder.appendingPathComponent("\(artifact.name).part").path))
+        #expect(!FileManager.default.fileExists(atPath: folder.appendingPathComponent("\(artifact.sha256).part").path))
     }
 
     // ports: ZstdModelTest#wrongContentLeavesNoModel
@@ -74,7 +74,7 @@ import libzstd
                 try ArtifactFetcher.decompress(source, artifact, into: folder, decoder: ZstdDecompressor())
             }
             #expect(!FileManager.default.fileExists(atPath: folder.appendingPathComponent(artifact.name).path))
-            #expect(!FileManager.default.fileExists(atPath: folder.appendingPathComponent("\(artifact.name).part").path))
+            #expect(!FileManager.default.fileExists(atPath: folder.appendingPathComponent("\(artifact.sha256).part").path))
         }
     }
 

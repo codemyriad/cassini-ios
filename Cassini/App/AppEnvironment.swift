@@ -229,4 +229,6 @@ extension EnvironmentValues {
     @Entry var clock: any AppClock = SystemClock()
     /// Screens restore what they saved with the scene, such as the library search.
     @Entry var restoresSceneState = true
+    /// Where the pinned models are installed (`AppEnvironment.models`); About reads the model host's notices there.
+    @Entry var modelRoot: URL = ModelCatalog.defaultRoot
 }

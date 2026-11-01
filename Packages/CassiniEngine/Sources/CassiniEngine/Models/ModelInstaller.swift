@@ -8,12 +8,12 @@ public protocol ModelStore: Sendable {
     func consented() async -> Bool
     /// Whether the device has a usable network path now.
     func hasValidatedNetwork() -> Bool
-    /// Whether `model` is installed and verified (its marker holds the pinned value).
+    /// Whether `model` is installed (its revision directory is complete).
     func ready(_ model: ModelDescriptor) -> Bool
     /// Free bytes where the models are installed.
     func usableBytes() -> Int64
-    /// Installs `model` through `ArtifactFetcher` with Range resume: deletes its marker, fetches and verifies each
-    /// file, then writes the marker. `progress` receives a count in bytes of `model`'s download (0 to
+    /// Installs `model` through `ArtifactFetcher` with Range resume: fetches and verifies each file into the model's
+    /// staging directory, then renames it into place. `progress` receives a count in bytes of `model`'s download (0 to
     /// `model.downloadBytes`) and whether it is verifying. Throws what `ArtifactFetcher` throws.
     func install(_ model: ModelDescriptor, progress: @escaping @Sendable (Int64, Bool) -> Void) async throws
 }
@@ -141,11 +141,12 @@ public struct ModelInstaller: Sendable {
     /// network error reads NO_CONNECTION when `online` says there is no network, INTERRUPTED when there is; a timeout,
     /// an unknown host or a refused connection is always NO_CONNECTION. A redirect outside the allow-list
     /// (`RedirectPolicy` reports "… is not allowed") is HOST_NOT_ALLOWED. SPACE, VERIFY and INSTALL map to their own
-    /// errors; a full disk is NOT_ENOUGH_STORAGE (iOS reports it as its own error); anything else did not finish
-    /// installing.
+    /// errors; a full disk is NOT_ENOUGH_STORAGE (iOS reports it as its own error); a model the host's manifest does
+    /// not offer as pinned (`DistManifest`) is PIN_UNAVAILABLE (iOS only); anything else did not finish installing.
     public static func downloadError(_ failure: any Error, online: () -> Bool) -> DownloadError {
         if let failure = failure as? ModelError {
             switch failure.failure {
+            case .download(let error): return error
             case .space: return .notEnoughStorage
             case .modelVerify: return .fileCheckFailed
             case .modelDownload:

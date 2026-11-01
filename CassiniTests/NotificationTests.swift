@@ -103,6 +103,9 @@ private final class RecordingCenter: UserNotificationCenter, @unchecked Sendable
         #expect(text(.failed(.download(.fileCheckFailed))).body == "Model verification failed. Please download it again.")
         #expect(text(.failed(.download(.install))).body == "Could not save the model. Free some space and retry.")
         #expect(text(.failed(.download(.interrupted))).body == "Model download failed. Check your connection and retry.")
+        // iOS only: a model the host no longer offers as pinned says that only an update helps.
+        #expect(text(.failed(.download(.pinUnavailable))).body
+                == "This version of the model is no longer offered for download. Update Cassini, then try again.")
         #expect(text(.failed(.unknown)).body == "Something went wrong. Please try again.")
         #expect(NotificationCategory(.transcriptionStopped).offersResume)
         #expect(!NotificationCategory(.transcribed(speakers: 1, duration: 1)).offersResume)

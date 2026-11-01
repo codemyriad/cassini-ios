@@ -46,7 +46,8 @@ command below runs from the repository root, not from a folder under `Packages/`
   licences, navigation and deep links.
 - **CassiniInference**. The file reader behind both transcribers, `ParakeetTranscriber` over a fake native runtime
   (windows on the inference thread, the detector and its fetch only online, the detector's high-passed input across
-  windows and after a resume, consent and install, the pinned sizes and marker, memory, resume, cancel), the speaker
+  windows and after a resume, consent and install, the revision directory and sizes, the per-session check, memory,
+  resume, cancel), the speaker
   model installer and manifest, the licence assets, and the opt-in real-model test (below).
   `CassiniTests/ParakeetJobTests` runs a real Ultra job on the simulator through `scripts/sherpa-bench.sh`, and
   `CassiniTests/DCVectorTests` runs D26.1's shared DC vector through the real detector and Ultra (it needs the

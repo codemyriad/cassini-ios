@@ -35,10 +35,10 @@ public struct ModelPlan: Hashable, Sendable {
         /// Bytes fetched over the network.
         public var downloadBytes: Int64 { models.reduce(0) { $0 + $1.downloadBytes } }
 
-        /// Bytes on disk while installing: the download, plus the decompressed files of a compressed download (both
-        /// exist until the compressed copy is deleted).
+        /// Bytes on disk at most while installing: the models install one after another, so every installed file plus
+        /// the largest single download being decompressed (`ModelDescriptor.installBytes`).
         public var installBytes: Int64 {
-            models.reduce(0) { $0 + $1.downloadBytes + ($1.download != nil ? $1.artifactBytes : 0) }
+            models.reduce(0) { $0 + $1.artifactBytes } + (models.map(\.largestDownloadBytes).max() ?? 0)
         }
 
         /// The size shown next to the part: `downloadBytes` in whole MiB as `ModelCatalog.mebibytes` rounds it.
@@ -60,18 +60,23 @@ public struct ModelPlan: Hashable, Sendable {
     /// Every byte the plan fetches over the network.
     public var totalBytes: Int64 { missing.reduce(0) { $0 + $1.downloadBytes } }
 
-    /// The total the screen shows: the sum of the rounded part sizes, so the numbers on screen add up (640 + 62 + 28 =
-    /// 730 for a fresh install, which is also `mebibytes(totalBytes)`).
+    /// The total the screen shows: the sum of the rounded part sizes, so the numbers on screen add up (440 + 62 + 26 =
+    /// 528 for a fresh install; `mebibytes(totalBytes)` would round the same bytes to 530).
     public var totalMebibytes: Int64 { missing.reduce(0) { $0 + $1.mebibytes } }
 
-    /// Free space needed before the first byte: each missing part's `installBytes` plus `ArtifactFetcher.slackBytes`,
-    /// or 0 when nothing is missing. Kept `.part` files are not subtracted; `ArtifactFetcher` checks each file again
-    /// with what it still has to fetch.
+    /// Free space needed before the first byte: every file of the missing parts, plus the largest single download (the
+    /// parts install one after another, and each download is deleted once its file is in place), plus
+    /// `ArtifactFetcher.slackBytes`; 0 when nothing is missing. Kept `.part` files are not subtracted;
+    /// `ArtifactFetcher` checks each file again with what it still has to fetch.
     public var requiredFreeBytes: Int64 {
-        missing.isEmpty ? 0 : missing.reduce(0) { $0 + $1.installBytes } + ArtifactFetcher.slackBytes
+        guard !missing.isEmpty else { return 0 }
+        let models = missing.flatMap(\.models)
+        let largest = models.map(\.largestDownloadBytes).max() ?? 0
+        return models.reduce(0) { $0 + $1.artifactBytes } + largest + ArtifactFetcher.slackBytes
     }
 
-    /// `requiredFreeBytes` as the "Needs about 860 MB free" figure, rounded like every size on the screen.
+    /// `requiredFreeBytes` as the "Needs about 1230 MB free" figure, rounded like every size on the screen (a fresh
+    /// install needs about 1231 MiB and shows 1230; the space check itself compares bytes).
     public var requiredFreeMebibytes: Int64 { missing.isEmpty ? 0 : ModelCatalog.mebibytes(requiredFreeBytes) }
 
     /// The plan for the models `ready` reports, in `ModelPart` order.

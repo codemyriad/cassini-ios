@@ -9,8 +9,8 @@
 #   scripts/speaker-smoke.sh
 #
 # Environment:
-#   CASSINI_SPEAKER_MODELS  the speaker-models directory (default .tools/models/speaker-models, which
-#                           scripts/fetch-ci-models.py --dest .tools/models fills); its parent is the job's model root
+#   CASSINI_SPEAKER_MODELS  the model root with the diarizer and CAM++ installed (default .tools/models, which
+#                           scripts/fetch-ci-models.py --dest .tools/models fills); it is also the job's model root
 #   CASSINI_SPEAKER_JOB     0 skips the end-to-end job
 #   CASSINI_ANDROID         the cassini-android checkout with fixtures/audio/fleurs-it-short.wav (default
 #                           ~/dev/cassini-android, then ../cassini-android beside the main checkout)
@@ -24,10 +24,10 @@ root=$PWD
 . scripts/native-common.sh
 [ -d "$sherpa_xcframework" ] || { echo "error: no $sherpa_xcframework; run scripts/build-sherpa-xcframework.sh" >&2; exit 1; }
 
-models=${CASSINI_SPEAKER_MODELS:-$root/.tools/models/speaker-models}
-for f in nemotron-3-diarization.int8.onnx voiceprint-campplus.onnx; do
-    [ -f "$models/$f" ] || { echo "error: missing $models/$f; run scripts/fetch-ci-models.py --dest .tools/models" >&2; exit 1; }
-done
+fetch=(/usr/bin/python3 -I scripts/fetch-ci-models.py)
+models=${CASSINI_SPEAKER_MODELS:-$root/.tools/models}
+"${fetch[@]}" --dest "$models" --ready nemotron-3-diarization-int8 campplus-voxceleb-16k \
+    || { echo "error: no speaker models in $models; run scripts/fetch-ci-models.py --dest .tools/models" >&2; exit 1; }
 audio=$root/.tools/fixtures/fleurs-two-speakers.wav
 if [ ! -f "$audio" ]; then
     common=$(git -C "$root" rev-parse --path-format=absolute --git-common-dir)
@@ -71,9 +71,9 @@ fi
 xcrun simctl bootstatus "$udid" -b > /dev/null
 
 # The end-to-end job needs Parakeet Ultra and its detector beside the speaker models (CASSINI_SPEAKER_JOB=0 skips it).
-model_root=$(dirname "$models")
+model_root=$models
 only=(-only-testing:CassiniTests/SpeakerSmokeTests)
-if [ "${CASSINI_SPEAKER_JOB:-1}" != 0 ] && [ -f "$model_root/parakeet-ultra/verified" ] && [ -f "$model_root/vad/verified" ]; then
+if [ "${CASSINI_SPEAKER_JOB:-1}" != 0 ] && "${fetch[@]}" --dest "$model_root" --ready parakeet-ultra-0.6b-int8 silero-vad; then
     only+=(-only-testing:CassiniTests/SpeakerJobTests)
 fi
 echo "==> ${only[*]#-only-testing:} on $name ($udid)"

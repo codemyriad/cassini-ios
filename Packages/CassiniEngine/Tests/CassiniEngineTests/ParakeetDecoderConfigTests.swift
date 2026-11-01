@@ -27,7 +27,9 @@ import CassiniNotebook
         #expect(config.numThreads == 2)
         #expect(config.decodingMethod == "greedy_search")
         #expect(ParakeetFiles(directory: URL(fileURLWithPath: "/m")) == files)
-        #expect(ParakeetFiles(root: URL(fileURLWithPath: "/r")).encoder.path == "/r/parakeet-ultra/encoder.int8.onnx")
+        // The manifest's paths in Ultra's revision directory (D4).
+        #expect(ParakeetFiles(root: URL(fileURLWithPath: "/r")).encoder.path
+                == "/r/models/parakeet-ultra-0.6b-int8/18cb623004dd6c15999b93cb70b14d8a1f6e8f3a2a97ff733f104bfc3494f6a9/encoder.int8.onnx")
     }
 
     // ports: ParakeetDecoderConfigTest#presentNeedsEveryFile

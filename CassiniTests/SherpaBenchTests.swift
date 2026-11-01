@@ -16,14 +16,14 @@ import CassiniSherpa
 ///   CASSINI_PARAKEET_AUDIO      the FLEURS-it short clip, 16 kHz mono WAV
 ///   CASSINI_PARAKEET_GOLDEN     Android's fleurs-it-short.txt golden
 ///   CASSINI_BENCH_LONG_SECONDS  length of the long run in 28 s windows (default 0: skipped)
-///   CASSINI_BENCH_SPEAKERS      the speaker-models directory: with the recognizer still loaded, stream 60 s through
-///                               Sortformer and make a CAM++ print, as a job holds both
+///   CASSINI_BENCH_SPEAKERS      a model root with the speaker models' revision directories: with the recognizer
+///                               still loaded, stream 60 s through Sortformer and make a CAM++ print, as a job holds
+///                               both
 ///   CASSINI_BENCH_OUT           a file to write the measurements to as JSON
 final class SherpaBenchTests: XCTestCase {
     private static let rate = 16_000
-    /// The pinned export's sizes (the plan's fixed choices).
-    private static let sizes = ["encoder.int8.onnx": 652_282_347, "decoder.int8.onnx": 11_845_275,
-                                "joiner.int8.onnx": 6_355_277, "tokens.txt": 93_939]
+    /// The pinned export's sizes (the dist pin, D16 §2).
+    private static let sizes = Dictionary(uniqueKeysWithValues: ModelCatalog.parakeetArtifacts.map { ($0.name, Int($0.size)) })
 
     func testParakeetUltraDecodesOnTheSimulator() throws {
         let environment = ProcessInfo.processInfo.environment
@@ -118,7 +118,8 @@ final class SherpaBenchTests: XCTestCase {
         if let speakerModels = environment["CASSINI_BENCH_SPEAKERS"].map({ URL(fileURLWithPath: $0) }) {
             let started = Date()
             let clip = repeated(fleurs, seconds: 60)
-            let diarizer = try SortformerStream(model: speakerModels.appendingPathComponent("nemotron-3-diarization.int8.onnx"))
+            let diarizer = try SortformerStream(model: URL(fileURLWithPath: ModelCatalog.diarization.path(
+                in: speakerModels, ModelCatalog.diarizationModel.name)))
             var start = 0
             while start < clip.count {
                 let end = min(clip.count, start + IncrementalTranscript.windowSamples)
@@ -128,7 +129,7 @@ final class SherpaBenchTests: XCTestCase {
             }
             let streamed = MemorySample.now()
             let prints = try VoiceprintExtractor.compute(
-                model: speakerModels.appendingPathComponent("voiceprint-campplus.onnx"),
+                model: URL(fileURLWithPath: ModelCatalog.voiceprint.path(in: speakerModels, ModelCatalog.voiceprintModel.name)),
                 audio: PcmAudio(clip, sampleRate: Self.rate), windows: ["s": [PrintWindow(0, 45 * Self.rate)]]) {}
             let printed = MemorySample.now()
             report["speakers"] = ["seconds": Date().timeIntervalSince(started), "slots": Set(diarizer.turns.map(\.speaker)).count,

@@ -10,7 +10,6 @@ import CassiniNotebook
 /// sizes, so nothing is downloaded and almost no disk is used.
 @MainActor @Suite final class PinnedModelInstallerTests {
     private static let partBytes = 1024
-    private static let settle = Duration.milliseconds(300)
 
     private let folder = TemporaryFolder()
     private let suite = "cassini.tests.\(UUID().uuidString)"
@@ -33,7 +32,7 @@ import CassiniNotebook
         UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite)
     }
 
-    private nonisolated static func key(_ model: ModelDescriptor) -> String { "\(model.directory)/\(model.markerFile)" }
+    private nonisolated static func key(_ model: ModelDescriptor) -> String { model.pin }
 
     private let everyModel = ModelPart.allCases.flatMap(\.models).map(key).sorted()
     private let all = Set(ModelPart.allCases)
@@ -66,7 +65,7 @@ import CassiniNotebook
         owner.startDownload([.speech])
         try await waitUntil { [fetcher] in fetcher.started }
         let job = Task { [owner, all] in try await owner.install(all) }
-        try await Task.sleep(for: Self.settle)
+        try await waitUntil("The second install never waited for the first") { [owner] in owner.waitingForEnd == 1 }
         #expect(fetcher.fetched == [Self.key(ModelCatalog.parakeet)], "the second install waits for the first")
 
         release.open()
@@ -86,8 +85,10 @@ import CassiniNotebook
         await download.value
         try await waitUntil { [owner] in owner.status == .idle }
         #expect(release.interrupted)
-        let part = ModelCatalog.parakeet.directory(in: models.root).appendingPathComponent("encoder.int8.onnx.part")
+        // The parts stay in the model's staging directory, and no revision appears.
+        let part = ModelCatalog.parakeet.staging(in: models.root).appendingPathComponent("encoder.int8.onnx.part")
         #expect(exists(part))
+        #expect(!exists(ModelCatalog.parakeet.directory(in: models.root)))
         #expect(models.status[.speech] == .missing(consented: true))
     }
 
@@ -99,8 +100,9 @@ import CassiniNotebook
 
         owner.cancel()
         let again = Task { [owner, all] in try await owner.install(all) }
-        try await Task.sleep(for: Self.settle)
-        #expect(release.interrupted)
+        try await waitUntil("The request never waited for the cancelled fetch") { [owner, release] in
+            release.interrupted && owner.waitingForEnd == 1
+        }
         #expect(fetcher.fetched == [Self.key(ModelCatalog.parakeet)], "no second fetch while the first one runs")
 
         release.open()
@@ -181,7 +183,7 @@ private final class GatedFetcher: ModelFetching, Sendable {
     func fetch(_ model: ModelDescriptor, into directory: URL,
                progress: @escaping @Sendable (Int64, Bool) -> Void) async throws {
         state.withLock { state in
-            state.fetched.append("\(model.directory)/\(model.markerFile)")
+            state.fetched.append(model.pin)
             state.inFlight += 1
             state.mostInFlight = max(state.mostInFlight, state.inFlight)
         }

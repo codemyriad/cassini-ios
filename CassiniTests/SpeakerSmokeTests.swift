@@ -1,5 +1,6 @@
 import XCTest
 import AVFoundation
+import CassiniEngine
 import CassiniNotebook
 import CassiniSherpa
 
@@ -9,7 +10,8 @@ import CassiniSherpa
 /// runs it on a simulator.
 ///
 /// Environment (xcodebuild passes TEST_RUNNER_<name> through as <name>):
-///   CASSINI_SPEAKER_MODELS   the speaker-models directory (nemotron-3-diarization.int8.onnx, voiceprint-campplus.onnx)
+///   CASSINI_SPEAKER_MODELS   a model root with the revision directories of the diarizer and CAM++
+///                            (models/<id>/<source_sha256>/, as scripts/fetch-ci-models.py writes them)
 ///   CASSINI_SPEAKER_AUDIO    fleurs-two-speakers.wav; its .json beside it lists the three spans
 ///   CASSINI_SPEAKER_OUT      a file to write the measurements to as JSON
 final class SpeakerSmokeTests: XCTestCase {
@@ -29,8 +31,8 @@ final class SpeakerSmokeTests: XCTestCase {
         let audioURL = try XCTUnwrap(environment["CASSINI_SPEAKER_AUDIO"].map { URL(fileURLWithPath: $0) })
         let fixture = try JSONDecoder().decode(Fixture.self, from: Data(contentsOf: audioURL.deletingPathExtension()
             .appendingPathExtension("json")))
-        let sortformer = models.appendingPathComponent("nemotron-3-diarization.int8.onnx")
-        let campplus = models.appendingPathComponent("voiceprint-campplus.onnx")
+        let sortformer = URL(fileURLWithPath: ModelCatalog.diarization.path(in: models, ModelCatalog.diarizationModel.name))
+        let campplus = URL(fileURLWithPath: ModelCatalog.voiceprint.path(in: models, ModelCatalog.voiceprintModel.name))
         let samples = try readMono16k(audioURL)
         XCTAssertEqual(Int64(samples.count) * 1000 / Int64(Self.rate), fixture.durationMs)
         var report: [String: Any] = ["platform": "iOS Simulator (not a device measurement)",

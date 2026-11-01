@@ -24,16 +24,16 @@ import CassiniEngineTesting
     /// aRedirectToAHostOffTheListIsNeverFollowed, against the platform's URL loading).
     @Test func aRedirectComesBackAsItIsAndIsNotFollowed() async throws {
         StubProtocol.reset { request in
-            if request.url?.host() == "huggingface.co" {
+            if request.url?.host() == "dist.gocassini.com" {
                 return .redirect(to: "https://example.com/elsewhere")
             }
             return .answer(200, [:], [Data("followed".utf8)])
         }
-        let answer = try await transport.get(URL(string: "https://huggingface.co/model")!, headers: [:], timeout: 30)
+        let answer = try await transport.get(URL(string: "https://dist.gocassini.com/model")!, headers: [:], timeout: 30)
         #expect(answer.status == 302)
         #expect(answer.header("Location") == "https://example.com/elsewhere")
         answer.close()
-        #expect(StubProtocol.hosts == ["huggingface.co"])
+        #expect(StubProtocol.hosts == ["dist.gocassini.com"])
     }
 
     @Test func theRangeIsSentAndThePartialBodyStreams() async throws {
@@ -42,7 +42,7 @@ import CassiniEngineTesting
             return .answer(206, ["Content-Range": "bytes 3-8/9", "Content-Length": "6", "X-Range": range],
                            [Data("abc".utf8), Data("def".utf8)])
         }
-        let answer = try await transport.get(URL(string: "https://huggingface.co/model")!,
+        let answer = try await transport.get(URL(string: "https://dist.gocassini.com/model")!,
                                                headers: ["Range": "bytes=3-"], timeout: 30)
         #expect(answer.status == 206)
         #expect(answer.header("x-range") == "bytes=3-")
@@ -55,7 +55,7 @@ import CassiniEngineTesting
     @Test func noAnswerThrowsTheURLError() async {
         StubProtocol.reset { _ in .fail(URLError(.notConnectedToInternet)) }
         await #expect(throws: URLError.self) {
-            _ = try await transport.get(URL(string: "https://huggingface.co/model")!, headers: [:], timeout: 30)
+            _ = try await transport.get(URL(string: "https://dist.gocassini.com/model")!, headers: [:], timeout: 30)
         }
     }
 
@@ -63,27 +63,27 @@ import CassiniEngineTesting
     /// is never asked.
     @Test func aForcedBadRedirectIsRefusedAsHostNotAllowed() async throws {
         StubProtocol.reset { request in
-            request.url?.host() == "huggingface.co" ? .redirect(to: "https://example.com/tokens.txt")
+            request.url?.host() == "dist.gocassini.com" ? .redirect(to: "https://example.com/tokens.txt")
                 : .answer(200, [:], [Data("tokens".utf8)])
         }
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
-        let tokens = ModelCatalog.parakeetArtifacts[3]
+        let tokens = try #require(ModelCatalog.parakeetArtifacts[3].download)
         do {
             try await ArtifactFetcher(transport: transport, storage: FakeStorage()).fetch(tokens.url, tokens, into: directory) { _, _ in }
             Issue.record("The redirect must be refused")
         } catch {
             #expect(ModelInstaller.downloadError(error, online: { true }) == .hostNotAllowed)
         }
-        #expect(StubProtocol.hosts == ["huggingface.co"])
+        #expect(StubProtocol.hosts == ["dist.gocassini.com"])
     }
 
     /// The error comes from `get` when URL loading ends the task before it hands over the head, else from the body.
     @Test func aTransferThatBreaksOffThrows() async throws {
         StubProtocol.reset { _ in .answer(200, ["Content-Length": "100"], [Data("abc".utf8)], then: URLError(.networkConnectionLost)) }
         await #expect(throws: URLError.self) {
-            let answer = try await transport.get(URL(string: "https://huggingface.co/model")!, headers: [:], timeout: 30)
+            let answer = try await transport.get(URL(string: "https://dist.gocassini.com/model")!, headers: [:], timeout: 30)
             _ = try await read(answer)
         }
     }

@@ -11,8 +11,8 @@ import CassiniEngineTesting
 /// `ParakeetTranscriber` over a fake native runtime and generated audio: a 16 kHz float WAV with word `wN` as a burst of
 /// magnitude (N + 1) / 100, alternating in sign, a quarter second into second N. The fake recognizer turns each burst
 /// into a timed token; the fake detector finds each burst in what it hears, the high-passed track (D26.1), which keeps
-/// such a burst and would take a steady one away. The model files are sparse files of the pinned sizes with their
-/// markers.
+/// such a burst and would take a steady one away. The model files are sparse files of the pinned sizes in their
+/// revision directories; the per-session check passes unless a test says otherwise.
 @Suite(.serialized) struct ParakeetTranscriberTests {
     private let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     private var root: URL { folder.appendingPathComponent("models", isDirectory: true) }
@@ -45,8 +45,8 @@ import CassiniEngineTesting
         return url
     }
 
-    /// Installs `model` as sparse files of its pinned sizes, with its marker.
-    private func install(_ model: ModelDescriptor, marker: Bool = true) throws {
+    /// Installs `model` as sparse files of its pinned sizes in its revision directory, with the host's notices.
+    private func install(_ model: ModelDescriptor, notice: Bool = true) throws {
         let directory = model.directory(in: root)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         for artifact in model.artifacts {
@@ -56,13 +56,15 @@ import CassiniEngineTesting
             try handle.truncate(atOffset: UInt64(artifact.size))
             try handle.close()
         }
-        if marker { try Data(model.markerValue.utf8).write(to: directory.appendingPathComponent(model.markerFile)) }
+        if notice { try Data("notices".utf8).write(to: directory.appendingPathComponent(ModelDescriptor.noticeFile)) }
     }
 
     /// What the fake runtime saw.
     final class Native: @unchecked Sendable {
         let lock = NSLock()
         var loads = 0, detectors = 0, decodes = 0
+        /// Recognizers released: a run's go when it ends.
+        var releases = 0
         /// What the detectors heard, one entry for each reset: a window's input.
         var heard: [[Float]] = []
         var threads: Set<String> = []
@@ -90,6 +92,7 @@ import CassiniEngineTesting
     final class Recognizer: SpeechDecoding {
         let native: Native
         init(_ native: Native) { self.native = native }
+        deinit { native.record { $0.releases += 1 } }
         func decode(_ samples: [Float]) throws -> RecognizedTokens {
             native.record { $0.decodes += 1; $0.threads.insert(Thread.current.name ?? "") }
             let delay = native.lock.withLock { native.decodeDelay }
@@ -162,9 +165,20 @@ import CassiniEngineTesting
         func add(_ event: TranscriptionEvent) { list.withLock { $0.append(event) } }
     }
 
+    /// A verifier that has checked every model already, as after an install in this session.
+    private func checked() -> ModelVerifier {
+        let verifier = ModelVerifier { _, _, _ in "" }
+        for model in ModelCatalog.all { verifier.markVerified(model, in: root) }
+        return verifier
+    }
+
+    /// The pinned SHA-256 of each file by name: a digest that finds every file as pinned.
+    private static let pins = Dictionary(uniqueKeysWithValues: ModelCatalog.all.flatMap(\.artifacts).map { ($0.name, $0.sha256) })
+
     private func transcriber(_ native: Native, online: Bool = false, installs: Installs? = nil,
-                             memory: Int64? = nil) -> ParakeetTranscriber {
-        ParakeetTranscriber(models: .init(root: root, online: { online }, install: installs?.install),
+                             memory: Int64? = nil, verifier: ModelVerifier? = nil) -> ParakeetTranscriber {
+        ParakeetTranscriber(models: .init(root: root, online: { online }, install: installs?.install,
+                                          verifier: verifier ?? checked()),
                             runtime: native.runtime, availableMemory: { memory })
     }
 
@@ -281,12 +295,12 @@ import CassiniEngineTesting
         await #expect(throws: TranscriptionError.failed(.model)) { try await run(transcriber(Native()), url) }
     }
 
-    @Test func noNativeObjectIsMadeWithoutTheMarkerOrWithAFileMissing() async throws {
+    @Test func noNativeObjectIsMadeWithoutTheRevisionOrWithAFileMissing() async throws {
         defer { try? FileManager.default.removeItem(at: folder) }
-        try install(ModelCatalog.parakeet, marker: false)
+        try install(ModelCatalog.parakeet, notice: false)
         let url = try audio(seconds: 3)
         let native = Native()
-        // Without its marker the model is not installed: no download allowed, nothing loads.
+        // Without its notices the revision is not complete: no download allowed, nothing loads.
         await #expect(throws: TranscriptionError.needsConsent) { try await run(transcriber(native), url, allowDownload: false) }
         await #expect(throws: TranscriptionError.failed(.model)) { try await run(transcriber(native), url) }
         // A file of the wrong size is not the pinned model either.
@@ -296,6 +310,123 @@ import CassiniEngineTesting
         try encoder.close()
         await #expect(throws: TranscriptionError.needsConsent) { try await run(transcriber(native), url, allowDownload: false) }
         #expect(native.counts.loads == 0)
+    }
+
+    // MARK: - The check before the first load of a session (D16 §4)
+
+    @Test func theFirstRunOfASessionChecksEveryFileOnTheSpeechThreadAndTheNextDoesNot() async throws {
+        defer { try? FileManager.default.removeItem(at: folder) }
+        try install(ModelCatalog.parakeet)
+        try install(ModelCatalog.vad)
+        let url = try audio(seconds: 3)
+        let hashed = Mutex<[String]>([]), threads = Mutex<Set<String>>([])
+        let verifier = ModelVerifier { file, _, _ in
+            hashed.withLock { $0.append(file.lastPathComponent) }
+            threads.withLock { _ = $0.insert(Thread.current.name ?? "") }
+            return Self.pins[file.lastPathComponent] ?? ""
+        }
+        let native = Native()
+        let (first, events) = try await run(transcriber(native, verifier: verifier), url)
+        #expect(words(first) == ["w0", "w1", "w2"])
+        #expect(hashed.withLock { $0 } == ModelCatalog.parakeet.artifacts.map(\.name) + ["silero_vad.onnx"])
+        #expect(threads.withLock { $0 } == ["Cassini speech"], "never on the cooperative pool")
+        #expect(events.preparing == 1, "the Preparing stage while the files are checked")
+        if case .preparingModel(nil) = events.all.first {} else { Issue.record("Preparing comes first: \(events.all)") }
+
+        let (_, again) = try await run(transcriber(native, verifier: verifier), url)
+        #expect(hashed.withLock { $0 }.count == 5, "checked once a session")
+        #expect(again.preparing == 0)
+    }
+
+    /// A Parakeet file that fails its check: the revision is removed and the run fails with VERIFY ("Model
+    /// verification failed. Please download it again."). This build does not download Ultra itself (PR D wires it),
+    /// so the next run of this process fails with MODEL, and the next launch picks Apple Speech.
+    @Test func aFileThatFailsItsCheckFailsTheRunWithVerifyAndRemovesTheModel() async throws {
+        defer { try? FileManager.default.removeItem(at: folder) }
+        try install(ModelCatalog.parakeet)
+        try install(ModelCatalog.vad)
+        let url = try audio(seconds: 3)
+        let native = Native()
+        let verifier = ModelVerifier { file, _, _ in
+            file.lastPathComponent == "decoder.int8.onnx" ? "not the pin" : Self.pins[file.lastPathComponent] ?? ""
+        }
+        let parakeet = transcriber(native, verifier: verifier)
+        let events = Events()
+        await #expect(throws: TranscriptionError.failed(.modelVerify)) {
+            _ = try await parakeet.transcribe(TranscriptionRequest(url: url, language: "it-IT", allowDownload: false)) {
+                events.add($0)
+            }
+        }
+        #expect(events.preparing == 1)
+        #expect(native.counts.loads == 0 && native.counts.detectors == 0, "nothing loads")
+        #expect(!ModelCatalog.parakeet.ready(in: root))
+        #expect(!FileManager.default.fileExists(atPath: ModelCatalog.parakeet.directory(in: root).path))
+        #expect(try FileManager.default.contentsOfDirectory(atPath: ModelCatalog.parakeet.directory(in: root)
+            .deletingLastPathComponent().path).isEmpty, "retired by rename, then deleted")
+        #expect(await parakeet.assetStatus(locale: Locale(identifier: "it-IT")) == .notDownloaded)
+        await #expect(throws: TranscriptionError.failed(.model)) { try await run(parakeet, url) }
+        await #expect(throws: TranscriptionError.needsConsent) { try await run(parakeet, url, allowDownload: false) }
+        #expect(SpeechCapability.choose(linked: true, installed: ModelCatalog.parakeet.ready(in: root), capable: true)
+                == .appleSpeech)
+    }
+
+    @Test func aDetectorThatFailsItsCheckIsRemovedAndTheRunGoesOn() async throws {
+        defer { try? FileManager.default.removeItem(at: folder) }
+        try install(ModelCatalog.parakeet)
+        try install(ModelCatalog.vad)
+        let url = try audio(seconds: 30)
+        let native = Native()
+        let verifier = ModelVerifier { file, _, _ in
+            file.lastPathComponent == ModelCatalog.sileroVad.name ? "" : Self.pins[file.lastPathComponent] ?? ""
+        }
+        let (result, _) = try await run(transcriber(native, verifier: verifier), url)
+        #expect(words(result) == (0..<30).map { "w\($0)" })
+        #expect(result.segmentation == DecodeCutting.incrementalProvenance(detectorReady: false))
+        #expect(native.counts.detectors == 0)
+        #expect(!ModelCatalog.vad.ready(in: root))
+        #expect(ModelCatalog.parakeet.ready(in: root))
+    }
+
+    /// The check stops at the run's cancel flag; a stopped check is not recorded, so the next run checks again.
+    @Test func aCancelledCheckStopsTheRunAndIsDoneAgainNextTime() async throws {
+        defer { try? FileManager.default.removeItem(at: folder) }
+        try install(ModelCatalog.parakeet)
+        let url = try audio(seconds: 3)
+        let started = Mutex(false), stopping = Mutex(true), neverCancelled = Mutex(false)
+        let verifier = ModelVerifier { file, cancelled, _ in
+            started.withLock { $0 = true }
+            // A hash in progress, block by block, until the run's cancel flag is set; bounded, so a cancel that never
+            // reaches the check fails the test instead of hanging it.
+            let deadline = ContinuousClock.now + .seconds(30)
+            while stopping.withLock({ $0 }) {
+                if cancelled() { throw CancellationError() }
+                if ContinuousClock.now > deadline {
+                    neverCancelled.withLock { $0 = true }
+                    throw POSIXError(.ETIMEDOUT)
+                }
+            }
+            return Self.pins[file.lastPathComponent] ?? ""
+        }
+        let native = Native()
+        let parakeet = transcriber(native, verifier: verifier)
+        let task = Task { try await run(parakeet, url) }
+        let deadline = ContinuousClock.now + .seconds(20)
+        while !started.withLock({ $0 }) {
+            guard ContinuousClock.now < deadline else { Issue.record("The check never started"); return }
+            await Task.yield()
+        }
+        task.cancel()
+        await #expect(throws: CancellationError.self) { try await task.value }
+        #expect(!neverCancelled.withLock { $0 }, "the cancel flag never reached the check")
+        #expect(!verifier.isChecked(ModelCatalog.parakeet, in: root))
+        #expect(ModelCatalog.parakeet.ready(in: root), "a stopped check removes nothing")
+        #expect(native.counts.loads == 0)
+
+        stopping.withLock { $0 = false }
+        let (result, events) = try await run(parakeet, url)
+        #expect(words(result) == ["w0", "w1", "w2"])
+        #expect(events.preparing == 1, "checked again")
+        #expect(verifier.isChecked(ModelCatalog.parakeet, in: root))
     }
 
     @Test func aRecognizerThatCannotLoadFailsWithModel() async throws {
@@ -341,6 +472,31 @@ import CassiniEngineTesting
     /// input, the 2 s it shares with the window before included, is a stretch of that one filtered track. A resumed
     /// run's filter starts from zero at its restored window and runs on the same way from there. The recording
     /// carries the failing microphone's offset, so a filter started afresh at a window would differ.
+    /// A run resumed in a session whose detector fails its check goes on at quiet points, and its segmentation names
+    /// quiet points for the whole transcript. The checkpoint does not record how its earlier windows were cut (nor does
+    /// Android's), and the detector is best effort: one installed, missing or unmakeable between two runs mixes the same
+    /// way. The words are the recognizer's; only the provenance's cut mode covers both.
+    @Test func aResumedRunWhoseDetectorFailsItsCheckGoesOnAtQuietPoints() async throws {
+        defer { try? FileManager.default.removeItem(at: folder) }
+        try install(ModelCatalog.parakeet)
+        try install(ModelCatalog.vad)
+        let url = try audio(seconds: 70)
+        let (whole, events) = try await run(transcriber(Native()), url)
+        #expect(whole.segmentation == DecodeCutting.incrementalProvenance(detectorReady: true))
+        let first = try #require(events.windows.first)
+
+        let verifier = ModelVerifier { file, _, _ in
+            file.lastPathComponent == ModelCatalog.sileroVad.name ? "" : Self.pins[file.lastPathComponent] ?? ""
+        }
+        let native = Native()
+        let (resumed, _) = try await run(transcriber(native, verifier: verifier), url,
+                                         resume: TranscriptResume(recognition: first.recognition, words: first.words))
+        #expect(words(resumed) == (0..<70).map { "w\($0)" })
+        #expect(resumed.segmentation == DecodeCutting.incrementalProvenance(detectorReady: false))
+        #expect(native.counts.detectors == 0)
+        #expect(!ModelCatalog.vad.ready(in: root), "the detector's revision is retired")
+    }
+
     @Test func theDetectorHearsTheTrackHighPassedOnceAcrossWindows() async throws {
         defer { try? FileManager.default.removeItem(at: folder) }
         try install(ModelCatalog.parakeet)
@@ -408,11 +564,12 @@ import CassiniEngineTesting
         native.decodeDelay = 0.3
         let parakeet = transcriber(native)
         let task = Task { try await run(parakeet, url) }
-        while native.counts.decodes == 0 { try await Task.sleep(for: .milliseconds(10)) }
+        try await waitUntil("The first decode never started") { native.counts.decodes > 0 }
         task.cancel()
         await #expect(throws: CancellationError.self) { try await task.value }
         let decodes = native.counts.decodes
-        try await Task.sleep(for: .milliseconds(500))
+        // The run's end releases its recognizer: no decode can come after it.
+        try await waitUntil("The recognizer was never released") { native.lock.withLock { native.releases } == 1 }
         #expect(native.counts.decodes == decodes, "nothing decodes after the cancel")
         #expect(decodes < 3)
     }
@@ -446,6 +603,18 @@ import CassiniEngineTesting
         #expect(threads.withLock { $0 } == ["Cassini speech"])
         #expect(engines.opened.count == 1)
         #expect(speakers.turns.map(\.speaker).uniqued() == [2, 5], "the turns stay once the diarizer is released")
+    }
+}
+
+/// Polls `condition` until it holds, for at most twenty seconds; then records `message` and throws.
+private func waitUntil(_ message: Comment, _ condition: () -> Bool) async throws {
+    let deadline = ContinuousClock.now + .seconds(20)
+    while !condition() {
+        guard ContinuousClock.now < deadline else {
+            Issue.record(message)
+            throw CancellationError()
+        }
+        try await Task.sleep(for: .milliseconds(5))
     }
 }
 

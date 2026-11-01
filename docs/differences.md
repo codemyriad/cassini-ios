@@ -41,7 +41,16 @@ that were not ported, with the reason for each.
     for it. A recognizer failure is the `JobFailure` itself (`TIMINGS`, `MODEL`, `MEMORY`).
   - **Models.** The transcriber asks the installer for SPEECH when Ultra is missing (with consent) and, online, when
     only the detector is missing (`ParakeetModels.request`, Android's `installModels`). Before any native object is
-    made, Ultra's files must have their pinned sizes and its marker, else `MODEL`.
+    made, Ultra's revision directory must be complete, else `MODEL`.
+  - **Check before the first load (D16 §4, iOS first).** Before the first load in each session every file of Ultra and
+    of the detector is hashed against its pins (`ModelVerifier`) on the inference thread, stopped by the run's cancel
+    flag, while the job shows the Preparing stage. A detector that fails is removed and the run cuts at quiet points;
+    an Ultra that fails is removed and the run fails with `VERIFY`. Until the in-app Ultra download is wired (PR D),
+    later runs of that process fail with `MODEL` and the next launch picks Apple Speech (`SpeechCapability`); D16 §6's
+    copy and Whistle-style fallback setting do not apply to iOS, whose recognizer is chosen at launch. Android has no
+    such check yet. A resumed run whose detector is removed between its windows cuts the rest at quiet points, as it
+    already did when the detector was installed between runs, and its `x-segmentation` names quiet points for the
+    whole transcript: the checkpoint does not record how its earlier windows were cut (nor does Android's).
   - **Language.** Parakeet takes none: its jobs and checkpoints carry `""`. Its words are written, and their body
     counted at every window, with `und` (see "Transcript language" below). Android counts its decoded windows with
     `""` and stamps `und` only on the finished transcript, so iOS's per-window check is 17 bytes stricter.
@@ -108,13 +117,56 @@ that were not ported, with the reason for each.
   the 500 ms tail, gives "4.892" where the golden has "4892" and otherwise matches it word for word (with the tail it
   also gives "raggiun" for "raggiunge"; the goldens decode VAD spans, which the spike does not), so iOS will keep
   goldens of its own.
-- **Pinned model downloads.** `CassiniEngine/Models` ports Android's
-  `ModelCatalog`, `ModelPart` rules, `ModelPlan`, `RedirectPolicy`, `ArtifactFetcher`, `ModelInstaller`,
-  `ModelRepository` and `ModelInstallOwner` (as `PinnedModelInstaller`) with the same pins, URLs, directories,
-  markers, figures (640 + 62 + 28 = 730 MiB, about 860 MiB free) and tests. The app installs Android's speaker models
-  (Nemotron Sortformer and CAM++) through it. Until the speech download is wired (WP6), and on devices that keep
-  Apple Speech because they cannot hold Ultra (a platform constraint), the Model download screen shows
-  `ModelDownloadPlan`'s figures. The differences that remain:
+- **Pinned model downloads (D4, D16, D53.1).** `CassiniEngine/Models` ports Android's
+  `ModelCatalog`, `ModelPart` rules, `ModelPlan`, `RedirectPolicy`, `ArtifactFetcher`, `DistManifest`,
+  `ModelInstaller`, `ModelRepository` and `ModelInstallOwner` (as `PinnedModelInstaller`) with the same dist pins
+  (`parakeet-ultra-0.6b-int8`, `silero-vad`, `nemotron-3-diarization-int8`, `campplus-voxceleb-16k`, each by
+  `(id, source_sha256)` with both SHA-256 values of every file), URLs, figures (440 + 62 + 26 = 528 MiB, about
+  1230 MiB free: every installed file plus the largest single download, the 431 MiB encoder, because the files install
+  one at a time and each `.zst` goes once its file is in place) and tests. Every model comes from `dist.gocassini.com`
+  only, through its manifest; Hugging Face and GitHub are gone from the catalog and the allow-list. The app installs Android's speaker models (Nemotron
+  Sortformer and CAM++) through it. Until the speech download is wired (PR D), and on devices that keep Apple Speech
+  because they cannot hold Ultra (a platform constraint), the Model download screen shows `ModelDownloadPlan`'s
+  figures. The differences that remain:
+  - **Layout without a marker.** Android keeps a `verified` marker holding the source hash in
+    `models/<id>/<source_sha256>/`. iOS collects a model's files and the host's `NOTICE.txt` in
+    `models/<id>/.<source_sha256>.staging/` (which keeps `.part` files and checked files across failures and app
+    kills), writes it through (`F_FULLFSYNC`) and renames it into place (`RENAME_EXCL`), then writes the parent through,
+    as the desktop does; the directory's name is the pin. A model is ready when its revision directory has every file
+    at its pinned size and a `NOTICE.txt`. A revision that is there but incomplete, or fails its check, is retired by
+    renaming it to `.remove-<UUID>` before it is deleted. The root stays `Application Support/CassiniModels` (not the
+    desktop's `…/Cassini/models`): `Application Support/Cassini` holds the backed-up note folders. Directories of earlier
+    development builds (`parakeet-ultra/`, `vad/`, `speaker-models/`), other revisions and retired revisions are deleted
+    at launch (`ModelRepository.prune`, D51: nothing is migrated).
+  - **Manifest checks.** Both apps read the live manifest before a download and take only the pinned row, checking
+    every artifact entry against the pins. iOS also requires the manifest's `base_url`, each entry's URL to be
+    `base_url/key`, `encoding` `zstd-seekable` and `format_version` `0.1.0`. A missing or contradicted pin is iOS's own
+    failure, `DOWNLOAD_PIN_UNAVAILABLE`: the banner "Model not available" says to update Cassini and has no Retry
+    (Android reports `VERIFY`, File check failed, with Download again). A manifest longer than 1 MiB, sent or
+    announced, is refused the same way. The On-device models row of that part keeps Android's single failed status
+    ("Download failed — tries again next time", which opens the model download): the next install, by a job or the
+    row, reads the manifest again (one small request) and fetches nothing unless the host offers the pin again, so a
+    pin restored on the host needs no update. An unreachable manifest is a download error (`NO_CONNECTION` or
+    `INTERRUPTED`), and kept parts stay.
+  - **NOTICE.txt** is downloaded from the host into each installed revision, as the desktop does, and About › Model
+    notices shows it from an installed revision (the newest). Android bundles a pinned copy instead.
+  - **Resume.** Both resume a part with `Range: bytes=<length>-`, restart from zero on any `200` to a resumed request,
+    whatever its entity tag (the size and SHA-256 checks decide), and delete the part on a `416`, so a proxy that strips
+    entity tags cannot make every retry fail the same way. iOS also sends `Accept-Encoding: identity` and
+    `If-Range: "<compressed sha256>"` (Android sends only `Range`), and adds two checks: a `206` must carry that tag,
+    else it fails as a download error and deletes the part (Android takes any `206` whose `Content-Range` fits); an
+    answer with a `Content-Encoding` fails as a download error and keeps the part. Parts are named after the compressed
+    SHA-256 (`<sha256>.part`), so a part only ever resumes the file it is a prefix of. A cancel while a checked `.zst`
+    is decompressed keeps the `.zst`; it is deleted only once its file is in place, a retry neither downloads it again
+    nor counts it in the free-space check, and a retry that finds the file in place deletes a `.zst` an app kill left
+    beside it. A full disk while decompressing fails with `NOT_ENOUGH_STORAGE` and another local write failure with
+    `INSTALL`, not File check failed (`VERIFY` is kept for a stream the decoder refuses). Each decompressed file is
+    written through before its rename. Files already checked in the staging directory are hashed again on a retry rather
+    than downloaded.
+  - **Progress.** Within a model only the last file's check reports as Checking files; the checks of the files before
+    it keep the progress at their end as downloading, so the status does not alternate for each file.
+  - **Provenance** names Ultra `parakeet-ultra-0.6b-int8@<source_sha256>` (D16 §5); Android still writes
+    `moondream/parakeet-ultra INT8`. The revision and the checkpoint model are the source SHA-256 on both.
   - **Transport.** `ArtifactFetcher` talks to an `HTTPTransport` port. The app's adapter, `URLSessionTransport`, is
     a data-task `URLSession` whose delegate refuses every redirect, so `RedirectPolicy` decides each hop as
     `HttpURLConnection` with `instanceFollowRedirects = false` does on Android. It asks for `Accept-Encoding:
@@ -127,7 +179,7 @@ that were not ported, with the reason for each.
     as an I/O error (`INTERRUPTED`). Both check the free space before the first byte.
   - **Stopped by the system.** `PinnedModelInstaller.stopDownloads()` stands for the end of the
     `BGContinuedProcessingTask`, as Android's for the foreground service's time-out.
-  - **Compressed downloads.** The diarizer is seekable Zstandard, which Apple's Compression framework does not read.
+  - **Compressed downloads.** Every model file is seekable Zstandard, which Apple's Compression framework does not read.
     `ArtifactFetcher.fetchCompressed` takes a `Decompressing` port, which the app fills with `ZstdDecompressor`
     (CassiniInference, `ZstdModelTest` ported as `ZstdDecompressorTests`).
     `aCompressedDownloadChecksOnceFromZeroToItsSize` runs with a stand-in format.
@@ -175,11 +227,17 @@ that were not ported, with the reason for each.
   suggestion reads "Is this Luca?", and the Remember subtitle says "Future notes will suggest Luca" instead of Android's
   "will name Luca automatically".
 - **Speaker model install.** The speaker models come from the pinned catalog through the shared
-  `PinnedModelInstaller`, as on Android: the diarizer as seekable Zstandard from `dist.gocassini.com`, unpacked by
-  `ZstdDecompressor` (facebook/zstd 1.5.7, the release that zstd-jni bundles), and CAM++ from the sherpa-onnx
-  release on GitHub. Each file is checked against its pinned size and SHA-256, every redirect follows
-  `RedirectPolicy`, and a request made during an install joins it. A build without the native runtime reports the
-  speaker models as unsupported and has no speaker step.
+  `PinnedModelInstaller`, as on Android: the diarizer and CAM++ as seekable Zstandard from `dist.gocassini.com`,
+  unpacked by `ZstdDecompressor` (facebook/zstd 1.5.7, the release that zstd-jni bundles). Each file is checked
+  against both of its pinned SHA-256 values, every redirect follows `RedirectPolicy`, and a request made during an
+  install joins it. Before their first use in each session both are hashed again on the inference thread (iOS only,
+  D16 §4): a diarizer that fails is removed, so a streaming run shows every word as one voice and the next run
+  downloads it again, and a whole-file analysis fails with File check failed (Download again installs it); a CAM++ that
+  fails is removed and nobody is named. A file that cannot be read (an I/O or permission error) is not proof of damage:
+  it retires nothing and is never loaded unchecked. A diarizer that cannot be read gives the streaming run no engines
+  and fails a whole-file analysis with `MODEL` (Download again could not help); a CAM++ that cannot be read is left out
+  until a later check reads it. A build without the native runtime reports the speaker models as unsupported
+  and has no speaker step.
 - **Offline errors.** iOS has no reachability check. URL Loading already reports an offline device as
   `notConnectedToInternet` (or `timedOut`, `cannotFindHost`, `dataNotAllowed`), and these map to `NO_CONNECTION`.
   `networkConnectionLost` and HTTP errors map to `INTERRUPTED`.
@@ -316,10 +374,10 @@ that were not ported, with the reason for each.
   variant gets `{engine: cassini-ios, kind: user-edited}`. A version made by a merge also gets `x-speakerMerges`,
   `x-speakerAssignmentEditedBy` and `x-derivedFromTranscript`, as Android's merged variant does.
 - **Parakeet runs** write Android's processing step (`TranscriptProvenance.parakeetRun`): `backend` "sherpa-onnx",
-  `engine` "Parakeet TDT", `model` "moondream/parakeet-ultra INT8", `version` "sherpa-onnx 1.13.7; model revision
-  <revision>", `source` "recording", `language` "und" (D53.2), Android's `x-segmentation`
-  string, `x-inferenceMs` (decode time)
-  and `x-resumedFromMs`. Only `device` differs (iOS's hardware model and OS). The goldens against Android's 0.1.0
+  `engine` "Parakeet TDT", `model` `parakeet-ultra-0.6b-int8@<source_sha256>` (D16 §5; Android writes
+  "moondream/parakeet-ultra INT8"), `version` "sherpa-onnx 1.13.7; model revision <revision>", `source` "recording",
+  `language` "und" (D53.2), Android's `x-segmentation` string, `x-inferenceMs` (decode time) and `x-resumedFromMs`.
+  Only `model` and `device` (iOS's hardware model and OS) differ. The goldens against Android's 0.1.0
   record and the model names shown in the app follow in WP5; the Apple fallback writes the record below.
 - **Keys.** The record has Android's keys (`JobProvenance`, `SpeakerAttribution.record`) with iOS's values;
   `ProvenanceGoldenTests` pins the key sets and JSON types against Android's:
@@ -600,7 +658,8 @@ These features exist only on iOS. They were kept by decision.
   default), Speakers (identify speakers, name strong matches automatically) and Your library (counts and duration).
   Turning automatic transcription off makes every finish and import audio only.
 - **Notices that exist only on iOS:** REC_INPUT_LOST, REC_COMPRESSION_FAILED, NOTES_UNREADABLE ("2 notes can't be
-  read"), "No speakers were detected" and "This audio can't be played" (a playback error at run time).
+  read"), DL_PIN_UNAVAILABLE ("Model not available": the model host no longer offers the pinned model; update Cassini;
+  no Retry, closable), "No speakers were detected" and "This audio can't be played" (a playback error at run time).
 - **Document info** adds "Made by" (an imported document's vendor). Its model row names Apple's speech model.
 
 ## Platform
@@ -763,7 +822,7 @@ calls, reset, the denormal guard and the windowed track), `DecodeConstantsTests`
 | `CheckpointGoldenTest` | `CheckpointGoldenTests` | A version 2 golden; `aChangedLanguageNoLongerMatches` became `aChangedModelNoLongerMatches`; `anAppleEraCheckpointIsNotResumedWithUltra` adapts `aCheckpointOfParakeetV3IsNotResumedWithUltra` |
 | `CheckpointStateTest` | `CheckpointStateTests` | The `recognition` member and its rules |
 | `TranscriptionJobTest` (windows, fsync, stop and resume, stop before the first window, body limit, mismatch, `OutOfMemoryError`) | `TranscriptionJobParakeetTests` | Over a scripted recognizer and the real `IncrementalTranscript`; the failure mapping (`MEMORY`, `TIMINGS`, `MODEL`, `CANCELLED`) |
-| `TranscriptionJobTest#aMissingSpeechDetectorIsFetchedAgainOnlyOnline` | `ParakeetTranscriberTests` (CassiniInference) | With the rest of the adapter: windows on the inference thread, consent and install, marker and sizes, memory, resume, cancel |
+| `TranscriptionJobTest#aMissingSpeechDetectorIsFetchedAgainOnlyOnline` | `ParakeetTranscriberTests` (CassiniInference) | With the rest of the adapter: windows on the inference thread, consent and install, revision directory and sizes, the per-session check, memory, resume, cancel |
 | — (D26.1) | `DCVectorTests` (hosted, `scripts/sherpa-bench.sh`) | The shared `dc-quiet-jfk-v1` vector and JFK at the failing microphone's level through the real Silero and Ultra, with and without the offset |
 | `DeviceSmokeTest` FLEURS golden | `ParakeetJobTests` (hosted, `scripts/sherpa-bench.sh`) | A real job on the arm64 simulator against iOS's own golden (`CassiniTests/Goldens/fleurs-it-short.ios.json`), because the int8 kernels differ from the x86_64 emulator's; on 2026-10-15 its text equalled Android's golden word for word |
 

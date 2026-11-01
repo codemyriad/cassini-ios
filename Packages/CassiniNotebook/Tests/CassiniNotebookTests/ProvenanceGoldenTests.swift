@@ -31,7 +31,7 @@ import CassiniNotebook
     ]
     static let device = RunDevice(model: "iPhone17,1", system: "iOS 26.0.1 (23A355)")
     static let diarizationRevision = "f667ed73aee57d40cc39428eb768b4fd87a0a29e"
-    static let diarizationSha = "01d1f893f394cc0418ae78425d216ed62c334c0125e650135332a7a8e595f168"
+    static let diarizationSha = "47c221ea9b4d4e7f6c108bd098e769bc706cdc986c29f6133c93cae335fe6779"
 
     /// A run as the job records it: the words, then the speaker step with its matches (Sortformer and CAM++, as
     /// Android's).

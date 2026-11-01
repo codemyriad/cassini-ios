@@ -8,7 +8,7 @@ import CassiniNotebook
 /// the members are iOS's version 1. Equality is semantic: members are compared as parsed JSON, not as bytes.
 @Suite struct CheckpointGoldenTests {
     /// `ModelCatalog.parakeetRevision` (CassiniEngine).
-    static let ultra = "b86784a3a5356cbd126f710b61cd90c5fe5898f1"
+    static let ultra = "18cb623004dd6c15999b93cb70b14d8a1f6e8f3a2a97ff733f104bfc3494f6a9"
 
     private let golden = Data(Self.json.utf8)
     private var state: CheckpointState { get throws { try CheckpointState.decode(golden) } }
@@ -113,7 +113,7 @@ import CassiniNotebook
       "doneMs": 28000,
       "elapsedMs": 18754,
       "inferenceMs": 4776,
-      "model": "b86784a3a5356cbd126f710b61cd90c5fe5898f1",
+      "model": "18cb623004dd6c15999b93cb70b14d8a1f6e8f3a2a97ff733f104bfc3494f6a9",
       "recognition": {
         "end": 448000,
         "position": 450048,

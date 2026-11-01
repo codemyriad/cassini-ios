@@ -1,19 +1,14 @@
 import Foundation
 import CassiniNotebook
 
-/// The speaker models in the catalog (Android's SPEAKERS and VOICES parts): the Nemotron Sortformer diarizer, fetched
-/// as seekable Zstandard from Cassini's model host, and CAM++, from the pinned sherpa-onnx release, both in
-/// `CassiniModels/speaker-models/` with their own markers. They install through the shared `PinnedModelInstaller`,
-/// as one install of both parts. iOS shows them as one row ("Speaker models"), so their status is one: ready when both
-/// are installed.
+/// The speaker models in the catalog (Android's SPEAKERS and VOICES parts): the Nemotron Sortformer diarizer and CAM++,
+/// each from the model host as seekable Zstandard, each in its own revision directory. They install through the shared
+/// `PinnedModelInstaller`, as one install of both parts. iOS shows them as one row ("Speaker models"), so their status
+/// is one: ready when both are installed.
 ///
 /// The speaker consent is iOS's own (`speakerModelsConsentAt`), which the caller checks; the install is `granted`.
 public struct SpeakerModels: Sendable {
     public static let parts: Set<ModelPart> = [.speakers, .voices]
-
-    /// Each file the speaker models download and its pinned URL, as "Where the models come from" lists them.
-    public static let downloads: [(name: String, url: URL)] = [ModelCatalog.diarizationDownload, ModelCatalog.voiceprintModel]
-        .map { ($0.name, URL(string: $0.url)!) }
 
     public let repository: ModelRepository
     public let installer: PinnedModelInstaller

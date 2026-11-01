@@ -5,7 +5,7 @@ import Testing
 import CassiniEngineTesting
 import CassiniNotebook
 
-/// Android's ModelRepositoryTest over a scratch model root: statuses from fake marker files, consent in a real
+/// Android's ModelRepositoryTest over a scratch model root: statuses from fake revision directories, consent in a real
 /// `SettingsStore`, and installs through a fake fetcher. No real model file is read or written.
 @MainActor @Suite final class ModelRepositoryTests {
     private let folder = TemporaryFolder()
@@ -20,8 +20,11 @@ import CassiniNotebook
         UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite)
     }
 
+    private let verifier = ModelVerifier { _, _, _ in "" }
+
     private func repository(failing: [ModelDescriptor: JobFailure] = [:]) -> ModelRepository {
-        ModelRepository(root: models, consent: settings, fetcher: FakeFetcher(failing: failing, log: log))
+        ModelRepository(root: models, consent: settings, fetcher: FakeFetcher(failing: failing, log: log),
+                        verifier: verifier)
     }
 
     /// Writes each artifact as a sparse file and reports download and check progress, or fails for `failing`.
@@ -31,7 +34,8 @@ import CassiniNotebook
 
         func fetch(_ model: ModelDescriptor, into directory: URL,
                    progress: @escaping @Sendable (Int64, Bool) -> Void) async throws {
-            log.append("\(model.directory)/\(model.markerFile)")
+            log.append(model.pin)
+            log.directories.withLock { $0.append(directory) }
             if let failure = failing[model] { throw ModelError(failure) }
             progress(model.downloadBytes / 2, false)
             progress(model.downloadBytes, false)
@@ -55,15 +59,17 @@ import CassiniNotebook
         #expect(repo.status == status)
         #expect(await !repo.consented())
         #expect(repo.plan().parts == ModelPart.allCases)
-        #expect(repo.plan().totalMebibytes == 730)
+        #expect(repo.plan().totalMebibytes == 528)
     }
 
-    // ports: ModelRepositoryTest#markerFilesDecideReadiness
+    // ports: ModelRepositoryTest#markerFilesDecideReadiness (iOS: the revision directories, with their notices)
     @Test func markerFilesDecideReadiness() async throws {
         install(ModelCatalog.parakeet, in: models)
-        install(ModelCatalog.diarization, in: models, marker: "another sha")
+        install(ModelCatalog.diarization, in: models)
+        try FileManager.default.removeItem(at: ModelCatalog.diarization.directory(in: models)
+            .appendingPathComponent(ModelDescriptor.noticeFile))
         install(ModelCatalog.voiceprint, in: models)
-        // A file of the wrong size is not ready, even with the right marker.
+        // A file of the wrong size is not ready, even with the notices.
         sparse(ModelCatalog.voiceprint.directory(in: models).appendingPathComponent(ModelCatalog.voiceprintModel.name), size: 10)
 
         let status = await repository().refresh()
@@ -111,7 +117,8 @@ import CassiniNotebook
         #expect(events.dropFirst(2).first == .verifying(percent: 50))
         #expect(events.last == .ready)
         #expect(ModelCatalog.diarization.ready(in: models))
-        #expect(!ModelCatalog.voiceprint.ready(in: models), "the voiceprint marker is separate")
+        #expect(!ModelCatalog.voiceprint.ready(in: models), "the voiceprint has its own directory")
+        #expect(verifier.isChecked(ModelCatalog.diarization, in: models), "an install has just checked every file")
     }
 
     // ports: ModelRepositoryTest#aFailedExtraIsSkippedAndAFailedPrimaryFailsThePart
@@ -129,7 +136,7 @@ import CassiniNotebook
         await failing.refresh()
         await #expect(throws: ModelError(.modelVerify)) { try await failing.install(.voices) }
         #expect(failing.status[.voices] == .failed(.modelVerify, detail: "VERIFY"))
-        #expect(!exists(ModelCatalog.voiceprint.directory(in: models).appendingPathComponent("verified-voiceprint")))
+        #expect(!exists(ModelCatalog.voiceprint.directory(in: models)), "no revision without every file checked")
         // The failure stays until the part is installed.
         #expect(await failing.refresh()[.voices] == .failed(.modelVerify, detail: "VERIFY"))
         install(ModelCatalog.voiceprint, in: models)
@@ -144,10 +151,11 @@ import CassiniNotebook
         _ = try? await repo.install(.speech)
 
         #expect(repo.status[.speech] == .missing(consented: false))
-        #expect(log.entries == ["parakeet-ultra/verified"], "no detector after a cancelled Parakeet")
+        #expect(log.entries == [ModelCatalog.parakeet.pin], "no detector after a cancelled Parakeet")
     }
 
-    // ports: ModelRepositoryTest#anInstallSkipsReadyModelsAndKeepsMarkersUntilVerified
+    // ports: ModelRepositoryTest#anInstallSkipsReadyModelsAndKeepsMarkersUntilVerified (iOS: the files go to the
+    // staging directory, and only a complete one becomes the revision)
     @Test func anInstallSkipsReadyModelsAndKeepsMarkersUntilVerified() async throws {
         install(ModelCatalog.parakeet, in: models)
         let repo = repository()
@@ -155,8 +163,95 @@ import CassiniNotebook
 
         _ = try await repo.install(.speech)
 
-        #expect(log.entries == ["vad/verified"])
+        #expect(log.entries == [ModelCatalog.vad.pin])
+        #expect(log.directories.withLock { $0 } == [ModelCatalog.vad.staging(in: models)])
         #expect(ModelCatalog.vad.ready(in: models))
+        #expect(!exists(ModelCatalog.vad.staging(in: models)), "renamed into place")
+    }
+
+    /// An install that fails or is stopped publishes no revision; its staging directory keeps the parts and the checked
+    /// files, and the next install fetches into the same one.
+    @Test func anInterruptedInstallLeavesNoRevisionAndResumesFromItsStaging() async throws {
+        struct Halfway: ModelFetching {
+            func fetch(_ model: ModelDescriptor, into directory: URL,
+                       progress: @escaping @Sendable (Int64, Bool) -> Void) async throws {
+                sparse(directory.appendingPathComponent("\(model.artifacts[0].sha256).part"), size: 10)
+                throw ModelError(.modelDownload, "dropped")
+            }
+        }
+        let model = ModelCatalog.voiceprint
+        let halfway = ModelRepository(root: models, consent: settings, fetcher: Halfway(), verifier: verifier)
+        await #expect(throws: ModelError(.modelDownload, "dropped")) { try await halfway.installModel(model) { _, _ in } }
+        #expect(!exists(model.directory(in: models)))
+        #expect(length(model.staging(in: models).appendingPathComponent("\(model.artifacts[0].sha256).part")) == 10)
+
+        try await repository().installModel(model) { _, _ in }
+
+        #expect(log.directories.withLock { $0 } == [model.staging(in: models)])
+        #expect(model.ready(in: models))
+        #expect(try FileManager.default.contentsOfDirectory(atPath: model.directory(in: models).path).sorted()
+                == [model.artifacts[0].name, ModelDescriptor.noticeFile].sorted(), "no part is kept in the revision")
+    }
+
+    /// A fetch that leaves a file or the notices out publishes nothing.
+    @Test func anIncompleteFetchPublishesNothing() async throws {
+        struct NoNotice: ModelFetching {
+            func fetch(_ model: ModelDescriptor, into directory: URL,
+                       progress: @escaping @Sendable (Int64, Bool) -> Void) async throws {
+                sparse(model, in: directory)
+                try FileManager.default.removeItem(at: directory.appendingPathComponent(ModelDescriptor.noticeFile))
+            }
+        }
+        let repo = ModelRepository(root: models, consent: settings, fetcher: NoNotice(), verifier: verifier)
+        let error = await #expect(throws: ModelError.self) { try await repo.installModel(ModelCatalog.vad) { _, _ in } }
+        #expect(error?.failure == .modelInstall)
+        #expect(!ModelCatalog.vad.ready(in: models))
+        #expect(!verifier.isChecked(ModelCatalog.vad, in: models))
+    }
+
+    /// A revision directory that is there but not complete (a file cut short) is retired before the new one is
+    /// published: renamed away and deleted, never mixed with the new files.
+    @Test func aBrokenRevisionIsRetiredBeforeTheNewOneIsPublished() async throws {
+        let model = ModelCatalog.diarization
+        install(model, in: models)
+        let stale = model.directory(in: models).appendingPathComponent("stale.bin")
+        try Data("old".utf8).write(to: stale)
+        sparse(model.directory(in: models).appendingPathComponent(model.artifacts[0].name), size: 10)
+        #expect(!model.ready(in: models))
+
+        try await repository().installModel(model) { _, _ in }
+
+        #expect(model.ready(in: models))
+        #expect(!exists(stale))
+        let siblings = try FileManager.default.contentsOfDirectory(atPath: model.directory(in: models)
+            .deletingLastPathComponent().path)
+        #expect(siblings == [model.sourceSha256], "no .remove- directory is left")
+    }
+
+    /// D51: nothing of earlier development builds is migrated. Their directories, other revisions of a model, ids the
+    /// catalog does not have and retired revisions are deleted; each pinned revision and its staging directory stay.
+    @Test func revisionsOutsideTheCatalogAreRemoved() throws {
+        for model in ModelCatalog.all { install(model, in: models) }
+        let manager = FileManager.default
+        let staging = ModelCatalog.parakeet.staging(in: models)
+        try manager.createDirectory(at: staging, withIntermediateDirectories: true)
+        sparse(staging.appendingPathComponent("caf7.part"), size: 10)
+        let gone = [
+            models.appendingPathComponent("parakeet-ultra"), models.appendingPathComponent("vad"),
+            models.appendingPathComponent("speaker-models"), models.appendingPathComponent("stray.txt"),
+            models.appendingPathComponent("models/whistle"),
+            models.appendingPathComponent("models/silero-vad/\(String(repeating: "0", count: 64))"),
+            models.appendingPathComponent("models/silero-vad/.\(String(repeating: "0", count: 64)).staging"),
+            models.appendingPathComponent("models/nemotron-3-diarization-int8/.remove-\(UUID().uuidString)"),
+        ]
+        for url in gone { try manager.createDirectory(at: url, withIntermediateDirectories: true) }
+
+        repository().prune()
+
+        for url in gone { #expect(!exists(url), "\(url.lastPathComponent)") }
+        for model in ModelCatalog.all { #expect(model.ready(in: models), "\(model.pin)") }
+        #expect(length(staging.appendingPathComponent("caf7.part")) == 10)
+        ModelRepository.prune(root: folder.root.appendingPathComponent("nothing"))
     }
 
     // ports: ModelRepositoryTest#theInstallOwnerPushesProgress
@@ -203,9 +298,10 @@ import CassiniNotebook
     }
 }
 
-/// The models a fake fetcher was asked for, in order.
+/// The models a fake fetcher was asked for, in order, and the directories it filled.
 private final class FetchLog: Sendable {
     private let items = Mutex<[String]>([])
+    let directories = Mutex<[URL]>([])
     func append(_ item: String) { items.withLock { $0.append(item) } }
     var entries: [String] { items.withLock { $0 } }
 }

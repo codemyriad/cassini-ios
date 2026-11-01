@@ -14,8 +14,9 @@ import CassiniSherpa
 /// (CASSINI_SHERPA_LOCAL=1) and the environment names the models and the mix; scripts/speaker-smoke.sh runs it.
 ///
 /// Environment (xcodebuild passes TEST_RUNNER_<name> through as <name>):
-///   CASSINI_PARAKEET_MODEL_ROOT  a model root as scripts/fetch-ci-models.py writes it (parakeet-ultra/, vad/ and
-///                                speaker-models/ with their markers; read only, cloned into this app's caches)
+///   CASSINI_PARAKEET_MODEL_ROOT  a model root as scripts/fetch-ci-models.py writes it (the revision directories
+///                                models/<id>/<source_sha256>/ of the four models; read only, cloned into this app's
+///                                caches)
 ///   CASSINI_SPEAKER_AUDIO        fleurs-two-speakers.wav; its .json beside it lists the three spans
 ///   CASSINI_SPEAKER_JOB_OUT      a file to write the measurements to as JSON
 final class SpeakerJobTests: XCTestCase {
@@ -33,7 +34,7 @@ final class SpeakerJobTests: XCTestCase {
             .appendingPathExtension("json")))
         let models = try cloneModels(from: source)
         for model in [ModelCatalog.parakeet, ModelCatalog.vad, ModelCatalog.diarization, ModelCatalog.voiceprint] {
-            XCTAssertTrue(model.ready(in: models), "\(model.directory)/\(model.markerFile)")
+            XCTAssertTrue(model.ready(in: models), model.directory)
         }
 
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("speaker-job-\(UUID().uuidString)", isDirectory: true)
@@ -201,10 +202,11 @@ final class SpeakerJobTests: XCTestCase {
         let target = URL.cachesDirectory.appendingPathComponent("CassiniModels-speakers", isDirectory: true)
         let manager = FileManager.default
         try manager.createDirectory(at: target, withIntermediateDirectories: true)
-        for folder in ["parakeet-ultra", "vad", "speaker-models"] {
-            let destination = target.appendingPathComponent(folder, isDirectory: true)
-            if manager.fileExists(atPath: destination.path) { continue }
-            try manager.copyItem(at: source.appendingPathComponent(folder, isDirectory: true), to: destination)
+        for model in ModelCatalog.all where !model.ready(in: target) {
+            let destination = model.directory(in: target)
+            try? manager.removeItem(at: destination)
+            try manager.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try manager.copyItem(at: model.directory(in: source), to: destination)
         }
         return target
     }

@@ -9,8 +9,14 @@ import CassiniNotebook
 ///
 /// - **Models.** Before it decodes, a run asks the installer for what `ParakeetModels.request` says: Ultra when it is
 ///   missing (only with `allowDownload`, else `needsConsent`; a failed install is `DOWNLOAD_*`), or the detector alone
-///   when only it is missing and the device is online (best effort). Before any native object is made, Ultra's files
-///   must have their pinned sizes and its marker (`ModelCatalog.parakeet.ready`), else `MODEL`.
+///   when only it is missing and the device is online (best effort). Before any native object is made, Ultra's revision
+///   must be complete (`ModelCatalog.parakeet.ready`), else `MODEL`.
+/// - **Check (D16 §4).** Before the first load in each session, every file of Ultra and of the detector is hashed
+///   against its pins (`ModelVerifier`), on the inference thread, stopped by the run's cancel flag; the job shows the
+///   Preparing stage (`.preparingModel(nil)`) meanwhile. A file that differs retires its revision: for Ultra the run
+///   fails with `VERIFY` ("Model verification failed. Please download it again.") and later runs of this process fail
+///   with `MODEL` until the model is installed again (this build does not download Ultra itself, so the next launch
+///   picks Apple Speech, `SpeechCapability`); for the detector the run goes on cutting at quiet points.
 /// - **Thread.** Reading and decoding run on one dedicated thread (`InferenceThread.speech`). The recognizer is made
 ///   with the first window and released when the run ends, before the speaker step loads its own models.
 /// - **Memory.** `os_proc_available_memory()` is checked before the model loads and before each window
@@ -31,14 +37,50 @@ public struct ParakeetTranscriber: Transcribing {
         public var online: @Sendable () -> Bool
         /// The shared installer (`PinnedModelInstaller.install`); nil when this build installs nothing itself.
         public var install: Install?
+        /// The per-session check of the installed files.
+        public var verifier: ModelVerifier
 
-        public init(root: URL, online: @escaping @Sendable () -> Bool = { false }, install: Install? = nil) {
-            self.root = root; self.online = online; self.install = install
+        public init(root: URL, online: @escaping @Sendable () -> Bool = { false }, install: Install? = nil,
+                    verifier: ModelVerifier = .shared) {
+            self.root = root; self.online = online; self.install = install; self.verifier = verifier
         }
 
         var speechReady: Bool { ModelCatalog.parakeet.ready(in: root) }
         var detectorReady: Bool { ModelCatalog.vad.ready(in: root) }
         var detector: URL { URL(fileURLWithPath: ModelCatalog.vad.path(in: root, ModelCatalog.sileroVad.name)) }
+
+        /// Whether a run would hash files before it loads them: a model that is installed but not checked this session.
+        var needsCheck: Bool {
+            !verifier.isChecked(ModelCatalog.parakeet, in: root)
+                || (detectorReady && !verifier.isChecked(ModelCatalog.vad, in: root))
+        }
+
+        /// Checks Ultra and the detector once a session, on the calling (inference) thread: the detector to cut with,
+        /// nil when it is not installed or failed its check (it is then removed). Throws `VERIFY` when Ultra failed its
+        /// check (its revision is removed), `MODEL` when a file cannot be read, `CancellationError` once `cancel` is set.
+        func checked(cancel: CancelFlag) throws -> URL? {
+            let cancelled = { cancel.isSet }
+            do {
+                guard try verifier.verify(ModelCatalog.parakeet, in: root, cancelled: cancelled) else {
+                    throw TranscriptionError.failed(.modelVerify)
+                }
+            } catch let error as TranscriptionError {
+                throw error
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                throw TranscriptionError.failed(.model)
+            }
+            guard detectorReady else { return nil }
+            do {
+                return try verifier.verify(ModelCatalog.vad, in: root, cancelled: cancelled) ? detector : nil
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                // Best effort, as a detector that cannot be made: the run cuts at quiet points.
+                return nil
+            }
+        }
     }
 
     private let models: Models
@@ -76,14 +118,18 @@ public struct ParakeetTranscriber: Transcribing {
                            events: @escaping @Sendable (TranscriptionEvent) -> Void) async throws -> TranscriptionResult {
         try await prepareModels(allowDownload: request.allowDownload, events: events)
         try Task.checkCancellation()
-        // The native loader ends the process on a missing file: sizes and the marker are checked first.
+        // The native loader ends the process on a missing file: the revision's files are checked first.
         let files = ParakeetFiles(root: models.root)
         guard models.speechReady, files.present() else { throw TranscriptionError.failed(.model) }
-        let run = Run(files: files, detector: models.detectorReady ? models.detector : nil, runtime: runtime,
-                      availableMemory: availableMemory)
+        let models = models, runtime = runtime, availableMemory = availableMemory
+        if models.needsCheck { events(.preparingModel(nil)) }
         let cancel = CancelFlag()
         return try await withTaskCancellationHandler {
-            try await thread.run { try run.transcribe(request, cancel: cancel, events: events) }
+            try await thread.run {
+                let detector = try models.checked(cancel: cancel)
+                let run = Run(files: files, detector: detector, runtime: runtime, availableMemory: availableMemory)
+                return try run.transcribe(request, cancel: cancel, events: events)
+            }
         } onCancel: {
             cancel.set()
         }

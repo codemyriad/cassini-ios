@@ -96,6 +96,6 @@ extension BannerKind {
     public var isImportFailure: Bool { [.importTooLarge, .importNoSpace, .importOpen].contains(self) }
     /// The download failures, closed until the next install.
     public var isDownloadFailure: Bool {
-        [.dlNoConnection, .dlStopped, .dlNoSpace, .dlFileCheck, .dlInstallFailed].contains(self)
+        [.dlNoConnection, .dlStopped, .dlNoSpace, .dlFileCheck, .dlInstallFailed, .dlPinUnavailable].contains(self)
     }
 }

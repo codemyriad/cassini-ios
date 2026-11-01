@@ -174,6 +174,7 @@ public enum Notices {
         case .notEnoughStorage: BannerSpec(.dlNoSpace, BannerArgs(bytes: requiredFreeBytes), announce: announce)
         case .fileCheckFailed: BannerSpec(.dlFileCheck, announce: announce)
         case .install: BannerSpec(.dlInstallFailed, announce: announce)
+        case .pinUnavailable: BannerSpec(.dlPinUnavailable, announce: announce)
         }
     }
 

@@ -76,6 +76,9 @@ public final class PinnedModelInstaller: Sendable {
 
     public var status: Status { fields.withLock { $0.status } }
 
+    /// The requests that wait for the running install to end before they start their own (tests wait on it).
+    var waitingForEnd: Int { fields.withLock { $0.current?.enders.count ?? 0 } }
+
     /// How the last install ended: its outcome, or STOPPED_BY_SYSTEM when iOS stopped it (`stopDownloads`). Nil before
     /// the first one and after an install that was cancelled in another way.
     public var lastOutcome: InstallOutcome? { fields.withLock { $0.lastOutcome } }
