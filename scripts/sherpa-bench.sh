@@ -12,7 +12,8 @@
 # Environment:
 #   CASSINI_PARAKEET_MODEL_ROOT the model root as scripts/fetch-ci-models.py writes it, read only (default .tools/models,
 #                               then .tools/ci-models)
-#   CASSINI_PARAKEET_MODELS     the Ultra directory, read only (default <model root>/parakeet-ultra)
+#   CASSINI_PARAKEET_MODELS     the Ultra directory, read only (default its revision directory under the model root,
+#                               scripts/fetch-ci-models.py --print-path parakeet-ultra-0.6b-int8)
 #   CASSINI_PARAKEET_RECORD     1 records CassiniTests/Goldens/fleurs-it-short.ios.json instead of comparing with it
 #   CASSINI_BENCH_ONLY          bench, job or dc runs only that test (default all three)
 #   CASSINI_DC_VECTOR           the directory with D26.1's dc-quiet-jfk-v1 WAVs (default ux-draft/dc in
@@ -20,8 +21,9 @@
 #   CASSINI_ANDROID             the cassini-android checkout with the fixtures and goldens (default ~/dev/cassini-android,
 #                               the plan's baseline at main, then ../cassini-android beside the main checkout)
 #   CASSINI_BENCH_LONG_SECONDS  the long run in 28 s windows (default 3600; 0 skips it)
-#   CASSINI_BENCH_SPEAKERS      the speaker-models directory: with Ultra still loaded, stream 60 s through Sortformer
-#                               and make a CAM++ print (default <model root>/speaker-models when installed; none skips)
+#   CASSINI_BENCH_SPEAKERS      a model root with the diarizer and CAM++ installed: with Ultra still loaded, stream 60 s
+#                               through Sortformer and make a CAM++ print (default the model root when both are
+#                               installed there; none skips)
 #   CASSINI_IPHONE              the device type to clone (default "iPhone 17")
 # Writes .tools/bench/<time>.json and the xcodebuild log beside it. The simulator clone is
 # ts-<worktree directory>-bench, so scripts/test.sh clean removes it with this worktree's other clones.
@@ -31,16 +33,17 @@ root=$PWD
 . scripts/native-common.sh
 [ -d "$sherpa_xcframework" ] || { echo "error: no $sherpa_xcframework; run scripts/build-sherpa-xcframework.sh" >&2; exit 1; }
 
+fetch=(/usr/bin/python3 -I scripts/fetch-ci-models.py)
 model_root=${CASSINI_PARAKEET_MODEL_ROOT:-}
 for candidate in "$root/.tools/models" "$root/.tools/ci-models"; do
     [ -n "$model_root" ] && break
-    [ -f "$candidate/parakeet-ultra/verified" ] && model_root=$candidate
+    "${fetch[@]}" --dest "$candidate" --ready parakeet-ultra-0.6b-int8 && model_root=$candidate
 done
 [ -n "$model_root" ] || { echo "error: no models; run scripts/fetch-ci-models.py --dest .tools/models" >&2; exit 1; }
-models=${CASSINI_PARAKEET_MODELS:-$model_root/parakeet-ultra}
+models=${CASSINI_PARAKEET_MODELS:-$("${fetch[@]}" --dest "$model_root" --print-path parakeet-ultra-0.6b-int8)}
 speakers=${CASSINI_BENCH_SPEAKERS:-}
-if [ -z "$speakers" ] && [ -f "$model_root/speaker-models/verified" ] && [ -f "$model_root/speaker-models/verified-voiceprint" ]; then
-    speakers=$model_root/speaker-models
+if [ -z "$speakers" ] && "${fetch[@]}" --dest "$model_root" --ready nemotron-3-diarization-int8 campplus-voxceleb-16k; then
+    speakers=$model_root
 fi
 [ "$speakers" = none ] && speakers=""
 dc_vector=${CASSINI_DC_VECTOR:-$HOME/dev/cassini-coordination/ux-draft/dc}

@@ -74,8 +74,8 @@ import CassiniEngine
     }
 
     @Test func aMarkdownSectionRunsToTheNextHeadingWithoutItsMarks() {
-        let markdown = "# Privacy\n\nIntro\n\n## Network\n\nHosts:\n\n- `huggingface.co`\n\n## Permissions\n\nMicrophone"
-        #expect(LicenseTexts.section(markdown, heading: "## Network") == "Network\n\nHosts:\n\n- `huggingface.co`")
+        let markdown = "# Privacy\n\nIntro\n\n## Network\n\nHosts:\n\n- `dist.gocassini.com`\n\n## Permissions\n\nMicrophone"
+        #expect(LicenseTexts.section(markdown, heading: "## Network") == "Network\n\nHosts:\n\n- `dist.gocassini.com`")
         #expect(LicenseTexts.section(markdown, heading: "## Missing").isEmpty)
         #expect(LicenseTexts.plain(markdown).hasPrefix("Privacy\n\nIntro\n\nNetwork"))
     }

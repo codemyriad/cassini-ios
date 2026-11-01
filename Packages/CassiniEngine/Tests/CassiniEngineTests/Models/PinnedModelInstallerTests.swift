@@ -33,7 +33,7 @@ import CassiniNotebook
         UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite)
     }
 
-    private nonisolated static func key(_ model: ModelDescriptor) -> String { "\(model.directory)/\(model.markerFile)" }
+    private nonisolated static func key(_ model: ModelDescriptor) -> String { model.pin }
 
     private let everyModel = ModelPart.allCases.flatMap(\.models).map(key).sorted()
     private let all = Set(ModelPart.allCases)
@@ -86,8 +86,10 @@ import CassiniNotebook
         await download.value
         try await waitUntil { [owner] in owner.status == .idle }
         #expect(release.interrupted)
-        let part = ModelCatalog.parakeet.directory(in: models.root).appendingPathComponent("encoder.int8.onnx.part")
+        // The parts stay in the model's staging directory, and no revision appears.
+        let part = ModelCatalog.parakeet.staging(in: models.root).appendingPathComponent("encoder.int8.onnx.part")
         #expect(exists(part))
+        #expect(!exists(ModelCatalog.parakeet.directory(in: models.root)))
         #expect(models.status[.speech] == .missing(consented: true))
     }
 
@@ -181,7 +183,7 @@ private final class GatedFetcher: ModelFetching, Sendable {
     func fetch(_ model: ModelDescriptor, into directory: URL,
                progress: @escaping @Sendable (Int64, Bool) -> Void) async throws {
         state.withLock { state in
-            state.fetched.append("\(model.directory)/\(model.markerFile)")
+            state.fetched.append(model.pin)
             state.inFlight += 1
             state.mostInFlight = max(state.mostInFlight, state.inFlight)
         }

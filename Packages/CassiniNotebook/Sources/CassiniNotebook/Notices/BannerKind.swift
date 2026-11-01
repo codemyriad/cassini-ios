@@ -23,7 +23,7 @@ public enum BannerArg: String, CaseIterable, Hashable, Sendable {
 /// Not on iOS: `NO_ENCODER` (Cassini always has its Opus encoder), `TX_MEMORY` (iOS ends an app out of memory without
 /// a catchable error), `IMPORT_WAV` (AVFoundation reads every WAV) and `REC_STOPPED_FILE_LIMIT` (the capture is a CAF
 /// file without M4A's 1 GiB end). iOS only:
-/// `REC_INPUT_LOST`, `REC_COMPRESSION_FAILED` and `NOTES_UNREADABLE`.
+/// `REC_INPUT_LOST`, `REC_COMPRESSION_FAILED`, `NOTES_UNREADABLE` and `DL_PIN_UNAVAILABLE`.
 public enum BannerKind: String, CaseIterable, Hashable, Sendable {
     // Document trust.
     case trustVerified = "TRUST_VERIFIED"
@@ -68,6 +68,9 @@ public enum BannerKind: String, CaseIterable, Hashable, Sendable {
     case dlNoSpace = "DL_NO_SPACE"
     case dlFileCheck = "DL_FILE_CHECK"
     case dlInstallFailed = "DL_INSTALL_FAILED"
+    /// The model host does not offer the model as this build pins it: only an update of Cassini helps, so there is no
+    /// Retry. iOS only.
+    case dlPinUnavailable = "DL_PIN_UNAVAILABLE"
     case dlRecordNow = "DL_RECORD_NOW"
 
     // Library and import.
@@ -95,7 +98,7 @@ public enum BannerKind: String, CaseIterable, Hashable, Sendable {
     /// The user can close it.
     public var dismissible: Bool { entry.dismissible }
     /// A kind Android does not have.
-    public var iOSOnly: Bool { [.recInputLost, .recCompressionFailed, .notesUnreadable].contains(self) }
+    public var iOSOnly: Bool { [.recInputLost, .recCompressionFailed, .notesUnreadable, .dlPinUnavailable].contains(self) }
 
     private struct Entry {
         var tone: Tone
@@ -144,6 +147,7 @@ public enum BannerKind: String, CaseIterable, Hashable, Sendable {
         case .dlNoSpace: Entry(tone: .error, group: .download, uses: [.bytes], actions: [.retry])
         case .dlFileCheck: Entry(tone: .error, group: .download, actions: [.downloadAgain])
         case .dlInstallFailed: Entry(tone: .error, group: .download, actions: [.tryAgain])
+        case .dlPinUnavailable: Entry(tone: .error, group: .download, dismissible: true)
         case .dlRecordNow: Entry(tone: .info, group: .download, actions: [.download])
 
         case .libEmpty: Entry(tone: .plain, group: .library, actions: [.record, .import])

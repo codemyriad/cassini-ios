@@ -1226,6 +1226,47 @@
         }
       }
     },
+    "This version of the model is no longer offered for download. Update Cassini, then try again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This version of the model is no longer offered for download. Update Cassini, then try again."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esta versión del modelo ya no se ofrece para descargar. Actualiza Cassini y vuelve a intentarlo."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cette version du modèle n’est plus proposée au téléchargement. Mettez à jour Cassini, puis réessayez."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questa versione del modello non è più disponibile per il download. Aggiorna Cassini, poi riprova."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esta versão do modelo não está mais disponível para download. Atualize o Cassini e tente novamente."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esta versão do modelo já não está disponível para transferência. Atualize o Cassini e tente novamente."
+          }
+        }
+      }
+    },
     "Transcription was interrupted. Keep Cassini open, then tap Transcribe to start again.": {
       "extractionState": "manual",
       "localizations": {

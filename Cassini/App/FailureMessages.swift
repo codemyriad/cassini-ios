@@ -46,6 +46,9 @@ extension JobFailure {
         case .reservationLimit:
             String(localized: "The system cannot reserve another speech language. Try a language already installed on this device.",
                    table: "Failures")
+        case .download(.pinUnavailable):
+            String(localized: "This version of the model is no longer offered for download. Update Cassini, then try again.",
+                   table: "Failures")
         case .download(let error): error.failure.transcriptionMessage
         case .documentRefused(.unverified):
             String(localized: "The audio of this document could not be checked, so a new version cannot be added.",

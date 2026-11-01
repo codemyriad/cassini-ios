@@ -100,9 +100,20 @@ import CassiniNotebook
         #expect(try await ModelInstaller(store: enough).install(all) { _ in } == .installed())
     }
 
-    // ports: ModelInstallerTest#roomForSpeechAloneInstallsSpeechAndDegradesTheRest
-    @Test func roomForSpeechAloneInstallsSpeechAndDegradesTheRest() async throws {
-        let store = FakeStore(usable: speechFreeBytes)
+    // ports: ModelInstallerTest#theRoomThatSpeechNeedsAlsoFitsTheOtherParts
+    @Test func theRoomThatSpeechNeedsAlsoFitsTheOtherParts() async throws {
+        // Speech's peak holds the 431 MiB encoder download, which is deleted before the speaker parts start.
+        #expect(try await ModelInstaller(store: FakeStore(usable: speechFreeBytes)).install(all) { _ in } == .installed())
+    }
+
+    // ports: ModelInstallerTest#spaceTakenDuringSpeechInstallsSpeechAndDegradesTheRest
+    @Test func spaceTakenDuringSpeechInstallsSpeechAndDegradesTheRest() async throws {
+        let speech = speechFreeBytes
+        let store = FakeStore(usable: speech)
+        // Another app fills the phone while speech downloads: only what speech's files left stays free.
+        store.onInstall = { [store] model, _ in
+            if model == ModelCatalog.parakeet { store.take(speech - model.artifactBytes) }
+        }
         let outcome = try await ModelInstaller(store: store).install(all) { _ in }
         #expect(outcome == .installed(failed: [.speakers: .notEnoughStorage, .voices: .notEnoughStorage]))
         #expect(store.attempts == [ModelCatalog.parakeet, ModelCatalog.vad])
@@ -153,7 +164,8 @@ import CassiniNotebook
         }
         func refusal(_ location: String, hop: Int) -> any Error {
             do {
-                _ = try RedirectPolicy.downloads.next(from: URL(string: "https://huggingface.co/model")!, location: location, hop: hop)
+                _ = try RedirectPolicy.downloads.next(from: URL(string: "https://dist.gocassini.com/model")!, location: location,
+                                                      hop: hop)
                 Issue.record("The redirect must be refused")
                 return CancellationError()
             } catch {
@@ -161,7 +173,7 @@ import CassiniNotebook
             }
         }
         let refused = refusal("https://example.org/model", hop: 1)
-        let tooMany = refusal("https://cdn-lfs.hf.co/model", hop: 6)
+        let tooMany = refusal("https://dist.gocassini.com/model", hop: 6)
         #expect(map(refused) == .hostNotAllowed)
         #expect(map(refused, online: false) == .hostNotAllowed)
         #expect(map(tooMany) == .interrupted)
@@ -170,6 +182,9 @@ import CassiniNotebook
         #expect(map(ModelError(.space)) == .notEnoughStorage)
         #expect(map(ModelError(.modelVerify)) == .fileCheckFailed)
         #expect(map(ModelError(.modelInstall)) == .install)
+        // iOS only: the host's manifest does not offer the model as pinned; nothing to retry until Cassini is updated.
+        #expect(map(ModelError(.download(.pinUnavailable), "The manifest does not list x")) == .pinUnavailable)
+        #expect(map(ModelError(.download(.pinUnavailable)), online: false) == .pinUnavailable)
         #expect(map(URLError(.timedOut)) == .noConnection)
         #expect(map(URLError(.cannotFindHost)) == .noConnection)
         #expect(map(URLError(.networkConnectionLost)) == .interrupted)
@@ -227,8 +242,8 @@ import CassiniNotebook
     }
 }
 
-/// Android's FakeStore: the models in `ready` are installed; each install takes what `ModelPlan.Item.installBytes`
-/// counts for its model from the free bytes.
+/// Android's FakeStore: the models in `ready` are installed; each install takes its installed files from the free
+/// bytes (its downloads are deleted once checked).
 private final class FakeStore: ModelStore, Sendable {
     private struct State {
         var installed: Set<ModelDescriptor>
@@ -261,6 +276,9 @@ private final class FakeStore: ModelStore, Sendable {
         set { state.withLock { $0.onInstall = newValue } }
     }
 
+    /// Space that something else takes.
+    func take(_ bytes: Int64) { state.withLock { $0.free -= bytes } }
+
     func fail(_ model: ModelDescriptor, with error: any Error) { state.withLock { $0.failures[model] = error } }
 
     func consented() async -> Bool {
@@ -291,7 +309,7 @@ private final class FakeStore: ModelStore, Sendable {
         try await onInstall(model, progress)
         state.withLock { state in
             state.installed.insert(model)
-            state.free -= ModelPlan.Item(.speech, [model]).installBytes
+            state.free -= model.artifactBytes
         }
     }
 }

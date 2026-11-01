@@ -62,6 +62,8 @@ private let english: [BannerKind: (String, String?, [String])] = [
     .dlNoSpace: ("Not enough storage", "Free about 860 MB and try again.", ["Retry"]),
     .dlFileCheck: ("File check failed", "The download was damaged and has been discarded.", ["Download again"]),
     .dlInstallFailed: ("Couldn’t finish installing", "Try again. Your recordings are safe.", ["Try again"]),
+    .dlPinUnavailable: ("Model not available",
+                        "The model server no longer offers this version of the model. Update Cassini to download it.", []),
     .dlRecordNow: ("Record now, transcribe later", "Transcription needs a one-time download. Audio is safe meanwhile.",
                    ["Download"]),
     .libEmpty: ("No notes yet", "Record something, or import an audio file.", ["Record", "Import"]),

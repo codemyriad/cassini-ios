@@ -39,17 +39,18 @@ func sparse(_ url: URL, size: Int64) {
     try! handle.close()
 }
 
-/// Sparse files of `model`'s pinned sizes in `directory`.
+/// Sparse files of `model`'s pinned sizes in `directory`, with the host's notices: what a fetch leaves there.
 func sparse(_ model: ModelDescriptor, in directory: URL) {
     for artifact in model.artifacts { sparse(directory.appendingPathComponent(artifact.name), size: artifact.size) }
+    try! Data("notices".utf8).write(to: directory.appendingPathComponent(ModelDescriptor.noticeFile))
 }
 
-/// Sparse files of the pinned sizes and the marker, as a finished install leaves them.
-func install(_ model: ModelDescriptor, in root: URL, marker: String? = nil) {
+/// The revision directory of `model` with sparse files of the pinned sizes and the notices, as a finished install
+/// leaves it.
+func install(_ model: ModelDescriptor, in root: URL) {
     let directory = model.directory(in: root)
     try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     sparse(model, in: directory)
-    try! Data((marker ?? model.markerValue).utf8).write(to: directory.appendingPathComponent(model.markerFile))
 }
 
 /// Polls `condition` until it holds, for at most twenty seconds.

@@ -184,9 +184,10 @@ public struct TranscriptProvenance: Codable, Hashable, Sendable {
     /// The sherpa-onnx release the native runtime is built from (scripts/native-dependencies.json).
     public static let sherpaVersion = "1.13.7"
 
-    /// The record of a Parakeet run, with Android's values (`JobProvenance.recognition`) but `device`: `model` is
-    /// `<id> <precision>`, `revision` the model's pinned revision, `segmentation` how the audio was cut. The language
-    /// is `und`: Parakeet does not say which one it heard (D53.2).
+    /// The record of a Parakeet run, with Android's values (`JobProvenance.recognition`) but `device` and `model`:
+    /// `model` is the model host's pin, `<id>@<source_sha256>` (D16 §5; Android writes `<id> <precision>`), `revision`
+    /// the model's pinned revision, `segmentation` how the audio was cut. The language is `und`: Parakeet does not say
+    /// which one it heard (D53.2).
     public static func parakeetRun(model: String, revision: String, segmentation: String, inferenceMs: Int64,
                                    resumedFromMs: Int64, device: RunDevice) -> TranscriptProvenance {
         TranscriptProvenance(backend: sherpaBackend, engine: parakeetEngine, model: model, device: device.description,

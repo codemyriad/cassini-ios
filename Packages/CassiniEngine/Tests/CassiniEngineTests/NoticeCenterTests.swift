@@ -84,6 +84,11 @@ import CassiniNotebook
         #expect(heard == [.importOpen, .dlNoConnection])
         #expect(BannerKind.importOpen.isImportFailure && !BannerKind.importOpen.isDownloadFailure)
         #expect(BannerKind.dlStopped.isDownloadFailure)
+        // Every download banner that reports a failure closes until the next install; progress and offers do not.
+        for kind in BannerKind.allCases where kind.group == .download {
+            #expect(kind.isDownloadFailure == (kind.tone == .error), "\(kind)")
+        }
+        #expect(BannerKind.dlPinUnavailable.isDownloadFailure)
     }
 
     @Test func unreadableNotesCloseForThisRun() {

@@ -37,8 +37,8 @@ On iPad the Library stays beside the note, in landscape and in portrait:
 
 Speech recognition and speaker analysis run on the device. Cassini does not upload audio, transcripts or
 voiceprints. It has no accounts, no analytics and no advertising. The network is used only to download models, and
-only after you agree: Apple's speech model for your language, and the speaker models from Cassini's model host
-(`dist.gocassini.com`) and GitHub. Voiceprints
+only after you agree: Apple's speech model for your language, and every other model only from Cassini's model host,
+`dist.gocassini.com`, through its manifest (D4, D53.1). Voiceprints
 stay in the app's private storage, are excluded from backups, and are never written into a document or an export.
 System backups may include recordings and transcripts.
 
@@ -224,11 +224,30 @@ samples raw ([differences](docs/differences.md#speech-recognition)).
 ```sh
 scripts/build-sherpa-xcframework.sh   # pinned sources -> .tools/sherpa/SherpaOnnxC.xcframework and a reproducible zip
 scripts/verify-native-runtime.sh      # the lock (scripts/native-dependencies.json) against Package.swift and the build
-scripts/fetch-ci-models.py --dest .tools/models   # the pinned models, verified, in the app's layout
+scripts/fetch-ci-models.py --dest .tools/models   # the pinned models from dist.gocassini.com, verified, in the app's
+                                                  # layout (models/<id>/<source_sha256>/ with NOTICE.txt)
+scripts/fetch-ci-models.py --check-live           # the live manifest still lists every pin (two small GETs)
 scripts/sherpa-bench.sh               # simulator: Ultra decode vs Android's golden, memory and speed, and a real job
                                       # vs iOS's golden (CASSINI_PARAKEET_RECORD=1 records it)
 scripts/speaker-smoke.sh              # simulator smoke: Sortformer streaming + save/restore and CAM++ on two FLEURS voices
 ```
+
+**Models from the model host (D4, D53.1).** Every model Cassini installs itself comes from `dist.gocassini.com` and
+from nowhere else: `ModelCatalog` compiles in the four pins (Parakeet Ultra INT8, Silero VAD, Nemotron 3 Diarization
+INT8 with ONNX interface v2, CAM++), each as `(id, source_sha256)` with both SHA-256 values of every file. Before a
+download, `NetworkModelFetcher` reads the live `manifest.json` and requires the pinned row and every artifact entry
+(key, URL, sizes, both hashes, encoding) to agree with the pins (`DistManifest`); a missing or contradicted pin fails
+with its own banner, "Model not available" (`DOWNLOAD_PIN_UNAVAILABLE`, no Retry; the Settings row keeps the generic
+failed status, and the next install reads the manifest again). Each file is its own seekable
+Zstandard object, resumed with Range and If-Range (the entity tag is the quoted compressed SHA-256) and checked before
+and after decompression; the files and the host's `NOTICE.txt` are collected in
+`CassiniModels/models/<id>/.<source_sha256>.staging/` and renamed into `CassiniModels/models/<id>/<source_sha256>/`.
+About › Model notices shows that `NOTICE.txt` from an installed revision. Before the first load in each session every
+installed file is hashed again (`ModelVerifier`, D16 §4); a file that differs retires the revision. The in-app
+download of Ultra is wired with the runtime release (PR D); until then a failed check of Ultra fails the job with
+"Model verification failed" and the next launch uses Apple Speech. Provenance names Ultra
+`parakeet-ultra-0.6b-int8@<source_sha256>` (D16 §5). These pins need the codemyriad sherpa-onnx fork at `0c2ee3f`
+(D16 §1): a local build with the older runtime cannot load the v2 diarizer or the dist Ultra export.
 
 `CASSINI_SHERPA_LOCAL=1` makes `Package.swift` link the two xcframeworks in the gitignored `.tools/sherpa` into
 `CassiniSherpa`, the only module that imports `SherpaOnnxC`. The binaries are iOS-only (`.when(platforms: [.iOS])`),

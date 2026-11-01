@@ -16,8 +16,9 @@ import CassiniSherpa
 /// can differ slightly; the test reports the difference from Android's text and does not require it to be zero.
 ///
 /// Environment (xcodebuild passes TEST_RUNNER_<name> through as <name>):
-///   CASSINI_PARAKEET_MODEL_ROOT  a model root as scripts/fetch-ci-models.py writes it (parakeet-ultra/ and vad/ with
-///                                their markers; read only, cloned into this app's caches)
+///   CASSINI_PARAKEET_MODEL_ROOT  a model root as scripts/fetch-ci-models.py writes it (the revision directories
+///                                models/<id>/<source_sha256>/ of Ultra and the detector; read only, cloned into this
+///                                app's caches)
 ///   CASSINI_PARAKEET_AUDIO       the FLEURS-it short clip
 ///   CASSINI_PARAKEET_GOLDEN      Android's fleurs-it-short.txt golden (optional, reported only)
 ///   CASSINI_PARAKEET_RECORD=1    write the iOS golden instead of comparing with it
@@ -32,8 +33,8 @@ final class ParakeetJobTests: XCTestCase {
                                    "set CASSINI_PARAKEET_MODEL_ROOT")
         let clip = try XCTUnwrap(environment["CASSINI_PARAKEET_AUDIO"].map { URL(fileURLWithPath: $0) })
         let models = try cloneModels(from: source)
-        XCTAssertTrue(ModelCatalog.parakeet.ready(in: models), "Ultra with its marker")
-        XCTAssertTrue(ModelCatalog.vad.ready(in: models), "the speech detector with its marker")
+        XCTAssertTrue(ModelCatalog.parakeet.ready(in: models), "Ultra's revision directory")
+        XCTAssertTrue(ModelCatalog.vad.ready(in: models), "the speech detector's revision directory")
 
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("parakeet-job-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: root) }
@@ -60,7 +61,7 @@ final class ParakeetJobTests: XCTestCase {
         let text = words.map(\.text).joined(separator: " ")
         let record = try XCTUnwrap(provenance.provenance(for: saved))
         XCTAssertEqual(record.engine, "Parakeet TDT")
-        XCTAssertEqual(record.model, "moondream/parakeet-ultra INT8")
+        XCTAssertEqual(record.model, "parakeet-ultra-0.6b-int8@18cb623004dd6c15999b93cb70b14d8a1f6e8f3a2a97ff733f104bfc3494f6a9")
         XCTAssertEqual(record.language, "")
         XCTAssertEqual(record.segmentation, DecodeCutting.incrementalProvenance(detectorReady: true))
         XCTAssertGreaterThan(record.inferenceMs, 0)
@@ -109,7 +110,7 @@ final class ParakeetJobTests: XCTestCase {
         for model in [ModelCatalog.parakeet, ModelCatalog.vad] where !model.ready(in: target) {
             let destination = model.directory(in: target)
             try? manager.removeItem(at: destination)
-            try manager.createDirectory(at: target, withIntermediateDirectories: true)
+            try manager.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
             try manager.copyItem(at: model.directory(in: source), to: destination)
         }
         return target

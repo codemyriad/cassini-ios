@@ -14,7 +14,7 @@ import CassiniSherpa
 
     override func tearDown() async throws { try? FileManager.default.removeItem(at: root) }
 
-    /// Ultra's files as sparse files of their pinned sizes, with the marker.
+    /// Ultra's revision directory: its files as sparse files of their pinned sizes, with the host's notices.
     private func installUltra() throws {
         let directory = ModelCatalog.parakeet.directory(in: root)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -25,8 +25,7 @@ import CassiniSherpa
             try handle.truncate(atOffset: UInt64(artifact.size))
             try handle.close()
         }
-        try Data(ModelCatalog.parakeet.markerValue.utf8)
-            .write(to: directory.appendingPathComponent(ModelCatalog.parakeet.markerFile))
+        try Data("notices".utf8).write(to: directory.appendingPathComponent(ModelDescriptor.noticeFile))
     }
 
     func testWithoutTheModelTheAppTranscribesWithAppleSpeech() {

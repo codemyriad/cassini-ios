@@ -36,7 +36,7 @@ import CassiniNotebook
             .filter { $0.part != .speech }).requiredFreeBytes)
         let reports = Mutex<[InstallProgress]>([])
         try await models.install { progress in reports.withLock { $0.append(progress) } }
-        #expect(fetcher.fetched == ["speaker-models/verified", "speaker-models/verified-voiceprint"],
+        #expect(fetcher.fetched == [ModelCatalog.diarization.pin, ModelCatalog.voiceprint.pin],
                 "the diarizer, then CAM++, nothing of speech")
         #expect(models.diarizerReady && models.printsReady)
         #expect(await models.refresh(linked: true) == .ready)
@@ -82,10 +82,15 @@ import CassiniNotebook
 
     @Test func theCatalogPartsAndDownloadsAreAndroids() {
         #expect(SpeakerModels.parts == [.speakers, .voices])
-        #expect(SpeakerModels.downloads.map(\.url.absoluteString) == [ModelCatalog.diarizationURL, ModelCatalog.voiceprintURL])
-        #expect(models.diarizer.lastPathComponent == "nemotron-3-diarization.int8.onnx")
-        #expect(models.voiceprint.lastPathComponent == "voiceprint-campplus.onnx")
-        #expect(models.diarizer.deletingLastPathComponent().lastPathComponent == "speaker-models")
+        let downloads = ModelCatalog.downloads.map(\.url.absoluteString)
+        for model in [ModelCatalog.diarizationModel, ModelCatalog.voiceprintModel] {
+            #expect(model.download.map { downloads.contains($0.url) } == true, "\(model.name)")
+        }
+        // The manifest's paths, each model in its own revision directory (D4).
+        #expect(models.diarizer.path == ModelCatalog.diarization.path(in: models.root, "model.int8.onnx"))
+        #expect(models.voiceprint.path
+                == ModelCatalog.voiceprint.path(in: models.root, "3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx"))
+        #expect(models.diarizer.deletingLastPathComponent().lastPathComponent == ModelCatalog.diarization.sourceSha256)
     }
 }
 
@@ -103,7 +108,7 @@ final class SparseFetcher: ModelFetching, @unchecked Sendable {
     }
 
     func fetch(_ model: ModelDescriptor, into directory: URL, progress: @escaping @Sendable (Int64, Bool) -> Void) async throws {
-        lock.withLock { _fetched.append("\(model.directory)/\(model.markerFile)") }
+        lock.withLock { _fetched.append(model.pin) }
         progress(model.downloadBytes / 2, false)
         progress(model.downloadBytes, false)
         progress(model.downloadBytes, true)

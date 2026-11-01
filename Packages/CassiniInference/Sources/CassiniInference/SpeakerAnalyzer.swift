@@ -2,6 +2,7 @@ import AVFoundation
 import CassiniCore
 import CassiniEngine
 import CassiniNotebook
+import Synchronization
 
 /// Android's speaker pipeline over the native runtime (`SpeakerRuntime`, CassiniSherpa's in the app): streaming
 /// Sortformer and CAM++ from the catalog's pinned files (`SpeakerModels`).
@@ -12,13 +13,32 @@ import CassiniNotebook
 ///   mono floats in the job's 28 s windows with 2 s overlap, gives each window to the same `WindowSpeakers` with the
 ///   transcript's words that fall in it, and makes a CAM++ print per speaker from the voice clips (kept in memory: at
 ///   most 45 s per speaker). It runs on the speech inference thread, one native body at a time.
-/// - **Models.** Installed through the shared `PinnedModelInstaller` (Range resume, pinned SHA-256, the redirect
-///   policy); the diarizer comes as seekable Zstandard. A build without the native runtime reports them unsupported.
+/// - **Models.** Installed through the shared `PinnedModelInstaller` from the model host (Range and If-Range resume,
+///   both SHA-256 pins, the redirect policy), each file as seekable Zstandard. A build without the native runtime
+///   reports them unsupported.
+/// - **Check (D16 §4).** Before the first load in each session the diarizer and CAM++ are hashed against their pins
+///   (`ModelVerifier`) on the inference thread, never on the cooperative pool, stopped by a cancel flag. A file that
+///   differs retires its revision. Without the diarizer `streamingEngines` gives none (the job shows every word as one
+///   voice, TX_ONE_VOICE, and the next run downloads it again) and `analyze` fails with `DOWNLOAD_FILE_CHECK_FAILED`
+///   (Download again installs it again); without CAM++ the speakers are told apart and nobody is named. A file that
+///   cannot be read retires nothing and is never loaded: a diarizer gives no engines and fails `analyze` with `MODEL`
+///   (a download would change nothing), and a CAM++ is left out (`printsReady` false) until a later check reads it.
 public struct SpeakerAnalyzer: SpeakerAnalyzing {
     public let models: SpeakerModels
     private let runtime: SpeakerRuntime
     private let thread: InferenceThread
     private let availableMemory: @Sendable () -> Int64?
+    private let session = Session()
+
+    /// What this analyzer's checks found in this process.
+    private final class Session: Sendable {
+        private let unreadable = Mutex(false)
+        /// Whether the last check of CAM++ could not read it.
+        var voiceprintUnreadable: Bool {
+            get { unreadable.withLock { $0 } }
+            set { unreadable.withLock { $0 = newValue } }
+        }
+    }
 
     public init(models: SpeakerModels, runtime: SpeakerRuntime,
                 availableMemory: @escaping @Sendable () -> Int64? = TranscriptionJob.availableMemory) {
@@ -43,11 +63,55 @@ public struct SpeakerAnalyzer: SpeakerAnalyzing {
 
     public func cancelModelInstall() async { models.cancel() }
 
-    public func printsReady() async -> Bool { runtime.linked && models.printsReady }
+    /// Whether CAM++ can name speakers: installed, and not found unreadable by this session's last check.
+    public func printsReady() async -> Bool { runtime.linked && models.printsReady && !session.voiceprintUnreadable }
 
     public func streamingEngines() async -> (any SpeakerEngines)? {
         guard runtime.linked, models.diarizerReady else { return nil }
+        guard let checked = try? await checkModels(), checked.diarizer == .passed else { return nil }
         return Engines(runtime: runtime, diarizer: models.diarizer, voiceprint: models.voiceprint, thread: thread)
+    }
+
+    /// The per-session check of the speaker models: the diarizer's result, and CAM++'s (`.failed` when it is not
+    /// installed or was not checked because the diarizer did not pass).
+    struct Checked: Equatable, Sendable {
+        var diarizer: Check
+        var voiceprint: Check
+    }
+
+    /// One model's check. `.failed` is a file that differs (the revision is retired, so the model reads as not
+    /// installed) or a model that is not installed; `.unreadable` a file that could not be read, which retires nothing.
+    enum Check: Equatable, Sendable { case passed, failed, unreadable }
+
+    /// Checks the diarizer and CAM++ once a session, on the inference thread; CAM++ only after a diarizer that passed.
+    /// Records whether CAM++ was unreadable, so `printsReady` leaves it out until a check reads it. Throws
+    /// `CancellationError` when the task is cancelled.
+    func checkModels() async throws -> Checked {
+        let verifier = models.repository.verifier, root = models.root
+        let cancel = CancelFlag()
+        let checked = try await withTaskCancellationHandler {
+            try await thread.run {
+                let cancelled = { cancel.isSet }
+                let diarizer = try Self.check(ModelCatalog.diarization, verifier, root, cancelled)
+                let voiceprint = diarizer == .passed && ModelCatalog.voiceprint.ready(in: root)
+                    ? try Self.check(ModelCatalog.voiceprint, verifier, root, cancelled) : .failed
+                return Checked(diarizer: diarizer, voiceprint: voiceprint)
+            }
+        } onCancel: {
+            cancel.set()
+        }
+        if checked.diarizer == .passed { session.voiceprintUnreadable = checked.voiceprint == .unreadable }
+        return checked
+    }
+
+    /// `model`'s check; a file that cannot be read is `.unreadable` and removes nothing.
+    private static func check(_ model: ModelDescriptor, _ verifier: ModelVerifier, _ root: URL,
+                              _ cancelled: () -> Bool) throws -> Check {
+        do { return try verifier.verify(model, in: root, cancelled: cancelled) ? .passed : .failed } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            return .unreadable
+        }
     }
 
     public func analyze(url: URL, words: [Word], allowDownload: Bool,
@@ -62,8 +126,17 @@ public struct SpeakerAnalyzer: SpeakerAnalyzing {
                 throw SpeakerAnalysisError.needsConsent
             }
         }
-        guard let engines = await streamingEngines() else { throw JobFailure.model }
-        let printsReady = models.printsReady, memory = availableMemory
+        guard models.diarizerReady else { throw JobFailure.model }
+        let checked = try await checkModels()
+        switch checked.diarizer {
+        case .passed: break
+        // A diarizer that fails its check is removed: Download again installs it again.
+        case .failed: throw SpeakerAnalysisError.download(.fileCheckFailed, requiredFreeBytes: 0)
+        // One that cannot be read is still installed: a download would change nothing.
+        case .unreadable: throw JobFailure.model
+        }
+        let engines = Engines(runtime: runtime, diarizer: models.diarizer, voiceprint: models.voiceprint, thread: thread)
+        let printsReady = models.printsReady && checked.voiceprint == .passed, memory = availableMemory
         let cancel = CancelFlag()
         return try await withTaskCancellationHandler {
             try await thread.run {

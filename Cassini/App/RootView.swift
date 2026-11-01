@@ -54,6 +54,7 @@ private struct RouteDestination: View {
     let route: Route
     @Environment(Router.self) private var router
     @Environment(NoteScreens.self) private var notes
+    @Environment(\.modelRoot) private var modelRoot
 
     var body: some View {
         screen.navigationBarBackButtonHidden(router.hidesBackButton(route))
@@ -66,7 +67,7 @@ private struct RouteDestination: View {
         case .settings: SettingsView()
         case .savedVoices: SavedVoicesView()
         case .trash: TrashView()
-        case .licenses: LicensesView()
+        case .licenses: LicensesView(models: modelRoot)
         case .modelDownload(let noteID): ModelDownloadView(noteID: noteID)
         }
     }

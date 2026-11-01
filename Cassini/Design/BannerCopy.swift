@@ -52,6 +52,7 @@ enum BannerCopy {
         case .dlNoSpace: String(localized: "Not enough storage", table: "Notices")
         case .dlFileCheck: String(localized: "File check failed", table: "Notices")
         case .dlInstallFailed: String(localized: "Couldn’t finish installing", table: "Notices")
+        case .dlPinUnavailable: String(localized: "Model not available", table: "Notices")
         case .dlRecordNow: String(localized: "Record now, transcribe later", table: "Notices")
 
         case .libEmpty: String(localized: "No notes yet", table: "Notices")
@@ -132,6 +133,9 @@ enum BannerCopy {
                 : String(localized: "Free some space and try again.", table: "Notices")
         case .dlFileCheck: String(localized: "The download was damaged and has been discarded.", table: "Notices")
         case .dlInstallFailed: String(localized: "Try again. Your recordings are safe.", table: "Notices")
+        case .dlPinUnavailable:
+            String(localized: "The model server no longer offers this version of the model. Update Cassini to download it.",
+                   table: "Notices")
         case .dlRecordNow: String(localized: "Transcription needs a one-time download. Audio is safe meanwhile.", table: "Notices")
 
         case .libEmpty: String(localized: "Record something, or import an audio file.", table: "Notices")

@@ -1,79 +1,110 @@
 {
-  "comment": "The models of ModelCatalog (Packages/CassiniEngine/Sources/CassiniEngine/Models/ModelCatalog.swift) for scripts/fetch-ci-models.py, the same list as Android's scripts/ci-models.json. ModelCatalogTests.theCiModelListIsTheCatalog makes sure that this file and the catalog agree.",
+  "comment": "The models of ModelCatalog (Packages/CassiniEngine/Sources/CassiniEngine/Models/ModelCatalog.swift) for scripts/fetch-ci-models.py, as dist.gocassini.com publishes them (manifest schema 2 of 2026-10-27), in the shape of Android's scripts/ci-models.json without its marker fields. Each file is downloaded as its own seekable Zstandard object, checked with both SHA-256 values and decompressed; each model directory also gets the host's NOTICE.txt. ModelCatalogTests.theCiModelListIsTheCatalog makes sure that this file and the catalog agree.",
+  "manifest": "https://dist.gocassini.com/manifest.json",
+  "notice": "https://dist.gocassini.com/NOTICE.txt",
   "models": [
     {
-      "directory": "parakeet-ultra",
-      "marker": "verified",
-      "markerValue": "b86784a3a5356cbd126f710b61cd90c5fe5898f1",
+      "id": "parakeet-ultra-0.6b-int8",
+      "sourceSha256": "18cb623004dd6c15999b93cb70b14d8a1f6e8f3a2a97ff733f104bfc3494f6a9",
+      "directory": "models/parakeet-ultra-0.6b-int8/18cb623004dd6c15999b93cb70b14d8a1f6e8f3a2a97ff733f104bfc3494f6a9",
       "artifacts": [
         {
           "name": "encoder.int8.onnx",
-          "size": 652282347,
-          "sha256": "f4d06712d32431b1718eceba2153c314ac4425e8fe708a3534f5e56c5ad53697",
-          "url": "https://huggingface.co/tpmaerk/parakeet-ultra-sherpa-onnx-int8/resolve/b86784a3a5356cbd126f710b61cd90c5fe5898f1/encoder.int8.onnx"
+          "size": 652282922,
+          "sha256": "299617fefd4664d1c115b691dcb6413cabcdbcc694cdf3cb4464b72c5fc3ae69",
+          "download": {
+            "name": "encoder.int8.onnx.zst",
+            "size": 452306705,
+            "sha256": "caf7a38f2ad3224c1863564fb6e975a11aa3ae6ad1e7ad0bee5c4f5e018babb4",
+            "url": "https://dist.gocassini.com/models/files/caf7a38f2ad3224c1863564fb6e975a11aa3ae6ad1e7ad0bee5c4f5e018babb4/encoder.int8.onnx.zst"
+          }
         },
         {
           "name": "decoder.int8.onnx",
-          "size": 11845275,
-          "sha256": "94373c6405c8149d1c9d1e9862514e0e3e88dab1c7de18fac9d5df9c6ba5efdd",
-          "url": "https://huggingface.co/tpmaerk/parakeet-ultra-sherpa-onnx-int8/resolve/b86784a3a5356cbd126f710b61cd90c5fe5898f1/decoder.int8.onnx"
+          "size": 11845274,
+          "sha256": "1fab98fe6c12aded87d2da66272cc9e148d0a0044ce3850a12fe56302ec4a922",
+          "download": {
+            "name": "decoder.int8.onnx.zst",
+            "size": 8841708,
+            "sha256": "69e2e91d01225bc552f8b0113630562fc52622cb2a3c61ef4445ee779f06b295",
+            "url": "https://dist.gocassini.com/models/files/69e2e91d01225bc552f8b0113630562fc52622cb2a3c61ef4445ee779f06b295/decoder.int8.onnx.zst"
+          }
         },
         {
           "name": "joiner.int8.onnx",
           "size": 6355277,
           "sha256": "8a71aaccfdba3d451775507a889afd2257d2e754463fd81095a8c8f290f924c2",
-          "url": "https://huggingface.co/tpmaerk/parakeet-ultra-sherpa-onnx-int8/resolve/b86784a3a5356cbd126f710b61cd90c5fe5898f1/joiner.int8.onnx"
+          "download": {
+            "name": "joiner.int8.onnx.zst",
+            "size": 3714640,
+            "sha256": "639fda62a71242a8d7cefb6647f2094eb8ac783925ce91cbd047a0de6988f396",
+            "url": "https://dist.gocassini.com/models/files/639fda62a71242a8d7cefb6647f2094eb8ac783925ce91cbd047a0de6988f396/joiner.int8.onnx.zst"
+          }
         },
         {
           "name": "tokens.txt",
           "size": 93939,
           "sha256": "d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d",
-          "url": "https://huggingface.co/tpmaerk/parakeet-ultra-sherpa-onnx-int8/resolve/b86784a3a5356cbd126f710b61cd90c5fe5898f1/tokens.txt"
+          "download": {
+            "name": "tokens.txt.zst",
+            "size": 45831,
+            "sha256": "5b3811f0c23fefc86835981f0a23ecfb817999df272ad744c597e5b669ea1b4a",
+            "url": "https://dist.gocassini.com/models/files/5b3811f0c23fefc86835981f0a23ecfb817999df272ad744c597e5b669ea1b4a/tokens.txt.zst"
+          }
         }
       ]
     },
     {
-      "directory": "vad",
-      "marker": "verified",
-      "markerValue": "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6",
+      "id": "silero-vad",
+      "sourceSha256": "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6",
+      "directory": "models/silero-vad/9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6",
       "artifacts": [
         {
           "name": "silero_vad.onnx",
           "size": 643854,
           "sha256": "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6",
-          "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx"
+          "download": {
+            "name": "silero_vad.onnx.zst",
+            "size": 469349,
+            "sha256": "dad26acf8515705fed5510d847c69366cb2710681ec4f87484a2de65ca855a3c",
+            "url": "https://dist.gocassini.com/models/files/dad26acf8515705fed5510d847c69366cb2710681ec4f87484a2de65ca855a3c/silero_vad.onnx.zst"
+          }
         }
       ]
     },
     {
-      "directory": "speaker-models",
-      "marker": "verified",
-      "markerValue": "01d1f893f394cc0418ae78425d216ed62c334c0125e650135332a7a8e595f168",
+      "id": "nemotron-3-diarization-int8",
+      "sourceSha256": "47c221ea9b4d4e7f6c108bd098e769bc706cdc986c29f6133c93cae335fe6779",
+      "directory": "models/nemotron-3-diarization-int8/47c221ea9b4d4e7f6c108bd098e769bc706cdc986c29f6133c93cae335fe6779",
       "artifacts": [
         {
-          "name": "nemotron-3-diarization.int8.onnx",
-          "size": 103941758,
-          "sha256": "01d1f893f394cc0418ae78425d216ed62c334c0125e650135332a7a8e595f168",
-          "url": ""
+          "name": "model.int8.onnx",
+          "size": 103967426,
+          "sha256": "47c221ea9b4d4e7f6c108bd098e769bc706cdc986c29f6133c93cae335fe6779",
+          "download": {
+            "name": "model.int8.onnx.zst",
+            "size": 64915668,
+            "sha256": "794720a59892189484d38a186d2b350018b4194cae55292f501b2849d6313290",
+            "url": "https://dist.gocassini.com/models/files/794720a59892189484d38a186d2b350018b4194cae55292f501b2849d6313290/model.int8.onnx.zst"
+          }
         }
-      ],
-      "download": {
-        "name": "nemotron-3-diarization.int8.onnx.zst",
-        "size": 64982914,
-        "sha256": "51249515e4cb49dc00c5d5dc0a41ac59aa91157d689ec9586b3f4bf567c3f602",
-        "url": "https://dist.gocassini.com/models/files/51249515e4cb49dc00c5d5dc0a41ac59aa91157d689ec9586b3f4bf567c3f602/model.int8.onnx.zst"
-      }
+      ]
     },
     {
-      "directory": "speaker-models",
-      "marker": "verified-voiceprint",
-      "markerValue": "357a834f702b80161e5b981182c038e18553c1f2ca752ed6cec2052365d4129b",
+      "id": "campplus-voxceleb-16k",
+      "sourceSha256": "357a834f702b80161e5b981182c038e18553c1f2ca752ed6cec2052365d4129b",
+      "directory": "models/campplus-voxceleb-16k/357a834f702b80161e5b981182c038e18553c1f2ca752ed6cec2052365d4129b",
       "artifacts": [
         {
-          "name": "voiceprint-campplus.onnx",
+          "name": "3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx",
           "size": 29596978,
           "sha256": "357a834f702b80161e5b981182c038e18553c1f2ca752ed6cec2052365d4129b",
-          "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx"
+          "download": {
+            "name": "3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx.zst",
+            "size": 27138478,
+            "sha256": "c310f60acec22ce27d78bd37736e40015af6473a1e3482224e81434aca5557b0",
+            "url": "https://dist.gocassini.com/models/files/c310f60acec22ce27d78bd37736e40015af6473a1e3482224e81434aca5557b0/3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx.zst"
+          }
         }
       ]
     }

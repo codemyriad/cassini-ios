@@ -30,46 +30,75 @@ public struct InstallResult: Hashable, Sendable {
     public init(part: ModelPart, skipped: [ModelDescriptor]) { self.part = part; self.skipped = skipped }
 }
 
-/// Fetches the files of one model into its directory (Android's `ModelFetcher`). Tests pass a fake; the app uses
+/// Fetches the files of one model into a directory (Android's `ModelFetcher`). Tests pass a fake; the app uses
 /// `NetworkModelFetcher`.
 public protocol ModelFetching: Sendable {
-    /// Installs `model`'s artifacts in `directory`, verified. `progress` gets the bytes of the model's download done
-    /// so far and whether they are being checked rather than downloaded. Fails with a `ModelError`.
+    /// Places `model`'s artifacts, verified, and the model host's `NOTICE.txt` in `directory` (the model's staging
+    /// directory). `progress` gets the bytes of the model's download done so far and whether they are being checked
+    /// rather than downloaded. Fails with a `ModelError`.
     func fetch(_ model: ModelDescriptor, into directory: URL,
                progress: @escaping @Sendable (Int64, Bool) -> Void) async throws
 }
 
-/// `ArtifactFetcher` with Range resume, following only the redirects `redirects` allows. `url` says where each
-/// artifact comes from. A compressed download needs `decoder`; without one it fails with `INSTALL`.
+/// Downloads from the model host only (D4, D53.1; Android's `ModelFetcher.network`). First reads the host's manifest
+/// and finds the model's pinned pair and files in it (`DistManifest.urls`): a manifest that does not list them as
+/// pinned refuses the download with `PIN_UNAVAILABLE` before any file is fetched. Then the host's notices go into the
+/// directory, and each file is fetched as its own seekable Zstandard object with `ArtifactFetcher.fetchCompressed`
+/// (Range and If-Range resume, verified before and after decompression), following only the redirects `redirects`
+/// allows (HTTPS to `ModelCatalog.downloadHosts`, at most five hops).
+///
+/// The progress counts the compressed bytes of every file. Only the last file's check reports as checking: the files
+/// before it are checked while the progress stays at their end, so the status does not go back and forth between
+/// downloading and checking for each file.
 public struct NetworkModelFetcher: ModelFetching {
     public let fetcher: ArtifactFetcher
     public let redirects: RedirectPolicy
     public let decoder: (any Decompressing)?
-    private let url: @Sendable (Artifact) -> String
+    public let manifestURL: String
+    public let noticeURL: String
+    /// The origin the manifest must name (`base_url`).
+    public let base: String
 
     public init(fetcher: ArtifactFetcher, redirects: RedirectPolicy = .downloads, decoder: (any Decompressing)? = nil,
-                url: @escaping @Sendable (Artifact) -> String = { $0.url }) {
-        self.fetcher = fetcher; self.redirects = redirects; self.decoder = decoder; self.url = url
+                manifestURL: String = ModelCatalog.manifestURL, noticeURL: String = ModelCatalog.noticeURL,
+                base: String = ModelCatalog.distBase) {
+        self.fetcher = fetcher; self.redirects = redirects; self.decoder = decoder
+        self.manifestURL = manifestURL; self.noticeURL = noticeURL; self.base = base
     }
 
     public func fetch(_ model: ModelDescriptor, into directory: URL,
                       progress: @escaping @Sendable (Int64, Bool) -> Void) async throws {
-        if let download = model.download {
-            guard let decoder, let artifact = model.artifacts.first, model.artifacts.count == 1 else {
-                throw ModelError(.modelInstall, "No decoder for \(download.name)")
-            }
-            try await fetcher.fetchCompressed(url(download), download: download, artifact: artifact, into: directory,
-                                              decoder: decoder, redirects: redirects, progress: progress)
-            return
-        }
+        guard let decoder else { throw ModelError(.modelInstall, "No Zstandard decoder") }
+        let urls = try await manifest().urls(model, allowed: redirects)
+        try await fetcher.fetchNotice(noticeURL, into: directory, redirects: redirects)
         var completed: Int64 = 0
-        for artifact in model.artifacts {
-            let done = completed
-            try await fetcher.fetch(url(artifact), artifact, into: directory, redirects: redirects) { bytes, verifying in
-                progress(done + bytes, verifying)
+        for (index, artifact) in model.artifacts.enumerated() {
+            guard let download = artifact.download, let url = urls[artifact.name] else {
+                throw ModelError(.modelInstall, "\(artifact.name) has no pinned download")
             }
-            completed += artifact.size
+            let done = completed, last = index == model.artifacts.count - 1
+            try await fetcher.fetchCompressed(url, download: download, artifact: artifact, into: directory,
+                                              decoder: decoder, redirects: redirects) { bytes, verifying in
+                if verifying && !last {
+                    progress(done + download.size, false)
+                } else {
+                    progress(done + bytes, verifying)
+                }
+            }
+            completed += download.size
         }
+    }
+
+    /// The host's manifest. One that is too long cannot be the host's: it is refused as a model the host does not
+    /// offer, not as a damaged download.
+    private func manifest() async throws -> DistManifest {
+        let data: Data
+        do {
+            data = try await fetcher.read(manifestURL, limit: DistManifest.maxBytes, redirects: redirects)
+        } catch let error as ModelError where error.failure == .modelVerify {
+            throw ModelError(.download(.pinUnavailable), "Manifest: \(error.message)")
+        }
+        return try DistManifest.parse(data, base: base)
     }
 }
 
@@ -92,6 +121,11 @@ public protocol ModelConsentRecords: Sendable {
 /// `consented()` before any install, and `install` does not.
 ///
 /// The root is excluded from backups once an install creates it.
+///
+/// Layout (D4): `<root>/models/<id>/<source_sha256>/` holds a model's files and the host's `NOTICE.txt`. An install
+/// collects them in `<root>/models/<id>/.<source_sha256>.staging/`, which keeps `.part` files and checked files
+/// across failures and app kills, then renames it into place; a broken revision is retired by renaming it to
+/// `.remove-<UUID>` before it is deleted. `prune` deletes everything else.
 public final class ModelRepository: Sendable {
     private struct State {
         var ready: [ModelPart: Bool] = [:]
@@ -103,12 +137,17 @@ public final class ModelRepository: Sendable {
     public let root: URL
     private let consent: any ModelConsentRecords
     private let fetcher: any ModelFetching
+    /// The per-session check of the installed models (`ModelVerifier`).
+    public let verifier: ModelVerifier
     private let onChange: @Sendable ([ModelPart: ModelStatus]) -> Void
     private let state = Mutex(State())
 
+    /// `verifier` learns of each install, which has just checked every file.
     public init(root: URL, consent: any ModelConsentRecords, fetcher: any ModelFetching,
+                verifier: ModelVerifier = .shared,
                 onChange: @escaping @Sendable ([ModelPart: ModelStatus]) -> Void = { _ in }) {
-        self.root = root; self.consent = consent; self.fetcher = fetcher; self.onChange = onChange
+        self.root = root; self.consent = consent; self.fetcher = fetcher; self.verifier = verifier
+        self.onChange = onChange
     }
 
     public var status: [ModelPart: ModelStatus] { state.withLock { $0.status } }
@@ -158,8 +197,7 @@ public final class ModelRepository: Sendable {
     }
 
     /// Installs the models of `part` that are not ready, through the fetcher, and pushes the progress into `status`
-    /// and to `progress`. Each model's marker is deleted first and written only after all of its files verified. The
-    /// primary model is required: its failure ends the install with its `ModelError` (CANCELLED when the task was
+    /// and to `progress`. Each model's revision appears only once all of its files verified. The primary model is required: its failure ends the install with its `ModelError` (CANCELLED when the task was
     /// cancelled). An extra (the speech detector) is best effort: its failure is logged and listed in
     /// `InstallResult.skipped`.
     public func install(_ part: ModelPart,
@@ -202,19 +240,27 @@ public final class ModelRepository: Sendable {
         return InstallResult(part: part, skipped: skipped)
     }
 
-    /// Installs one `model` through the fetcher, with no status update: deletes its marker, fetches and verifies its
-    /// files (resuming `.part` files), then writes the marker. `progress` gets the bytes of the model's download and
-    /// whether they are being checked. Any failure is thrown as a `ModelError` (a full disk becomes SPACE, any other
-    /// file or network error DOWNLOAD), or as `CancellationError`.
+    /// Installs one `model` through the fetcher, with no status update. A revision directory that is there but not
+    /// complete is retired first. The fetcher fills the model's staging directory (resuming its `.part` files and
+    /// keeping the files it checked before); once every file and the notices are there, the staging directory is
+    /// written through to storage, renamed into place (never over an existing directory) and its parent written
+    /// through. `progress` gets the bytes of the model's download and whether they are being checked. Any failure is
+    /// thrown as a `ModelError` (a full disk becomes SPACE, any other file or network error DOWNLOAD), or as
+    /// `CancellationError`; the staging directory stays for the next attempt.
     public func installModel(_ model: ModelDescriptor,
                              progress: @escaping @Sendable (Int64, Bool) -> Void) async throws {
         try prepareRoot()
-        let directory = model.directory(in: root)
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let marker = directory.appendingPathComponent(model.markerFile)
-        try? FileManager.default.removeItem(at: marker)
+        let final = model.directory(in: root)
+        if model.ready(in: root) { return }
+        let staging = model.staging(in: root)
         do {
-            try await fetcher.fetch(model, into: directory, progress: progress)
+            try ModelFiles.retire(final)
+            try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
+        } catch {
+            throw ModelError(.modelInstall, "\(error)")
+        }
+        do {
+            try await fetcher.fetch(model, into: staging, progress: progress)
         } catch let error as ModelError {
             throw error
         } catch {
@@ -223,10 +269,52 @@ public final class ModelRepository: Sendable {
             if CheckpointFiles.isOutOfSpace(error) { throw ModelError(.space, "\(error)") }
             throw ModelError(.modelDownload, "\(error)")
         }
+        guard model.complete(staging) else { throw ModelError(.modelInstall, "\(model.pin) is incomplete") }
         do {
-            try Data(model.markerValue.utf8).write(to: marker, options: .atomic)
+            try Self.removeLeftovers(of: model, in: staging)
+            try ModelFiles.sync(staging)
+            try ModelFiles.renameExclusive(staging, final)
+            try ModelFiles.sync(final.deletingLastPathComponent())
         } catch {
             throw ModelError(.modelInstall, "\(error)")
+        }
+        verifier.markVerified(model, in: root)
+    }
+
+    /// Deletes what is left in a complete staging directory besides the model's files and notices (the `.part` of a
+    /// file that verified on another attempt).
+    private static func removeLeftovers(of model: ModelDescriptor, in staging: URL) throws {
+        let keep = Set(model.artifacts.map(\.name) + [ModelDescriptor.noticeFile])
+        for name in try FileManager.default.contentsOfDirectory(atPath: staging.path) where !keep.contains(name) {
+            try FileManager.default.removeItem(at: staging.appendingPathComponent(name))
+        }
+    }
+
+    /// Deletes everything under the root that no model of the catalog reads: the directories of earlier development
+    /// builds (`parakeet-ultra/`, `vad/`, `speaker-models/`; D51, nothing is migrated), the revisions and staging
+    /// directories of other pins, ids the catalog no longer has, and retired revisions. A model's pinned revision and
+    /// its staging directory stay, so this can run beside an install.
+    public func prune() { Self.prune(root: root) }
+
+    /// `prune` for the model root `root`.
+    public static func prune(root: URL) {
+        let manager = FileManager.default
+        guard let entries = try? manager.contentsOfDirectory(atPath: root.path) else { return }
+        for name in entries where name != ModelDescriptor.modelsDirectory {
+            try? manager.removeItem(at: root.appendingPathComponent(name))
+        }
+        let models = root.appendingPathComponent(ModelDescriptor.modelsDirectory, isDirectory: true)
+        let pinned = Dictionary(ModelCatalog.all.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        for id in (try? manager.contentsOfDirectory(atPath: models.path)) ?? [] {
+            let directory = models.appendingPathComponent(id, isDirectory: true)
+            guard let model = pinned[id] else {
+                try? manager.removeItem(at: directory)
+                continue
+            }
+            let keep: Set<String> = [model.sourceSha256, ".\(model.sourceSha256).staging"]
+            for name in (try? manager.contentsOfDirectory(atPath: directory.path)) ?? [] where !keep.contains(name) {
+                try? manager.removeItem(at: directory.appendingPathComponent(name))
+            }
         }
     }
 
@@ -247,7 +335,7 @@ public final class ModelRepository: Sendable {
             return true
         } catch {
             if model == part.primary || ModelInstaller.isCancellation(error) { throw error }
-            Self.log("Skipped \(model.directory)/\(model.markerFile): \(error)")
+            Self.log("Skipped \(model.pin): \(error)")
             return false
         }
     }

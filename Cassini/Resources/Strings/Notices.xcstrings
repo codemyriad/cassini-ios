@@ -2639,6 +2639,47 @@
         }
       }
     },
+    "Model not available": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Model not available"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modelo no disponible"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modèle indisponible"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modello non disponibile"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modelo indisponível"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modelo indisponível"
+          }
+        }
+      }
+    },
     "Newer Cassini format": {
       "extractionState": "manual",
       "localizations": {
@@ -4480,6 +4521,47 @@
           "stringUnit": {
             "state": "translated",
             "value": "Os dados Cassini do ficheiro estão danificados. O áudio continua a ser reproduzido."
+          }
+        }
+      }
+    },
+    "The model server no longer offers this version of the model. Update Cassini to download it.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The model server no longer offers this version of the model. Update Cassini to download it."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El servidor de modelos ya no ofrece esta versión del modelo. Actualiza Cassini para descargarlo."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le serveur des modèles ne propose plus cette version du modèle. Mettez à jour Cassini pour le télécharger."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il server dei modelli non offre più questa versione del modello. Aggiorna Cassini per scaricarlo."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O servidor de modelos não oferece mais esta versão do modelo. Atualize o Cassini para baixá-lo."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O servidor de modelos já não disponibiliza esta versão do modelo. Atualize o Cassini para o transferir."
           }
         }
       }

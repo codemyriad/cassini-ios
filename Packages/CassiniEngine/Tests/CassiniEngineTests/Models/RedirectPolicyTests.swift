@@ -5,12 +5,12 @@ import CassiniNotebook
 
 @Suite struct RedirectPolicyTests {
     private let policy = RedirectPolicy.downloads
-    private let start = URL(string: "https://huggingface.co/repo/resolve/rev/encoder.int8.onnx")!
+    private let start = URL(string: "https://dist.gocassini.com/models/files/x/encoder.int8.onnx.zst")!
 
     /// The message of the refusal of `location`; records an issue when it is followed.
-    @discardableResult private func refused(_ location: String?, hop: Int = 1) -> String {
+    @discardableResult private func refused(_ location: String?, hop: Int = 1, by: RedirectPolicy? = nil) -> String {
         do {
-            let next = try policy.next(from: start, location: location, hop: hop)
+            let next = try (by ?? policy).next(from: start, location: location, hop: hop)
             Issue.record("Expected \(location ?? "nil") to be refused, got \(next)")
         } catch let error as ModelError {
             #expect(error.failure == .modelDownload)
@@ -21,56 +21,60 @@ import CassiniNotebook
         return ""
     }
 
-    // ports: RedirectPolicyTest#theRecordedRedirectTargetsAreAllowed
-    @Test func theRecordedRedirectTargetsAreAllowed() throws {
-        for target in [
-            "https://us.aws.cdn.hf.co/xet-bridge-us/68a0/bccb?Expires=1&Signature=x",
-            "https://cas-bridge.xethub.hf.co/xet-bridge-us/a",
-            "https://cdn-lfs.huggingface.co/repos/a",
-            "https://release-assets.githubusercontent.com/github-production-release-asset/531380835/x",
-            "https://objects.githubusercontent.com/github-production-release-asset-2e65be/x",
-            "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx",
-            "https://dist.gocassini.com/models/files/x/model.int8.onnx.zst",
-        ] {
-            #expect(try policy.next(from: start, location: target, hop: 1).absoluteString == target)
-        }
+    // ports: RedirectPolicyTest#onlyTheModelHostIsAllowed
+    @Test func onlyTheModelHostIsAllowed() throws {
+        let target = "https://dist.gocassini.com/models/files/x/model.int8.onnx.zst"
+        #expect(try policy.next(from: start, location: target, hop: 1).absoluteString == target)
+        #expect(policy.hosts == ["dist.gocassini.com"])
     }
 
     // ports: RedirectPolicyTest#aRelativeLocationStaysOnTheSameHost
     @Test func aRelativeLocationStaysOnTheSameHost() throws {
-        let next = try policy.next(from: start, location: "/api/resolve-cache/models/repo/rev/tokens.txt?x=1", hop: 1)
-        #expect(next.absoluteString == "https://huggingface.co/api/resolve-cache/models/repo/rev/tokens.txt?x=1")
+        let next = try policy.next(from: start, location: "/models/files/y/tokens.txt.zst?x=1", hop: 1)
+        #expect(next.absoluteString == "https://dist.gocassini.com/models/files/y/tokens.txt.zst?x=1")
     }
 
     // ports: RedirectPolicyTest#everyCatalogueUrlStartsOnAnAllowedHttpsHost
     @Test func everyCatalogueUrlStartsOnAnAllowedHttpsHost() {
-        let urls = (ModelCatalog.consented + [ModelCatalog.vad]).flatMap { $0.artifacts + [$0.download].compactMap { $0 } }
-            .map(\.url).filter { !$0.isEmpty }
-        #expect(urls.count == 7)
+        let urls = ModelCatalog.all.flatMap(\.artifacts).compactMap(\.download).map(\.url)
+            + [ModelCatalog.manifestURL, ModelCatalog.noticeURL]
+        #expect(urls.count == 9)
         for url in urls { #expect(policy.allows(URL(string: url)!), "\(url)") }
     }
 
-    // ports: RedirectPolicyTest#otherHostsAreRefused
+    // ports: RedirectPolicyTest#otherHostsAreRefused (the former model hosts of D53.1 among them)
     @Test func otherHostsAreRefused() {
         for target in [
             "https://example.com/model",
-            "https://evilhuggingface.co/model",
-            "https://huggingface.co.example.com/model",
-            "https://hf.co/model",
-            "https://githubusercontent.com/model",
+            "https://huggingface.co/repo/resolve/rev/encoder.int8.onnx",
+            "https://us.aws.cdn.hf.co/xet-bridge-us/a",
+            "https://cdn-lfs.huggingface.co/repos/a",
+            "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx",
+            "https://release-assets.githubusercontent.com/github-production-release-asset/x",
+            "https://objects.githubusercontent.com/github-production-release-asset-2e65be/x",
             "https://gocassini.com/model",
             "https://other.gocassini.com/model",
+            "https://dist.gocassini.com.example.com/model",
             "https://127.0.0.1/model",
         ] {
             refused(target)
         }
     }
 
+    // ports: RedirectPolicyTest#aWildcardEntryMatchesSubdomainsOnly
+    @Test func aWildcardEntryMatchesSubdomainsOnly() {
+        let wildcard = RedirectPolicy(hosts: ["*.example.com"])
+        #expect(wildcard.hostAllowed("cdn.example.com"))
+        #expect(wildcard.hostAllowed("a.b.example.com"))
+        #expect(!wildcard.hostAllowed("example.com"))
+        #expect(!wildcard.hostAllowed("evilexample.com"))
+        refused("https://example.com/model", by: wildcard)
+    }
+
     // ports: RedirectPolicyTest#plainHttpIsRefusedEvenToAnAllowedHost
     @Test func plainHttpIsRefusedEvenToAnAllowedHost() {
-        #expect(refused("http://us.aws.cdn.hf.co/xet").contains("http://us.aws.cdn.hf.co"))
-        refused("http://huggingface.co/repo")
-        refused("ftp://huggingface.co/repo")
+        #expect(refused("http://dist.gocassini.com/x").contains("http://dist.gocassini.com"))
+        refused("ftp://dist.gocassini.com/x")
     }
 
     // ports: RedirectPolicyTest#aMissingOrBadLocationIsRefused
@@ -82,13 +86,13 @@ import CassiniNotebook
 
     // ports: RedirectPolicyTest#theSixthRedirectIsRefused
     @Test func theSixthRedirectIsRefused() throws {
-        _ = try policy.next(from: start, location: "https://us.aws.cdn.hf.co/a", hop: RedirectPolicy.maxRedirectsDefault)
-        #expect(refused("https://us.aws.cdn.hf.co/a", hop: RedirectPolicy.maxRedirectsDefault + 1).contains("More than 5"))
+        _ = try policy.next(from: start, location: "https://dist.gocassini.com/a", hop: RedirectPolicy.maxRedirectsDefault)
+        #expect(refused("https://dist.gocassini.com/a", hop: RedirectPolicy.maxRedirectsDefault + 1).contains("More than 5"))
     }
 
     // ports: RedirectPolicyTest#hostsMatchWithoutCaseOrATrailingDot
     @Test func hostsMatchWithoutCaseOrATrailingDot() {
-        #expect(policy.hostAllowed("US.AWS.CDN.HF.CO"))
+        #expect(policy.hostAllowed("DIST.GOCASSINI.COM"))
         #expect(policy.hostAllowed("dist.gocassini.com."))
         #expect(!policy.hostAllowed(""))
         #expect(!policy.hostAllowed(nil))

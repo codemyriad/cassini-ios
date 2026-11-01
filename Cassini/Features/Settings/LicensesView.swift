@@ -7,7 +7,12 @@ import CassiniInference
 struct LicensesView: View {
     @Environment(\.openURL) private var openURL
     @SceneStorage("licenses.open") private var savedEntry: String?
-    @State private var model = LicensesModel(text: LicensesView.text)
+    @State private var model: LicensesModel
+
+    /// `models` is the model root, whose installed revisions keep the model host's notices.
+    init(models: URL) {
+        _model = State(initialValue: LicensesModel { try await LicensesView.text($0, models: models) })
+    }
 
     var body: some View {
         @Bindable var model = model
@@ -36,9 +41,12 @@ struct LicensesView: View {
         .onChange(of: model.opened) { _, entry in savedEntry = entry?.rawValue }
     }
 
-    /// The bundled files, read off the main actor.
-    @Sendable private static func text(_ entry: LicenseEntry) async throws -> String {
-        let texts = LicenseTexts(downloads: SpeakerModels.downloads) { name in
+    /// The bundled files and the model host's notices of an installed model, read off the main actor.
+    @Sendable private static func text(_ entry: LicenseEntry, models: URL) async throws -> String {
+        let notice: @Sendable () -> String? = {
+            ModelCatalog.installedNotice(in: models).flatMap { try? String(contentsOf: $0, encoding: .utf8) }
+        }
+        let texts = LicenseTexts(downloads: ModelCatalog.downloads, notice: notice) { name in
             let parts = name.split(separator: ".", maxSplits: 1).map(String.init)
             guard let url = Bundle.main.url(forResource: parts[0], withExtension: parts.count > 1 ? parts[1] : nil) else {
                 throw CocoaError(.fileReadNoSuchFile)

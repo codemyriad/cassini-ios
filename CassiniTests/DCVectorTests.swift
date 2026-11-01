@@ -19,7 +19,7 @@ import CassiniSherpa
 ///
 /// Environment (xcodebuild passes TEST_RUNNER_<name> through as <name>):
 ///   CASSINI_DC_VECTOR            coordination `ux-draft/dc`, with `../whistle/pipeline-input-48k.wav` beside it
-///   CASSINI_PARAKEET_MODEL_ROOT  a model root with parakeet-ultra/ and vad/ and their markers (read only)
+///   CASSINI_PARAKEET_MODEL_ROOT  a model root with the revision directories of Ultra and the detector (read only)
 final class DCVectorTests: XCTestCase {
     private static let offset: Float = -2060.0 / 32768
     private static let files = [

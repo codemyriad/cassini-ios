@@ -29,9 +29,10 @@ public let sourceCodeURL = URL(string: "https://github.com/codemyriad/cassini-io
 ///
 /// - Cassini: the GPLv3 text (`Cassini-GPL-3.0.txt`, a copy of the repository's `LICENSE`).
 /// - Third-party notices: `ThirdPartyNotices.txt` without its model notices.
-/// - Model notices: the notices' sections about the models.
-/// - Where the models come from: the Network section of `Privacy.txt`, then the pinned URL of every file Cassini
-///   downloads.
+/// - Model notices: the notices' sections about the models, then the model host's `NOTICE.txt` as an installed model
+///   keeps it (D4: the notices come with the downloaded models; before the first download there is none).
+/// - Where the models come from: the Network section of `Privacy.txt`, then the URL of the manifest, of the notices
+///   and of every file Cassini downloads.
 /// - Privacy: `Privacy.txt`, its headings without their `#` marks.
 ///
 /// The notices are sections that start with a title line and are separated by two blank lines.
@@ -40,16 +41,20 @@ public struct LicenseTexts: Sendable {
     public static let notices = "ThirdPartyNotices.txt"
     public static let privacy = "Privacy.txt"
     /// The titles of the notices' sections about models.
-    public static let modelSections = ["Speech recognition models", "Downloaded speaker models"]
+    public static let modelSections = ["Speech recognition models", "Downloaded models"]
     public static let networkHeading = "## Network"
 
     /// The text of a bundled file by name.
     private let read: @Sendable (String) throws -> String
     /// Each downloaded file and its pinned URL.
     private let downloads: [(name: String, url: URL)]
+    /// The model host's notices as an installed model keeps them; nil when no model is installed.
+    private let notice: @Sendable () -> String?
 
-    public init(downloads: [(name: String, url: URL)], read: @escaping @Sendable (String) throws -> String) {
+    public init(downloads: [(name: String, url: URL)], notice: @escaping @Sendable () -> String? = { nil },
+                read: @escaping @Sendable (String) throws -> String) {
         self.downloads = downloads
+        self.notice = notice
         self.read = read
     }
 
@@ -57,7 +62,8 @@ public struct LicenseTexts: Sendable {
         switch entry {
         case .cassini: try read(Self.gpl)
         case .thirdParty: Self.join(try noticeSections().filter { !Self.modelSections.contains($0.title) }.map(\.text))
-        case .models: Self.join(try noticeSections().filter { Self.modelSections.contains($0.title) }.map(\.text))
+        case .models:
+            Self.join(try noticeSections().filter { Self.modelSections.contains($0.title) }.map(\.text) + [notice() ?? ""])
         case .modelSources:
             Self.join([Self.section(try read(Self.privacy), heading: Self.networkHeading)]
                       + downloads.map { "\($0.name)\n\($0.url.absoluteString)" })

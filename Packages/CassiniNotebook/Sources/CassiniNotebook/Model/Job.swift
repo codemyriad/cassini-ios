@@ -36,6 +36,9 @@ public enum DownloadError: String, Codable, CaseIterable, Hashable, Sendable {
     case hostNotAllowed = "HOST_NOT_ALLOWED"
     /// iOS ended the background time the download ran in.
     case stoppedBySystem = "STOPPED_BY_SYSTEM"
+    /// The model host's manifest does not list the model as this build pins it (its id and source hash, or any of its
+    /// files): only a newer Cassini can download it, so trying again does not help. iOS only (D4, D53.1).
+    case pinUnavailable = "PIN_UNAVAILABLE"
 }
 
 /// Why a job or a step of it failed, as a stable code. The app maps each code to its copy; the code is what is stored.
@@ -171,13 +174,15 @@ public struct TrashedJob: Codable, Hashable, Sendable {
 extension DownloadError {
     /// The failure whose message a download error shows in "Couldn't transcribe" (Android
     /// `ModelInstallOwner.failureOf`): no space, a failed file check and a failed install have their own; the rest
-    /// are a failed download.
+    /// are a failed download. A model the host does not offer as pinned (iOS only) is its own failure, the download
+    /// error itself: no plain failure says "update Cassini".
     public var failure: JobFailure {
         switch self {
         case .notEnoughStorage: .space
         case .fileCheckFailed: .modelVerify
         case .install: .modelInstall
         case .noConnection, .interrupted, .hostNotAllowed, .stoppedBySystem: .modelDownload
+        case .pinUnavailable: .download(.pinUnavailable)
         }
     }
 }

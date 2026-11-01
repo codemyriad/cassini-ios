@@ -141,7 +141,7 @@ import CassiniNotebook
         let kinds: [DownloadError: BannerKind] = [
             .noConnection: .dlNoConnection, .interrupted: .dlStopped, .hostNotAllowed: .dlStopped,
             .stoppedBySystem: .dlStopped, .notEnoughStorage: .dlNoSpace, .fileCheckFailed: .dlFileCheck,
-            .install: .dlInstallFailed,
+            .install: .dlInstallFailed, .pinUnavailable: .dlPinUnavailable,
         ]
         #expect(Set(kinds.keys) == Set(DownloadError.allCases))
         for (error, kind) in kinds {
@@ -158,6 +158,9 @@ import CassiniNotebook
         #expect(Notices.download(.stoppedBySystem).args.bySystem)
         #expect(!Notices.download(.interrupted).args.bySystem)
         #expect(Notices.download(.fileCheckFailed).actions == [.downloadAgain])
+        // iOS only: a model the host does not offer as pinned has nothing to retry; the banner can be closed.
+        #expect(Notices.download(.pinUnavailable).actions.isEmpty)
+        #expect(Notices.download(.pinUnavailable).dismissible)
 
         let failure = DownloadFact(part: .speech, failure: .noConnection, at: at)
         #expect(only(Notices.library(NoticeFacts(download: failure), LibraryFacts(loading: true)))?.kind == .dlNoConnection)
@@ -319,6 +322,9 @@ import CassiniNotebook
         for error in [DownloadError.noConnection, .interrupted, .hostNotAllowed, .stoppedBySystem] {
             #expect(error.failure == .modelDownload, "\(error)")
         }
+        // iOS only: a model the host does not offer as pinned is its own failure, with its own message.
+        #expect(DownloadError.pinUnavailable.failure == .download(.pinUnavailable))
+        #expect(JobFailure.download(.pinUnavailable).code == "DOWNLOAD_PIN_UNAVAILABLE")
     }
 
     // ports: LibraryMappingTest#documentRows (transcribeAgainRefused)
@@ -338,17 +344,19 @@ import CassiniNotebook
         #expect(Set(BannerKind.allCases.filter { !$0.appEmitted }) == [.txCalculating, .txBattery])
         #expect(BannerKind.dlDownloading.actions == [.cancel])
         #expect(BannerKind.dlChecking.actions.isEmpty)
-        #expect(Set(BannerKind.allCases.filter(\.dismissible)) == [.recovered, .recCompressionFailed, .notesUnreadable])
+        #expect(Set(BannerKind.allCases.filter(\.dismissible))
+                == [.recovered, .recCompressionFailed, .notesUnreadable, .dlPinUnavailable])
         let counts = Dictionary(grouping: BannerKind.allCases, by: \.group).mapValues(\.count)
         // Android's groups less NO_ENCODER, TX_MEMORY, IMPORT_WAV and REC_STOPPED_FILE_LIMIT, plus the iOS kinds.
-        #expect(counts == [.trust: 7, .recording: 9, .transcription: 8, .download: 8, .library: 10])
+        #expect(counts == [.trust: 7, .recording: 9, .transcription: 8, .download: 9, .library: 10])
         #expect(BannerKind.allCases.allSatisfy { $0.actions.count <= 2 })
         #expect(BannerKind.trustVerified.tone == .ok)
         #expect(BannerKind.libNoMatch.tone == .plain)
         #expect(BannerKind.recovered.tone == .info)
         #expect(BannerKind.txFailed.tone == .error)
         #expect(BannerKind.txQueueHeld.tone == .warn)
-        #expect(Set(BannerKind.allCases.filter(\.iOSOnly)) == [.recInputLost, .recCompressionFailed, .notesUnreadable])
+        #expect(Set(BannerKind.allCases.filter(\.iOSOnly))
+                == [.recInputLost, .recCompressionFailed, .notesUnreadable, .dlPinUnavailable])
     }
 
     // ports: BannerKindTest#specDefaultsComeFromTheKind

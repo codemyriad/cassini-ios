@@ -2,10 +2,11 @@ import Foundation
 
 /// Which redirects a download follows (Android's `RedirectPolicy`). The `HTTPTransport` never follows a redirect
 /// itself; `ArtifactFetcher` asks `next` for each `Location`, so a model download can reach only `hosts`, over HTTPS
-/// when `httpsOnly`, in at most `maxRedirects` hops. The start URL is not checked here: it comes from `ModelCatalog`.
+/// when `httpsOnly`, in at most `maxRedirects` hops. The start URL is not checked here: it is the manifest or notices
+/// URL of `ModelCatalog`, or a file URL that `DistManifest` checked with `allows`.
 ///
-/// Host entries follow `ModelCatalog.downloadHosts`: `*.example.com` matches subdomains only, anything else matches
-/// the whole host. Matching ignores case and a trailing dot.
+/// Host entries follow `ModelCatalog.downloadHosts`, which has only the model host: `*.example.com` would match
+/// subdomains only, anything else matches the whole host. Matching ignores case and a trailing dot.
 public struct RedirectPolicy: Hashable, Sendable {
     public static let maxRedirectsDefault = 5
 

@@ -34,8 +34,8 @@ let package = Package(
         // The only importer of SherpaOnnxC; empty of native code unless CASSINI_SHERPA_LOCAL is set (see above).
         .library(name: "CassiniSherpa", targets: ["CassiniSherpa"])
     ],
-    // Zstandard decompresses the seekable .zst of the speaker model download (`ZstdDecompressor`); Android links
-    // zstd-jni with the same release.
+    // Zstandard decompresses the seekable .zst of every model file from the model host (`ZstdDecompressor`); Android
+    // links zstd-jni with the same release.
     dependencies: [.package(url: "https://github.com/facebook/zstd.git", revision: "f8745da6ff1ad1e7bab384bd1f9d742439278e99"),
         .package(url: "https://github.com/alta/swift-opus.git", revision: "6f3cb6bd3ffed1fe5f06d00a962d5c191a50daf8")],
     targets: [
@@ -53,7 +53,7 @@ let package = Package(
         .target(name: "CassiniEngine", dependencies: ["CassiniCore", "CassiniNotebook"], path: "Packages/CassiniEngine/Sources/CassiniEngine"),
         .target(name: "CassiniEngineTesting", dependencies: ["CassiniCore", "CassiniEngine", "CassiniNotebook"], path: "Packages/CassiniEngine/Sources/CassiniEngineTesting"),
         .testTarget(name: "CassiniEngineTests", dependencies: ["CassiniCore", "CassiniEngine", "CassiniEngineTesting", "CassiniNotebook"], path: "Packages/CassiniEngine/Tests/CassiniEngineTests",
-                    resources: [.copy("Resources/language-tag")]),
+                    resources: [.copy("Resources/language-tag"), .copy("Resources/model-host")]),
         sherpaTarget,
         .testTarget(name: "CassiniSherpaTests", dependencies: ["CassiniSherpa", "CassiniEngine", "CassiniNotebook"], path: "Packages/CassiniSherpa/Tests/CassiniSherpaTests")
     ] + sherpaBinaries

@@ -45,7 +45,8 @@ import CassiniNotebook
         let record = try #require(h.provenance(of: await h.note()))
         #expect(record.backend == "sherpa-onnx")
         #expect(record.engine == "Parakeet TDT")
-        #expect(record.model == "moondream/parakeet-ultra INT8")
+        // D16 §5: the model host's pin (Android still writes "moondream/parakeet-ultra INT8").
+        #expect(record.model == "parakeet-ultra-0.6b-int8@18cb623004dd6c15999b93cb70b14d8a1f6e8f3a2a97ff733f104bfc3494f6a9")
         #expect(record.version == "sherpa-onnx 1.13.7; model revision \(ModelCatalog.parakeetRevision)")
         #expect(record.source == "recording")
         #expect(record.language == "und", "Parakeet does not say which language it heard (D53.2)")
