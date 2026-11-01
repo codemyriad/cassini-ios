@@ -2,10 +2,15 @@ import Foundation
 
 /** Writing a document: a new seal over the audio, and relabel and retitle, which rewrite only the manifest. */
 extension CassiniDocument {
-    /** Adds a variant while retaining existing descriptors, bodies, extensions and unrelated tags. */
+    /**
+     * Adds a variant while retaining existing descriptors, bodies, extensions and unrelated tags. Without [existing],
+     * a fresh seal carries [source]'s private and unknown manifest members, its meeting id and its meeting and
+     * provenance members not tied to its transcripts; see [seal].
+     */
     public static func create(_ audioBytes: [UInt8], transcript: Transcript, title: String, processing: JSONObject,
-                              existing: CassiniDocument? = nil, speakerLabels: [String: String] = [:]) throws -> [UInt8] {
-        let (comments, digest) = try seal(OggOpus.scan(ArraySource(audioBytes)), transcript, title, processing, existing, speakerLabels)
+                              existing: CassiniDocument? = nil, speakerLabels: [String: String] = [:],
+                              carrying source: CassiniDocument? = nil) throws -> [UInt8] {
+        let (comments, digest) = try seal(OggOpus.scan(ArraySource(audioBytes)), transcript, title, processing, existing, speakerLabels, source)
         let out = ArraySink()
         try check(try OggOpus.rewrite(ArraySource(audioBytes), tags: comments.packet, to: out).digest() == digest, "Audio changed while sealing")
         try verify(read(out.bytes), transcript)
@@ -15,8 +20,9 @@ extension CassiniDocument {
     /** Streams [audio] into [target] behind the new tags and verifies the written file from disk; nothing is left on failure. */
     @discardableResult
     public static func create(_ audio: URL, transcript: Transcript, title: String, processing: JSONObject, existing: CassiniDocument?,
-                              speakerLabels: [String: String], target: URL) throws -> CassiniDocument {
-        let (comments, digest) = try seal(OggOpus.scan(audio), transcript, title, processing, existing, speakerLabels)
+                              speakerLabels: [String: String], carrying source: CassiniDocument? = nil,
+                              target: URL) throws -> CassiniDocument {
+        let (comments, digest) = try seal(OggOpus.scan(audio), transcript, title, processing, existing, speakerLabels, source)
         do {
             try writeWithTags(audio, comments, digest, target)
             let sealed = read(target)
@@ -98,6 +104,45 @@ extension CassiniDocument {
         }
     }
 
+    /** The top-level members the manifest schema defines. A fresh seal writes the ones it needs itself. */
+    static let schemaMembers = ["kind", "version", "profile", "meeting", "audio", "integrity", "speakers", "transcripts",
+                                "readableTranscripts", "provenance", "summary", "attachments"]
+
+    /**
+     * What a fresh seal carries from [source]'s manifest, verbatim and in its order: `x` (private data, SPEC "Private
+     * use") and every other top-level member the schema does not define (SPEC: a rewrite carries unrecognised members
+     * forward). Nothing for a source without a manifest.
+     */
+    public static func carriedMembers(of source: CassiniDocument?) -> [(key: String, value: JSON)] {
+        (source?.manifest?.pairs ?? []).filter { pair in !schemaMembers.contains { sameBytes($0, pair.key) } }
+    }
+
+    /** The `meeting` members a fresh seal sets itself; every other member of the source's `meeting` is kept. */
+    static let resealedMeetingMembers = ["title", "createdAtUtc", "durationMs"]
+
+    /** The `provenance` members that describe the source's transcripts, summary and audio; a fresh seal keeps the rest. */
+    static let sourceProvenanceMembers = ["speechToText", "displayTranscript", "meetingSummary", "attribution", "wordTimings"]
+
+    /**
+     * The `meeting` a fresh seal starts from: [source]'s, verbatim and in its order, when it has an id. A fresh seal
+     * covers the same audio packets, so it is a tag rewrite and keeps the meeting's id (SPEC `meeting.id`) along with
+     * `recordedAtLocal` and every member this build does not know; it then sets [resealedMeetingMembers] itself.
+     */
+    public static func carriedMeeting(of source: CassiniDocument?) -> JSONObject? {
+        guard let meeting = source?.manifest?["meeting"]?.object, meeting["id"]?.string?.isEmpty == false else { return nil }
+        return meeting
+    }
+
+    /**
+     * The members of [source]'s `provenance` a fresh seal keeps, verbatim and in their order: every one but
+     * [sourceProvenanceMembers], which describe variants, a summary and word timing the seal does not carry.
+     */
+    public static func carriedProvenance(of source: CassiniDocument?) -> [(key: String, value: JSON)] {
+        (source?.manifest?["provenance"]?.object?.pairs ?? []).filter { pair in
+            !sourceProvenanceMembers.contains { sameBytes($0, pair.key) }
+        }
+    }
+
     static func verify(_ sealed: CassiniDocument, _ transcript: Transcript) throws {
         try check(sealed.state == .ok && agreesWithManifest(sealed) && sealed.selected()?.transcript == transcript,
                   "Sealed document does not read back")
@@ -108,20 +153,32 @@ extension CassiniDocument {
      * [existing] document its transcript chunks and foreign comments are kept and every tag derived from the manifest
      * is written afresh, so no stale copy survives. Without one no CASSINI_ tag of the source can be trusted to match
      * the new manifest, so all of them are dropped; foreign comments always survive. TITLE follows `meeting.title`.
+     *
+     * A fresh seal builds its manifest anew from what [source] holds that is not tied to its transcripts or audio
+     * (SPEC "Extensibility": a rewrite carries unrecognised members forward). It appends [carriedMembers] unchanged,
+     * the private `x` data and any top-level member a newer format defines; starts `meeting` from [carriedMeeting],
+     * keeping its id; and starts `provenance` from [carriedProvenance]. That source is the unverified or stale document
+     * being sealed afresh; its integrity, audio, speakers, transcripts, summary and their provenance describe audio
+     * the new manifest does not, so none of them is carried. Beside [existing] the manifest is already that
+     * document's, so [source] must be nil.
      */
     static func seal(_ stream: OggOpus.Info, _ transcript: Transcript, _ title: String, _ processing: JSONObject,
-                             _ existing: CassiniDocument?, _ speakerLabels: [String: String]) throws -> (comments: Comments, digest: String) {
+                     _ existing: CassiniDocument?, _ speakerLabels: [String: String],
+                     _ source: CassiniDocument? = nil) throws -> (comments: Comments, digest: String) {
         let digest = try stream.digest()
         try check(existing == nil || existing!.state == .ok, "Never rebind stale transcripts to different audio")
+        try check(existing == nil || source == nil, "A seal beside a document keeps its manifest; it carries nothing else")
         let now = now()
         let shape: [(String, JSON)] = [("sampleRate", .int(48000)), ("channels", .int(stream.channels)),
                                        ("sampleCount", .int(stream.sampleCount)), ("durationMs", .int(stream.durationMs))]
         let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        var meeting = carriedMeeting(of: source) ?? JSONObject([("id", .string("mtg_" + UUID().uuidString.lowercased()))])
+        meeting["title"] = .string(trimmedTitle.isEmpty ? "Recording" : trimmedTitle)
+        meeting["createdAtUtc"] = .string(now)
+        meeting["durationMs"] = .int(stream.durationMs)
         var manifest = existing?.manifest ?? JSONObject([
             ("kind", .string("cassini-portable-meeting")), ("version", .int(1)), ("profile", .string("ogg-opus")),
-            ("meeting", .object(JSONObject([("id", .string("mtg_" + UUID().uuidString.lowercased())),
-                                            ("title", .string(trimmedTitle.isEmpty ? "Recording" : trimmedTitle)),
-                                            ("createdAtUtc", .string(now)), ("durationMs", .int(stream.durationMs))]))),
+            ("meeting", .object(meeting)),
             ("audio", .object(JSONObject([("container", .string("ogg")), ("codec", .string("opus")), ("sampleRate", .int(48000)),
                                           ("channels", .int(stream.channels)), ("sampleCount", .int(stream.sampleCount)),
                                           ("durationMs", .int(stream.durationMs))]))),
@@ -151,7 +208,7 @@ extension CassiniDocument {
             speakers.append(.object(JSONObject([("id", .string(word.speaker)), ("label", .string(label))])))
         }
         manifest["speakers"] = .array(speakers)
-        var provenance = manifest["provenance"]?.object ?? JSONObject()
+        var provenance = manifest["provenance"]?.object ?? JSONObject(carriedProvenance(of: source).map { ($0.key, $0.value) })
         var speech = provenance["speechToText"]?.object ?? JSONObject()
         speech[id] = .object(processing)
         provenance["speechToText"] = .object(speech)
@@ -163,6 +220,7 @@ extension CassiniDocument {
                                                             ("wordsMeasured", .int(0)), ("wordsFlagged", .int(0)), ("wordsDropped", .int(0))]))
         }
         manifest["provenance"] = .object(provenance)
+        if existing == nil { for (key, value) in carriedMembers(of: source) { manifest[key] = value } }
         var comments: Comments
         if let existing {
             // A verified document's transcript chunks stay; every copy of its manifest is rebuilt from the new one.

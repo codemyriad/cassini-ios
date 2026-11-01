@@ -402,9 +402,32 @@ stricter or looser than the spec.
   names it. The launch sweep removes `tmp/Exports` and stale `*.tmp` files, as Android's `DocumentRepository.sweep`
   does.
 - **Portable export.** Audio without an Ogg Opus original is encoded with libopus and mixed down to mono. An export
-  that would not fit the 16 MiB word body or the 8 MiB OpusTags packet is refused before it is written. A note
-  imported from a stale, unverified or unknown-format document gets a fresh seal over the same audio. The imported
-  file itself is never changed.
+  that would not fit the 16 MiB word body or the 8 MiB OpusTags packet is refused before it is written. Data carried
+  from the source counts toward that limit, and toward the 16 MiB manifest limit too, so private data that gzip shrinks
+  well is refused as too long rather than failing in the codec. The imported file itself is never changed. What the
+  export keeps of an imported document depends on how that document reads at export time, not on the state stored at
+  import:
+  - **Verified:** every variant stays, and the note's versions are added beside them, with the note's title and
+    speaker names.
+  - **Stale or unverified, nothing new on the device:** the export is the document itself, byte for byte, like
+    Android's Save a copy. Its variants, provenance, `x` data and honest state all survive. Renamed speakers and a
+    renamed title are not written, as on Android, whose relabel and retitle need a verified document. The note screen
+    keeps such a note read-only anyway, so only the title can change.
+  - **Stale or unverified, with versions made on the device (Transcribe again on a stale document):** a fresh seal
+    over the same audio that holds only those versions. The note is read-only otherwise, so no edit, merge or rename
+    gets here, and an unverified document cannot take a new version at all. The newest version is the default, even
+    when the note shows an imported version. The imported variants are not sealed again, because the audio does not
+    vouch for them; the note still shows them, and no provenance record names them. What the source manifest holds
+    apart from its transcripts and audio is carried verbatim (D53.2 Q3, SPEC "Extensibility"): `x` (desktop notes
+    under `x["gocassini.com"]`), any top-level member the schema does not define, the `meeting` with its id,
+    `recordedAtLocal` and unknown members (only the title, `createdAtUtc` and `durationMs` are written afresh), and
+    the `provenance` members other than `speechToText`, `displayTranscript`, `meetingSummary`, `attribution` and
+    `wordTimings`. Its integrity, audio, speakers, transcripts, readable transcripts, summary, attachments and
+    `CASSINI_*` tags are not carried; foreign and `X_*` tags are. The speakers are rebuilt from the new words, so
+    unknown members of the source's speaker entries are lost. `CassiniDocument.create(…, carrying:)` does the
+    carrying, and Android's has no such parameter yet.
+  - **Broken, newer-format or plain audio:** a fresh seal with only the foreign tags, since there is no manifest to
+    keep.
 
 ## Recording
 

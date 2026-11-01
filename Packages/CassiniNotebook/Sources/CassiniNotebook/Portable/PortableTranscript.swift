@@ -124,19 +124,27 @@ public enum PortableExportError: Error, Equatable, Sendable {
 }
 
 extension PortableTranscript {
+    /// The states of a source whose transcripts a reader shows but its audio does not vouch for: an export never
+    /// seals their variants as verified.
+    public static let untrustedStates: Set<DocumentState> = [.unverified, .staleAudio]
+
     /// Writes `opus` to `destination` with the note's transcript added as the new default variant. A verified source
-    /// keeps every earlier variant and gets the note's title and speaker names; any other source is sealed afresh,
-    /// keeping only its foreign tags. `processing` is the variant's provenance record (`ExportProvenance`). Returns the
-    /// new variant's id. The source is never changed.
+    /// keeps every earlier variant and gets the note's title and speaker names. Any other source is sealed afresh over
+    /// the same audio: it keeps its foreign tags and, from an unverified or stale manifest, its private `x` data,
+    /// unknown members, meeting id and meeting details verbatim (`CassiniDocument.seal`), but none of its variants.
+    /// `processing` is the variant's provenance record (`ExportProvenance`). `source` is the document at `opus` when the
+    /// caller has read (and verified) it already. Returns the new variant's id. The source is never changed.
     @discardableResult
     public static func export(note: Note, opus: URL, destination: URL,
-                              processing: JSONObject = ExportProvenance.userEdited) throws -> String? {
-        let source = CassiniDocument.read(opus)
+                              processing: JSONObject = ExportProvenance.userEdited,
+                              source known: CassiniDocument? = nil) throws -> String? {
+        let source = known ?? CassiniDocument.read(opus)
         let transcript = Transcript(words(of: note), language: Note.bcp47(note.language))
         guard !transcript.words.isEmpty else { throw PortableExportError.noTranscript }
         guard WordBodyBudget.fits(transcript.words, language: transcript.language) else { throw PortableExportError.tooLong }
         let labels = Dictionary((note.speakers ?? []).map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
         var existing: CassiniDocument?
+        var carried: CassiniDocument?
         if source.state == .ok, var manifest = source.manifest {
             if var meeting = manifest["meeting"]?.object {
                 meeting["title"] = .string(note.title)
@@ -152,12 +160,15 @@ extension PortableTranscript {
             var updated = source
             updated.manifest = manifest
             existing = updated
+        } else if untrustedStates.contains(source.state) {
+            carried = source
         }
         let fits = try existing.map { try WordBodyBudget.fitsHeader(transcript, beside: $0) }
-            ?? WordBodyBudget.fitsHeader(transcript, sealing: FileSource(opus))
+            ?? WordBodyBudget.fitsHeader(transcript, sealing: FileSource(opus), carrying: carried)
         guard fits else { throw PortableExportError.tooLong }
         return try CassiniDocument.create(opus, transcript: transcript, title: note.title, processing: processing,
-                                          existing: existing, speakerLabels: labels, target: destination).defaultId
+                                          existing: existing, speakerLabels: labels, carrying: carried,
+                                          target: destination).defaultId
     }
 
     /// The note's words; a passage without word timing becomes words that each span the whole passage.
@@ -172,5 +183,19 @@ extension PortableTranscript {
                 }
             }
         }
+    }
+}
+
+extension Note {
+    /// Whether the note shows its selected version as it was read from the imported document.
+    public var showsImportedVersion: Bool {
+        shownVersionIndex.map { versions?[$0].portableID != nil } ?? false
+    }
+
+    /// Whether the note holds nothing made on this device beside its imported document: it shows an imported version
+    /// as it was read, and every version with words is a variant of the document. An export of such a note from a
+    /// document it does not trust is that document byte for byte, as Android's Save a copy is.
+    public var holdsOnlyImportedVersions: Bool {
+        showsImportedVersion && (versions ?? []).allSatisfy { $0.segments.isEmpty || $0.portableID != nil }
     }
 }

@@ -38,6 +38,58 @@ enum ImportFixtures {
         return try CassiniDocument.create(opus(), transcript: Transcript(words, language: "it"), title: title,
                                           processing: JSONObject(), speakerLabels: ["S1": "Ada"])
     }
+
+    /// Private data as a desktop app writes it: notes under `x["gocassini.com"]` with a member this build does not
+    /// know, a foreign domain and an integer above 2^53.
+    static let privateText = #"{"gocassini.com":{"notes":[{"atMs":1200,"text":"Budget next week","futureNoteField":true}]},"#
+        + #""example.com":{"ticket":"OPS-14","count":9007199254740993}}"#
+
+    /// A verified document with two variants, "prima versione" then "seconda versione" (the default), a private tag
+    /// and `x` holding `privateData`.
+    static func documentWithPrivateData(_ privateData: String = privateText, title: String = "Due") throws -> [UInt8] {
+        let first = try CassiniDocument.create(opus(comments: ["X_EXAMPLE_COM_TICKET=OPS-14"]),
+                                               transcript: Transcript(words("prima versione"), language: "it"), title: title,
+                                               processing: JSONObject([("engine", .string("gocassini"))]), speakerLabels: ["S1": "Ada"])
+        var base = CassiniDocument.read(first)
+        base.manifest?["x"] = .object(try JSON.parseObject(privateData))
+        return try CassiniDocument.create(first, transcript: Transcript(words("seconda versione"), language: "it"), title: title,
+                                          processing: JSONObject([("engine", .string("gocassini"))]), existing: base)
+    }
+
+    /// `document`'s tags over other audio: its stale twin.
+    static func staleTwin(_ document: [UInt8]) throws -> [UInt8] {
+        try OggOpus.mux(OggOpus.read(opus(packets: 100)), tags: OggOpus.read(document).tags)
+    }
+
+    /// `document` with its audio digest copy contradicting the manifest, so its audio cannot be verified.
+    static func unverifiedTwin(_ document: [UInt8]) throws -> [UInt8] {
+        let comments = CassiniDocument.read(document).comments.map { comment in
+            comment.hasPrefix("CASSINI_AUDIO_OPUS_SHA256=") ? "CASSINI_AUDIO_OPUS_SHA256=" + String(repeating: "0", count: 64) : comment
+        }
+        return try OggOpus.mux(OggOpus.read(document), tags: CassiniDocument.tagsPacket(comments))
+    }
+
+    private static func words(_ text: String) -> [Word] {
+        text.split(separator: " ").enumerated().map { index, word in
+            Word("S1", Int64(index * 500), Int64(index * 500 + 400), String(word))
+        }
+    }
+
+    /// `count` characters of base64url from a seeded generator: text that gzip barely shrinks, the same on every run.
+    static func noise(_ count: Int) -> String {
+        let alphabet = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_".utf8)
+        var state: UInt64 = 1
+        var out = [UInt8](repeating: 0, count: count)
+        for i in 0..<count {
+            // SplitMix64.
+            state &+= 0x9E37_79B9_7F4A_7C15
+            var z = state
+            z = (z ^ (z >> 30)) &* 0xBF58_476D_1CE4_E5B9
+            z = (z ^ (z >> 27)) &* 0x94D0_49BB_1331_11EB
+            out[i] = alphabet[Int((z ^ (z >> 31)) & 63)]
+        }
+        return String(decoding: out, as: UTF8.self)
+    }
 }
 
 /// A library root, a folder of files to import and the import's collaborators.
@@ -488,28 +540,208 @@ private func sha256(_ url: URL) throws -> String {
         #expect(h.noteDirs().isEmpty)
     }
 
-    @Test func exportingAStaleDocumentKeepsItsOtherReadableVariants() async throws {
-        let h = try ImportHarness()
-        let first = try ImportFixtures.document("prima versione", title: "Due")
-        let words = [Word("S1", 0, 400, "seconda"), Word("S1", 500, 900, "versione")]
-        let two = try CassiniDocument.create(first, transcript: Transcript(words, language: "it"), title: "Due",
-                                             processing: JSONObject(), existing: CassiniDocument.read(first))
-        let stale = try OggOpus.mux(OggOpus.read(ImportFixtures.opus(packets: 100)), tags: OggOpus.read(two).tags)
-        let id = try h.created(try await h.run(try h.input(stale, "due.opus")))
-        let note = try await h.note(id)
-        #expect(note.document?.state == .staleAudio)
-        #expect(note.versions?.count == 2)
-        let folder = h.inputs.appendingPathComponent("export")
+    /// Exports the note into a fresh folder under the inputs; the folder holds nothing else.
+    private func export(_ note: Note, _ h: ImportHarness, folder name: String = "export") async throws -> (URL, URL) {
+        let folder = h.inputs.appendingPathComponent(name)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-
         let output = try await PortableExportService(audio: h.audio, provenance: FakeProvenance())
             .export(note, original: h.store.originalAudioURL(for: note), playable: h.store.audioURL(for: note),
                     into: folder, filename: "Due")
+        return (folder, output)
+    }
+
+    /// The text of each variant of `document`, in order.
+    private func texts(_ document: CassiniDocument) -> [String?] {
+        document.variants.map { $0.transcript?.words.map(\.text).joined(separator: " ") }
+    }
+
+    /// A transcription made on this device, as Transcribe again keeps it.
+    private func localVersion(_ text: String) -> TranscriptVersion {
+        TranscriptVersion(kind: .transcription, segments: [TranscriptSegment(text: text, start: 0, end: 1, speakerID: "S1")],
+                          speakers: [NoteSpeaker(id: "S1", name: "Ada")])
+    }
+
+    /// A stale or unverified note with nothing made on this device exports its document as it is, as Android's Save
+    /// a copy does: its variants, provenance, private data and honest state all survive.
+    @Test(arguments: [DocumentState.staleAudio, .unverified])
+    func anUntrustedNoteWithNothingNewExportsItsDocumentByteForByte(state: DocumentState) async throws {
+        let h = try ImportHarness()
+        let document = try ImportFixtures.documentWithPrivateData()
+        let source = state == .staleAudio ? try ImportFixtures.staleTwin(document) : try ImportFixtures.unverifiedTwin(document)
+        let note = try await h.note(try h.created(try await h.run(try h.input(source, "due.opus"))))
+        #expect(note.document?.state == state)
+        #expect(note.versions?.count == 2)
+        #expect(note.holdsOnlyImportedVersions)
+
+        let (folder, output) = try await export(note, h)
+
+        #expect(try Data(contentsOf: output) == Data(source))
+        let before = CassiniDocument.read(source), after = CassiniDocument.read(output)
+        #expect(after.state == state)
+        #expect(after.manifest?["x"]?.serialized() == before.manifest?["x"]?.serialized())
+        #expect(after.variants.map(\.id) == before.variants.map(\.id))
+        #expect(after.manifest?["provenance"]?.serialized() == before.manifest?["provenance"]?.serialized())
+        #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path) == ["Due.opus"])
+    }
+
+    /// Such a note cannot take a new title or speaker name into its document: the document is shared as it is, as on
+    /// Android, whose relabel and retitle need a verified document. (The note screen keeps such a note read-only.)
+    @Test func anUntrustedNoteWithNothingNewKeepsItsDocumentAsItIsWhenRenamed() async throws {
+        let h = try ImportHarness()
+        let source = try ImportFixtures.staleTwin(try ImportFixtures.documentWithPrivateData())
+        var note = try await h.note(try h.created(try await h.run(try h.input(source, "due.opus"))))
+        note.title = "Rinominata"
+        note.renameSpeaker("S1", name: "Bea")
+        #expect(note.holdsOnlyImportedVersions)
+
+        let (_, output) = try await export(note, h)
+
+        #expect(try Data(contentsOf: output) == Data(source))
+    }
+
+    /// The trust the export acts on is the original's as it reads now, not the state stored at import: a note stored
+    /// as verified whose original no longer verifies is shared as that file, never sealed as verified.
+    @Test func theExportFollowsHowTheOriginalReadsNow() async throws {
+        let h = try ImportHarness()
+        let document = try ImportFixtures.documentWithPrivateData()
+        var note = try await h.note(try h.created(try await h.run(try h.input(document, "due.opus"))))
+        #expect(note.document?.state == .ok)
+        let stale = try ImportFixtures.staleTwin(document)
+        try Data(stale).write(to: h.store.originalAudioURL(for: note))
+
+        let (_, copied) = try await export(note, h)
+
+        #expect(try Data(contentsOf: copied) == Data(stale))
+
+        note.versions?.append(localVersion("terza versione"))
+        let (_, sealed) = try await export(note, h, folder: "sealed")
+
+        let exported = CassiniDocument.read(sealed)
+        #expect(exported.state == .ok)
+        #expect(texts(exported) == ["terza versione"], "no imported variant is sealed again over audio that does not vouch for it")
+        #expect(exported.manifest?["x"]?.serialized() == CassiniDocument.read(stale).manifest?["x"]?.serialized())
+    }
+
+    /// Transcribe again on a stale note: the export seals only the new version over the audio as it is, carrying the
+    /// source's private data verbatim (D53.2 Q3); the imported variants describe other audio and are not sealed again.
+    @Test func aStaleNoteWithANewVersionExportsOnlyThatVersionAndKeepsThePrivateData() async throws {
+        let h = try ImportHarness()
+        let source = try ImportFixtures.staleTwin(try ImportFixtures.documentWithPrivateData())
+        var note = try await h.note(try h.created(try await h.run(try h.input(source, "due.opus"))))
+        #expect(note.document?.state == .staleAudio)
+        let local = localVersion("terza versione")
+        note.versions?.append(local)
+        note.selectedVersionID = local.id
+        note.transcript = local.segments
+        note.speakers = local.speakers
+
+        let (_, output) = try await export(note, h)
+
+        let before = CassiniDocument.read(source), exported = CassiniDocument.read(output)
+        #expect(exported.state == .ok)
+        #expect(texts(exported) == ["terza versione"])
+        #expect(exported.manifest?["x"]?.serialized() == before.manifest?["x"]?.serialized())
+        #expect(exported.manifest?["x"]?.serialized().contains("9007199254740993") == true)
+        #expect(exported.comments.contains("X_EXAMPLE_COM_TICKET=OPS-14"))
+        #expect(try OggOpus.scan(output).digest() == OggOpus.scan(h.store.originalAudioURL(for: note)).digest())
+    }
+
+    /// With a new version kept but an imported one shown, the newest version made here is the default: an imported
+    /// variant is sealed again only over audio that vouches for it.
+    @Test func aStaleNoteShowingAnImportedVersionExportsItsNewestLocalVersion() async throws {
+        let h = try ImportHarness()
+        let source = try ImportFixtures.staleTwin(try ImportFixtures.documentWithPrivateData())
+        var note = try await h.note(try h.created(try await h.run(try h.input(source, "due.opus"))))
+        note.versions?.append(localVersion("terza versione"))
+        note.versions?.append(localVersion("quarta versione"))
+        #expect(note.showsImportedVersion)
+
+        let (_, output) = try await export(note, h)
 
         let exported = CassiniDocument.read(output)
         #expect(exported.state == .ok)
-        let texts = Set(exported.variants.compactMap { $0.transcript?.words.map(\.text).joined(separator: " ") })
-        #expect(texts == ["prima versione", "seconda versione"])
-        #expect(exported.selected()?.transcript?.words.map(\.text).joined(separator: " ") == note.text)
+        #expect(texts(exported) == ["terza versione", "quarta versione"])
+        #expect(exported.selected()?.transcript?.words.map(\.text) == ["quarta", "versione"])
+        #expect(exported.manifest?["x"]?.serialized() == CassiniDocument.read(source).manifest?["x"]?.serialized())
+    }
+
+    /// A merge made from an imported version of a stale note names that version as its source; the export does not
+    /// hold that variant, so the record names no variant and no attribution audit of the old file.
+    @Test func aStaleNoteMergedFromAnImportedVersionNamesNoVariantTheExportLacks() async throws {
+        let h = try ImportHarness()
+        let source = try ImportFixtures.staleTwin(try ImportFixtures.documentWithPrivateData())
+        var note = try await h.note(try h.created(try await h.run(try h.input(source, "due.opus"))))
+        let imported = try #require(note.selectedVersionID)
+        note.addSpeaker(id: "S2", name: "Bea")
+        note.mergeSpeaker("S2", into: "S1")
+        let merged = try #require(note.versions?.first { $0.id == note.selectedVersionID })
+        #expect(merged.portableID == nil)
+        #expect(merged.derivedFrom == imported)
+
+        let (_, output) = try await export(note, h)
+
+        let exported = CassiniDocument.read(output)
+        #expect(exported.state == .ok)
+        let ids = exported.variants.map(\.id)
+        #expect(ids.count == 1)
+        let record = exported.manifest?["provenance"]?.object?["speechToText"]?.object?[ids[0]]?.object
+        #expect(record?["x-speakerMerges"]?.serialized() == #"{"S2":"S1"}"#)
+        #expect(record?.has("x-derivedFromTranscript") == false)
+        #expect(record?.has("x-sourceAttribution") == false)
+        #expect(exported.manifest?["x"]?.serialized() == CassiniDocument.read(source).manifest?["x"]?.serialized())
+    }
+
+    /// A verified source keeps its private data and every variant, as it always did.
+    @Test func aVerifiedNoteKeepsThePrivateDataAndEveryImportedVariant() async throws {
+        let h = try ImportHarness()
+        let source = try ImportFixtures.documentWithPrivateData()
+        var note = try await h.note(try h.created(try await h.run(try h.input(source, "due.opus"))))
+        #expect(note.document?.state == .ok)
+        #expect(note.holdsOnlyImportedVersions)
+        note.title = "Rinominata"
+        note.renameSpeaker("S1", name: "Bea")
+
+        let (_, output) = try await export(note, h)
+
+        let before = CassiniDocument.read(source), exported = CassiniDocument.read(output)
+        #expect(exported.state == .ok)
+        #expect(try Data(contentsOf: output) != Data(source), "a verified source is sealed again, never copied")
+        #expect(exported.manifest?["meeting"]?.object?["title"] == .string("Rinominata"))
+        #expect(exported.manifest?["speakers"]?.array?.first?.object?["label"] == .string("Bea"))
+        #expect(exported.variants.count == 3)
+        #expect(exported.manifest?["x"]?.serialized() == before.manifest?["x"]?.serialized())
+        #expect(exported.variants.prefix(2).map(\.id) == before.variants.map(\.id))
+        #expect(exported.variants.prefix(2).map(\.body) == before.variants.map(\.body))
+        #expect(exported.comments.contains("X_EXAMPLE_COM_TICKET=OPS-14"))
+    }
+
+    /// Private data the new file cannot hold beside the new words refuses the export, and nothing is left behind.
+    @Test func privateDataTooLargeToCarryRefusesTheExportAndLeavesNothing() async throws {
+        let h = try ImportHarness()
+        // Cover art that leaves the new file room for the words but not for the notes the source carries too.
+        let cover = "METADATA_BLOCK_PICTURE=" + String(repeating: "A", count: 7_700_000)
+        let notes = #"{"gocassini.com":{"notes":[{"atMs":0,"text":""# + ImportFixtures.noise(550_000) + #""}]}}"#
+        let words = Transcript([Word("S1", 0, 400, "terza"), Word("S1", 500, 900, "versione")])
+        // One seal makes the document (each pass over an 8 MiB header takes a second in a debug build).
+        let document = try CassiniDocument.create(ImportFixtures.opus(comments: [cover]), transcript: words, title: "Due",
+                                                  processing: JSONObject(), carrying: CassiniDocument(
+                                                      state: .staleAudio, manifest: JSONObject([("x", .object(try JSON.parseObject(notes)))])))
+        let original = try h.input(try ImportFixtures.staleTwin(document), "due.opus")
+        #expect(try WordBodyBudget.fitsHeader(words, sealing: FileSource(original)), "the words alone fit beside the cover")
+        var note = Note(title: "Due")
+        note.document = DocumentInfo(state: .staleAudio)
+        let local = localVersion("terza versione")
+        note.versions = [local]
+        note.selectedVersionID = local.id
+        note.transcript = local.segments
+        note.speakers = local.speakers
+        let folder = h.inputs.appendingPathComponent("export")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+
+        await #expect(throws: PortableExportError.tooLong) {
+            try await PortableExportService(audio: h.audio, provenance: FakeProvenance())
+                .export(note, original: original, playable: original, into: folder, filename: "Due")
+        }
+        #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path).isEmpty)
     }
 }

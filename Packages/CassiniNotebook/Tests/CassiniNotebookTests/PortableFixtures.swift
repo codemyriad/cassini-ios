@@ -24,6 +24,31 @@ enum PortableFixtures {
         return try OggOpus.mux(OggOpus.read(bytes), tags: CassiniDocument.tagsPacket(document.comments.compactMap(keep)))
     }
 
+    /// Private data as a desktop app writes it: notes under `x["gocassini.com"]`, a foreign domain, an integer above 2^53.
+    static let privateText = #"{"gocassini.com":{"notes":[{"atMs":1200,"text":"Budget next week"}]},"#
+        + #""example.com":{"ticket":"OPS-14","count":9007199254740993}}"#
+
+    /// A verified document of `words` whose manifest carries `privateText` as `x`.
+    static func documentWithPrivateData(_ words: [Word], title: String) throws -> [UInt8] {
+        let first = try document(words, title: title)
+        var base = CassiniDocument.read(first)
+        base.manifest?["x"] = .object(try JSON.parseObject(privateText))
+        return try CassiniDocument.create(first, transcript: Transcript(words, language: "it"), title: title,
+                                          processing: JSONObject(), existing: base)
+    }
+
+    /// `document`'s tags over other audio: its stale twin.
+    static func staleTwin(_ document: [UInt8]) throws -> [UInt8] {
+        try OggOpus.mux(OggOpus.read(silence(packets: 20)), tags: OggOpus.read(document).tags)
+    }
+
+    /// `document` with its audio digest copy contradicting the manifest, so its audio cannot be verified.
+    static func unverifiedTwin(_ document: [UInt8]) throws -> [UInt8] {
+        try rewritingComments(document) { comment in
+            comment.hasPrefix("CASSINI_AUDIO_OPUS_SHA256=") ? "CASSINI_AUDIO_OPUS_SHA256=" + String(repeating: "0", count: 64) : comment
+        }
+    }
+
     static func temporaryDirectory() throws -> URL {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("cassini-notebook-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)

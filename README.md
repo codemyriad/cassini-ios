@@ -93,8 +93,10 @@ records their exact revisions.
   kept. Every transcription, merge and run of edits keeps the transcript from before it as a version you can go back
   to.
 - **Export** text, SRT or WebVTT subtitles, structured JSON, a copy of the original audio, or a portable Cassini
-  `.opus` document. The document keeps the source's verified transcripts and audio packets, adds the note's versions
-  and speaker names, and records how each transcript was made.
+  `.opus` document. The document keeps the source's verified transcripts, its private `x` data and its audio packets,
+  adds the note's versions and speaker names, and records how each transcript was made. A stale or unverified source
+  with nothing new on the device is shared as it is, without a renamed title; one transcribed again keeps only the new
+  versions, beside the source's private data and meeting details.
 - **Recently Deleted.** Deleted notes stay for 30 days, with Undo right after the delete, and can be restored,
   deleted now, or emptied all at once. A permanent delete also removes that note's voice samples.
 - **Settings** for the app language (in the Settings app), the speech language, automatic transcription, speaker
