@@ -63,6 +63,8 @@ import CassiniEngineTesting
     final class Native: @unchecked Sendable {
         let lock = NSLock()
         var loads = 0, detectors = 0, decodes = 0
+        /// Recognizers released: a run's go when it ends.
+        var releases = 0
         /// What the detectors heard, one entry for each reset: a window's input.
         var heard: [[Float]] = []
         var threads: Set<String> = []
@@ -90,6 +92,7 @@ import CassiniEngineTesting
     final class Recognizer: SpeechDecoding {
         let native: Native
         init(_ native: Native) { self.native = native }
+        deinit { native.record { $0.releases += 1 } }
         func decode(_ samples: [Float]) throws -> RecognizedTokens {
             native.record { $0.decodes += 1; $0.threads.insert(Thread.current.name ?? "") }
             let delay = native.lock.withLock { native.decodeDelay }
@@ -561,11 +564,12 @@ import CassiniEngineTesting
         native.decodeDelay = 0.3
         let parakeet = transcriber(native)
         let task = Task { try await run(parakeet, url) }
-        while native.counts.decodes == 0 { try await Task.sleep(for: .milliseconds(10)) }
+        try await waitUntil("The first decode never started") { native.counts.decodes > 0 }
         task.cancel()
         await #expect(throws: CancellationError.self) { try await task.value }
         let decodes = native.counts.decodes
-        try await Task.sleep(for: .milliseconds(500))
+        // The run's end releases its recognizer: no decode can come after it.
+        try await waitUntil("The recognizer was never released") { native.lock.withLock { native.releases } == 1 }
         #expect(native.counts.decodes == decodes, "nothing decodes after the cancel")
         #expect(decodes < 3)
     }
@@ -599,6 +603,18 @@ import CassiniEngineTesting
         #expect(threads.withLock { $0 } == ["Cassini speech"])
         #expect(engines.opened.count == 1)
         #expect(speakers.turns.map(\.speaker).uniqued() == [2, 5], "the turns stay once the diarizer is released")
+    }
+}
+
+/// Polls `condition` until it holds, for at most twenty seconds; then records `message` and throws.
+private func waitUntil(_ message: Comment, _ condition: () -> Bool) async throws {
+    let deadline = ContinuousClock.now + .seconds(20)
+    while !condition() {
+        guard ContinuousClock.now < deadline else {
+            Issue.record(message)
+            throw CancellationError()
+        }
+        try await Task.sleep(for: .milliseconds(5))
     }
 }
 

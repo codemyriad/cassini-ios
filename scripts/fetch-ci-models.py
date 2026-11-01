@@ -6,9 +6,11 @@ Usage: scripts/fetch-ci-models.py [--dest DIR] [--print-key | --print-path ID | 
 The default DIR is .tools/ci-models (gitignored). Each model goes into DIR/models/<id>/<source_sha256>/, as the app
 installs it into Application Support/CassiniModels (D4): every file comes as its own seekable Zstandard object, which
 is resumed with Range and If-Range (the host's entity tag is the quoted SHA-256 of the compressed file) and asked for
-with Accept-Encoding: identity; its SHA-256 is checked, then it is decompressed and the decompressed size and SHA-256
-are checked. The files and the host's NOTICE.txt are collected in DIR/models/<id>/.<source_sha256>.staging/, which is
-renamed into place once complete. Files that are already correct are not downloaded again, so a restored cache costs
+with Accept-Encoding: identity. A 200 restarts from zero whatever its entity tag; a 206 without that tag or with another
+range, and a 416, delete the part, so the next attempt starts clean; a 206 that stops short of the end, or an answer cut
+off before its announced length, keeps its bytes for the next attempt. The file's SHA-256 is checked, then it is
+decompressed and the decompressed size and SHA-256 are checked. The files and the host's NOTICE.txt are collected in
+DIR/models/<id>/.<source_sha256>.staging/, which is renamed into place once complete. Files that are already correct are not downloaded again, so a restored cache costs
 only the hash checks. Only https://dist.gocassini.com is contacted, and no redirect is followed. The env-gated
 simulator tests (scripts/sherpa-bench.sh, scripts/speaker-smoke.sh) read the models from DIR.
 It needs Python 3.10 or later, and the zstd tool before Python 3.14.
@@ -25,6 +27,7 @@ import argparse
 import hashlib
 import http.client
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -84,6 +87,13 @@ def read(url: str, limit: int) -> bytes:
     return body
 
 
+def continues(content_range: str, offset: int, size: int) -> bool:
+    """Whether a 206's Content-Range starts at `offset`, ends inside the file and has its pinned `size` as total (a host
+    may cap an open-ended range; the next attempt resumes after it)."""
+    match = re.fullmatch(r"bytes (\d+)-(\d+)/(\d+)", content_range.strip())
+    return bool(match) and int(match[1]) == offset and offset <= int(match[2]) < size and int(match[3]) == size
+
+
 def download(pin: dict, partial: Path) -> None:
     """Downloads the compressed file `pin` into `partial`, resuming its bytes when the host still has the same file."""
     url, tag = allowed(pin["url"]), f'"{pin["sha256"]}"'
@@ -103,24 +113,36 @@ def download(pin: dict, partial: Path) -> None:
                     raise SystemExit(f"{url} came encoded.")
                 etag = response.headers.get("ETag")
                 if response.status == 206:
-                    expected = f"bytes {offset}-{pin['size'] - 1}/{pin['size']}"
-                    if etag != tag or response.headers.get("Content-Range") != expected:
-                        raise SystemExit(f"{url}: a partial answer for another file or range ({etag}).")
+                    if etag != tag or not continues(response.headers.get("Content-Range", ""), offset, pin["size"]):
+                        # Not this file's bytes from the offset: the next attempt starts from zero.
+                        partial.unlink(missing_ok=True)
+                        raise OSError(f"a partial answer for another file or range ({etag}); the part is deleted")
                     mode = "ab"
                 elif response.status == 200:
-                    if offset and etag != tag:
-                        raise SystemExit(f"{url}: a whole answer with the entity tag {etag}; the part is kept.")
+                    # A whole answer restarts from zero whatever its entity tag (a proxy may strip it): the size and
+                    # SHA-256 checks decide whether it is the file.
                     mode = "wb"
                 else:
                     raise SystemExit(f"{url}: HTTP {response.status}")
                 with partial.open(mode) as output:
                     shutil.copyfileobj(response, output, CHUNK)
+                # http.client ends a body cut off before its Content-Length without an error; `length` keeps the rest.
+                ended = not response.length
             if partial.stat().st_size == pin["size"]:
                 return
+            if mode == "wb" and ended:
+                # A whole answer that ended at its announced length at another size is not the file (a captive
+                # portal): start over. One cut off early, or a capped range, keeps its bytes for the next attempt.
+                partial.unlink()
+            print(f"The download stopped at byte {partial.stat().st_size if partial.exists() else 0}", flush=True)
         except urllib.error.HTTPError as error:
-            # Every error keeps the part, 416 too: a part shorter than the pinned size is a range the file has.
+            # An unsatisfiable range: the part does not fit the file served, so the next attempt starts from zero.
+            # Other errors keep the part.
+            if error.code == 416:
+                partial.unlink(missing_ok=True)
             if attempt == ATTEMPTS:
                 raise SystemExit(f"Cannot download {url}: {error}") from error
+            print(f"The download failed: {error}", flush=True)
         except (OSError, http.client.HTTPException) as error:
             if attempt == ATTEMPTS:
                 raise SystemExit(f"Cannot download {url}: {error}") from error

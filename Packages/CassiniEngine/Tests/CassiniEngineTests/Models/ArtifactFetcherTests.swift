@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 import Testing
 @testable import CassiniEngine
 import CassiniEngineTesting
@@ -196,10 +197,9 @@ import CassiniNotebook
         }
     }
 
-    // ports: ArtifactFetcherTest#aFullAnswerToARangeRequestRestartsFromZero (iOS: the whole answer carries the file's
-    // entity tag, which iOS requires before it truncates a kept part)
+    // ports: ArtifactFetcherTest#aFullAnswerToARangeRequestRestartsFromZero
     @Test func aFullAnswerToARangeRequestRestartsFromZero() async throws {
-        let server = FakeServer { [weights] _ in FakeServer.Answer(200, weights, headers: ["ETag": Self.tag(weights)]) }
+        let server = FakeServer { [weights] _ in FakeServer.Answer(200, weights) }
         try await withFolder { directory in
             // Not a prefix of the artifact: a restart must not keep any of it.
             try Data(repeating: 1, count: 50_000).write(to: part(directory))
@@ -261,18 +261,21 @@ import CassiniNotebook
         }
     }
 
-    /// iOS only (Android's ArtifactFetcherTest#anUnsatisfiableRangeDeletesThePart deletes it): a kept part is always
-    /// shorter than the pinned file (a longer one is discarded before the request), so the file has the range asked for
-    /// and a 416 comes from something else (a proxy, a misconfigured host). It fails as a download error and every kept
-    /// byte stays for the next attempt.
-    @Test func anUnsatisfiableRangeKeepsThePart() async throws {
-        let server = FakeServer { _ in FakeServer.Answer(416, Data(), headers: ["Content-Range": "bytes */1000"]) }
+    // ports: ArtifactFetcherTest#anUnsatisfiableRangeDeletesThePart (iOS: and the next attempt starts from zero)
+    @Test func anUnsatisfiableRangeDeletesThePart() async throws {
+        let attempts = Counter()
+        let respond = Self.ranged(weights)
+        let server = FakeServer { headers in
+            attempts.next() == 1 ? FakeServer.Answer(416, Data(), headers: ["Content-Range": "bytes */1000"]) : respond(headers)
+        }
         try await withFolder { directory in
-            let kept = weights.prefix(123_456)
-            try kept.write(to: part(directory))
+            try weights.prefix(123_456).write(to: part(directory))
             #expect(await failure { try await fetch(server, artifact(weights), directory) } == .modelDownload)
-            #expect(try Data(contentsOf: part(directory)) == kept)
+            #expect(!exists(part(directory)))
             #expect(!exists(model(directory)))
+            try await fetch(server, artifact(weights), directory)
+            #expect(server.requests.map { $0["range"] } == ["bytes=123456-", nil], "the retry asks for the whole file")
+            #expect(try Data(contentsOf: model(directory)) == weights)
         }
     }
 
@@ -488,38 +491,82 @@ import CassiniNotebook
         }
     }
 
-    /// iOS only (Android restarts on any 200): a whole answer to a resumed request truncates the kept part only when
-    /// it carries the file's entity tag and no encoding. A captive portal, a proxy or another file fails as a download
-    /// error, and every kept byte stays for the next attempt.
-    @Test func aWholeAnswerWithoutTheFilesEntityTagKeepsThePart() async throws {
-        let answers: [FakeServer.Answer] = [
-            FakeServer.Answer(200, Data("<html>sign in</html>".utf8)),
-            FakeServer.Answer(200, weights, headers: ["ETag": "\"another file\""]),
-            FakeServer.Answer(200, weights, headers: ["ETag": Self.tag(weights), "Content-Encoding": "gzip"]),
-        ]
-        for answer in answers {
-            let server = FakeServer { _ in answer }
-            try await withFolder { directory in
-                let kept = weights.prefix(123_456)
-                try kept.write(to: part(directory))
-                #expect(await failure { try await fetch(server, artifact(weights), directory) } == .modelDownload)
-                #expect(try Data(contentsOf: part(directory)) == kept, "\(answer.headers)")
-                #expect(!exists(model(directory)))
-            }
+    /// Behind a proxy that strips entity tags: a transfer breaks, and the retry's whole answer without an entity tag
+    /// restarts the kept part from zero and installs the file (Android's rule; the size and SHA-256 checks decide).
+    @Test func aResumedWholeAnswerWithoutAnEntityTagRestartsAndTheRetrySucceeds() async throws {
+        let attempts = Counter()
+        let server = FakeServer { [weights] _ in
+            attempts.next() == 1 ? FakeServer.Answer(200, weights, sent: 100_000) : FakeServer.Answer(200, weights)
+        }
+        try await withFolder { directory in
+            #expect(await failure { try await fetch(server, artifact(weights), directory) } == .modelDownload)
+            #expect(length(part(directory)) == 100_000)
+            try await fetch(server, artifact(weights), directory)
+            #expect(server.requests.map { $0["range"] } == [nil, "bytes=100000-"])
+            #expect(try Data(contentsOf: model(directory)) == weights)
+            #expect(!exists(part(directory)))
         }
     }
 
-    /// iOS only: a partial answer for another file (a server that ignored If-Range) is not appended; the part stays.
-    @Test func aPartialAnswerForAnotherFileKeepsThePart() async throws {
+    /// A whole answer to a resumed request restarts from zero whatever its entity tag. One with the file's bytes
+    /// installs it; one that is not the file (a captive portal) fails its check, which deletes the part, so the next
+    /// attempt starts clean and succeeds.
+    @Test func aWholeAnswerToAResumeRestartsWhateverItsEntityTag() async throws {
+        let portal = FakeServer.Answer(200, Data("<html>sign in</html>".utf8))
+        let fetched = FakeServer { [weights] _ in FakeServer.Answer(200, weights, headers: ["ETag": "\"another file\""]) }
+        try await withFolder { directory in
+            try Data(repeating: 1, count: 123_456).write(to: part(directory))
+            try await fetch(fetched, artifact(weights), directory)
+            #expect(fetched.requests.map { $0["range"] } == ["bytes=123456-"])
+            #expect(try Data(contentsOf: model(directory)) == weights)
+        }
+        let attempts = Counter()
+        let behindAPortal = FakeServer { [weights] _ in attempts.next() == 1 ? portal : FakeServer.Answer(200, weights) }
+        try await withFolder { directory in
+            try weights.prefix(123_456).write(to: part(directory))
+            #expect(await failure { try await fetch(behindAPortal, artifact(weights), directory) } == .modelVerify)
+            #expect(!exists(part(directory)))
+            try await fetch(behindAPortal, artifact(weights), directory)
+            #expect(behindAPortal.requests.map { $0["range"] } == ["bytes=123456-", nil])
+            #expect(try Data(contentsOf: model(directory)) == weights)
+        }
+    }
+
+    /// iOS only: an encoded answer counts other bytes than the file's, so it fails as a download error and the part
+    /// stays; asking again from zero would not help.
+    @Test func anEncodedWholeAnswerToAResumeKeepsThePart() async throws {
         let server = FakeServer { [weights] _ in
-            FakeServer.Answer(206, weights.subdata(in: 1000..<weights.count),
-                              headers: ["Content-Range": "bytes 1000-\(weights.count - 1)/\(weights.count)",
-                                        "ETag": "\"another file\""])
+            FakeServer.Answer(200, weights, headers: ["ETag": Self.tag(weights), "Content-Encoding": "gzip"])
         }
         try await withFolder { directory in
-            try weights.prefix(1000).write(to: part(directory))
+            let kept = weights.prefix(123_456)
+            try kept.write(to: part(directory))
             #expect(await failure { try await fetch(server, artifact(weights), directory) } == .modelDownload)
-            #expect(length(part(directory)) == 1000)
+            #expect(try Data(contentsOf: part(directory)) == kept)
+            #expect(!exists(model(directory)))
+        }
+    }
+
+    /// iOS only: a partial answer without the file's entity tag (a proxy that strips it, a server that ignored
+    /// If-Range) is not appended. It fails as a download error and deletes the part, so the next attempt asks for the
+    /// whole file instead of failing the same way.
+    @Test func aPartialAnswerWithoutTheFilesEntityTagDeletesThePart() async throws {
+        for tag: String? in [nil, "\"another file\""] {
+            let attempts = Counter()
+            let server = FakeServer { [weights] _ in
+                guard attempts.next() == 1 else { return FakeServer.Answer(200, weights) }
+                var headers = ["Content-Range": "bytes 1000-\(weights.count - 1)/\(weights.count)"]
+                headers["ETag"] = tag
+                return FakeServer.Answer(206, weights.subdata(in: 1000..<weights.count), headers: headers)
+            }
+            try await withFolder { directory in
+                try weights.prefix(1000).write(to: part(directory))
+                #expect(await failure { try await fetch(server, artifact(weights), directory) } == .modelDownload)
+                #expect(!exists(part(directory)), "\(tag ?? "no entity tag")")
+                try await fetch(server, artifact(weights), directory)
+                #expect(server.requests.map { $0["range"] } == ["bytes=1000-", nil])
+                #expect(try Data(contentsOf: model(directory)) == weights)
+            }
         }
     }
 
@@ -546,7 +593,8 @@ import CassiniNotebook
     }
 
     /// A cancel (or iOS ending the background time) while a checked download is decompressed keeps the download: the
-    /// next attempt decompresses it again without a request.
+    /// next attempt decompresses it again without a request, and counts none of its bytes as still to fetch, so it
+    /// needs room for the decompressed file only.
     @Test func aCancelWhileDecompressingKeepsTheCheckedDownload() async throws {
         let compressed = InvertedBytes.compress(weights)
         var download = artifact(compressed)
@@ -563,9 +611,13 @@ import CassiniNotebook
             #expect(await attempt.value == .cancelled)
             #expect(try Data(contentsOf: directory.appendingPathComponent("model.onnx.zst")) == compressed)
             #expect(!exists(model(directory)))
+            #expect(ArtifactFetcher.bytesToFetch(download, in: directory) == 0)
             let offline = FakeServer { _ in FakeServer.Answer(500, Data()) }
-            try await self.fetcher(offline).fetchCompressed(offline.url, download: download, artifact: artifact(weights),
-                                                       into: directory, decoder: InvertedBytes()) { _, _ in }
+            // Room for the decompressed file and the slack, not for the download again.
+            let room = FakeStorage(availableBytes: Int64(weights.count) + ArtifactFetcher.slackBytes + 1)
+            try await ArtifactFetcher(transport: offline, storage: room)
+                .fetchCompressed(offline.url, download: download, artifact: artifact(weights), into: directory,
+                                 decoder: InvertedBytes()) { _, _ in }
             #expect(offline.requests.isEmpty)
             #expect(try Data(contentsOf: model(directory)) == weights)
             #expect(!exists(directory.appendingPathComponent("model.onnx.zst")), "deleted once the file is in place")
@@ -592,6 +644,45 @@ import CassiniNotebook
             }
             #expect(server.requests.count == 1, "the checked download is not fetched again")
         }
+    }
+
+    /// A local failure to write the decompressed file (not a full disk) fails with INSTALL, not VERIFY ("download
+    /// damaged"): the download was checked and stays for the next attempt.
+    @Test func aWriteErrorWhileDecompressingFailsWithInstallAndKeepsTheDownload() async throws {
+        let compressed = InvertedBytes.compress(weights)
+        let folder = TemporaryFolder()
+        defer { folder.remove() }
+        let directory = folder.root
+        let source = directory.appendingPathComponent("model.onnx.zst")
+        try compressed.write(to: source)
+        let output = ArtifactFetcher.partial(artifact(weights), in: directory)
+        // The output's descriptor refuses writes after it is opened.
+        let unwritable = UnwritableOutputDecoder(output: output)
+        #expect(await failure {
+            try ArtifactFetcher.decompress(source, artifact(weights), into: directory, decoder: unwritable)
+        } == .modelInstall)
+        #expect(unwritable.found.withLock { $0 }, "the decoder found the output's descriptor")
+        #expect(!exists(output) && !exists(model(directory)))
+        // The output cannot be created: a directory holds its name.
+        try FileManager.default.createDirectory(at: output, withIntermediateDirectories: false)
+        #expect(await failure {
+            try ArtifactFetcher.decompress(source, artifact(weights), into: directory, decoder: InvertedBytes())
+        } == .modelInstall)
+        #expect(try Data(contentsOf: source) == compressed)
+        #expect(!exists(model(directory)))
+    }
+
+    /// A stream the decoder cannot read fails with VERIFY and leaves no decompressed file.
+    @Test func aStreamTheDecoderRefusesFailsWithVerify() async throws {
+        let folder = TemporaryFolder()
+        defer { folder.remove() }
+        let directory = folder.root
+        let source = directory.appendingPathComponent("model.onnx.zst")
+        try InvertedBytes.compress(weights).write(to: source)
+        #expect(await failure {
+            try ArtifactFetcher.decompress(source, artifact(weights), into: directory, decoder: DamagedStreamDecoder())
+        } == .modelVerify)
+        #expect(!exists(ArtifactFetcher.partial(artifact(weights), in: directory)) && !exists(model(directory)))
     }
 
     /// An install killed after a decompressed file was renamed into place but before its download was deleted: the
@@ -670,6 +761,39 @@ struct FullDiskDecoder: Decompressing {
     func decompress(_ source: URL, into sink: (Data) throws -> Void) throws {
         try sink(Data(count: 16))
         throw error
+    }
+}
+
+/// A decoder whose output descriptor refuses writes: it finds the descriptor open on `output` and puts a read-only one
+/// in its place (`dup2`, so the number is never free for another file), then hands over a block.
+final class UnwritableOutputDecoder: Decompressing {
+    let output: URL
+    let found = Mutex(false)
+
+    init(output: URL) { self.output = output }
+
+    func decompress(_ source: URL, into sink: (Data) throws -> Void) throws {
+        guard let resolved = realpath(output.path, nil) else { throw POSIXError(.ENOENT) }
+        let wanted = String(cString: resolved)
+        free(resolved)
+        let readOnly = open("/dev/null", O_RDONLY)
+        defer { close(readOnly) }
+        var path = [CChar](repeating: 0, count: Int(MAXPATHLEN))
+        for descriptor in 0..<getdtablesize() where descriptor != readOnly {
+            guard fcntl(descriptor, F_GETPATH, &path) == 0, String(cString: path) == wanted else { continue }
+            if dup2(readOnly, descriptor) >= 0 { found.withLock { $0 = true } }
+        }
+        try sink(Data(count: 16))
+    }
+}
+
+/// A decoder that finds the stream damaged after its first block.
+struct DamagedStreamDecoder: Decompressing {
+    struct Damaged: Error {}
+
+    func decompress(_ source: URL, into sink: (Data) throws -> Void) throws {
+        try sink(Data(count: 16))
+        throw Damaged()
     }
 }
 

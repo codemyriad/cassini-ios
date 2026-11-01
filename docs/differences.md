@@ -150,16 +150,19 @@ that were not ported, with the reason for each.
     `INTERRUPTED`), and kept parts stay.
   - **NOTICE.txt** is downloaded from the host into each installed revision, as the desktop does, and About › Model
     notices shows it from an installed revision (the newest). Android bundles a pinned copy instead.
-  - **Resume.** Both send `Accept-Encoding: identity`, `Range` and `If-Range: "<compressed sha256>"`. iOS takes an
-    answer to a resumed request only with that entity tag and no `Content-Encoding`: a `200` or `206` for another file
-    (a captive portal, a proxy) fails as a download error and leaves the kept part untouched, where Android restarts
-    from zero on any `200`. A `416` also keeps the part, where Android deletes it: a kept part is always shorter than
-    the pinned file, so the range exists and that answer is not the file's. Parts are named after the compressed SHA-256
-    (`<sha256>.part`), so a part only ever resumes the file it is a prefix of. A cancel while a checked `.zst` is
-    decompressed keeps the `.zst`; it is deleted only once its file is in place, and a retry that finds the file in
-    place deletes a `.zst` an app kill left beside it. A full disk while decompressing fails with `NOT_ENOUGH_STORAGE`,
-    not File check failed. Each decompressed file is written through before its rename. Files already checked in the
-    staging directory are hashed again on a retry rather than downloaded.
+  - **Resume.** Both resume a part with `Range: bytes=<length>-`, restart from zero on any `200` to a resumed request,
+    whatever its entity tag (the size and SHA-256 checks decide), and delete the part on a `416`, so a proxy that strips
+    entity tags cannot make every retry fail the same way. iOS also sends `Accept-Encoding: identity` and
+    `If-Range: "<compressed sha256>"` (Android sends only `Range`), and adds two checks: a `206` must carry that tag,
+    else it fails as a download error and deletes the part (Android takes any `206` whose `Content-Range` fits); an
+    answer with a `Content-Encoding` fails as a download error and keeps the part. Parts are named after the compressed
+    SHA-256 (`<sha256>.part`), so a part only ever resumes the file it is a prefix of. A cancel while a checked `.zst`
+    is decompressed keeps the `.zst`; it is deleted only once its file is in place, a retry neither downloads it again
+    nor counts it in the free-space check, and a retry that finds the file in place deletes a `.zst` an app kill left
+    beside it. A full disk while decompressing fails with `NOT_ENOUGH_STORAGE` and another local write failure with
+    `INSTALL`, not File check failed (`VERIFY` is kept for a stream the decoder refuses). Each decompressed file is
+    written through before its rename. Files already checked in the staging directory are hashed again on a retry rather
+    than downloaded.
   - **Progress.** Within a model only the last file's check reports as Checking files; the checks of the files before
     it keep the progress at their end as downloading, so the status does not alternate for each file.
   - **Provenance** names Ultra `parakeet-ultra-0.6b-int8@<source_sha256>` (D16 §5); Android still writes

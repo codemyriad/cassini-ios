@@ -18,10 +18,11 @@ public protocol Decompressing: Sendable {
 /// Every request asks for `Accept-Encoding: identity`, and an answer with another `Content-Encoding` fails with
 /// `DOWNLOAD`: the bytes counted, resumed and hashed are the file's own. A resumed request also sends `If-Range` with
 /// the entity tag of the pinned file, which the model host gives as its quoted SHA-256 (D4): a server holding other
-/// bytes answers the whole file. iOS takes an answer to a resumed request only when it carries that entity tag: a
-/// `206` or a `200` with another tag (a captive portal, a proxy, another file) fails with `DOWNLOAD` and leaves the kept
-/// `.part` as it was, so it is never truncated by an answer that is not the file. An unsatisfiable range (`416`) keeps it
-/// too: a `.part` shorter than the pinned size is always a range the file has, so that answer is not the file's.
+/// bytes answers the whole file. A `200` to a resumed request restarts from zero whatever its entity tag (Android's
+/// rule): the size and SHA-256 checks decide whether it is the file, and a proxy that strips entity tags cannot keep
+/// every retry failing. A `206` without that entity tag cannot be told apart from bytes of another file, and an
+/// unsatisfiable range (`416`) says the kept `.part` does not fit the file served: both fail with `DOWNLOAD` and delete
+/// the `.part`, so the next attempt starts from zero instead of failing the same way.
 ///
 /// Redirects are followed by hand, only as `RedirectPolicy` allows: HTTPS to `ModelCatalog.downloadHosts`, at most
 /// five hops. Any other redirect fails the file with `DOWNLOAD` and keeps its `.part`.
@@ -78,9 +79,12 @@ public struct ArtifactFetcher: Sendable {
         return hash.finalize().map { String(format: "%02x", $0) }.joined()
     }
 
-    /// The bytes of `artifact` still to download into `directory`: its size less a `.part` that can still be its
-    /// prefix. A longer `.part` is deleted by `fetch`, so it saves nothing.
+    /// The bytes of `artifact` still to download into `directory`: none when its file is already there at its pinned
+    /// size (`fetch` checks its SHA-256 without a request; for a compressed download, an install interrupted while it
+    /// was decompressed), else its size less a `.part` that can still be its prefix. A longer `.part` is deleted by
+    /// `fetch`, so it saves nothing.
     public static func bytesToFetch(_ artifact: Artifact, in directory: URL) -> Int64 {
+        if ModelFiles.length(of: directory.appendingPathComponent(artifact.name)) == artifact.size { return 0 }
         let kept = ModelFiles.length(of: partial(artifact, in: directory))
         return kept > artifact.size ? artifact.size : artifact.size - kept
     }
@@ -93,9 +97,10 @@ public struct ArtifactFetcher: Sendable {
     ///
     /// A `.part` left by an earlier attempt is resumed with `Range: bytes=<length>-` and `If-Range: "<sha256>"`. A
     /// `206` answer is accepted only when it carries that entity tag, its `Content-Range` starts at that length and its
-    /// total is the pinned size; a `200` answer with that entity tag restarts from zero. A `206` that ends before the
-    /// artifact's last byte (some servers cap open-ended ranges) keeps what it brought and fails with `DOWNLOAD`, so the
-    /// next attempt resumes further on. On a size or SHA-256 mismatch the `.part` is deleted.
+    /// total is the pinned size; a `200` answer restarts from zero, whatever its entity tag. A `206` without that entity
+    /// tag or a `416` fails with `DOWNLOAD` and deletes the `.part`. A `206` that ends before the artifact's last byte
+    /// (some servers cap open-ended ranges) keeps what it brought and fails with `DOWNLOAD`, so the next attempt resumes
+    /// further on. On a size or SHA-256 mismatch the `.part` is deleted.
     public func fetch(_ url: String, _ artifact: Artifact, into directory: URL,
                       redirects: RedirectPolicy = .downloads, progress: (Int64, Bool) -> Void) async throws {
         let destination = directory.appendingPathComponent(artifact.name)
@@ -224,20 +229,21 @@ public struct ArtifactFetcher: Sendable {
 
     /// Whether `answer` continues the `offset` bytes of `partial`: for a `206` with the artifact's entity tag whose
     /// range starts there, ends inside the artifact and has the pinned size as its total, the offset just past the
-    /// range's last byte; nil for a whole `200` answer (with the artifact's entity tag when `partial` has bytes, so a
-    /// whole answer of another file never truncates it). Any other answer fails and keeps `partial`, an unsatisfiable
-    /// range (`416`) too: `fetch` asks only for a range inside the pinned size, so that answer is not the file's.
+    /// range's last byte; nil for a whole `200` answer, whatever its entity tag (the size and SHA-256 checks guard what
+    /// it brings). Any other answer fails with `DOWNLOAD`. A `206` without the artifact's entity tag and an
+    /// unsatisfiable range (`416`) also delete `partial`: neither can continue it, so the next attempt starts from zero
+    /// rather than asking for the same range again.
     private static func resumes(_ answer: HTTPAnswer, _ artifact: Artifact, _ partial: URL,
                                 _ offset: Int64) throws -> Int64? {
-        let tag = answer.header("ETag")?.trimmingCharacters(in: .whitespaces)
-        if answer.status == 200 {
-            if offset > 0 && tag != entityTag(artifact) {
-                throw ModelError(.modelDownload, "A whole answer with the entity tag \(tag ?? "none") for a kept part")
-            }
-            return nil
+        if answer.status == 200 { return nil }
+        if answer.status == 416 {
+            remove(partial)
+            throw ModelError(.modelDownload, "HTTP 416 for a part of \(offset) bytes")
         }
         if answer.status != 206 || offset == 0 { throw ModelError(.modelDownload, "HTTP \(answer.status)") }
+        let tag = answer.header("ETag")?.trimmingCharacters(in: .whitespaces)
         guard tag == entityTag(artifact) else {
+            remove(partial)
             throw ModelError(.modelDownload, "A partial answer with the entity tag \(tag ?? "none")")
         }
         let header = (answer.header("Content-Range") ?? "").trimmingCharacters(in: .whitespaces)
@@ -312,32 +318,35 @@ public struct ArtifactFetcher: Sendable {
 
     /// Decompresses a verified `source` into `directory` as `artifact`, or fails without a file. The file is written
     /// through to storage (`F_FULLFSYNC`) before its rename. `progress` receives the bytes written, then the
-    /// artifact's size plus the bytes hashed (up to twice its size). A full disk fails with `SPACE`, other write and
-    /// sync failures with `INSTALL`, output that is not the pinned file with `VERIFY`.
+    /// artifact's size plus the bytes hashed (up to twice its size). A full disk fails with `SPACE`; other failures to
+    /// create, write, close or sync the decompressed file (this device's, not the download's) with `INSTALL`; a stream
+    /// the decoder cannot read, or output that is not the pinned file, with `VERIFY`.
     public static func decompress(_ source: URL, _ artifact: Artifact, into directory: URL, decoder: any Decompressing,
                                   progress: (Int64) -> Void = { _ in }) throws {
         let destination = directory.appendingPathComponent(artifact.name)
         let partial = partial(artifact, in: directory)
         defer { remove(partial) }
         do {
-            let output = try writer(partial, append: false)
+            let output: FileHandle
+            do { output = try writer(partial, append: false) } catch { throw writing(error) }
             var count: Int64 = 0
             var throttle = Throttle()
             do {
-                defer { try? output.close() }
                 try decoder.decompress(source) { block in
                     try ModelError.require(!Task.isCancelled, .cancelled)
                     count += Int64(block.count)
                     try ModelError.require(count <= artifact.size, .modelVerify)
-                    try output.write(contentsOf: block)
+                    do { try output.write(contentsOf: block) } catch { throw writing(error) }
                     if throttle.due() { progress(count) }
                 }
+            } catch {
+                try? output.close()
+                throw error
             }
+            do { try output.close() } catch { throw writing(error) }
             try ModelError.require(ModelFiles.length(of: partial) == artifact.size, .modelVerify)
             try ModelError.require(try digest(partial) { progress(artifact.size + $0) } == artifact.sha256, .modelVerify)
-            do { try ModelFiles.sync(partial) } catch {
-                throw ModelError(CheckpointFiles.isOutOfSpace(error) ? .space : .modelInstall, "\(error)")
-            }
+            do { try ModelFiles.sync(partial) } catch { throw writing(error) }
             try ModelError.require(rename(partial.path, destination.path) == 0, .modelInstall)
         } catch let error as ModelError {
             throw error
@@ -346,8 +355,15 @@ public struct ArtifactFetcher: Sendable {
         } catch where CheckpointFiles.isOutOfSpace(error) {
             throw ModelError(.space, "Decompression: \(error)")
         } catch {
+            // What is left comes from the decoder: the stream is not what was checked.
             throw ModelError(.modelVerify, "Decompression: \(error)")
         }
+    }
+
+    /// A failure to write the decompressed file on this device: `SPACE` for a full disk, else `INSTALL`.
+    private static func writing(_ error: any Error) -> ModelError {
+        if let error = error as? ModelError { return error }
+        return ModelError(CheckpointFiles.isOutOfSpace(error) ? .space : .modelInstall, "Decompression: \(error)")
     }
 
     /// Maps a count out of `of` to the same share of `to`.

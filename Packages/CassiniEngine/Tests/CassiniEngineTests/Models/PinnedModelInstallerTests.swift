@@ -10,7 +10,6 @@ import CassiniNotebook
 /// sizes, so nothing is downloaded and almost no disk is used.
 @MainActor @Suite final class PinnedModelInstallerTests {
     private static let partBytes = 1024
-    private static let settle = Duration.milliseconds(300)
 
     private let folder = TemporaryFolder()
     private let suite = "cassini.tests.\(UUID().uuidString)"
@@ -66,7 +65,7 @@ import CassiniNotebook
         owner.startDownload([.speech])
         try await waitUntil { [fetcher] in fetcher.started }
         let job = Task { [owner, all] in try await owner.install(all) }
-        try await Task.sleep(for: Self.settle)
+        try await waitUntil("The second install never waited for the first") { [owner] in owner.waitingForEnd == 1 }
         #expect(fetcher.fetched == [Self.key(ModelCatalog.parakeet)], "the second install waits for the first")
 
         release.open()
@@ -101,8 +100,9 @@ import CassiniNotebook
 
         owner.cancel()
         let again = Task { [owner, all] in try await owner.install(all) }
-        try await Task.sleep(for: Self.settle)
-        #expect(release.interrupted)
+        try await waitUntil("The request never waited for the cancelled fetch") { [owner, release] in
+            release.interrupted && owner.waitingForEnd == 1
+        }
         #expect(fetcher.fetched == [Self.key(ModelCatalog.parakeet)], "no second fetch while the first one runs")
 
         release.open()

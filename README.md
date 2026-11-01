@@ -239,8 +239,9 @@ download, `NetworkModelFetcher` reads the live `manifest.json` and requires the 
 (key, URL, sizes, both hashes, encoding) to agree with the pins (`DistManifest`); a missing or contradicted pin fails
 with its own banner, "Model not available" (`DOWNLOAD_PIN_UNAVAILABLE`, no Retry; the Settings row keeps the generic
 failed status, and the next install reads the manifest again). Each file is its own seekable
-Zstandard object, resumed with Range and If-Range (the entity tag is the quoted compressed SHA-256) and checked before
-and after decompression; the files and the host's `NOTICE.txt` are collected in
+Zstandard object, resumed with Range and If-Range (the entity tag is the quoted compressed SHA-256; a `200` restarts
+from zero whatever its tag, and a `206` without that tag or a `416` deletes the part) and checked before and after
+decompression; the files and the host's `NOTICE.txt` are collected in
 `CassiniModels/models/<id>/.<source_sha256>.staging/` and renamed into `CassiniModels/models/<id>/<source_sha256>/`.
 About › Model notices shows that `NOTICE.txt` from an installed revision. Before the first load in each session every
 installed file is hashed again (`ModelVerifier`, D16 §4); a file that differs retires the revision. The in-app
