@@ -219,6 +219,115 @@ struct PortableConformanceImportTests {
         #expect(exported.selected()?.transcript?.language == "en-US")
         #expect(exported.comments.filter { $0.uppercased().hasPrefix("TITLE=") } == ["TITLE=New title"])
     }
+
+    /// An unverified or stale source is sealed afresh with none of its variants, but its private `x` data travels
+    /// verbatim (D53.2 Q3): a fresh seal hashes the audio it covers, so trust is computed again.
+    @Test(arguments: [DocumentState.staleAudio, .unverified])
+    func exportFromAnUntrustedSourceCarriesItsPrivateData(state: DocumentState) throws {
+        let directory = try PortableFixtures.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let document = try PortableFixtures.documentWithPrivateData([Word("S1", 0, 500, "prima")], title: "Note")
+        let bytes = state == .staleAudio ? try PortableFixtures.staleTwin(document) : try PortableFixtures.unverifiedTwin(document)
+        let source = directory.appendingPathComponent("source.opus")
+        try Data(bytes).write(to: source)
+        let read = CassiniDocument.read(source)
+        try #require(read.state == state)
+        var note = Note(title: "Note")
+        note.transcript = [TranscriptSegment(text: "dopo", start: 0, end: 0.5, speakerID: "S1")]
+        let output = directory.appendingPathComponent("export.opus")
+
+        try PortableTranscript.export(note: note, opus: source, destination: output, source: read)
+
+        let exported = CassiniDocument.read(output)
+        #expect(exported.state == .ok)
+        #expect(exported.manifest?["x"]?.serialized() == read.manifest?["x"]?.serialized())
+        #expect(exported.manifest?["x"]?.serialized().contains("9007199254740993") == true)
+        #expect(exported.variants.map(\.id) == ["words"])
+        #expect(exported.selected()?.transcript?.words.map(\.text) == ["dopo"])
+        #expect(exported.comments.contains("X_CUSTOM=keep=me"))
+        #expect(try Data(contentsOf: source) == Data(bytes))
+    }
+
+    /// Private data that gzip shrinks to almost nothing but that would push the manifest past the payload limit is
+    /// refused as too long, not with a codec error, and nothing is written.
+    @Test func privateDataTooLargeUncompressedIsTooLong() throws {
+        let directory = try PortableFixtures.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let source = directory.appendingPathComponent("source.opus")
+        try Data(try PortableFixtures.silence()).write(to: source)
+        let notes = JSON.object(JSONObject([("example.com", .string(String(repeating: "a", count: CassiniPayload.maxRaw - 1024)))]))
+        let stale = CassiniDocument(state: .staleAudio, manifest: JSONObject([("x", notes)]))
+        var note = Note(title: "Note")
+        note.transcript = [TranscriptSegment(text: "dopo", start: 0, end: 0.5, speakerID: "S1")]
+        let output = directory.appendingPathComponent("export.opus")
+
+        #expect(throws: PortableExportError.tooLong) {
+            try PortableTranscript.export(note: note, opus: source, destination: output, source: stale)
+        }
+        #expect(!FileManager.default.fileExists(atPath: output.path))
+    }
+
+    @Test func aVerifiedSourceKeepsItsPrivateDataAndVariants() throws {
+        let directory = try PortableFixtures.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let source = directory.appendingPathComponent("doc.opus")
+        try Data(try PortableFixtures.documentWithPrivateData([Word("S1", 0, 500, "ciao")], title: "Old")).write(to: source)
+        let before = CassiniDocument.read(source)
+        try #require(before.state == .ok)
+        var note = Note(title: "Old")
+        note.transcript = [TranscriptSegment(text: "hello", start: 0, end: 0.5, speakerID: "S1")]
+        let output = directory.appendingPathComponent("out.opus")
+
+        try PortableTranscript.export(note: note, opus: source, destination: output)
+
+        let exported = CassiniDocument.read(output)
+        #expect(exported.state == .ok)
+        #expect(exported.manifest?["x"]?.serialized() == before.manifest?["x"]?.serialized())
+        #expect(exported.variants.prefix(2).map(\.id) == before.variants.map(\.id))
+        #expect(exported.variants.prefix(2).map(\.body) == before.variants.map(\.body))
+    }
+}
+
+@Suite struct ImportedOnlyTests {
+    private func imported(_ text: String) -> TranscriptVersion {
+        var version = TranscriptVersion(kind: .imported, segments: [TranscriptSegment(text: text, start: 0, end: 1, speakerID: "S1")],
+                                        speakers: [NoteSpeaker(id: "S1", name: "Ada")])
+        version.portableID = "words"
+        return version
+    }
+
+    private func note(showing version: TranscriptVersion, versions: [TranscriptVersion]) -> Note {
+        var note = Note(title: "Imported")
+        note.versions = versions
+        note.selectedVersionID = version.id
+        note.transcript = version.segments
+        note.speakers = version.speakers
+        return note
+    }
+
+    @Test func aNoteShowingAnImportedVersionAsReadHoldsOnlyImportedVersions() {
+        let first = imported("prima"), second = imported("seconda")
+        let note = note(showing: first, versions: [first, second])
+        #expect(note.showsImportedVersion)
+        #expect(note.holdsOnlyImportedVersions)
+    }
+
+    @Test func anEditOrALocalVersionIsSomethingMadeHere() {
+        let first = imported("prima")
+        var edited = note(showing: first, versions: [first])
+        edited.transcript[0].text = "modificata"
+        #expect(!edited.showsImportedVersion)
+        #expect(!edited.holdsOnlyImportedVersions)
+
+        let local = TranscriptVersion(kind: .transcription, segments: [TranscriptSegment(text: "nuova", start: 0, end: 1)], speakers: [])
+        let withLocal = note(showing: first, versions: [first, local])
+        #expect(withLocal.showsImportedVersion)
+        #expect(!withLocal.holdsOnlyImportedVersions)
+
+        let empty = TranscriptVersion(kind: .previous, segments: [], speakers: [])
+        #expect(note(showing: first, versions: [first, empty]).holdsOnlyImportedVersions)
+        #expect(!note(showing: local, versions: [first, local]).showsImportedVersion)
+    }
 }
 
 @Suite struct ImportedNoteTests {

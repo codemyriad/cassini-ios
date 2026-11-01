@@ -46,3 +46,19 @@ func withTemporaryDirectory<T>(_ body: (URL) throws -> T) throws -> T {
 func comments(_ document: CassiniDocument, named filter: (String) -> Bool) -> [String] {
     document.comments.filter { filter(CassiniDocument.tagName($0)) }
 }
+
+/** [count] characters of base64url drawn by a seeded generator: text that gzip barely shrinks, the same on every run. */
+func noise(_ count: Int, seed: UInt64 = 1) -> String {
+    let alphabet = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_".utf8)
+    var state = seed
+    var out = [UInt8](repeating: 0, count: count)
+    for i in 0..<count {
+        // SplitMix64.
+        state &+= 0x9E37_79B9_7F4A_7C15
+        var z = state
+        z = (z ^ (z >> 30)) &* 0xBF58_476D_1CE4_E5B9
+        z = (z ^ (z >> 27)) &* 0x94D0_49BB_1331_11EB
+        out[i] = alphabet[Int((z ^ (z >> 31)) & 63)]
+    }
+    return String(decoding: out, as: UTF8.self)
+}

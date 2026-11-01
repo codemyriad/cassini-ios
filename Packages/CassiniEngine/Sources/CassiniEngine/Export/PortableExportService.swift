@@ -3,12 +3,21 @@ import CassiniCore
 import CassiniNotebook
 
 /// Writes a note as a Cassini document: its audio as Ogg Opus with every transcript version made on this device added
-/// as a variant (and, for a source that is not verified, its imported variants too), the note's own transcript last
-/// and default.
+/// as a variant, the note's own transcript last and default.
 ///
-/// The audio is the imported Ogg Opus when the note has one (a verified document keeps its earlier variants), else the
-/// playable file encoded to Opus. Intermediate files go in `<folder>/work/`, which is removed afterwards, so no title
-/// can collide with them. The source is never changed.
+/// The audio is the imported Ogg Opus when the note has one, else the playable file encoded to Opus. What the export
+/// keeps of an imported document depends on how that document reads now, verified once per export:
+/// - `ok`: every variant stays, with the note's title and speaker names.
+/// - `unverified` or `staleAudio`, with nothing made on this device (`Note.holdsOnlyImportedVersions`): the export is
+///   the document itself, byte for byte, as Android's Save a copy is. Its variants, provenance, private data and
+///   honest state all survive.
+/// - `unverified` or `staleAudio` with versions made here: a fresh seal of only those versions over the same audio,
+///   carrying the source manifest's private `x` data, unknown members and meeting verbatim. The imported variants
+///   are not sealed again, since the audio does not vouch for them; the note still shows them.
+/// - anything else: a fresh seal that keeps only the foreign tags.
+///
+/// Intermediate files go in `<folder>/work/`, which is removed afterwards, so no title can collide with them. The
+/// source is never changed.
 public struct PortableExportService: Sendable {
     private let audio: any AudioProcessing
     private let provenance: any ProvenanceStoring
@@ -27,27 +36,42 @@ public struct PortableExportService: Sendable {
         defer { try? FileManager.default.removeItem(at: work) }
         do {
             var opus = original
-            if (try? ImportClassifier.sniff(fileAt: original)) != .oggOpus {
+            var source: CassiniDocument?
+            if (try? ImportClassifier.sniff(fileAt: original)) == .oggOpus {
+                source = await Self.read(original)
+            } else {
                 opus = work.appendingPathComponent("encoded.opus")
                 try await audio.encodeOpus(playable, to: opus)
             }
-            var variants = Self.keptVariants(of: note)
-            let run = provenance.load(note.id)
-            let audit = Self.attributionAudit(of: note, original: original)
-            for (index, version) in Self.versionsToSeal(of: note).enumerated() {
+            let state = source?.state
+            if let state, PortableTranscript.untrustedStates.contains(state), note.holdsOnlyImportedVersions {
                 try Task.checkCancellation()
-                var snapshot = note
-                snapshot.transcript = version.segments
-                snapshot.speakers = version.speakers
-                let next = work.appendingPathComponent("version-\(index).opus")
-                variants[version.id] = try await Self.seal(snapshot, opus, next, Self.record(version, run, variants, note, audit))
-                opus = next
+                try FileManager.default.copyItem(at: original, to: output)
+                return output
             }
-            try Task.checkCancellation()
+            let verified = state == .ok
+            var variants = verified ? Self.keptVariants(of: note) : [:]
+            let run = provenance.load(note.id)
+            let audit = verified ? Self.attributionAudit(of: note, original: original) : nil
+            var versions = Self.versionsToSeal(of: note)
             var current = note.versions?.first { $0.id == note.selectedVersionID }
                 ?? TranscriptVersion(kind: .editedTranscript, segments: note.transcript, speakers: note.speakers ?? [])
             current.segments = note.transcript
-            _ = try await Self.seal(note, opus, output, Self.record(current, run, variants, note, audit))
+            current.speakers = note.speakers ?? []
+            // An imported version is sealed again only over audio that vouches for it; otherwise the newest version
+            // made here is the default.
+            if !verified, note.showsImportedVersion, let last = versions.popLast() { current = last }
+            for (index, version) in versions.enumerated() {
+                try Task.checkCancellation()
+                let next = work.appendingPathComponent("version-\(index).opus")
+                variants[version.id] = try await Self.seal(Self.showing(version, of: note), opus, next,
+                                                           Self.record(version, run, variants, note, audit), source)
+                opus = next
+                source = nil
+            }
+            try Task.checkCancellation()
+            _ = try await Self.seal(Self.showing(current, of: note), opus, output,
+                                    Self.record(current, run, variants, note, audit), source)
             return output
         } catch {
             try? FileManager.default.removeItem(at: output)
@@ -55,20 +79,24 @@ public struct PortableExportService: Sendable {
         }
     }
 
-    /// The versions besides the current one that the export adds as variants, oldest first. A verified source keeps
-    /// its own variants, so only the ones made on this device are added; any other source is sealed afresh, so its
-    /// readable imported variants are added too.
+    /// The versions besides the current one that the export adds as variants, oldest first: the ones with words made
+    /// on this device. An imported version is either kept by its verified source or not sealed again.
     static func versionsToSeal(of note: Note) -> [TranscriptVersion] {
-        let sourceKeepsVariants = note.document?.state == .ok
-        return (note.versions ?? []).filter { version in
-            version.id != note.selectedVersionID && !version.segments.isEmpty
-                && (version.portableID == nil || !sourceKeepsVariants)
+        (note.versions ?? []).filter { version in
+            version.id != note.selectedVersionID && !version.segments.isEmpty && version.portableID == nil
         }
+    }
+
+    /// `note` showing `version`'s transcript and speakers.
+    private static func showing(_ version: TranscriptVersion, of note: Note) -> Note {
+        var snapshot = note
+        snapshot.transcript = version.segments
+        snapshot.speakers = version.speakers
+        return snapshot
     }
 
     /// The variant ids of the imported versions a verified source keeps, by version.
     private static func keptVariants(of note: Note) -> [UUID: String] {
-        guard note.document?.state == .ok else { return [:] }
         var ids: [UUID: String] = [:]
         for version in note.versions ?? [] { if let portableID = version.portableID { ids[version.id] = portableID } }
         return ids
@@ -86,19 +114,25 @@ public struct PortableExportService: Sendable {
                                        sourceAttribution: source?.portableID == nil ? nil : audit)
     }
 
-    /// The verified source document's `provenance.attribution`, which describes its own variants; nil for any other
-    /// source, which the export seals afresh, and when no version re-attributes one of its variants. The source was
-    /// verified at import, so only its tags are read again.
+    /// The verified source document's `provenance.attribution`, which describes its own variants; nil when no version
+    /// re-attributes one of its variants. The source was verified already, so only its tags are read again.
     private static func attributionAudit(of note: Note, original: URL) -> JSONObject? {
-        guard note.document?.state == .ok, let versions = note.versions else { return nil }
+        guard let versions = note.versions else { return nil }
         let imported = Set(versions.filter { $0.portableID != nil }.map(\.id))
         guard versions.contains(where: { $0.attributedFrom.map(imported.contains) ?? false }) else { return nil }
         return CassiniDocument.read(original, verify: false).manifest?["provenance"]?.object?["attribution"]?.object
     }
 
-    private static func seal(_ note: Note, _ opus: URL, _ target: URL, _ processing: JSONObject) async throws -> String? {
+    /// Seals `note` into `target`; `source` is the document at `opus` when it has been read already.
+    private static func seal(_ note: Note, _ opus: URL, _ target: URL, _ processing: JSONObject,
+                             _ source: CassiniDocument?) async throws -> String? {
         try await Task.detached(priority: .userInitiated) {
-            try PortableTranscript.export(note: note, opus: opus, destination: target, processing: processing)
+            try PortableTranscript.export(note: note, opus: opus, destination: target, processing: processing, source: source)
         }.value
+    }
+
+    /// The document at `url`, its audio verified.
+    private static func read(_ url: URL) async -> CassiniDocument {
+        await Task.detached(priority: .userInitiated) { CassiniDocument.read(url) }.value
     }
 }

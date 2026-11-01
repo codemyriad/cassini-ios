@@ -72,4 +72,40 @@ import Testing
         let stale = try silence(["CASSINI_FILL=" + String(repeating: "x", count: OggOpus.maxHeaderBytes - 4096)])
         #expect(try WordBodyBudget.fitsHeader(transcript, sealing: ArraySource(stale)))
     }
+
+    /** A fresh seal that carries a source's private data grows its manifest by that data, so a huge notes list does not fit. */
+    @Test func aFreshSealCountsTheMembersItCarries() throws {
+        let transcript = Transcript([Word("spk_1", 0, 20, "Ciao")])
+        func carrying(_ text: String) -> CassiniDocument {
+            let notes = JSON.object(JSONObject([("notes", .array([.object(JSONObject([("atMs", .int(0)), ("text", .string(text))]))]))]))
+            return CassiniDocument(state: .staleAudio, manifest: JSONObject([("kind", .string("cassini-portable-meeting")),
+                                                                              ("x", .object(JSONObject([("gocassini.com", notes)])))]))
+        }
+        let audio = try silence()
+        var source: ArraySource { ArraySource(audio) }
+        let alone = try WordBodyBudget.headerBytes(adding: transcript, sealing: source)
+        let small = carrying(noise(64 << 10))
+        #expect(try WordBodyBudget.headerBytes(adding: transcript, sealing: source, carrying: small) > alone + (64 << 10))
+        #expect(try WordBodyBudget.fitsHeader(transcript, sealing: source, carrying: small))
+        #expect(try WordBodyBudget.headerBytes(adding: transcript, sealing: source, carrying: CassiniDocument(state: .plainAudio)) == alone)
+        #expect(try !WordBodyBudget.fitsHeader(transcript, sealing: source, carrying: carrying(noise(Int(WordBodyBudget.maxHeaderBytes)))))
+    }
+
+    /**
+     * Private data that gzip shrinks to almost nothing still makes the manifest the codec checks against its 16 MiB
+     * limit, so it does not fit either, however small its tags would be.
+     */
+    @Test func aFreshSealRefusesCarriedDataTooLargeUncompressed() throws {
+        let transcript = Transcript([Word("spk_1", 0, 20, "Ciao")])
+        let audio = try silence()
+        func carrying(_ count: Int) -> CassiniDocument {
+            CassiniDocument(state: .staleAudio, manifest: JSONObject([
+                ("x", .object(JSONObject([("example.com", .string(String(repeating: "a", count: count)))]))),
+            ]))
+        }
+        let large = carrying(Int(WordBodyBudget.maxCarriedBytes))
+        #expect(try WordBodyBudget.headerBytes(adding: transcript, sealing: ArraySource(audio), carrying: large) < 1 << 20)
+        #expect(try !WordBodyBudget.fitsHeader(transcript, sealing: ArraySource(audio), carrying: large))
+        #expect(try WordBodyBudget.fitsHeader(transcript, sealing: ArraySource(audio), carrying: carrying(Int(WordBodyBudget.maxCarriedBytes) - 64)))
+    }
 }

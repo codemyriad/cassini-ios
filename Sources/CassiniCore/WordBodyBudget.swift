@@ -66,11 +66,13 @@ public enum WordBodyBudget {
 
     /**
      * As [headerBytes(adding:to:)] for a fresh seal of [source], which keeps every foreign comment of the audio: an
-     * imported file's cover art or lyrics count against the same limit.
+     * imported file's cover art or lyrics count against the same limit. What the seal carries from [carried]'s manifest
+     * (`CassiniDocument.carriedMembers`, such as a long notes list under `x`, and its kept `meeting` and `provenance`
+     * members) grows the manifest by about its own encoded size, so that is counted too.
      */
-    public static func headerBytes(adding transcript: Transcript, sealing source: ByteSource) throws -> Int64 {
-        let foreign = try CassiniDocument.foreignComments(OggOpus.headers(source).tags)
-        return try headerBytes(adding: transcript, keeping: CassiniDocument.tagsPacket(foreign.text, opaque: foreign.opaque))
+    public static func headerBytes(adding transcript: Transcript, sealing source: ByteSource,
+                                   carrying carried: CassiniDocument? = nil) throws -> Int64 {
+        try headerBytes(adding: transcript, sealing: source, carried: carriedText(of: carried))
     }
 
     /** Whether sealing [transcript] beside [existing] keeps the header within [maxHeaderBytes]. */
@@ -78,9 +80,47 @@ public enum WordBodyBudget {
         try headerBytes(adding: transcript, to: existing) <= maxHeaderBytes
     }
 
-    /** Whether a fresh seal of [transcript] into [source] keeps the header within [maxHeaderBytes]. */
-    public static func fitsHeader(_ transcript: Transcript, sealing source: ByteSource) throws -> Bool {
-        try headerBytes(adding: transcript, sealing: source) <= maxHeaderBytes
+    /** The manifest bytes, uncompressed, that what a fresh seal carries may fill: the payload limit less room for the rest. */
+    public static let maxCarriedBytes = Int64(CassiniPayload.maxRaw) - (256 << 10)
+
+    /**
+     * Whether a fresh seal of [transcript] into [source], carrying [carried]'s private and unknown manifest members,
+     * keeps the header within [maxHeaderBytes] and the manifest within the payload limit: private data that gzip
+     * shrinks well can fit the header and still make a manifest the codec refuses.
+     */
+    public static func fitsHeader(_ transcript: Transcript, sealing source: ByteSource,
+                                  carrying carried: CassiniDocument? = nil) throws -> Bool {
+        let text = carriedText(of: carried)
+        guard Int64(text?.utf8.count ?? 0) <= maxCarriedBytes else { return false }
+        return try headerBytes(adding: transcript, sealing: source, carried: text) <= maxHeaderBytes
+    }
+
+    private static func headerBytes(adding transcript: Transcript, sealing source: ByteSource, carried: String?) throws -> Int64 {
+        let foreign = try CassiniDocument.foreignComments(OggOpus.headers(source).tags)
+        let kept = try headerBytes(adding: transcript, keeping: CassiniDocument.tagsPacket(foreign.text, opaque: foreign.opaque))
+        return try kept + carriedBytes(carried)
+    }
+
+    /** What a fresh seal carries from [source]'s manifest, as one compact JSON object; nil when it carries nothing. */
+    private static func carriedText(of source: CassiniDocument?) -> String? {
+        var members = CassiniDocument.carriedMembers(of: source).map { ($0.key, $0.value) }
+        if let meeting = CassiniDocument.carriedMeeting(of: source) { members.append(("meeting", .object(meeting))) }
+        let provenance = CassiniDocument.carriedProvenance(of: source)
+        if !provenance.isEmpty { members.append(("provenance", .object(JSONObject(provenance.map { ($0.key, $0.value) })))) }
+        return members.isEmpty ? nil : JSONObject(members).serialized()
+    }
+
+    /**
+     * The manifest chunk tags that [text] alone would encode to (gzip, unpadded base64url, 4096 characters a chunk,
+     * each behind its name and length): about what it adds to a manifest. Counted, not encoded, so a large `x` is
+     * compressed once and never parsed again.
+     */
+    private static func carriedBytes(_ text: String?) throws -> Int64 {
+        guard let text else { return 0 }
+        let gzipped = Int64(try CassiniPayload.gzip(Array(text.utf8)).count)
+        let encoded = (gzipped * 4 + 2) / 3
+        let chunks = (encoded + 4095) / 4096
+        return encoded + chunks * Int64(CassiniDocument.manifestPrefix.utf8.count + 4 + 1 + 4)
     }
 
     private static func headerBytes(adding transcript: Transcript, keeping kept: [UInt8]) throws -> Int64 {
