@@ -11,7 +11,7 @@ import CassiniEngineTesting
     private let transport: URLSessionTransport = {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [StubProtocol.self]
-        return URLSessionTransport(configuration: configuration)
+        return URLSessionTransport(userAgent: "CassiniTalk/0.1.0 (iOS 26.1; build 2)", configuration: configuration)
     }()
 
     private func read(_ answer: HTTPAnswer) async throws -> Data {
