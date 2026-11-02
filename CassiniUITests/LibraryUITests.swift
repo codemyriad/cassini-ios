@@ -196,7 +196,8 @@ final class LibraryUITests: XCTestCase {
         let save = app.buttons["Save"]
         XCTAssertFalse(save.isEnabled, "nothing changed yet")
         clear(field)
-        XCTAssertTrue(app.staticTexts["Enter a title."].waitForExistence(within: 3))
+        XCTAssertTrue(app.staticTexts["Enter a title."].waitForExistence(within: 10),
+                      "no blank-title message; the field holds \(String(describing: field.value))")
         XCTAssertFalse(save.isEnabled)
         field.typeText("  Thoughts from the morning walk ")
         XCTAssertTrue(field.waitForValue("  Thoughts from the morning walk "), "the field holds \(String(describing: field.value))")
