@@ -129,7 +129,8 @@ TestFlight still need.
   download, so the download screen and Settings use an estimate there.
 - The build carries what App Store Connect asks for: privacy manifests for the app and the Live Activity extension,
   `ITSAppUsesNonExemptEncryption` set to false, and the increased-memory-limit entitlement. The App Privacy answers
-  are "Data Not Collected" with no tracking. A public privacy policy URL is still needed before a submission.
+  are "Data Not Collected" with no tracking. The privacy policy is published at https://cassini.talk/privacy/ios/
+  from `Privacy.txt` ([distribution](docs/distribution.md#app-store-connect-answers)).
 - A real device is still needed to validate recognition, model downloads, long background capture and transcription,
   Bluetooth routes, the Live Activity and thermal behaviour. [Validation](docs/validation.md) has the checklist.
 

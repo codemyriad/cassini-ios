@@ -128,7 +128,10 @@ Store profile for `io.codemyriad.cassini` already grants it.
 - **App Privacy:** Data Not Collected; no tracking. This matches both privacy manifests (`NSPrivacyCollectedDataTypes`
   empty, `NSPrivacyTracking` false) and `Privacy.txt`: recordings, transcripts and voiceprints stay on the device, and
   the only network use is downloading pinned models.
-- **Privacy policy URL:** still to be decided; the default is to host it next to Android's.
+- **Privacy policy URL:** https://cassini.talk/privacy/ios/ (the overview for every app is
+  https://cassini.talk/privacy/). The page is published from `Cassini/Resources/Licenses/Privacy.txt`, the text
+  Settings shows, so the two say the same. When `Privacy.txt` changes, ask the coordinator to republish the page.
+  It goes in App Store Connect under App Information → Privacy Policy URL.
 - **Export compliance:** answered in the build (`ITSAppUsesNonExemptEncryption` false), so no question per upload.
 - **App Review note:** explain that background audio (`UIBackgroundModes` audio) keeps a recording going with the screen
   locked and lets playback continue on the lock screen, and that `processing` finishes a running transcription. Mention
