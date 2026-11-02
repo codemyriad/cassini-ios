@@ -13,7 +13,8 @@ import CassiniNotebook
     }
 
     /// A note whose earlier analysis gave "old_a" and "old_b", with "old_a" named Anna, then transcribed again: the
-    /// words are new and the shown transcript has no speakers yet (as `TranscriptionJob.saveTranscript` leaves it).
+    /// words are new and the shown transcript is one voice, the run's "Speaker 1" (as `TranscriptionJob.saveTranscript`
+    /// leaves it, D59).
     private func transcribedAgain(nameA: String = "Anna", matchA: VoiceMatchState = .unmatched) -> Note {
         var note = Note(title: "Riunione")
         note.transcript = [TranscriptSegment(text: "Prima", start: 0, end: 4, speakerID: "old_a"),
@@ -23,9 +24,10 @@ import CassiniNotebook
         note.speakers = [anna, NoteSpeaker(id: "old_b", name: "Speaker 2")]
         note.refreshSpeakerLabels()
         note.saveCurrentVersion(.previous)
-        note.transcript = [TranscriptSegment(text: "Nuova prima", start: 0, end: 4),
-                           TranscriptSegment(text: "Nuova seconda", start: 5, end: 9)]
-        note.speakers = []
+        let voice = NoteSpeaker.oneVoice(prefix: "run2_")
+        note.transcript = Note.oneVoice([TranscriptSegment(text: "Nuova prima", start: 0, end: 4),
+                                         TranscriptSegment(text: "Nuova seconda", start: 5, end: 9)], voice)
+        note.speakers = [voice]
         note.selectedVersionID = nil
         note.saveCurrentVersion(.transcription)
         return note
@@ -53,6 +55,23 @@ import CassiniNotebook
         #expect(note.transcript.map(\.speaker) == ["Anna", "Speaker 2"])
         // The match to a note-local voice is stored as no match, never as a link to a saved voice.
         #expect(note.speakers?.first?.match == .unmatched)
+    }
+
+    /// D59: the analysis attributes the one voice of Transcribe again in place, and finds the names in the latest
+    /// version that told speakers apart, past another one-voice transcription.
+    @Test func theOneVoiceOfTranscribeAgainIsAttributedInPlaceWithTheNamesBefore() {
+        var note = transcribedAgain()
+        let voice = NoteSpeaker.oneVoice(prefix: "run3_")
+        note.transcript = Note.oneVoice([TranscriptSegment(text: "Terza prima", start: 0, end: 4),
+                                         TranscriptSegment(text: "Terza seconda", start: 5, end: 9)], voice)
+        note.speakers = [voice]
+        note.selectedVersionID = nil
+        note.saveCurrentVersion(.transcription)
+        let again = analysed(note)
+        #expect(again.speakers?.map(\.name) == ["Anna", "Speaker 2"])
+        #expect(again.versions?.map(\.kind) == [.previous, .transcription, .transcription], "no version is added")
+        #expect(again.versions?.last?.speakers.map(\.name) == ["Anna", "Speaker 2"])
+        #expect(again.versions?[1].speakers == [.oneVoice(prefix: "run2_")], "the earlier transcription keeps its one voice")
     }
 
     @Test func placeholdersAndRejectedSpeakersDoNotCarryOver() {

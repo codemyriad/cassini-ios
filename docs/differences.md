@@ -293,14 +293,32 @@ that were not ported, with the reason for each.
   keeps one word list with a speaker per word. The screen flattens the shown version's passages into words. A passage
   without word times (an edited one) counts as one word of its whole text, so it plays and highlights as one piece.
   Character ranges count Swift characters, not UTF-16 units.
-- **Passages without a speaker** show as "Unknown speaker" in amber, and their header is not a button. In exports
-  they get the id `unassigned`, the id the sealed document uses. Android's words always have a speaker. The TXT, SRT
-  and WebVTT exports label them "Unknown speaker" in the app's language, and the Cassini document writes the same
-  label into its `speakers[]` entry for `unassigned` (D47, parity report risk 4), so every reader shows what the app
-  showed rather than the raw id, which Android and this app read as an unlabelled "Speaker N". The entry is added only
-  when a word uses it. A verified source that already has an `unassigned` entry keeps it verbatim, label included: it
-  was written when its words were produced, and an export in another language must not rewrite it. Only renaming that
-  speaker in the note changes its label, as for any speaker.
+- **One voice (D59, amended after Android R9).** As on Android, the words of a run that no speaker step told apart
+  (the setting is off, the speaker models were declined or failed, or the step failed) are one speaker whose id is new
+  to the run, labelled "Speaker 1" in the app's language when the words are saved (`NoteSpeaker.oneVoice`), so the
+  screen, the Speakers list and every export show and write "Speaker 1". The id is the run's speaker prefix and `1`,
+  the id its diarizer would give its first speaker: Android writes `diar_<run uuid>_1`, iOS `<UUID>_1`
+  (`WindowSpeakers.freshPrefix()`, the same form as its diarized ids). A streaming run uses its own prefix, restored
+  from the checkpoint on a resume; any other run takes a fresh one when it saves the words. So Transcribe again never
+  reuses an earlier run's speaker, nor the name or saved voice the user gave it (D56), in the note or in an exported
+  document. The job writes it when it saves the words (`TranscriptionJob.saveTranscript`); a run resumed for its
+  speaker step finds those words saved and keeps them. The Apple Speech recognizer and checkpoints without streamed
+  speakers keep words without a speaker until the job saves them. The draft shows those as Speaker 1 too, but its
+  header there is only a label (`NoteTurn.nameableSpeakerID`): that speaker has no id until the words are saved,
+  so it is named in the note once they are. Android's draft words already carry `diar_<run>_1`, so its one voice
+  can be named in the draft. The speaker step that follows, or Identify speakers later, replaces the one voice in
+  the transcription's own version, as long as it is still a single unnamed speaker linked to no saved voice (a
+  speaker step that found one unnamed voice counts the same); a named one is kept as a version. Notes saved before
+  keep their passages as stored (D51).
+- **Passages without a speaker** are only those the user set to no speaker (Edit passage, "Unassigned"). They show as
+  "Unknown speaker" in amber, and their header is not a button. In exports they get the id `unassigned`, the id the
+  sealed document uses. Android's words always have a speaker. The TXT, SRT and WebVTT exports label them "Unknown
+  speaker" in the app's language, and the Cassini document writes the same label into its `speakers[]` entry for
+  `unassigned` (D47, parity report risk 4), so every reader shows what the app showed rather than the raw id, which
+  Android and this app read as an unlabelled "Speaker N". The entry is added only when a word uses it. A verified source
+  that already has an `unassigned` entry keeps it verbatim, label included: it was written when its words were produced,
+  and an export in another language must not rewrite it. Only renaming that speaker in the note changes its label, as
+  for any speaker.
 - **No FTS4.** Search uses `LibraryIndex`, an in-memory index with each note's tokens folded for case and accents. It
   is built at the first search and kept until the note changes. `SearchText.snippet` follows SQLite's `snippet()`
   window choice. The tests that probe SQLite have nothing to test.

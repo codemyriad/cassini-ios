@@ -164,8 +164,27 @@ import CassiniNotebook
         #expect(h.applied.isEmpty)
         let note = try #require(await h.note())
         #expect(note.speakerAnalysisFailure == .speakers)
-        #expect(note.transcript.allSatisfy { $0.speakerID == nil })
+        let id = TranscriptionJobTests.OneVoice.expectOneVoice(note)
+        let prefix = try #require(h.checkpoints.saved.last?.speakers?.prefix)
+        #expect(id == prefix + "1", "the one voice is the run's own, as its words were (D59)")
         #expect(h.provenance(of: note)?.speakerDiarization == nil)
+    }
+
+    /// D59: a run resumed after its speakers failed keeps the prefix its checkpoint saved, so the one voice is the id
+    /// its words got before the stop, not a new one.
+    @Test func aResumedRunKeepsItsOwnOneVoice() async throws {
+        let (h, _) = try await harness(engines: FakeSpeakerEngines(failAt: 0, turns: Self.twoSpeakers))
+        let transcriber = try #require(h.engine as? WindowedTranscriber)
+        let stop = StopSignal()
+        transcriber.beforeWindow = { index in if index == 1 { stop.stop(.pause(.user)) } }
+        #expect(await h.run(stop: stop).outcome == .paused(.user))
+        let saved = try #require(h.checkpoints.saved.last?.speakers)
+        #expect(saved.failed)
+        transcriber.beforeWindow = { _ in }
+        #expect(await h.run().outcome == .done)
+        let note = try #require(await h.note())
+        #expect(TranscriptionJobTests.OneVoice.expectOneVoice(note) == saved.prefix + "1")
+        #expect(note.speakerAnalysisFailure == .speakers)
     }
 
     /// Without CAM++ the speakers are told apart and no clip is kept: no prints, no identification.

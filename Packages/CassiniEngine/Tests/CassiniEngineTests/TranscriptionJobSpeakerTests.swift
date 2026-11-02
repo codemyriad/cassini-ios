@@ -20,6 +20,7 @@ extension TranscriptionJobTests {
             #expect(note.transcript.flatMap(\.words).count == 70)
             #expect(h.provenance(of: note)?.speakerDiarization == nil)
             #expect(h.applied.isEmpty)
+            OneVoice.expectOneVoice(note)
         }
 
         @Test func aFailedSpeakerSaveAlsoDegradesToOneVoice() async throws {
@@ -139,10 +140,11 @@ extension TranscriptionJobTests {
             #expect(outcome == .done)
             #expect(events.contains(.speakersUnavailable))
             #expect(await h.note()?.speakerAnalysisFailure == .speakers)
+            OneVoice.expectOneVoice(await h.note())
         }
 
         @Test func aStopInTheSpeakerStepKeepsTheWordsAndResumesWithTheSpeakers() async throws {
-            let analyzer = FakeAnalyzer(suspends: true)
+            let analyzer = FakeAnalyzer(analysis: OneVoice.twoSpeakers, suspends: true)
             let h = try await Harness(analyzer: analyzer)
             let stop = StopSignal()
             let running = Task { await h.run(stop: stop) }
@@ -155,12 +157,17 @@ extension TranscriptionJobTests {
             #expect(outcome == .paused(.user))
             #expect(try h.files.load(h.noteID)?.wordsComplete == true)
             #expect(await h.note()?.transcript.flatMap(\.words).count == 70, "the words are in the note")
+            OneVoice.expectOneVoice(await h.note())
+            let versions = await h.note()?.versions?.count
 
             let (resumed, _) = await h.run()
             #expect(resumed == .done)
             #expect(h.transcriber.starts == [0], "the words are not transcribed again")
             #expect(h.applied.count == 1)
             #expect(!h.files.exists(h.noteID))
+            let note = try #require(await h.note())
+            #expect(note.versions?.count == versions, "the one-voice words are recognised as saved, not saved again")
+            #expect(Set(note.transcript.compactMap(\.speakerID)) == ["a", "b"])
         }
     }
 }

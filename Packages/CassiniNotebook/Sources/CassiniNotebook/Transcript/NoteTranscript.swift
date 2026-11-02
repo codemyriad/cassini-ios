@@ -40,6 +40,11 @@ public struct NoteTurn: Identifiable, Hashable, Sendable {
     /// The passages the paragraph shows, in order, each with where it starts in the paragraph (for Edit passage).
     public let passages: [PassageRef]
 
+    /// The speaker the header names (Name a speaker): nil for a passage without a speaker, and for the draft's one
+    /// voice (`NoteTranscripts.draftOneVoice`), which the job names only once it saves the words under the run's id
+    /// (D59), so its header is only a label.
+    public var nameableSpeakerID: String? { speakerID == NoteTranscripts.draftOneVoice ? nil : speakerID }
+
     /// The character range of word `index` in `text`.
     public func range(ofWord index: Int) -> Range<Int> {
         offsets[index]..<(offsets[index] + words[index].text.count)
@@ -189,12 +194,12 @@ public enum NoteTranscripts {
     /// The draft of a running or stopped job: each speaker's `labels` (placeholders numbered by first word without
     /// one), the "auto" badge for the `automatic` ones, the `suggestions` cards, each above the first paragraph of its
     /// speaker's latest turn, and `tentativeFromMs`: words that end after it may still change (nil for a stopped
-    /// draft, whose words are all settled). A word without a speaker id (Apple Speech, or no speakers told apart) has
-    /// no speaker.
+    /// draft, whose words are all settled). Words without a speaker id (Apple Speech, or no speakers told apart) are
+    /// one voice, "Speaker 1", as the job saves them (`NoteSpeaker.oneVoice`, D59), under `draftOneVoice`.
     public static func draft(_ words: [DraftWord], tentativeFromMs: Int64?, labels: [String: String] = [:],
                              automatic: Set<String> = [], suggestions: [DraftSuggestion] = []) -> NoteTranscript {
         let transcriptWords = words.map {
-            TranscriptWord(speaker: $0.speaker.isEmpty ? nil : $0.speaker, start: Double($0.startMs) / 1000,
+            TranscriptWord(speaker: $0.speaker.isEmpty ? draftOneVoice : $0.speaker, start: Double($0.startMs) / 1000,
                            end: Double($0.endMs) / 1000, text: $0.text)
         }
         let order = orderOfAppearance(transcriptWords)
@@ -226,6 +231,10 @@ public enum NoteTranscripts {
         }
         return NoteTranscript(turns: turns)
     }
+
+    /// The speaker id a draft shows its words without a speaker under: the run's one voice has no id until the job
+    /// saves the words, so it cannot be named in the draft (`NoteTurn.nameableSpeakerID`).
+    public static let draftOneVoice = "draft_1"
 
     /// The `segmentID` of a draft's suggestion cards: a draft has no passages yet.
     public static let draftSegment = UUID(uuid: (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))

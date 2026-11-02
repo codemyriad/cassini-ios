@@ -107,11 +107,11 @@ extension Note {
     }
 
     /// The named speakers whose names an analysis carries over: the shown ones, or, when the shown transcript has none
-    /// yet (Transcribe again cleared them), those of the latest version that has some. A speaker counts with a name
-    /// that is no placeholder and no rejection.
+    /// told apart yet (Transcribe again left it one voice, `isOneVoice`), those of the latest version that has some. A
+    /// speaker counts with a name that is no placeholder and no rejection.
     private var carriedSpeakers: [NoteSpeaker] {
         let shown = speakers ?? []
-        let named = shown.isEmpty ? (versions ?? []).last(where: { !$0.speakers.isEmpty })?.speakers ?? [] : shown
+        let named = shown.isOneVoice ? (versions ?? []).last(where: { !$0.speakers.isOneVoice })?.speakers ?? [] : shown
         return named.filter { !DefaultLabels.isDefault(id: $0.id, label: $0.name) && !$0.match.isRejection }
     }
 
@@ -150,7 +150,7 @@ extension Note {
 
     /// Puts a speaker analysis into the note: every passage gets a speaker of `turns`, the speakers are numbered in
     /// order of first appearance and get their match (`autoName` names a speaker after an automatic match). A
-    /// transcription shown as it was made, with no speakers yet (the analysis that follows it in the same job, or
+    /// transcription shown as it was made, in one voice (the analysis that follows it in the same job, or
     /// Identify speakers on it later), takes the speakers into its own version, as Android seals a transcription and
     /// its speakers as one variant. Otherwise the transcript before it is kept as a version and the result is a new
     /// one. A match to one of `localVoices` (the
@@ -226,11 +226,11 @@ extension Note {
         speakerAnalysisFailure = nil
     }
 
-    /// The index of the shown version when it is a transcription without speakers, which an analysis attributes in
-    /// place.
+    /// The index of the shown version when it is a transcription in one voice (`isOneVoice`: a single speaker under
+    /// its placeholder, as a run without a speaker step leaves it), which an analysis attributes in place.
     private var attributableInPlace: Int? {
         guard let index = shownVersionIndex, let version = versions?[index], version.kind == .transcription,
-              version.speakers.isEmpty else { return nil }
+              version.speakers.isOneVoice else { return nil }
         return index
     }
 }

@@ -67,6 +67,12 @@ extension TranscriptionJobHost {
 /// - **Speakers after the words.** A speakers-only job (Identify speakers), an Apple Speech transcription, and a
 ///   Parakeet run resumed from a checkpoint that did not stream speakers analyse the whole file after the words are in
 ///   the note (`SpeakerAnalyzing.analyze`). A failure leaves every word one voice and the job still succeeds.
+/// - **One voice (D59, amended after Android R9).** The words go into the note with one speaker whose id is new to
+///   the run, `<prefix>1` (`NoteSpeaker.oneVoice`), labelled "Speaker 1" in the user's language, as Android writes
+///   `diar_<run>_1`. The prefix is the streaming speakers' (restored from the checkpoint on a resume), else a fresh
+///   one (`WindowSpeakers.freshPrefix()`), so Transcribe again never reuses an earlier run's speaker, its name or its
+///   saved voice (D56). The speaker step replaces it with its own speakers; when no step runs or it fails, the note
+///   keeps it.
 /// - **Draft names (Android's `names.json`).** A streaming run opens naming (`DraftNamesStore`); a fresh one starts
 ///   with no names. Each window ends with a round of live voice matching (`LiveMatching`). Once the words are done the
 ///   job closes naming and puts the names into the note with the speakers: the draft merges, the user's labels, the
@@ -253,7 +259,9 @@ public struct TranscriptionJob: TranscriptionJobRunning {
             }
             if streamed != nil { streamed?.names = drafts?.close(job.noteID) }
             events(.namingClosed(matching: plan.runs && plan.printsReady))
-            guard let words, await saveTranscript(words, resumed: checkpoint?.wordsComplete == true, context) else {
+            let prefix = streamed?.prefix ?? checkpoint?.speakers?.prefix ?? WindowSpeakers.freshPrefix()
+            guard let words, await saveTranscript(words, resumed: checkpoint?.wordsComplete == true, prefix: prefix,
+                                                  context) else {
                 return .failed(.save)
             }
             context.totalMs = words.totalMs
@@ -358,14 +366,11 @@ public struct TranscriptionJob: TranscriptionJobRunning {
     /// Puts the words into the note as a new version, even when they equal the transcript shown (as Android adds a
     /// variant for every transcription), and records their provenance. A run that resumed for its speaker step finds
     /// them saved already (the record describes them) and leaves the note as it is, edits and all. The words go in
-    /// with one voice: the speaker step gives them their speakers, the streamed ones too.
-    private func saveTranscript(_ words: CheckpointState, resumed: Bool, _ context: Context) async -> Bool {
-        let segments = words.segments.map { segment in
-            var plain = segment
-            plain.speakerID = nil
-            plain.speaker = nil
-            return plain
-        }
+    /// with one voice, the run's `<prefix>1` labelled "Speaker 1" in the user's language (D59): the speaker step
+    /// replaces it with their speakers, the streamed ones too, and without one the note keeps it.
+    private func saveTranscript(_ words: CheckpointState, resumed: Bool, prefix: String, _ context: Context) async -> Bool {
+        let voice = NoteSpeaker.oneVoice(prefix: prefix)
+        let segments = Note.oneVoice(words.segments, voice)
         if resumed, provenance.load(context.noteID)?.describes(segments) == true { return true }
         let language = context.wordsLanguage
         let run: TranscriptProvenance
@@ -388,7 +393,7 @@ public struct TranscriptionJob: TranscriptionJobRunning {
                 note.saveCurrentVersion(.previous, id: before, date: date)
                 note.transcript = segments
                 note.language = language
-                note.speakers = []
+                note.speakers = segments.isEmpty ? [] : [voice]
                 note.selectedVersionID = nil
                 note.saveCurrentVersion(.transcription, id: after, date: date)
                 note.failure = nil

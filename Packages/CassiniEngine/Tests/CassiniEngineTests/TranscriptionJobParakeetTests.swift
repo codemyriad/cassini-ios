@@ -83,7 +83,11 @@ import CassiniNotebook
         #expect(transcriber.requests.last?.resume?.words.map(\.text) == (0..<54).map { "w\($0)" })
 
         let expected = try #require(await whole.note()), actual = try #require(await stopped.note())
-        #expect(actual.transcript.flatMap(\.draftWords) == expected.transcript.flatMap(\.draftWords))
+        // The same words; each run's one voice is its own (D59).
+        let words = { (note: Note) in note.transcript.flatMap(\.draftWords).map { "\($0.startMs) \($0.endMs) \($0.text)" } }
+        #expect(words(actual) == words(expected))
+        #expect(actual.transcript.map(\.start) == expected.transcript.map(\.start))
+        #expect(Set(actual.transcript.map(\.speakerID)).count == 1)
         let resumed = stopped.provenance(of: actual)
         #expect(resumed?.resumedFromMs == 54_000)
         #expect(resumed?.inferenceMs == 300, "two windows before the stop, the last part after it")

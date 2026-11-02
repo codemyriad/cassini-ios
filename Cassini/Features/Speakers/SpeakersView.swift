@@ -39,7 +39,7 @@ struct SpeakersView: View {
                     .disabled(readOnly != nil)
                     Section {
                         Button(SpeakersCopy.identifySpeakers, systemImage: "waveform.badge.magnifyingglass") {
-                            if !(note.speakers ?? []).isEmpty { rerun = true } else { Task { await model.identifySpeakers() } }
+                            if !(note.speakers ?? []).isOneVoice { rerun = true } else { Task { await model.identifySpeakers() } }
                         }
                         .disabled(note.transcript.isEmpty || readOnly != nil || !note.audio.isPlayable)
                         .accessibilityIdentifier("identifySpeakers")
