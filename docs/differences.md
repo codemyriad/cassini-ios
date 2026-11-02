@@ -310,6 +310,13 @@ that were not ported, with the reason for each.
   the transcription's own version, as long as it is still a single unnamed speaker linked to no saved voice (a
   speaker step that found one unnamed voice counts the same); a named one is kept as a version. Notes saved before
   keep their passages as stored (D51).
+- **Speaker ids per run (D56).** Every speaker step writes ids of its own: the streaming diarizer of a Parakeet run
+  and the whole-file analysis (an Apple Speech transcription, Identify speakers) each take a fresh
+  `WindowSpeakers.freshPrefix()`, so their speakers are `<UUID>_1`, `<UUID>_2`, …, as Android's are
+  `diar_<run uuid>_n`. A new analysis never gives its speakers an earlier run's ids, so no name, saved voice or
+  `voiceSource` of the earlier run lands on them by id. Names and exclusions reach the new speakers only through a
+  voice match and the time overlap with the transcript shown, as before. Labels stay "Speaker N" by order of first
+  appearance (D47).
 - **Passages without a speaker** are only those the user set to no speaker (Edit passage, "Unassigned"). They show as
   "Unknown speaker" in amber, and their header is not a button. In exports they get the id `unassigned`, the id the
   sealed document uses. Android's words always have a speaker. The TXT, SRT and WebVTT exports label them "Unknown
