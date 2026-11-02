@@ -150,6 +150,8 @@ TestFlight still need.
 - **Storage model.** A note is a `note.json` beside its audio. The portable Cassini document is sealed only at export,
   with the run's provenance under Android's keys. Each variant carries the language of the run that made its words
   (D53.2): `und` for Parakeet, as Android writes, the locale that ran for Apple Speech, never the Settings language.
+  Passages without a speaker are sealed as the speaker `unassigned`, labelled "Unknown speaker" in the app's language
+  (D47); Android's words always have a speaker. The cross-app vectors are checked through the reader and the import.
   Android keeps the transcript
   in a sealed document and a Room catalogue. The queue is `jobs.json`, and checkpoints use iOS's own format. Search
   uses an in-memory index instead of FTS4. Saved voices keep one sample per note instead of a running mean.

@@ -10,6 +10,8 @@ xcuserdata/
 .swiftpm/
 *.xcodeproj/
 *.opus
+# The cross-app vectors (coordination ux-draft/cross-app-vectors) are test inputs, pinned by their SHA-256.
+!Packages/*/Tests/*/Resources/cross-app-vectors/*.opus
 *.wav
 *.caf
 *.m4a

@@ -107,12 +107,16 @@ final class AudioPipelineTests: XCTestCase {
         await test.graph.imports.importFile(source, opensNote: false).value
         let id = try XCTUnwrap(store.notes.first?.id)
         await store.commit(id) { note in
-            note.transcript = [.init(text: "Hello there", start: 0, end: 1.5, speaker: "Alex", speakerID: "a")]
+            note.transcript = [.init(text: "Hello there", start: 0, end: 1.5, speaker: "Alex", speakerID: "a"),
+                               .init(text: "Who is it?", start: 1.5, end: 2)]
             note.speakers = [NoteSpeaker(id: "a", name: "Alex")]; note.status = .ready
         }
         let portable = try await test.graph.exports.exportPortable(id)
         defer { try? FileManager.default.removeItem(at: portable.deletingLastPathComponent()) }
-        XCTAssertEqual(CassiniDocument.read(portable).state, .ok)
+        let sealed = CassiniDocument.read(portable)
+        XCTAssertEqual(sealed.state, .ok)
+        // The passage without a speaker is written under the label the note shows it with (D47).
+        XCTAssertEqual(sealed.speakerLabel("unassigned"), NoteCopy.unknownSpeaker)
         let original = try Data(contentsOf: portable)
         test.clock.advance(by: .seconds(60))
         await test.graph.imports.importFile(portable, opensNote: false).value
@@ -123,13 +127,43 @@ final class AudioPipelineTests: XCTestCase {
         XCTAssertEqual(imported.audioFilename, "playback.caf")
         XCTAssertEqual(imported.originalAudioFilename, "document.opus")
         XCTAssertEqual(imported.audio, .plain)
-        XCTAssertEqual(imported.transcript.first?.speaker, "Alex")
+        XCTAssertEqual(imported.transcript.map(\.speaker), ["Alex", NoteCopy.unknownSpeaker])
         XCTAssertEqual(imported.duration, 2, accuracy: 0.01)
         XCTAssertEqual(try Data(contentsOf: XCTUnwrap(store.originalAudioURL(imported))), original)
         XCTAssertEqual(try Data(contentsOf: portable), original)
         test.graph.playback.show(imported, owner: PlaybackOwner())
         XCTAssertEqual(test.graph.playback.state.noteID, imported.id)
         XCTAssertEqual(test.playback.loadedURL, store.audioURL(imported))
+    }
+
+    /// The tests run in English, where the label is the literal "Unknown speaker"; a stand-in label shows that the
+    /// export store writes the one it is given (the app's `ExportCopy.texts`, in the user's language) into the sealed
+    /// document, as into the transcript exports, rather than a fixed string.
+    @MainActor func testTheSealedDocumentLabelsPassagesWithoutASpeakerWithTheExportTexts() async throws {
+        let sources = try makeRoot(); defer { try? FileManager.default.removeItem(at: sources) }
+        let test = TestGraph(); defer { test.tearDown() }
+        let source = sources.appendingPathComponent("capture.caf")
+        try writeSignal(to: source)
+        await test.graph.start()
+        test.graph.settings.autoTranscribe = false
+        let store = test.graph.library
+        await test.graph.imports.importFile(source, opensNote: false).value
+        let id = try XCTUnwrap(store.notes.first?.id)
+        await store.commit(id) { note in
+            note.transcript = [.init(text: "Pronto", start: 0, end: 1, speaker: "Alex", speakerID: "a"),
+                               .init(text: "Chi è?", start: 1, end: 2)]
+            note.speakers = [NoteSpeaker(id: "a", name: "Alex")]; note.status = .ready
+        }
+        let english = ExportCopy.texts(locale: Locale(identifier: "en_US"), timeZone: TimeZone(identifier: "UTC")!)
+        let texts = ExportTexts(subtitle: english.subtitle, emptyText: english.emptyText, unassignedLabel: "Voce senza nome")
+        let exports = ExportStore(library: store, audio: test.graph.environment.audio,
+                                  folder: test.root.appendingPathComponent("tmp/StandIn", isDirectory: true), texts: texts) {}
+
+        let portable = try await exports.exportPortable(id)
+        let text = try await exports.exportTranscript(id, format: .text)
+
+        XCTAssertEqual(CassiniDocument.read(portable).speakerLabel("unassigned"), "Voce senza nome")
+        XCTAssertTrue(try String(contentsOf: text, encoding: .utf8).contains("Voce senza nome"))
     }
 
     @MainActor func testThreeFilesPickedAtOnceAreAllImportedAndAReimportOpensTheNote() async throws {

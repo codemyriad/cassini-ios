@@ -105,7 +105,7 @@ private actor Gate {
         earlier.portableID = nil
         note.versions = [earlier]
 
-        let output = try await PortableExportService(audio: FakeAudioProcessing(duration: 2), provenance: FakeProvenance())
+        let output = try await PortableExportService(audio: FakeAudioProcessing(duration: 2), provenance: FakeProvenance(), unassignedLabel: "Unknown speaker")
             .export(note, original: playable, playable: playable, into: folder, filename: "encoded")
 
         #expect(output.lastPathComponent == "encoded.opus")
@@ -126,13 +126,13 @@ private actor Gate {
         let opus = try ImportFixtures.opus(packets: 100)
         try Data(opus).write(to: original)
 
-        let output = try await PortableExportService(audio: FakeAudioProcessing(), provenance: FakeProvenance())
+        let output = try await PortableExportService(audio: FakeAudioProcessing(), provenance: FakeProvenance(), unassignedLabel: "Unknown speaker")
             .export(transcribed("Talk"), original: original, playable: original, into: folder, filename: "Talk")
         #expect(try OggOpus.scan(output).digest() == OggOpus.scan(original).digest())
         #expect(try Data(contentsOf: original) == Data(opus))
 
         await #expect(throws: PortableExportError.noTranscript) {
-            try await PortableExportService(audio: FakeAudioProcessing(), provenance: FakeProvenance())
+            try await PortableExportService(audio: FakeAudioProcessing(), provenance: FakeProvenance(), unassignedLabel: "Unknown speaker")
                 .export(Note(title: "Empty"), original: original, playable: original, into: folder, filename: "Empty")
         }
         #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path).sorted() == ["Talk.opus", "source.opus"])
@@ -172,7 +172,7 @@ private actor Gate {
         try Data(ImportFixtures.opus(packets: 100)).write(to: original)
         let note = twoSpeakers()
 
-        let output = try await PortableExportService(audio: FakeAudioProcessing(), provenance: FakeProvenance([note.id: runRecord(note)]))
+        let output = try await PortableExportService(audio: FakeAudioProcessing(), provenance: FakeProvenance([note.id: runRecord(note)]), unassignedLabel: "Unknown speaker")
             .export(note, original: original, playable: original, into: folder, filename: "Two")
 
         let document = CassiniDocument.read(output)
@@ -196,7 +196,7 @@ private actor Gate {
         note.transcript[1].text = "everyone"
         note.transcript[1].words = []
 
-        let output = try await PortableExportService(audio: FakeAudioProcessing(), provenance: FakeProvenance([note.id: record]))
+        let output = try await PortableExportService(audio: FakeAudioProcessing(), provenance: FakeProvenance([note.id: record]), unassignedLabel: "Unknown speaker")
             .export(note, original: original, playable: original, into: folder, filename: "Two")
 
         let document = CassiniDocument.read(output)
@@ -213,7 +213,7 @@ private actor Gate {
         let record = runRecord(note)
         note.mergeSpeaker("b", into: "a")
 
-        let output = try await PortableExportService(audio: FakeAudioProcessing(), provenance: FakeProvenance([note.id: record]))
+        let output = try await PortableExportService(audio: FakeAudioProcessing(), provenance: FakeProvenance([note.id: record]), unassignedLabel: "Unknown speaker")
             .export(note, original: original, playable: original, into: folder, filename: "Two")
 
         let document = CassiniDocument.read(output)
@@ -263,7 +263,7 @@ private actor Gate {
                                        streaming: true),
                            transcript: note.transcript)
 
-        let output = try await PortableExportService(audio: FakeAudioProcessing(), provenance: FakeProvenance([note.id: record]))
+        let output = try await PortableExportService(audio: FakeAudioProcessing(), provenance: FakeProvenance([note.id: record]), unassignedLabel: "Unknown speaker")
             .export(note, original: original, playable: original, into: folder, filename: "Two")
 
         let document = CassiniDocument.read(output)
@@ -287,7 +287,7 @@ private actor Gate {
         note.revisePassage(passage, to: passage.revised(text: "everyone", speakerID: "a", speakers: note.speakers ?? []),
                            stamp: VersionStamp(date: Date()))
 
-        let output = try await PortableExportService(audio: FakeAudioProcessing(), provenance: FakeProvenance([note.id: record]))
+        let output = try await PortableExportService(audio: FakeAudioProcessing(), provenance: FakeProvenance([note.id: record]), unassignedLabel: "Unknown speaker")
             .export(note, original: original, playable: original, into: folder, filename: "Two")
 
         let document = CassiniDocument.read(output)

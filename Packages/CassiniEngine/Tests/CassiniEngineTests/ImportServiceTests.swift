@@ -544,7 +544,7 @@ private func sha256(_ url: URL) throws -> String {
     private func export(_ note: Note, _ h: ImportHarness, folder name: String = "export") async throws -> (URL, URL) {
         let folder = h.inputs.appendingPathComponent(name)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let output = try await PortableExportService(audio: h.audio, provenance: FakeProvenance())
+        let output = try await PortableExportService(audio: h.audio, provenance: FakeProvenance(), unassignedLabel: "Unknown speaker")
             .export(note, original: h.store.originalAudioURL(for: note), playable: h.store.audioURL(for: note),
                     into: folder, filename: "Due")
         return (folder, output)
@@ -739,7 +739,7 @@ private func sha256(_ url: URL) throws -> String {
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
 
         await #expect(throws: PortableExportError.tooLong) {
-            try await PortableExportService(audio: h.audio, provenance: FakeProvenance())
+            try await PortableExportService(audio: h.audio, provenance: FakeProvenance(), unassignedLabel: "Unknown speaker")
                 .export(note, original: original, playable: original, into: folder, filename: "Due")
         }
         #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path).isEmpty)

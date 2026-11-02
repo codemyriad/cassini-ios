@@ -294,7 +294,13 @@ that were not ported, with the reason for each.
   without word times (an edited one) counts as one word of its whole text, so it plays and highlights as one piece.
   Character ranges count Swift characters, not UTF-16 units.
 - **Passages without a speaker** show as "Unknown speaker" in amber, and their header is not a button. In exports
-  they get the id `unassigned`, the id the sealed document uses. Android's words always have a speaker.
+  they get the id `unassigned`, the id the sealed document uses. Android's words always have a speaker. The TXT, SRT
+  and WebVTT exports label them "Unknown speaker" in the app's language, and the Cassini document writes the same
+  label into its `speakers[]` entry for `unassigned` (D47, parity report risk 4), so every reader shows what the app
+  showed rather than the raw id, which Android and this app read as an unlabelled "Speaker N". The entry is added only
+  when a word uses it. A verified source that already has an `unassigned` entry keeps it verbatim, label included: it
+  was written when its words were produced, and an export in another language must not rewrite it. Only renaming that
+  speaker in the note changes its label, as for any speaker.
 - **No FTS4.** Search uses `LibraryIndex`, an in-memory index with each note's tokens folded for case and accents. It
   is built at the first search and kept until the note changes. `SearchText.snippet` follows SQLite's `snippet()`
   window choice. The tests that probe SQLite have nothing to test.
@@ -546,6 +552,12 @@ stricter or looser than the spec.
     carrying, and Android's has no such parameter yet.
   - **Broken, newer-format or plain audio:** a fresh seal with only the foreign tags, since there is no manifest to
     keep.
+- **Cross-app vectors** (parity report risk 6). The files of coordination `ux-draft/cross-app-vectors`, which every
+  Cassini app must open the same way, are copied byte for byte into `CassiniEngineTests/Resources/cross-app-vectors`
+  with `expected.json`, each pinned by its SHA-256 (a file's pin is `SHA256.json`'s). `CrossAppVectorTests` checks
+  every expectation through the reader (`CassiniDocument.read`, audio verified) and through the import, down to the
+  words the Note screen opens on. `two-versions-default-switched.opus` (D53.3, the shape Android writes when you choose
+  a version) opens on `second-pass`, "ONE TWO. THREE.", with no change to the reader.
 
 ## Recording
 

@@ -135,8 +135,14 @@ extension PortableTranscript {
     /// The variant's language is the note's as it is (`TranscriptLanguage`): the run's, or an imported variant's value as
     /// stored. `processing` is the variant's provenance record (`ExportProvenance`). `source` is the document at `opus` when the
     /// caller has read (and verified) it already. Returns the new variant's id. The source is never changed.
+    ///
+    /// Passages without a speaker are the speaker `unassigned` (`ExportTranscript.unassignedSpeaker`). When a word uses
+    /// it and the manifest has no entry for it yet, its entry is labelled `unassignedLabel`, the label the app shows
+    /// such passages under in the user's language (D47: written when produced, shown as stored). An entry a verified
+    /// source already has keeps its stored label, unless the note names a speaker `unassigned` (one read from that
+    /// entry, perhaps renamed), whose name it gets as any other speaker's.
     @discardableResult
-    public static func export(note: Note, opus: URL, destination: URL,
+    public static func export(note: Note, opus: URL, destination: URL, unassignedLabel: String,
                               processing: JSONObject = ExportProvenance.userEdited,
                               source known: CassiniDocument? = nil) throws -> String? {
         let source = known ?? CassiniDocument.read(opus)
@@ -167,15 +173,19 @@ extension PortableTranscript {
         let fits = try existing.map { try WordBodyBudget.fitsHeader(transcript, beside: $0) }
             ?? WordBodyBudget.fitsHeader(transcript, sealing: FileSource(opus), carrying: carried)
         guard fits else { throw PortableExportError.tooLong }
+        // Only a new entry takes it: the seal labels the speakers the manifest does not have yet.
+        var newLabels = labels
+        if newLabels[ExportTranscript.unassignedSpeaker] == nil { newLabels[ExportTranscript.unassignedSpeaker] = unassignedLabel }
         return try CassiniDocument.create(opus, transcript: transcript, title: note.title, processing: processing,
-                                          existing: existing, speakerLabels: labels, carrying: carried,
+                                          existing: existing, speakerLabels: newLabels, carrying: carried,
                                           target: destination).defaultId
     }
 
-    /// The note's words; a passage without word timing becomes words that each span the whole passage.
+    /// The note's words; a passage without word timing becomes words that each span the whole passage, and one
+    /// without a speaker is `ExportTranscript.unassignedSpeaker`'s.
     static func words(of note: Note) -> [Word] {
         note.transcript.flatMap { segment -> [Word] in
-            let id = segment.speakerID ?? "unassigned"
+            let id = segment.speakerID ?? ExportTranscript.unassignedSpeaker
             let source = segment.words.isEmpty ? [TimedWord(text: segment.text, start: segment.start, end: segment.end)] : segment.words
             // A source run may contain several words. Each keeps the run's range; never invent subword timing.
             return source.flatMap { word in
