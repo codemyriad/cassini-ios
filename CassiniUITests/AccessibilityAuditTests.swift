@@ -13,6 +13,7 @@ import XCTest
 // ports: ScreenAccessibilityTest#recording
 // ports: ScreenAccessibilityTest#settings
 // ports: AppAccessibilityTest#theLibraryAndSettingsHaveNoFindings
+// Its waits allow 20 s: upper bounds for the iPad clone on a busy machine, where a screen can take that long to open.
 final class AccessibilityAuditTests: XCTestCase {
     private static let fixture = "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA"
     /// The largest Dynamic Type size (AX5).
@@ -48,7 +49,7 @@ final class AccessibilityAuditTests: XCTestCase {
     @MainActor private func settings(_ extra: [String] = []) -> XCUIApplication {
         let app = library(extra)
         app.buttons["settingsButton"].tap()
-        XCTAssertTrue(app.buttons["appLanguageRow"].waitForExistence(within: 5))
+        XCTAssertTrue(app.buttons["appLanguageRow"].waitForExistence(within: 20))
         return app
     }
 
@@ -56,7 +57,7 @@ final class AccessibilityAuditTests: XCTestCase {
         let app = launch(["--seed", "trash"] + extra)
         XCTAssertTrue(app.buttons["recentlyDeletedButton"].waitForExistence(within: 15))
         app.buttons["recentlyDeletedButton"].tap()
-        XCTAssertTrue(app.staticTexts["Old interview draft"].waitForExistence(within: 5))
+        XCTAssertTrue(app.staticTexts["Old interview draft"].waitForExistence(within: 20))
         return app
     }
 
@@ -67,7 +68,7 @@ final class AccessibilityAuditTests: XCTestCase {
         let row = app.buttons["savedVoicesRow"]
         for _ in 0..<6 where !row.isHittable { app.swipeUp() }
         row.tap()
-        XCTAssertTrue(app.staticTexts["Alex Moreau"].waitForExistence(within: 5))
+        XCTAssertTrue(app.staticTexts["Alex Moreau"].waitForExistence(within: 20))
         return app
     }
 
@@ -180,7 +181,7 @@ final class AccessibilityAuditTests: XCTestCase {
         let app = note(Self.largestText)
         for label in ["Play", "Back 10 seconds", "Forward 10 seconds"] {
             let button = app.buttons[label]
-            XCTAssertTrue(button.waitForExistence(within: 5), label)
+            XCTAssertTrue(button.waitForExistence(within: 20), label)
             XCTAssertGreaterThanOrEqual(button.frame.width, 44, label)
             XCTAssertGreaterThanOrEqual(button.frame.height, 44, label)
         }

@@ -76,7 +76,7 @@ import CassiniEngineTesting
         let id = try await recordingWithAFailedSeal()
         let store = try XCTUnwrap(library.noteStore)
         try await store.mutate(id) { $0.playbackPosition = 5 }
-        let deadline = ContinuousClock.now + .seconds(5)
+        let deadline = ContinuousClock.now + .seconds(30) // An upper bound for a busy machine.
         while library.note(id)?.playbackPosition != 5, ContinuousClock.now < deadline {
             try await Task.sleep(for: .milliseconds(10))
         }

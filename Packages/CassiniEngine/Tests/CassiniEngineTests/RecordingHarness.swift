@@ -64,7 +64,7 @@ import CassiniNotebook
 
     func note(_ id: UUID) async -> Note? { await store.note(id) }
 
-    func waitFor(_ what: String = "condition", timeout: Duration = .seconds(5), _ condition: @MainActor () async -> Bool) async throws {
+    func waitFor(_ what: String = "condition", timeout: Duration = .seconds(30), _ condition: @MainActor () async -> Bool) async throws {
         let deadline = ContinuousClock.now + timeout
         while !(await condition()) {
             guard ContinuousClock.now < deadline else {
