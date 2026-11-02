@@ -586,7 +586,12 @@ stricter or looser than the spec.
   with `expected.json`, each pinned by its SHA-256 (a file's pin is `SHA256.json`'s). `CrossAppVectorTests` checks
   every expectation through the reader (`CassiniDocument.read`, audio verified) and through the import, down to the
   words the Note screen opens on. `two-versions-default-switched.opus` (D53.3, the shape Android writes when you choose
-  a version) opens on `second-pass`, "ONE TWO. THREE.", with no change to the reader.
+  a version) opens on `second-pass`, "ONE TWO. THREE.", with no change to the reader. `android-written-v1.opus`, a note
+  written by cassini-android's own writers, opens on its speaker merge `words-78fd7ee6` with all five words by "Anna".
+  Its first version shows "Anna" and "Voce 2", the Italian placeholder as stored, under any UI language (D47). Its
+  `diar_<run>_n` ids, languages (`und`), title, tags (no DATE), indented bodies and provenance (`x-speakerMerges`, the
+  float-widened diarization numbers) read as the vector says, with no change to the reader. A key in `expected.json`
+  that no check reads fails the suite.
 
 ## Recording
 
