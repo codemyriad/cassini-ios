@@ -1,4 +1,5 @@
 import XCTest
+import UIKit
 import Synchronization
 import CassiniEngine
 import CassiniNotebook
@@ -66,6 +67,14 @@ import CassiniSherpa
         } catch is CancellationError {}
         try await waitUntil("the installer never went idle") { models.installer.status == .idle }
         XCTAssertEqual(fetcher.fetched, [ModelCatalog.parakeet.pin], "nothing else was fetched")
+    }
+
+    /// D54: the model downloads name the app's marketing version, the iOS version as iOS writes it, and the build.
+    func testTheModelDownloadsUserAgentComesFromTheBundle() throws {
+        let info = try XCTUnwrap(Bundle.main.infoDictionary)
+        let version = try XCTUnwrap(info["CFBundleShortVersionString"] as? String)
+        let build = try XCTUnwrap(info["CFBundleVersion"] as? String)
+        XCTAssertEqual(PinnedModels.userAgent, "CassiniTalk/\(version) (iOS \(UIDevice.current.systemVersion); build \(build))")
     }
 
     private func waitUntil(_ message: String, _ condition: () -> Bool) async throws {

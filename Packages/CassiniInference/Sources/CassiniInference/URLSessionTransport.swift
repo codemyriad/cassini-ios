@@ -9,11 +9,15 @@ import CassiniEngine
 /// `URLRequest.timeoutInterval` is the time allowed without data, as Android's read timeout.
 ///
 /// Requests ask for `Accept-Encoding: identity`, so `Content-Length` and `Content-Range` count the bytes of the file.
+/// Every request, each redirect hop included (`ArtifactFetcher` asks for each hop itself), carries `userAgent` (D54,
+/// `ModelUserAgent`), set last so that no caller header replaces it and CFNetwork's default never goes out.
 public final class URLSessionTransport: HTTPTransport {
     private let delegate = Delegate()
     private let session: URLSession
+    private let userAgent: String
 
-    public init(configuration: URLSessionConfiguration = .ephemeral) {
+    public init(userAgent: String, configuration: URLSessionConfiguration = .ephemeral) {
+        self.userAgent = userAgent
         let configuration = configuration
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
         configuration.urlCache = nil
@@ -32,6 +36,7 @@ public final class URLSessionTransport: HTTPTransport {
         request.httpMethod = "GET"
         request.setValue("identity", forHTTPHeaderField: "Accept-Encoding")
         for (name, value) in headers { request.setValue(value, forHTTPHeaderField: name) }
+        request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
         let task = session.dataTask(with: request)
         let delegate = delegate
         var answer = try await withTaskCancellationHandler {

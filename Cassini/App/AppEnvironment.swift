@@ -213,21 +213,31 @@ extension AppEnvironment {
 /// repository and one installer, which speech and the speaker models share, so one install runs at a time and a job
 /// that joins the standalone download fetches each file once (Android's single `ModelInstallOwner`). The fetcher
 /// resumes with Range and decompresses each file's seekable Zstandard; the repository reads the speech consent from
-/// `defaults`.
+/// `defaults`. Every request to the model host names the app in `userAgent` (D54).
 struct PinnedModels: Sendable {
     let root: URL
     let repository: ModelRepository
     let installer: PinnedModelInstaller
 
     /// `fetcher` replaces the model host in tests.
-    init(root: URL, defaults: UserDefaults, storage: any StorageProbe, fetcher: (any ModelFetching)? = nil) {
-        let fetcher = fetcher ?? NetworkModelFetcher(fetcher: ArtifactFetcher(transport: URLSessionTransport(),
-                                                                              storage: storage),
-                                                     decoder: ZstdDecompressor())
+    init(root: URL, defaults: UserDefaults, storage: any StorageProbe, userAgent: String = PinnedModels.userAgent,
+         fetcher: (any ModelFetching)? = nil) {
+        let fetcher = fetcher ?? NetworkModelFetcher(
+            fetcher: ArtifactFetcher(transport: URLSessionTransport(userAgent: userAgent), storage: storage),
+            decoder: ZstdDecompressor())
         self.root = root
         repository = ModelRepository(root: root, consent: DefaultsModelConsent(defaults: defaults), fetcher: fetcher)
         installer = PinnedModelInstaller(models: repository, storage: storage, online: { NetworkPath.shared.isOnline })
     }
+}
+
+extension PinnedModels {
+    /// `CassiniTalk/<CFBundleShortVersionString> (iOS <version>; build <CFBundleVersion>)` (D54), read once from the
+    /// app's bundle and the system: the version a person sees in Settings, never a literal.
+    static let userAgent = ModelUserAgent.string(
+        version: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown",
+        system: ProcessInfo.processInfo.operatingSystemVersion,
+        build: Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "unknown")
 }
 
 /// The speech consent the model repository reads (`models.consentAt`, as `SettingsStore` writes it), before the stores

@@ -33,7 +33,7 @@ Cassini downloads models only from this host, only over HTTPS, and follows a red
 
 The models are also checked: each downloaded file and the file that Cassini unpacks from it must match their pinned sizes and SHA-256 hashes before Cassini installs them.
 
-A host receives the IP address of your device and the name of the file. The privacy policy of each host applies to these data. Cassini sends no cookies and no account data.
+A host receives the IP address of your device, the name of the file, and Cassini's name and version with the iOS version and Cassini's build number, for example `CassiniTalk/0.1.0 (iOS 26.1; build 2)`; nothing that names you or your device. The privacy policy of each host applies to these data. Cassini sends no cookies and no account data.
 
 Before Cassini uses a downloaded model for the first time after it starts, it checks the SHA-256 hash of every file again. A model that fails this check is deleted and has to be downloaded again.
 
