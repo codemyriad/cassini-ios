@@ -55,18 +55,26 @@ import CassiniNotebook
     }
 
     /// SwiftUI learns how to compare a view type in the background, and until it has, it redraws a paragraph whose
-    /// inputs did not change (for seconds on a busy machine). Makes `change` until it redraws only `expected`, for up
-    /// to `timeout`, so the checks that follow measure the steady state a long playback runs in.
-    private func warmUp(_ window: UIWindow, expected: Set<String>, timeout: TimeInterval = 30, _ change: (Int) -> Void) {
+    /// inputs did not change (for seconds on a busy machine, and not always for good after one clean pass). Makes
+    /// `change` until it redraws only `expected` `steady` times in a row, so the checks that follow measure the steady
+    /// state a long playback runs in. A screen that never gets there within `timeout` fails: that is the regression the
+    /// checks look for, not load.
+    private func warmUp(_ window: UIWindow, expected: Set<String>, steady: Int = 3, timeout: TimeInterval = 60,
+                        _ change: (Int) -> Void, file: StaticString = #filePath, line: UInt = #line) {
         let deadline = Date().addingTimeInterval(timeout)
-        var attempt = 0
+        var attempt = 0, inARow = 0
+        var last: [String: Int] = [:]
         while Date() < deadline {
             RenderProbe.reset()
             change(attempt)
             settle(window)
-            if Set(RenderProbe.renders.keys) == expected { return }
+            last = RenderProbe.renders
+            inARow = Set(last.keys) == expected ? inARow + 1 : 0
+            if inARow == steady { return }
             attempt += 1
         }
+        XCTFail("never redrew only \(expected) \(steady) times in a row within \(Int(timeout)) s; last: \(last)",
+                file: file, line: line)
     }
 
     func testANewActiveWordRedrawsOnlyTheParagraphsThatHoldTheOldAndTheNewWord() {
@@ -143,7 +151,10 @@ import CassiniNotebook
         settle(window)
         XCTAssertTrue(RenderProbe.renders.isEmpty, "an idle screen draws nothing: \(RenderProbe.renders)")
 
-        playback.seek(1.7)
+        // Ticks inside one word (word 3 spans 1.5-1.9 s) reach their steady state, then one more draws nothing.
+        warmUp(window, expected: []) { playback.seek($0 % 2 == 0 ? 1.7 : 1.8) }
+        RenderProbe.reset()
+        playback.seek(1.75)
         settle(window)
         XCTAssertTrue(RenderProbe.renders.isEmpty, "a tick inside the same word: \(RenderProbe.renders)")
 
