@@ -12,9 +12,9 @@ command below runs from the repository root, not from a folder under `Packages/`
 
 | Tier | What runs | Count |
 |---|---|---|
-| `fast` | `scripts/check-strings.sh`, then `swift test` over the packages | 1,095 tests: 1,086 Swift Testing tests in 155 suites and 9 XCTest cases; the real-model test is skipped unless enabled |
-| `app` | The hosted unit tests (`CassiniTests`) in the app on a simulator | 73 |
-| `ui` | The UI tests (`CassiniUITests`) on up to three iPhone clones, and the `testIPad*` tests on an iPad clone | 84 test methods: 65 run on the iPhones, the 8 `testIPad*` tests on the iPad, and the 11 `ScreenshotTests` skip |
+| `fast` | `scripts/check-strings.sh`, then `swift test` over the packages | 1,567 tests: 1,558 Swift Testing tests in 198 suites and 9 XCTest cases; the real-model test is skipped unless enabled |
+| `app` | The hosted unit tests (`CassiniTests`) in the app on a simulator | 82, of which the 6 real-model ones skip unless `scripts/sherpa-bench.sh` or `scripts/speaker-smoke.sh` names their models |
+| `ui` | The UI tests (`CassiniUITests`) on up to three iPhone clones, and the `testIPad*` tests on an iPad clone | 91 test methods: 72 run on the iPhones, the 8 `testIPad*` tests on the iPad, and the 11 `ScreenshotTests` skip |
 | `all` | All three; the package tests run beside the build | |
 
 ### `fast`: the string catalogs and the package tests
@@ -85,8 +85,8 @@ End to end on the simulator, through UI-test launches with named seeds, a fixed 
 `CassiniTests/SpeakerJobTests` runs a real job with Parakeet Ultra, streaming Sortformer and CAM++ on the arm64
 simulator, over a two-speaker FLEURS mix (A, B, A). It tells the speakers apart window by window, saves A as a voice
 from its CAM++ print, and checks that Transcribe again names A with Android's thresholds. It is skipped unless the
-build links the native runtime and the environment names the models and the mix; `scripts/speaker-smoke.sh` fetches
-both and runs it with `CassiniTests/SpeakerSmokeTests`, which check the wrappers on their own. This is a smoke test of
+environment names the models and the mix (every iOS build links the native runtime); `scripts/speaker-smoke.sh`
+fetches both and runs it with `CassiniTests/SpeakerSmokeTests`, which check the wrappers on their own. This is a smoke test of
 real inference, not a diarization-error-rate benchmark or a voice-matching calibration. Model weights and recordings
 are never committed.
 

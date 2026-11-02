@@ -1,5 +1,5 @@
 #!/bin/bash
-# Build Cassini's sherpa-onnx runtime for iOS: the codemyriad fork at dbbeef9c (release 1.13.7 plus the Parakeet
+# Build Cassini's sherpa-onnx runtime for iOS: the codemyriad fork at 0c2ee3f (tag v1.13.7-cassini-parakeet-ultra-v1, D16:
 # NeMo frontend of upstream PR #4024) against ONNX Runtime 1.27.1, C API only, no TTS, for iPhone (OS64) and the
 # Apple-silicon simulator (SIMULATORARM64). The iOS counterpart of cassini-android's scripts/build-native-aar.sh.
 #

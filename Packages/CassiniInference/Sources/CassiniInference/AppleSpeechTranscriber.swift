@@ -64,12 +64,12 @@ public actor AppleSpeechTranscriber: Transcribing {
     }
 
     /// Throws `TranscriptionError.failed(.download(_))` when the download or the install fails.
-    public func installAssets(locale requested: Locale, progress: @escaping @Sendable (Double) -> Void) async throws {
+    public func installAssets(locale requested: Locale, progress: @escaping @Sendable (InstallProgress) -> Void) async throws {
         guard SpeechTranscriber.isAvailable,
               let locale = await SpeechTranscriber.supportedLocale(equivalentTo: requested) else { return }
         let module = SpeechTranscriber(locale: locale, transcriptionOptions: [], reportingOptions: [], attributeOptions: [])
         guard await AssetInventory.status(forModules: [module]) != .installed else { return }
-        try await Self.install(module, locale: locale) { if let fraction = $0 { progress(fraction) } }
+        try await Self.install(module, locale: locale) { if let fraction = $0 { progress(.downloading(fraction)) } }
     }
 
     public func assetStatus(locale: Locale) async -> ModelPartStatus {

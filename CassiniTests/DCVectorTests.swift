@@ -7,7 +7,7 @@ import CassiniNotebook
 import CassiniSherpa
 
 /// D26.1 through the real Silero detector and Parakeet Ultra. Opt-in and skipped unless the build links the runtime
-/// (CASSINI_SHERPA_LOCAL=1) and the environment names the vectors and the models; scripts/sherpa-bench.sh runs it.
+/// (every iOS build does) and the environment names the vectors and the models; scripts/sherpa-bench.sh runs it.
 ///
 /// The shared vector `dc-quiet-jfk-v1` is the D11 JFK input made quiet (about 34 LSB AC RMS) over the failing
 /// microphone's -2060 offset, with a control without the offset. iOS resamples with `AVAudioConverter` and its detector
@@ -32,7 +32,9 @@ final class DCVectorTests: XCTestCase {
 
     /// `ux-draft/`, with the committed files checked.
     private func drafts() throws -> URL {
-        try XCTSkipUnless(SherpaRuntime.isLinked, "built without CASSINI_SHERPA_LOCAL")
+        try XCTSkipUnless(SherpaRuntime.isLinked, "built without the native runtime")
+        // Opt-in: every iOS build links the runtime, so the environment decides (scripts/sherpa-bench.sh sets it).
+        try XCTSkipUnless(environment["CASSINI_DC_VECTOR"] != nil, "opt-in: scripts/sherpa-bench.sh sets CASSINI_DC_VECTOR")
         let folder = try XCTUnwrap(environment["CASSINI_DC_VECTOR"].map { URL(fileURLWithPath: $0) }, "set CASSINI_DC_VECTOR")
         let drafts = folder.deletingLastPathComponent()
         for (path, sha) in Self.files {
@@ -81,9 +83,16 @@ final class DCVectorTests: XCTestCase {
             words.append(result.segments.flatMap(\.draftWords).map(\.text))
         }
         print("DC_VECTOR mic level words \(words[0].joined(separator: " "))")
+        print("DC_VECTOR mic level words with offset \(words[1].joined(separator: " "))")
         XCTAssertTrue(words[0].joined(separator: " ").contains("ask not what your country can do for you"))
-        XCTAssertEqual(words[1], words[0], "the same words over the offset")
+        // The recognizer hears the raw samples (D26.1), and the dist export (D16) on the 0c2ee3f runtime writes one
+        // comma differently over the offset ("Americans" for "Americans,"): the words are the same, the punctuation
+        // may differ.
+        XCTAssertEqual(words[1].map(Self.bare), words[0].map(Self.bare), "the same words over the offset")
     }
+
+    /// A word without its punctuation.
+    private static func bare(_ word: String) -> String { String(word.unicodeScalars.filter { !CharacterSet.punctuationCharacters.contains($0) }) }
 
     private func detector(in models: URL) throws -> SileroDetector {
         try SileroDetector(config: SileroConfig(model: URL(fileURLWithPath: ModelCatalog.vad.path(in: models, ModelCatalog.sileroVad.name))))

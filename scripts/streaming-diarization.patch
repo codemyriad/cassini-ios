@@ -1,5 +1,5 @@
 diff --git a/sherpa-onnx/csrc/offline-speaker-diarization-impl.h b/sherpa-onnx/csrc/offline-speaker-diarization-impl.h
-index d2cbdebd..6de39645 100644
+index d2cbdeb..6de3964 100644
 --- a/sherpa-onnx/csrc/offline-speaker-diarization-impl.h
 +++ b/sherpa-onnx/csrc/offline-speaker-diarization-impl.h
 @@ -20,6 +20,13 @@ class OfflineSpeakerDiarizationImpl {
@@ -17,7 +17,7 @@ index d2cbdebd..6de39645 100644
  
    virtual int32_t SampleRate() const = 0;
 diff --git a/sherpa-onnx/csrc/offline-speaker-diarization-sortformer-impl.h b/sherpa-onnx/csrc/offline-speaker-diarization-sortformer-impl.h
-index 6e964d74..bba1ee93 100644
+index 035590c..b44000b 100644
 --- a/sherpa-onnx/csrc/offline-speaker-diarization-sortformer-impl.h
 +++ b/sherpa-onnx/csrc/offline-speaker-diarization-sortformer-impl.h
 @@ -67,13 +67,31 @@ class OfflineSpeakerDiarizationSortformerImpl
@@ -53,7 +53,7 @@ index 6e964d74..bba1ee93 100644
      const auto &meta = model_.GetModelMetaData();
      const int32_t num_speakers = meta.cache.num_speakers;
      const int32_t factor = meta.cache.subsampling_factor;
-@@ -97,7 +115,8 @@ class OfflineSpeakerDiarizationSortformerImpl
+@@ -98,7 +116,8 @@ class OfflineSpeakerDiarizationSortformerImpl
  
      std::vector<float> ans(static_cast<int64_t>(num_frames) * num_speakers);
  
@@ -63,7 +63,7 @@ index 6e964d74..bba1ee93 100644
  
      auto memory_info =
          Ort::MemoryInfo::CreateCpu(OrtDeviceAllocator, OrtMemTypeDefault);
-@@ -157,6 +176,8 @@ class OfflineSpeakerDiarizationSortformerImpl
+@@ -161,6 +180,8 @@ class OfflineSpeakerDiarizationSortformerImpl
    }
  
   private:
@@ -72,7 +72,7 @@ index 6e964d74..bba1ee93 100644
    void Init() {
      const auto &meta = model_.GetModelMetaData();
  
-@@ -251,7 +272,7 @@ class OfflineSpeakerDiarizationSortformerImpl
+@@ -265,7 +286,7 @@ class OfflineSpeakerDiarizationSortformerImpl
    }
  
    OfflineSpeakerDiarizationResult ComputeResult(
@@ -81,7 +81,7 @@ index 6e964d74..bba1ee93 100644
      const auto &meta = model_.GetModelMetaData();
      const int32_t num_speakers = meta.cache.num_speakers;
      const int32_t num_frames =
-@@ -276,7 +297,7 @@ class OfflineSpeakerDiarizationSortformerImpl
+@@ -290,7 +311,7 @@ class OfflineSpeakerDiarizationSortformerImpl
            start_index = f;
          } else if (!is_active && start_index >= 0) {
            this_speaker.emplace_back(start_index * frame_shift, f * frame_shift,
@@ -91,7 +91,7 @@ index 6e964d74..bba1ee93 100644
          }
        }
 diff --git a/sherpa-onnx/csrc/offline-speaker-diarization.cc b/sherpa-onnx/csrc/offline-speaker-diarization.cc
-index f3dce842..b6faedaf 100644
+index f3dce84..b6faeda 100644
 --- a/sherpa-onnx/csrc/offline-speaker-diarization.cc
 +++ b/sherpa-onnx/csrc/offline-speaker-diarization.cc
 @@ -110,6 +110,18 @@ OfflineSpeakerDiarizationResult OfflineSpeakerDiarization::Process(
@@ -114,7 +114,7 @@ index f3dce842..b6faedaf 100644
  template OfflineSpeakerDiarization::OfflineSpeakerDiarization(
      AAssetManager *mgr, const OfflineSpeakerDiarizationConfig &config);
 diff --git a/sherpa-onnx/csrc/offline-speaker-diarization.h b/sherpa-onnx/csrc/offline-speaker-diarization.h
-index acbb6f52..b173e8f9 100644
+index acbb6f5..b173e8f 100644
 --- a/sherpa-onnx/csrc/offline-speaker-diarization.h
 +++ b/sherpa-onnx/csrc/offline-speaker-diarization.h
 @@ -75,6 +75,13 @@ class OfflineSpeakerDiarization {
@@ -132,11 +132,11 @@ index acbb6f52..b173e8f9 100644
    std::unique_ptr<OfflineSpeakerDiarizationImpl> impl_;
  };
 diff --git a/sherpa-onnx/csrc/sortformer-speaker-cache.cc b/sherpa-onnx/csrc/sortformer-speaker-cache.cc
-index b2a2a037..a14f7b51 100644
+index 9edc6ce..10cb9f4 100644
 --- a/sherpa-onnx/csrc/sortformer-speaker-cache.cc
 +++ b/sherpa-onnx/csrc/sortformer-speaker-cache.cc
-@@ -66,6 +66,33 @@ SortformerSpeakerCache::SortformerSpeakerCache(
-       static_cast<int32_t>(std::floor(budget * config_.weak_boost_rate));
+@@ -73,6 +73,33 @@ SortformerSpeakerCache::SortformerSpeakerCache(
+   num_weak_boosted_frames_ = NumFramesForRate(budget, config_.weak_boost_rate);
  }
  
 +std::vector<float> SortformerSpeakerCache::SaveState() const {
@@ -170,7 +170,7 @@ index b2a2a037..a14f7b51 100644
    std::vector<float> ans;
    ans.reserve(cache_embeds_.size() + fifo_.size());
 diff --git a/sherpa-onnx/csrc/sortformer-speaker-cache.h b/sherpa-onnx/csrc/sortformer-speaker-cache.h
-index c25ba4d9..66198ae5 100644
+index c25ba4d..66198ae 100644
 --- a/sherpa-onnx/csrc/sortformer-speaker-cache.h
 +++ b/sherpa-onnx/csrc/sortformer-speaker-cache.h
 @@ -58,6 +58,9 @@ class SortformerSpeakerCache {
@@ -184,10 +184,28 @@ index c25ba4d9..66198ae5 100644
    // matrix of shape (NumCachedFrames(), hidden_size).
    std::vector<float> GetEmbeds() const;
 diff --git a/sherpa-onnx/jni/offline-speaker-diarization.cc b/sherpa-onnx/jni/offline-speaker-diarization.cc
-index 5927d81c..17680248 100644
+index 79fb104..1768024 100644
 --- a/sherpa-onnx/jni/offline-speaker-diarization.cc
 +++ b/sherpa-onnx/jni/offline-speaker-diarization.cc
-@@ -230,6 +230,18 @@ Java_com_k2fsa_sherpa_onnx_OfflineSpeakerDiarization_process(
+@@ -46,6 +46,17 @@ static OfflineSpeakerDiarizationConfig GetOfflineSpeakerDiarizationConfig(
+   SHERPA_ONNX_JNI_READ_STRING(ans.segmentation.provider, provider,
+                               segmentation_config_cls, segmentation_config);
+ 
++  fid = env->GetFieldID(segmentation_config_cls, "sortformer",
++                        "Lcom/k2fsa/sherpa/onnx/"
++                        "OfflineSpeakerSegmentationSortformerModelConfig;");
++  jobject sortformer_config = env->GetObjectField(segmentation_config, fid);
++  jclass sortformer_config_cls = env->GetObjectClass(sortformer_config);
++
++  SHERPA_ONNX_JNI_READ_STRING(ans.segmentation.sortformer.model, model,
++                              sortformer_config_cls, sortformer_config);
++  SHERPA_ONNX_JNI_READ_FLOAT(ans.segmentation.sortformer.threshold, threshold,
++                             sortformer_config_cls, sortformer_config);
++
+   //---------- embedding ----------
+   fid = env->GetFieldID(
+       cls, "embedding",
+@@ -219,6 +230,18 @@ Java_com_k2fsa_sherpa_onnx_OfflineSpeakerDiarization_process(
    return ProcessImpl(env, segments);
  }
  
@@ -206,7 +224,7 @@ index 5927d81c..17680248 100644
  SHERPA_ONNX_EXTERN_C
  JNIEXPORT jobjectArray JNICALL
  Java_com_k2fsa_sherpa_onnx_OfflineSpeakerDiarization_processWithCallback(
-@@ -281,3 +293,20 @@ Java_com_k2fsa_sherpa_onnx_OfflineSpeakerDiarization_getSampleRate(
+@@ -270,3 +293,20 @@ Java_com_k2fsa_sherpa_onnx_OfflineSpeakerDiarization_getSampleRate(
    return reinterpret_cast<sherpa_onnx::OfflineSpeakerDiarization *>(ptr)
        ->SampleRate();
  }
@@ -228,10 +246,30 @@ index 5927d81c..17680248 100644
 +  return reinterpret_cast<sherpa_onnx::OfflineSpeakerDiarization *>(ptr)->RestoreStreamingState(v);
 +}
 diff --git a/sherpa-onnx/kotlin-api/OfflineSpeakerDiarization.kt b/sherpa-onnx/kotlin-api/OfflineSpeakerDiarization.kt
-index 60b0b962..a8adce16 100644
+index feb84bc..a8adce1 100644
 --- a/sherpa-onnx/kotlin-api/OfflineSpeakerDiarization.kt
 +++ b/sherpa-onnx/kotlin-api/OfflineSpeakerDiarization.kt
-@@ -75,6 +75,16 @@ class OfflineSpeakerDiarization(
+@@ -7,11 +7,19 @@ data class OfflineSpeakerSegmentationPyannoteModelConfig(
+     var windowShiftRatio: Float = 0.1f,
+ )
+ 
++// Sortformer end-to-end diarization model, e.g., Nemotron-3-Diarization.
++// If model is set, pyannote, embedding and clustering are ignored.
++data class OfflineSpeakerSegmentationSortformerModelConfig(
++    var model: String = "",
++    var threshold: Float = 0.5f,
++)
++
+ data class OfflineSpeakerSegmentationModelConfig(
+     var pyannote: OfflineSpeakerSegmentationPyannoteModelConfig = OfflineSpeakerSegmentationPyannoteModelConfig(),
+     var numThreads: Int = 1,
+     var debug: Boolean = false,
+     var provider: String = "cpu",
++    var sortformer: OfflineSpeakerSegmentationSortformerModelConfig = OfflineSpeakerSegmentationSortformerModelConfig(),
+ )
+ 
+ data class FastClusteringConfig(
+@@ -67,6 +75,16 @@ class OfflineSpeakerDiarization(
  
      fun process(samples: FloatArray) = process(ptr, samples)
  

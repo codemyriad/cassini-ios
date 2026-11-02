@@ -175,14 +175,14 @@ import CassiniNotebook
         }
     }
 
-    @Test func theRecognizerIsChosenByLinkModelsAndMemory() {
+    /// Parakeet whenever the runtime is linked and the device can hold Ultra, installed or not: the job downloads it.
+    @Test func theRecognizerIsChosenByLinkAndMemory() {
         let gib: UInt64 = 1 << 30
         #expect(!SpeechCapability.parakeetCapable(physicalMemory: 4 * gib))
         #expect(SpeechCapability.parakeetCapable(physicalMemory: 5_900_000_000))
-        #expect(SpeechCapability.choose(linked: true, installed: true, capable: true) == .parakeet)
-        #expect(SpeechCapability.choose(linked: false, installed: true, capable: true) == .appleSpeech)
-        #expect(SpeechCapability.choose(linked: true, installed: false, capable: true) == .appleSpeech)
-        #expect(SpeechCapability.choose(linked: true, installed: true, capable: false) == .appleSpeech)
+        #expect(SpeechCapability.choose(linked: true, capable: true) == .parakeet)
+        #expect(SpeechCapability.choose(linked: false, capable: true) == .appleSpeech)
+        #expect(SpeechCapability.choose(linked: true, capable: false) == .appleSpeech)
         #expect(SpeechRecognizer.parakeet.checkpointModel(language: "it-IT") == ModelCatalog.parakeetRevision)
         #expect(SpeechRecognizer.appleSpeech.checkpointModel(language: "it-IT") == "apple-speechtranscriber it-IT")
     }
@@ -225,7 +225,7 @@ final class WindowedTranscriber: Transcribing, @unchecked Sendable {
     var recognizer: SpeechRecognizer { .parakeet }
     func segmentation() async -> String? { Self.segmentation }
     func assetStatus(locale: Locale) async -> ModelPartStatus { .ready }
-    func installAssets(locale: Locale, progress: @escaping @Sendable (Double) -> Void) async throws {}
+    func installAssets(locale: Locale, progress: @escaping @Sendable (InstallProgress) -> Void) async throws {}
     func speechLanguages() async -> [SpeechLanguage] { [] }
 
     func transcribe(_ request: TranscriptionRequest,

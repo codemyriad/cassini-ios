@@ -34,11 +34,13 @@ public enum ModelRowStatus: Hashable, Sendable {
     }
 }
 
-/// How big a part is, for its row's subtitle.
+/// How big a part is, for its row's subtitle: its download over the network, as the model download screen quotes it.
 public enum ModelSize: Hashable, Sendable {
     /// Apple's speech assets: iOS downloads and keeps them, and does not tell their size first.
     case managedBySystem
     case bytes(Int64)
+    /// A model with its precision, as Android's speech row: "INT8 · 443 MB".
+    case precision(String, bytes: Int64)
     /// Installed with another part's models.
     case includedWith(ModelPart)
 }
@@ -60,6 +62,19 @@ public enum ModelRows {
                             size: (ModelPart) -> ModelSize) -> [ModelRow] {
         ModelPart.allCases.compactMap { part in
             statuses[part].map { ModelRow(part: part, size: size(part), status: status($0, consented: consented(part))) }
+        }
+    }
+
+    /// A row's size, as downloaded. Parakeet's speech row shows Ultra's download with the precision ("INT8 · 443 MB",
+    /// D16: the speech detector has no row of its own); Apple's assets are managed by iOS. The speakers row is the
+    /// diarizer and CAM++, which download together; the voices row comes with it.
+    public static func size(of part: ModelPart, recognizer: SpeechRecognizer) -> ModelSize {
+        switch part {
+        case .speech where recognizer == .parakeet:
+            .precision(ModelCatalog.parakeetPrecision, bytes: ModelDownloadPlan.fullDownloadBytes(.speech))
+        case .speech: .managedBySystem
+        case .speakers: .bytes(ModelDownloadPlan.fullDownloadBytes(.speakers))
+        case .voices: .includedWith(.speakers)
         }
     }
 

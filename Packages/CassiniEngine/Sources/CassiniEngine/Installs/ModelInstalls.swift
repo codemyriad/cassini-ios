@@ -11,8 +11,12 @@ import CassiniNotebook
 ///   reads again once that one ends, so it never returns what was read before it was asked for.
 /// - `install(_:)` installs the parts one after another; a request while one runs adds the parts it does not cover,
 ///   which install after it, so nothing is fetched twice. `cancel()` stops it, and a cancel is no failure. Its progress,
-///   then the failure of the first part that failed and was not asked for again, is `download`, which the download notice and the Settings rows show. A failed part shows as failed until
-///   the next install of it; a failed speech install counts only for the language it was for.
+///   then the failure of the first part that failed and was not asked for again, is `download`, which the download
+///   notice and the Settings rows show. A failed part shows as failed until the next install of it; a failed speech
+///   install counts only for the language it was for.
+/// - The standalone install holds background time (`BackgroundRunner`) from its start to its end, so a download of
+///   Parakeet Ultra goes on after Cassini leaves the screen. When iOS takes that time back, the install stops as a
+///   cancel does and the part in flight shows "Download stopped" (STOPPED_BY_SYSTEM) until its next install.
 /// - `statuses` is what the Settings rows show: the running job's model download over the standalone install and the
 ///   stored status. Recognising saved voices uses the speaker models' install, so it always has their status.
 @MainActor @Observable public final class ModelInstalls {
@@ -45,15 +49,31 @@ import CassiniNotebook
     /// The language `failures[.speech]` is for.
     @ObservationIgnored private var speechFailureLanguage: String?
     @ObservationIgnored private var followers: [Task<Void, Never>] = []
+    @ObservationIgnored private let background: (any BackgroundRunner)?
+    @ObservationIgnored private let backgroundTitle: @MainActor () -> String
+    @ObservationIgnored private let backgroundSubtitle: @MainActor () -> String
+    /// The background time the running standalone install holds, and the progress iOS shows for it.
+    @ObservationIgnored private var backgroundToken: BackgroundToken?
+    @ObservationIgnored private var backgroundProgress = Progress(totalUnitCount: 100)
+    /// The bytes of every part the running standalone install was asked for, and of those it has finished: the
+    /// background progress weighs each part's fraction by them, so it never goes back when the next part starts.
+    @ObservationIgnored private var backgroundBytes: (total: Int64, done: Int64) = (0, 0)
 
     /// `language` is the BCP-47 speech language whose assets count; `job` is the running job's progress, whose model
-    /// download the rows show.
+    /// download the rows show. `background` gives the standalone install its time after Cassini leaves the screen,
+    /// under `backgroundTitle` and `backgroundSubtitle`.
     public init(transcriber: any Transcribing, analyzer: any SpeakerAnalyzing, clock: any AppClock,
-                job: JobProgress? = nil, language: @escaping @MainActor () -> String) {
+                job: JobProgress? = nil, background: (any BackgroundRunner)? = nil,
+                backgroundTitle: @escaping @MainActor () -> String = { "Downloading models" },
+                backgroundSubtitle: @escaping @MainActor () -> String = { "They run on this device" },
+                language: @escaping @MainActor () -> String) {
         self.transcriber = transcriber
         self.analyzer = analyzer
         self.clock = clock
         self.job = job
+        self.background = background
+        self.backgroundTitle = backgroundTitle
+        self.backgroundSubtitle = backgroundSubtitle
         self.language = language
         follow()
     }
@@ -64,6 +84,15 @@ import CassiniNotebook
 
     /// Whether a standalone install runs.
     public var isInstalling: Bool { installing != nil }
+
+    /// The recognizer whose model the speech row and the download screen show.
+    public var speechRecognizer: SpeechRecognizer { transcriber.recognizer }
+
+    /// The free space the speech model's install asks for ("Free about N MB" of a job's failed download).
+    public var speechInstallBytes: Int64 { transcriber.assetInstallBytes }
+
+    /// The free space the speaker models' install asks for ("Free about N MB" of a failed Identify speakers).
+    public var speakersInstallBytes: Int64 { analyzer.modelInstallBytes }
 
     /// What a part's row shows: the standalone install's progress or failure over the stored status; nil while the
     /// part has not been read.
@@ -134,6 +163,8 @@ import CassiniNotebook
         for part in added { failures[part] = nil }
         installFailures.removeAll { added.contains($0.part) }
         queued.append(contentsOf: added)
+        if installing == nil { backgroundBytes = (0, 0) }
+        backgroundBytes.total += added.reduce(0) { $0 + bytes(of: $1) }
         guard installing == nil else {
             // During the closing refresh nothing is in flight: the part asked for shows as downloading at once.
             if inFlight == nil { download = DownloadFact(part: queued[0], at: clock.now) }
@@ -143,15 +174,16 @@ import CassiniNotebook
         installNumber += 1
         let number = installNumber
         download = DownloadFact(part: queued[0], at: clock.now)
+        holdBackgroundTime(number)
         installing = Task { [weak self] in await self?.drain(number) }
     }
 
-    /// Cancels the standalone install: the part in flight stops (the speaker models' install ends for every caller
-    /// that waits on it, a job's analysis too) and the parts after it are dropped. A cancel is no failure: the rows
-    /// show what a refresh finds, and the files fetched so far stay for the next install.
+    /// Cancels the standalone install: its wait on the part in flight ends and the parts after it are dropped. The
+    /// shared installer stops that part's install when nobody else waits on it; a job that waits on the same install
+    /// goes on with it (the processing card's Cancel stops the job's download). A cancel is no failure: the rows show
+    /// what a refresh finds, and the files fetched so far stay for the next install.
     public func cancel() {
         guard let installing else { return }
-        let part = inFlight
         installNumber += 1
         self.installing = nil
         inFlight = nil
@@ -159,10 +191,44 @@ import CassiniNotebook
         installFailures = []
         download = nil
         installing.cancel()
-        if part == .speakers {
-            let analyzer = analyzer
-            Task { await analyzer.cancelModelInstall() }
+        releaseBackgroundTime()
+    }
+
+    /// iOS took the standalone install's background time back: the install stops as `cancel()` stops it, and the part
+    /// in flight shows "Download stopped" until its next install. Runs before iOS's handler returns.
+    private func stopBySystem(_ number: Int) {
+        guard installNumber == number, let installing else { return }
+        let part = inFlight ?? queued.first
+        installNumber += 1
+        self.installing = nil
+        inFlight = nil
+        queued = []
+        installFailures = []
+        installing.cancel()
+        backgroundToken = nil
+        guard let part else { download = nil; return }
+        let error = DownloadError.stoppedBySystem
+        failures[part] = error
+        if part == .speech { speechFailureLanguage = language() }
+        download = DownloadFact(part: part, failure: error, at: clock.now)
+    }
+
+    /// Asks for background time for install `number`, with a progress that follows the part in flight.
+    private func holdBackgroundTime(_ number: Int) {
+        guard let background, backgroundToken == nil else { return }
+        // A new progress each time: a progress joins the system's task only once.
+        backgroundProgress = Progress(totalUnitCount: 100)
+        backgroundToken = background.begin(title: backgroundTitle(), subtitle: backgroundSubtitle(),
+                                           progress: backgroundProgress) { [weak self] in
+            // The runner ends the token right after this.
+            self?.stopBySystem(number)
         }
+    }
+
+    private func releaseBackgroundTime() {
+        guard let token = backgroundToken else { return }
+        backgroundToken = nil
+        background?.end(token)
     }
 
     /// Installs the queued parts one after another, then reads every part again; parts asked for during that read are
@@ -176,6 +242,7 @@ import CassiniNotebook
                 let failure = await install(part, number)
                 guard installNumber == number else { break }
                 inFlight = nil
+                backgroundBytes.done += bytes(of: part)
                 if let failure {
                     download = failure
                     installFailures.append(failure)
@@ -188,6 +255,7 @@ import CassiniNotebook
         installing = nil
         download = installFailures.first
         installFailures = []
+        releaseBackgroundTime()
     }
 
     /// The user closed the failure of the last standalone install: the download notice goes, while the part's row
@@ -205,7 +273,7 @@ import CassiniNotebook
         do {
             switch part {
             case .speech:
-                try await transcriber.installAssets(locale: Locale(identifier: language)) { report(.downloading($0)) }
+                try await transcriber.installAssets(locale: Locale(identifier: language), progress: report)
             case .speakers, .voices:
                 try await analyzer.installModels(progress: report)
             }
@@ -213,8 +281,8 @@ import CassiniNotebook
         } catch {
             if error is CancellationError || Task.isCancelled || installNumber != number { return nil }
             var (failure, bytes) = Self.failure(error)
-            // iOS does not tell a speech asset's size: "Free about N MB" says what the plan asks for.
-            if part == .speech, bytes == 0 { bytes = ModelDownloadPlan.speechInstallBytes }
+            // A speech failure carries no figure: "Free about N MB" says what the speech install asks for.
+            if part == .speech, bytes == 0 { bytes = transcriber.assetInstallBytes }
             failures[part] = failure
             if part == .speech { speechFailureLanguage = language }
             return DownloadFact(part: part, failure: failure, requiredFreeBytes: bytes, at: clock.now)
@@ -227,6 +295,18 @@ import CassiniNotebook
         case .downloading(let fraction): download = DownloadFact(part: part, fraction: fraction, at: clock.now)
         case .checking: download = DownloadFact(part: part, fraction: download?.fraction, checking: true, at: clock.now)
         }
+        guard let fraction = download?.fraction, backgroundBytes.total > 0 else { return }
+        let done = Double(backgroundBytes.done) + Double(bytes(of: part)) * min(max(fraction, 0), 1)
+        let units = Int64((done / Double(backgroundBytes.total) * 100).rounded(.down))
+        // A part asked for during the install adds to the whole: the progress waits rather than go back.
+        backgroundProgress.completedUnitCount = max(backgroundProgress.completedUnitCount, min(units, 100))
+    }
+
+    /// A part's weight in the background progress: its download, or for Apple's speech assets, whose size iOS does not
+    /// tell, the estimate of their install.
+    private func bytes(of part: ModelPart) -> Int64 {
+        part == .speech && transcriber.recognizer != .parakeet ? ModelDownloadPlan.speechInstallBytes
+            : ModelDownloadPlan.fullDownloadBytes(part)
     }
 
     /// Reads the models again when the speech language changes, and when the running job's model download ends.

@@ -36,11 +36,15 @@ final class SettingsFlowTests: XCTestCase {
             .waitForExistence(within: 5))
         XCTAssertTrue(app.staticTexts["Notifications are off"].waitForExistence(within: 5))
         XCTAssertTrue(app.buttons["Turn on"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["speechLanguagePicker"].exists,
+                      "Apple Speech takes a language: Transcription offers the picker")
         let speech = element(app, startingWith: "Speech recognition")
         reveal(speech, in: app)
         XCTAssertTrue(speech.label.contains("Ready"), speech.label)
+        XCTAssertTrue(speech.label.contains("Managed by iOS"), speech.label)
         XCTAssertFalse(row(app, startingWith: "Speech recognition").exists, "a Ready row is not a button")
         XCTAssertTrue(row(app, startingWith: "Telling speakers apart").label.contains("Not downloaded"))
+        XCTAssertTrue(row(app, startingWith: "Telling speakers apart").label.contains("88 MB"))
         let voices = row(app, startingWith: "Saved voices")
         reveal(voices, in: app)
         XCTAssertTrue(voices.label.contains("None yet"), voices.label)
@@ -48,6 +52,34 @@ final class SettingsFlowTests: XCTestCase {
         XCTAssertTrue(row(app, startingWith: "Recently Deleted,").label.contains("Empty"))
         let version = element(app, startingWith: "Cassini talk 0.1.0")
         reveal(version, in: app)
+    }
+
+    /// On a Parakeet device the speech row shows the model's precision and its download by the shared size rule, and
+    /// Transcription has no Speech language picker: Parakeet hears the language.
+    @MainActor func testOnAParakeetDeviceTheSpeechRowShowsItsDownload() {
+        let app = openSettings(["--parakeet"])
+        // The picker would sit above this toggle, in the same section: once the toggle is there, so would it be.
+        XCTAssertTrue(app.switches.matching(NSPredicate(format: "label BEGINSWITH %@", "Transcribe after recording"))
+            .firstMatch.waitForExistence(within: 5))
+        XCTAssertFalse(app.descendants(matching: .any)["speechLanguagePicker"].exists)
+        XCTAssertFalse(element(app, startingWith: "Speech language").exists)
+        let speech = element(app, startingWith: "Speech recognition")
+        reveal(speech, in: app)
+        XCTAssertEqual(speech.label, "Speech recognition, INT8 · 443 MB, Ready")
+        XCTAssertTrue(row(app, startingWith: "Telling speakers apart").label.contains("88 MB"))
+    }
+
+    /// A Parakeet device without Ultra: its row is a button that opens the download screen with the sizes.
+    @MainActor func testOnAParakeetDeviceAMissingSpeechModelOpensTheDownloadWithItsSize() {
+        let app = openSettings(["--parakeet", "--models-missing"])
+        let speech = row(app, startingWith: "Speech recognition")
+        reveal(speech, in: app)
+        XCTAssertEqual(speech.label, "Speech recognition, INT8 · 443 MB, Not downloaded")
+        speech.tap()
+        XCTAssertTrue(app.staticTexts["Transcribe on this device"].waitForExistence(within: 5))
+        XCTAssertTrue(app.buttons["Download"].exists)
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label == %@", "Speech recognition, 443 MB")).firstMatch
+            .exists)
     }
 
     // ports: SettingsViewModelTest#onlyANotDownloadedOrAFailedRowOpensModelDownload (on the screen)

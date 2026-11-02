@@ -43,7 +43,8 @@ extension TranscriptionCoordinator {
         }
         // A new progress each time: a progress joins the system's task only once.
         backgroundProgress = Progress(totalUnitCount: 100)
-        background = parts.background.begin(title: title, progress: backgroundProgress) { [weak self] in
+        background = parts.background.begin(title: title, subtitle: parts.backgroundSubtitle,
+                                            progress: backgroundProgress) { [weak self] in
             // The runner ends the token right after this; an ended token never expires, so this is the drain's.
             self?.background = nil
             self?.systemStop()

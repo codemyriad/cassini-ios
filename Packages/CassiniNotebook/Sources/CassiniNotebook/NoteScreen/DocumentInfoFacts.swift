@@ -28,9 +28,11 @@ public struct DocumentInfoFacts: Hashable, Sendable {
     /// Why a damaged document's transcript could not be read.
     public var readError: String?
 
-    /// The facts of `note`, with the record of the run that made its transcript (nil when it is not the run's) and
-    /// the size of its audio file.
-    public static func of(_ note: Note, provenance: TranscriptProvenance?, fileBytes: Int64?) -> DocumentInfoFacts {
+    /// The facts of `note`, with the record of the run that made its transcript (nil when it is not the run's), the
+    /// size of its audio file and the names of the speech models by provenance model string
+    /// (`ModelCatalog.speechModelNames`).
+    public static func of(_ note: Note, provenance: TranscriptProvenance?, fileBytes: Int64?,
+                          speechModels: [String: String]) -> DocumentInfoFacts {
         let speakers = Set(note.transcript.compactMap(\.speakerID))
         let processing = provenance.flatMap { $0.inferenceMs > 0 ? $0.inferenceMs : nil }
         let readError: String? = switch note.document?.state {
@@ -44,11 +46,17 @@ public struct DocumentInfoFacts: Hashable, Sendable {
             language: TranscriptLanguage.known(note.language),
             processingMs: processing,
             realtimeFactor: processing.map { note.duration * 1000 / Double($0) },
-            model: provenance.map { modelName($0.engine) },
+            model: provenance.map { modelName($0, speechModels: speechModels) },
             speakersToldApart: provenance.map { $0.speakerDiarization != nil },
             namesFromVoices: provenance?.speakerIdentification?.autoApplied ?? 0,
             resumedFromMs: provenance.flatMap { $0.resumedFromMs > 0 ? $0.resumedFromMs : nil },
             fileBytes: fileBytes, meetingID: note.document?.meetingID, vendor: note.document?.vendor, readError: readError)
+    }
+
+    /// The name Document info shows for a run's model: its `model`'s name in `speechModels` (Parakeet Ultra), else
+    /// the name of its engine (Apple Speech, whose model string carries the locale, and anything this app does not know).
+    public static func modelName(_ provenance: TranscriptProvenance, speechModels: [String: String]) -> String {
+        provenance.model.flatMap { speechModels[$0] } ?? modelName(provenance.engine)
     }
 
     /// The name Document info shows for a provenance engine id: Apple's on-device speech model for this app's engine,

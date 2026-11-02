@@ -69,7 +69,7 @@ import CassiniNotebook
         processing.modelDownload = ModelDownloadAdapter(
             settings: settings, processing: processing, transcriber: environment.transcriber,
             analyzer: environment.analyzer, storage: environment.storage, notices: noticeCenter,
-            root: environment.root)
+            root: environment.root, models: environment.models)
         settingsPorts = SettingsAdapter(settings: settings, library: library, voices: voices, processing: processing,
                                         notices: noticeCenter, transcriber: environment.transcriber)
         notices = NoticesStore(center: noticeCenter, router: router, processing: processing, recording: recording)
@@ -114,11 +114,19 @@ import CassiniNotebook
                 notifier: environment.notifier, background: environment.background, clock: environment.clock,
                 backgroundTitle: { String(localized: "Transcribing “\($0)”", table: "Transcription",
                                           comment: "The system's progress while a note is transcribed") },
+                backgroundSubtitle: String(localized: "Your audio stays on this device", table: "Transcription",
+                                           comment: "Subtitle of the system's progress while a note is transcribed"),
                 progress: progress)
             return TranscriptionCoordinator(parts, settings: settings)
         }
         let models = ModelInstalls(transcriber: environment.transcriber, analyzer: environment.analyzer,
-                                   clock: environment.clock, job: progress) { [settings] in settings.speechLanguage }
+                                   clock: environment.clock, job: progress, background: environment.background,
+                                   backgroundTitle: { String(localized: "Downloading models", table: "Processing") },
+                                   backgroundSubtitle: {
+                                       String(localized: "They run on this device", table: "Processing",
+                                              comment: "Subtitle of the system's progress while models download")
+                                   },
+                                   language: { [settings] in settings.speechLanguage })
         return ProcessingStore(coordinator: coordinator, progress: progress, checkpoints: checkpoints, models: models,
                                analyzer: environment.analyzer, notices: notices, drafts: drafts)
     }
@@ -169,7 +177,7 @@ import CassiniNotebook
 
     /// Saves the playback position and keeps the app awake until every pending write has landed.
     func enterBackground() {
-        let token = environment.background.begin(title: String(localized: "Saving your recordings", table: "Recording"), progress: Progress(), onExpire: {})
+        let token = environment.background.begin(title: String(localized: "Saving your recordings", table: "Recording"), onExpire: {})
         playback.savePosition()
         Task { [playback, library, background = environment.background] in
             await playback.settle()

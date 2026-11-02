@@ -28,6 +28,7 @@ import CassiniNotebook
         func refreshNotices() async { noticeRefreshes += 1 }
         var languages: [SpeechLanguage] = []
         func speechLanguages() async -> [SpeechLanguage] { languages }
+        var recognizer = SpeechRecognizer.appleSpeech
     }
 
     @MainActor private final class Effects { var list: [SettingsModel.Effect] = [] }
@@ -59,6 +60,22 @@ import CassiniNotebook
         #expect(model.trash == 2)
         #expect(model.version == "9.9.9")
         #expect(model.notificationsOff)
+    }
+
+    /// Each row's size is its download: on a Parakeet device the speech row shows Ultra's with the precision, "INT8 ·
+    /// 443 MB" (D16; the speech detector has no row of its own); on a device that keeps Apple Speech iOS manages the
+    /// speech assets. The speakers row is both speaker models; voices come with it.
+    @Test func theRowsShowTheirDownloadAndTheSpeechRowTheRecognizers() {
+        let speech = ModelCatalog.parakeetBytes
+        #expect(ModelRows.size(of: .speech, recognizer: .parakeet) == .precision("INT8", bytes: speech))
+        #expect(SizeText(bytes: speech).english() == "443 MB")
+        #expect(ModelRows.size(of: .speech, recognizer: .appleSpeech) == .managedBySystem)
+        for recognizer in [SpeechRecognizer.parakeet, .appleSpeech] {
+            #expect(ModelRows.size(of: .speakers, recognizer: recognizer)
+                    == .bytes(ModelCatalog.speakerBytes + ModelCatalog.voiceprintBytes))
+            #expect(ModelRows.size(of: .voices, recognizer: recognizer) == .includedWith(.speakers))
+        }
+        #expect(SizeText(bytes: ModelCatalog.speakerBytes + ModelCatalog.voiceprintBytes).english() == "88 MB")
     }
 
     @Test func aPartNotReadYetHasNoRow() async {
@@ -122,6 +139,14 @@ import CassiniNotebook
                     SpeechLanguage(id: "it-IT", installed: false)])
         #expect(model.languageOptions(chosen: "xx-XX", name: name).map(\.id) == ["xx-XX", "en-US", "de-DE", "it-IT"],
                 "a chosen language that is not on offer stays in the picker")
+    }
+
+    /// Only Apple Speech takes a speech language: a Parakeet device has no picker (it would offer one language that
+    /// changes nothing), as Android has none.
+    @Test func onlyAnAppleSpeechDeviceShowsTheSpeechLanguagePicker() async {
+        #expect(await model().showsSpeechLanguage)
+        ports.recognizer = .parakeet
+        #expect(await !model().showsSpeechLanguage)
     }
 
     // ports: SettingsViewModelTest#theLanguageGoesToAppCompatAndPhoneIsTheEmptyList (iOS sets the app language in the

@@ -26,18 +26,13 @@ import CassiniNotebook
         part == .speech ? settings.downloadsAllowed : settings.speakerDownloadsAllowed
     }
 
-    func size(of part: ModelPart) -> ModelSize {
-        switch part {
-        case .speech: .managedBySystem
-        // The diarizer and CAM++ download together: their bytes over the network.
-        case .speakers: .bytes(ModelCatalog.speakerBytes + ModelCatalog.voiceprintBytes)
-        case .voices: .includedWith(.speakers)
-        }
-    }
+    func size(of part: ModelPart) -> ModelSize { ModelRows.size(of: part, recognizer: transcriber.recognizer) }
 
     func refreshModels() async { await processing.models.refresh() }
 
     func speechLanguages() async -> [SpeechLanguage] { await transcriber.speechLanguages() }
+
+    var recognizer: SpeechRecognizer { transcriber.recognizer }
 
     var voices: Int { voicesStore.savedVoices.count }
     var trash: Int { library.notes.count { $0.trashedAt != nil } }

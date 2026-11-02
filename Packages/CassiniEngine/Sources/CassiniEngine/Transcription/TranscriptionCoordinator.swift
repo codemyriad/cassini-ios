@@ -28,6 +28,8 @@ public final class TranscriptionCoordinator {
         public var clock: any AppClock
         /// The title of the system's progress while a note with this title is transcribed.
         public var backgroundTitle: @MainActor (_ noteTitle: String) -> String
+        /// The subtitle of the system's progress while the queue transcribes.
+        public var backgroundSubtitle: String
         /// The running job's progress that the Note screen and the Library rows read: it is told when each job
         /// begins, each of its events in order, and when it ends. The system's progress follows it when it is given.
         public var progress: JobProgress?
@@ -36,10 +38,12 @@ public final class TranscriptionCoordinator {
                     checkpoints: any JobCheckpoints, consent: ModelConsent, notifier: any Notifier,
                     background: any BackgroundRunner, clock: any AppClock,
                     backgroundTitle: @escaping @MainActor (_ noteTitle: String) -> String = { "Transcribing “\($0)”" },
+                    backgroundSubtitle: String = "Your audio stays on this device",
                     progress: JobProgress? = nil) {
             self.jobs = jobs; self.notes = notes; self.runner = runner; self.checkpoints = checkpoints
             self.consent = consent; self.notifier = notifier; self.background = background; self.clock = clock
-            self.backgroundTitle = backgroundTitle; self.progress = progress
+            self.backgroundTitle = backgroundTitle; self.backgroundSubtitle = backgroundSubtitle
+            self.progress = progress
         }
     }
 

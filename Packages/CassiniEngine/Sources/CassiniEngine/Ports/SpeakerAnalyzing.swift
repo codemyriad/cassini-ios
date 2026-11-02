@@ -72,11 +72,9 @@ public protocol SpeakerAnalyzing: Sendable {
     func refreshModelStatus() async -> ModelPartStatus
     /// Downloads and installs the models now (the model download screen's standalone Download, or a job before its
     /// decode), or joins the install that runs, reporting how far it has got. Does nothing when they are installed;
-    /// a failed install throws `SpeakerAnalysisError.download`.
+    /// a failed install throws `SpeakerAnalysisError.download`. Cancelling the caller ends its wait: an install that
+    /// another caller waits on goes on, and the files fetched so far, partial ones too, stay for the next install.
     func installModels(progress: @escaping @Sendable (InstallProgress) -> Void) async throws
-    /// Cancels the models' install that runs, if any: every caller waiting on it, an analysis or the standalone
-    /// download, stops with `CancellationError`. The files fetched so far, partial ones too, stay for the next install.
-    func cancelModelInstall() async
     /// The free space an install of the models asks for before its first byte; the model download screen asks for the
     /// same.
     var modelInstallBytes: Int64 { get }

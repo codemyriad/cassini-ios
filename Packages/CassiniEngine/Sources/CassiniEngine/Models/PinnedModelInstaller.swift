@@ -16,17 +16,16 @@ import CassiniNotebook
 ///   cancels the shared install at once; every waiter then gets `CancellationError`. A cancelled install stops the
 ///   fetch, and `ArtifactFetcher` keeps its `.part` files for a Range resume. A request that arrives before a cancelled
 ///   fetch has ended waits for its end, so only one fetch is ever in flight.
-/// - `stopDownloads()` is iOS ending the background time of a standalone download (`BGContinuedProcessingTask`
-///   expiry, Android's foreground-service time-out): the parts show "Download stopped" until the next install.
 ///
-/// The standalone download is no job: its only state is `status` and the `.part` files.
+/// The standalone download (`ModelInstalls`) is one more caller; when iOS takes its background time back it stops
+/// its own wait, and shows "Download stopped" itself.
 public final class PinnedModelInstaller: Sendable {
     /// What the installer does now (Android's `InstallState`).
     public enum Status: Hashable, Sendable {
         case idle
-        /// An install of `parts` runs. `progress` is its latest report (nil before the first byte). `standalone` is
-        /// true while the download from Settings or a banner waits on it; `waiters` counts every caller that waits.
-        case installing(parts: Set<ModelPart>, progress: DownloadProgress?, standalone: Bool, waiters: Int)
+        /// An install of `parts` runs. `progress` is its latest report (nil before the first byte); `waiters` counts
+        /// every caller that waits.
+        case installing(parts: Set<ModelPart>, progress: DownloadProgress?, waiters: Int)
     }
 
     private struct Install {
@@ -35,10 +34,7 @@ public final class PinnedModelInstaller: Sendable {
         var task: Task<InstallOutcome, any Error>?
         var waiting: [UUID: CheckedContinuation<InstallOutcome, any Error>] = [:]
         var listeners: [UUID: @Sendable (DownloadProgress) -> Void] = [:]
-        var standalone: Set<UUID> = []
         var progress: DownloadProgress?
-        /// Set by `stopDownloads`: when this install ends cancelled, it shows as "Download stopped".
-        var stopped = false
         /// Cancelled, but its fetch has not ended: new requests wait for its end.
         var cancelling = false
         /// The requests that wait for this install to end before they start their own.
@@ -48,12 +44,9 @@ public final class PinnedModelInstaller: Sendable {
     private struct Fields {
         var current: Install?
         var installs = 0
-        /// The standalone downloads (`startDownload`) that have not ended.
-        var downloads: [UUID: Task<Void, Never>] = [:]
         /// Callers that were cancelled before they could wait.
         var left: Set<UUID> = []
         var status: Status = .idle
-        var lastOutcome: InstallOutcome?
     }
 
     /// A request that has to wait for the install `number` to end first.
@@ -79,48 +72,13 @@ public final class PinnedModelInstaller: Sendable {
     /// The requests that wait for the running install to end before they start their own (tests wait on it).
     var waitingForEnd: Int { fields.withLock { $0.current?.enders.count ?? 0 } }
 
-    /// How the last install ended: its outcome, or STOPPED_BY_SYSTEM when iOS stopped it (`stopDownloads`). Nil before
-    /// the first one and after an install that was cancelled in another way.
-    public var lastOutcome: InstallOutcome? { fields.withLock { $0.lastOutcome } }
-
     /// Installs the missing models of `parts`, or joins the install of the same parts that runs now. Cancelling the
     /// caller stops its wait; the install goes on while another caller waits. `granted` says the caller has its
     /// consent already (the speaker models, which have a consent of their own on iOS); otherwise the install asks
     /// `ModelRepository.consented()`.
     public func install(_ parts: Set<ModelPart>, granted: Bool = false,
                         onProgress: @escaping @Sendable (DownloadProgress) -> Void = { _ in }) async throws -> InstallOutcome {
-        try await install(parts, onProgress, standalone: false, granted: granted)
-    }
-
-    /// The download from Settings or a banner, with no note: installs `parts` in the background and shows its
-    /// progress through `status` and `ModelRepository.status`. `cancel()` stops it.
-    @discardableResult public func startDownload(_ parts: Set<ModelPart> = Set(ModelPart.allCases)) -> Task<Void, Never> {
-        let id = UUID()
-        return fields.withLock { fields in
-            let task = Task {
-                // A cancelled download keeps its .part files; there is nothing more to do.
-                _ = try? await self.install(parts, { _ in }, standalone: true, granted: false)
-                self.fields.withLock { _ = $0.downloads.removeValue(forKey: id) }
-            }
-            fields.downloads[id] = task
-            return task
-        }
-    }
-
-    /// iOS ended the background time of a standalone download: every standalone wait ends, and the install ends when
-    /// no job waits on it either. The `.part` files stay for a Range resume. When the install ends cancelled, each of
-    /// its parts that is not installed shows "Download stopped" (STOPPED_BY_SYSTEM) until the next install, and
-    /// `lastOutcome` tells it. False when no standalone download ran.
-    @discardableResult public func stopDownloads() async -> Bool {
-        let waiting = fields.withLock { fields in
-            let tasks = Array(fields.downloads.values)
-            if !tasks.isEmpty { fields.current?.stopped = true }
-            return tasks
-        }
-        guard !waiting.isEmpty else { return false }
-        for task in waiting { task.cancel() }
-        for task in waiting { await task.value }
-        return true
+        try await install(parts, onProgress, granted: granted)
     }
 
     /// Cancels the install that runs now, if any: every caller stops waiting with `CancellationError`. Its `.part`
@@ -132,7 +90,6 @@ public final class PinnedModelInstaller: Sendable {
             let waiting = Array(install.waiting.values)
             install.waiting = [:]
             install.listeners = [:]
-            install.standalone = []
             fields.current = install
             return (install.task, waiting)
         }
@@ -141,7 +98,7 @@ public final class PinnedModelInstaller: Sendable {
     }
 
     private func install(_ parts: Set<ModelPart>, _ onProgress: @escaping @Sendable (DownloadProgress) -> Void,
-                         standalone: Bool, granted: Bool) async throws -> InstallOutcome {
+                         granted: Bool) async throws -> InstallOutcome {
         precondition(!parts.isEmpty, "No model part to install")
         while true {
             try Task.checkCancellation()
@@ -149,7 +106,7 @@ public final class PinnedModelInstaller: Sendable {
             do {
                 return try await withTaskCancellationHandler {
                     try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<InstallOutcome, any Error>) in
-                        attach(id, parts, onProgress, standalone, granted, continuation)
+                        attach(id, parts, onProgress, granted, continuation)
                     }
                 } onCancel: {
                     self.leave(id)
@@ -165,7 +122,7 @@ public final class PinnedModelInstaller: Sendable {
     /// current install is being cancelled (its fetch can block until the read timeout, and a new install must not fetch
     /// the same files at the same time).
     private func attach(_ id: UUID, _ parts: Set<ModelPart>, _ listener: @escaping @Sendable (DownloadProgress) -> Void,
-                        _ standalone: Bool, _ granted: Bool,
+                        _ granted: Bool,
                         _ continuation: CheckedContinuation<InstallOutcome, any Error>) {
         enum Attached { case joined(Status), started(Task<InstallOutcome, any Error>, Int, Status), busy(Int), left }
         let attached: Attached = fields.withLock { fields in
@@ -181,7 +138,6 @@ public final class PinnedModelInstaller: Sendable {
             }
             fields.current?.waiting[id] = continuation
             fields.current?.listeners[id] = listener
-            if standalone { fields.current?.standalone.insert(id) }
             let status = Self.publish(&fields)
             if let (task, number) = started { return .started(task, number, status) }
             return .joined(status)
@@ -208,7 +164,6 @@ public final class PinnedModelInstaller: Sendable {
                     return (nil, nil, nil)
                 }
                 install.listeners[id] = nil
-                install.standalone.remove(id)
                 var stop: Task<InstallOutcome, any Error>?
                 if install.waiting.isEmpty && !install.cancelling {
                     install.cancelling = true
@@ -256,28 +211,12 @@ public final class PinnedModelInstaller: Sendable {
                 self.report(number, progress)
             }
             showOutcome(ordered, outcome)
-            fields.withLock { $0.lastOutcome = outcome }
             await models.refresh()
             return outcome
         } catch {
             if ModelInstaller.isCancellation(error) {
-                let (stopped, progress) = fields.withLock { fields in
-                    fields.current?.number == number ? (fields.current?.stopped == true, fields.current?.progress) : (false, nil)
-                }
-                if stopped {
-                    // iOS stopped it (stopDownloads): "Download stopped" until the next install. The refresh below
-                    // shows the parts that were installed as ready again.
-                    let error = DownloadError.stoppedBySystem
-                    for part in ordered {
-                        models.publishProgress(part, .failed(error.failure, detail: error.rawValue))
-                    }
-                    let part = progress?.part ?? ordered[0]
-                    fields.withLock { $0.lastOutcome = .failed(part: part, error: error, requiredFreeBytes: 0) }
-                } else {
-                    for part in ordered { models.clearProgress(part) }
-                    // A Cancel of the user is no failure: an older failure must not show again.
-                    fields.withLock { $0.lastOutcome = nil }
-                }
+                // A cancel is no failure: an older failure must not show again.
+                for part in ordered { models.clearProgress(part) }
             }
             await models.refresh()
             throw error
@@ -323,8 +262,7 @@ public final class PinnedModelInstaller: Sendable {
     /// The status from the fields, stored in them.
     private static func publish(_ fields: inout Fields) -> Status {
         if let install = fields.current, !install.cancelling {
-            fields.status = .installing(parts: install.parts, progress: install.progress,
-                                        standalone: !install.standalone.isEmpty, waiters: install.waiting.count)
+            fields.status = .installing(parts: install.parts, progress: install.progress, waiters: install.waiting.count)
         }
         return fields.status
     }

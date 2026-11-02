@@ -280,6 +280,5 @@ final class InstallingAnalyzer: SpeakerAnalyzing, @unchecked Sendable {
         if let failure { throw failure }
         lock.withLock { installed = true }
     }
-    func cancelModelInstall() async {}
     var modelInstallBytes: Int64 { 0 }
 }

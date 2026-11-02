@@ -198,6 +198,56 @@ import CassiniNotebook
         #expect(plan(speech: .notDownloaded, speakers: .ready, identify: true).isEmpty)
     }
 
+    // ports: ModelDownloadViewModelTest#showsTheMissingPartsWithTheirSizesAndTheSpaceTheInstallNeeds (the figures)
+    /// On a Parakeet device speech shows Ultra's download ("443 MB", D16: the speech detector has no row of its own),
+    /// the speakers part both speaker models', the body their total, and the space check asks for the whole install,
+    /// the detector included (Android's `ModelPlan`). iOS shows the two speaker models as one part.
+    @Test func aParakeetDeviceShowsEachPartsDownloadAndTheSpaceOfTheWholeInstall() {
+        let fresh = ModelPlan.of { _ in false }
+        let plan = ModelDownloadPlan.plan(speech: .notDownloaded, speakers: .notDownloaded, forNote: false,
+                                          identifySpeakers: true, speakersInstallBytes: 1, recognizer: .parakeet,
+                                          catalog: fresh)
+        #expect(plan.missing == [.speech, .speakers])
+        let speech: Int64 = 464_908_884, speakers: Int64 = 64_915_668 + 27_138_478
+        #expect(plan.downloadBytes == [.speech: speech, .speakers: speakers])
+        #expect(plan.totalDownloadBytes == fresh.totalBytes - ModelCatalog.vad.downloadBytes)
+        #expect(plan.requiredFreeBytes == fresh.requiredFreeBytes, "the speech detector counts in the free space")
+        #expect(SizeText(bytes: plan.downloadBytes[.speech]!).english() == "443 MB", "D4 and D16")
+        #expect(SizeText(bytes: plan.downloadBytes[.speakers]!).english() == "88 MB")
+        #expect(SizeText(bytes: plan.totalDownloadBytes!).english() == "531 MB")
+        #expect(SizeText(bytes: plan.requiredFreeBytes).english() == "1.2 GB")
+    }
+
+    /// Only what is still missing counts: a speech detector already installed is neither shown nor asked room for,
+    /// and an installed diarizer leaves CAM++ alone on the speakers row.
+    @Test func aParakeetPlanCountsOnlyTheModelsStillMissing() {
+        let catalog = ModelPlan.of { $0 == ModelCatalog.vad || $0 == ModelCatalog.diarization }
+        let plan = ModelDownloadPlan.plan(speech: .notDownloaded, speakers: .notDownloaded, forNote: false,
+                                          identifySpeakers: true, speakersInstallBytes: 1, recognizer: .parakeet,
+                                          catalog: catalog)
+        #expect(plan.downloadBytes == [.speech: ModelCatalog.parakeetBytes, .speakers: ModelCatalog.voiceprintBytes])
+        #expect(plan.requiredFreeBytes == catalog.requiredFreeBytes)
+        // A speakers-only job on a Parakeet device: the speaker models' own figures.
+        let speakers = ModelDownloadPlan.plan(speech: .notDownloaded, speakers: .notDownloaded, forNote: true,
+                                              identifySpeakers: false, speakersOnly: true, speakersInstallBytes: 54_000_000,
+                                              recognizer: .parakeet, catalog: ModelPlan.of { _ in false })
+        #expect(speakers.missing == [.speakers])
+        #expect(speakers.totalDownloadBytes == ModelCatalog.speakerBytes + ModelCatalog.voiceprintBytes)
+        #expect(speakers.requiredFreeBytes == 54_000_000, "what the speaker models' installer checks")
+    }
+
+    /// On a device that keeps Apple Speech the speech part has no size (iOS does not tell it first), so the body
+    /// quotes no total and the space check keeps its estimate.
+    @Test func anAppleSpeechDeviceShowsNoSpeechSizeAndKeepsItsEstimate() {
+        let plan = ModelDownloadPlan.plan(speech: .notDownloaded, speakers: .notDownloaded, forNote: false,
+                                          identifySpeakers: true, speakersInstallBytes: 54_000_000,
+                                          recognizer: .appleSpeech, catalog: ModelPlan.of { _ in false })
+        #expect(plan.downloadBytes == [.speakers: ModelCatalog.speakerBytes + ModelCatalog.voiceprintBytes])
+        #expect(plan.totalDownloadBytes == nil)
+        #expect(plan.requiredFreeBytes == ModelDownloadPlan.speechInstallBytes + 54_000_000)
+        #expect(ModelDownloadPlan.fullDownloadBytes(.voices) == ModelDownloadPlan.fullDownloadBytes(.speakers))
+    }
+
     @Test func thePlanKeepsThePartOrderAndNeedsNoSpaceWhenComplete() {
         #expect(ModelDownloadPlan(missing: [.speakers, .speech], speakersInstallBytes: 1).missing == [.speech, .speakers])
         #expect(ModelDownloadPlan(missing: [], speakersInstallBytes: 1).requiredFreeBytes == 0)

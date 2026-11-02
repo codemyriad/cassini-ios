@@ -2,10 +2,12 @@ import Foundation
 import Observation
 import CassiniNotebook
 
-/// The models a job still needs, and the free space their install asks for, as the Model download screen shows them.
-/// The speech part here is Apple's assets, which a device that cannot hold Parakeet Ultra keeps using (decision D2);
-/// the catalog's own figures are `ModelPlan` (640 MiB for speech), which this plan takes over when the transcriber
-/// moves to Ultra.
+/// The models a job still needs, the download each one shows and the free space their install asks for, as the Model
+/// download screen shows them. On a Parakeet device (decision D2) the figures are the catalog's (`ModelPlan`): speech
+/// shows Ultra's download alone, as D16's model rows do (its speech detector, under 1 MB, has no row of its own but is
+/// installed with it and counts in the free space); the speakers row shows the download of each speaker model still
+/// missing; the free space is the whole install's. On a device that keeps Apple Speech the speech part is Apple's
+/// assets, whose size iOS does not tell: it shows none, and the free space uses an estimate (`speechInstallBytes`).
 public struct ModelDownloadPlan: Hashable, Sendable {
     /// Missing parts, in `ModelPart` order.
     public var missing: [ModelPart]
@@ -14,11 +16,15 @@ public struct ModelDownloadPlan: Hashable, Sendable {
     /// The plan of a note's speakers-only job (Identify speakers): it installs the speaker models and transcribes
     /// nothing.
     public var speakersOnly: Bool
+    /// The download shown next to each missing part; Apple's speech assets have none.
+    public var downloadBytes: [ModelPart: Int64]
 
-    public init(missing: [ModelPart], requiredFreeBytes: Int64, speakersOnly: Bool = false) {
+    public init(missing: [ModelPart], requiredFreeBytes: Int64, speakersOnly: Bool = false,
+                downloadBytes: [ModelPart: Int64] = [:]) {
         self.missing = ModelPart.allCases.filter(missing.contains)
         self.requiredFreeBytes = requiredFreeBytes
         self.speakersOnly = speakersOnly
+        self.downloadBytes = downloadBytes.filter { missing.contains($0.key) }
     }
 
     /// The plan for `missing`, asking for `speechInstallBytes` for the speech model and `speakersInstallBytes` (what
@@ -30,20 +36,65 @@ public struct ModelDownloadPlan: Hashable, Sendable {
                   + (speakers ? speakersInstallBytes : 0), speakersOnly: speakersOnly)
     }
 
-    /// What the model download screen installs. Apple's speech model counts unless it is ready or cannot be used for
-    /// the language. The speaker models count when they are not ready and either a note's job tells speakers apart
+    /// What the model download screen installs. The speech model counts unless it is ready or cannot be used for the
+    /// language. The speaker models count when they are not ready and either a note's job tells speakers apart
     /// (`identifySpeakers`) or there is no note: the standalone download from a Settings row installs every part that
     /// is not ready, whatever the Speakers switch says. A note's speakers-only job (Identify speakers) needs the speaker
     /// models alone.
+    ///
+    /// `catalog` is what the catalog still has to install (`ModelPlan.of(root:)`): it gives each part's download, and
+    /// on a Parakeet device (`recognizer`) the free space too. Without it a part shows no size.
     public static func plan(speech: ModelPartStatus, speakers: ModelPartStatus, forNote: Bool, identifySpeakers: Bool,
-                            speakersOnly: Bool = false, speakersInstallBytes: Int64) -> ModelDownloadPlan {
+                            speakersOnly: Bool = false, speakersInstallBytes: Int64,
+                            recognizer: SpeechRecognizer = .appleSpeech, catalog: ModelPlan? = nil) -> ModelDownloadPlan {
         var missing: [ModelPart] = []
         if speech != .ready, speech != .unsupported, !speakersOnly { missing.append(.speech) }
         if speakers != .ready, !forNote || identifySpeakers || speakersOnly { missing.append(.speakers) }
-        return ModelDownloadPlan(missing: missing, speakersInstallBytes: speakersInstallBytes, speakersOnly: speakersOnly)
+        var plan = ModelDownloadPlan(missing: missing, speakersInstallBytes: speakersInstallBytes, speakersOnly: speakersOnly)
+        guard let catalog else { return plan }
+        let parakeet = recognizer == .parakeet
+        // The catalog's items of each missing part; the speakers row stands for both speaker models.
+        func items(_ part: ModelPart) -> [ModelPlan.Item] {
+            catalog.missing.filter { part == .speakers ? SpeakerModels.parts.contains($0.part) : $0.part == part }
+        }
+        for part in plan.missing where part != .speech || parakeet {
+            if part == .speech {
+                // The speech part is missing exactly while Ultra is.
+                plan.downloadBytes[part] = fullDownloadBytes(.speech)
+                continue
+            }
+            let found = items(part)
+            let models = found.isEmpty ? Self.models(of: part) : found.flatMap(\.models)
+            plan.downloadBytes[part] = models.reduce(0) { $0 + $1.downloadBytes }
+        }
+        if parakeet, plan.missing.contains(.speech) {
+            let all = plan.missing.flatMap(items)
+            if !all.isEmpty { plan.requiredFreeBytes = ModelPlan(all).requiredFreeBytes }
+        }
+        return plan
+    }
+
+    /// Every model of what a row stands for: the speakers row is the diarizer and CAM++.
+    private static func models(of part: ModelPart) -> [ModelDescriptor] {
+        part == .speakers ? ModelPart.speakers.models + ModelPart.voices.models : part.models
+    }
+
+    /// The download a part shows when nothing of it is installed: Ultra's for speech ("443 MB", D16; the speech
+    /// detector has no row of its own), the diarizer and CAM++ for the speakers row (Settings shows the voices row as
+    /// coming with it).
+    public static func fullDownloadBytes(_ part: ModelPart) -> Int64 {
+        if part == .speech { return part.primary.downloadBytes }
+        return models(of: part == .voices ? .speakers : part).reduce(0) { $0 + $1.downloadBytes }
     }
 
     public var isEmpty: Bool { missing.isEmpty }
+
+    /// The one-time download the body quotes ("about 531 MB"): the sum of the parts' downloads, nil when a part shows
+    /// none.
+    public var totalDownloadBytes: Int64? {
+        guard !missing.isEmpty, missing.allSatisfy({ downloadBytes[$0] != nil }) else { return nil }
+        return missing.reduce(0) { $0 + (downloadBytes[$1] ?? 0) }
+    }
 
     /// iOS does not tell the speech assets' size before they are downloaded, so the space check uses an estimate for
     /// one language that covers the download and the installed copy.

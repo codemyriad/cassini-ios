@@ -8,10 +8,10 @@ import CassiniSherpa
 
 /// A real Parakeet Ultra transcription job on the simulator, end to end: `TranscriptionJob` over `ParakeetTranscriber`
 /// and CassiniSherpa's recognizer and detector, on FLEURS-it short, compared with the iOS golden. Opt-in and skipped
-/// unless the build links the runtime (CASSINI_SHERPA_LOCAL=1) and the environment names the models and the clip;
-/// scripts/sherpa-bench.sh runs it.
+/// unless the build links the runtime (every iOS build does) and the environment names the models and the clip;
+/// scripts/sherpa-bench.sh runs it. The models are dist's D16 pins (`parakeet-ultra-0.6b-int8@18cb6230…`, Silero VAD).
 ///
-/// The golden is iOS's own (`Goldens/fleurs-it-short.ios.json`, arm64 simulator). Android's comes from the x86_64
+/// The golden is iOS's own (`Goldens/fleurs-it-short.ios.json`, arm64 simulator, the dist export on the 0c2ee3f runtime). Android's comes from the x86_64
 /// emulator and the ONNX Runtime int8 kernels differ between the two (iOS runs the arm64 UDOT ones), so words and times
 /// can differ slightly; the test reports the difference from Android's text and does not require it to be zero.
 ///
@@ -28,7 +28,9 @@ final class ParakeetJobTests: XCTestCase {
 
     func testAnUltraJobTranscribesFleursAsTheGoldenSays() async throws {
         let environment = ProcessInfo.processInfo.environment
-        try XCTSkipUnless(SherpaRuntime.isLinked, "built without CASSINI_SHERPA_LOCAL")
+        try XCTSkipUnless(SherpaRuntime.isLinked, "built without the native runtime")
+        // Opt-in: every iOS build links the runtime, so the environment decides (scripts/sherpa-bench.sh sets it).
+        try XCTSkipUnless(environment["CASSINI_PARAKEET_MODEL_ROOT"] != nil, "opt-in: scripts/sherpa-bench.sh sets CASSINI_PARAKEET_MODEL_ROOT")
         let source = try XCTUnwrap(environment["CASSINI_PARAKEET_MODEL_ROOT"].map { URL(fileURLWithPath: $0) },
                                    "set CASSINI_PARAKEET_MODEL_ROOT")
         let clip = try XCTUnwrap(environment["CASSINI_PARAKEET_AUDIO"].map { URL(fileURLWithPath: $0) })
@@ -61,8 +63,11 @@ final class ParakeetJobTests: XCTestCase {
         let text = words.map(\.text).joined(separator: " ")
         let record = try XCTUnwrap(provenance.provenance(for: saved))
         XCTAssertEqual(record.engine, "Parakeet TDT")
+        // D16 §5: the model by its dist pin; D53.2: Parakeet hears the language, so its words are written as "und".
         XCTAssertEqual(record.model, "parakeet-ultra-0.6b-int8@18cb623004dd6c15999b93cb70b14d8a1f6e8f3a2a97ff733f104bfc3494f6a9")
-        XCTAssertEqual(record.language, "")
+        XCTAssertEqual(record.model, ModelCatalog.parakeetProvenanceModel)
+        XCTAssertEqual(record.language, "und")
+        XCTAssertEqual(saved.language, "und")
         XCTAssertEqual(record.segmentation, DecodeCutting.incrementalProvenance(detectorReady: true))
         XCTAssertGreaterThan(record.inferenceMs, 0)
 

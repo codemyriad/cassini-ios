@@ -1,23 +1,24 @@
 [
   {
     "name": "sherpa-onnx",
-    "version": "1.13.7+nemotron-diarization+parakeet-reference-frontend (dbbeef9c23e158c52949dd620659a20608e501c9)",
-    "url": "https://github.com/codemyriad/sherpa-onnx/archive/dbbeef9c23e158c52949dd620659a20608e501c9.tar.gz",
-    "sha256": "6b1519317bfc51d2b486ece4d324b6eb7b16f3debe41145bb5aaa3c42e747501"
+    "version": "1.13.7-cassini-parakeet-ultra-v1 (0c2ee3f3f5f16bb06d234a0f98632810296ba0eb)",
+    "url": "https://github.com/codemyriad/sherpa-onnx/archive/0c2ee3f3f5f16bb06d234a0f98632810296ba0eb.tar.gz",
+    "sha256": "b6998671b8d40c3a2f4a3a52ca1be82156353544fd1d0a8f28f85ef61db0f076"
   },
   {
     "name": "onnxruntime-ios",
     "version": "1.27.1",
-    "url": "https://github.com/csukuangfj/onnxruntime-libs/releases/download/v1.27.1/onnxruntime-ios-static-xcframework-1.27.1.xcframework.zip",
+    "url": "https://github.com/codemyriad/sherpa-onnx/releases/download/v1.13.7-cassini-mobile.1/onnxruntime-ios-static-xcframework-1.27.1.xcframework.zip",
+    "upstreamUrl": "https://github.com/csukuangfj/onnxruntime-libs/releases/download/v1.27.1/onnxruntime-ios-static-xcframework-1.27.1.xcframework.zip",
     "sha256": "985deaff345c7bcfbe4979b2daeec09d7a745b1e9cb73f37f4077364eb578e62"
   },
   {
     "name": "sherpa-onnx-ios",
-    "version": "1.13.7-dbbeef9c-ios.2",
-    "file": "sherpa-onnx-1.13.7-dbbeef9c-ios-no-tts.xcframework.zip",
-    "url": "",
-    "sha256": "a2924ea6d4d40f423ab10ffa179a00e8ad6c0a3ef0d4db62efb2cf5e0ea18953",
-    "patchSha256": "91b3f2c55e2d5188a71a3602a56f94d3ae128e0b04635838c5f70800412700d5",
+    "version": "1.13.7-0c2ee3f-ios.1",
+    "file": "sherpa-onnx-1.13.7-0c2ee3f-ios-no-tts.xcframework.zip",
+    "url": "https://github.com/codemyriad/sherpa-onnx/releases/download/v1.13.7-cassini-mobile.1/sherpa-onnx-1.13.7-0c2ee3f-ios-no-tts.xcframework.zip",
+    "sha256": "6d305165927b0b2c1fa805b137fc2e345e1c128e92f800de80e90f7096a88fce",
+    "patchSha256": "9a3a78e4d806b5980cccee07a89c6ef5c8e6af75526bf5dda0c24faf121ded4e",
     "cApiPatchSha256": "19ad205be861863a6bbca8c10b6743578b925325f4a307251492e190c060f009"
   },
   {

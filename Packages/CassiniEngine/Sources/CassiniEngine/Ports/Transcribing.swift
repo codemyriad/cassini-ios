@@ -94,9 +94,14 @@ public protocol Transcribing: Sendable {
                     events: @escaping @Sendable (TranscriptionEvent) -> Void) async throws -> TranscriptionResult
     func assetStatus(locale: Locale) async -> ModelPartStatus
     /// Downloads and installs the speech model for `locale` now, as the model download screen's Download does,
-    /// reporting the fraction done. Does nothing when it is installed or not offered for `locale`; a failed download
-    /// or install throws `TranscriptionError.failed(.download(_))`.
-    func installAssets(locale: Locale, progress: @escaping @Sendable (Double) -> Void) async throws
+    /// reporting the fraction done and then Checking files (Parakeet; Apple's assets report only the fraction). Does
+    /// nothing when it is installed or not offered for `locale`; a failed download or install throws
+    /// `TranscriptionError.failed(.download(_))`, and a cancelled one `CancellationError`. Cancelling the caller
+    /// ends its wait: an install that another caller (a job) waits on goes on, and the files fetched so far stay.
+    func installAssets(locale: Locale, progress: @escaping @Sendable (InstallProgress) -> Void) async throws
+    /// The free space the speech model's install asks for before its first byte ("Free about N MB"): Parakeet's
+    /// `ModelPlan` figure, or the estimate for Apple's assets, whose size iOS does not tell.
+    var assetInstallBytes: Int64 { get }
     /// The languages the speech model can transcribe here, each marked when its assets are installed.
     func speechLanguages() async -> [SpeechLanguage]
     /// The speech model that transcribes `locale` here, as the provenance's `model` names it; nil when unknown.
@@ -115,6 +120,7 @@ extension Transcribing {
     }
     public var recognizer: SpeechRecognizer { .appleSpeech }
     public func segmentation() async -> String? { nil }
+    public var assetInstallBytes: Int64 { ModelDownloadPlan.speechInstallBytes }
 }
 
 /// A language of speech the transcriber offers.

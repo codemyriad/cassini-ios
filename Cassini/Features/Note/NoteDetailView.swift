@@ -179,6 +179,16 @@ struct NoteSectionView: View {
     private var bannerFacts: NoteBannerFacts {
         let state = processing.state
         return NoteBannerFacts(trustToggled: model.screen.trustToggled, queueHold: state.hold, waitingJobs: state.queue.count,
-                               dismissed: model.screen.dismissed)
+                               dismissed: model.screen.dismissed, speechInstallBytes: installBytes.speech,
+                               speakersInstallBytes: installBytes.speakers)
+    }
+
+    /// The free-space figures of a model download that failed for want of room: Parakeet's (nil keeps the estimate of
+    /// Apple's assets) and the speaker models' (an Identify speakers). Read only for that banner: they look at the
+    /// model files.
+    private var installBytes: (speech: Int64?, speakers: Int64?) {
+        guard case .download(.notEnoughStorage)? = model.job?.failure else { return (nil, nil) }
+        let models = processing.models
+        return (models.speechRecognizer == .parakeet ? models.speechInstallBytes : nil, models.speakersInstallBytes)
     }
 }

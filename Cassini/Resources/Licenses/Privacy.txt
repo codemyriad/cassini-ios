@@ -19,9 +19,9 @@ When you import a file, or open a file with Cassini from a different app, Cassin
 
 Cassini connects to the internet only to download models. It sends no audio, transcripts, voiceprints, names or settings.
 
-Cassini downloads no model before you agree. The "Transcribe on this device" screen lists the models it needs. The first download starts only when you tap "Download and transcribe" or "Download". If you tap "Not now — keep the audio", Cassini downloads nothing.
+Cassini downloads no model before you agree. The "Transcribe on this device" screen lists the models it needs and the size of each download. The first download starts only when you tap "Download and transcribe" or "Download". If you tap "Not now — keep the audio", Cassini downloads nothing.
 
-- Speech recognition: Apple's on-device speech models. iOS downloads them from Apple and keeps them; Cassini asks iOS to install the model for the speech language you choose. On devices that run Parakeet Ultra, Cassini downloads it and its speech detector (Silero VAD) from `dist.gocassini.com`, Cassini's model host.
+- Speech recognition (Parakeet Ultra and its speech detector, Silero VAD): `dist.gocassini.com`, Cassini's model host. On devices without the memory for Parakeet Ultra, Cassini uses Apple's on-device speech models instead: iOS downloads them from Apple and keeps them, and Cassini asks iOS to install the model for the speech language you choose.
 - Telling speakers apart (NVIDIA Nemotron-3-Diarization): `dist.gocassini.com`
 - Recognising saved voices (3D-Speaker CAM++): `dist.gocassini.com`
 

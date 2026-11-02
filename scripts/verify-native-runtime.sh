@@ -4,9 +4,10 @@
 #   scripts/verify-native-runtime.sh [--quiet]
 #
 # Checks:
-#   - Package.swift: the local binary targets point at the paths scripts/native-common.sh names, and every released
-#     binary target (url:) carries the checksum the lock pins for it;
-#   - the lock: the sherpa-onnx source is the codemyriad fork at a full commit, ONNX Runtime is 1.27.1;
+#   - Package.swift: the local binary targets (CASSINI_SHERPA_LOCAL=1) point at the paths scripts/native-common.sh
+#     names, and both released binary targets (url:, the default) carry the URL and checksum the lock pins for them;
+#   - the lock: the sherpa-onnx source is the codemyriad fork at a full commit, ONNX Runtime is 1.27.1, and both
+#     binaries are assets of one codemyriad/sherpa-onnx release;
 #   - when a build is present in .tools/sherpa (scripts/build-sherpa-xcframework.sh): the zip's SwiftPM checksum is the
 #     lock's (unless the lock still says PENDING), both slices (ios-arm64, ios-arm64-simulator) export the C API Cassini
 #     calls (recognizer, VAD, and the streaming Sortformer diarizer and CAM++ extractor Android's speaker path uses,
@@ -71,18 +72,35 @@ grep -q "path: \"$sherpa_xcframework\"" Package.swift && ok "Package.swift links
     || fail "Package.swift has no binaryTarget at $sherpa_xcframework"
 grep -q "path: \"$onnxruntime_xcframework\"" Package.swift && ok "Package.swift links $onnxruntime_xcframework locally" \
     || fail "Package.swift has no binaryTarget at $onnxruntime_xcframework"
-# A released target: .binaryTarget(name: "...", url: "...", checksum: "...") on one line.
+# A released target: .binaryTarget(name: "...", url: "...", checksum: "...") on one line. Both must be there, each
+# with the lock's URL and checksum.
+released=""
 while IFS= read -r line; do
     name=$(sed -n 's/.*name: *"\([^"]*\)".*/\1/p' <<<"$line")
+    url=$(sed -n 's/.*url: *"\([^"]*\)".*/\1/p' <<<"$line")
     checksum=$(sed -n 's/.*checksum: *"\([^"]*\)".*/\1/p' <<<"$line")
     case "$name" in
-        SherpaOnnxC) want=$sherpa_sha ;;
-        onnxruntime) want=$ort_sha ;;
+        SherpaOnnxC) want=$sherpa_sha; want_url=$(pin sherpa-onnx-ios url) ;;
+        onnxruntime) want=$ort_sha; want_url=$(pin onnxruntime-ios url) ;;
         *) continue ;;
     esac
+    released="$released $name"
     [ "$checksum" = "$want" ] && ok "Package.swift's $name checksum is the lock's" \
         || fail "Package.swift's $name checksum is $checksum, the lock pins $want"
+    [ "$url" = "$want_url" ] && ok "Package.swift's $name URL is the lock's" \
+        || fail "Package.swift's $name URL is $url, the lock pins $want_url"
 done < <(grep -E '\.binaryTarget\(.*url:' Package.swift || true)
+for name in SherpaOnnxC onnxruntime; do
+    [[ " $released " == *" $name "* ]] || fail "Package.swift has no released binaryTarget $name (url:, checksum:)"
+done
+release_base='^https://github.com/codemyriad/sherpa-onnx/releases/download/[^/]+/'
+sherpa_url=$(pin sherpa-onnx-ios url); ort_url=$(pin onnxruntime-ios url)
+if [[ "$sherpa_url" =~ $release_base ]] && [ "${sherpa_url%/*}" = "${ort_url%/*}" ] \
+    && [ "${sherpa_url##*/}" = "$(pin sherpa-onnx-ios file)" ]; then
+    ok "both binaries are assets of ${sherpa_url%/*}"
+else
+    fail "the lock's binaries are not assets of one codemyriad/sherpa-onnx release: $sherpa_url, $ort_url"
+fi
 
 # ---------------------------------------------------------------- a local build
 
@@ -138,10 +156,11 @@ if [ -d "$sherpa_xcframework" ]; then
     done
     header=$sherpa_xcframework/ios-arm64/SherpaOnnxC.framework/Headers/sherpa-onnx/c-api/c-api.h
     grep -q 'const char \*const \*tokens_arr;' "$header" && ok "c-api.h has tokens_arr" || fail "c-api.h has no tokens_arr"
-    grep -q 'SherpaOnnxOfflineSpeakerSegmentationSortformerModelConfig sortformer;' "$header" \
+    # The D16 fork takes Sortformer through the pyannote slot (it has no sortformer field).
+    ! grep -q 'SherpaOnnxOfflineSpeakerSegmentationSortformerModelConfig sortformer;' "$header" \
         && grep -q '^SherpaOnnxOfflineSpeakerDiarizationProcessStreamingChunk($' "$header" \
-        && ok "c-api.h has the Sortformer config and the streaming diarization calls" \
-        || fail "c-api.h lacks the Sortformer config or scripts/streaming-diarization-c-api.patch"
+        && ok "c-api.h is the D16 fork's (no Sortformer field) with the streaming diarization calls" \
+        || fail "c-api.h is not the D16 fork's or lacks scripts/streaming-diarization-c-api.patch"
 fi
 if [ -d "$onnxruntime_xcframework" ]; then
     for slice in ios-arm64 ios-arm64_x86_64-simulator; do

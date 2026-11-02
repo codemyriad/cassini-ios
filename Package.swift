@@ -1,24 +1,30 @@
 // swift-tools-version: 6.2
 import PackageDescription
 
-// The sherpa-onnx runtime (Parakeet Ultra) for iOS only. CASSINI_SHERPA_LOCAL=1 links the xcframeworks that
-// scripts/build-sherpa-xcframework.sh writes to the gitignored .tools/sherpa; without it CassiniSherpa compiles to a
-// module that reports the runtime as not linked. macOS never links either binary, so `swift test` downloads and links
-// nothing native. The lock is scripts/native-dependencies.json (scripts/verify-native-runtime.sh checks it).
+// The sherpa-onnx runtime (Parakeet Ultra and the speaker models), iOS only: the codemyriad fork at 0c2ee3f and ONNX
+// Runtime 1.27.1 as static xcframeworks from the fork's release v1.13.7-cassini-mobile.1 (the ONNX Runtime zip is a
+// mirror of csukuangfj's, the same bytes). The lock is scripts/native-dependencies.json, and
+// scripts/verify-native-runtime.sh compares each released target with it, so each stays on one line.
+// CASSINI_SHERPA_LOCAL=1 links the xcframeworks that scripts/build-sherpa-xcframework.sh writes to the gitignored
+// .tools/sherpa instead. Both binaries are iOS-only dependencies: `swift test` on macOS links no native code, though
+// SwiftPM downloads the two release zips once to resolve the package (about 41 MB, then cached).
 let sherpaLocal = !["", "0"].contains(Context.environment["CASSINI_SHERPA_LOCAL"] ?? "")
 let iOSOnly = TargetDependencyCondition.when(platforms: [.iOS])
 let sherpaBinaries: [Target] = sherpaLocal ? [
     .binaryTarget(name: "SherpaOnnxC", path: ".tools/sherpa/SherpaOnnxC.xcframework"),
     .binaryTarget(name: "onnxruntime", path: ".tools/sherpa/onnxruntime.xcframework")
-] : []
+] : [
+    .binaryTarget(name: "SherpaOnnxC", url: "https://github.com/codemyriad/sherpa-onnx/releases/download/v1.13.7-cassini-mobile.1/sherpa-onnx-1.13.7-0c2ee3f-ios-no-tts.xcframework.zip", checksum: "6d305165927b0b2c1fa805b137fc2e345e1c128e92f800de80e90f7096a88fce"),
+    .binaryTarget(name: "onnxruntime", url: "https://github.com/codemyriad/sherpa-onnx/releases/download/v1.13.7-cassini-mobile.1/onnxruntime-ios-static-xcframework-1.27.1.xcframework.zip", checksum: "985deaff345c7bcfbe4979b2daeec09d7a745b1e9cb73f37f4077364eb578e62")
+]
 let sherpaTarget: Target = .target(
     name: "CassiniSherpa",
-    dependencies: ["CassiniEngine", "CassiniNotebook"]
-        + (sherpaLocal ? [.target(name: "SherpaOnnxC", condition: iOSOnly), .target(name: "onnxruntime", condition: iOSOnly)] : []),
+    dependencies: ["CassiniEngine", "CassiniNotebook",
+                   .target(name: "SherpaOnnxC", condition: iOSOnly), .target(name: "onnxruntime", condition: iOSOnly)],
     path: "Packages/CassiniSherpa/Sources/CassiniSherpa",
-    linkerSettings: sherpaLocal ? [.linkedLibrary("c++", .when(platforms: [.iOS])),
-                                   .linkedFramework("CoreML", .when(platforms: [.iOS])),
-                                   .linkedFramework("Accelerate", .when(platforms: [.iOS]))] : [])
+    linkerSettings: [.linkedLibrary("c++", .when(platforms: [.iOS])),
+                     .linkedFramework("CoreML", .when(platforms: [.iOS])),
+                     .linkedFramework("Accelerate", .when(platforms: [.iOS]))])
 
 let package = Package(
     name: "Cassini",
@@ -31,7 +37,7 @@ let package = Package(
         .library(name: "CassiniEngineTesting", targets: ["CassiniEngineTesting"]),
         .library(name: "CassiniInference", targets: ["CassiniInference"]),
         .library(name: "CassiniAudio", targets: ["CassiniAudio"]),
-        // The only importer of SherpaOnnxC; empty of native code unless CASSINI_SHERPA_LOCAL is set (see above).
+        // The only importer of SherpaOnnxC, which iOS builds link (see above); on macOS it has no native code.
         .library(name: "CassiniSherpa", targets: ["CassiniSherpa"])
     ],
     // Zstandard decompresses the seekable .zst of every model file from the model host (`ZstdDecompressor`); Android

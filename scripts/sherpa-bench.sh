@@ -1,7 +1,7 @@
 #!/bin/bash
-# The WP0 spike on a simulator: builds the app and its hosted tests with CASSINI_SHERPA_LOCAL=1 (the runtime from
-# scripts/build-sherpa-xcframework.sh), then runs CassiniTests/SherpaBenchTests, which loads Parakeet Ultra, decodes
-# FLEURS-it short against Android's golden, 28 s and 60 s clips and optionally a long run, and records memory and speed,
+# The WP0 spike on a simulator: builds the app and its hosted tests with the native runtime (the release that
+# Package.swift links), then runs CassiniTests/SherpaBenchTests, which loads Parakeet Ultra, decodes FLEURS-it short
+# against Android's golden, 28 s and 60 s clips and optionally a long run, and records memory and speed,
 # and CassiniTests/ParakeetJobTests, a real Ultra transcription job on the same clip checked against the iOS golden,
 # and CassiniTests/DCVectorTests, D26.1's dc-quiet-jfk-v1 vector through the real detector with and without the
 # high-pass and through Ultra (when the vector is found).
@@ -25,13 +25,18 @@
 #                               through Sortformer and make a CAM++ print (default the model root when both are
 #                               installed there; none skips)
 #   CASSINI_IPHONE              the device type to clone (default "iPhone 17")
+#   CASSINI_SHERPA_LOCAL        1 builds with the runtime of scripts/build-sherpa-xcframework.sh in .tools/sherpa
 # Writes .tools/bench/<time>.json and the xcodebuild log beside it. The simulator clone is
 # ts-<worktree directory>-bench, so scripts/test.sh clean removes it with this worktree's other clones.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 root=$PWD
 . scripts/native-common.sh
-[ -d "$sherpa_xcframework" ] || { echo "error: no $sherpa_xcframework; run scripts/build-sherpa-xcframework.sh" >&2; exit 1; }
+# The release by default; CASSINI_SHERPA_LOCAL=1 builds with the local runtime instead.
+sherpa_env=${CASSINI_SHERPA_LOCAL:-0}
+if [ "$sherpa_env" != 0 ]; then
+    [ -d "$sherpa_xcframework" ] || { echo "error: no $sherpa_xcframework; run scripts/build-sherpa-xcframework.sh" >&2; exit 1; }
+fi
 
 fetch=(/usr/bin/python3 -I scripts/fetch-ci-models.py)
 model_root=${CASSINI_PARAKEET_MODEL_ROOT:-}
@@ -74,8 +79,8 @@ log=$out/$stamp.log
 
 echo "==> xcodegen"
 xcodegen generate --quiet
-echo "==> build for testing (CASSINI_SHERPA_LOCAL=1, arm64 simulator)"
-CASSINI_SHERPA_LOCAL=1 xcodebuild build-for-testing -project Cassini.xcodeproj -scheme Cassini \
+echo "==> build for testing (CASSINI_SHERPA_LOCAL=$sherpa_env, arm64 simulator)"
+CASSINI_SHERPA_LOCAL=$sherpa_env xcodebuild build-for-testing -project Cassini.xcodeproj -scheme Cassini \
     -derivedDataPath "$derived" -destination 'generic/platform=iOS Simulator' \
     CODE_SIGNING_ALLOWED=NO COMPILER_INDEX_STORE_ENABLE=NO ONLY_ACTIVE_ARCH=YES ARCHS=arm64 > "$out/$stamp.build.log" 2>&1 \
     || { grep -E "error:" "$out/$stamp.build.log" | head -20 >&2; echo "see $out/$stamp.build.log" >&2; exit 1; }

@@ -153,6 +153,14 @@ import CassiniNotebook
         #expect(banner.kind == .dlNoSpace)
         #expect(banner.args.bytes == ModelDownloadPlan.speechInstallBytes)
         #expect(banner.args.bytes > 0, "never \"Free about 0 MB\"")
+        // On a Parakeet device the facts carry what Ultra's install asks for.
+        let facts = NoteBannerFacts(speechInstallBytes: 1_290_000_000, speakersInstallBytes: 125_000_000)
+        let parakeet = try #require(banners(plain, job: failed, facts: facts).first)
+        #expect(parakeet.args.bytes == 1_290_000_000)
+        // Identify speakers installs only the speaker models: it asks for their figure, not Ultra's.
+        let speakers = job(.failed, .speakersOnly, failure: .download(.notEnoughStorage))
+        let identify = try #require(banners(transcribed, job: speakers, facts: facts).first { $0.kind == .dlNoSpace })
+        #expect(identify.args.bytes == 125_000_000)
         var screen = NoteScreenState()
         #expect(screen.bannerAction(.retry, note: plain, job: failed) == .transcribe(.transcribe))
         #expect(screen.bannerAction(.downloadAgain, note: plain, job: job(.failed, .transcribeAgain))

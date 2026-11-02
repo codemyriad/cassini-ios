@@ -47,11 +47,36 @@ import CassiniNotebook
         #expect(notices.contains("libopus"))
     }
 
+    /// Every entry of the native lock is in the runtime the app links (sherpa-onnx and the sources it is built from,
+    /// ONNX Runtime), so the notices name each one, and each source archive's version; an `-ios` entry is the iOS
+    /// build of the entry without the suffix. ONNX Runtime's own notices, for the libraries inside it, are bundled.
+    @Test func theNoticesNameEveryNativeComponentTheRuntimeContains() throws {
+        let notices = try Self.read(LicenseTexts.notices)
+        let data = try Data(contentsOf: Self.root.appendingPathComponent("scripts/native-dependencies.json"))
+        let entries = try #require(try JSONSerialization.jsonObject(with: data) as? [[String: String]])
+        #expect(entries.count >= 12)
+        for entry in entries {
+            let name = try #require(entry["name"])
+            let component = name.hasSuffix("-ios") ? String(name.dropLast(4)) : name
+            #expect(notices.lowercased().contains(component), "ThirdPartyNotices.txt does not name \(component)")
+            guard entry["file"] != nil, !name.hasSuffix("-ios"), var version = entry["version"] else { continue }
+            if version.hasPrefix("\(name)-") { version.removeFirst(name.count + 1) }
+            if version.hasPrefix("v") { version.removeFirst() }
+            #expect(notices.contains(version), "ThirdPartyNotices.txt does not give \(name)'s version \(version)")
+        }
+        let onnx = try Self.read(LicenseTexts.onnxRuntimeNotices)
+        #expect(onnx.hasPrefix("THIRD PARTY SOFTWARE NOTICES AND INFORMATION"))
+        for library in ["protobuf", "abseil", "re2", "flatbuffers", "cpuinfo"] {
+            #expect(onnx.lowercased().contains(library), "ONNX Runtime's notices do not name \(library)")
+        }
+    }
+
     /// The diarization provenance names the sherpa-onnx release the runtime is built from (the lock), and the notices
     /// name the Zstandard release Package.swift pins.
     @Test func theDiarizationBackendNamesThePinnedRuntime() throws {
         let lock = try String(contentsOf: Self.root.appendingPathComponent("scripts/native-dependencies.json"), encoding: .utf8)
-        #expect(lock.contains("\"version\": \"\(TranscriptProvenance.sherpaVersion)+"))
+        // The D16 fork's tag, 1.13.7-cassini-parakeet-ultra-v1 at 0c2ee3f.
+        #expect(lock.contains("\"version\": \"\(TranscriptProvenance.sherpaVersion)-cassini-"))
         #expect(TranscriptProvenance.SpeakerDiarization.sortformerBackend.hasPrefix("sherpa-onnx \(TranscriptProvenance.sherpaVersion) "))
         let package = try String(contentsOf: Self.root.appendingPathComponent("Package.swift"), encoding: .utf8)
         #expect(package.contains("facebook/zstd.git\", revision: \"\(ZstdDecompressor.revision)\""))
@@ -115,7 +140,10 @@ import CassiniNotebook
         #expect(try texts.text(.cassini).contains("GNU GENERAL PUBLIC LICENSE"))
         let thirdParty = try texts.text(.thirdParty)
         #expect(thirdParty.hasPrefix("sherpa-onnx"))
-        for name in ["ONNX Runtime", "Zstandard", "swift-opus", "libopus"] { #expect(thirdParty.contains(name), "\(name)") }
+        for name in ["ONNX Runtime", "Zstandard", "swift-opus", "libopus", "Eigen", "Mozilla Public License", "KISS FFT"] {
+            #expect(thirdParty.contains(name), "\(name)")
+        }
+        #expect(thirdParty.contains("ONNX Runtime third-party notices\n\nTHIRD PARTY SOFTWARE NOTICES"), "ONNX Runtime's own")
         #expect(!thirdParty.contains("Downloaded models"), "the model notices have their own row")
         #expect(!thirdParty.contains("OpenMDW"), "the diarizer's licence comes with the host's notices")
         let models = try texts.text(.models)

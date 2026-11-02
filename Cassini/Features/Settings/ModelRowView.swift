@@ -51,7 +51,10 @@ extension ModelSize {
     func label(locale: Locale) -> String {
         switch self {
         case .managedBySystem: String(localized: "Managed by iOS", table: "Settings")
-        case .bytes(let bytes): bytes.formatted(.byteCount(style: .file).locale(locale))
+        case .bytes(let bytes): SizeCopy.text(bytes, locale: locale)
+        case .precision(let precision, let bytes):
+            String(localized: "\(precision) · \(SizeCopy.text(bytes, locale: locale))", table: "Settings",
+                   comment: "The speech row's subtitle: the model's precision and its download (INT8 · 443 MB)")
         case .includedWith: String(localized: "Comes with telling speakers apart", table: "Settings")
         }
     }

@@ -34,14 +34,20 @@ public struct SpeakerModels: Sendable {
     /// What is still to install of the speaker parts.
     public var plan: ModelPlan { ModelPlan(ModelPlan.of(root: root).missing.filter { Self.parts.contains($0.part) }) }
 
-    /// The free space the install of what is missing asks for before its first byte.
-    public var installBytes: Int64 { plan.requiredFreeBytes }
+    /// The free space the install of what is missing asks for before its first byte; with nothing missing, a fresh
+    /// install's, so a note whose install failed for want of room never asks to free 0 bytes after the models came in
+    /// some other way (as `ParakeetTranscriber.assetInstallBytes`).
+    public var installBytes: Int64 {
+        let plan = plan
+        return (plan.isEmpty ? ModelPlan([ModelPart.speakers, .voices].map { ModelPlan.Item($0, $0.models) }) : plan)
+            .requiredFreeBytes
+    }
 
     /// The status of the one row: an install of the speaker parts that runs, else ready, the failure the last install
     /// left, or not downloaded. `linked` false (a build without the native runtime) is unsupported.
     public func status(linked: Bool) -> ModelPartStatus {
         guard linked else { return .unsupported }
-        if case .installing(let parts, let progress, _, _) = installer.status, !parts.isDisjoint(with: Self.parts) {
+        if case .installing(let parts, let progress, _) = installer.status, !parts.isDisjoint(with: Self.parts) {
             guard let progress, Self.parts.contains(progress.part) else { return .downloading(nil) }
             return progress.verifying ? .checking : .downloading(fraction(of: progress))
         }
@@ -84,9 +90,6 @@ public struct SpeakerModels: Sendable {
             throw SpeakerAnalysisError.needsConsent
         }
     }
-
-    /// Cancels the install that runs; its `.part` files stay.
-    public func cancel() { installer.cancel() }
 
     private func fraction(of progress: DownloadProgress) -> Double? { Self.fraction(of: progress, plan: plan) }
 

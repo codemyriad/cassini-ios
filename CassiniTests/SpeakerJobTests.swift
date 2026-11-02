@@ -11,7 +11,7 @@ import CassiniSherpa
 /// two-speaker FLEURS mix (A, B, A again; scripts/fetch-speaker-fixture.py). The first run tells the speakers apart
 /// window by window and gives each a CAM++ print; A is then saved as a voice from that print, and Transcribe again
 /// names A from it with Android's thresholds. Opt-in and skipped unless the build links the runtime
-/// (CASSINI_SHERPA_LOCAL=1) and the environment names the models and the mix; scripts/speaker-smoke.sh runs it.
+/// (every iOS build does) and the environment names the models and the mix; scripts/speaker-smoke.sh runs it.
 ///
 /// Environment (xcodebuild passes TEST_RUNNER_<name> through as <name>):
 ///   CASSINI_PARAKEET_MODEL_ROOT  a model root as scripts/fetch-ci-models.py writes it (the revision directories
@@ -25,7 +25,9 @@ final class SpeakerJobTests: XCTestCase {
 
     func testAnUltraJobTellsTheTwoSpeakersApartAndTranscribeAgainNamesTheSavedOne() async throws {
         let environment = ProcessInfo.processInfo.environment
-        try XCTSkipUnless(SherpaRuntime.isLinked, "built without CASSINI_SHERPA_LOCAL")
+        try XCTSkipUnless(SherpaRuntime.isLinked, "built without the native runtime")
+        // Opt-in: every iOS build links the runtime, so the environment decides (scripts/speaker-smoke.sh sets it).
+        try XCTSkipUnless(environment["CASSINI_PARAKEET_MODEL_ROOT"] != nil, "opt-in: scripts/speaker-smoke.sh sets CASSINI_PARAKEET_MODEL_ROOT")
         let source = try XCTUnwrap(environment["CASSINI_PARAKEET_MODEL_ROOT"].map { URL(fileURLWithPath: $0) },
                                    "set CASSINI_PARAKEET_MODEL_ROOT")
         let clip = try XCTUnwrap(environment["CASSINI_SPEAKER_AUDIO"].map { URL(fileURLWithPath: $0) },

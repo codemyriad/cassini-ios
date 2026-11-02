@@ -106,7 +106,8 @@ import CassiniNotebook
         #expect(TranscriptLanguage.known(c.stored) == c.display)
         var note = Note(title: "Note")
         note.language = c.stored ?? ""
-        #expect(DocumentInfoFacts.of(note, provenance: nil, fileBytes: nil).language == c.display, "Document info")
+        #expect(DocumentInfoFacts.of(note, provenance: nil, fileBytes: nil, speechModels: [:]).language == c.display,
+                "Document info")
     }
 
     // MARK: - Writer

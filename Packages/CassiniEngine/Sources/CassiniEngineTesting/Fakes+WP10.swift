@@ -8,9 +8,6 @@ extension FakeAnalyzer {
     /// Reports the install as done at once; nothing is installed, so `modelStatus` stays as it was.
     public func installModels(progress: @escaping @Sendable (InstallProgress) -> Void) async throws { progress(.downloading(1)) }
 
-    /// The fake's install ends at once, so there is nothing to cancel.
-    public func cancelModelInstall() async {}
-
     /// About what the real speaker models ask for.
     public var modelInstallBytes: Int64 { 54_000_000 }
 }

@@ -5,8 +5,10 @@ import CassiniNotebook
 /// trust banner over the reading content, the job's transcription and download banners, one voice, and the held queue
 /// below a paused job. What their buttons ask for and what closing one does is `NoteScreenState`'s.
 public enum NoteBanners {
-    /// The free space a failed model download asks for: a job downloads only the speech model, and iOS does not tell
-    /// an asset's size before it is downloaded, so this is the plan's estimate (never 0).
+    /// The free space a failed model download asks for when the facts give none: a transcription downloads only the
+    /// speech model, and iOS does not tell an Apple asset's size before it is downloaded, so this is the plan's
+    /// estimate (never 0). Parakeet's figure, and the speaker models' of an Identify speakers, come with the facts
+    /// (`NoteBannerFacts`).
     public static let downloadFreeBytes = ModelDownloadPlan.speechInstallBytes
 
     /// A finished transcript whose speakers could not be told apart (Android `NoteMapping.oneVoice`): on iOS, one whose
@@ -42,7 +44,9 @@ public enum NoteBanners {
         }
         if mode.showsReading, let trust = trustBanner(note, toggled: facts.trustToggled) { specs.append(trust) }
         specs += Notices.job(job, oneVoice: oneVoice(note), failureText: job?.failure.map(failureText),
-                             requiredFreeBytes: downloadFreeBytes, noNewVersion: note.refusesNewVersion)
+                             requiredFreeBytes: (job?.kind == .speakersOnly ? facts.speakersInstallBytes
+                                                 : facts.speechInstallBytes) ?? downloadFreeBytes,
+                             noNewVersion: note.refusesNewVersion)
         if case .paused = mode, facts.queueHold != nil, facts.waitingJobs > 0 {
             specs.append(BannerSpec(.txQueueHeld, BannerArgs(count: facts.waitingJobs)))
         }

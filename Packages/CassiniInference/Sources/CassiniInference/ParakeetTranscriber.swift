@@ -14,9 +14,9 @@ import CassiniNotebook
 /// - **Check (D16 §4).** Before the first load in each session, every file of Ultra and of the detector is hashed
 ///   against its pins (`ModelVerifier`), on the inference thread, stopped by the run's cancel flag; the job shows the
 ///   Preparing stage (`.preparingModel(nil)`) meanwhile. A file that differs retires its revision: for Ultra the run
-///   fails with `VERIFY` ("Model verification failed. Please download it again.") and later runs of this process fail
-///   with `MODEL` until the model is installed again (this build does not download Ultra itself, so the next launch
-///   picks Apple Speech, `SpeechCapability`); for the detector the run goes on cutting at quiet points.
+///   fails with `VERIFY` ("Model verification failed. Please download it again."), and the next run downloads it
+///   again like a missing model (with consent; without an installer it fails with `MODEL`); for the detector the run
+///   goes on cutting at quiet points.
 /// - **Thread.** Reading and decoding run on one dedicated thread (`InferenceThread.speech`). The recognizer is made
 ///   with the first window and released when the run ends, before the speaker step loads its own models.
 /// - **Memory.** `os_proc_available_memory()` is checked before the model loads and before each window
@@ -43,6 +43,13 @@ public struct ParakeetTranscriber: Transcribing {
         public init(root: URL, online: @escaping @Sendable () -> Bool = { false }, install: Install? = nil,
                     verifier: ModelVerifier = .shared) {
             self.root = root; self.online = online; self.install = install; self.verifier = verifier
+        }
+
+        /// The shared installer of `installer`'s repository root: what the app passes.
+        public init(installer: PinnedModelInstaller, root: URL, online: @escaping @Sendable () -> Bool,
+                    verifier: ModelVerifier = .shared) {
+            self.init(root: root, online: online, install: { try await installer.install($0, onProgress: $1) },
+                      verifier: verifier)
         }
 
         var speechReady: Bool { ModelCatalog.parakeet.ready(in: root) }
@@ -109,9 +116,20 @@ public struct ParakeetTranscriber: Transcribing {
 
     public func speechLanguages() async -> [SpeechLanguage] { [] }
 
-    public func installAssets(locale: Locale, progress: @escaping @Sendable (Double) -> Void) async throws {
+    /// The standalone download (Settings, the model download screen): Ultra and its detector through the shared
+    /// installer, joining a job's install of them, with the fraction of the download and then Checking files.
+    /// Cancelling the caller ends its wait; the installer stops the install when nobody else waits on it.
+    public func installAssets(locale: Locale, progress: @escaping @Sendable (InstallProgress) -> Void) async throws {
         guard !models.speechReady, models.install != nil else { return }
-        try await install { if let fraction = $0 { progress(fraction) } }
+        try await install(progress)
+    }
+
+    /// What the installer's space check asks for before the first byte of speech: every file of Ultra and the
+    /// detector that is missing, plus the largest of their downloads (`ModelPlan`); a fresh install's figure once
+    /// Ultra is installed (the figure of a later install, after the model was removed).
+    public var assetInstallBytes: Int64 {
+        let missing = ModelPlan.of(root: models.root).missing.filter { $0.part == .speech }
+        return ModelPlan(missing.isEmpty ? [ModelPlan.Item(.speech, ModelPart.speech.models)] : missing).requiredFreeBytes
     }
 
     public func transcribe(_ request: TranscriptionRequest,
@@ -146,7 +164,7 @@ public struct ParakeetTranscriber: Transcribing {
         if speechReady {
             // The detector alone, best effort: without it the run cuts at quiet points.
             guard models.install != nil else { return }
-            do { try await install { events(.preparingModel($0)) } } catch is CancellationError {
+            do { try await install { events(.preparingModel($0.fraction)) } } catch is CancellationError {
                 throw CancellationError()
             } catch {}
             return
@@ -154,14 +172,15 @@ public struct ParakeetTranscriber: Transcribing {
         guard allowDownload else { throw TranscriptionError.needsConsent }
         guard models.install != nil else { throw TranscriptionError.failed(.model) }
         events(.preparingModel(nil))
-        try await install { events(.preparingModel($0)) }
+        try await install { events(.preparingModel($0.fraction)) }
     }
 
-    /// Installs SPEECH, reporting the fraction done (nil while unknown).
-    private func install(_ report: @escaping @Sendable (Double?) -> Void) async throws {
+    /// Installs SPEECH, reporting the fraction done (nil while unknown), then Checking files.
+    private func install(_ report: @escaping @Sendable (InstallProgress) -> Void) async throws {
         guard let install = models.install else { return }
         let outcome = try await install([.speech]) { progress in
-            report(progress.totalBytes > 0 ? Double(progress.doneBytes) / Double(progress.totalBytes) : nil)
+            if progress.verifying { return report(.checking) }
+            report(.downloading(progress.totalBytes > 0 ? Double(progress.doneBytes) / Double(progress.totalBytes) : nil))
         }
         switch outcome {
         case .installed: return
@@ -306,4 +325,9 @@ extension ParakeetTranscriber {
             }
         }
     }
+}
+
+private extension InstallProgress {
+    /// The fraction of a download, nil while unknown and while the files are checked.
+    var fraction: Double? { if case .downloading(let fraction) = self { fraction } else { nil } }
 }
