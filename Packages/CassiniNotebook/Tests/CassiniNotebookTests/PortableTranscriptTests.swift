@@ -287,6 +287,52 @@ struct PortableConformanceImportTests {
         #expect(exported.variants.prefix(2).map(\.id) == before.variants.map(\.id))
         #expect(exported.variants.prefix(2).map(\.body) == before.variants.map(\.body))
     }
+
+    /// D56 and D47: every write keeps a speaker's members verbatim, `voiceSource` and members this app does not know
+    /// included; only `label` changes. iOS diarizes as `spk_N`, so a new variant adds its own speakers and never
+    /// stamps or re-ranks a desktop `<group>~n` voice. The `x["codemyriad.io"]` mirror stays byte for byte.
+    @Test func everyWriteKeepsTheSpeakersUnknownMembers() throws {
+        let directory = try PortableFixtures.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let stamp = #"{"inputSHA256":"\#(String(repeating: "a", count: 64))","turnsSHA256":"\#(String(repeating: "b", count: 64))"}"#
+        let first = try PortableFixtures.document([Word("others~2", 0, 500, "ciao")], title: "Desktop")
+        var base = CassiniDocument.read(first)
+        base.manifest?["speakers"] = .array([.object(try JSON.parseObject(
+            #"{"id":"others~2","label":"Speaker 2","voiceSource":\#(stamp),"futureMember":{"n":9007199254740993}}"#))])
+        base.manifest?["x"] = .object(try JSON.parseObject(
+            #"{"codemyriad.io":{"meeting":{"speakers":[{"id":"others~2","voiceSource":\#(stamp)}]}}}"#))
+        let source = directory.appendingPathComponent("doc.opus")
+        try Data(try CassiniDocument.create(first, transcript: Transcript([Word("others~2", 0, 500, "ciao")], language: "it"),
+                                            title: "Desktop", processing: JSONObject(), existing: base)).write(to: source)
+        let before = CassiniDocument.read(source)
+        try #require(before.state == .ok)
+        let original = try #require(before.manifest?["speakers"]?.array?.first?.object)
+        func withLabel(_ label: String) -> String {
+            var speaker = original
+            speaker["label"] = .string(label)
+            return speaker.serialized()
+        }
+
+        // An export with a rename and a variant diarized on this device.
+        var note = Note(title: "Desktop")
+        note.transcript = [TranscriptSegment(text: "ciao", start: 0, end: 0.5, speakerID: "others~2"),
+                           TranscriptSegment(text: "hello", start: 0.5, end: 1, speakerID: "spk_1")]
+        note.speakers = [NoteSpeaker(id: "others~2", name: "Mira"), NoteSpeaker(id: "spk_1", name: "Speaker 1")]
+        let output = directory.appendingPathComponent("out.opus")
+        try PortableTranscript.export(note: note, opus: source, destination: output)
+        let exported = CassiniDocument.read(output)
+        #expect(exported.state == .ok)
+        let speakers = exported.manifest?["speakers"]?.array?.compactMap { $0.object?.serialized() }
+        #expect(speakers == [withLabel("Mira"), #"{"id":"spk_1","label":"Speaker 1"}"#])
+        #expect(exported.manifest?["x"]?.serialized() == before.manifest?["x"]?.serialized())
+
+        // A rename in place.
+        let renamed = directory.appendingPathComponent("renamed.opus")
+        try CassiniDocument.relabel(source, existing: before, labels: ["others~2": "Ada"], target: renamed)
+        let relabelled = CassiniDocument.read(renamed)
+        #expect(relabelled.manifest?["speakers"]?.array?.compactMap { $0.object?.serialized() } == [withLabel("Ada")])
+        #expect(relabelled.manifest?["x"]?.serialized() == before.manifest?["x"]?.serialized())
+    }
 }
 
 @Suite struct ImportedOnlyTests {
