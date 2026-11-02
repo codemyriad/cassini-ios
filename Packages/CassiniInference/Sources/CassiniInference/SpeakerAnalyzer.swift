@@ -61,8 +61,6 @@ public struct SpeakerAnalyzer: SpeakerAnalyzing {
         try await models.install(progress: progress)
     }
 
-    public func cancelModelInstall() async { models.cancel() }
-
     /// Whether CAM++ can name speakers: installed, and not found unreadable by this session's last check.
     public func printsReady() async -> Bool { runtime.linked && models.printsReady && !session.voiceprintUnreadable }
 

@@ -19,8 +19,9 @@ import CassiniNotebook
     private func cleanUp() { UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite) }
 
     private func consent(_ settings: SettingsStore, speech: ModelPartStatus, speakers: Bool,
-                         parakeet: Bool = false) -> ModelConsent {
-        ModelConsent.recorded(settings: settings, speech: FakeTranscriber(.returns([], total: 0), status: speech),
+                         parakeet: Bool = false, recognizer: SpeechRecognizer = .appleSpeech) -> ModelConsent {
+        ModelConsent.recorded(settings: settings,
+                              speech: FakeTranscriber(.returns([], total: 0), status: speech, recognizer: recognizer),
                               speakers: FakeAnalyzer(modelIdentity: speakers ? "fake-model" : nil),
                               parakeetReady: { parakeet })
     }
@@ -52,6 +53,20 @@ import CassiniNotebook
         let plan = ModelDownloadPlan.plan(speech: .ready, speakers: .notDownloaded, forNote: true,
                                           identifySpeakers: true, speakersInstallBytes: 100)
         #expect(plan.missing == [.speakers])
+    }
+
+    /// On a Parakeet device Apple's speech assets are no consent: iOS may have installed them for dictation. Only the
+    /// recorded consent or an installed Ultra lets a job download (decision D2).
+    @Test func appleAssetsAreNoConsentOnAParakeetDevice() async {
+        defer { cleanUp() }
+        let settings = settings()
+        #expect(await !consent(settings, speech: .unsupported, speakers: false, recognizer: .parakeet)
+            .allows(.transcribe, "en-US"))
+        #expect(await consent(settings, speech: .notDownloaded, speakers: false, parakeet: true, recognizer: .parakeet)
+            .allows(.transcribeAgain, "en-US"))
+        settings.recordConsent()
+        #expect(await consent(settings, speech: .notDownloaded, speakers: false, recognizer: .parakeet)
+            .allows(.transcribe, "en-US"))
     }
 
     // ports (Apple Speech fallback, ModelRepositoryTests has the port): ModelRepositoryTest#consentIsTheStoredTimeOrParakeet

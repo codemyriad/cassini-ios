@@ -23,12 +23,12 @@ that were not ported, with the reason for each.
   on the host with fakes. Decodes run on one dedicated thread at `.userInitiated` (`InferenceThread`); the recognizer
   is made with the first window and released when the words step ends, before the speaker step loads its models.
   Differences:
-  - **Apple Speech fallback (decision D2, iOS only).** A device that cannot hold Ultra, a build without the native
-    runtime, or a device without the installed model keeps Apple's `SpeechAnalyzer` / `SpeechTranscriber`
-    (`AppleSpeechTranscriber`), with the speech language setting and its failure codes. `AppEnvironment` asks the pure
-    `SpeechCapability.choose(linked:installed:capable:)` once at launch. The capability rule (at least 5 GiB of
-    physical memory) is **provisional until the WP0 device gate**. Until the in-app download is wired (WP6), Ultra is
-    used only when its files are already in Application Support/CassiniModels. On the Apple path the file goes to the
+  - **Apple Speech fallback (decision D2, iOS only).** A device that cannot hold Ultra keeps Apple's `SpeechAnalyzer` /
+    `SpeechTranscriber` (`AppleSpeechTranscriber`), with the speech language setting and its failure codes; so would a
+    build without the native runtime, which every iOS build now links. `AppEnvironment` asks the pure
+    `SpeechCapability.choose(linked:capable:)` once at launch, whether or not Ultra is installed: a job downloads it
+    with consent, as on Android. The capability rule (at least 5 GiB of physical memory) is **provisional until the
+    WP0 device gate**. On the Apple path the file goes to the
     analyzer one second at a time from the resume point; a "window" is one finalized result, and a final result
     without words counts as an empty finalized segment so silences still advance `doneMs`. Its block size and resume
     point live in `AppleSpeechWindows` (iOS-only `AppleSpeechWindowsTests`).
@@ -45,12 +45,13 @@ that were not ported, with the reason for each.
   - **Check before the first load (D16 §4, iOS first).** Before the first load in each session every file of Ultra and
     of the detector is hashed against its pins (`ModelVerifier`) on the inference thread, stopped by the run's cancel
     flag, while the job shows the Preparing stage. A detector that fails is removed and the run cuts at quiet points;
-    an Ultra that fails is removed and the run fails with `VERIFY`. Until the in-app Ultra download is wired (PR D),
-    later runs of that process fail with `MODEL` and the next launch picks Apple Speech (`SpeechCapability`); D16 §6's
-    copy and Whistle-style fallback setting do not apply to iOS, whose recognizer is chosen at launch. Android has no
-    such check yet. A resumed run whose detector is removed between its windows cuts the rest at quiet points, as it
-    already did when the detector was installed between runs, and its `x-segmentation` names quiet points for the
-    whole transcript: the checkpoint does not record how its earlier windows were cut (nor does Android's).
+    an Ultra that fails is removed and the run fails with `VERIFY`; the next run downloads it again through the shared
+    installer, as a missing model, with consent
+    (`ParakeetTranscriberTests.aModelThatFailedItsCheckIsDownloadedAgainByTheNextRun`). D16 §6's copy and
+    Whistle-style fallback setting do not apply to iOS, whose recognizer is chosen at launch. Android has no such check
+    yet. A resumed run whose detector is removed between its windows cuts the rest at quiet points, as it already did
+    when the detector was installed between runs, and its `x-segmentation` names quiet points for the whole
+    transcript: the checkpoint does not record how its earlier windows were cut (nor does Android's).
   - **Language.** Parakeet takes none: its jobs and checkpoints carry `""`. Its words are written, and their body
     counted at every window, with `und` (see "Transcript language" below). Android counts its decoded windows with
     `""` and stamps `und` only on the finished transcript, so iOS's per-window check is 17 bytes stricter.
@@ -94,19 +95,35 @@ that were not ported, with the reason for each.
   counts as nothing to download, and the job fails with `UNSUPPORTED_LANGUAGE` rather than waiting for a consent that
   cannot help. `UNSUPPORTED_LANGUAGE` and `RESERVATION_LIMIT` (Apple's speech assets) are failure codes that exist only
   on iOS.
-- **Speech model size.** iOS does not report the size of Apple's speech assets before they are downloaded. Settings
-  shows "Managed by iOS" instead of a size, and "Not available" when Apple has no model for the language or the
-  device. The model download screen lists the missing parts without sizes. Its free-space check and the "Needs about N
-  free" figure use an estimate per part: 512 MiB for the speech model (`ModelDownloadPlan.speechInstallBytes`) and the pinned
-  files plus 32 MiB for the speaker models. DL_NO_SPACE quotes the plan's figure. When there is no figure, its body
-  reads "Free some space and try again." and never "0 MB".
+- **Sizes.** Every size on the model download screen and the On-device models rows follows the shared rule of
+  `ux-draft/format-vectors.json` (`sizeRule`, v4: MB rounded half up, GB with one decimal from 1000 MB, KB below 1 MB;
+  `SizeText`, tested with the vectors), so Ultra's download reads "443 MB" as D4 and D16 write it. Android still
+  rounds to tens from 100 MiB (`ModelCatalog.mebibytes`: 440, 1230) and should adopt the rule. The speech part shows
+  Ultra's download alone, **443 MB**, as D16's model rows do: its speech detector (458 KB) has no row of its own, is
+  installed with it and counts in the free space. Android sums every model of the part
+  (`part.models.sumOf { downloadBytes }`), which its rounding to tens hides (440 either way). The speakers row is the
+  diarizer and CAM++, 62 + 26 MB, shown as 88 MB (iOS shows them as one row). On a Parakeet device the consent screen
+  lists each missing part with its size and the body quotes their total ("Cassini needs a one-time download of about
+  **531 MB**", the figure in bold and kept on one line, as Android's), and Settings shows the speech row as "INT8 · 443
+  MB" (Android's copy). The free space is the whole install's `ModelPlan` figure, about 1231 MiB, shown as "1.2 GB" by
+  the rule. The banners'
+  "N MB" figures (download progress, DL_NO_SPACE) keep their earlier rounding.
+- **Speech model size on Apple Speech devices.** iOS does not report the size of Apple's speech assets before they are
+  downloaded. On a device that keeps Apple Speech, Settings shows "Managed by iOS" instead of a size, and "Not
+  available" when Apple has no model for the language or the device. The model download screen lists the speech part
+  without a size and its body without a total. Its free-space check and the "Needs about N free" figure use an
+  estimate per part: 512 MiB for the speech model (`ModelDownloadPlan.speechInstallBytes`) and the pinned files plus
+  32 MiB for the speaker models. DL_NO_SPACE quotes the plan's figure (on a Parakeet device, the speech install's
+  `ModelPlan` figure). When there is no figure, its body reads "Free some space and try again." and never "0 MB".
 - **Download progress.** Apple's assets report only a fraction, not bytes. `DownloadProgress`
   therefore carries per-mille counts, and the download banner has no byte counts. Apple install errors map to
   `NO_CONNECTION` (URL connectivity errors), `NOT_ENOUGH_STORAGE` (out of space) or `INSTALL`. Apple gives no
   "free about N MB" figure for its own downloads.
-- **Native runtime (in progress, not yet used by the app).** The Parakeet Ultra port builds the same sherpa-onnx fork
-  commit (dbbeef9c) against the same ONNX Runtime (1.27.1) as Android, as a static xcframework with only the C API and
-  no TTS (`scripts/build-sherpa-xcframework.sh`; Android's AAR keeps its JNI layer). Speaker diarization is on in
+- **Native runtime.** Every iOS build links the same sherpa-onnx fork commit as Android, codemyriad `0c2ee3f` (D16
+  §1), against the same ONNX Runtime (1.27.1), as static xcframeworks with only the C API and no TTS, from the fork's
+  release `v1.13.7-cassini-mobile.1` (`Package.swift` binary targets; `scripts/build-sherpa-xcframework.sh` rebuilds
+  the same bytes, and `CASSINI_SHERPA_LOCAL=1` links that local build; Android's AAR from the same release keeps its
+  JNI layer). Speaker diarization is on in
   both, and both apply Android's `scripts/streaming-diarization.patch` (Sortformer's incremental mode). That patch adds
   its entry points only to JNI and Kotlin, so iOS adds a second, iOS-only patch,
   `scripts/streaming-diarization-c-api.patch`, with the same three calls in the C API
@@ -124,10 +141,13 @@ that were not ported, with the reason for each.
   `(id, source_sha256)` with both SHA-256 values of every file), URLs, figures (440 + 62 + 26 = 528 MiB, about
   1230 MiB free: every installed file plus the largest single download, the 431 MiB encoder, because the files install
   one at a time and each `.zst` goes once its file is in place) and tests. Every model comes from `dist.gocassini.com`
-  only, through its manifest; Hugging Face and GitHub are gone from the catalog and the allow-list. The app installs Android's speaker models (Nemotron
-  Sortformer and CAM++) through it. Until the speech download is wired (PR D), and on devices that keep Apple Speech
+  only, through its manifest; Hugging Face and GitHub are gone from the catalog and the allow-list. The app builds
+  one repository and one `PinnedModelInstaller` (`PinnedModels`) and installs Ultra with its speech detector, and
+  Android's speaker models (Nemotron Sortformer and CAM++), through it, so a job that joins the standalone download
+  fetches each file once. The standalone speech download (Settings, the model download screen) shows Downloading,
+  then Checking files; its Cancel is described under "Cancel during a job's download". On devices that keep Apple Speech
   because they cannot hold Ultra (a platform constraint), the Model download screen shows `ModelDownloadPlan`'s
-  figures. The differences that remain:
+  estimate for the speech part. The differences that remain:
   - **Layout without a marker.** Android keeps a `verified` marker holding the source hash in
     `models/<id>/<source_sha256>/`. iOS collects a model's files and the host's `NOTICE.txt` in
     `models/<id>/.<source_sha256>.staging/` (which keeps `.part` files and checked files across failures and app
@@ -174,7 +194,7 @@ that were not ported, with the reason for each.
     and hides the Range answers.
   - **Cancellation** is Swift task cancellation, checked between blocks where Android checks the thread's interrupt.
   - **Network check.** iOS has no `NET_CAPABILITY_VALIDATED`; `NetworkPath` reads `NWPathMonitor` (satisfied, and
-    whether the path is expensive or constrained, for the consent screen's mobile-data note).
+    whether the path is expensive or constrained). Like Android, the consent screen has no mobile-data note.
   - **A full disk** during a download is `NOT_ENOUGH_STORAGE`, as iOS reports it as its own error. Android reads it
     as an I/O error (`INTERRUPTED`). Both check the free space before the first byte.
   - **Stopped by the system.** `PinnedModelInstaller.stopDownloads()` stands for the end of the
@@ -183,8 +203,10 @@ that were not ported, with the reason for each.
     `ArtifactFetcher.fetchCompressed` takes a `Decompressing` port, which the app fills with `ZstdDecompressor`
     (CassiniInference, `ZstdModelTest` ported as `ZstdDecompressorTests`).
     `aCompressedDownloadChecksOnceFromZeroToItsSize` runs with a stand-in format.
-  - **Consent** follows Android (`models.consentAt`, or Parakeet installed), plus the Apple Speech rule on fallback
-    devices (assets installed, or not offered for the language).
+  - **Consent** follows Android (`models.consentAt`, or Parakeet installed). Only on devices that keep Apple Speech
+    does the Apple rule add to it (assets installed, or not offered for the language); on a Parakeet device assets
+    iOS installed for dictation are no consent to the Ultra download
+    (`ModelConsentTests.appleAssetsAreNoConsentOnAParakeetDevice`).
   - `ModelInstallOwnerTest` is ported as `PinnedModelInstallerTests`.
 
 ### Speaker analysis
@@ -581,7 +603,12 @@ stricter or looser than the spec.
   the drain's first claim, from the screen. The system shows "Transcribing “title”" with the job's progress and a Stop
   button, and each next job only changes the title. iOS grants this request only while Cassini is on the screen. A
   drain that starts in the background, or a refused request, falls back to the finite time of
-  `beginBackgroundTask`.
+  `beginBackgroundTask`. The standalone model download (Settings, the model download screen; Android runs it in the
+  same foreground service) holds its own continued task under a second identifier
+  (`io.codemyriad.cassini.transcription.work`), titled "Downloading models", from its start to its end
+  (`ModelInstalls`), so a 443 MB Ultra download goes on after Cassini leaves the screen. When iOS takes that time back,
+  or the person presses Stop, the standalone download stops as its Cancel does and the part shows "Download stopped"
+  (STOPPED_BY_SYSTEM), as Android's `stopDownloads()` shows it, until its next install.
 - **When iOS takes the time back.** Expiry and the system's Stop do what Android's `onTimeout` does. The job's stop is
   signalled before iOS's expiration handler returns, the queue is held (`system`), and the job shows as paused by the
   system. While Cassini is hidden, the notification "Transcription paused by iOS · iOS needed the time back. Open
@@ -604,8 +631,13 @@ stricter or looser than the spec.
   ready, one after another (`ModelInstalls`). Settings shows a running standalone install as DL_DOWNLOADING with
   Cancel, because the screen closes once the download starts.
 - **Cancel during a job's download** stops the job and puts the note back to its state from before, as Android's
-  `cancelDownload()` with `Cancel.RESTORE` does. A job that is waiting on Apple's speech assets is not ended by it:
-  iOS has no shared owner of that install, and AssetInventory shares the download itself.
+  `cancelDownload()` with `Cancel.RESTORE` does. The Cancel of a standalone Parakeet or speaker models download (the
+  Settings banner, iOS's own: Android has one banner for both) ends only the standalone's wait; the shared installer
+  stops the install when nobody else waits on it, as Android's `ModelInstallOwner` does for a caller that leaves. A job
+  that waits on the same install, or on one that the standalone request waited to end, goes on, and its card's Cancel
+  stops it as above; so the job is never paused as interrupted by a Cancel it did not get
+  (`PinnedModelInstallerTests.theStandaloneCancelLeavesAJobsInstallRunning`). A job that is waiting on Apple's speech
+  assets is not ended by it either: AssetInventory shares the download itself.
 - **The stepper** reads Reading, Preparing, Words, Speakers & matching, Saving (Android: Words & voices, then
   Matching). When the speaker step will run, the words fill the bar to 85 % and the speakers fill it from 85 % to 99 %.
   The headlines are Android's, plus "Finding speakers". During the words, the time left counts the words plus the

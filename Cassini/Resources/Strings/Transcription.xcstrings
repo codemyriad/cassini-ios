@@ -42,6 +42,47 @@
         }
       }
     },
+    "Cassini needs a one-time download of about %@. After that, recognising words and telling voices apart happen on this device, even offline. Your audio stays here.": {
+      "comment": "Model download screen body with the total download, such as 531 MB",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cassini needs a one-time download of about %@. After that, recognising words and telling voices apart happen on this device, even offline. Your audio stays here."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cassini necesita una única descarga de unos %@. Después, reconoce las palabras y distingue las voces en este dispositivo, incluso sin conexión. Tu audio se queda aquí."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cassini a besoin d’un téléchargement unique d’environ %@. Ensuite, la reconnaissance des mots et la distinction des voix se font sur cet appareil, même hors ligne. Votre audio reste ici."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cassini ha bisogno di un unico download di circa %@. Dopo, il riconoscimento delle parole e la distinzione delle voci avvengono su questo dispositivo, anche offline. Il tuo audio resta qui."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O Cassini precisa de um download único de cerca de %@. Depois disso, o reconhecimento de palavras e a distinção entre vozes acontecem neste dispositivo, mesmo offline. Seu áudio fica aqui."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O Cassini precisa de uma transferência única de cerca de %@. Depois disso, o reconhecimento de palavras e a distinção de vozes acontecem neste dispositivo, mesmo sem ligação. O áudio fica aqui."
+          }
+        }
+      }
+    },
     "Cassini needs a one-time download. After that, recognising words and telling voices apart happen on this device, even offline. Your audio stays here.": {
       "comment": "Model download screen body",
       "localizations": {

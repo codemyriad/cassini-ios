@@ -168,9 +168,10 @@ public final class SortformerStream: StreamingDiarizer, @unchecked Sendable {
         let strings = [config.model.path, config.provider, ""].map { strdup($0)! }
         defer { strings.forEach { free($0) } }
         var native = SherpaOnnxOfflineSpeakerDiarizationConfig()
-        native.segmentation.sortformer.model = UnsafePointer(strings[0])
-        native.segmentation.sortformer.threshold = config.threshold
-        native.segmentation.pyannote.model = UnsafePointer(strings[2])
+        // The D16 fork's C API has no Sortformer field: a model whose metadata says nemotron3_diarization goes in the
+        // pyannote slot, and the native side uses its default threshold of 0.5 (`Diarization.threshold`).
+        precondition(config.threshold == 0.5, "the D16 C API cannot set the Sortformer threshold")
+        native.segmentation.pyannote.model = UnsafePointer(strings[0])
         native.segmentation.num_threads = config.threads
         native.segmentation.provider = UnsafePointer(strings[1])
         native.embedding.model = UnsafePointer(strings[2])

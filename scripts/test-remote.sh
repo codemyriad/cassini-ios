@@ -6,7 +6,8 @@
 # the iOS simulators (iPhone 17, iPad Pro 13-inch (M5)); the script checks the Xcode version before it copies anything.
 # The tree is synced to ~/dev/cassini-ios there, with ../cassini-format beside it so the conformance vectors cannot be
 # skipped (CASSINI_CONFORMANCE_REQUIRED=1). Builds and caches stay on the remote Mac between runs (DerivedData.noindex,
-# .build and .test-cache under ~/dev/cassini-ios).
+# .build and .test-cache under ~/dev/cassini-ios). The gitignored .tools (local runtime builds, models, benchmarks) is
+# not copied: the tiers link the released runtime, which the remote Mac downloads once when it resolves the packages.
 set -eu
 here="$(cd "$(dirname "$0")/.." && pwd)"
 if [ -z "${CASSINI_MAC:-}" ]; then
@@ -22,7 +23,7 @@ if [ "${version:-0}" -lt 26 ]; then
 fi
 
 ssh "$host" 'mkdir -p ~/dev'
-rsync -az --delete --exclude .build --exclude .git --exclude DerivedData --exclude DerivedData.noindex --exclude .test-cache --exclude '*.xcodeproj' \
+rsync -az --delete --exclude .build --exclude .git --exclude DerivedData --exclude DerivedData.noindex --exclude .test-cache --exclude .tools --exclude '*.xcodeproj' \
     "$here/" "$host:dev/cassini-ios/"
 format="$here/../cassini-format"
 # A worktree sits deeper than the checkout that cassini-format is beside.

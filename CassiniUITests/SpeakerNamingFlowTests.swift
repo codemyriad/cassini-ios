@@ -99,8 +99,11 @@ final class SpeakerNamingFlowTests: XCTestCase {
         XCTAssertTrue(again.waitForExistence(within: 5))
         again.tap()
         XCTAssertTrue(app.staticTexts["Transcribe on this device"].waitForExistence(within: 10))
-        XCTAssertTrue(app.staticTexts["Telling speakers apart"].exists)
-        XCTAssertFalse(app.staticTexts["Speech recognition"].exists, "Identify speakers needs no speech model")
+        // The part reads with its download ("Telling speakers apart, 88 MB").
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Telling speakers apart"))
+            .firstMatch.exists)
+        XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Speech recognition"))
+            .firstMatch.exists, "Identify speakers needs no speech model")
         XCTAssertTrue(app.buttons["Download and identify speakers"].exists)
         app.buttons["Not now — keep the audio"].tap()
         XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 5))

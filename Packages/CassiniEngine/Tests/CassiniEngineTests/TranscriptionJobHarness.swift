@@ -163,7 +163,7 @@ extension TranscriptionJobTests {
 
         func assetStatus(locale: Locale) async -> ModelPartStatus { status }
 
-        func installAssets(locale: Locale, progress: @escaping @Sendable (Double) -> Void) async throws { progress(1) }
+        func installAssets(locale: Locale, progress: @escaping @Sendable (InstallProgress) -> Void) async throws { progress(.downloading(1)) }
 
         func speechLanguages() async -> [SpeechLanguage] { [] }
     }
@@ -245,7 +245,6 @@ extension TranscriptionJobTests {
         func modelStatus() async -> ModelPartStatus { .notDownloaded }
         func refreshModelStatus() async -> ModelPartStatus { .notDownloaded }
         func installModels(progress: @escaping @Sendable (InstallProgress) -> Void) async throws { throw failure }
-        func cancelModelInstall() async {}
         var modelInstallBytes: Int64 { 0 }
     }
 
@@ -258,7 +257,6 @@ extension TranscriptionJobTests {
         func modelStatus() async -> ModelPartStatus { .ready }
         func refreshModelStatus() async -> ModelPartStatus { .ready }
         func installModels(progress: @escaping @Sendable (InstallProgress) -> Void) async throws {}
-        func cancelModelInstall() async {}
         var modelInstallBytes: Int64 { 0 }
     }
 }

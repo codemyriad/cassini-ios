@@ -69,7 +69,7 @@ import CassiniNotebook
         processing.modelDownload = ModelDownloadAdapter(
             settings: settings, processing: processing, transcriber: environment.transcriber,
             analyzer: environment.analyzer, storage: environment.storage, notices: noticeCenter,
-            root: environment.root)
+            root: environment.root, models: environment.models)
         settingsPorts = SettingsAdapter(settings: settings, library: library, voices: voices, processing: processing,
                                         notices: noticeCenter, transcriber: environment.transcriber)
         notices = NoticesStore(center: noticeCenter, router: router, processing: processing, recording: recording)
@@ -118,7 +118,9 @@ import CassiniNotebook
             return TranscriptionCoordinator(parts, settings: settings)
         }
         let models = ModelInstalls(transcriber: environment.transcriber, analyzer: environment.analyzer,
-                                   clock: environment.clock, job: progress) { [settings] in settings.speechLanguage }
+                                   clock: environment.clock, job: progress, background: environment.background,
+                                   backgroundTitle: { String(localized: "Downloading models", table: "Processing") },
+                                   language: { [settings] in settings.speechLanguage })
         return ProcessingStore(coordinator: coordinator, progress: progress, checkpoints: checkpoints, models: models,
                                analyzer: environment.analyzer, notices: notices, drafts: drafts)
     }

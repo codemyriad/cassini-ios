@@ -6,7 +6,7 @@ import CassiniNotebook
 import CassiniSherpa
 
 /// The WP0 spike: a real Parakeet Ultra decode through the sherpa-onnx C API, with memory and speed. Opt-in and
-/// skipped unless the build links the runtime (CASSINI_SHERPA_LOCAL=1) and the environment names the models;
+/// skipped unless the build links the runtime (every iOS build does) and the environment names the models;
 /// scripts/sherpa-bench.sh runs it on a simulator. Simulator figures are not device measurements: the simulator
 /// has no jetsam limit and runs on the Mac's cores.
 ///
@@ -27,7 +27,9 @@ final class SherpaBenchTests: XCTestCase {
 
     func testParakeetUltraDecodesOnTheSimulator() throws {
         let environment = ProcessInfo.processInfo.environment
-        try XCTSkipUnless(SherpaRuntime.isLinked, "built without CASSINI_SHERPA_LOCAL")
+        try XCTSkipUnless(SherpaRuntime.isLinked, "built without the native runtime")
+        // Opt-in: every iOS build links the runtime, so the environment decides (scripts/sherpa-bench.sh sets it).
+        try XCTSkipUnless(environment["CASSINI_PARAKEET_MODELS"] != nil, "opt-in: scripts/sherpa-bench.sh sets CASSINI_PARAKEET_MODELS")
         let source = try XCTUnwrap(environment["CASSINI_PARAKEET_MODELS"].map { URL(fileURLWithPath: $0) },
                                    "set CASSINI_PARAKEET_MODELS")
         let audio = try XCTUnwrap(environment["CASSINI_PARAKEET_AUDIO"].map { URL(fileURLWithPath: $0) })
@@ -48,6 +50,7 @@ final class SherpaBenchTests: XCTestCase {
         report["loadSeconds"] = Date().timeIntervalSince(loadStart)
         let urlLine = log.split(separator: "\n").first { $0.contains("url=") || $0.contains("url:") || $0.contains("\turl") }
         report["encoderUrlLine"] = urlLine.map(String.init) ?? ""
+        // The dist export (D16 §2) keeps that url in its encoder metadata; the fork's 0c2ee3f selects TDT by it.
         XCTAssertTrue(log.contains("https://huggingface.co/moondream/parakeet-ultra"), "encoder metadata: \(log.suffix(2000))")
         let loaded = MemorySample.now()
         report["loadedFootprintMiB"] = mib(loaded.footprintBytes)

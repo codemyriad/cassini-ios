@@ -31,7 +31,8 @@
 			</array>
 		</dict>
 		<!-- Sizes and dates of files in the app container: checkpoint and playback signatures, the sweep of stale
-		     temporary files, recovered recordings, the document info size, and the model files' sizes. -->
+		     temporary files, recovered recordings, the document info size, and the model files' sizes. The linked
+		     sherpa-onnx and ONNX Runtime call stat and fstat on the model files in Application Support only. -->
 		<dict>
 			<key>NSPrivacyAccessedAPIType</key>
 			<string>NSPrivacyAccessedAPICategoryFileTimestamp</string>

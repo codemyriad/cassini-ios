@@ -150,7 +150,7 @@ private struct NoSpaceTranscriber: Transcribing {
         throw TranscriptionError.failed(.download(.notEnoughStorage))
     }
     func assetStatus(locale: Locale) async -> ModelPartStatus { .notDownloaded }
-    func installAssets(locale: Locale, progress: @escaping @Sendable (Double) -> Void) async throws {
+    func installAssets(locale: Locale, progress: @escaping @Sendable (InstallProgress) -> Void) async throws {
         throw TranscriptionError.failed(.download(.notEnoughStorage))
     }
     func speechLanguages() async -> [SpeechLanguage] { [] }
@@ -164,8 +164,8 @@ private struct HangingDownloads: Transcribing {
         while true { try await Task.sleep(for: .seconds(3600)) }
     }
     func assetStatus(locale: Locale) async -> ModelPartStatus { .notDownloaded }
-    func installAssets(locale: Locale, progress: @escaping @Sendable (Double) -> Void) async throws {
-        progress(0.2)
+    func installAssets(locale: Locale, progress: @escaping @Sendable (InstallProgress) -> Void) async throws {
+        progress(.downloading(0.2))
         while true { try await Task.sleep(for: .seconds(3600)) }
     }
     func speechLanguages() async -> [SpeechLanguage] { [] }

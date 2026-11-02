@@ -22,8 +22,19 @@ public struct FakeTranscriber: Transcribing {
     public let script: Script
     private static let resultInterval = Duration.milliseconds(1_200)
     public let status: ModelPartStatus
+    /// Apple Speech, or Parakeet as on a device that can hold Ultra: the model download screen and the Settings row
+    /// then show Ultra's sizes.
+    public let recognizer: SpeechRecognizer
 
-    public init(_ script: Script, status: ModelPartStatus = .ready) { self.script = script; self.status = status }
+    public init(_ script: Script, status: ModelPartStatus = .ready, recognizer: SpeechRecognizer = .appleSpeech) {
+        self.script = script; self.status = status; self.recognizer = recognizer
+    }
+
+    /// Parakeet's figure for a fresh install of Ultra and its detector, or the estimate for Apple's assets.
+    public var assetInstallBytes: Int64 {
+        recognizer == .parakeet ? ModelPlan([ModelPlan.Item(.speech, ModelPart.speech.models)]).requiredFreeBytes
+            : ModelDownloadPlan.speechInstallBytes
+    }
 
     public func modelName(locale: Locale) async -> String? { "Fake SpeechTranscriber \(locale.identifier(.bcp47))" }
 
@@ -73,8 +84,8 @@ public struct FakeTranscriber: Transcribing {
     public func assetStatus(locale: Locale) async -> ModelPartStatus { status }
 
     /// Reports the download as done at once; nothing is installed, so `assetStatus` stays as it was.
-    public func installAssets(locale: Locale, progress: @escaping @Sendable (Double) -> Void) async throws {
-        progress(1)
+    public func installAssets(locale: Locale, progress: @escaping @Sendable (InstallProgress) -> Void) async throws {
+        progress(.downloading(1))
     }
 }
 #endif

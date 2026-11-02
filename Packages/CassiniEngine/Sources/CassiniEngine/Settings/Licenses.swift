@@ -28,7 +28,8 @@ public let sourceCodeURL = URL(string: "https://github.com/codemyriad/cassini-io
 /// The text of each row, from the app's bundled files:
 ///
 /// - Cassini: the GPLv3 text (`Cassini-GPL-3.0.txt`, a copy of the repository's `LICENSE`).
-/// - Third-party notices: `ThirdPartyNotices.txt` without its model notices.
+/// - Third-party notices: `ThirdPartyNotices.txt` without its model notices, then ONNX Runtime's own third-party
+///   notices (`ONNXRuntime-ThirdPartyNotices.txt`, upstream's file for the release the runtime links).
 /// - Model notices: the notices' sections about the models, then the model host's `NOTICE.txt` as an installed model
 ///   keeps it (D4: the notices come with the downloaded models; before the first download there is none).
 /// - Where the models come from: the Network section of `Privacy.txt`, then the URL of the manifest, of the notices
@@ -39,6 +40,7 @@ public let sourceCodeURL = URL(string: "https://github.com/codemyriad/cassini-io
 public struct LicenseTexts: Sendable {
     public static let gpl = "Cassini-GPL-3.0.txt"
     public static let notices = "ThirdPartyNotices.txt"
+    public static let onnxRuntimeNotices = "ONNXRuntime-ThirdPartyNotices.txt"
     public static let privacy = "Privacy.txt"
     /// The titles of the notices' sections about models.
     public static let modelSections = ["Speech recognition models", "Downloaded models"]
@@ -61,7 +63,9 @@ public struct LicenseTexts: Sendable {
     public func text(_ entry: LicenseEntry) throws -> String {
         switch entry {
         case .cassini: try read(Self.gpl)
-        case .thirdParty: Self.join(try noticeSections().filter { !Self.modelSections.contains($0.title) }.map(\.text))
+        case .thirdParty:
+            Self.join(try noticeSections().filter { !Self.modelSections.contains($0.title) }.map(\.text)
+                      + ["ONNX Runtime third-party notices", try read(Self.onnxRuntimeNotices)])
         case .models:
             Self.join(try noticeSections().filter { Self.modelSections.contains($0.title) }.map(\.text) + [notice() ?? ""])
         case .modelSources:

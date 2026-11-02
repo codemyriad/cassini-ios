@@ -145,12 +145,14 @@ import CassiniEngineTesting
         var calls: [Set<ModelPart>] = []
         var outcome: InstallOutcome = .installed()
         var onInstall: @Sendable () throws -> Void = {}
+        /// What the install reports before it ends.
+        var reports = [DownloadProgress(part: .speech, doneBytes: 1, totalBytes: 2, verifying: false)]
         var list: [Set<ModelPart>] { lock.withLock { calls } }
 
         var install: ParakeetTranscriber.Models.Install {
             { [self] parts, progress in
                 lock.withLock { calls.append(parts) }
-                progress(DownloadProgress(part: .speech, doneBytes: 1, totalBytes: 2, verifying: false))
+                for report in lock.withLock({ reports }) { progress(report) }
                 try lock.withLock { onInstall }()
                 return lock.withLock { outcome }
             }
@@ -339,8 +341,8 @@ import CassiniEngineTesting
     }
 
     /// A Parakeet file that fails its check: the revision is removed and the run fails with VERIFY ("Model
-    /// verification failed. Please download it again."). This build does not download Ultra itself (PR D wires it),
-    /// so the next run of this process fails with MODEL, and the next launch picks Apple Speech.
+    /// verification failed. Please download it again."). Without an installer the next run fails with MODEL, or asks
+    /// for consent; `aModelThatFailedItsCheckIsDownloadedAgainByTheNextRun` has the app's case.
     @Test func aFileThatFailsItsCheckFailsTheRunWithVerifyAndRemovesTheModel() async throws {
         defer { try? FileManager.default.removeItem(at: folder) }
         try install(ModelCatalog.parakeet)
@@ -366,8 +368,62 @@ import CassiniEngineTesting
         #expect(await parakeet.assetStatus(locale: Locale(identifier: "it-IT")) == .notDownloaded)
         await #expect(throws: TranscriptionError.failed(.model)) { try await run(parakeet, url) }
         await #expect(throws: TranscriptionError.needsConsent) { try await run(parakeet, url, allowDownload: false) }
-        #expect(SpeechCapability.choose(linked: true, installed: ModelCatalog.parakeet.ready(in: root), capable: true)
-                == .appleSpeech)
+        #expect(SpeechCapability.choose(linked: true, capable: true) == .parakeet, "the device keeps Parakeet")
+    }
+
+    /// After a failed check the next run downloads Ultra again through the shared installer, as for a model that was
+    /// never installed, and the files it installed count as checked.
+    @Test func aModelThatFailedItsCheckIsDownloadedAgainByTheNextRun() async throws {
+        defer { try? FileManager.default.removeItem(at: folder) }
+        try install(ModelCatalog.parakeet)
+        let url = try audio(seconds: 3)
+        let native = Native()
+        let hashed = Mutex(0)
+        let verifier = ModelVerifier { file, _, _ in
+            hashed.withLock { $0 += 1 }
+            return file.lastPathComponent == "encoder.int8.onnx" ? "not the pin" : Self.pins[file.lastPathComponent] ?? ""
+        }
+        let installs = Installs()
+        let parakeet = transcriber(native, installs: installs, verifier: verifier)
+        await #expect(throws: TranscriptionError.failed(.modelVerify)) { try await run(parakeet, url) }
+        #expect(!ModelCatalog.parakeet.ready(in: root))
+        #expect(installs.list.isEmpty, "the failed run downloads nothing")
+        let checks = hashed.withLock { $0 }
+
+        let model = ModelCatalog.parakeet, root = root
+        installs.onInstall = { [self] in
+            try install(model)
+            verifier.markVerified(model, in: root)
+        }
+        let (result, events) = try await run(parakeet, url)
+        #expect(installs.list == [[.speech]])
+        #expect(events.preparing >= 2, "the download shows as Preparing")
+        #expect(words(result) == ["w0", "w1", "w2"])
+        #expect(native.counts.loads == 1)
+        #expect(hashed.withLock { $0 } == checks, "an install counts as this session's check")
+    }
+
+    /// The standalone download (Settings, the model download screen): the fraction of the download, then Checking
+    /// files, through the shared installer. The space it asks for is the speech part's `ModelPlan` figure.
+    @Test func theStandaloneDownloadReportsTheDownloadThenCheckingFiles() async throws {
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let installs = Installs()
+        installs.reports = [DownloadProgress(part: .speech, doneBytes: 1, totalBytes: 4, verifying: false),
+                            DownloadProgress(part: .speech, doneBytes: 4, totalBytes: 4, verifying: true)]
+        let model = ModelCatalog.parakeet
+        installs.onInstall = { [self] in try install(model) }
+        let parakeet = transcriber(Native(), online: true, installs: installs)
+        let fresh = ModelPlan([ModelPlan.Item(.speech, [ModelCatalog.parakeet, ModelCatalog.vad])]).requiredFreeBytes
+        #expect(parakeet.assetInstallBytes == fresh)
+        let reports = Mutex<[InstallProgress]>([])
+        try await parakeet.installAssets(locale: Locale(identifier: "it-IT")) { report in reports.withLock { $0.append(report) } }
+        #expect(reports.withLock { $0 } == [.downloading(0.25), .checking])
+        #expect(installs.list == [[.speech]])
+        #expect(await parakeet.assetStatus(locale: Locale(identifier: "it-IT")) == .ready)
+        #expect(parakeet.assetInstallBytes == fresh, "an installed Ultra asks for a fresh install's figure")
+
+        try await parakeet.installAssets(locale: Locale(identifier: "it-IT")) { _ in }
+        #expect(installs.list.count == 1, "nothing to install")
     }
 
     @Test func aDetectorThatFailsItsCheckIsRemovedAndTheRunGoesOn() async throws {

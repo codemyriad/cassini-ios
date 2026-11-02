@@ -38,7 +38,7 @@ build for the UI-test launches, and is empty in Release, where every source is c
 `ModelDownloadModel`, `LicensesModel`), navigation (`Route`, `ScreenStack`, `DeepLinks`) and `Startup`. |
 | `CassiniEngineTesting` | Fakes of every port (`FakeTranscriber`, `FakeAnalyzer`, `FakeCapture`, `FakeClock`, …). Each source is under `#if DEBUG`, so a Release build links an empty module. |
 | `CassiniInference` | The adapters to the recognition engines: `ParakeetTranscriber` (Parakeet Ultra over the `SpeechDecoding`/`SpeechDetecting` ports, on its own inference thread), `AppleSpeechTranscriber` (`SpeechAnalyzer`, the fallback on devices that cannot hold Ultra) and `SpeakerAnalyzer` (Android's streaming Sortformer and CAM++ over the native runtime, from the pinned catalog through `PinnedModelInstaller`), with `ZstdDecompressor` for the diarizer's seekable Zstandard download. |
-| `CassiniSherpa` | The only importer of the sherpa-onnx C API (`SherpaOnnxC`, iOS only, linked with `CASSINI_SHERPA_LOCAL=1`): `ParakeetDecoder` and `SileroDetector`, which conform to CassiniEngine's ports, and `SherpaRuntime.speech`, the factory the app passes to `ParakeetTranscriber`. Without the runtime its objects throw `notLinked`. |
+| `CassiniSherpa` | The only importer of the sherpa-onnx C API (`SherpaOnnxC`, iOS only: the release `v1.13.7-cassini-mobile.1`, or the local build with `CASSINI_SHERPA_LOCAL=1`): `ParakeetDecoder` and `SileroDetector`, which conform to CassiniEngine's ports, and `SherpaRuntime.speech`, the factory the app passes to `ParakeetTranscriber`. Without the runtime its objects throw `notLinked`. |
 | `CassiniAudio` | Audio work that needs AVFoundation or libopus: inspection, CAF repair and Opus encode and decode (through `COpusBridge`). |
 | `Cassini` (app) | `AppEnvironment`, `AppGraph` (which binds each screen model's `Ports` to the stores, e.g. `NoteScreens`), the `Router`, the adapters (`AVCaptureAdapter`, `AVPlaybackAdapter`, `ActivityKitAdapter`, `UNNotifier`, `UIKitBackgroundRunner`, …), the thin app stores (`ProcessingStore`, `RecordingStore`, `PlaybackStore`, `ImportStore`, `ExportStore`, `NoticesStore`), the views and the string catalogs. |
 
@@ -61,8 +61,10 @@ build for the UI-test launches, and is empty in Release, where every source is c
   Restore to `TrashService`, Record and Import to the recorder and the importer, and Saved voices' rename and forget to
   `VoicesStore` after its `SavedVoicesScreen` reducer. No view changes a note or a file itself.
 - **Composition.** `AppEnvironment` lists everything the app is built from: the root folder, the preferences, the
-  clock, the locale and every adapter. `AppEnvironment.live()` is the device. `uiTesting(arguments:)` (Debug only)
-  gives a separate library, a clock fixed at Thursday 8 October 2026 09:41 UTC, en_US formatting and fakes.
+  clock, the locale and every adapter. `AppEnvironment.live()` is the device: it builds one `PinnedModels` (the model
+  repository and `PinnedModelInstaller`) that `ParakeetTranscriber` and `SpeakerAnalyzer` share, so one install runs
+  at a time. `uiTesting(arguments:)` (Debug only) gives a separate library, a clock fixed at Thursday 8 October 2026
+  09:41 UTC, en_US formatting and fakes (`--parakeet` makes the fake transcriber stand for Ultra).
   `AppGraph` builds the stores from an environment and puts them into the SwiftUI environment. The hosted tests build
   the same graph over a temporary folder (`CassiniTests/TestGraph.swift`).
 

@@ -6,7 +6,7 @@ import SherpaOnnxC
 #endif
 
 public enum SherpaError: Error, Equatable {
-    /// This build does not link the native runtime (CASSINI_SHERPA_LOCAL was not set, or not an iOS build).
+    /// This build does not link the native runtime: not an iOS build, such as `swift test` on macOS.
     case notLinked
     /// A model file is missing; the native loader would end the process.
     case missingFiles

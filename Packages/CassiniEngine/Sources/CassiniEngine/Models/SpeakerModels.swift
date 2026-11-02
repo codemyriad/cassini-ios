@@ -85,9 +85,6 @@ public struct SpeakerModels: Sendable {
         }
     }
 
-    /// Cancels the install that runs; its `.part` files stay.
-    public func cancel() { installer.cancel() }
-
     private func fraction(of progress: DownloadProgress) -> Double? { Self.fraction(of: progress, plan: plan) }
 
     /// The share of the whole speaker download that `progress` (of one part) stands for.

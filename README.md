@@ -37,8 +37,9 @@ On iPad the Library stays beside the note, in landscape and in portrait:
 
 Speech recognition and speaker analysis run on the device. Cassini does not upload audio, transcripts or
 voiceprints. It has no accounts, no analytics and no advertising. The network is used only to download models, and
-only after you agree: Apple's speech model for your language, and every other model only from Cassini's model host,
-`dist.gocassini.com`, through its manifest (D4, D53.1). Voiceprints
+only after you agree: Parakeet Ultra and every other model only from Cassini's model host, `dist.gocassini.com`,
+through its manifest (D4, D53.1), and, on a device that keeps Apple Speech, Apple's speech model for your language.
+Voiceprints
 stay in the app's private storage, are excluded from backups, and are never written into a document or an export.
 System backups may include recordings and transcripts.
 
@@ -70,8 +71,9 @@ records their exact revisions.
 - **Import** any audio format that iOS reads, plus Ogg Opus and Cassini `.opus` documents, from Files (several files
   at once) or with "Open in Cassini" from another app. A file that is already in the library is not added twice. A
   Cassini document's verified transcripts are imported with it.
-- **Transcribe on the device** with Apple's `SpeechAnalyzer`, after a one-time model download for the speech language
-  you choose. The queue is durable: jobs run one at a time and survive a relaunch. Progress is saved every 30 seconds
+- **Transcribe on the device** with Parakeet Ultra, after a one-time download of about 531 MB (Ultra, its speech
+  detector and the speaker models, from Cassini's model host), or, on devices without the memory for Ultra, with
+  Apple's `SpeechAnalyzer` after a model download for the speech language you choose. The queue is durable: jobs run one at a time and survive a relaunch. Progress is saved every 30 seconds
   of audio, so "Stop and keep progress", iOS taking the background time back, or a crash all resume from the last
   checkpoint. The progress card shows the stages, the percent, the time left, a battery projection and the draft so
   far. Transcription continues in the background with a system progress indicator, and a notification says when a
@@ -123,8 +125,8 @@ TestFlight still need.
   kept, and resumes when you continue.
 - Opus playback supports standard mono and stereo files (channel mapping 0). For other files the transcript stays
   readable and the original is kept, with an explanation in place of the player.
-- Apple manages its speech models. iOS does not report their size before the download, so the download screen and
-  Settings use an estimate.
+- On a device that keeps Apple Speech, Apple manages its speech models. iOS does not report their size before the
+  download, so the download screen and Settings use an estimate there.
 - The build carries what App Store Connect asks for: privacy manifests for the app and the Live Activity extension,
   `ITSAppUsesNonExemptEncryption` set to false, and the increased-memory-limit entitlement. The App Privacy answers
   are "Data Not Collected" with no tracking. A public privacy policy URL is still needed before a submission.
@@ -135,16 +137,16 @@ TestFlight still need.
 
 [docs/differences.md](docs/differences.md) describes each difference in detail. In summary:
 
-- **Engines and thresholds.** iOS uses Apple's `SpeechTranscriber` for words, where Android uses Parakeet. Speakers
+- **Engines and thresholds.** iOS uses Parakeet Ultra for words, as Android does, on devices with the memory for it
+  (at least 5 GiB, a provisional rule until a device is measured), and Apple's `SpeechTranscriber` on the others.
+  Speakers
   use Android's streaming Sortformer and CAM++ with Android's thresholds (0.72 automatic, 0.50 suggest, 0.08 margin,
   4 s of speech), so the voiceprints are Android's; voices saved by earlier iOS builds are named again. iOS keeps
-  automatic naming off by default. The speech language is chosen in Settings, because Apple's models are per
-  language. The move to Parakeet Ultra has begun: the pinned model catalog, plan, redirect
-  policy, fetcher and installer are ported with Android's tests, behind an `HTTPTransport` port over a data-task
-  `URLSession` that never follows a redirect itself, but the app does not use them yet. The Parakeet transcriber and
-  the job are in place (`ParakeetTranscriber`, checkpoint version 2): a build with the native runtime transcribes with
-  Ultra when its model is installed and the device has the memory (a provisional rule until a device is measured), and
-  falls back to Apple Speech otherwise. Devices that cannot hold Ultra keep Apple Speech.
+  automatic naming off by default. On Apple Speech devices the speech language is chosen in Settings, because
+  Apple's models are per language. The pinned model catalog, plan, redirect policy, fetcher and installer are ported
+  with Android's tests, behind an `HTTPTransport` port over a data-task `URLSession` that never follows a redirect
+  itself, and one shared installer downloads Ultra, its speech detector and the speaker models with consent. Sizes
+  follow the shared rule of the format vectors ("443 MB"), where Android still rounds to tens.
 - **Storage model.** A note is a `note.json` beside its audio. The portable Cassini document is sealed only at export,
   with the run's provenance under Android's keys. Each variant carries the language of the run that made its words
   (D53.2): `und` for Parakeet, as Android writes, the locale that ran for Apple Speech, never the Settings language.
@@ -197,29 +199,33 @@ subset. `scripts/render-icon.swift` draws the app icon (`swift scripts/render-ic
 
 UI-test launches (`--ui-testing`, Debug builds only) use a library and preferences of their own, a clock fixed at
 Thursday 8 October 2026 09:41 UTC, en_US formatting, and fake transcription and speaker analysis. Named seeds fill the
-library: `--seed library|search|reading|speakers|voices|trash|processing|recording|statuses|long`. A normal launch
-starts empty, and Release builds link no fakes.
+library: `--seed library|search|reading|speakers|voices|trash|processing|recording|statuses|long`. `--parakeet` makes
+the fake transcriber stand for Parakeet Ultra, so the model download screen and Settings show its sizes. A normal
+launch starts empty, and Release builds link no fakes.
 
-### Native speech runtime (in progress)
+### Native speech runtime
 
-The move to Parakeet Ultra builds sherpa-onnx for iOS from the same fork and commit as Android (codemyriad/sherpa-onnx
-`dbbeef9c`, which carries the NeMo frontend of upstream #4024) against ONNX Runtime 1.27.1, with the C API and without
-TTS. Like Android it has speaker diarization on and applies Android's `scripts/streaming-diarization.patch`, so the
-streaming Sortformer diarizer and the CAM++ speaker-embedding extractor are in the build;
-`scripts/streaming-diarization-c-api.patch` (iOS only) puts the streaming calls into the C API, because Android's
-patch adds them only to JNI. It is not yet a release asset, so a normal build links no native code and the app uses
-Apple's recognizer. Android's pure decode rules (windows, quiet cuts, seam merge, word gate, speech feed, incremental
-28 s windows) are ported with their tests to CassiniNotebook/Transcription, and `ParakeetTranscriber`
-(CassiniInference) drives them over CassiniSherpa's `ParakeetDecoder` and `SileroDetector`. A build with
-`CASSINI_SHERPA_LOCAL=1` uses Ultra when its model is in Application Support/CassiniModels and the device passes
-`SpeechCapability`; Apple's recognizer stays as the fallback for devices that cannot hold Ultra (`AppleSpeechWindows`).
-Speakers run on the same runtime: `CassiniSherpa` wraps Android's streaming Sortformer diarizer (`SortformerStream`,
-with save and restore of its state) and CAM++ extractor (`VoiceprintExtractor`); the streaming rules (`TurnHistory`,
-`SpeakerBudget`, `Diarization`, the voice-clip cache, `DraftNames` and draft stats) are in CassiniNotebook, and the
-job (`WindowSpeakers`, `LiveMatching`, `DraftNamesStore`) in CassiniEngine. Without the native runtime there is no
-speaker step. The speech detector hears the recording through WebRTC's 100 Hz high-pass (`SpeechInputFilter`,
-decision D26.1), so a microphone's DC offset does not change what it finds; the recognizer and the speakers get the
-samples raw ([differences](docs/differences.md#speech-recognition)).
+Every iOS build links sherpa-onnx from the same fork and commit as Android, codemyriad/sherpa-onnx `0c2ee3f` (D16 §1:
+the NeMo frontend, Ultra's TDT selection by its plain URL, Nemotron-3 diarization), against ONNX Runtime 1.27.1, with
+the C API and without TTS. Like Android it has speaker diarization on and applies Android's
+`scripts/streaming-diarization.patch`, so the streaming Sortformer diarizer and the CAM++ speaker-embedding extractor
+are in the build; `scripts/streaming-diarization-c-api.patch` (iOS only) puts the streaming calls into the C API,
+because Android's patch adds them only to JNI. The build is published as the release
+[`v1.13.7-cassini-mobile.1`](https://github.com/codemyriad/sherpa-onnx/releases/tag/v1.13.7-cassini-mobile.1)
+(`sherpa-onnx-1.13.7-0c2ee3f-ios-no-tts.xcframework.zip`, and a mirror of csukuangfj's ONNX Runtime 1.27.1 static
+xcframework), which `Package.swift` links as two binary targets by URL and checksum. Android's pure decode rules
+(windows, quiet cuts, seam merge, word gate, speech feed, incremental 28 s windows) are ported with their tests to
+CassiniNotebook/Transcription, and `ParakeetTranscriber` (CassiniInference) drives them over CassiniSherpa's
+`ParakeetDecoder` and `SileroDetector`. The app uses Ultra when the device passes `SpeechCapability`, installed or not:
+a job, or the model download screen's Download, fetches Ultra and its speech detector with consent through the installer
+the speaker models share (`PinnedModels`). Apple's recognizer stays as the fallback for devices that cannot hold Ultra
+(`AppleSpeechWindows`). Speakers run on the same runtime: `CassiniSherpa` wraps Android's streaming Sortformer diarizer
+(`SortformerStream`, with save and restore of its state) and CAM++ extractor (`VoiceprintExtractor`); the streaming
+rules (`TurnHistory`, `SpeakerBudget`, `Diarization`, the voice-clip cache, `DraftNames` and draft stats) are in
+CassiniNotebook, and the job (`WindowSpeakers`, `LiveMatching`, `DraftNamesStore`) in CassiniEngine. Without the native
+runtime there is no speaker step. The speech detector hears the recording through WebRTC's 100 Hz high-pass
+(`SpeechInputFilter`, decision D26.1), so a microphone's DC offset does not change what it finds; the recognizer and the
+speakers get the samples raw ([differences](docs/differences.md#speech-recognition)).
 
 ```sh
 scripts/build-sherpa-xcframework.sh   # pinned sources -> .tools/sherpa/SherpaOnnxC.xcframework and a reproducible zip
@@ -244,27 +250,29 @@ from zero whatever its tag, and a `206` without that tag or a `416` deletes the 
 decompression; the files and the host's `NOTICE.txt` are collected in
 `CassiniModels/models/<id>/.<source_sha256>.staging/` and renamed into `CassiniModels/models/<id>/<source_sha256>/`.
 About › Model notices shows that `NOTICE.txt` from an installed revision. Before the first load in each session every
-installed file is hashed again (`ModelVerifier`, D16 §4); a file that differs retires the revision. The in-app
-download of Ultra is wired with the runtime release (PR D); until then a failed check of Ultra fails the job with
-"Model verification failed" and the next launch uses Apple Speech. Provenance names Ultra
+installed file is hashed again (`ModelVerifier`, D16 §4); a file that differs retires the revision, the job fails
+with "Model verification failed", and the next job downloads it again. Provenance names Ultra
 `parakeet-ultra-0.6b-int8@<source_sha256>` (D16 §5). These pins need the codemyriad sherpa-onnx fork at `0c2ee3f`
-(D16 §1): a local build with the older runtime cannot load the v2 diarizer or the dist Ultra export.
+(D16 §1): an older runtime cannot load the v2 diarizer or the dist Ultra export.
 
-`CASSINI_SHERPA_LOCAL=1` makes `Package.swift` link the two xcframeworks in the gitignored `.tools/sherpa` into
-`CassiniSherpa`, the only module that imports `SherpaOnnxC`. The binaries are iOS-only (`.when(platforms: [.iOS])`),
-so `swift test` on macOS links and downloads neither. Unlike Android's two ABIs, iOS builds only the device
-(`ios-arm64`) and the Apple-silicon simulator (`ios-arm64-simulator`) slices, so a build with the local runtime is
-arm64-only. `CassiniTests/SherpaBenchTests`, `CassiniTests/ParakeetJobTests` and `CassiniTests/SpeakerSmokeTests`
-skip themselves unless that build runs with the models named in their environment. `ParakeetJobTests` compares a real
-job's words with `CassiniTests/Goldens/fleurs-it-short.ios.json`, recorded on the arm64 simulator: iOS keeps goldens of
-its own because ONNX Runtime's int8 kernels differ from those of Android's x86_64 emulator.
-`scripts/fetch-speaker-fixture.py` mixes the speaker smoke test's two-speaker clip from public FLEURS audio (Android
-has no public meeting recording) into the gitignored `.tools/fixtures`.
+`Package.swift` links the release's two xcframeworks into `CassiniSherpa`, the only module that imports `SherpaOnnxC`;
+`CASSINI_SHERPA_LOCAL=1` links the ones `scripts/build-sherpa-xcframework.sh` writes to the gitignored `.tools/sherpa`
+instead (the same bytes; `scripts/verify-native-runtime.sh` checks both against the lock). The binaries are iOS-only
+(`.when(platforms: [.iOS])`), so `swift test` on macOS links no native code, but SwiftPM still downloads the two release
+zips once when it resolves the package (about 41 MB, then cached in `.build` and SwiftPM's cache), and so does Xcode for
+`scripts/test.sh` and `scripts/test-remote.sh`: the first run needs the network. Unlike Android's two ABIs, iOS builds
+only the device (`ios-arm64`) and the Apple-silicon simulator (`ios-arm64-simulator`) slices, so every build is
+arm64-only. `CassiniTests/SherpaBenchTests`, `CassiniTests/ParakeetJobTests`, `CassiniTests/SpeakerJobTests`,
+`CassiniTests/SpeakerSmokeTests` and `CassiniTests/DCVectorTests` skip themselves unless the environment names their
+models, as `scripts/sherpa-bench.sh` and `scripts/speaker-smoke.sh` do. `ParakeetJobTests` compares a real job's words
+with `CassiniTests/Goldens/fleurs-it-short.ios.json`, recorded on the arm64 simulator with the dist export: iOS keeps
+goldens of its own because ONNX Runtime's int8 kernels differ from those of Android's x86_64 emulator.
+`scripts/fetch-speaker-fixture.py` mixes the speaker smoke test's two-speaker clip from public FLEURS audio (Android has
+no public meeting recording) into the gitignored `.tools/fixtures`.
 
-The locked build (`sherpa-onnx-ios` `1.13.7-dbbeef9c-ios.2`) predates the move to `io.codemyriad` and still names its
-framework `app.codemyriad.sherpa-onnx`; `scripts/build-sherpa-xcframework.sh` now writes `io.codemyriad.sherpa-onnx`.
-The next native rebuild therefore changes the zip's checksum: give it the next version (`ios.3`) and its `sha256` in
-`scripts/native-dependencies.json`.
+A new runtime is a new release asset: rebuild with `scripts/build-sherpa-xcframework.sh`, publish the zip, then put
+its URL, version and SwiftPM checksum in `scripts/native-dependencies.json` and the same URL and checksum in
+`Package.swift`, and run `scripts/verify-native-runtime.sh`.
 
 [Validation](docs/validation.md) lists what each tier covers, the test counts and the device checklist.
 [Architecture](docs/architecture.md) describes the modules, state ownership, startup, storage and the
@@ -273,5 +281,8 @@ transcription lifecycle.
 ## License
 
 Cassini for iOS is free software under the [GPLv3](LICENSE). `Cassini/Resources/Licenses/ThirdPartyNotices.txt` lists
-the licences of the dependencies and the models. The portable format is specified in
+the licences of the dependencies and the models, including every library of the native runtime's lock
+(`scripts/native-dependencies.json`, checked by `LicenseAssetsTests`); `ONNXRuntime-ThirdPartyNotices.txt` next to it is
+ONNX Runtime 1.27.1's own notices for the libraries inside it. Both show under Settings → Source code and notices. The
+portable format is specified in
 [cassini-format](https://github.com/codemyriad/cassini-format).

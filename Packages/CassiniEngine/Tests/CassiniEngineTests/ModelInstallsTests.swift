@@ -147,7 +147,9 @@ import CassiniNotebook
         #expect(transcriber.installs == 1)
     }
 
-    @Test func cancelStopsTheSpeakerModelsForEveryCallerAndIsNoFailure() async throws {
+    /// Cancel ends the standalone's own wait on the speaker models' install (the shared installer stops it when
+    /// nobody else waits) and is no failure.
+    @Test func cancelEndsTheSpeakerModelsWaitAndIsNoFailure() async throws {
         let analyzer = ScriptedAnalyzer(status: .notDownloaded, gated: true)
         let installs = ModelInstalls(transcriber: FakeTranscriber(.returns([], total: 0), status: .notDownloaded),
                                      analyzer: analyzer, clock: FakeClock()) { "en-US" }
@@ -186,6 +188,113 @@ import CassiniNotebook
         #expect(analyzer.cancels == 0, "the speaker models' install was not running")
         #expect(installs.failures.isEmpty)
         #expect(installs.status(of: .speech) == .notDownloaded)
+    }
+
+    /// Parakeet's standalone download: the row shows the download, then Checking files, then Ready.
+    @Test func aParakeetDownloadShowsDownloadingThenCheckingFiles() async throws {
+        let transcriber = SharedInstallTranscriber()
+        let installs = ModelInstalls(transcriber: transcriber, analyzer: ScriptedAnalyzer(status: .ready),
+                                     clock: FakeClock()) { "en-US" }
+        await installs.refresh()
+        installs.install([.speech])
+        try await until { transcriber.installs == 1 }
+        transcriber.report(.downloading(0.3))
+        try await until { installs.status(of: .speech) == .downloading(0.3) }
+        transcriber.report(.checking)
+        try await until { installs.status(of: .speech) == .checking }
+        #expect(installs.download?.checking == true, "the download notice says so too")
+        transcriber.finish(nil)
+        try await until { !installs.isInstalling }
+        #expect(installs.status(of: .speech) == .ready)
+        #expect(transcriber.cancels == 0)
+    }
+
+    /// The standalone install holds background time from its start to its end, with the download's progress, so a
+    /// download of Ultra goes on after Cassini leaves the screen.
+    @Test func theStandaloneInstallHoldsBackgroundTimeUntilItEnds() async throws {
+        let transcriber = SharedInstallTranscriber()
+        let background = FakeBackgroundRunner()
+        let installs = ModelInstalls(transcriber: transcriber, analyzer: ScriptedAnalyzer(status: .ready),
+                                     clock: FakeClock(), background: background,
+                                     backgroundTitle: { "Downloading models" }) { "en-US" }
+        await installs.refresh()
+        installs.install([.speech])
+        #expect(background.activeCount == 1)
+        #expect(background.titles.values.first == "Downloading models")
+        installs.install([.speakers])
+        #expect(background.begunCount == 1, "one background time for the whole install")
+        try await until { transcriber.installs == 1 }
+        transcriber.finish(nil)
+        try await until { !installs.isInstalling }
+        #expect(background.activeCount == 0 && background.endedCount == 1)
+
+        installs.install([.speech])
+        #expect(background.activeCount == 1)
+        installs.cancel()
+        #expect(background.activeCount == 0, "a cancel gives the time back")
+    }
+
+    /// iOS takes the time back: the install stops, and the part in flight shows "Download stopped" (STOPPED_BY_SYSTEM)
+    /// on its row and in the download notice until its next install.
+    @Test func whenIOSTakesTheTimeBackTheDownloadShowsStopped() async throws {
+        let transcriber = SharedInstallTranscriber()
+        let analyzer = ScriptedAnalyzer(status: .notDownloaded)
+        let background = FakeBackgroundRunner()
+        let installs = ModelInstalls(transcriber: transcriber, analyzer: analyzer, clock: FakeClock(),
+                                     background: background) { "en-US" }
+        await installs.refresh()
+        installs.install([.speech, .speakers])
+        try await until { transcriber.installs == 1 }
+        background.expireAll()
+        #expect(!installs.isInstalling)
+        #expect(installs.download?.failure == .stoppedBySystem)
+        #expect(installs.download?.part == .speech)
+        #expect(installs.status(of: .speech) == .failed(.stoppedBySystem))
+        try await until { transcriber.cancels == 1 && transcriber.ended }
+        try await until { installs.status(of: .speech) == .failed(.stoppedBySystem) }
+        #expect(analyzer.installs == 0, "the parts after it are dropped")
+        #expect(background.activeCount == 0)
+
+        installs.install([.speech])
+        #expect(installs.status(of: .speech) == .downloading(nil), "the next install clears it")
+        #expect(background.activeCount == 1)
+    }
+
+    /// Cancel of Parakeet's download ends the standalone's wait on the shared install, as for the speaker models.
+    @Test func cancelEndsTheWaitOnParakeetsSharedInstallAndIsNoFailure() async throws {
+        let transcriber = SharedInstallTranscriber()
+        let analyzer = ScriptedAnalyzer(status: .notDownloaded)
+        let installs = ModelInstalls(transcriber: transcriber, analyzer: analyzer, clock: FakeClock()) { "en-US" }
+        await installs.refresh()
+        installs.install([.speech, .speakers])
+        try await until { transcriber.installs == 1 }
+        transcriber.report(.checking)
+        try await until { installs.status(of: .speech) == .checking }
+        installs.cancel()
+        #expect(!installs.isInstalling)
+        try await until { transcriber.cancels == 1 }
+        #expect(analyzer.cancels == 0, "the speaker models' install was not running")
+        try await until { transcriber.ended }
+        #expect(installs.failures.isEmpty)
+        #expect(installs.download == nil)
+        #expect(analyzer.installs == 0, "the parts after the cancelled one are dropped")
+    }
+
+    /// "Free about N MB" of a failed speech download is what the transcriber's install asks for: Parakeet's
+    /// `ModelPlan` figure rather than the estimate for Apple's assets.
+    @Test func aSpeechDownloadWithoutRoomAsksForTheTranscribersFigure() async throws {
+        let transcriber = SharedInstallTranscriber()
+        let installs = ModelInstalls(transcriber: transcriber, analyzer: ScriptedAnalyzer(status: .ready),
+                                     clock: FakeClock()) { "en-US" }
+        await installs.refresh()
+        installs.install([.speech])
+        try await until { transcriber.installs == 1 }
+        transcriber.finish(TranscriptionError.failed(.download(.notEnoughStorage)))
+        try await until { !installs.isInstalling }
+        #expect(installs.download?.failure == .notEnoughStorage)
+        #expect(installs.download?.requiredFreeBytes == transcriber.assetInstallBytes)
+        #expect(installs.speechInstallBytes == transcriber.assetInstallBytes)
+        #expect(installs.speechRecognizer == .parakeet)
     }
 
     @Test func aRefreshAskedForDuringAnotherReadsAgainOnceItEnds() async throws {
@@ -272,12 +381,11 @@ private final class ScriptedAnalyzer: SpeakerAnalyzing {
         var status: ModelPartStatus
         var installs = 0
         var progress: (@Sendable (InstallProgress) -> Void)?
-        var finish: CheckedContinuation<Void, Error>?
-        var cancels = 0
     }
 
     private let state: Mutex<State>
     private let gated: Bool
+    private let held = HeldInstall()
 
     init(status: ModelPartStatus, gated: Bool = false) {
         state = Mutex(State(status: status))
@@ -285,19 +393,15 @@ private final class ScriptedAnalyzer: SpeakerAnalyzing {
     }
 
     var installs: Int { state.withLock { $0.installs } }
-    var cancels: Int { state.withLock { $0.cancels } }
+    var cancels: Int { held.cancels }
 
     func report(_ fraction: Double) { state.withLock { $0.progress }?(.downloading(fraction)) }
 
     func reportChecking() { state.withLock { $0.progress }?(.checking) }
 
     func finish(with error: SpeakerAnalysisError?, status: ModelPartStatus) {
-        let waiter = state.withLock { state in
-            state.status = status
-            defer { state.finish = nil }
-            return state.finish
-        }
-        if let error { waiter?.resume(throwing: error) } else { waiter?.resume() }
+        state.withLock { $0.status = status }
+        held.end(error)
     }
 
     func analyze(url: URL, words: [Word], allowDownload: Bool,
@@ -310,20 +414,53 @@ private final class ScriptedAnalyzer: SpeakerAnalyzing {
 
     var modelInstallBytes: Int64 { 54_000_000 }
 
+    /// A gated install waits for `finish`; cancelling its caller ends the wait with `CancellationError`, as the shared
+    /// installer does for a caller that leaves, and counts in `cancels`.
     func installModels(progress: @escaping @Sendable (InstallProgress) -> Void) async throws {
         state.withLock { $0.installs += 1; $0.progress = progress }
         guard gated else { return }
-        try await withCheckedThrowingContinuation { continuation in state.withLock { $0.finish = continuation } }
+        try await held.wait()
+    }
+}
+
+/// An install the test holds: `wait()` returns when the test calls `end`, or throws `CancellationError` when its
+/// caller is cancelled, as the shared installer ends the wait of a caller that leaves; `cancels` counts those.
+private final class HeldInstall: Sendable {
+    private struct State {
+        var waiter: CheckedContinuation<Void, Error>?
+        var cancelled = false
+        var cancels = 0
     }
 
-    /// Ends the gated install for its caller with `CancellationError`, as the real install does for every caller.
-    func cancelModelInstall() async {
-        let waiter = state.withLock { state in
-            state.cancels += 1
-            defer { state.finish = nil }
-            return state.finish
+    private let state = Mutex(State())
+
+    var cancels: Int { state.withLock { $0.cancels } }
+
+    func wait() async throws {
+        state.withLock { $0.cancelled = false }
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                let cancelled = state.withLock { state in
+                    if !state.cancelled { state.waiter = continuation }
+                    return state.cancelled
+                }
+                if cancelled { continuation.resume(throwing: CancellationError()) }
+            }
+        } onCancel: {
+            let waiter = state.withLock { state in
+                state.cancelled = true
+                state.cancels += 1
+                defer { state.waiter = nil }
+                return state.waiter
+            }
+            waiter?.resume(throwing: CancellationError())
         }
-        waiter?.resume(throwing: CancellationError())
+    }
+
+    /// Ends the wait: returns without `error`, else throws it.
+    func end(_ error: Error?) {
+        let waiter = state.withLock { state in defer { state.waiter = nil }; return state.waiter }
+        if let error { waiter?.resume(throwing: error) } else { waiter?.resume() }
     }
 }
 
@@ -390,7 +527,7 @@ private final class LanguageTranscriber: Transcribing {
         return status
     }
 
-    func installAssets(locale: Locale, progress: @escaping @Sendable (Double) -> Void) async throws {
+    func installAssets(locale: Locale, progress: @escaping @Sendable (InstallProgress) -> Void) async throws {
         let fails = state.withLock { state in
             state.installs += 1
             return state.failsInstall
@@ -414,6 +551,49 @@ private final class LanguageTranscriber: Transcribing {
             waiter?.resume()
         }
         try Task.checkCancellation()
+    }
+
+    func speechLanguages() async -> [SpeechLanguage] { [] }
+}
+
+/// Parakeet over the shared installer, driven by the test: its install reports what the test says and ends when the
+/// test finishes it, or with `CancellationError` once its caller is cancelled.
+private final class SharedInstallTranscriber: Transcribing {
+    private struct State {
+        var status: ModelPartStatus = .notDownloaded
+        var installs = 0
+        var ended = false
+        var progress: (@Sendable (InstallProgress) -> Void)?
+    }
+
+    private let state = Mutex(State())
+    private let held = HeldInstall()
+
+    var recognizer: SpeechRecognizer { .parakeet }
+    var assetInstallBytes: Int64 { 1_290_000_000 }
+    var installs: Int { state.withLock { $0.installs } }
+    var cancels: Int { held.cancels }
+    var ended: Bool { state.withLock { $0.ended } }
+
+    func report(_ progress: InstallProgress) { state.withLock { $0.progress }?(progress) }
+
+    /// Ends the install: installed without `error`, else failed with it.
+    func finish(_ error: Error?) {
+        if error == nil { state.withLock { $0.status = .ready } }
+        held.end(error)
+    }
+
+    func transcribe(_ request: TranscriptionRequest,
+                    events: @escaping @Sendable (TranscriptionEvent) -> Void) async throws -> TranscriptionResult {
+        TranscriptionResult(segments: [])
+    }
+
+    func assetStatus(locale: Locale) async -> ModelPartStatus { state.withLock { $0.status } }
+
+    func installAssets(locale: Locale, progress: @escaping @Sendable (InstallProgress) -> Void) async throws {
+        state.withLock { $0.installs += 1; $0.progress = progress }
+        defer { state.withLock { $0.ended = true } }
+        try await held.wait()
     }
 
     func speechLanguages() async -> [SpeechLanguage] { [] }

@@ -10,11 +10,17 @@ public struct NoteBannerFacts: Hashable, Sendable {
     public var waitingJobs = 0
     /// Banners closed on this screen, by id.
     public var dismissed: Set<String> = []
+    /// The free space the speech model's install asks for ("Free about N MB" of a transcription's failed download);
+    /// nil for the estimate of Apple's assets.
+    public var speechInstallBytes: Int64?
+    /// The free space the speaker models' install asks for ("Free about N MB" of a failed Identify speakers).
+    public var speakersInstallBytes: Int64?
 
     public init(trustToggled: Bool = false, queueHold: QueueHold? = nil, waitingJobs: Int = 0,
-                dismissed: Set<String> = []) {
+                dismissed: Set<String> = [], speechInstallBytes: Int64? = nil, speakersInstallBytes: Int64? = nil) {
         self.trustToggled = trustToggled; self.queueHold = queueHold; self.waitingJobs = waitingJobs
-        self.dismissed = dismissed
+        self.dismissed = dismissed; self.speechInstallBytes = speechInstallBytes
+        self.speakersInstallBytes = speakersInstallBytes
     }
 }
 

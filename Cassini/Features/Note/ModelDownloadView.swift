@@ -38,6 +38,7 @@ struct ModelDownloadView: View {
 private struct ModelDownloadContent: View {
     let model: ModelDownloadModel
     let plan: ModelDownloadPlan
+    @Environment(\.locale) private var locale
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -47,17 +48,23 @@ private struct ModelDownloadContent: View {
                     Text("Transcribe on this device", tableName: "Transcription")
                         .font(.system(.largeTitle, design: .serif)).foregroundStyle(Color.ink)
                         .accessibilityAddTraits(.isHeader)
-                    Text("Cassini needs a one-time download. After that, recognising words and telling voices apart happen on this device, even offline. Your audio stays here.", tableName: "Transcription")
-                        .font(.title3).foregroundStyle(Color.muted)
+                    intro(total: plan.totalDownloadBytes).font(.title3).foregroundStyle(Color.muted)
                     VStack(spacing: 0) {
                         ForEach(Array(plan.missing.enumerated()), id: \.element) { index, part in
                             if index > 0 { Divider().padding(.leading, 16) }
-                            Text(part.label).font(.body).foregroundStyle(Color.ink)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.horizontal, 16).padding(.vertical, 14)
+                            HStack(spacing: 12) {
+                                Text(part.label).font(.body).foregroundStyle(Color.ink)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                if let bytes = plan.downloadBytes[part] {
+                                    Text(SizeCopy.text(bytes, locale: locale))
+                                        .font(.subheadline.monospacedDigit()).foregroundStyle(Color.muted)
+                                }
+                            }
+                            .padding(.horizontal, 16).padding(.vertical, 14)
+                            .accessibilityElement(children: .combine)
                         }
                     }.cardBackground(radius: Radius.control)
-                    Text("Needs about \(plan.requiredFreeBytes.formatted(.byteCount(style: .file))) free while installing. Each file is checked before it is used.", tableName: "Transcription")
+                    Text("Needs about \(SizeCopy.text(plan.requiredFreeBytes, locale: locale)) free while installing. Each file is checked before it is used.", tableName: "Transcription")
                         .font(.subheadline).foregroundStyle(Color.muted)
                     Button(action: model.openSources) {
                         Text("Where the models come from · Privacy", tableName: "Transcription")
@@ -72,6 +79,21 @@ private struct ModelDownloadContent: View {
         }
         .padding(.horizontal, 20).padding(.bottom, 24)
         .readableWidth()
+    }
+
+    /// The body, with the one-time download when every part tells its size (Parakeet devices): "about **531 MB**",
+    /// the figure in bold ink and kept on one line (Android `ModelDownloadBody`).
+    private func intro(total: Int64?) -> Text {
+        guard let total else {
+            return Text("Cassini needs a one-time download. After that, recognising words and telling voices apart happen on this device, even offline. Your audio stays here.", tableName: "Transcription")
+        }
+        let size = SizeCopy.text(total, locale: locale).replacingOccurrences(of: " ", with: "\u{00A0}")
+        var text = AttributedString(String(localized: "Cassini needs a one-time download of about \(size). After that, recognising words and telling voices apart happen on this device, even offline. Your audio stays here.", table: "Transcription", comment: "Model download screen body with the total download, such as 531 MB"))
+        if let range = text.range(of: size) {
+            text[range].font = .title3.weight(.bold)
+            text[range].foregroundColor = Color.ink
+        }
+        return Text(text)
     }
 }
 

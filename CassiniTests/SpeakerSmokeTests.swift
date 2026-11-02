@@ -6,7 +6,7 @@ import CassiniSherpa
 
 /// The speaker package's native smoke test: streaming Sortformer and CAM++ through the sherpa-onnx C API, on a
 /// two-speaker mix of FLEURS clips (A, B, A again; scripts/fetch-speaker-fixture.py). Opt-in and skipped unless the
-/// build links the runtime (CASSINI_SHERPA_LOCAL=1) and the environment names the models; scripts/speaker-smoke.sh
+/// build links the runtime (every iOS build does) and the environment names the models; scripts/speaker-smoke.sh
 /// runs it on a simulator.
 ///
 /// Environment (xcodebuild passes TEST_RUNNER_<name> through as <name>):
@@ -25,7 +25,9 @@ final class SpeakerSmokeTests: XCTestCase {
 
     func testSortformerStreamsTwoSpeakersAndCamPlusTellsThemApart() throws {
         let environment = ProcessInfo.processInfo.environment
-        try XCTSkipUnless(SherpaRuntime.isLinked, "built without CASSINI_SHERPA_LOCAL")
+        try XCTSkipUnless(SherpaRuntime.isLinked, "built without the native runtime")
+        // Opt-in: every iOS build links the runtime, so the environment decides (scripts/speaker-smoke.sh sets it).
+        try XCTSkipUnless(environment["CASSINI_SPEAKER_MODELS"] != nil, "opt-in: scripts/speaker-smoke.sh sets CASSINI_SPEAKER_MODELS")
         let models = try XCTUnwrap(environment["CASSINI_SPEAKER_MODELS"].map { URL(fileURLWithPath: $0) },
                                    "set CASSINI_SPEAKER_MODELS")
         let audioURL = try XCTUnwrap(environment["CASSINI_SPEAKER_AUDIO"].map { URL(fileURLWithPath: $0) })

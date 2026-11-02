@@ -11,21 +11,24 @@ import CassiniNotebook
     private let storage: any StorageProbe
     private let notices: NoticeCenter
     private let root: URL
+    private let models: URL
 
+    /// `root` is where the notes are, `models` where the pinned models are installed.
     init(settings: SettingsStore, processing: ProcessingStore, transcriber: any Transcribing,
-         analyzer: any SpeakerAnalyzing, storage: any StorageProbe, notices: NoticeCenter, root: URL) {
+         analyzer: any SpeakerAnalyzing, storage: any StorageProbe, notices: NoticeCenter, root: URL, models: URL) {
         self.settings = settings; self.processing = processing; self.transcriber = transcriber
-        self.analyzer = analyzer; self.storage = storage; self.notices = notices; self.root = root
+        self.analyzer = analyzer; self.storage = storage; self.notices = notices; self.root = root; self.models = models
     }
 
-    /// `ModelDownloadPlan.plan` over the speech assets of the chosen language and the speaker models' status, for the
-    /// note's job.
+    /// `ModelDownloadPlan.plan` over the speech model of the chosen language and the speaker models' status, for the
+    /// note's job, with the sizes of what the catalog still has to install.
     func plan(for noteID: UUID?) async -> ModelDownloadPlan {
         let speakersOnly = noteID.flatMap { processing.state.jobs[$0]?.kind } == .speakersOnly
         return ModelDownloadPlan.plan(speech: await transcriber.assetStatus(locale: Locale(identifier: settings.speechLanguage)),
                                       speakers: await analyzer.modelStatus(), forNote: noteID != nil,
                                       identifySpeakers: settings.identifySpeakers, speakersOnly: speakersOnly,
-                                      speakersInstallBytes: analyzer.modelInstallBytes)
+                                      speakersInstallBytes: analyzer.modelInstallBytes,
+                                      recognizer: transcriber.recognizer, catalog: ModelPlan.of(root: models))
     }
 
     func usableBytes() async -> Int64 { storage.availableBytes(at: root) }

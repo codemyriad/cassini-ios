@@ -103,8 +103,9 @@ import CassiniNotebook
     /// The files fetched so far stay.
     func cancelJobDownload() { coordinator?.cancelDownload() }
 
-    /// The Settings banner's Cancel of the standalone install (`ModelInstalls.cancel()`); a job that downloads at the
-    /// same time goes on. The files fetched so far stay.
+    /// The Settings banner's Cancel of the standalone install (`ModelInstalls.cancel()`): only the standalone's wait
+    /// ends, so a job that downloads the same model at the same time goes on, and its card's Cancel stops it. The
+    /// files fetched so far stay.
     func cancelStandaloneDownload() { models.cancel() }
     func continueQueue() { coordinator?.continueQueue() }
 

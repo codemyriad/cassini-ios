@@ -4,19 +4,21 @@ import CassiniEngine
 
 /// Time to finish work after Cassini leaves the screen.
 ///
-/// Work that reports progress (the transcription queue) runs as one `BGContinuedProcessingTask`: iOS shows its title
-/// and progress, and its Stop button, like iOS taking the time back, runs the work's expiration handler. The queue
-/// asks for it once per drain, from the screen, and gives each next job its title with `update`. When iOS refuses
-/// that request (it is only granted while Cassini is on the screen, and not under heavy load), and for other work
-/// such as saving the last edits, it falls back to the finite time of `beginBackgroundTask`. Either way the work's
+/// Work that reports progress (the transcription queue, a model download from Settings) runs as a
+/// `BGContinuedProcessingTask`: iOS shows its title and progress, and its Stop button, like iOS taking the time back,
+/// runs the work's expiration handler. The queue asks for it once per drain, from the screen, and gives each next job
+/// its title with `update`. Each continued task held at a time has its own identifier, so the queue and a model
+/// download can both hold one. When iOS refuses a request (it is only granted while Cassini is on the screen, and not
+/// under heavy load), when both identifiers are held, and for other work such as saving the last edits, it falls back
+/// to the finite time of `beginBackgroundTask`. Either way the work's
 /// expiration handler runs on the main actor and the token ends before iOS's handler returns, exactly once: UIKit
 /// terminates an app whose finite task is still running after its expiration handler, and documents no time after it.
 /// What the work starts from its handler (the paused job's write) is best-effort; the queue's stored `system` hold lets
 /// the launch repair finish it when Cassini is killed while suspended.
 @MainActor final class UIKitBackgroundRunner: BackgroundRunner {
-    /// Matches `BGTaskSchedulerPermittedIdentifiers` (`io.codemyriad.cassini.transcription.*`). One identifier
-    /// serves every drain: at most one continued task is held at a time.
-    static let identifier = "io.codemyriad.cassini.transcription.queue"
+    /// Match `BGTaskSchedulerPermittedIdentifiers` (`io.codemyriad.cassini.transcription.*`). A request takes the first
+    /// one that no held continued task has: the queue's drain, which asks first, usually gets the first.
+    static let identifiers = ["io.codemyriad.cassini.transcription.queue", "io.codemyriad.cassini.transcription.work"]
 
     private typealias Expiry = @MainActor () -> Void
 
@@ -34,17 +36,18 @@ import CassiniEngine
 
     /// A continued-processing request, and its task once iOS has started it.
     private final class Continued {
+        let identifier: String
         let progress: Progress
         let onExpire: Expiry
         var title: String
         var task: BGContinuedProcessingTask?
-        init(title: String, progress: Progress, onExpire: @escaping Expiry) {
-            self.title = title; self.progress = progress; self.onExpire = onExpire
+        init(identifier: String, title: String, progress: Progress, onExpire: @escaping Expiry) {
+            self.identifier = identifier; self.title = title; self.progress = progress; self.onExpire = onExpire
         }
     }
 
     private var held: [BackgroundToken: Held] = [:]
-    private var registered = false
+    private var registered: Set<String> = []
 
     private static var subtitle: String {
         String(localized: "Your audio stays on this device", table: "Transcription",
@@ -84,36 +87,42 @@ import CassiniEngine
             if let task = continued.task {
                 task.setTaskCompleted(success: success)
             } else {
-                BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: Self.identifier)
+                BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: continued.identifier)
             }
         }
     }
 
-    /// Asks iOS to run the work as continued processing; nil when it refuses or a continued task is held already.
+    /// Asks iOS to run the work as continued processing, under an identifier no held continued task has; nil when it
+    /// refuses or every identifier is held.
     private func submit(title: String, progress: Progress, onExpire: @escaping Expiry) -> Continued? {
-        let isContinued: (Held) -> Bool = { if case .continued = $0 { true } else { false } }
-        guard !held.values.contains(where: isContinued), register() else {
+        let taken = Set(held.values.compactMap { entry -> String? in
+            if case .continued(let continued) = entry { continued.identifier } else { nil }
+        })
+        guard let identifier = Self.identifiers.first(where: { !taken.contains($0) }), register(identifier) else {
             return nil
         }
-        let request = BGContinuedProcessingTaskRequest(identifier: Self.identifier, title: title, subtitle: Self.subtitle)
+        let request = BGContinuedProcessingTaskRequest(identifier: identifier, title: title, subtitle: Self.subtitle)
         request.strategy = .fail
         do { try BGTaskScheduler.shared.submit(request) } catch { return nil }
-        return Continued(title: title, progress: progress, onExpire: onExpire)
+        return Continued(identifier: identifier, title: title, progress: progress, onExpire: onExpire)
     }
 
-    /// Registers the launch handler once; continued-processing handlers may be registered after launch.
-    private func register() -> Bool {
-        if registered { return true }
-        registered = BGTaskScheduler.shared.register(forTaskWithIdentifier: Self.identifier, using: .main) { [weak self] task in
+    /// Registers the launch handler of `identifier` once; continued-processing handlers may be registered after launch.
+    private func register(_ identifier: String) -> Bool {
+        if registered.contains(identifier) { return true }
+        let done = BGTaskScheduler.shared.register(forTaskWithIdentifier: identifier, using: .main) { [weak self] task in
             MainActor.assumeIsolated { self?.started(task) }
         }
-        return registered
+        if done { registered.insert(identifier) }
+        return done
     }
 
-    /// iOS started the continued-processing task asked for last.
+    /// iOS started the continued-processing task asked for last under the task's identifier.
     private func started(_ task: BGTask) {
         let pending = held.first { _, entry in
-            if case .continued(let continued) = entry { continued.task == nil } else { false }
+            if case .continued(let continued) = entry {
+                continued.task == nil && continued.identifier == task.identifier
+            } else { false }
         }
         guard let task = task as? BGContinuedProcessingTask, let (token, entry) = pending,
               case .continued(let continued) = entry else {

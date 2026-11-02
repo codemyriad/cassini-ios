@@ -33,9 +33,10 @@ public enum SpeechCapability {
     /// Whether a device with `physicalMemory` bytes can hold Ultra.
     public static func parakeetCapable(physicalMemory: UInt64) -> Bool { physicalMemory >= minimumPhysicalMemory }
 
-    /// Parakeet when the native runtime is linked, its model is installed and the device can hold it; else Apple Speech.
-    public static func choose(linked: Bool, installed: Bool, capable: Bool) -> SpeechRecognizer {
-        linked && installed && capable ? .parakeet : .appleSpeech
+    /// Parakeet when the native runtime is linked and the device can hold it, whether or not its model is installed
+    /// (a job downloads it with consent, as on Android); else Apple Speech.
+    public static func choose(linked: Bool, capable: Bool) -> SpeechRecognizer {
+        linked && capable ? .parakeet : .appleSpeech
     }
 }
 

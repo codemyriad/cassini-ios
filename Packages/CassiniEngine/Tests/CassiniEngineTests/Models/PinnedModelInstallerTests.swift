@@ -1,3 +1,4 @@
+import CassiniCore
 import Foundation
 import Synchronization
 import Testing
@@ -92,6 +93,49 @@ import CassiniNotebook
         #expect(models.status[.speech] == .missing(consented: true))
     }
 
+    /// The Cancel of the standalone download (`ModelInstalls.cancel()`, Settings) ends only its own wait: a job that
+    /// waits on the same install goes on with it, as does the job's install that a speaker download from Settings waits
+    /// to end. Nobody is cancelled who did not ask for it, so the job is never paused as interrupted.
+    @Test func theStandaloneCancelLeavesAJobsInstallRunning() async throws {
+        let installs = ModelInstalls(transcriber: InstallerTranscriber(owner: owner),
+                                     analyzer: InstallerAnalyzer(models: SpeakerModels(repository: models, installer: owner)),
+                                     clock: FakeClock()) { "en-US" }
+        let job = Task { [owner] in try await owner.install([.speech]) }
+        try await waitUntil { [fetcher] in fetcher.started }
+
+        // Settings joins the job's Ultra download, then the user taps Cancel.
+        installs.install([.speech])
+        try await waitUntil { [owner] in Self.waiters(owner) == 2 }
+        installs.cancel()
+        try await waitUntil { [owner] in Self.waiters(owner) == 1 }
+        #expect(!release.interrupted, "the job's download goes on")
+
+        // A speaker download from Settings waits for the job's install to end; its Cancel leaves that install alone.
+        installs.install([.speakers])
+        try await waitUntil { [owner] in owner.waitingForEnd == 1 }
+        installs.cancel()
+        try await waitUntil { [owner] in owner.waitingForEnd == 0 }
+        #expect(Self.waiters(owner) == 1)
+        #expect(!release.interrupted)
+
+        release.open()
+        #expect(try await job.value == .installed())
+        #expect(fetcher.fetched == [Self.key(ModelCatalog.parakeet), Self.key(ModelCatalog.vad)], "nothing else fetched")
+    }
+
+    /// The Cancel of a standalone download that nobody else waits on stops the install; its `.part` files stay.
+    @Test func theStandaloneCancelStopsAnInstallNobodyElseWaitsOn() async throws {
+        let installs = ModelInstalls(transcriber: InstallerTranscriber(owner: owner),
+                                     analyzer: InstallerAnalyzer(models: SpeakerModels(repository: models, installer: owner)),
+                                     clock: FakeClock()) { "en-US" }
+        installs.install([.speech])
+        try await waitUntil { [fetcher] in fetcher.started }
+        installs.cancel()
+        try await waitUntil { [owner] in owner.status == .idle }
+        #expect(release.interrupted)
+        #expect(exists(ModelCatalog.parakeet.staging(in: models.root).appendingPathComponent("encoder.int8.onnx.part")))
+    }
+
     // ports: ModelInstallOwnerTest#aRequestRightAfterACancelWaitsForTheCancelledFetchToEnd
     @Test func aRequestRightAfterACancelWaitsForTheCancelledFetchToEnd() async throws {
         release.stubborn = true
@@ -160,6 +204,41 @@ import CassiniNotebook
         #expect(models.status[.speech] == .failed(.modelDownload, detail: "STOPPED_BY_SYSTEM"))
         #expect(await !owner.stopDownloads(), "no standalone download runs")
     }
+}
+
+/// Speech over the shared installer, as Parakeet's standalone download installs it.
+private struct InstallerTranscriber: Transcribing {
+    let owner: PinnedModelInstaller
+
+    func transcribe(_ request: TranscriptionRequest,
+                    events: @escaping @Sendable (TranscriptionEvent) -> Void) async throws -> TranscriptionResult {
+        TranscriptionResult(segments: [])
+    }
+
+    func assetStatus(locale: Locale) async -> ModelPartStatus { .notDownloaded }
+
+    func installAssets(locale: Locale, progress: @escaping @Sendable (InstallProgress) -> Void) async throws {
+        _ = try await owner.install([.speech])
+    }
+
+    func speechLanguages() async -> [SpeechLanguage] { [] }
+}
+
+/// The speaker models over the shared installer, as `SpeakerAnalyzer` installs them.
+private struct InstallerAnalyzer: SpeakerAnalyzing {
+    let models: SpeakerModels
+
+    func analyze(url: URL, words: [Word], allowDownload: Bool,
+                 progress: @escaping @Sendable (SpeakerAnalysisEvent) -> Void) async throws -> SpeakerAnalysis {
+        SpeakerAnalysis(turns: [], prints: [])
+    }
+
+    func modelStatus() async -> ModelPartStatus { models.status(linked: true) }
+    func refreshModelStatus() async -> ModelPartStatus { await models.refresh(linked: true) }
+    func installModels(progress: @escaping @Sendable (InstallProgress) -> Void) async throws {
+        try await models.install(progress: progress)
+    }
+    var modelInstallBytes: Int64 { models.installBytes }
 }
 
 /// Blocks the fetch of Parakeet until `release` opens, after it wrote a `.part` file; records every fetch.

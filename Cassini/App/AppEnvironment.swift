@@ -64,36 +64,38 @@ import CassiniEngineTesting
         return calendar
     }
 
-    /// Parakeet Ultra when this build links the native runtime, its model is installed under `models` and the device can
-    /// hold it (`SpeechCapability`); Apple Speech otherwise (decision D2). Chosen once at launch.
-    static func speechTranscriber(models: URL = ModelCatalog.defaultRoot,
+    /// Parakeet Ultra when this build links the native runtime and the device can hold it (`SpeechCapability`),
+    /// whether or not its model is installed: a job downloads Ultra and its speech detector through the shared
+    /// installer with consent, and the model download screen's Download does too. Apple Speech otherwise (decision D2).
+    /// Chosen once at launch.
+    static func speechTranscriber(models: PinnedModels,
                                   physicalMemory: UInt64 = ProcessInfo.processInfo.physicalMemory) -> any Transcribing {
-        switch SpeechCapability.choose(linked: SherpaRuntime.isLinked, installed: ModelCatalog.parakeet.ready(in: models),
+        switch SpeechCapability.choose(linked: SherpaRuntime.isLinked,
                                        capable: SpeechCapability.parakeetCapable(physicalMemory: physicalMemory)) {
-        case .parakeet: ParakeetTranscriber(models: .init(root: models), runtime: SherpaRuntime.speech)
+        case .parakeet:
+            ParakeetTranscriber(models: .init(installer: models.installer, root: models.root,
+                                              online: { NetworkPath.shared.isOnline }),
+                                runtime: SherpaRuntime.speech)
         case .appleSpeech: AppleSpeechTranscriber()
         }
     }
 
-    /// Android's speaker pipeline (streaming Sortformer and CAM++) over the catalog's pinned files in `models`, which
-    /// the shared installer fetches with Range resume and the redirect policy (the diarizer as seekable Zstandard).
-    /// Without the native runtime the speaker models are unsupported.
-    static func speakerAnalyzer(models: URL = ModelCatalog.defaultRoot, defaults: UserDefaults = .standard,
-                                storage: any StorageProbe = FileSystemStorageProbe()) -> SpeakerAnalyzer {
-        let fetcher = NetworkModelFetcher(fetcher: ArtifactFetcher(transport: URLSessionTransport(), storage: storage),
-                                          decoder: ZstdDecompressor())
-        let repository = ModelRepository(root: models, consent: DefaultsModelConsent(defaults: defaults), fetcher: fetcher)
-        let installer = PinnedModelInstaller(models: repository, storage: storage, online: { NetworkPath.shared.isOnline })
-        return SpeakerAnalyzer(models: SpeakerModels(repository: repository, installer: installer),
-                               runtime: SherpaRuntime.speakers)
+    /// Android's speaker pipeline (streaming Sortformer and CAM++) over the catalog's pinned files, which the shared
+    /// installer fetches. Without the native runtime the speaker models are unsupported.
+    static func speakerAnalyzer(models: PinnedModels) -> SpeakerAnalyzer {
+        SpeakerAnalyzer(models: SpeakerModels(repository: models.repository, installer: models.installer),
+                        runtime: SherpaRuntime.speakers)
     }
 
     static func live() -> AppEnvironment {
-        AppEnvironment(
+        let storage = FileSystemStorageProbe()
+        let models = PinnedModels(root: ModelCatalog.defaultRoot, defaults: .standard, storage: storage)
+        return AppEnvironment(
             root: URL.applicationSupportDirectory.appendingPathComponent("Cassini", isDirectory: true),
             defaults: .standard, clock: SystemClock(), locale: .autoupdatingCurrent, timeZone: .autoupdatingCurrent,
-            transcriber: speechTranscriber(), analyzer: speakerAnalyzer(), capture: AVCaptureAdapter(),
-            microphone: AVMicrophonePermission(), liveActivity: ActivityKitAdapter(), playback: AVPlaybackAdapter(), audio: LocalAudioProcessing(), storage: FileSystemStorageProbe(),
+            transcriber: speechTranscriber(models: models), analyzer: speakerAnalyzer(models: models),
+            capture: AVCaptureAdapter(), microphone: AVMicrophonePermission(), liveActivity: ActivityKitAdapter(),
+            playback: AVPlaybackAdapter(), audio: LocalAudioProcessing(), storage: storage,
             background: UIKitBackgroundRunner(), notifier: UNNotifier())
     }
 
@@ -123,6 +125,7 @@ extension AppEnvironment {
                   modelDownloading: arguments.contains("--model-downloading"),
                   draftGrowing: arguments.contains("--draft-growing"),
                   speakersReady: arguments.contains("--speakers-ready"),
+                  parakeet: arguments.contains("--parakeet"),
                   notificationsDenied: arguments.contains("--notifications-denied"),
                   heldCapture: arguments.contains("--capture-held"), region: value(after: "-AppleLocale", in: arguments),
                   inProcess: inProcess, token: token)
@@ -137,30 +140,32 @@ extension AppEnvironment {
     /// only, or on any seed with `speakersReady` (`--speakers-ready`), whose speaker step finds the fixture's two voices
     /// taking turns; the processing seed's job has measured its pace, so its card shows a time left.
     /// Notifications are never asked for and count as allowed, so no banner says they are off, unless
-    /// `notificationsDenied` (`--notifications-denied`) turns them off.
+    /// `notificationsDenied` (`--notifications-denied`) turns them off. With `parakeet` (`--parakeet`) the fake
+    /// transcriber stands for Parakeet Ultra, as on a device that can hold it: the model download screen and the
+    /// speech row show Ultra's sizes.
     static func uiTesting(reset: Bool, seed: Seed?, openFixture: OpenFixture? = nil,
                           modelsMissing: Bool = false, modelDownloading: Bool = false, draftGrowing: Bool = false,
-                          speakersReady: Bool = false,
+                          speakersReady: Bool = false, parakeet: Bool = false,
                           notificationsDenied: Bool = false, heldCapture: Bool = false, region: String? = nil,
                           inProcess: Bool = false, token: String = "") -> AppEnvironment {
         let storage = UITestStorage.generation(reset: reset, inProcess: inProcess)
         let root = storage.root
         let defaults = UserDefaults(suiteName: storage.suite) ?? .standard
         let status: ModelPartStatus = modelsMissing ? .notDownloaded : .ready
-        let transcriber = switch seed {
-        case .processing where modelDownloading: FakeTranscriber(.downloading(fraction: 0.46), status: status)
+        let recognizer: SpeechRecognizer = parakeet ? .parakeet : .appleSpeech
+        let script: FakeTranscriber.Script = switch seed {
+        case .processing where modelDownloading: .downloading(fraction: 0.46)
         case .processing where draftGrowing:
-            FakeTranscriber(.growing(TestFixtures.growingDraft, every: .milliseconds(500), total: TestFixtures.processingDuration),
-                            status: status)
+            .growing(TestFixtures.growingDraft, every: .milliseconds(500), total: TestFixtures.processingDuration)
         case .processing:
-            FakeTranscriber(.frozen(done: 0.62 * TestFixtures.processingDuration, total: TestFixtures.processingDuration,
-                                    draft: TestFixtures.processingDraft, pace: TestFixtures.processingPace), status: status)
+            .frozen(done: 0.62 * TestFixtures.processingDuration, total: TestFixtures.processingDuration,
+                    draft: TestFixtures.processingDraft, pace: TestFixtures.processingPace)
         case .statuses:
-            FakeTranscriber(.frozen(done: 0.62 * TestFixtures.processingDuration, total: TestFixtures.processingDuration),
-                            status: status)
+            .frozen(done: 0.62 * TestFixtures.processingDuration, total: TestFixtures.processingDuration)
         default:
-            FakeTranscriber(.returns(TestFixtures.transcribedSegments, total: TestFixtures.fixtureDuration), status: status)
+            .returns(TestFixtures.transcribedSegments, total: TestFixtures.fixtureDuration)
         }
+        let transcriber = FakeTranscriber(script, status: status, recognizer: recognizer)
         // The recording seed tells the speakers apart, as a walk from recording to naming needs; the processing seed's
         // job has its speaker step ahead.
         let analyzer = switch seed {
@@ -203,6 +208,27 @@ extension AppEnvironment {
     }
 }
 #endif
+
+/// The catalog's models of one app run (Parakeet Ultra, Silero VAD, the diarizer and CAM++ under `root`): one
+/// repository and one installer, which speech and the speaker models share, so one install runs at a time and a job
+/// that joins the standalone download fetches each file once (Android's single `ModelInstallOwner`). The fetcher
+/// resumes with Range and decompresses each file's seekable Zstandard; the repository reads the speech consent from
+/// `defaults`.
+struct PinnedModels: Sendable {
+    let root: URL
+    let repository: ModelRepository
+    let installer: PinnedModelInstaller
+
+    /// `fetcher` replaces the model host in tests.
+    init(root: URL, defaults: UserDefaults, storage: any StorageProbe, fetcher: (any ModelFetching)? = nil) {
+        let fetcher = fetcher ?? NetworkModelFetcher(fetcher: ArtifactFetcher(transport: URLSessionTransport(),
+                                                                              storage: storage),
+                                                     decoder: ZstdDecompressor())
+        self.root = root
+        repository = ModelRepository(root: root, consent: DefaultsModelConsent(defaults: defaults), fetcher: fetcher)
+        installer = PinnedModelInstaller(models: repository, storage: storage, online: { NetworkPath.shared.isOnline })
+    }
+}
 
 /// The speech consent the model repository reads (`models.consentAt`, as `SettingsStore` writes it), before the stores
 /// exist. The speaker models have a consent of their own, which the job and the download screen check; their install
