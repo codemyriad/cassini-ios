@@ -94,7 +94,11 @@ that were not ported, with the reason for each.
   per language ("· Installed" marks the ones on the device). Parakeet devices have no such picker: Parakeet recognises
   any language on its own, as Android does. A language that Apple does not offer counts as nothing to download, and the
   job fails with `UNSUPPORTED_LANGUAGE` rather than waiting for a consent that cannot help. `UNSUPPORTED_LANGUAGE` and
-  `RESERVATION_LIMIT` (Apple's speech assets) are failure codes that exist only on iOS.
+  `RESERVATION_LIMIT` (Apple's speech assets) are failure codes that exist only on iOS. So that nobody transcribes in
+  the wrong language unawares, the consent screen on those devices names the language and where it is set (D59 (2)):
+  "Cassini recognises speech in Italian (Italy). To transcribe another language, change it in Settings › Speech
+  language." It is not shown for Identify speakers, which recognises no speech. iOS has no first-run screen, so the
+  consent screen at the first transcription is the only place it appears.
 - **Sizes.** Every size on the model download screen and the On-device models rows follows the shared rule of
   `ux-draft/format-vectors.json` (`sizeRule`, v4: MB rounded half up, GB with one decimal from 1000 MB, KB below 1 MB;
   `SizeText`, tested with the vectors), so Ultra's download reads "443 MB" as D4 and D16 write it. Android still

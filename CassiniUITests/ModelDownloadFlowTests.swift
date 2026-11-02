@@ -34,6 +34,15 @@ final class ModelDownloadFlowTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Speech recognition"].exists, "iOS does not tell the size of Apple's assets")
         XCTAssertTrue(part(app, "Telling speakers apart").label.hasSuffix("88 MB"))
         XCTAssertFalse(text(app, containing: "one-time download of about").exists, "no total without the speech size")
+        // D59 (2): Apple Speech hears only the language set in Settings, so the screen names it and where to change it.
+        let language = app.staticTexts["speechLanguageLine"]
+        XCTAssertTrue(language.exists)
+        XCTAssertTrue(language.label.hasPrefix("Cassini recognises speech in "), language.label)
+        XCTAssertTrue(language.label.hasSuffix(". To transcribe another language, change it in Settings › Speech language."),
+                      language.label)
+        let name = language.label.dropFirst("Cassini recognises speech in ".count).prefix { $0 != "." }
+        XCTAssertTrue(!name.isEmpty && !name.contains("-") && !name.contains("_"),
+                      "the language's name, as Settings shows it, not its code: \(name)")
 
         app.buttons["Where the models come from · Privacy"].tap()
         XCTAssertTrue(app.navigationBars["Source code and notices"].waitForExistence(within: 5))
@@ -57,6 +66,7 @@ final class ModelDownloadFlowTests: XCTestCase {
         // The figure keeps its unit on its line: a no-break space.
         XCTAssertTrue(text(app, containing: "Cassini needs a one-time download of about 531\u{00A0}MB.").exists)
         XCTAssertTrue(text(app, containing: "Needs about 1.2 GB free while installing.").exists)
+        XCTAssertFalse(app.staticTexts["speechLanguageLine"].exists, "Parakeet hears the language")
         XCTAssertTrue(app.buttons["Download and transcribe"].exists)
     }
 

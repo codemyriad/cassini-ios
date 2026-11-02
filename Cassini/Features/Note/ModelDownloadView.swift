@@ -64,6 +64,12 @@ private struct ModelDownloadContent: View {
                             .accessibilityElement(children: .combine)
                         }
                     }.cardBackground(radius: Radius.control)
+                    if let language = model.speechLanguage {
+                        // D59 (2): Apple Speech hears only the language set in Settings.
+                        Text("Cassini recognises speech in \(name(of: language)). To transcribe another language, change it in Settings › Speech language.", tableName: "Transcription", comment: "On the consent screen of devices that use Apple’s speech models. %@ is the speech language’s name, e.g. Italian (Italy). ‘Settings › Speech language’ names the screen and the setting.")
+                            .font(.subheadline).foregroundStyle(Color.muted)
+                            .accessibilityIdentifier("speechLanguageLine")
+                    }
                     Text("Needs about \(SizeCopy.text(plan.requiredFreeBytes, locale: locale)) free while installing. Each file is checked before it is used.", tableName: "Transcription")
                         .font(.subheadline).foregroundStyle(Color.muted)
                     Button(action: model.openSources) {
@@ -80,6 +86,9 @@ private struct ModelDownloadContent: View {
         .padding(.horizontal, 20).padding(.bottom, 24)
         .readableWidth()
     }
+
+    /// The language's name as the Settings picker shows it, in the app's language.
+    private func name(of identifier: String) -> String { locale.localizedString(forIdentifier: identifier) ?? identifier }
 
     /// The body, with the one-time download when every part tells its size (Parakeet devices): "about **531 MB**",
     /// the figure in bold ink and kept on one line (Android `ModelDownloadBody`).

@@ -31,6 +31,8 @@ import CassiniNotebook
                                       recognizer: transcriber.recognizer, catalog: ModelPlan.of(root: models))
     }
 
+    func speechLanguage() -> String? { transcriber.recognizer.usesLanguage ? settings.speechLanguage : nil }
+
     func usableBytes() async -> Int64 { storage.availableBytes(at: root) }
 
     func recordConsent(for parts: [ModelPart]) {

@@ -106,6 +106,9 @@ public struct ModelDownloadPlan: Hashable, Sendable {
     /// The missing parts and the free space their install needs. With a note, the parts its job uses; without one
     /// (the standalone download from Settings), every part that is not ready.
     func plan(for noteID: UUID?) async -> ModelDownloadPlan
+    /// The language the recognizer is set to hear (`SettingsStore.speechLanguage`, BCP 47) on a device that keeps
+    /// Apple Speech; nil where the recognizer hears the language itself (Parakeet).
+    func speechLanguage() -> String?
     /// Free bytes where the models go.
     func usableBytes() async -> Int64
     /// Agrees to downloading `parts`.
@@ -146,6 +149,11 @@ public final class ModelDownloadModel {
     public private(set) var busy = false
     /// The bytes the "Not enough storage" banner asks for; nil without that banner.
     public private(set) var noSpaceBytes: Int64?
+    /// The speech language the line under the parts names (D59 (2): "Cassini recognises speech in …, change it in
+    /// Settings › Speech language"): read with the plan, on a device that keeps Apple Speech, for a plan that
+    /// transcribes. Nil on a Parakeet device, which hears the language, and for a speakers-only job, which recognises
+    /// no speech.
+    public private(set) var speechLanguage: String?
 
     @ObservationIgnored private let ports: any ModelDownloadPorts
     @ObservationIgnored public var onEffect: (Effect) -> Void = { _ in }
@@ -165,7 +173,9 @@ public final class ModelDownloadModel {
     /// Reads the plan once the screen is shown.
     public func load() async {
         let plan = await ports.plan(for: noteID)
-        if plan.isEmpty { await closeStale() } else { self.plan = plan }
+        if plan.isEmpty { await closeStale(); return }
+        speechLanguage = plan.speakersOnly ? nil : ports.speechLanguage()
+        self.plan = plan
     }
 
     /// Download, and Retry in the no-space banner.
