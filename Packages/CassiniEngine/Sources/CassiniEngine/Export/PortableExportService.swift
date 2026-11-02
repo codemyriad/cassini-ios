@@ -22,11 +22,15 @@ import CassiniNotebook
 public struct PortableExportService: Sendable {
     private let audio: any AudioProcessing
     private let provenance: any ProvenanceStoring
+    private let unassignedLabel: String
 
     /// `provenance` holds the note's on-device runs' records; each variant whose words a run made carries that run's.
-    public init(audio: any AudioProcessing, provenance: any ProvenanceStoring) {
+    /// `unassignedLabel` is what the app calls a passage without a speaker, in the user's language: the label of the
+    /// `unassigned` speaker each variant that has such passages adds (`PortableTranscript.export`).
+    public init(audio: any AudioProcessing, provenance: any ProvenanceStoring, unassignedLabel: String) {
         self.audio = audio
         self.provenance = provenance
+        self.unassignedLabel = unassignedLabel
     }
 
     /// The exported file, `<folder>/<filename>.opus`. Nothing it made stays in `folder` when it throws.
@@ -66,14 +70,14 @@ public struct PortableExportService: Sendable {
             for (index, version) in versions.enumerated() {
                 try Task.checkCancellation()
                 let next = work.appendingPathComponent("version-\(index).opus")
-                variants[version.id] = try await Self.seal(Self.showing(version, of: note), opus, next,
-                                                           Self.record(version, runs, variants, note, audit), source)
+                variants[version.id] = try await seal(Self.showing(version, of: note), opus, next,
+                                                      Self.record(version, runs, variants, note, audit), source)
                 opus = next
                 source = nil
             }
             try Task.checkCancellation()
-            _ = try await Self.seal(Self.showing(current, of: note), opus, output,
-                                    Self.record(current, runs, variants, note, audit), source)
+            _ = try await seal(Self.showing(current, of: note), opus, output,
+                               Self.record(current, runs, variants, note, audit), source)
             return output
         } catch {
             try? FileManager.default.removeItem(at: output)
@@ -129,10 +133,12 @@ public struct PortableExportService: Sendable {
     }
 
     /// Seals `note` into `target`; `source` is the document at `opus` when it has been read already.
-    private static func seal(_ note: Note, _ opus: URL, _ target: URL, _ processing: JSONObject,
-                             _ source: CassiniDocument?) async throws -> String? {
-        try await Task.detached(priority: .userInitiated) {
-            try PortableTranscript.export(note: note, opus: opus, destination: target, processing: processing, source: source)
+    private func seal(_ note: Note, _ opus: URL, _ target: URL, _ processing: JSONObject,
+                      _ source: CassiniDocument?) async throws -> String? {
+        let unassignedLabel = unassignedLabel
+        return try await Task.detached(priority: .userInitiated) {
+            try PortableTranscript.export(note: note, opus: opus, destination: target, unassignedLabel: unassignedLabel,
+                                          processing: processing, source: source)
         }.value
     }
 

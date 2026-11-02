@@ -12,14 +12,18 @@ import CassiniNotebook
     @ObservationIgnored private let texts: ExportTexts
     @ObservationIgnored private let ready: @MainActor () async -> Void
 
-    /// `ready` returns once the launch work has run, so the launch sweep never removes an export being shared.
-    init(library: LibraryStore, audio: any AudioProcessing, folder: URL, locale: Locale, timeZone: TimeZone,
+    /// `texts` are the localized lines of every export (`ExportCopy.texts`); the sealed document labels passages without
+    /// a speaker with `texts.unassignedLabel`, as the transcript exports do. `ready` returns once the launch work has
+    /// run, so the launch sweep never removes an export being shared.
+    init(library: LibraryStore, audio: any AudioProcessing, folder: URL, texts: ExportTexts,
          ready: @escaping @MainActor () async -> Void) {
         self.library = library
         self.ready = ready
+        self.texts = texts
         service = library.noteStore.map { ExportService(notes: $0, folder: folder) }
-        portable = library.noteStore.map { PortableExportService(audio: audio, provenance: ProvenanceFiles(notes: $0)) }
-        texts = ExportCopy.texts(locale: locale, timeZone: timeZone)
+        portable = library.noteStore.map {
+            PortableExportService(audio: audio, provenance: ProvenanceFiles(notes: $0), unassignedLabel: texts.unassignedLabel)
+        }
     }
 
     /// The note's transcript in `format`, once the edits on screen are stored.

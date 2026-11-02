@@ -39,6 +39,16 @@ import Testing
         }
     }
 
+    /// The label a Cassini document export writes for passages without a speaker (the Export table's) is the one the
+    /// Note screen shows them under, in every language (D47: written as the app shows it, and shown as stored).
+    @Test(arguments: languages)
+    func theExportedUnknownSpeakerIsTheOneTheNoteShows(language: String) throws {
+        let bundle = try Self.bundle(language)
+        let exported = bundle.localizedString(forKey: "Unknown speaker", value: nil, table: "Export")
+        #expect(exported == bundle.localizedString(forKey: "Unknown speaker", value: nil, table: "Note"))
+        #expect(language == "en" || exported != "Unknown speaker", "\(language) is translated")
+    }
+
     /// A count reads in its language's CLDR category: 0 is `one` in French and Brazilian Portuguese but `other` in
     /// European Portuguese, Spanish and Italian ("0 note" against "0 notas"). A million is `many` in every language but
     /// English; `many` has the `other` text, so those cases check that the form is there rather than which one is read.

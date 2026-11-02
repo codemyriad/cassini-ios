@@ -26,7 +26,7 @@ import CassiniCore
     note.transcript[1].text = "Edited reply"; note.transcript[1].words = []
     let output = url.deletingLastPathComponent().appendingPathComponent(UUID().uuidString + ".opus")
     defer { try? FileManager.default.removeItem(at: output) }
-    try PortableTranscript.export(note: note, opus: url, destination: output)
+    try PortableTranscript.export(note: note, opus: url, destination: output, unassignedLabel: "Unknown speaker")
     let document = CassiniDocument.read(output)
     #expect(document.state == .ok)
     #expect(document.title == note.title)
@@ -165,7 +165,7 @@ struct PortableConformanceImportTests {
         note.speakers = portable.speakers
         let before = try Data(contentsOf: source)
 
-        try PortableTranscript.export(note: note, opus: source, destination: output)
+        try PortableTranscript.export(note: note, opus: source, destination: output, unassignedLabel: "Unknown speaker")
 
         let exported = CassiniDocument.read(output)
         #expect(exported.state == .ok)
@@ -185,7 +185,7 @@ struct PortableConformanceImportTests {
         let output = directory.appendingPathComponent("export.opus")
         var note = Note(title: "Edited")
         note.transcript = try imported("017-dangling-transcript-id").segments
-        try PortableTranscript.export(note: note, opus: source, destination: output)
+        try PortableTranscript.export(note: note, opus: source, destination: output, unassignedLabel: "Unknown speaker")
         #expect(CassiniDocument.read(output).state == .ok)
     }
 }
@@ -197,7 +197,8 @@ struct PortableConformanceImportTests {
         let source = directory.appendingPathComponent("audio.opus")
         try Data(try PortableFixtures.silence()).write(to: source)
         #expect(throws: PortableExportError.noTranscript) {
-            try PortableTranscript.export(note: Note(title: "Empty"), opus: source, destination: directory.appendingPathComponent("out.opus"))
+            try PortableTranscript.export(note: Note(title: "Empty"), opus: source, destination: directory.appendingPathComponent("out.opus"),
+                                          unassignedLabel: "Unknown speaker")
         }
         #expect(!FileManager.default.fileExists(atPath: directory.appendingPathComponent("out.opus").path))
     }
@@ -212,7 +213,7 @@ struct PortableConformanceImportTests {
         note.language = "en_US"
         note.transcript = [TranscriptSegment(text: "hello", start: 0, end: 0.5, speakerID: "S1")]
         let output = directory.appendingPathComponent("out.opus")
-        try PortableTranscript.export(note: note, opus: source, destination: output)
+        try PortableTranscript.export(note: note, opus: source, destination: output, unassignedLabel: "Unknown speaker")
         let exported = CassiniDocument.read(output)
         #expect(exported.state == .ok)
         #expect(exported.title == "New title")
@@ -237,7 +238,7 @@ struct PortableConformanceImportTests {
         note.transcript = [TranscriptSegment(text: "dopo", start: 0, end: 0.5, speakerID: "S1")]
         let output = directory.appendingPathComponent("export.opus")
 
-        try PortableTranscript.export(note: note, opus: source, destination: output, source: read)
+        try PortableTranscript.export(note: note, opus: source, destination: output, unassignedLabel: "Unknown speaker", source: read)
 
         let exported = CassiniDocument.read(output)
         #expect(exported.state == .ok)
@@ -263,7 +264,7 @@ struct PortableConformanceImportTests {
         let output = directory.appendingPathComponent("export.opus")
 
         #expect(throws: PortableExportError.tooLong) {
-            try PortableTranscript.export(note: note, opus: source, destination: output, source: stale)
+            try PortableTranscript.export(note: note, opus: source, destination: output, unassignedLabel: "Unknown speaker", source: stale)
         }
         #expect(!FileManager.default.fileExists(atPath: output.path))
     }
@@ -279,7 +280,7 @@ struct PortableConformanceImportTests {
         note.transcript = [TranscriptSegment(text: "hello", start: 0, end: 0.5, speakerID: "S1")]
         let output = directory.appendingPathComponent("out.opus")
 
-        try PortableTranscript.export(note: note, opus: source, destination: output)
+        try PortableTranscript.export(note: note, opus: source, destination: output, unassignedLabel: "Unknown speaker")
 
         let exported = CassiniDocument.read(output)
         #expect(exported.state == .ok)
@@ -319,7 +320,7 @@ struct PortableConformanceImportTests {
                            TranscriptSegment(text: "hello", start: 0.5, end: 1, speakerID: "spk_1")]
         note.speakers = [NoteSpeaker(id: "others~2", name: "Mira"), NoteSpeaker(id: "spk_1", name: "Speaker 1")]
         let output = directory.appendingPathComponent("out.opus")
-        try PortableTranscript.export(note: note, opus: source, destination: output)
+        try PortableTranscript.export(note: note, opus: source, destination: output, unassignedLabel: "Unknown speaker")
         let exported = CassiniDocument.read(output)
         #expect(exported.state == .ok)
         let speakers = exported.manifest?["speakers"]?.array?.compactMap { $0.object?.serialized() }
@@ -332,6 +333,78 @@ struct PortableConformanceImportTests {
         let relabelled = CassiniDocument.read(renamed)
         #expect(relabelled.manifest?["speakers"]?.array?.compactMap { $0.object?.serialized() } == [withLabel("Ada")])
         #expect(relabelled.manifest?["x"]?.serialized() == before.manifest?["x"]?.serialized())
+    }
+
+    /// D47 and parity report risk 4: a passage without a speaker is the speaker `unassigned`, labelled as the app shows
+    /// such passages in the user's language, never with its raw id, which Android and this app's reader take for an
+    /// unlabelled speaker ("Speaker N"). The entry exists only when a word uses it.
+    @Test func aPassageWithoutASpeakerIsLabelledAsTheAppShowsIt() throws {
+        let directory = try PortableFixtures.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let source = directory.appendingPathComponent("audio.opus")
+        try Data(try PortableFixtures.silence()).write(to: source)
+        var note = Note(title: "Riunione")
+        note.speakers = [NoteSpeaker(id: "spk_1", name: "Ada")]
+        note.transcript = [TranscriptSegment(text: "ciao", start: 0, end: 0.4, speakerID: "spk_1"),
+                           TranscriptSegment(text: "chi parla?", start: 0.4, end: 0.9)]
+        let output = directory.appendingPathComponent("out.opus")
+
+        try PortableTranscript.export(note: note, opus: source, destination: output, unassignedLabel: "Voce sconosciuta")
+
+        let exported = CassiniDocument.read(output)
+        #expect(exported.state == .ok)
+        #expect(exported.manifest?["speakers"]?.array?.compactMap { $0.object?.serialized() }
+                == [#"{"id":"spk_1","label":"Ada"}"#, #"{"id":"unassigned","label":"Voce sconosciuta"}"#])
+        #expect(exported.selected()?.transcript?.words.map(\.speaker) == ["spk_1", "unassigned", "unassigned"])
+        // Every reader, this one included, shows the label as stored.
+        let reread = try #require(PortableTranscript.read(from: output))
+        var imported = Note(title: "Riunione")
+        imported.transcript = reread.segments; imported.speakers = reread.speakers
+        #expect(NoteTranscripts.sealed(imported).turns.map(\.name) == [.named("Ada"), .named("Voce sconosciuta")])
+
+        // Without such a passage there is no entry.
+        note.transcript[1].speakerID = "spk_1"
+        let named = directory.appendingPathComponent("named.opus")
+        try PortableTranscript.export(note: note, opus: source, destination: named, unassignedLabel: "Voce sconosciuta")
+        #expect(CassiniDocument.read(named).manifest?["speakers"]?.array?.compactMap { $0.object?["id"]?.string } == ["spk_1"])
+    }
+
+    /// A verified source that has an `unassigned` entry already keeps it verbatim, its label too: the label was written
+    /// when its words were produced (D47), and an export in another language must not rewrite it. The note's name for
+    /// `unassigned`, read from that entry, changes the label only once the user renames it, as for any speaker.
+    @Test func aVerifiedSourcesUnassignedEntryKeepsItsStoredLabel() throws {
+        let directory = try PortableFixtures.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let first = try PortableFixtures.document([Word("unassigned", 0, 400, "hello")], title: "Shared",
+                                                  labels: ["unassigned": "Unknown speaker"])
+        var base = CassiniDocument.read(first)
+        base.manifest?["speakers"] = .array([.object(try JSON.parseObject(#"{"id":"unassigned","label":"Unknown speaker","futureMember":1}"#))])
+        let source = directory.appendingPathComponent("doc.opus")
+        try Data(try CassiniDocument.create(first, transcript: Transcript([Word("unassigned", 0, 400, "hello")], language: "en"),
+                                            title: "Shared", processing: JSONObject(), existing: base)).write(to: source)
+        let portable = try #require(PortableTranscript.read(from: source))
+        try #require(portable.state == .ok)
+        let entry = #"{"id":"unassigned","label":"Unknown speaker","futureMember":1}"#
+
+        // An Italian export that adds a passage without a speaker, and one where the shown version names no one.
+        var note = Note(title: "Shared")
+        note.transcript = portable.segments + [TranscriptSegment(text: "ciao", start: 0.4, end: 0.8)]
+        note.speakers = portable.speakers
+        var nobody = Note(title: "Shared")
+        nobody.transcript = [TranscriptSegment(text: "ciao", start: 0, end: 0.8)]
+        for (index, exporting) in [note, nobody].enumerated() {
+            let output = directory.appendingPathComponent("out-\(index).opus")
+            try PortableTranscript.export(note: exporting, opus: source, destination: output, unassignedLabel: "Voce sconosciuta")
+            let exported = CassiniDocument.read(output)
+            #expect(exported.state == .ok)
+            #expect(exported.manifest?["speakers"]?.array?.compactMap { $0.object?.serialized() } == [entry], "export \(index)")
+        }
+
+        note.renameSpeaker("unassigned", name: "Mira")
+        let renamed = directory.appendingPathComponent("renamed.opus")
+        try PortableTranscript.export(note: note, opus: source, destination: renamed, unassignedLabel: "Voce sconosciuta")
+        #expect(CassiniDocument.read(renamed).manifest?["speakers"]?.array?.compactMap { $0.object?.serialized() }
+                == [#"{"id":"unassigned","label":"Mira","futureMember":1}"#])
     }
 }
 

@@ -150,7 +150,7 @@ import CassiniNotebook
         let folder = h.root.appendingPathComponent("export", isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let output = try await PortableExportService(audio: FakeAudioProcessing(duration: 70, opensAnyFile: true),
-                                                     provenance: h.provenanceFiles)
+                                                     provenance: h.provenanceFiles, unassignedLabel: "Unknown speaker")
             .export(note, original: h.audioURL, playable: h.audioURL, into: folder, filename: "export")
         let document = CassiniDocument.read(output)
         let id = try #require(document.defaultId)

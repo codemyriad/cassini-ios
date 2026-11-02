@@ -1,0 +1,28 @@
+{
+ "two-versions-default-switched": {
+  "file": "two-versions-default-switched.opus",
+  "decision": "D53.3",
+  "expect": {
+   "classification": "cassini",
+   "state": "ok",
+   "payloadTrust": "verified",
+   "transcriptIds": [
+    "raw-asr",
+    "second-pass"
+   ],
+   "defaultTranscriptId": "second-pass",
+   "opensOn": "second-pass",
+   "openingWords": [
+    "ONE",
+    "TWO.",
+    "THREE."
+   ],
+   "wordCounts": {
+    "raw-asr": 3,
+    "second-pass": 3
+   },
+   "errors": [],
+   "warnings": []
+  }
+ }
+}
