@@ -45,8 +45,8 @@ struct TurnView: View, Equatable {
         let _ = RenderProbe.rendered(turn.id)
         #endif
         VStack(alignment: .leading, spacing: 2) {
-            TurnHeader(turn: turn, button: renamable && turn.speakerID != nil) {
-                if let id = turn.speakerID { actions.nameSpeaker(id) }
+            TurnHeader(turn: turn, button: renamable && turn.nameableSpeakerID != nil) {
+                if let id = turn.nameableSpeakerID { actions.nameSpeaker(id) }
             }
             paragraph
         }

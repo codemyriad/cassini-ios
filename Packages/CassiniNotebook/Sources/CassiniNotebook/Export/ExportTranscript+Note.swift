@@ -2,11 +2,12 @@ import CassiniCore
 import Foundation
 
 extension ExportTranscript {
-    /// The speaker id of passages no speaker was found for; the sealed document uses the same id.
+    /// The speaker id of passages without a speaker: those the user set to no speaker, and those of notes stored
+    /// before D59 (read as stored, D51). The sealed document uses the same id.
     public static let unassignedSpeaker = "unassigned"
 
     /// The export of `note`'s current transcript, or of `version` when one is given. Labels are the speakers' names
-    /// as the note shows them; passages without a speaker are labelled `unassignedLabel`.
+    /// as the note shows them; passages without a speaker (`unassignedSpeaker`) are labelled `unassignedLabel`.
     ///
     /// A timed word whose text holds several words gives one word per part, each with the word's range. A passage
     /// without word timing (one edited by hand) gives one word per part too, its span shared out among them

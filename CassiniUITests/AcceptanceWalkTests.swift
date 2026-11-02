@@ -41,8 +41,10 @@ final class AcceptanceWalkTests: XCTestCase {
         XCTAssertTrue(play.wait(until: NSPredicate(format: "label == 'Play'"), within: 3))
 
         // Name a speaker from its passage header: every passage of the first speaker carries the new name.
+        // The words come in one voice, "Speaker 1" (D59); a second speaker shows the speaker step is done.
+        XCTAssertTrue(speakerHeader(app, "Speaker 2").waitForExistence(within: 15), "the speakers are told apart after the words")
         let first = speakerHeader(app, "Speaker 1")
-        XCTAssertTrue(first.waitForExistence(within: 15), "the speakers are told apart after the words")
+        XCTAssertTrue(first.exists)
         // A transcription and its speakers are one version, as on Android: there is no version chip yet.
         XCTAssertFalse(app.buttons["versionChip"].exists, "the first transcription is the note's only version")
         first.tap()
