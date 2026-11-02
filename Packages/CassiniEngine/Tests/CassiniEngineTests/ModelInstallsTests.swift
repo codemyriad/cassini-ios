@@ -634,9 +634,10 @@ private final class SharedInstallTranscriber: Transcribing {
     func speechLanguages() async -> [SpeechLanguage] { [] }
 }
 
-/// Polls `condition` on the main actor until it holds, for at most five seconds.
+/// Polls `condition` on the main actor until it holds, for at most 30 seconds: an upper bound for a busy machine (the
+/// package tests run beside the UI build), never a wait a passing run sees.
 @MainActor private func until(_ condition: @MainActor () -> Bool) async throws {
-    let deadline = ContinuousClock.now + .seconds(5)
+    let deadline = ContinuousClock.now + .seconds(30)
     while !condition() {
         guard ContinuousClock.now < deadline else {
             Issue.record("The condition never held")

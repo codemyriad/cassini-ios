@@ -566,6 +566,31 @@ record_durations() {
 
 count_ran() { cat "$@" 2>/dev/null | grep -cE "^Test Case '-\[CassiniUITests\.[A-Za-z0-9_]+ [A-Za-z0-9_]+\]' (passed|failed|skipped)" || true; }
 
+# The tests (Class/method) a log shows started but never ending: their runner was killed under them.
+killed_tests() {
+    local log="$1"
+    sed -nE "s/^Test Case '-\[CassiniUITests\.([A-Za-z0-9_]+) ([A-Za-z0-9_]+)\]' (started|passed|failed|skipped).*/\1\/\2 \3/p" "$log" 2>/dev/null \
+        | awk '{ if ($2 == "started") open[$1] = 1; else delete open[$1] } END { for (t in open) print t }' | sort
+}
+
+# The simulator's backboardd (its display server) sometimes aborts in Metal's texture validation while Core Animation
+# flattens a layer (iOS 27 simulator; a report lands in ~/Library/Logs/DiagnosticReports). Its respawn ends every
+# process in the clone, the UI test runner too, so the test it was running fails with "Test crashed with signal kill"
+# and no assertion. When that shard's only failures are such tests and a backboardd report appeared during the run,
+# they run once more on the same clone, into ui-<shard>-retry.log. Returns 0 when the shard is green after it.
+retry_killed_tests() {
+    local shard="$1" udid="$2" log="$logs/ui-$1.log" killed t args=()
+    killed=$(killed_tests "$log")
+    [ -n "$killed" ] || return 1
+    grep -qE "^Test Case '.*' failed \(" "$log" && return 1
+    [ -n "$(find "$HOME/Library/Logs/DiagnosticReports" -name 'backboardd-*.ips' -newer "$logs/.ui-started" 2>/dev/null)" ] || return 1
+    echo "  ui-$shard: the simulator's backboardd crashed (Metal texture validation) and took the runner with it;" \
+        "running again: $(echo $killed)"
+    while IFS= read -r t; do args+=("-only-testing:CassiniUITests/$t"); done <<< "$killed"
+    test_on CassiniUITests "$logs/ui-$shard-retry.log" "$logs/ui-$shard-retry.xcresult" "$udid" "${args[@]}" || return 1
+    [ "$(count_ran "$logs/ui-$shard-retry.log")" = "$(printf '%s\n' "$killed" | wc -l | tr -d ' ')" ]
+}
+
 # The UI tests to run: every one, or those an -only-testing selection names (classes or methods). Other xcodebuild
 # arguments (and -skip-testing) are passed through.
 selected_ui_tests() {
@@ -605,7 +630,8 @@ tier_ui() {
 
     # Each shard starts as soon as its clone is up; the iPad, booted for this run only, starts when it is.
     step_start "UI tests ($workers shard(s)$( [ -n "$ipad_tests" ] && echo ' + iPad'))"
-    rm -f "$logs"/ui-*.log
+    rm -rf "$logs"/ui-*.log "$logs"/ui-*-retry.xcresult
+    touch "$logs/.ui-started"
     local pids=() k shard_args t
     wait_first_boot
     for k in $(seq 1 "$workers"); do
@@ -627,12 +653,20 @@ tier_ui() {
     fi
     local failed="" p
     for p in "${pids[@]}"; do wait "${p%%:*}" || failed="$failed ${p##*:}"; done
+    local still=""
+    for p in $failed; do
+        if [ "$p" = ipad ]; then retry_killed_tests ipad "$ipad" && continue
+        else retry_killed_tests "$p" "$(clone_udid "$prefix-iphone-$p" "$iphone_type")" && continue
+        fi
+        still="$still $p"
+    done
+    failed=$still
     record_durations
     step_end
 
     # Every test ran exactly once on the iPhones: a shard that lost tests fails here too.
-    local ran; ran=$(count_ran "$logs"/ui-[0-9].log)
-    echo "UI tests: $ran of $count ran on iPhone$( [ -n "$ipad" ] && echo ", $(count_ran "$logs/ui-ipad.log") of $(printf '%s\n' "$ipad_tests" | wc -l | tr -d ' ') on iPad")"
+    local ran; ran=$(count_ran "$logs"/ui-[0-9].log "$logs"/ui-[0-9]-retry.log)
+    echo "UI tests: $ran of $count ran on iPhone$( [ -n "$ipad" ] && echo ", $(count_ran "$logs/ui-ipad.log" "$logs/ui-ipad-retry.log") of $(printf '%s\n' "$ipad_tests" | wc -l | tr -d ' ') on iPad")"
     for p in $failed; do
         echo "shard $p failed (see $logs/ui-$p.log):" >&2
         grep -E "error:|failed \(|\*\* TEST|test.sh:|could not boot" "$logs/ui-$p.log" | tail -20 >&2
@@ -644,7 +678,7 @@ tier_ui() {
     case " ${extra[*]-} " in *" -skip-testing"*) return 0 ;; esac
     [ "$ran" = "$count" ] || die "expected $count UI tests, $ran ran"
     if [ -n "$ipad" ]; then
-        [ "$(count_ran "$logs/ui-ipad.log")" = "$(printf '%s\n' "$ipad_tests" | wc -l | tr -d ' ')" ] \
+        [ "$(count_ran "$logs/ui-ipad.log" "$logs/ui-ipad-retry.log")" = "$(printf '%s\n' "$ipad_tests" | wc -l | tr -d ' ')" ] \
             || die "the iPad did not run all of its UI tests"
     fi
 }

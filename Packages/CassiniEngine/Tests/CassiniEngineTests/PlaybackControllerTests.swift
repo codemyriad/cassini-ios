@@ -41,7 +41,7 @@ import CassiniNotebook
     private var milliseconds: Int { Int((controller.state.position * 1000).rounded()) }
 
     private func waitFor(_ what: String, _ condition: @MainActor () -> Bool) async throws {
-        let deadline = ContinuousClock.now + .seconds(5)
+        let deadline = ContinuousClock.now + .seconds(30) // An upper bound for a busy machine.
         while !condition() {
             guard ContinuousClock.now < deadline else {
                 Issue.record("Timed out waiting for \(what)")
