@@ -132,6 +132,36 @@
             "state": "translated",
             "value": "Cassini recognises speech in %@. To transcribe another language, change it in Settings › Speech language."
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Idioma que reconoce Cassini: %@. Para transcribir otro idioma, cámbialo en Ajustes › Idioma hablado."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Langue reconnue par Cassini : %@. Pour transcrire une autre langue, modifiez-la dans Réglages › Langue parlée."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lingua riconosciuta da Cassini: %@. Per trascrivere un’altra lingua, cambiala in Impostazioni › Lingua del parlato."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Idioma reconhecido pelo Cassini: %@. Para transcrever outro idioma, altere-o em Ajustes › Idioma da fala."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Idioma reconhecido pelo Cassini: %@. Para transcrever outro idioma, altere-o em Definições › Idioma da fala."
+          }
         }
       }
     },
