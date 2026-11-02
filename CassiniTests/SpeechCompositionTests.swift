@@ -53,7 +53,7 @@ import CassiniSherpa
         let download = Task { try await transcriber.installAssets(locale: Locale(identifier: "it-IT")) { _ in } }
         // The installer shows the install before it asks the host for Ultra: wait for both.
         try await waitUntil("the speech download never reached the shared installer and the host") {
-            guard case .installing(let parts, _, _, _) = models.installer.status, parts == [.speech] else { return false }
+            guard case .installing(let parts, _, _) = models.installer.status, parts == [.speech] else { return false }
             return !fetcher.fetched.isEmpty
         }
         XCTAssertEqual(fetcher.fetched, [ModelCatalog.parakeet.pin])

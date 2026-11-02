@@ -221,6 +221,7 @@ import CassiniNotebook
         installs.install([.speech])
         #expect(background.activeCount == 1)
         #expect(background.titles.values.first == "Downloading models")
+        #expect(background.subtitles.values.first == "They run on this device", "not the queue's subtitle")
         installs.install([.speakers])
         #expect(background.begunCount == 1, "one background time for the whole install")
         try await until { transcriber.installs == 1 }
@@ -232,6 +233,40 @@ import CassiniNotebook
         #expect(background.activeCount == 1)
         installs.cancel()
         #expect(background.activeCount == 0, "a cancel gives the time back")
+    }
+
+    /// The background progress weighs each part by its download over the whole install, so it never goes back when
+    /// the next part starts: half of Ultra (443 MB) is under half of the whole, and the speaker models (88 MB) start
+    /// where it ended.
+    @Test func theBackgroundProgressNeverGoesBackWhenTheNextPartStarts() async throws {
+        let transcriber = SharedInstallTranscriber()
+        let analyzer = ScriptedAnalyzer(status: .notDownloaded, gated: true)
+        let background = FakeBackgroundRunner()
+        let installs = ModelInstalls(transcriber: transcriber, analyzer: analyzer, clock: FakeClock(),
+                                     background: background) { "en-US" }
+        await installs.refresh()
+        installs.install([.speech, .speakers])
+        let progress = try #require(background.progresses.values.first)
+        var seen: [Int64] = []
+        try await until { transcriber.installs == 1 }
+        for fraction in [0.5, 1.0] {
+            transcriber.report(.downloading(fraction))
+            try await until { installs.status(of: .speech) == .downloading(fraction) }
+            seen.append(progress.completedUnitCount)
+        }
+        transcriber.finish(nil)
+        try await until { analyzer.installs == 1 }
+        for fraction in [0.1, 0.5, 1.0] {
+            analyzer.report(fraction)
+            try await until { installs.status(of: .speakers) == .downloading(fraction) }
+            seen.append(progress.completedUnitCount)
+        }
+        #expect(seen == seen.sorted(), "never back: \(seen)")
+        #expect(seen[0] > 0 && seen[0] < 50, "half of Ultra is under half of the whole: \(seen)")
+        #expect(seen[2] > seen[1], "the speaker models go on from where Ultra ended: \(seen)")
+        #expect(seen.last == 100)
+        analyzer.finish(with: nil, status: .ready)
+        try await until { !installs.isInstalling }
     }
 
     /// iOS takes the time back: the install stops, and the part in flight shows "Download stopped" (STOPPED_BY_SYSTEM)

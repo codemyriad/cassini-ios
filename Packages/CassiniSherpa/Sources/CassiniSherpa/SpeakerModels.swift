@@ -165,12 +165,12 @@ public final class SortformerStream: StreamingDiarizer, @unchecked Sendable {
     private static func create(_ config: SortformerConfig) throws -> OpaquePointer {
         // The native loader ends the process on a missing file instead of failing.
         guard fileExists(config.model) else { throw SherpaError.missingFiles }
+        // The D16 fork's C API has no Sortformer field: a model whose metadata says nemotron3_diarization goes in the
+        // pyannote slot, and the native side uses its default threshold of 0.5 (`Diarization.threshold`).
+        guard config.threshold == 0.5 else { throw SherpaError.unsupportedConfig }
         let strings = [config.model.path, config.provider, ""].map { strdup($0)! }
         defer { strings.forEach { free($0) } }
         var native = SherpaOnnxOfflineSpeakerDiarizationConfig()
-        // The D16 fork's C API has no Sortformer field: a model whose metadata says nemotron3_diarization goes in the
-        // pyannote slot, and the native side uses its default threshold of 0.5 (`Diarization.threshold`).
-        precondition(config.threshold == 0.5, "the D16 C API cannot set the Sortformer threshold")
         native.segmentation.pyannote.model = UnsafePointer(strings[0])
         native.segmentation.num_threads = config.threads
         native.segmentation.provider = UnsafePointer(strings[1])

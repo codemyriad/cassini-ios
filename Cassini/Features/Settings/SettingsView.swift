@@ -42,7 +42,7 @@ private struct SettingsForm: View {
     var body: some View {
         @Bindable var settings = settings
         Form {
-            AppLanguageSection(open: model.openAppLanguage)
+            AppLanguageSection(open: model.openAppLanguage, speechLanguageApart: model.showsSpeechLanguage)
             TranscriptionSection(model: model, language: $settings.speechLanguage, autoTranscribe: $settings.autoTranscribe)
             let banners = notices.settingsBanners
             if !banners.isEmpty {
@@ -82,6 +82,8 @@ private struct SettingsForm: View {
 /// iOS sets the app's language in the Settings app; the row shows it and opens Cassini's page there.
 struct AppLanguageSection: View {
     let open: () -> Void
+    /// Transcription has a Speech language picker (Apple Speech devices): the footer points to it.
+    let speechLanguageApart: Bool
 
     private var current: String { Self.name(of: Bundle.main.preferredLocalizations.first ?? "en") }
 
@@ -108,7 +110,9 @@ struct AppLanguageSection: View {
         } header: {
             Text("App language", tableName: "Settings").foregroundStyle(Color.muted)
         } footer: {
-            Text("The language of speech is chosen separately, under Transcription.", tableName: "Settings").foregroundStyle(Color.muted)
+            if speechLanguageApart {
+                Text("The language of speech is chosen separately, under Transcription.", tableName: "Settings").foregroundStyle(Color.muted)
+            }
         }
     }
 }
@@ -121,27 +125,35 @@ private struct TranscriptionSection: View {
 
     var body: some View {
         Section {
-            Picker(selection: $language) {
-                ForEach(model.languageOptions(chosen: language, name: name(of:)), id: \.id) { option in
-                    Group {
-                        if option.installed {
-                            Text("\(name(of: option.id)) · Installed", tableName: "Settings")
-                        } else {
-                            Text(name(of: option.id))
-                        }
-                    }.tag(option.id)
-                }
-            } label: {
-                Text("Speech language", tableName: "Settings")
-            }
-            // A list of its own rather than a menu: a long language name wraps instead of being cut at large text sizes.
-            .pickerStyle(.navigationLink)
+            // Only Apple Speech takes a language; Parakeet hears it, so its devices have no picker.
+            if model.showsSpeechLanguage { picker }
             Toggle(isOn: $autoTranscribe) { Text("Transcribe after recording or import", tableName: "Settings") }
         } header: {
             Text("Transcription", tableName: "Settings").foregroundStyle(Color.muted)
         } footer: {
-            Text("A new language applies to the next transcription.", tableName: "Settings").foregroundStyle(Color.muted)
+            if model.showsSpeechLanguage {
+                Text("A new language applies to the next transcription.", tableName: "Settings").foregroundStyle(Color.muted)
+            }
         }
+    }
+
+    private var picker: some View {
+        Picker(selection: $language) {
+            ForEach(model.languageOptions(chosen: language, name: name(of:)), id: \.id) { option in
+                Group {
+                    if option.installed {
+                        Text("\(name(of: option.id)) · Installed", tableName: "Settings")
+                    } else {
+                        Text(name(of: option.id))
+                    }
+                }.tag(option.id)
+            }
+        } label: {
+            Text("Speech language", tableName: "Settings")
+        }
+        // A list of its own rather than a menu: a long language name wraps instead of being cut at large text sizes.
+        .pickerStyle(.navigationLink)
+        .accessibilityIdentifier("speechLanguagePicker")
     }
 
     private func name(of identifier: String) -> String { locale.localizedString(forIdentifier: identifier) ?? identifier }

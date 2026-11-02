@@ -36,6 +36,8 @@ final class SettingsFlowTests: XCTestCase {
             .waitForExistence(within: 5))
         XCTAssertTrue(app.staticTexts["Notifications are off"].waitForExistence(within: 5))
         XCTAssertTrue(app.buttons["Turn on"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["speechLanguagePicker"].exists,
+                      "Apple Speech takes a language: Transcription offers the picker")
         let speech = element(app, startingWith: "Speech recognition")
         reveal(speech, in: app)
         XCTAssertTrue(speech.label.contains("Ready"), speech.label)
@@ -52,9 +54,15 @@ final class SettingsFlowTests: XCTestCase {
         reveal(version, in: app)
     }
 
-    /// On a Parakeet device the speech row shows the model's precision and its download by the shared size rule.
+    /// On a Parakeet device the speech row shows the model's precision and its download by the shared size rule, and
+    /// Transcription has no Speech language picker: Parakeet hears the language.
     @MainActor func testOnAParakeetDeviceTheSpeechRowShowsItsDownload() {
         let app = openSettings(["--parakeet"])
+        // The picker would sit above this toggle, in the same section: once the toggle is there, so would it be.
+        XCTAssertTrue(app.switches.matching(NSPredicate(format: "label BEGINSWITH %@", "Transcribe after recording"))
+            .firstMatch.waitForExistence(within: 5))
+        XCTAssertFalse(app.descendants(matching: .any)["speechLanguagePicker"].exists)
+        XCTAssertFalse(element(app, startingWith: "Speech language").exists)
         let speech = element(app, startingWith: "Speech recognition")
         reveal(speech, in: app)
         XCTAssertEqual(speech.label, "Speech recognition, INT8 · 443 MB, Ready")

@@ -40,18 +40,24 @@ import CassiniNotebook
     private var allReady: [ModelPart: ModelStatus] { ModelPart.allCases.reduce(into: [:]) { $0[$1] = .ready } }
 
     private nonisolated static func waiters(_ owner: PinnedModelInstaller) -> Int? {
-        if case .installing(_, _, _, let waiters) = owner.status { waiters } else { nil }
+        if case .installing(_, _, let waiters) = owner.status { waiters } else { nil }
+    }
+
+    /// A caller that installs `parts` and waits on its own, as the standalone download from Settings does
+    /// (`ModelInstalls`); Android's `startDownload`.
+    @discardableResult private nonisolated static func download(_ owner: PinnedModelInstaller,
+                                                                 _ parts: Set<ModelPart> = Set(ModelPart.allCases))
+        -> Task<Void, Never> {
+        Task { _ = try? await owner.install(parts) }
     }
 
     // ports: ModelInstallOwnerTest#aJobJoiningTheStandaloneDownloadFetchesEachArtifactOnce
     @Test func aJobJoiningTheStandaloneDownloadFetchesEachArtifactOnce() async throws {
-        owner.startDownload()
+        Self.download(owner)
         try await waitUntil { [fetcher] in fetcher.started }
         let progress = Mutex(0)
         let job = Task { [owner, all] in try await owner.install(all) { _ in progress.withLock { $0 += 1 } } }
         try await waitUntil { [owner] in Self.waiters(owner) == 2 }
-        guard case .installing(_, _, let standalone, _) = owner.status else { return }
-        #expect(standalone)
 
         release.open()
         #expect(try await job.value == .installed())
@@ -63,7 +69,7 @@ import CassiniNotebook
 
     // ports: ModelInstallOwnerTest#aRequestForOtherPartsWaitsAndFetchesNothingTwice
     @Test func aRequestForOtherPartsWaitsAndFetchesNothingTwice() async throws {
-        owner.startDownload([.speech])
+        Self.download(owner, [.speech])
         try await waitUntil { [fetcher] in fetcher.started }
         let job = Task { [owner, all] in try await owner.install(all) }
         try await waitUntil("The second install never waited for the first") { [owner] in owner.waitingForEnd == 1 }
@@ -76,7 +82,7 @@ import CassiniNotebook
 
     // ports: ModelInstallOwnerTest#cancelEndsEveryWaitAndKeepsThePartFiles
     @Test func cancelEndsEveryWaitAndKeepsThePartFiles() async throws {
-        let download = owner.startDownload()
+        let download = Self.download(owner)
         try await waitUntil { [fetcher] in fetcher.started }
         let job = Task { [owner, all] in try await owner.install(all) }
         try await waitUntil { [owner] in Self.waiters(owner) == 2 }
@@ -139,7 +145,7 @@ import CassiniNotebook
     // ports: ModelInstallOwnerTest#aRequestRightAfterACancelWaitsForTheCancelledFetchToEnd
     @Test func aRequestRightAfterACancelWaitsForTheCancelledFetchToEnd() async throws {
         release.stubborn = true
-        owner.startDownload()
+        Self.download(owner)
         try await waitUntil { [fetcher] in fetcher.started }
 
         owner.cancel()
@@ -173,7 +179,7 @@ import CassiniNotebook
         let executor = GatedExecutor()
         defer { executor.open() }
         let gated = PinnedModelInstaller(models: models, storage: FakeStorage(), online: { true }, executor: executor)
-        let download = gated.startDownload([.speech])
+        let download = Self.download(gated, [.speech])
         try await waitUntil { gated.status != .idle }
         gated.cancel()
         executor.open()
@@ -194,16 +200,6 @@ import CassiniNotebook
         #expect(PinnedModelInstaller.statusOf(progress) == .downloading(percent: 25, bytes: 50, total: 200))
     }
 
-    /// iOS ended the background time of the standalone download: its parts show "Download stopped".
-    @Test func aStoppedDownloadShowsStoppedBySystemUntilTheNextInstall() async throws {
-        owner.startDownload([.speech])
-        try await waitUntil { [fetcher] in fetcher.started }
-        #expect(await owner.stopDownloads())
-        try await waitUntil { [owner] in owner.status == .idle }
-        #expect(owner.lastOutcome == .failed(part: .speech, error: .stoppedBySystem, requiredFreeBytes: 0))
-        #expect(models.status[.speech] == .failed(.modelDownload, detail: "STOPPED_BY_SYSTEM"))
-        #expect(await !owner.stopDownloads(), "no standalone download runs")
-    }
 }
 
 /// Speech over the shared installer, as Parakeet's standalone download installs it.

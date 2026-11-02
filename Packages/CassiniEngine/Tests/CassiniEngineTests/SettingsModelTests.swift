@@ -28,6 +28,7 @@ import CassiniNotebook
         func refreshNotices() async { noticeRefreshes += 1 }
         var languages: [SpeechLanguage] = []
         func speechLanguages() async -> [SpeechLanguage] { languages }
+        var recognizer = SpeechRecognizer.appleSpeech
     }
 
     @MainActor private final class Effects { var list: [SettingsModel.Effect] = [] }
@@ -138,6 +139,14 @@ import CassiniNotebook
                     SpeechLanguage(id: "it-IT", installed: false)])
         #expect(model.languageOptions(chosen: "xx-XX", name: name).map(\.id) == ["xx-XX", "en-US", "de-DE", "it-IT"],
                 "a chosen language that is not on offer stays in the picker")
+    }
+
+    /// Only Apple Speech takes a speech language: a Parakeet device has no picker (it would offer one language that
+    /// changes nothing), as Android has none.
+    @Test func onlyAnAppleSpeechDeviceShowsTheSpeechLanguagePicker() async {
+        #expect(await model().showsSpeechLanguage)
+        ports.recognizer = .parakeet
+        #expect(await !model().showsSpeechLanguage)
     }
 
     // ports: SettingsViewModelTest#theLanguageGoesToAppCompatAndPhoneIsTheEmptyList (iOS sets the app language in the

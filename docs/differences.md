@@ -90,11 +90,11 @@ that were not ported, with the reason for each.
   - `LongRunMeasurementTests#checkpointPathOfATenHourRun` measures iOS's own checkpoint path (the typed recognizer
     state and `CheckpointState.encoded()` of segments) instead of Android's three word-log variants, because iOS has
     no word log. `CASSINI_MEASURE_HOURS` shortens it.
-- **Speech language.** Apple's models are per language, so iOS asks for a speech language in Settings ("· Installed"
-  marks the ones on the device). Android recognises any language on its own. A language that Apple does not offer
-  counts as nothing to download, and the job fails with `UNSUPPORTED_LANGUAGE` rather than waiting for a consent that
-  cannot help. `UNSUPPORTED_LANGUAGE` and `RESERVATION_LIMIT` (Apple's speech assets) are failure codes that exist only
-  on iOS.
+- **Speech language.** On Apple Speech devices iOS asks for a speech language in Settings, because Apple's models are
+  per language ("· Installed" marks the ones on the device). Parakeet devices have no such picker: Parakeet recognises
+  any language on its own, as Android does. A language that Apple does not offer counts as nothing to download, and the
+  job fails with `UNSUPPORTED_LANGUAGE` rather than waiting for a consent that cannot help. `UNSUPPORTED_LANGUAGE` and
+  `RESERVATION_LIMIT` (Apple's speech assets) are failure codes that exist only on iOS.
 - **Sizes.** Every size on the model download screen and the On-device models rows follows the shared rule of
   `ux-draft/format-vectors.json` (`sizeRule`, v4: MB rounded half up, GB with one decimal from 1000 MB, KB below 1 MB;
   `SizeText`, tested with the vectors), so Ultra's download reads "443 MB" as D4 and D16 write it. Android still
@@ -197,8 +197,10 @@ that were not ported, with the reason for each.
     whether the path is expensive or constrained). Like Android, the consent screen has no mobile-data note.
   - **A full disk** during a download is `NOT_ENOUGH_STORAGE`, as iOS reports it as its own error. Android reads it
     as an I/O error (`INTERRUPTED`). Both check the free space before the first byte.
-  - **Stopped by the system.** `PinnedModelInstaller.stopDownloads()` stands for the end of the
-    `BGContinuedProcessingTask`, as Android's for the foreground service's time-out.
+  - **Stopped by the system.** The installer has no `startDownload`/`stopDownloads()`: the standalone download is
+    `ModelInstalls`, one more caller of the installer, and the end of its `BGContinuedProcessingTask` (Android's
+    foreground-service time-out) stops its own wait and shows "Download stopped" there. The ported
+    `ModelInstallOwnerTest` cases start that caller with `install`.
   - **Compressed downloads.** Every model file is seekable Zstandard, which Apple's Compression framework does not read.
     `ArtifactFetcher.fetchCompressed` takes a `Decompressing` port, which the app fills with `ZstdDecompressor`
     (CassiniInference, `ZstdModelTest` ported as `ZstdDecompressorTests`).
@@ -605,10 +607,13 @@ stricter or looser than the spec.
   drain that starts in the background, or a refused request, falls back to the finite time of
   `beginBackgroundTask`. The standalone model download (Settings, the model download screen; Android runs it in the
   same foreground service) holds its own continued task under a second identifier
-  (`io.codemyriad.cassini.transcription.work`), titled "Downloading models", from its start to its end
-  (`ModelInstalls`), so a 443 MB Ultra download goes on after Cassini leaves the screen. When iOS takes that time back,
-  or the person presses Stop, the standalone download stops as its Cancel does and the part shows "Download stopped"
-  (STOPPED_BY_SYSTEM), as Android's `stopDownloads()` shows it, until its next install.
+  (`io.codemyriad.cassini.transcription.work`), titled "Downloading models" with the subtitle "They run on this
+  device" (the queue's says "Your audio stays on this device"; it names no source, as Apple's speech assets come from
+  Apple and the rest from the model host), from its start to its end (`ModelInstalls`), so a 443 MB Ultra download
+  goes on after Cassini leaves the screen. Its progress weighs each part by its download, so it never goes back when
+  the next part starts. When iOS takes that time back, or the person presses Stop, the standalone download stops as
+  its Cancel does and the part shows "Download stopped" (STOPPED_BY_SYSTEM), as Android's `stopDownloads()` shows it,
+  until its next install.
 - **When iOS takes the time back.** Expiry and the system's Stop do what Android's `onTimeout` does. The job's stop is
   signalled before iOS's expiration handler returns, the queue is held (`system`), and the job shows as paused by the
   system. While Cassini is hidden, the notification "Transcription paused by iOS · iOS needed the time back. Open
@@ -686,13 +691,16 @@ These features exist only on iOS. They were kept by decision.
     larger text sizes (`testNoTextIsClippedInBrazilianPortuguese`).
 - **Forget all voice data** in Saved voices. It is offered when nobody is saved but notes still hold voiceprints, and
   also for a damaged list, so there is always a way back.
-- **Settings sections** for Transcription (the speech language, and "Transcribe after recording or import", on by
-  default), Speakers (identify speakers, name strong matches automatically) and Your library (counts and duration).
-  Turning automatic transcription off makes every finish and import audio only.
+- **Settings sections** for Transcription (the speech language on Apple Speech devices, and "Transcribe after
+  recording or import", on by default), Speakers (identify speakers, name strong matches automatically) and Your
+  library (counts and duration). Turning automatic transcription off makes every finish and import audio only.
 - **Notices that exist only on iOS:** REC_INPUT_LOST, REC_COMPRESSION_FAILED, NOTES_UNREADABLE ("2 notes can't be
   read"), DL_PIN_UNAVAILABLE ("Model not available": the model host no longer offers the pinned model; update Cassini;
   no Retry, closable), "No speakers were detected" and "This audio can't be played" (a playback error at run time).
-- **Document info** adds "Made by" (an imported document's vendor). Its model row names Apple's speech model.
+- **Document info** adds "Made by" (an imported document's vendor). Its model row names Parakeet Ultra ("Parakeet
+  Ultra, INT8") by the provenance model string, iOS's pin or Android's `<id> <precision>`
+  (`ModelCatalog.speechModelNames`, as Android's `NoteMapping.modelName`), and Apple's speech model by its engine;
+  any other model string shows its engine.
 
 ## Platform
 

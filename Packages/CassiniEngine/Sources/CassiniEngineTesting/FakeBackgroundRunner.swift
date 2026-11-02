@@ -9,15 +9,22 @@ import CassiniEngine
     public private(set) var begunCount = 0
     /// The title of each token that has not ended.
     public private(set) var titles: [BackgroundToken: String] = [:]
+    /// The subtitle of each token that has not ended.
+    public private(set) var subtitles: [BackgroundToken: String] = [:]
+    /// The progress of each token that has not ended, as iOS would show it.
+    public private(set) var progresses: [BackgroundToken: Progress] = [:]
 
     public init() {}
 
     public var activeCount: Int { active.count }
 
-    public func begin(title: String, progress: Progress, onExpire: @escaping @MainActor () -> Void) -> BackgroundToken {
+    public func begin(title: String, subtitle: String, progress: Progress,
+                      onExpire: @escaping @MainActor () -> Void) -> BackgroundToken {
         let token = BackgroundToken()
         active[token] = onExpire
         titles[token] = title
+        subtitles[token] = subtitle
+        progresses[token] = progress
         begunCount += 1
         return token
     }
@@ -28,6 +35,8 @@ import CassiniEngine
 
     public func end(_ token: BackgroundToken) {
         titles[token] = nil
+        subtitles[token] = nil
+        progresses[token] = nil
         if active.removeValue(forKey: token) != nil { endedCount += 1 }
     }
 

@@ -185,10 +185,12 @@ public enum ModelCatalog {
     /// What a Parakeet transcript's provenance names as its model: `<id>@<source_sha256>` (D16 §5).
     public static var parakeetProvenanceModel: String { parakeet.pin }
 
-    /// The name the app shows for the speech model of this build, by the model string iOS writes (its pin, D16 §5) and
-    /// by the one Android writes. Earlier models have no entry (D51).
+    /// The name Document info shows for the speech model of this build, by the model string of a transcript's
+    /// provenance: the pin iOS writes (D16 §5), and Android's `<id> <precision>` and `<id>`, named as Android's
+    /// `NoteMapping.modelName` names them ("Parakeet Ultra, INT8"). Earlier models have no entry (D51).
     public static let speechModelNames: [String: String] = [
-        parakeet.pin: parakeetDisplayName,
+        parakeet.pin: "\(parakeetDisplayName), \(parakeetPrecision)",
+        "\(parakeetModelID) \(parakeetPrecision)": "\(parakeetDisplayName), \(parakeetPrecision)",
         parakeetModelID: parakeetDisplayName,
     ]
 

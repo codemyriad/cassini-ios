@@ -32,15 +32,16 @@ import CassiniNotebook
     @Test func bothModelsInstallAsOneRowWithoutTheSpeechConsent() async throws {
         #expect(await models.refresh(linked: true) == .notDownloaded)
         #expect(models.status(linked: false) == .unsupported, "a build without the native runtime")
-        #expect(models.installBytes == ModelPlan(ModelPlan.of(root: models.root).missing
-            .filter { $0.part != .speech }).requiredFreeBytes)
+        let fresh = ModelPlan(ModelPlan.of(root: models.root).missing.filter { $0.part != .speech }).requiredFreeBytes
+        #expect(models.installBytes == fresh)
         let reports = Mutex<[InstallProgress]>([])
         try await models.install { progress in reports.withLock { $0.append(progress) } }
         #expect(fetcher.fetched == [ModelCatalog.diarization.pin, ModelCatalog.voiceprint.pin],
                 "the diarizer, then CAM++, nothing of speech")
         #expect(models.diarizerReady && models.printsReady)
         #expect(await models.refresh(linked: true) == .ready)
-        #expect(models.installBytes == 0)
+        #expect(models.installBytes == fresh,
+                "installed, a fresh install's figure: a note that failed for want of room never asks to free 0 bytes")
         let fractions = reports.withLock { $0 }.compactMap { if case .downloading(let value?) = $0 { value } else { nil } }
         #expect(fractions == fractions.sorted(), "one rising fraction over both downloads")
         #expect(fractions.last == 1)

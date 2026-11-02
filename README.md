@@ -101,9 +101,9 @@ records their exact revisions.
   versions, beside the source's private data and meeting details.
 - **Recently Deleted.** Deleted notes stay for 30 days, with Undo right after the delete, and can be restored,
   deleted now, or emptied all at once. A permanent delete also removes that note's voice samples.
-- **Settings** for the app language (in the Settings app), the speech language, automatic transcription, speaker
-  identification and automatic naming. The on-device model rows show their status, with Download and Cancel. Your
-  library's totals and the licences are there too.
+- **Settings** for the app language (in the Settings app), the speech language (Apple Speech devices only),
+  automatic transcription, speaker identification and automatic naming. The on-device model rows show their status,
+  with Download and Cancel. Your library's totals and the licences are there too.
 - **Six languages:** English, Italian, French, Spanish, and Brazilian and European Portuguese (D50).
   - Cassini follows the system's language. A regional variant reads as its language (fr-CA as French), and a bare
     `pt` as Brazilian Portuguese. pt-PT and the other Portuguese regions read as European Portuguese, and any other

@@ -1300,6 +1300,47 @@
         }
       }
     },
+    "They run on this device": {
+      "comment": "Subtitle of the system's progress while models download",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "They run on this device"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Funcionan en este dispositivo"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ils fonctionnent sur cet appareil"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Funzionano su questo dispositivo"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eles funcionam neste dispositivo"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Funcionam neste dispositivo"
+          }
+        }
+      }
+    },
     "This iPad is low on memory. Close other apps if transcription stops.": {
       "comment": "The memory hint on the processing card of an iPad",
       "extractionState": "manual",

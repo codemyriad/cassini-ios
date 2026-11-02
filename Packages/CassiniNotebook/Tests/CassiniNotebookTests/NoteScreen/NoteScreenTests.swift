@@ -315,7 +315,7 @@ import Testing
         #expect(note.versions?[1].segments == note.transcript && note.transcript[1].text == "Bene.")
         #expect(note.versions?[0].segments[0] == first, "the version before keeps the passage as it was")
         #expect(NoteChips.of(note)?.version == VersionChip(index: 2, count: 2, kind: .edited))
-        #expect(DocumentInfoFacts.of(note, provenance: nil, fileBytes: nil).versions == 2)
+        #expect(DocumentInfoFacts.of(note, provenance: nil, fileBytes: nil, speechModels: [:]).versions == 2)
     }
 
     /// A transcript with its speakers analysed: "Before speaker analysis" and "Speaker analysis", the second shown.
@@ -340,7 +340,7 @@ import Testing
                 "the shown version takes the names")
         #expect(note.versions?[0].segments.allSatisfy { $0.speaker == nil } == true, "the version before stays as it was")
         #expect(NoteChips.of(note)?.version == VersionChip(index: 2, count: 2, kind: .transcribedAgain))
-        #expect(DocumentInfoFacts.of(note, provenance: nil, fileBytes: nil).versions == 2)
+        #expect(DocumentInfoFacts.of(note, provenance: nil, fileBytes: nil, speechModels: [:]).versions == 2)
         #expect(note.mergeVersionNumbers == (2, 3))
     }
 
@@ -363,7 +363,7 @@ import Testing
         #expect(note.versions?[2].segments == note.transcript && note.versions?[2].speakers == note.speakers)
         #expect(note.transcript.map(\.speaker) == ["Giulia", "Speaker 2"])
         #expect(NoteChips.of(note)?.version == VersionChip(index: 3, count: 3, kind: .edited))
-        #expect(DocumentInfoFacts.of(note, provenance: nil, fileBytes: nil).versions == 3)
+        #expect(DocumentInfoFacts.of(note, provenance: nil, fileBytes: nil, speechModels: [:]).versions == 3)
     }
 
     /// Editing an older version keeps it and adds the edits after the kept versions.
@@ -394,6 +394,25 @@ import Testing
         #expect(DocumentInfoFacts.modelName("apple-speechtranscriber-2") == "apple-speechtranscriber-2")
     }
 
+    /// A Parakeet run names its model by the name of its model string (`ModelCatalog.speechModelNames`, tested with
+    /// the catalog), not by its engine; Apple Speech's model string carries the locale, so its engine names it, and a
+    /// model string without a name falls back to the engine too.
+    @Test func documentInfoNamesAParakeetRunByItsModel() {
+        let names = ["parakeet-ultra-0.6b-int8@abc": "Parakeet Ultra, INT8"]
+        let device = RunDevice(model: "iPhone17,1", system: "iOS 26.0.1 (23A355)")
+        let parakeet = TranscriptProvenance.parakeetRun(model: "parakeet-ultra-0.6b-int8@abc", revision: "abc",
+                                                        segmentation: "speech", inferenceMs: 4_000, resumedFromMs: 0,
+                                                        device: device)
+        #expect(DocumentInfoFacts.of(F.weeklySync, provenance: parakeet, fileBytes: nil, speechModels: names).model
+                == "Parakeet Ultra, INT8")
+        var other = parakeet
+        other.model = "parakeet-ultra-0.6b-int8@def"
+        #expect(DocumentInfoFacts.modelName(other, speechModels: names) == "Parakeet TDT", "a pin this build does not know")
+        let apple = TranscriptProvenance.appleRun(language: "it-IT", inferenceMs: 4_000, resumedFromMs: 0,
+                                                  model: "Apple SpeechTranscriber it-IT", device: device)
+        #expect(DocumentInfoFacts.modelName(apple, speechModels: names) == "Apple SpeechTranscriber")
+    }
+
     // ports: NoteViewModelTest#documentInfoReadsTheDocumentFactsWhenOpened
     @Test func documentInfoReadsTheFactsOfTheNoteAndItsRun() {
         var note = F.weeklySync
@@ -404,10 +423,10 @@ import Testing
                                               speakerDiarization: .sortformer(revision: "r", sha256: "s", elapsedMs: 1,
                                                                               turnCount: 4, speakerCount: 3,
                                                                               streaming: true))
-        #expect(DocumentInfoFacts.of(note, provenance: provenance, fileBytes: nil).namesFromVoices == 0,
-                "without x-speakerIdentification, as Android reads it")
+        #expect(DocumentInfoFacts.of(note, provenance: provenance, fileBytes: nil, speechModels: [:])
+                    .namesFromVoices == 0, "without x-speakerIdentification, as Android reads it")
         provenance.speakerIdentification = .campplus(dim: 512, speakersWithPrints: 3, autoApplied: 1, suggested: 1)
-        let info = DocumentInfoFacts.of(note, provenance: provenance, fileBytes: 1_234)
+        let info = DocumentInfoFacts.of(note, provenance: provenance, fileBytes: 1_234, speechModels: [:])
         #expect(info.fileBytes == 1_234)
         #expect(info.model == "Apple SpeechTranscriber")
         #expect(info.speakers == 3)
@@ -416,7 +435,7 @@ import Testing
         #expect(info.namesFromVoices == 1)
         #expect(info.resumedFromMs == nil)
         #expect(info.language == "it-IT")
-        let bare = DocumentInfoFacts.of(note, provenance: nil, fileBytes: nil)
+        let bare = DocumentInfoFacts.of(note, provenance: nil, fileBytes: nil, speechModels: [:])
         #expect(bare.model == nil && bare.realtimeFactor == nil && bare.speakersToldApart == nil)
     }
 
@@ -426,6 +445,6 @@ import Testing
     func documentInfoShowsNoUnknownLanguage(_ stored: String) {
         var note = F.weeklySync
         note.language = stored
-        #expect(DocumentInfoFacts.of(note, provenance: nil, fileBytes: nil).language == nil)
+        #expect(DocumentInfoFacts.of(note, provenance: nil, fileBytes: nil, speechModels: [:]).language == nil)
     }
 }

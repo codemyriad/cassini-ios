@@ -64,7 +64,8 @@ struct DocumentInfoSheet: View {
         let bytes = audio.flatMap { url in
             (try? FileManager.default.attributesOfItem(atPath: url.path))?[.size] as? NSNumber
         }?.int64Value
-        return DocumentInfoFacts.of(note, provenance: provenance?.provenance(for: note), fileBytes: bytes)
+        return DocumentInfoFacts.of(note, provenance: provenance?.provenance(for: note), fileBytes: bytes,
+                                    speechModels: ModelCatalog.speechModelNames)
     }
 
     private func transcriptionLine(_ facts: DocumentInfoFacts) -> String? {

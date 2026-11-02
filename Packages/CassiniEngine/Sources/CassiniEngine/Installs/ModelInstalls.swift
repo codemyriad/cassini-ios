@@ -51,16 +51,21 @@ import CassiniNotebook
     @ObservationIgnored private var followers: [Task<Void, Never>] = []
     @ObservationIgnored private let background: (any BackgroundRunner)?
     @ObservationIgnored private let backgroundTitle: @MainActor () -> String
+    @ObservationIgnored private let backgroundSubtitle: @MainActor () -> String
     /// The background time the running standalone install holds, and the progress iOS shows for it.
     @ObservationIgnored private var backgroundToken: BackgroundToken?
     @ObservationIgnored private var backgroundProgress = Progress(totalUnitCount: 100)
+    /// The bytes of every part the running standalone install was asked for, and of those it has finished: the
+    /// background progress weighs each part's fraction by them, so it never goes back when the next part starts.
+    @ObservationIgnored private var backgroundBytes: (total: Int64, done: Int64) = (0, 0)
 
     /// `language` is the BCP-47 speech language whose assets count; `job` is the running job's progress, whose model
     /// download the rows show. `background` gives the standalone install its time after Cassini leaves the screen,
-    /// under `backgroundTitle`.
+    /// under `backgroundTitle` and `backgroundSubtitle`.
     public init(transcriber: any Transcribing, analyzer: any SpeakerAnalyzing, clock: any AppClock,
                 job: JobProgress? = nil, background: (any BackgroundRunner)? = nil,
                 backgroundTitle: @escaping @MainActor () -> String = { "Downloading models" },
+                backgroundSubtitle: @escaping @MainActor () -> String = { "They run on this device" },
                 language: @escaping @MainActor () -> String) {
         self.transcriber = transcriber
         self.analyzer = analyzer
@@ -68,6 +73,7 @@ import CassiniNotebook
         self.job = job
         self.background = background
         self.backgroundTitle = backgroundTitle
+        self.backgroundSubtitle = backgroundSubtitle
         self.language = language
         follow()
     }
@@ -157,6 +163,8 @@ import CassiniNotebook
         for part in added { failures[part] = nil }
         installFailures.removeAll { added.contains($0.part) }
         queued.append(contentsOf: added)
+        if installing == nil { backgroundBytes = (0, 0) }
+        backgroundBytes.total += added.reduce(0) { $0 + bytes(of: $1) }
         guard installing == nil else {
             // During the closing refresh nothing is in flight: the part asked for shows as downloading at once.
             if inFlight == nil { download = DownloadFact(part: queued[0], at: clock.now) }
@@ -210,7 +218,8 @@ import CassiniNotebook
         guard let background, backgroundToken == nil else { return }
         // A new progress each time: a progress joins the system's task only once.
         backgroundProgress = Progress(totalUnitCount: 100)
-        backgroundToken = background.begin(title: backgroundTitle(), progress: backgroundProgress) { [weak self] in
+        backgroundToken = background.begin(title: backgroundTitle(), subtitle: backgroundSubtitle(),
+                                           progress: backgroundProgress) { [weak self] in
             // The runner ends the token right after this.
             self?.stopBySystem(number)
         }
@@ -233,6 +242,7 @@ import CassiniNotebook
                 let failure = await install(part, number)
                 guard installNumber == number else { break }
                 inFlight = nil
+                backgroundBytes.done += bytes(of: part)
                 if let failure {
                     download = failure
                     installFailures.append(failure)
@@ -285,7 +295,18 @@ import CassiniNotebook
         case .downloading(let fraction): download = DownloadFact(part: part, fraction: fraction, at: clock.now)
         case .checking: download = DownloadFact(part: part, fraction: download?.fraction, checking: true, at: clock.now)
         }
-        if let fraction = download?.fraction { backgroundProgress.completedUnitCount = Int64((fraction * 100).rounded()) }
+        guard let fraction = download?.fraction, backgroundBytes.total > 0 else { return }
+        let done = Double(backgroundBytes.done) + Double(bytes(of: part)) * min(max(fraction, 0), 1)
+        let units = Int64((done / Double(backgroundBytes.total) * 100).rounded(.down))
+        // A part asked for during the install adds to the whole: the progress waits rather than go back.
+        backgroundProgress.completedUnitCount = max(backgroundProgress.completedUnitCount, min(units, 100))
+    }
+
+    /// A part's weight in the background progress: its download, or for Apple's speech assets, whose size iOS does not
+    /// tell, the estimate of their install.
+    private func bytes(of part: ModelPart) -> Int64 {
+        part == .speech && transcriber.recognizer != .parakeet ? ModelDownloadPlan.speechInstallBytes
+            : ModelDownloadPlan.fullDownloadBytes(part)
     }
 
     /// Reads the models again when the speech language changes, and when the running job's model download ends.

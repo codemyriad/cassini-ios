@@ -32,6 +32,8 @@ import CassiniNotebook
 
     func speechLanguages() async -> [SpeechLanguage] { await transcriber.speechLanguages() }
 
+    var recognizer: SpeechRecognizer { transcriber.recognizer }
+
     var voices: Int { voicesStore.savedVoices.count }
     var trash: Int { library.notes.count { $0.trashedAt != nil } }
     var notes: [Note] { library.notes }

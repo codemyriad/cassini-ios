@@ -15,6 +15,8 @@ import CassiniNotebook
     func refreshModels() async
     /// The languages of speech on offer, each marked when its assets are installed.
     func speechLanguages() async -> [SpeechLanguage]
+    /// The recognizer this device transcribes with.
+    var recognizer: SpeechRecognizer { get }
     /// Saved voices.
     var voices: Int { get }
     /// Notes in Recently Deleted.
@@ -82,6 +84,10 @@ import CassiniNotebook
         await ports.refreshModels()
         speechLanguages = await ports.speechLanguages()
     }
+
+    /// Whether Transcription shows the Speech language picker: only Apple Speech takes a language (its models are per
+    /// language); Parakeet hears it, so a Parakeet device has no picker, as Android has none.
+    public var showsSpeechLanguage: Bool { ports.recognizer.usesLanguage }
 
     /// The Speech language picker's entries: the languages on offer sorted by `name`, preceded by the chosen one when
     /// it is not on offer (the picker never drops it). An entry whose assets are on the device shows "· Installed".

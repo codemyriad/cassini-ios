@@ -16,6 +16,8 @@ public enum SherpaError: Error, Equatable {
     case invalidAudio
     /// A saved Sortformer cache does not fit the model or is over `SpeakerBudget.diarizerStateFloats`.
     case restoreFailed
+    /// A setting the native API cannot take, such as a Sortformer threshold other than its default.
+    case unsupportedConfig
 }
 
 /// Whether this build links the sherpa-onnx C API.

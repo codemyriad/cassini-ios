@@ -72,6 +72,7 @@ extension TranscriptionCoordinatorTests {
             await h.coordinator.transcribe(b)
             _ = try await h.run(0)
             #expect(Array(h.background.titles.values) == ["Transcribing “A”"])
+            #expect(Array(h.background.subtitles.values) == ["Your audio stays on this device"])
             try await h.run(0).finish(.done)
             _ = try await h.run(1)
             #expect(h.background.begunCount == 1, "the next job runs in the same background time")

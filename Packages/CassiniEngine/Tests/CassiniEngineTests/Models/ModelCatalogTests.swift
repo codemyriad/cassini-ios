@@ -35,12 +35,23 @@ import CassiniNotebook
         #expect(ModelCatalog.parakeetPrecision == "INT8")
     }
 
-    // ports: ModelCatalogTest#theSpeechModelOfThisBuildHasAName (iOS also names its pin, the model string it writes)
+    // ports: ModelCatalogTest#theSpeechModelOfThisBuildHasAName (iOS also names its pin, the model string it writes),
+    // with NoteMappingTest#documentInfoNamesTheSpeechModel's precision rule
     @Test func theSpeechModelOfThisBuildHasAName() {
         #expect(ModelCatalog.speechModelNames == [
-            ModelCatalog.parakeetProvenanceModel: "Parakeet Ultra",
-            ModelCatalog.parakeetModelID: "Parakeet Ultra",
+            ModelCatalog.parakeetProvenanceModel: "Parakeet Ultra, INT8",
+            "moondream/parakeet-ultra INT8": "Parakeet Ultra, INT8",
+            "moondream/parakeet-ultra": "Parakeet Ultra",
         ])
+    }
+
+    /// Document info names an iOS Parakeet run's model by its pin through the catalog's names.
+    @Test func documentInfoNamesAParakeetRunParakeetUltraInt8() {
+        let run = TranscriptProvenance.parakeetRun(model: ModelCatalog.parakeetProvenanceModel,
+                                                   revision: ModelCatalog.parakeetRevision, segmentation: "speech",
+                                                   inferenceMs: 1, resumedFromMs: 0,
+                                                   device: RunDevice(model: "iPhone17,1", system: "iOS 26.0"))
+        #expect(DocumentInfoFacts.modelName(run, speechModels: ModelCatalog.speechModelNames) == "Parakeet Ultra, INT8")
     }
 
     /// iOS writes D16 §5's model string; Android still writes `<id> <precision>`.

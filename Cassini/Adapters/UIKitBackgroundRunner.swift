@@ -39,24 +39,23 @@ import CassiniEngine
         let identifier: String
         let progress: Progress
         let onExpire: Expiry
+        let subtitle: String
         var title: String
         var task: BGContinuedProcessingTask?
-        init(identifier: String, title: String, progress: Progress, onExpire: @escaping Expiry) {
-            self.identifier = identifier; self.title = title; self.progress = progress; self.onExpire = onExpire
+        init(identifier: String, title: String, subtitle: String, progress: Progress, onExpire: @escaping Expiry) {
+            self.identifier = identifier; self.title = title; self.subtitle = subtitle; self.progress = progress
+            self.onExpire = onExpire
         }
     }
 
     private var held: [BackgroundToken: Held] = [:]
     private var registered: Set<String> = []
 
-    private static var subtitle: String {
-        String(localized: "Your audio stays on this device", table: "Transcription",
-               comment: "Subtitle of the system's progress while a note is transcribed")
-    }
-
-    func begin(title: String, progress: Progress, onExpire: @escaping @MainActor () -> Void) -> BackgroundToken {
+    func begin(title: String, subtitle: String, progress: Progress,
+               onExpire: @escaping @MainActor () -> Void) -> BackgroundToken {
         let token = BackgroundToken()
-        if progress.totalUnitCount > 0, let continued = submit(title: title, progress: progress, onExpire: onExpire) {
+        if progress.totalUnitCount > 0,
+           let continued = submit(title: title, subtitle: subtitle, progress: progress, onExpire: onExpire) {
             held[token] = .continued(continued)
             return token
         }
@@ -71,7 +70,7 @@ import CassiniEngine
     func update(_ token: BackgroundToken, title: String) {
         guard case .continued(let continued) = held[token] else { return }
         continued.title = title
-        continued.task?.updateTitle(title, subtitle: Self.subtitle)
+        continued.task?.updateTitle(title, subtitle: continued.subtitle)
     }
 
     func end(_ token: BackgroundToken) {
@@ -94,17 +93,17 @@ import CassiniEngine
 
     /// Asks iOS to run the work as continued processing, under an identifier no held continued task has; nil when it
     /// refuses or every identifier is held.
-    private func submit(title: String, progress: Progress, onExpire: @escaping Expiry) -> Continued? {
+    private func submit(title: String, subtitle: String, progress: Progress, onExpire: @escaping Expiry) -> Continued? {
         let taken = Set(held.values.compactMap { entry -> String? in
             if case .continued(let continued) = entry { continued.identifier } else { nil }
         })
         guard let identifier = Self.identifiers.first(where: { !taken.contains($0) }), register(identifier) else {
             return nil
         }
-        let request = BGContinuedProcessingTaskRequest(identifier: identifier, title: title, subtitle: Self.subtitle)
+        let request = BGContinuedProcessingTaskRequest(identifier: identifier, title: title, subtitle: subtitle)
         request.strategy = .fail
         do { try BGTaskScheduler.shared.submit(request) } catch { return nil }
-        return Continued(identifier: identifier, title: title, progress: progress, onExpire: onExpire)
+        return Continued(identifier: identifier, title: title, subtitle: subtitle, progress: progress, onExpire: onExpire)
     }
 
     /// Registers the launch handler of `identifier` once; continued-processing handlers may be registered after launch.
@@ -131,7 +130,7 @@ import CassiniEngine
             return
         }
         continued.task = task
-        task.updateTitle(continued.title, subtitle: Self.subtitle)
+        task.updateTitle(continued.title, subtitle: continued.subtitle)
         task.progress.totalUnitCount = 100
         task.progress.addChild(continued.progress, withPendingUnitCount: 100)
         task.expirationHandler = { [weak self] in
