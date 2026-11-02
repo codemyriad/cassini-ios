@@ -7,17 +7,27 @@ import CassiniEngineTesting
 import CassiniNotebook
 
 /// The cross-app vectors (parity report risk 6): coordination `ux-draft/cross-app-vectors/`, files every Cassini app
-/// must open the same way. Each vector file and `expected.json` are copied byte for byte into
+/// must open the same way: `two-versions-default-switched` (from the conformance suite) and `android-written-v1`
+/// (written by cassini-android's own writers). Each vector file and `expected.json` are copied byte for byte into
 /// `Resources/cross-app-vectors/` and pinned by their SHA-256; a vector's pin is the one the coordination
-/// `SHA256.json` publishes. Every expectation `expected.json` lists is checked twice: through the reader
-/// (`CassiniDocument.read`, audio verified) and through the import, as the note it makes and the transcript the Note
-/// screen shows (`NoteTranscripts.sealed`).
+/// `SHA256.json` publishes. Every expectation `expected.json` lists is checked through the reader
+/// (`CassiniDocument.read`, audio verified) and, where the note keeps it, through the import too: the note it makes
+/// and the transcript the Note screen shows of each version (`NoteTranscripts.sealed`). A key no check reads fails
+/// `everyExpectationIsChecked`, so a new vector cannot pass on the keys the tests happen to know.
 @Suite struct CrossAppVectorTests {
     /// SHA-256 of the committed `expected.json`. Update it only together with a byte-identical copy of the shared file.
-    static let expectedPin = "fa70bcddde777621c30188870fd0212ac8e6da1a1b5664f5563555aac09813cd"
+    static let expectedPin = "ed8248eec38a9df2a05f770469c85ac7c1f9494e4a6b7cf52a0551746627f4b6"
     /// SHA-256 of each committed vector file, as coordination `ux-draft/cross-app-vectors/SHA256.json` gives it.
     static let filePins = [
         "two-versions-default-switched.opus": "d4bffa94eec9481f19668e53ee247f8e5a107402a0740094a0cc29b3252b9f6d",
+        "android-written-v1.opus": "29d8a4666d37fe01cee999652470b7c1ba5893af4dbc92a04092005bc777f725",
+    ]
+
+    /// The `expect` keys these tests check.
+    static let checkedKeys: Set<String> = [
+        "classification", "state", "payloadTrust", "audioTrust", "transcriptIds", "defaultTranscriptId", "opensOn",
+        "openingWords", "wordCounts", "errors", "warnings", "speakers", "shownLabels", "speakersByWord", "language",
+        "title", "tags", "bodyJsonIndented", "provenance",
     ]
 
     static let folder = "cross-app-vectors"
@@ -60,6 +70,11 @@ import CassiniNotebook
         }
     }
 
+    @Test(arguments: vectors)
+    func everyExpectationIsChecked(_ vector: Vector) {
+        #expect(Set(vector.expect.keys).subtracting(Self.checkedKeys).sorted() == [], "add a check for these keys")
+    }
+
     // MARK: - Reader
 
     @Test(arguments: vectors)
@@ -87,6 +102,55 @@ import CassiniNotebook
         #expect(opened.transcript?.words.prefix(opening.count).map(\.text) == opening)
         let portable = try #require(PortableTranscript(document))
         #expect(portable.selected?.portableID == expect["opensOn"]?.string, "the note's view of the document")
+
+        if let audio = expect["audioTrust"]?.string { #expect(Self.audioTrust(document.state) == audio, "\(document.state)") }
+        if let speakers = expect["speakers"]?.array {
+            // The manifest's speakers, in order: each id with its label as stored (D47), whatever else it carries.
+            let actual = (document.manifest?["speakers"]?.array ?? []).map { [$0.object?["id"]?.string, $0.object?["label"]?.string] }
+            #expect(actual == speakers.map { [$0.object?["id"]?.string, $0.object?["label"]?.string] })
+        }
+        if let byWord = expect["speakersByWord"]?.object {
+            for id in byWord.keys {
+                let words = document.variants.first { $0.id == id }?.transcript?.words
+                #expect(words?.map(\.speaker) == byWord[id]?.array?.compactMap(\.string), "\(id)")
+            }
+        }
+        if let languages = expect["language"]?.object {
+            for id in languages.keys {
+                let variant = document.variants.first { $0.id == id }
+                #expect(variant?.transcript?.language == languages[id]?.string, "\(id): the body's language")
+                #expect(variant?.descriptor["language"]?.string == languages[id]?.string, "\(id): the descriptor's language")
+            }
+        }
+        if let title = expect["title"]?.string { #expect(document.title == title) }
+        if let tags = expect["tags"]?.object {
+            for name in tags.keys {
+                let values = document.comments.compactMap { comment -> String? in
+                    guard let cut = comment.firstIndex(of: "="), comment[..<cut].uppercased() == name else { return nil }
+                    return String(comment[comment.index(after: cut)...])
+                }
+                if let value = tags[name]?.string { #expect(values == [value], "\(name)") } else { #expect(values == [], "no \(name) tag") }
+            }
+        }
+        if let indented = expect["bodyJsonIndented"]?.bool {
+            // Android writes its bodies indented, one of the deviations every reader accepts.
+            for variant in document.variants {
+                #expect((variant.body?.contains("\n") ?? false) == indented, "\(variant.id)")
+            }
+        }
+        if let provenance = expect["provenance"]?.object {
+            let speechToText = document.manifest?["provenance"]?.object?["speechToText"]?.object
+            for id in provenance.keys {
+                let actual = speechToText?[id]?.object
+                for (key, value) in try #require(provenance[id]?.object).pairs {
+                    if key == "hasXSpeakerDiarization" {
+                        #expect((actual?["x-speakerDiarization"]?.object != nil) == value.bool, "\(id)")
+                    } else {
+                        #expect(actual?[key] == value, "\(id) \(key)")
+                    }
+                }
+            }
+        }
     }
 
     // MARK: - Import
@@ -125,6 +189,58 @@ import CassiniNotebook
         let opening = try #require(vector.strings("openingWords"))
         let screen = NoteTranscripts.sealed(note).turns.flatMap(\.words).map(\.text)
         #expect(Array(screen.prefix(opening.count)) == opening, "the Note screen opens on \(opening.joined(separator: " "))")
+
+        if let title = expect["title"]?.string { #expect(note.title == title) }
+        if let languages = expect["language"]?.object {
+            for version in note.versions ?? [] {
+                let id = try #require(version.portableID)
+                #expect(version.language == languages[id]?.string, "\(id)")
+            }
+        }
+        if let byWord = expect["speakersByWord"]?.object {
+            for version in note.versions ?? [] {
+                let id = try #require(version.portableID)
+                let speakers = version.segments.flatMap { segment in segment.words.map { _ in segment.speakerID } }
+                #expect(speakers == byWord[id]?.array?.map(\.string), "\(id)")
+            }
+        }
+        if let shown = expect["shownLabels"]?.object {
+            // Each version as the Note screen shows it: stored labels as stored, in any UI language (D47).
+            for version in note.versions ?? [] {
+                let id = try #require(version.portableID)
+                var showing = note
+                showing.transcript = version.segments
+                showing.speakers = version.speakers
+                showing.selectedVersionID = version.id
+                var labels: [String] = []
+                for turn in NoteTranscripts.sealed(showing).turns {
+                    let label = Self.label(turn.name)
+                    if !labels.contains(label) { labels.append(label) }
+                }
+                #expect(labels == shown[id]?.array?.compactMap(\.string), "\(id)")
+            }
+        }
+    }
+
+    /// The text a speaker header shows.
+    private static func label(_ name: SpeakerName) -> String {
+        switch name {
+        case .named(let name): name
+        case .placeholder(_, let label): label
+        case .unknown: "Unknown speaker"
+        }
+    }
+
+    /// The audio trust of the conformance suite's vocabulary for the reader's `state`: the audio digest matches in
+    /// `ok`, is absent or unchecked in `unverified`, differs in `stale-audio` (cassini-format `spec/conformance/index.json`).
+    private static func audioTrust(_ state: DocumentState) -> String? {
+        switch state {
+        case .ok: "verified"
+        case .unverified: "unverified"
+        case .staleAudio: "mismatched"
+        case .plainAudio: "not-applicable"
+        case .unknownFormat, .invalidMetadata, .unreadable: nil
+        }
     }
 
     // The reader reports trust through its state alone: a payload that fails its digest makes the file
