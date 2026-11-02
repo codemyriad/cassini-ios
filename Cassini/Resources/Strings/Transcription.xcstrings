@@ -124,6 +124,47 @@
         }
       }
     },
+    "Cassini recognises speech in %@. To transcribe another language, change it in Settings › Speech language.": {
+      "comment": "On the consent screen of devices that use Apple’s speech models. %@ is the speech language’s name, e.g. Italian (Italy). ‘Settings › Speech language’ names the screen and the setting.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cassini recognises speech in %@. To transcribe another language, change it in Settings › Speech language."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Idioma que reconoce Cassini: %@. Para transcribir otro idioma, cámbialo en Ajustes › Idioma hablado."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Langue reconnue par Cassini : %@. Pour transcrire une autre langue, modifiez-la dans Réglages › Langue parlée."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lingua riconosciuta da Cassini: %@. Per trascrivere un’altra lingua, cambiala in Impostazioni › Lingua del parlato."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Idioma reconhecido pelo Cassini: %@. Para transcrever outro idioma, altere-o em Ajustes › Idioma da fala."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Idioma reconhecido pelo Cassini: %@. Para transcrever outro idioma, altere-o em Definições › Idioma da fala."
+          }
+        }
+      }
+    },
     "Download": {
       "comment": "Model download button without a note",
       "localizations": {

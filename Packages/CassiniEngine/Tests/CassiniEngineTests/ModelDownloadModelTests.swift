@@ -17,8 +17,10 @@ import CassiniNotebook
         var declines = 0
         var transcribed: [UUID] = []
         var downloads: [[ModelPart]] = []
+        var language: String? = "it-IT"
 
         func plan(for noteID: UUID?) async -> ModelDownloadPlan { plan }
+        func speechLanguage() -> String? { language }
         func usableBytes() async -> Int64 { usable }
         func recordConsent(for parts: [ModelPart]) { consents.append(parts) }
         func recordDeclined() { declines += 1 }
@@ -47,6 +49,22 @@ import CassiniNotebook
         #expect(model.withNote)
         #expect(model.noSpaceBytes == nil)
         #expect(await self.model(noteID: nil, effects: effects).withNote == false)
+        #expect(effects.list.isEmpty)
+    }
+
+    /// D59 (2): on a device that keeps Apple Speech the screen names the speech language a transcription will hear,
+    /// set in Settings; a Parakeet device hears it and a speakers-only job recognises no speech, so neither names one.
+    @Test func theSpeechLanguageIsNamedOnlyWhereAppleSpeechWillHearIt() async {
+        let effects = Effects()
+        #expect(await model(effects: effects).speechLanguage == "it-IT", "a note's transcription")
+        #expect(await model(noteID: nil, effects: effects).speechLanguage == "it-IT", "the download from Settings")
+        ports.plan = ModelDownloadPlan(missing: [.speakers], speakersInstallBytes: 54_000_000)
+        #expect(await model(effects: effects).speechLanguage == "it-IT", "Apple's assets are in, the job still transcribes")
+        ports.plan = ModelDownloadPlan(missing: [.speakers], speakersInstallBytes: 54_000_000, speakersOnly: true)
+        #expect(await model(effects: effects).speechLanguage == nil, "Identify speakers recognises no speech")
+        ports.plan = Self.fresh
+        ports.language = nil
+        #expect(await model(effects: effects).speechLanguage == nil, "Parakeet hears the language")
         #expect(effects.list.isEmpty)
     }
 
