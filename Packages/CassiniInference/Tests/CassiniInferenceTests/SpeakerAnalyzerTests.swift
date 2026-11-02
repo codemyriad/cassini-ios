@@ -96,17 +96,46 @@ import CassiniNotebook
         }
         // Windows at 0, 26 and 52 s; the turns on the recording clock, with ids of the analysis's own.
         #expect(engines.opened == [nil])
-        #expect(analysis.turns.map(\.speakerID).uniqued() == ["1", "2"])
+        let prefix = try #require(Self.runPrefix(analysis))
+        #expect(analysis.turns.map(\.speakerID).uniqued() == [prefix + "1", prefix + "2"])
         #expect(analysis.turns.first?.start == 0 && analysis.turns.last?.end == 70)
         #expect(analysis.transcript == nil, "the note attributes its own words")
         #expect(analysis.streaming && analysis.printsReady)
-        #expect(analysis.prints.map(\.speakerID) == ["1", "2"])
+        #expect(analysis.prints.map(\.speakerID) == [prefix + "1", prefix + "2"], "each print under its speaker's id")
         #expect(analysis.prints.allSatisfy { $0.model == VoiceprintModel.sha256 && $0.vector.count == 512 })
         // The clips are the selection's: at most 45 s each, the words told apart by the window's turns.
         let requested = try #require(engines.printRequests.first)
         #expect(requested.values.allSatisfy { $0.reduce(0) { $0 + $1.endSample - $1.startSample } <= 45 * 16_000 })
         #expect(fractions.withLock { $0 }.last == 1)
         #expect(fractions.withLock { $0 } == fractions.withLock { $0 }.sorted())
+    }
+
+    /// D56 and D59 as amended: every analysis writes speaker ids of its own, so Identify speakers run again never
+    /// gives its speakers an earlier run's ids, and with them that run's names or saved voices.
+    @Test func everyAnalysisHasSpeakerIdsOfItsOwn() async throws {
+        defer { try? FileManager.default.removeItem(at: folder) }
+        try install(ModelCatalog.diarization)
+        try install(ModelCatalog.voiceprint)
+        let speakers = analyzer(FakeSpeakerEngines(turns: Self.twoSpeakers))
+        let url = try audio(seconds: 70)
+        let first = try await speakers.analyze(url: url, words: words, allowDownload: false) { _ in }
+        let second = try await speakers.analyze(url: url, words: words, allowDownload: false) { _ in }
+        let firstPrefix = try #require(Self.runPrefix(first)), secondPrefix = try #require(Self.runPrefix(second))
+        #expect(firstPrefix != secondPrefix)
+        let firstIDs = Set(first.turns.map(\.speakerID) + first.prints.map(\.speakerID))
+        let secondIDs = Set(second.turns.map(\.speakerID) + second.prints.map(\.speakerID))
+        #expect(firstIDs.count == 2 && secondIDs.count == 2)
+        #expect(firstIDs.isDisjoint(with: secondIDs), "the same voices, told apart again, under new ids")
+    }
+
+    /// The prefix of an analysis's speaker ids, `<UUID>_` as `WindowSpeakers.freshPrefix()` makes it, when every
+    /// turn and print shares it.
+    static func runPrefix(_ analysis: SpeakerAnalysis) -> String? {
+        let ids = analysis.turns.map(\.speakerID) + analysis.prints.map(\.speakerID)
+        guard let first = ids.first, let cut = first.lastIndex(of: "_") else { return nil }
+        let prefix = String(first[...cut])
+        guard UUID(uuidString: String(prefix.dropLast())) != nil, ids.allSatisfy({ $0.hasPrefix(prefix) }) else { return nil }
+        return prefix
     }
 
     @Test func withoutTheVoiceprintModelTheSpeakersAreToldApartWithoutPrints() async throws {
@@ -118,7 +147,7 @@ import CassiniNotebook
         #expect(await speakers.streamingEngines() != nil, "a Parakeet run still tells speakers apart")
         #expect(await speakers.printsReady() == false)
         let analysis = try await speakers.analyze(url: try audio(seconds: 30), words: words, allowDownload: false) { _ in }
-        #expect(analysis.turns.map(\.speakerID).uniqued() == ["1"])
+        #expect(analysis.turns.map(\.speakerID).uniqued() == [try #require(Self.runPrefix(analysis)) + "1"])
         #expect(analysis.prints.isEmpty && !analysis.printsReady)
         #expect(engines.printRequests.isEmpty)
         // Without the diarizer nothing can be told apart, and nothing is fetched without consent.
@@ -213,7 +242,8 @@ import CassiniNotebook
         #expect(await speakers.streamingEngines() != nil)
         #expect(await speakers.printsReady() == false, "a Parakeet run collects no clips for it")
         let analysis = try await speakers.analyze(url: try audio(seconds: 70), words: words, allowDownload: false) { _ in }
-        #expect(analysis.turns.map(\.speakerID).uniqued() == ["1", "2"])
+        let prefix = try #require(Self.runPrefix(analysis))
+        #expect(analysis.turns.map(\.speakerID).uniqued() == [prefix + "1", prefix + "2"])
         #expect(analysis.prints.isEmpty && !analysis.printsReady)
         #expect(engines.printRequests.isEmpty, "CAM++ never loads unchecked")
         #expect(ModelCatalog.voiceprint.ready(in: root), "nothing is removed")

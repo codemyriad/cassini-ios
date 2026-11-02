@@ -152,15 +152,18 @@ public struct SpeakerAnalyzer: SpeakerAnalyzing {
                                       channels: 1, interleaved: false)!
 
     /// The whole-file analysis, on the inference thread: windows as `IncrementalTranscript` cuts them (28 s, the last
-    /// 2 s carried into the next), each with the words that overlap it on its own clock.
+    /// 2 s carried into the next), each with the words that overlap it on its own clock. Its speaker ids begin with
+    /// `prefix`, fresh for every analysis (`WindowSpeakers.freshPrefix()`), so a new analysis never reuses an earlier
+    /// run's ids and none of their names or saved voices land on its speakers (D56, D59 as amended).
     static func wholeFile(_ url: URL, words: [Word], engines: any SpeakerEngines, printsReady: Bool,
+                          prefix: String = WindowSpeakers.freshPrefix(),
                           memory: @escaping @Sendable () -> Int64?, cancel: CancelFlag,
                           progress: (SpeakerAnalysisEvent) -> Void) throws -> SpeakerAnalysis {
         let reader: FileReader
         do { reader = try FileReader(url: url, from: 0, to: format, downmix: true) } catch { throw JobFailure.open }
         let totalSamples = max(1, Int64((reader.duration * Double(format.sampleRate)).rounded()))
         let clips: MemoryClips? = printsReady ? MemoryClips() : nil
-        let speakers = try WindowSpeakers(engines: engines, clips: clips, prefix: "", availableMemory: memory)
+        let speakers = try WindowSpeakers(engines: engines, clips: clips, prefix: prefix, availableMemory: memory)
         defer { speakers.close() }
         let windowSamples = IncrementalTranscript.windowSamples, overlap = IncrementalTranscript.overlapSamples
         let rate = Int64(format.sampleRate)
@@ -211,7 +214,7 @@ public struct SpeakerAnalyzer: SpeakerAnalyzing {
                              speechSeconds: $0.value.seconds)
             }
         }
-        return SpeakerAnalysis(turns: speakers.turns.map { $0.speakerTurn(prefix: "") }, prints: prints, transcript: nil,
+        return SpeakerAnalysis(turns: speakers.turns.map { $0.speakerTurn(prefix: speakers.prefix) }, prints: prints, transcript: nil,
                                elapsedMs: speakers.elapsedMs, streaming: true, printsReady: printsReady)
     }
 
