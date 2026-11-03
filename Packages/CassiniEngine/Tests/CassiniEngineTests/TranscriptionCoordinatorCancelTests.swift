@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-import CassiniEngine
+@testable import CassiniEngine
 import CassiniEngineTesting
 import CassiniNotebook
 
@@ -159,10 +159,10 @@ extension TranscriptionCoordinatorTests {
             // Another queue action keeps the serial section busy, so the outcome cannot be written yet.
             h.checkpoints.hold(other)
             let busy = Task { await h.coordinator.dequeue(other) }
-            try await h.settle()
+            try await h.waitUntil("Remove from queue holds the serial section") { h.coordinator.lock.isBusy }
             #expect(h.coordinator.stop(a))
             let over = Task { await h.coordinator.startOver(a) }
-            try await h.settle()
+            try await h.waitUntil("Start over waits for the serial section") { h.coordinator.lock.waiting == 1 }
             first.finish(.paused(.user))
             try await h.waitUntil("the run ended") { first.hasEnded }
             h.checkpoints.release(other)
