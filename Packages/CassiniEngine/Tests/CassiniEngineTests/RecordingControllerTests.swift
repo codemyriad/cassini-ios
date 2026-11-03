@@ -229,7 +229,7 @@ import CassiniNotebook
         #expect(try h.active.pause == .user)
         h.capture.send(.interrupted)
         h.capture.send(.routeLost)
-        try await Task.sleep(for: .milliseconds(30))
+        try await h.eventsHandled()
         #expect(try h.active.pause == .user, "a user pause stays a user pause")
     }
 
@@ -270,7 +270,7 @@ import CassiniNotebook
         let h = try RecordingHarness(); defer { h.tearDown() }
         h.isReady = false
         #expect(h.controller.start())
-        try await Task.sleep(for: .milliseconds(30))
+        try await h.waitFor("the start waits for the app") { h.readyChecks >= 2 }
         #expect(h.controller.state == .starting)
         #expect(h.capture.starts == 0)
         h.isReady = true
@@ -293,7 +293,7 @@ import CassiniNotebook
 
         h.controller.pause()
         h.capture.send(.level(0.9))
-        try await Task.sleep(for: .milliseconds(30))
+        try await h.eventsHandled()
         #expect(h.controller.bars.levels.last == 0, "the bars freeze while paused")
     }
 

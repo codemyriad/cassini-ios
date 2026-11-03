@@ -48,7 +48,9 @@ import CassiniNotebook
     }
 
     /// Sends a capture event as the system would.
-    public func send(_ event: CaptureEvent) { continuation.yield(event) }
+    public func send(_ event: CaptureEvent) { sent += 1; continuation.yield(event) }
+    /// The events sent so far: a test waits until the controller has handled them all.
+    public private(set) var sent = 0
 }
 
 /// Records what the Live Activity was asked to show.

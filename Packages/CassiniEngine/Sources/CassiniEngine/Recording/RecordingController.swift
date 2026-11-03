@@ -98,12 +98,18 @@ public final class RecordingController {
     @ObservationIgnored private var activity: RecordingActivityState?
     /// States not yet told to every observer, oldest first.
     @ObservationIgnored private var undelivered: [RecordingState] = []
+    /// The capture's events handled so far, in the order they came: what a test waits on before it checks that one
+    /// changed nothing.
+    @ObservationIgnored private(set) var handledEvents = 0
 
     public init(parts: Parts) {
         self.parts = parts
         let stream = parts.capture.events
         events = Task { [weak self] in
-            for await event in stream { self?.handle(event) }
+            for await event in stream {
+                self?.handle(event)
+                self?.handledEvents += 1
+            }
         }
     }
 

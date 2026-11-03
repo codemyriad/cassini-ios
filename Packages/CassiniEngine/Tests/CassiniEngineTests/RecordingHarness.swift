@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-import CassiniEngine
+@testable import CassiniEngine
 import CassiniEngineTesting
 import CassiniNotebook
 
@@ -21,6 +21,8 @@ import CassiniNotebook
     let notes: CountingRecordingNotes
     let controller: RecordingController
     var isReady = true
+    /// How often a start has asked whether the app is ready.
+    private(set) var readyChecks = 0
 
     static let debounce: Duration = .milliseconds(50)
 
@@ -31,7 +33,9 @@ import CassiniNotebook
         notes = CountingRecordingNotes(store: store)
         var harness: RecordingHarness?
         controller = RecordingController(parts: .init(
-            ready: { while harness?.isReady == false { try? await Task.sleep(for: .milliseconds(5)) } },
+            ready: {
+                while harness?.isReady == false { harness?.readyChecks += 1; try? await Task.sleep(for: .milliseconds(5)) }
+            },
             notes: notes, capture: capture, storage: storage, audio: audio, settings: settings, handoff: handoff,
             liveActivity: activity, notifier: notifier, clock: clock,
             defaultTitle: { "Voice note \(RecordingTitles.dateTime($0, locale: Locale(identifier: "en_US"), timeZone: .gmt))" },
@@ -63,6 +67,12 @@ import CassiniNotebook
     }
 
     func note(_ id: UUID) async -> Note? { await store.note(id) }
+
+    /// Returns once the controller has handled every event the capture has sent so far (E1: before a check that
+    /// an event changed nothing, rather than a sleep that a busy host lets pass first).
+    func eventsHandled() async throws {
+        try await waitFor("the capture's events are handled") { controller.handledEvents >= capture.sent }
+    }
 
     func waitFor(_ what: String = "condition", timeout: Duration = .seconds(30), _ condition: @MainActor () async -> Bool) async throws {
         let deadline = ContinuousClock.now + timeout

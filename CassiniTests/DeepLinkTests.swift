@@ -99,14 +99,20 @@ import CassiniNotebook
         await DeepLinkHandler(router: test.graph.router, library: test.graph.library, processing: test.graph.processing,
                               recording: test.graph.recording, ready: {}).handle(.note(note.id, resume: true))
         #expect(test.graph.router.path == [.note(note.id)])
-        await test.graph.processing.coordinator?.awaitIdle()
-        try? await Task.sleep(for: .milliseconds(50))
+        await settle(test.graph)
         #expect(test.graph.processing.state.jobs[note.id] == nil, "Resume queues nothing for a note with no paused job")
         #expect(test.graph.library.note(note.id)?.transcript.isEmpty == true)
     }
 
     @Test func theLiveActivityLinkOpensTheRecording() {
         #expect(DeepLinks.parse(url: RecordingLink.url) == .recording)
+    }
+
+    /// Lets work that should not happen show itself before a check that it did not (E1: states, not 50 ms): the
+    /// main actor's queued tasks run to their first wait, then the queue drains.
+    private func settle(_ graph: AppGraph) async {
+        for _ in 0..<10 { await Task.yield() }
+        await graph.processing.coordinator?.awaitIdle()
     }
 
     private func draft(_ phase: JobPhase?) -> [String]? {
@@ -125,7 +131,7 @@ import CassiniNotebook
         await test.graph.processing.transcribe(note.id)
         await waitUntil { test.notifier.requestCount == 1 }
         await test.graph.processing.transcribe(note.id)
-        try? await Task.sleep(for: .milliseconds(50))
+        await settle(test.graph)
         #expect(test.notifier.requestCount == 1)
         #expect(test.graph.settings.notificationsAsked)
     }

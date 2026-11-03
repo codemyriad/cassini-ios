@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-import CassiniEngine
+@testable import CassiniEngine
 import CassiniEngineTesting
 import CassiniNotebook
 
@@ -97,8 +97,17 @@ import CassiniNotebook
         }
     }
 
-    /// Lets queued work that should not happen show itself.
-    func settle() async throws { try await Task.sleep(for: .milliseconds(150)) }
+    /// Lets queued work that should not happen show itself, before a check that it did not: the main-actor tasks the
+    /// test started reach their first wait, then the coordinator is quiet (E1: a state, not 150 ms that a busy host
+    /// could let pass before anything ran). Quiet is no section of the queue running or waiting, and no drain loop,
+    /// or one waiting in a run the test has not ended. Work that should not start would by then have started a run.
+    func settle() async throws {
+        for _ in 0..<10 { await Task.yield() }
+        try await waitUntil("the coordinator is quiet") {
+            !coordinator.lock.isBusy && coordinator.lock.waiting == 0
+                && (!coordinator.isDraining || runner.runs.contains { !$0.hasEnded })
+        }
+    }
 
     func tearDown() {
         try? FileManager.default.removeItem(at: root)
