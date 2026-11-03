@@ -25,6 +25,13 @@
 # Environment: CASSINI_IPHONE / CASSINI_IPAD device types (default "iPhone 17", "iPad Pro 13-inch (M5)"),
 # CASSINI_SIM_PREFIX as for scripts/test.sh, CASSINI_KEEP_SIMS=1 to leave the clones booted.
 set -euo pipefail
+# One heavy run at a time per host (scripts/test.sh, "the host"): this script runs under the host lock, which the
+# scripts/test.sh it calls then knows it holds.
+if [ "${CASSINI_HEAVY_LOCK_HELD:-}" != 1 ]; then
+    echo "taking the host lock ${CASSINI_HEAVY_LOCK:-$HOME/.cassini-heavy.lock} (waits while another run holds it)"
+    exec env CASSINI_HEAVY_LOCK_HELD=1 /usr/bin/lockf -k -t $(( ${CASSINI_LOCK_MINUTES:-60} * 60 )) \
+        "${CASSINI_HEAVY_LOCK:-$HOME/.cassini-heavy.lock}" "$0" "$@"
+fi
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
 derived="$root/DerivedData.noindex"

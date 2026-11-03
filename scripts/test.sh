@@ -27,6 +27,13 @@
 #   CASSINI_TEST_CACHE   shared cache directory (default: .test-cache beside the main checkout's .git)
 #   CASSINI_IPHONE / CASSINI_IPAD  device types to clone (default "iPhone 17", "iPad Pro 13-inch (M5)")
 #   CASSINI_SIM_PREFIX   clone name prefix (default ts-<worktree directory name>)
+#   CASSINI_HEAVY_LOCK   the host-wide lock file (default ~/.cassini-heavy.lock); CASSINI_LOCK_MINUTES how long to
+#                        wait for it (default 60); CASSINI_ADMIT_MINUTES how long to wait for the host to calm down
+#                        before booting the UI clones (default 10, 0 not at all)
+#
+# One heavy run at a time per host: every tier but fast and clean takes the host-wide lock before it boots or builds
+# anything, and waits while another run (of any worktree) holds it; the lock file names the holder. Before the UI
+# clones boot, the run also waits until the CPU and free memory leave room for them, then goes on regardless.
 #
 # Builds go to <worktree>/DerivedData.noindex (DerivedData links to it; Spotlight skips a .noindex directory), which
 # persists between runs so later builds are incremental. Package checkouts are shared between worktrees under the
@@ -86,6 +93,8 @@ summary() {
     local rc=$?
     # A swift test beside the build that has not been waited for (a failure stopped the run) ends here.
     if [ -n "${fast_pid:-}" ]; then pkill -P "$fast_pid" 2>/dev/null || true; kill "$fast_pid" 2>/dev/null || true; fi
+    # A run stopped by a signal ends its own xcodebuild and shards before it lets go of the host lock.
+    [ -z "$lock_pid" ] || end_own_processes
     printf '\n%-34s %6s\n' "step" "time"
     printf '%s' "$timings"
     printf '%-34s %5ss\n' "total" "$(( $(date +%s) - started_all ))"
@@ -94,6 +103,7 @@ summary() {
         echo "FAILED ($tier), logs in $logs (kept in $failed_logs after the next run)"
     fi
     if [ "$keep_sims" = "0" ]; then shutdown_clones; fi
+    release_heavy_lock
 }
 
 die() { echo "error: $*" >&2; exit 1; }
@@ -145,6 +155,77 @@ run_logged() {
         echo "see $log" >&2
         return 1
     fi
+}
+
+# ---------------------------------------------------------------- the host
+
+# Builds, simulators and UI tests of two runs at once (other worktrees, or the Mac and Android work on the same Mac)
+# made every test 2-4x slower and turned tight waits into false failures. The lock is an flock on $heavy_lock, held
+# by a small helper process rather than by this shell, so no daemon that xcodebuild or swift leaves running inherits
+# it; the helper lets go once this script has ended its own processes (summary), or at once if the script is killed
+# outright. The other heavy scripts (screenshots.sh, sherpa-bench.sh, speaker-smoke.sh) hold it through
+# `/usr/bin/lockf -k`, which another tool can use too, and set CASSINI_HEAVY_LOCK_HELD=1 so that the test.sh they call
+# does not wait for their own lock.
+heavy_lock="${CASSINI_HEAVY_LOCK:-$HOME/.cassini-heavy.lock}"
+lock_minutes="${CASSINI_LOCK_MINUTES:-60}"
+lock_pid="" lock_held_file=""
+take_heavy_lock() {
+    [ -z "$lock_pid" ] || return 0
+    [ "${CASSINI_HEAVY_LOCK_HELD:-}" != 1 ] || return 0
+    local note waited=0 shown="-"
+    # Named for this run: two runs of one worktree must not take each other's lock for their own.
+    lock_held_file="${TMPDIR:-/tmp}/cassini-heavy-lock-held.$$"
+    rm -f "$lock_held_file"
+    note="$(basename "$root") (test.sh $tier, pid $$, since $(date '+%Y-%m-%d %H:%M:%S'))"
+    /usr/bin/python3 -I -c '
+import fcntl, os, signal, sys, time
+path, parent, held, note = sys.argv[1], int(sys.argv[2]), sys.argv[3], sys.argv[4]
+signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
+# Not os.kill(parent, 0), which a killed but unreaped parent still passes: once it is gone this helper is reparented.
+def alive(): return os.getppid() == parent
+fd = os.open(path, os.O_RDWR | os.O_CREAT, 0o644)
+while True:
+    try: fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB); break
+    except BlockingIOError:
+        if not alive(): sys.exit(1)
+        time.sleep(1)
+try:
+    open(held, "w").close()
+    os.ftruncate(fd, 0); os.write(fd, (note + "\n").encode())
+    while alive(): time.sleep(1)
+finally:
+    os.ftruncate(fd, 0)
+' "$heavy_lock" "$$" "$lock_held_file" "$note" < /dev/null & lock_pid=$!
+    while [ ! -e "$lock_held_file" ]; do
+        kill -0 "$lock_pid" 2>/dev/null || { lock_pid=""; die "could not take the host lock $heavy_lock"; }
+        local holder; holder=$(cat "$heavy_lock" 2>/dev/null || true)
+        # An empty note is a holder that writes none (lockf), or the moment between two holders; this run's own note
+        # is its helper that has just taken the lock.
+        if [ $waited -ge 1 ] && [ "$holder" != "$shown" ] && [ "$holder" != "$note" ] \
+            && { [ -n "$holder" ] || [ "$shown" = "-" ]; }; then
+            echo "waiting for the host: ${holder:-another run} holds $heavy_lock"; shown=$holder
+        fi
+        # The helper gets a few seconds to start, so a limit of 0 means "do not wait", not "fail on a free lock".
+        if [ $waited -ge $(( lock_minutes * 60 )) ] && [ $waited -ge 5 ]; then
+            release_heavy_lock
+            die "host busy: ${holder:-another run} has held $heavy_lock for over $lock_minutes min"
+        fi
+        sleep 1; waited=$(( waited + 1 ))
+    done
+    [ $waited -lt 2 ] || echo "took the host lock after $(( waited / 60 )) min $(( waited % 60 )) s"
+}
+release_heavy_lock() {
+    [ -n "$lock_pid" ] || return 0
+    kill "$lock_pid" 2>/dev/null || true; wait "$lock_pid" 2>/dev/null || true; lock_pid=""
+    rm -f "$lock_held_file"
+}
+
+# Ends whatever this script still runs (a stopped run's xcodebuild, a shard), except the lock's helper, so the lock
+# is not handed on while they go on.
+end_own_processes() {
+    local children child
+    children=$(pgrep -P $$ || true)
+    for child in $children; do [ "$child" = "${lock_pid:-}" ] || end_tree "$child"; done
 }
 
 # ---------------------------------------------------------------- simulators
@@ -238,13 +319,50 @@ reap_idle_clones() {
     done < <(clones "ts-")
 }
 
+# Waits, up to CASSINI_ADMIT_MINUTES, until a quarter of the CPU is idle and there is memory for one more simulator
+# (the iPad, or a second shard), so the UI clones do not boot into a host that another run already keeps busy or
+# swapping. It then goes on regardless, with a warning: a busy host is never a reason to fail. The CPU is sampled over
+# two seconds rather than read from the load average, which lags by minutes and would still count this run's own
+# hosted tests; while this run's own swift test (beside the build) is still going, only the memory counts. The first
+# clone's boot is waited for before, so its own boot is not counted either.
+admit_minutes="${CASSINI_ADMIT_MINUTES:-10}"
+free_mb() {
+    local page; page=$(sysctl -n hw.pagesize)
+    vm_stat | awk -v p="$page" '/Pages (free|inactive|speculative|purgeable)/ { gsub("\\.", "", $NF); n += $NF } END { print int(n * p / 1048576) }'
+}
+# Percent of the CPU idle over two seconds; 100 when it cannot be sampled, so a missing tool never holds a run.
+cpu_idle() {
+    if [ -n "${fast_pid:-}" ] && kill -0 "$fast_pid" 2>/dev/null; then echo 100; return; fi
+    local idle; idle=$(iostat -n 0 -c 2 -w 2 2>/dev/null | tail -1 | awk '{ print int($3) }')
+    case "$idle" in ''|*[!0-9]*) echo 100 ;; *) echo "$idle" ;; esac
+}
+wait_for_room() {
+    [ "$admit_minutes" -gt 0 ] || return 0
+    local t0 waited=0 idle free booted
+    t0=$(date +%s)
+    # This run's own booted iPhones count as free, as in auto_workers: tier_ui shuts down the ones it does not use.
+    booted=$(our_clones | grep -c "Booted $prefix-iphone-" || true)
+    while :; do
+        idle=$(cpu_idle); free=$(( $(free_mb) + booted * 1536 ))
+        if [ "$idle" -ge 25 ] && [ "$free" -ge 2048 ]; then
+            [ $waited -eq 0 ] || echo "  the host has room after $(( waited / 60 )) min $(( waited % 60 )) s (CPU $idle% idle, $free MB free)"
+            return 0
+        fi
+        if [ $waited -ge $(( admit_minutes * 60 )) ]; then
+            echo "  warning: the host is still busy after $admit_minutes min (CPU $idle% idle, $free MB free); going on"
+            return 0
+        fi
+        [ $waited -gt 0 ] || echo "  waiting for room: CPU $idle% idle, $free MB free"
+        sleep 3; waited=$(( $(date +%s) - t0 ))
+    done
+}
+
 # Shards that fit in memory while leaving about 4 GB for everything else; each booted simulator with the app and its
 # test runner takes about 1.5 GB. Clones of ours that are already booted count as available. At most 3: on 10 cores
 # three shards already keep the CPU busy (simulator launches are CPU-bound), and a fourth made every test slower.
 auto_workers() {
-    local page free booted
-    page=$(sysctl -n hw.pagesize)
-    free=$(vm_stat | awk -v p="$page" '/Pages (free|inactive|speculative|purgeable)/ { gsub("\\.", "", $NF); n += $NF } END { print int(n * p / 1048576) }')
+    local free booted
+    free=$(free_mb)
     booted=$(our_clones | grep -c "Booted $prefix-iphone-" || true)
     local n=$(( (free - 4096) / 1536 + booted ))
     [ $n -gt 3 ] && n=3
@@ -612,6 +730,8 @@ tier_ui() {
 
     step_start "simulators"
     reap_idle_clones
+    wait_first_boot
+    wait_for_room
     local workers="${CASSINI_UI_WORKERS:-$(auto_workers)}"
     [ "$workers" -gt "$count" ] && workers=$count
     # Booted iPhone clones this run does not use give their memory back.
@@ -757,6 +877,7 @@ tier_changed() {
     case " $swift " in *" ALL "*) filter="" ;; *) filter=$(echo $swift | sed 's/ /|/g') ;; esac
     if [ -z "$swift" ] && [ $hosted = 0 ] && [ -z "$ui" ]; then echo "nothing to test"; return 0; fi
     if [ $hosted = 0 ] && [ -z "$ui" ]; then tier_fast "$filter"; return; fi
+    take_heavy_lock
     start_first_boot
     [ $strings = 1 ] && check_strings
     [ -n "$swift" ] && start_fast_beside "$filter"
@@ -784,16 +905,17 @@ extra_xcodebuild_from_extra() {
 case "$tier" in
     clean) delete_clones; echo "deleted the $prefix-* clones"; exit 0 ;;
     fast|app|ui|all|changed|build) ;;
-    *) sed -n '2,37p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+    *) sed -n '2,44p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac
 
 extra_xcodebuild_from_extra
 trap summary EXIT
 case "$tier" in
     fast) tier_fast ;;
-    app)  start_first_boot; build_for_testing; tier_app ;;
-    ui)   start_first_boot; build_for_testing; tier_ui ;;
-    all)  start_first_boot; check_strings; start_fast_beside; build_for_testing; tier_app; tier_ui; wait_fast_beside ;;
+    app)  take_heavy_lock; start_first_boot; build_for_testing; tier_app ;;
+    ui)   take_heavy_lock; start_first_boot; build_for_testing; tier_ui ;;
+    all)  take_heavy_lock; start_first_boot; check_strings; start_fast_beside; build_for_testing; tier_app; tier_ui
+          wait_fast_beside ;;
     changed) tier_changed ;;
-    build) build_for_testing ;;
+    build) take_heavy_lock; build_for_testing ;;
 esac
