@@ -230,17 +230,23 @@ take_heavy_lock() {
     rm -f "$lock_held_file"
     note="$(basename "$root") (test.sh $tier, pid $$, since $(date '+%Y-%m-%d %H:%M:%S'))"
     /usr/bin/python3 -I -c '
-import fcntl, os, signal, sys, time
+import fcntl, os, signal, sys, threading, time
 path, parent, held, note = sys.argv[1], int(sys.argv[2]), sys.argv[3], sys.argv[4]
 signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
 # Not os.kill(parent, 0), which a killed but unreaped parent still passes: once it is gone this helper is reparented.
 def alive(): return os.getppid() == parent
-fd = os.open(path, os.O_RDWR | os.O_CREAT, 0o644)
-while True:
-    try: fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB); break
-    except BlockingIOError:
-        if not alive(): sys.exit(1)
+# The wait is one blocking flock, so this run keeps its place among the waiters (the kernel serves them in order). A
+# try every second never had one: a lockf that queued after it took the lock each time it was let go, and a stream
+# of other runs starved the gate. A thread ends the wait if this script goes meanwhile.
+waiting = True
+def watch():
+    while waiting:
+        if not alive(): os._exit(1)
         time.sleep(1)
+threading.Thread(target=watch, daemon=True).start()
+fd = os.open(path, os.O_RDWR | os.O_CREAT, 0o644)
+fcntl.flock(fd, fcntl.LOCK_EX)
+waiting = False
 try:
     open(held, "w").close()
     os.ftruncate(fd, 0); os.write(fd, (note + "\n").encode())
