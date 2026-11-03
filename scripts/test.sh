@@ -6,7 +6,7 @@
 #   scripts/test.sh ui       build for testing, then the UI tests, sharded across simulator clones
 #   scripts/test.sh all      fast, app and ui (the package tests run beside the build)
 #   scripts/test.sh changed [base]
-#                            only what the changes since base touch (default: where the branch left main, plus
+#                            only what the changes since base touch (default: where the branch left origin/main, plus
 #                            uncommitted and untracked files): the string catalog check when a source or a catalog
 #                            changed, the package test targets, the hosted tests and the UI test classes of the
 #                            changed areas. For iterating; run all once before finishing.
@@ -721,8 +721,21 @@ swift_targets_for() {
     esac
 }
 
+# The ref the branch is compared with: origin/main when there is one, since a local main nobody updates falls behind
+# and then the diff takes in every merged PR since (a stale base adds tests, never drops them). main otherwise, for a
+# copy without the remote (test-remote.sh). Says so when the local main differs from origin/main.
+main_ref() {
+    local origin local_main
+    origin=$(git -C "$root" rev-parse -q --verify origin/main) || { echo main; return; }
+    local_main=$(git -C "$root" rev-parse -q --verify refs/heads/main || true)
+    if [ -n "$local_main" ] && [ "$local_main" != "$origin" ]; then
+        echo "note: the local main ($(git -C "$root" rev-parse --short "$local_main")) is not origin/main ($(git -C "$root" rev-parse --short "$origin")); comparing with origin/main" >&2
+    fi
+    echo origin/main
+}
+
 tier_changed() {
-    local base="${base_ref:-$(git -C "$root" merge-base HEAD main 2>/dev/null || echo HEAD)}"
+    local base="${base_ref:-$(git -C "$root" merge-base HEAD "$(main_ref)" 2>/dev/null || echo HEAD)}"
     local files f swift="" ui="" hosted=0 strings=0
     files=$(changed_files "$base")
     echo "changes since $(git -C "$root" rev-parse --short "$base"): $(printf '%s\n' "$files" | grep -c . || true) file(s)"

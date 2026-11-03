@@ -182,7 +182,7 @@ scripts/test.sh fast     # the string catalog check (scripts/check-strings.sh), 
 scripts/test.sh app      # build for testing, then the hosted unit tests (CassiniTests)
 scripts/test.sh ui       # build for testing, then the UI tests, sharded across simulator clones
 scripts/test.sh all      # all of the above (the package tests run beside the build); prints the time of each step
-scripts/test.sh changed  # only what the changes since main touch (or since a base: changed <ref>)
+scripts/test.sh changed  # only what the changes since origin/main touch (or since a base: changed <ref>)
 scripts/test.sh build    # only build for testing
 scripts/test.sh clean    # delete this worktree's simulator clones
 ```
