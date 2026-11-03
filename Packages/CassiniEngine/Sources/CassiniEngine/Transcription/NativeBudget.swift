@@ -25,6 +25,9 @@ public final class NativeBudget: Sendable {
     /// Whether someone holds the budget now.
     public var isHeld: Bool { state.withLock { $0.held } }
 
+    /// How many are waiting for it: lets a test wait until a waiter has queued instead of sleeping.
+    var waiterCount: Int { state.withLock { $0.waiters.count } }
+
     /// Runs `body` while holding the budget; the budget is given back however `body` ends.
     public func withBudget<Value>(_ body: () async throws -> Value) async throws -> Value {
         try await acquire()
