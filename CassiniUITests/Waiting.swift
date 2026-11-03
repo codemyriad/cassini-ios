@@ -50,6 +50,22 @@ extension XCUIElement {
 }
 
 extension XCUIElement {
+    /// Taps this button until `opened` holds, at most `attempts` times, and says whether it did. Right after a cold
+    /// launch on a busy iPad a tap can land while the app is still settling and be dropped: the screen recording of
+    /// a failed audit showed the Library still there 20 s after the tap on Recently Deleted. A screen that opens late
+    /// is not tapped twice while it is opening: each tap waits up to 8 s (the last up to `uiWaitFloor`) before the next,
+    /// and a button that is gone or covered is not tapped again.
+    @MainActor @discardableResult
+    func tap(until opened: () -> Bool, attempts: Int = 3) -> Bool {
+        for attempt in 1...attempts {
+            // Gone or covered: the tap took, and the screen is still on its way.
+            if attempt > 1 && !(exists && isHittable) { return poll(within: uiWaitFloor, opened) }
+            tap()
+            if poll(within: attempt == attempts ? uiWaitFloor : 8, opened) { return true }
+        }
+        return false
+    }
+
     /// Taps a menu item once it has stopped moving. A context menu or a pull-down menu still animates in when the app's
     /// own animations are off, and a tap that lands while it does is dropped on a busy machine ("Failed to tap", or a
     /// tap that does nothing). An open menu is also rebuilt whenever what it shows changes (a running job's note, at
