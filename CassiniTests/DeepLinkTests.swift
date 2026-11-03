@@ -16,8 +16,11 @@ import CassiniNotebook
         return note
     }
 
+    /// Up to 30 s by the clock (E1): 500 sleeps of 10 ms ran out after 5 s, or less, on a busy host. The test checks
+    /// the outcome itself.
     private func waitUntil(_ condition: @MainActor () -> Bool) async {
-        for _ in 0..<500 where !condition() { try? await Task.sleep(for: .milliseconds(10)) }
+        let deadline = ContinuousClock.now + .seconds(30)
+        while !condition() && ContinuousClock.now < deadline { try? await Task.sleep(for: .milliseconds(10)) }
     }
 
     @Test func aNotificationTapOpensTheNoteOnAColdStart() async throws {

@@ -145,8 +145,9 @@ final class ScreenshotTests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing", "--reset-test-data"] + arguments + localeArguments
         app.launchAndWait()
-        XCTAssertTrue(app.textFields["librarySearch"].waitForExistence(within: 15)
-                      || app.staticTexts["noteTitle"].waitForExistence(within: 5))
+        // One wait for either screen: waiting for the Library first cost a fixture launch its whole limit.
+        let search = app.textFields["librarySearch"], title = app.staticTexts["noteTitle"]
+        XCTAssertTrue(poll(within: max(15, uiWaitFloor)) { search.exists || title.exists })
         return app
     }
 

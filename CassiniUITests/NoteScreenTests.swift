@@ -63,7 +63,7 @@ final class NoteScreenTests: XCTestCase {
         let transcript = app.descendants(matching: .any)["turn-w0"]
         XCTAssertTrue(transcript.waitForExistence(within: 5))
         transcript.swipeUp()
-        XCTAssertFalse(chip.waitForExistence(within: 1), "paused: a drag leaves following on")
+        XCTAssertTrue(chip.staysAbsent(for: 1), "paused: a drag leaves following on")
         let play = app.buttons["playButton"]
         play.tap()
         XCTAssertTrue(play.wait(until: NSPredicate(format: "label == 'Pause' AND value == 'Playing'"), within: 3))
@@ -288,7 +288,7 @@ final class NoteScreenTests: XCTestCase {
         XCTAssertTrue(share.exists && share.isEnabled, "the audio can be shared")
         export.tap()
         let text = app.collectionViews.buttons["Transcript as text"]
-        XCTAssertTrue(!text.waitForExistence(within: 2) || !text.isEnabled, "no transcript to export")
+        XCTAssertTrue(text.staysAbsent(for: 2) || !text.isEnabled, "no transcript to export")
     }
 
     @MainActor func testDocumentInfoShowsTheNotesFacts() {
