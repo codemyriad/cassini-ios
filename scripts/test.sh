@@ -30,6 +30,9 @@
 #   CASSINI_HEAVY_LOCK   the host-wide lock file (default ~/.cassini-heavy.lock); CASSINI_LOCK_MINUTES how long to
 #                        wait for it (default 60); CASSINI_ADMIT_MINUTES how long to wait for the host to calm down
 #                        before booting the UI clones (default 10, 0 not at all)
+#   CASSINI_POST_STATUS=1  post the result of `all` as the commit status drmeyers/test-all of HEAD on GitHub (gh):
+#                        pending at the start, then success or failure. Only a full run of a clean, pushed HEAD
+#                        posts: no extra arguments, the iPad's tests, the release runtime, nothing uncommitted.
 #
 # One heavy run at a time per host: every tier but fast and clean takes the host-wide lock before it boots or builds
 # anything, and waits while another run (of any worktree) holds it; the lock file names the holder. Before the UI
@@ -103,10 +106,59 @@ summary() {
         echo "FAILED ($tier), logs in $logs (kept in $failed_logs after the next run)"
     fi
     if [ "$keep_sims" = "0" ]; then shutdown_clones; fi
+    post_status "$rc"
     release_heavy_lock
 }
 
 die() { echo "error: $*" >&2; exit 1; }
+
+# ---------------------------------------------------------------- the commit status
+
+# The coordinator merges on the PR's checks, and cassini-ios has no hosted CI: the gate on drmeyers records its
+# result on the commit it tested, so a merge has an objective check (D66, ios-9). A run that tested less than the
+# whole gate, or something other than the commit (uncommitted files, a HEAD that moved), posts nothing and says why.
+status_context="drmeyers/test-all"
+status_sha="" status_why="" ui_counts=""
+status_skip_reason() {
+    [ "$tier" = all ] || { echo "the tier is $tier, not all"; return; }
+    [ ${#extra[@]} -eq 0 ] || { echo "extra arguments (${extra[*]})"; return; }
+    case "${CASSINI_UI_IPAD:-1}" in 1) ;; *) echo "CASSINI_UI_IPAD=$CASSINI_UI_IPAD"; return ;; esac
+    [ -z "${CASSINI_SHERPA_LOCAL:-}" ] || { echo "CASSINI_SHERPA_LOCAL is set (not the release runtime)"; return; }
+    git -C "$root" rev-parse -q --verify HEAD > /dev/null 2>&1 || { echo "not a git checkout"; return; }
+    [ -z "$(git -C "$root" status --porcelain)" ] || { echo "uncommitted changes"; return; }
+    command -v gh > /dev/null || { echo "gh is not installed"; return; }
+}
+github_repo() { git -C "$root" remote get-url origin 2>/dev/null | sed -E 's#^.*github\.com[:/]##; s#\.git$##'; }
+send_status() {
+    local state="$1" description="$2"
+    run_limited "$logs/commit-status.log" 60 gh api -X POST "repos/$(github_repo)/statuses/$status_sha" \
+        -f state="$state" -f context="$status_context" -f description="${description:0:140}"
+}
+start_status() {
+    [ "${CASSINI_POST_STATUS:-}" = 1 ] || return 0
+    status_why=$(status_skip_reason)
+    if [ -n "$status_why" ]; then echo "no commit status: $status_why"; return 0; fi
+    status_sha=$(git -C "$root" rev-parse HEAD)
+    if ! send_status pending "running scripts/test.sh all on drmeyers"; then
+        status_why="GitHub refused it (is ${status_sha:0:7} pushed? see $logs/commit-status.log)"
+        echo "no commit status: $status_why"; status_sha=""
+    fi
+}
+post_status() {
+    local rc="$1" state description
+    [ -n "$status_sha" ] || return 0
+    if [ "$(git -C "$root" rev-parse HEAD)" != "$status_sha" ] || [ -n "$(git -C "$root" status --porcelain)" ]; then
+        state=error description="the checkout changed during the run; run the gate again"
+    elif [ "$rc" -eq 0 ]; then
+        state=success description="passed in $(( ($(date +%s) - started_all + 59) / 60 )) min${ui_counts:+: $ui_counts}"
+    elif [ "$rc" -ge 128 ]; then
+        state=error description="stopped (exit $rc)"
+    else
+        state=failure description="failed (exit $rc)${ui_counts:+: $ui_counts}"
+    fi
+    if send_status "$state" "$description"; then echo "commit status $status_context: $state on ${status_sha:0:7}"
+    else echo "commit status not posted, see $logs/commit-status.log"; fi
+}
 
 # $1 and every process it started, deepest first, so none is left behind when its parent goes.
 process_tree() {
@@ -862,6 +914,7 @@ tier_ui() {
 
     # Every test ran exactly once on the iPhones: a shard that lost tests fails here too.
     local ran; ran=$(count_ran "$logs"/ui-[0-9].log "$logs"/ui-[0-9]-retry.log)
+    ui_counts="iPhone $ran/$count$( [ -n "$ipad" ] && echo ", iPad $(count_ran "$logs/ui-ipad.log" "$logs/ui-ipad-retry.log")/$(printf '%s\n' "$ipad_tests" | wc -l | tr -d ' ')")"
     echo "UI tests: $ran of $count ran on iPhone$( [ -n "$ipad" ] && echo ", $(count_ran "$logs/ui-ipad.log" "$logs/ui-ipad-retry.log") of $(printf '%s\n' "$ipad_tests" | wc -l | tr -d ' ') on iPad")"
     for p in $failed; do
         echo "shard $p failed (see $logs/ui-$p.log):" >&2
@@ -981,11 +1034,12 @@ extra_xcodebuild_from_extra() {
 case "$tier" in
     clean) delete_clones; echo "deleted the $prefix-* clones"; exit 0 ;;
     fast|app|ui|all|changed|build) ;;
-    *) sed -n '2,44p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+    *) sed -n '2,47p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac
 
 extra_xcodebuild_from_extra
 trap summary EXIT
+start_status
 case "$tier" in
     fast) tier_fast ;;
     app)  start_heavy; start_first_boot; build_for_testing; tier_app ;;
