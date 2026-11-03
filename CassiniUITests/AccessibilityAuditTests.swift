@@ -130,6 +130,8 @@ final class AccessibilityAuditTests: XCTestCase {
     /// The same screens on the iPad, beside the Library's sidebar (an iOS-only layout).
     @MainActor func testIPadScreensPassTheAudit() throws {
         try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad, "the split view")
+        // Six screens in one test: about 160 s on a calm host, over the 300 s default when it runs 2-4x slower.
+        executionTimeAllowance = 600
         let screens: [(String, @MainActor ([String]) -> XCUIApplication)] = [
             ("library", library), ("note", note), ("recording", recording), ("settings", settings),
             ("trash", trash), ("savedVoices", savedVoices)]
