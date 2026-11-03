@@ -360,13 +360,15 @@ wait_for_room() {
 # Shards that fit in memory while leaving about 4 GB for everything else; each booted simulator with the app and its
 # test runner takes about 1.5 GB. Clones of ours that are already booted count as available. At most 3: on 10 cores
 # three shards already keep the CPU busy (simulator launches are CPU-bound), and a fourth made every test slower.
+# $1 is the memory (MB) the iPad clone takes beside them, 0 when it does not run. Prints 0 when even one iPhone shard
+# does not fit beside the iPad: the iPad then runs after the shard.
 auto_workers() {
-    local free booted
+    local ipad_mb="${1:-0}" free booted
     free=$(free_mb)
     booted=$(our_clones | grep -c "Booted $prefix-iphone-" || true)
-    local n=$(( (free - 4096) / 1536 + booted ))
+    local n=$(( (free - 4096 - ipad_mb) / 1536 + booted ))
     [ $n -gt 3 ] && n=3
-    [ $n -lt 1 ] && n=1
+    [ $n -lt 0 ] && n=0
     echo $n
 }
 
@@ -732,7 +734,19 @@ tier_ui() {
     reap_idle_clones
     wait_first_boot
     wait_for_room
-    local workers="${CASSINI_UI_WORKERS:-$(auto_workers)}"
+    local ipad_tests=""
+    case "${CASSINI_UI_IPAD:-1}" in
+        0) ;;
+        all) ipad_tests=$tests ;;
+        *) ipad_tests=$(printf '%s\n' "$tests" | grep '/testIPad' || true) ;;
+    esac
+    # The iPad clone (an iPad Pro, about 2 GB) is budgeted before the iPhone shards; when not even one shard fits
+    # beside it, it runs after the shards instead of beside them.
+    local workers="${CASSINI_UI_WORKERS:-$(auto_workers "$( [ -n "$ipad_tests" ] && echo 2048 || echo 0)")}" ipad_after=0
+    if [ "$workers" -lt 1 ]; then
+        workers=1
+        if [ -n "$ipad_tests" ]; then ipad_after=1; echo "  memory is short: the iPad runs after the iPhone shard"; fi
+    fi
     [ "$workers" -gt "$count" ] && workers=$count
     # Booted iPhone clones this run does not use give their memory back.
     our_clones | while read -r udid state name; do
@@ -740,16 +754,11 @@ tier_ui() {
         if [ "$state" = Booted ] && [ "${name##*-}" -gt "$workers" ]; then xcrun simctl shutdown "$udid" 2>/dev/null || true; fi
     done
     local plan; plan=$(printf '%s\n' "$tests" | plan_shards "$workers")
-    local ipad_tests=""
-    case "${CASSINI_UI_IPAD:-1}" in
-        0) ;;
-        all) ipad_tests=$tests ;;
-        *) ipad_tests=$(printf '%s\n' "$tests" | grep '/testIPad' || true) ;;
-    esac
     step_end
 
-    # Each shard starts as soon as its clone is up; the iPad, booted for this run only, starts when it is.
-    step_start "UI tests ($workers shard(s)$( [ -n "$ipad_tests" ] && echo ' + iPad'))"
+    # Each shard starts as soon as its clone is up; the iPad, booted for this run only, starts when it is (or once
+    # the shards are done, when memory is short).
+    step_start "UI tests ($workers shard(s)$( [ -n "$ipad_tests" ] && { [ $ipad_after = 1 ] && echo ', then iPad' || echo ' + iPad'; }))"
     rm -rf "$logs"/ui-*.log "$logs"/ui-*-retry.xcresult
     touch "$logs/.ui-started"
     local pids=() k shard_args t
@@ -763,6 +772,11 @@ tier_ui() {
           boot "$udid" || { echo "could not boot $prefix-iphone-$k" > "$logs/ui-$k.log"; exit 1; }
           test_on_retrying CassiniUITests "$logs/ui-$k.log" "$logs/ui-$k.xcresult" "$udid" "${shard_args[@]}" ) & pids+=("$!:$k")
     done
+    local failed="" p
+    if [ $ipad_after = 1 ]; then
+        for p in ${pids[@]+"${pids[@]}"}; do wait "${p%%:*}" || failed="$failed ${p##*:}"; done
+        pids=()
+    fi
     local ipad=""
     if [ -n "$ipad_tests" ]; then
         ipad=$(clone_udid "$prefix-ipad-1" "$ipad_type")
@@ -771,8 +785,7 @@ tier_ui() {
         ( boot "$ipad" || { echo "could not boot $prefix-ipad-1" > "$logs/ui-ipad.log"; exit 1; }
           test_on_retrying CassiniUITests "$logs/ui-ipad.log" "$logs/ui-ipad.xcresult" "$ipad" "${shard_args[@]}" ) & pids+=("$!:ipad")
     fi
-    local failed="" p
-    for p in "${pids[@]}"; do wait "${p%%:*}" || failed="$failed ${p##*:}"; done
+    for p in ${pids[@]+"${pids[@]}"}; do wait "${p%%:*}" || failed="$failed ${p##*:}"; done
     local still=""
     for p in $failed; do
         if [ "$p" = ipad ]; then retry_killed_tests ipad "$ipad" && continue
