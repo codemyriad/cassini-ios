@@ -29,6 +29,13 @@
 # Writes .tools/bench/<time>.json and the xcodebuild log beside it. The simulator clone is
 # ts-<worktree directory>-bench, so scripts/test.sh clean removes it with this worktree's other clones.
 set -euo pipefail
+# One heavy run at a time per host (scripts/test.sh, "the host"): this script runs under the host lock, which the
+# scripts/test.sh it calls then knows it holds.
+if [ "${CASSINI_HEAVY_LOCK_HELD:-}" != 1 ]; then
+    echo "taking the host lock ${CASSINI_HEAVY_LOCK:-$HOME/.cassini-heavy.lock} (waits while another run holds it)"
+    exec env CASSINI_HEAVY_LOCK_HELD=1 /usr/bin/lockf -k -t $(( ${CASSINI_LOCK_MINUTES:-60} * 60 )) \
+        "${CASSINI_HEAVY_LOCK:-$HOME/.cassini-heavy.lock}" "$0" "$@"
+fi
 cd "$(dirname "$0")/.."
 root=$PWD
 . scripts/native-common.sh
