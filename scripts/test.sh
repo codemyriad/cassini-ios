@@ -21,7 +21,9 @@
 #   CASSINI_UI_WORKERS   UI shards (default: as many as memory allows, at most 3)
 #   CASSINI_UI_IPAD      what the iPad clone runs: the tests named testIPad* (default), all (every UI test, beside
 #                        the iPhone shards; the longest step then) or 0 (nothing)
-#   CASSINI_KEEP_SIMS=0  shut the clones down afterwards (default: keep the iPhones booted for the next run)
+#   CASSINI_KEEP_SIMS    0 shuts the clones down afterwards, 1 keeps the iPhones booted for the next run (default:
+#                        0 after all, 1 after the other tiers)
+#   CASSINI_CONFORMANCE_REQUIRED  1 (the default for all) fails, rather than skips, missing conformance vectors
 #   CASSINI_IDLE_MINUTES booted clones of other worktrees that no xcodebuild has used for this long are shut down,
 #                        never deleted (default 15)
 #   CASSINI_TEST_CACHE   shared cache directory (default: .test-cache beside the main checkout's .git)
@@ -61,7 +63,11 @@ logs="$derived/test-logs"
 prefix="${CASSINI_SIM_PREFIX:-ts-$(basename "$root")}"
 iphone_type="${CASSINI_IPHONE:-iPhone 17}"
 ipad_type="${CASSINI_IPAD:-iPad Pro 13-inch (M5)}"
-keep_sims="${CASSINI_KEEP_SIMS:-1}"
+# After the whole gate the clones go (Mac and Android work on this host never reclaims their memory); after the
+# iterating tiers the iPhones stay booted for the next run.
+keep_sims="${CASSINI_KEEP_SIMS:-$( [ "$tier" = all ] && echo 0 || echo 1 )}"
+# The whole gate fails, rather than skips, the format's conformance vectors when it cannot find them.
+[ "$tier" != all ] || export CASSINI_CONFORMANCE_REQUIRED="${CASSINI_CONFORMANCE_REQUIRED:-1}"
 idle_minutes="${CASSINI_IDLE_MINUTES:-15}"
 leases="$cache/sim-leases"
 
@@ -593,8 +599,9 @@ tier_fast() {
     grep -E "^✔ Test run with|^✘ Test run with" "$logs/swift-test.log" || true
 }
 
-# swift test beside the build: it and the simulator work hardly compete (SwiftPM builds only the packages, once, and
-# its tests take a few seconds of CPU). Its time is added to the summary when it is waited for.
+# swift test beside the build, which saves its minute or two of wall time. They do compete for the CPU: beside a busy
+# build the package tests ran up to 100x slower (PR #24), so a wait in a package test allows 30 s, never a few. Its
+# time is added to the summary when it is waited for.
 fast_pid=""
 start_fast_beside() {
     ( local t0; t0=$(date +%s); rc=0; swift_test "${1:-}" 2> /dev/null || rc=$?
@@ -857,7 +864,10 @@ retry_killed_tests() {
     killed=$(killed_tests "$log")
     [ -n "$killed" ] || return 1
     grep -qE "^Test Case '.*' failed \(" "$log" && return 1
-    [ -n "$(find "$HOME/Library/Logs/DiagnosticReports" -name 'backboardd-*.ips' -newer "$logs/.ui-started" 2>/dev/null)" ] || return 1
+    # A crash of this clone's backboardd: the report names its device (coalition SimDevice.<udid>), so a crash in
+    # another worktree's clone at the same time does not count.
+    find "$HOME/Library/Logs/DiagnosticReports" -name 'backboardd-*.ips' -newer "$logs/.ui-started" \
+        -exec grep -l "SimDevice\.$udid" {} + 2>/dev/null | grep -q . || return 1
     echo "  ui-$shard: the simulator's backboardd crashed (Metal texture validation) and took the runner with it;" \
         "running again: $(echo $killed)"
     while IFS= read -r t; do args+=("-only-testing:CassiniUITests/$t"); done <<< "$killed"
@@ -1075,7 +1085,7 @@ extra_xcodebuild_from_extra() {
 case "$tier" in
     clean) delete_clones; echo "deleted the $prefix-* clones"; exit 0 ;;
     fast|app|ui|all|changed|build) ;;
-    *) sed -n '2,47p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+    *) sed -n '2,49p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac
 
 extra_xcodebuild_from_extra
