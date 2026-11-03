@@ -27,6 +27,9 @@ public final class FakeAnalyzer: SpeakerAnalyzing {
     }
 
     public var analyzeCount: Int { calls.withLock { $0 } }
+    /// Analyses that were cancelled while they waited for `resume()`.
+    public var cancelledWhileWaiting: Int { cancels.withLock { $0 } }
+    private let cancels = Mutex(0)
     /// The words each whole-file analysis was given.
     public var analyzedWords: [[Word]] { given.withLock { $0 } }
 
@@ -35,13 +38,18 @@ public final class FakeAnalyzer: SpeakerAnalyzing {
         calls.withLock { $0 += 1 }
         given.withLock { $0.append(words) }
         progress(.analyzing(0))
-        await withCheckedContinuation { continuation in
-            let waits = gate.withLock { waiters in
-                guard waiters != nil else { return false }
-                waiters?.append(continuation)
-                return true
+        await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                let waits = gate.withLock { waiters in
+                    guard waiters != nil else { return false }
+                    waiters?.append(continuation)
+                    return true
+                }
+                if !waits { continuation.resume() }
             }
-            if !waits { continuation.resume() }
+        } onCancel: {
+            // Still waits for resume(), as before; a test can now wait for the cancel instead of sleeping.
+            cancels.withLock { $0 += 1 }
         }
         try Task.checkCancellation()
         progress(.analyzing(1))

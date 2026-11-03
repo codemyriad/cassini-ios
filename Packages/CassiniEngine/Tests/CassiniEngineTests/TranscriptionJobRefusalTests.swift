@@ -32,7 +32,7 @@ extension TranscriptionJobTests {
             h.transcriber.hangs = true
             let stop = StopSignal()
             let running = Task { await h.run(stop: stop) }
-            try await Task.sleep(for: .milliseconds(150))
+            try await h.until("the model downloads") { !h.transcriber.starts.isEmpty }
             stop.stop(.pause(.system))
             let (outcome, events) = await running.value
             #expect(outcome == .paused(.system))

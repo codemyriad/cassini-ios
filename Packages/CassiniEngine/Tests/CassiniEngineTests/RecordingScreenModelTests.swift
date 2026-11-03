@@ -12,6 +12,8 @@ import CassiniNotebook
         var missing = false
         /// While true the speech-model lookup waits.
         var lookupHeld = false
+        /// Speech-model lookups that have answered.
+        var lookups = 0
         var effects: [RecordingEffect] = []
         let model: RecordingScreenModel
 
@@ -24,6 +26,7 @@ import CassiniNotebook
             model = RecordingScreenModel(controller: h.controller, ports: .init(
                 permission: permission, modelsMissing: {
                     while screen?.lookupHeld == true { try? await Task.sleep(for: .milliseconds(5)) }
+                    defer { screen?.lookups += 1 }
                     return screen?.missing ?? false
                 },
                 askNotificationsOnce: { [center] in if notifier { await center.askNotificationsOnce() } }))
@@ -113,7 +116,7 @@ import CassiniNotebook
         #expect(s.effects == [.close])
         s.permission.access = .granted
         s.model.appBecameActive()
-        try await Task.sleep(for: .milliseconds(50))
+        await s.h.controller.settle()
         #expect(s.h.capture.starts == 0)
         #expect(s.h.controller.state == .idle)
         #expect(s.model.banner == nil)
@@ -209,7 +212,9 @@ import CassiniNotebook
         await s.model.enter()
         try await s.h.waitFor("the second capture") { s.model.phase == .recording }
         s.lookupHeld = false
-        try await Task.sleep(for: .milliseconds(50))
+        try await s.h.waitFor("the lookup answers") { s.lookups == 1 }
+        // The finish's task looks at the screen right after the lookup answers, on the main actor.
+        for _ in 0..<10 { await Task.yield() }
         #expect(s.effects.isEmpty, "the new recording keeps the screen")
         #expect(s.h.controller.state.isActive)
     }

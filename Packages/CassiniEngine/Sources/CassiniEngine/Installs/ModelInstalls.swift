@@ -49,6 +49,10 @@ import CassiniNotebook
     /// The language `failures[.speech]` is for.
     @ObservationIgnored private var speechFailureLanguage: String?
     @ObservationIgnored private var followers: [Task<Void, Never>] = []
+    /// Standalone installs whose run has ended, a cancelled one's closing refresh included, and the running job's
+    /// model downloads the follower has seen begin: what a test waits on instead of sleeping.
+    @ObservationIgnored private(set) var installsEnded = 0
+    @ObservationIgnored private(set) var downloadsFollowed = 0
     @ObservationIgnored private let background: (any BackgroundRunner)?
     @ObservationIgnored private let backgroundTitle: @MainActor () -> String
     @ObservationIgnored private let backgroundSubtitle: @MainActor () -> String
@@ -234,6 +238,7 @@ import CassiniNotebook
     /// Installs the queued parts one after another, then reads every part again; parts asked for during that read are
     /// installed before the install ends. Install `number` stops at once when it is cancelled, after its refresh.
     private func drain(_ number: Int) async {
+        defer { installsEnded += 1 }
         repeat {
             while installNumber == number, !queued.isEmpty {
                 let part = queued.removeFirst()
@@ -326,6 +331,7 @@ import CassiniNotebook
             var downloading = false
             for await now in Observations({ job.modelDownload != nil }) {
                 defer { downloading = now }
+                if now, !downloading { self?.downloadsFollowed += 1 }
                 guard downloading, !now else { continue }
                 guard let self else { return }
                 await self.refresh()
