@@ -2,7 +2,7 @@ import CassiniCore
 import Foundation
 import Synchronization
 import Testing
-import CassiniEngine
+@testable import CassiniEngine
 import CassiniEngineTesting
 import CassiniNotebook
 
@@ -10,6 +10,19 @@ import CassiniNotebook
 /// waiter that is cancelled takes nothing. iOS has no plain-thread `acquire` (native work runs on the inference thread
 /// a job hands it to), so the interrupt cases are the task's cancellation.
 @Suite struct NativeBudgetTests {
+    /// Waits, up to 30 s by the clock (E1), until `budget` has `count` waiters: under load a task can take far longer
+    /// than any fixed sleep to reach its wait.
+    private func waiters(_ budget: NativeBudget, _ count: Int) async throws {
+        let deadline = ContinuousClock.now + .seconds(30)
+        while budget.waiterCount != count {
+            guard ContinuousClock.now < deadline else {
+                Issue.record("\(budget.waiterCount) waiter(s), expected \(count)")
+                return
+            }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+    }
+
     // ports: NativeBudgetTest#acquireAndReleaseOnAPlainThread
     @Test func acquireAndRelease() async throws {
         let budget = NativeBudget()
@@ -35,7 +48,8 @@ import CassiniNotebook
         let budget = NativeBudget()
         try await budget.acquire()
         let waiter = Task { try await budget.acquire() }
-        try await Task.sleep(for: .milliseconds(50))
+        // Cancelled once it waits: a cancel before that takes the already-cancelled path (the next test).
+        try await waiters(budget, 1)
         waiter.cancel()
         await #expect(throws: CancellationError.self) { try await waiter.value }
         budget.release()
@@ -59,9 +73,9 @@ import CassiniNotebook
         let order = Mutex<[Int]>([])
         try await budget.acquire()
         let first = Task { try await budget.withBudget { order.withLock { $0.append(1) } } }
-        try await Task.sleep(for: .milliseconds(30))
+        try await waiters(budget, 1)
         let second = Task { try await budget.withBudget { order.withLock { $0.append(2) } } }
-        try await Task.sleep(for: .milliseconds(30))
+        try await waiters(budget, 2)
         #expect(order.withLock { $0 }.isEmpty)
         budget.release()
         try await first.value
