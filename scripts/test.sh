@@ -323,7 +323,19 @@ for devices in json.load(sys.stdin)["devices"].values():
     for d in devices:
         if d["name"].startswith(prefix): print(d["udid"], d["state"], d["name"])' "$1"
 }
-our_clones() { clones "$prefix-"; }
+# Whether clone $2 is one of worktree prefix $1's: <prefix>-iphone-N, -ipad-N, -bench, -shots-iphone or -shots-ipad. A
+# prefix match alone would take in the clones of a worktree whose name extends this one's (capture-start-failure and
+# capture-start-failure-test), and shut down, erase or delete them in the middle of that worktree's run.
+clone_of() {
+    local rest="${2#"$1"-}"
+    [ "$rest" != "$2" ] && [[ $rest =~ ^(iphone-[0-9]+|ipad-[0-9]+|bench|shots-iphone|shots-ipad)$ ]]
+}
+our_clones() {
+    local udid state name
+    clones "$prefix-" | while read -r udid state name; do
+        if clone_of "$prefix" "$name"; then echo "$udid $state $name"; fi
+    done
+}
 
 shutdown_clones() {
     our_clones | while read -r udid state _; do
@@ -359,7 +371,7 @@ reap_idle_clones() {
     busy=$(ps -Ao args= | grep -E '(^|/)xcodebuild ' | grep -oE 'id=[0-9A-F-]{36}' | cut -c4- | sort -u || true)
     while read -r udid state name; do
         [ "$state" = Booted ] || continue
-        case "$name" in "$prefix-"*) continue ;; esac
+        if clone_of "$prefix" "$name"; then continue; fi
         if printf '%s\n' "$busy" | grep -qx "$udid"; then echo "  $name is in use by an xcodebuild"; continue; fi
         idle=$(idle_seconds "$udid")
         if [ "$idle" -ge $(( idle_minutes * 60 )) ]; then
@@ -423,24 +435,23 @@ reclaim_disk() {
     [ -n "$worktrees" ] || return 0
     while IFS= read -r w; do
         [ -d "$w" ] || continue
-        names="$names ts-$(basename "$w")-"
+        names="$names ts-$(basename "$w")"
         [ -f "$w/Package.resolved" ] && [ -f "$w/Package.swift" ] \
             && keys="$keys $(cat "$w/Package.resolved" "$w/Package.swift" | shasum | cut -c1-12)"
     done <<< "$worktrees"
     while read -r udid state name; do
         [ "$state" = Shutdown ] || continue
-        case "$name" in
-            "$prefix-"*)
-                local kb; kb=$(du -sk "$HOME/Library/Developer/CoreSimulator/Devices/$udid" 2>/dev/null | cut -f1 || true)
-                if [ "${kb:-0}" -gt $(( 8 * 1024 * 1024 )) ]; then
-                    echo "  erasing $name: it grew to $(( kb / 1024 / 1024 )) GB"
-                    xcrun simctl erase "$udid" 2>/dev/null || true
-                fi
-                continue ;;
-        esac
+        if clone_of "$prefix" "$name"; then
+            local kb; kb=$(du -sk "$HOME/Library/Developer/CoreSimulator/Devices/$udid" 2>/dev/null | cut -f1 || true)
+            if [ "${kb:-0}" -gt $(( 8 * 1024 * 1024 )) ]; then
+                echo "  erasing $name: it grew to $(( kb / 1024 / 1024 )) GB"
+                xcrun simctl erase "$udid" 2>/dev/null || true
+            fi
+            continue
+        fi
         [ -f "$leases/$udid" ] || continue
         owned=""
-        for p in $names; do case "$name" in "$p"*) owned=1; break ;; esac; done
+        for p in $names; do if clone_of "$p" "$name"; then owned=1; break; fi; done
         [ -z "$owned" ] || continue
         echo "  deleting $name: its worktree is gone"
         xcrun simctl delete "$udid" 2>/dev/null && rm -f "$leases/$udid"
@@ -1039,6 +1050,10 @@ esac
 
 extra_xcodebuild_from_extra
 trap summary EXIT
+# A run ended by a signal must not pass: under bash 3.2 the EXIT trap of a shell killed by a signal sees $? = 0, so
+# summary printed PASSED and posted a green commit status for a run that never finished. Exiting from the signal's
+# own trap hands summary the real status.
+trap 'exit 129' HUP; trap 'exit 130' INT; trap 'exit 143' TERM
 start_status
 case "$tier" in
     fast) tier_fast ;;
