@@ -183,7 +183,7 @@ import CassiniNotebook
         let h = try await Harness()
         h.transcriber.hangs = true
         let task = Task { await h.run().outcome }
-        try await Task.sleep(for: .milliseconds(100))
+        try await h.until("the transcription runs") { !h.transcriber.starts.isEmpty }
         task.cancel()
         #expect(await task.value == .cancelled)
     }

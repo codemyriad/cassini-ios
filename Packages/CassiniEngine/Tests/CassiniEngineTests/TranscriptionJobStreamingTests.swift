@@ -2,7 +2,7 @@ import CassiniCore
 import Foundation
 import Synchronization
 import Testing
-import CassiniEngine
+@testable import CassiniEngine
 import CassiniEngineTesting
 import CassiniNotebook
 
@@ -266,7 +266,7 @@ import CassiniNotebook
         // Once the budget is free the job runs, and gives it back.
         try await h.budget.acquire()
         let waiting = Task { await h.run() }
-        try await Task.sleep(for: .milliseconds(50))
+        try await h.until("the job waits for the budget") { h.budget.waiterCount == 1 }
         h.budget.release()
         #expect(await waiting.value.outcome == .done)
         #expect(!h.budget.isHeld)

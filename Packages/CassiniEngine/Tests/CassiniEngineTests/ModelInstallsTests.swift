@@ -2,7 +2,7 @@ import CassiniCore
 import Foundation
 import Synchronization
 import Testing
-import CassiniEngine
+@testable import CassiniEngine
 import CassiniEngineTesting
 import CassiniNotebook
 
@@ -160,8 +160,8 @@ import CassiniNotebook
         #expect(!installs.isInstalling)
         #expect(installs.download == nil)
         try await until { analyzer.cancels == 1 }
-        // Let the cancelled install end and read the models again.
-        try await Task.sleep(for: .milliseconds(50))
+        // The cancelled install ends by reading the models again.
+        try await until { installs.installsEnded == 1 }
         #expect(installs.failures.isEmpty)
         #expect(installs.status(of: .speakers) == .notDownloaded)
         #expect(installs.download == nil, "the cancelled install's end shows nothing")
@@ -183,7 +183,7 @@ import CassiniNotebook
         try await until { transcriber.cancelled }
         // The cancelled install ends by reading the models again; nothing is installed after that read.
         try await until { installs.status(of: .speech) == .notDownloaded }
-        try await Task.sleep(for: .milliseconds(50))
+        try await until { installs.installsEnded == 1 }
         #expect(analyzer.installs == 0, "the parts after the cancelled one are dropped")
         #expect(analyzer.cancels == 0, "the speaker models' install was not running")
         #expect(installs.failures.isEmpty)
@@ -385,8 +385,8 @@ import CassiniNotebook
         job.apply(.downloading(DownloadProgress(part: .speakers, doneBytes: 30, totalBytes: 100, verifying: false)))
         #expect(installs.statuses == [.speech: .ready, .speakers: .downloading(0.3), .voices: .downloading(0.3)],
                 "recognising saved voices follows the speaker models' download")
-        // Give the follower a turn to see the download before it ends.
-        try await Task.sleep(for: .milliseconds(50))
+        // The follower sees the download begin before it ends.
+        try await until { installs.downloadsFollowed == 1 }
         analyzer.finish(with: nil, status: .ready)
         job.end()
         try await until { installs.status(of: .speakers) == .ready }

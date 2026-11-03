@@ -148,10 +148,10 @@ extension TranscriptionJobTests {
             let h = try await Harness(analyzer: analyzer)
             let stop = StopSignal()
             let running = Task { await h.run(stop: stop) }
-            while analyzer.analyzeCount == 0 { try await Task.sleep(for: .milliseconds(10)) }
+            try await h.until("the speaker step runs") { analyzer.analyzeCount == 1 }
             stop.stop(.pause(.user))
-            // The analysis ends at its next check once the stop cancelled it.
-            try await Task.sleep(for: .milliseconds(100))
+            // The analysis ends at its next check once the stop has cancelled it.
+            try await h.until("the stop cancels the analysis") { analyzer.cancelledWhileWaiting == 1 }
             analyzer.resume()
             let (outcome, _) = await running.value
             #expect(outcome == .paused(.user))

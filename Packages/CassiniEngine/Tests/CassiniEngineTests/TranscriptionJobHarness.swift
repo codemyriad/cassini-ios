@@ -9,6 +9,19 @@ import CassiniNotebook
 /// The scripted transcriber, the host and the files a `TranscriptionJobTests` job runs over.
 extension TranscriptionJobTests {
     struct Harness {
+        /// Waits until `condition` holds, for at most 30 s: an upper bound for a busy host, never a wait a passing run
+        /// sees (E1). A wait that runs out fails the test.
+        func until(_ what: Comment, _ condition: () -> Bool) async throws {
+            let deadline = ContinuousClock.now + .seconds(30)
+            while !condition() {
+                guard ContinuousClock.now < deadline else {
+                    Issue.record("Timed out waiting until \(what)")
+                    throw CancellationError()
+                }
+                try await Task.sleep(for: .milliseconds(5))
+            }
+        }
+
         let root: URL
         let notes: NoteStore
         let noteID = UUID()
