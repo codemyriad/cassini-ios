@@ -357,6 +357,69 @@ wait_for_room() {
     done
 }
 
+# Gives disk back on a host that was 91% full, before a heavy run (the host lock held):
+# - deletes clones made by this repository's runs (they have a lease in this cache) whose worktree is gone, once they
+#   are shut down: a merged PR's worktree, removed without `clean`, left 7 GB of them;
+# - erases a shut-down clone of this worktree that grew past 8 GB (an iPad booted once per run grew to 8.1 GB, most of
+#   it a poster store and downloaded assets): its next boot starts from a fresh device;
+# - removes the leases of clones that no longer exist, and the package caches no live worktree resolves to, keeping
+#   the two newest.
+# A copy without git (scripts/test-remote.sh) cannot tell which worktrees are live, and leaves all of it alone.
+reclaim_disk() {
+    local worktrees w names="" keys="" udid state name p owned
+    worktrees=$(git -C "$root" worktree list --porcelain 2>/dev/null | sed -n 's/^worktree //p') || return 0
+    [ -n "$worktrees" ] || return 0
+    while IFS= read -r w; do
+        [ -d "$w" ] || continue
+        names="$names ts-$(basename "$w")-"
+        [ -f "$w/Package.resolved" ] && [ -f "$w/Package.swift" ] \
+            && keys="$keys $(cat "$w/Package.resolved" "$w/Package.swift" | shasum | cut -c1-12)"
+    done <<< "$worktrees"
+    while read -r udid state name; do
+        [ "$state" = Shutdown ] || continue
+        case "$name" in
+            "$prefix-"*)
+                local kb; kb=$(du -sk "$HOME/Library/Developer/CoreSimulator/Devices/$udid" 2>/dev/null | cut -f1 || true)
+                if [ "${kb:-0}" -gt $(( 8 * 1024 * 1024 )) ]; then
+                    echo "  erasing $name: it grew to $(( kb / 1024 / 1024 )) GB"
+                    xcrun simctl erase "$udid" 2>/dev/null || true
+                fi
+                continue ;;
+        esac
+        [ -f "$leases/$udid" ] || continue
+        owned=""
+        for p in $names; do case "$name" in "$p"*) owned=1; break ;; esac; done
+        [ -z "$owned" ] || continue
+        echo "  deleting $name: its worktree is gone"
+        xcrun simctl delete "$udid" 2>/dev/null && rm -f "$leases/$udid"
+    done < <(clones "ts-")
+    local devices lease_file
+    devices=$(xcrun simctl list devices -j | /usr/bin/python3 -c '
+import json, sys
+for devices in json.load(sys.stdin)["devices"].values():
+    for d in devices: print(d["udid"])') || return 0
+    for lease_file in "$leases"/*; do
+        [ -f "$lease_file" ] || continue
+        printf '%s\n' "$devices" | grep -qx "$(basename "$lease_file")" || rm -f "$lease_file"
+    done
+    local newest key dir
+    newest=$(ls -1td "$cache"/SourcePackages-* 2>/dev/null | head -2 | sed 's|.*/SourcePackages-||' | xargs || true)
+    for dir in "$cache"/SourcePackages-* "$cache"/swiftpm-*; do
+        [ -d "$dir" ] || continue
+        key=${dir##*-}
+        [[ $key =~ ^[0-9a-f]{12}$ ]] || continue
+        case " $keys $newest " in *" $key "*) continue ;; esac
+        echo "  removing ${dir##*/}: no worktree resolves to it"
+        rm -rf "${cache:?}/${dir##*/}"
+    done
+}
+
+# The start of every run that builds or boots: the host lock, then the disk.
+start_heavy() {
+    take_heavy_lock
+    reclaim_disk
+}
+
 # Shards that fit in memory while leaving about 4 GB for everything else; each booted simulator with the app and its
 # test runner takes about 1.5 GB. Clones of ours that are already booted count as available. At most 3: on 10 cores
 # three shards already keep the CPU busy (simulator launches are CPU-bound), and a fourth made every test slower.
@@ -890,7 +953,7 @@ tier_changed() {
     case " $swift " in *" ALL "*) filter="" ;; *) filter=$(echo $swift | sed 's/ /|/g') ;; esac
     if [ -z "$swift" ] && [ $hosted = 0 ] && [ -z "$ui" ]; then echo "nothing to test"; return 0; fi
     if [ $hosted = 0 ] && [ -z "$ui" ]; then tier_fast "$filter"; return; fi
-    take_heavy_lock
+    start_heavy
     start_first_boot
     [ $strings = 1 ] && check_strings
     [ -n "$swift" ] && start_fast_beside "$filter"
@@ -925,10 +988,10 @@ extra_xcodebuild_from_extra
 trap summary EXIT
 case "$tier" in
     fast) tier_fast ;;
-    app)  take_heavy_lock; start_first_boot; build_for_testing; tier_app ;;
-    ui)   take_heavy_lock; start_first_boot; build_for_testing; tier_ui ;;
-    all)  take_heavy_lock; start_first_boot; check_strings; start_fast_beside; build_for_testing; tier_app; tier_ui
+    app)  start_heavy; start_first_boot; build_for_testing; tier_app ;;
+    ui)   start_heavy; start_first_boot; build_for_testing; tier_ui ;;
+    all)  start_heavy; start_first_boot; check_strings; start_fast_beside; build_for_testing; tier_app; tier_ui
           wait_fast_beside ;;
     changed) tier_changed ;;
-    build) take_heavy_lock; build_for_testing ;;
+    build) start_heavy; build_for_testing ;;
 esac
