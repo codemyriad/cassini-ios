@@ -14,6 +14,8 @@ import XCTest
 // ports: ScreenAccessibilityTest#settings
 // ports: AppAccessibilityTest#theLibraryAndSettingsHaveNoFindings
 // Its waits allow 20 s: upper bounds for the iPad clone on a busy machine, where a screen can take that long to open.
+// The taps that open a screen are tried again when it does not open (`tap(until:)`): the first after a launch can
+// be dropped there.
 final class AccessibilityAuditTests: XCTestCase {
     private static let fixture = "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA"
     /// The largest Dynamic Type size (AX5).
@@ -41,31 +43,33 @@ final class AccessibilityAuditTests: XCTestCase {
     @MainActor private func recording(_ extra: [String] = []) -> XCUIApplication {
         let app = launch(["--seed", "recording"] + extra)
         XCTAssertTrue(app.buttons["recordButton"].waitForExistence(within: 15))
-        app.buttons["recordButton"].tap()
-        XCTAssertTrue(app.buttons["pauseResumeRecording"].waitForEnabled(within: 8))
+        let pause = app.buttons["pauseResumeRecording"]
+        app.buttons["recordButton"].tap(until: { pause.exists })
+        XCTAssertTrue(pause.waitForEnabled(within: 8))
         return app
     }
 
     @MainActor private func settings(_ extra: [String] = []) -> XCUIApplication {
         let app = library(extra)
-        app.buttons["settingsButton"].tap()
-        XCTAssertTrue(app.buttons["appLanguageRow"].waitForExistence(within: 20))
+        let language = app.buttons["appLanguageRow"]
+        XCTAssertTrue(app.buttons["settingsButton"].tap(until: { language.exists }), "Settings did not open")
         return app
     }
 
     @MainActor private func trash(_ extra: [String] = []) -> XCUIApplication {
         let app = launch(["--seed", "trash"] + extra)
         XCTAssertTrue(app.buttons["recentlyDeletedButton"].waitForExistence(within: 15))
-        app.buttons["recentlyDeletedButton"].tap()
-        XCTAssertTrue(app.staticTexts["Old interview draft"].waitForExistence(within: 20))
+        let draft = app.staticTexts["Old interview draft"]
+        XCTAssertTrue(app.buttons["recentlyDeletedButton"].tap(until: { draft.exists }),
+                      "Recently Deleted did not open")
         return app
     }
 
     @MainActor private func savedVoices(_ extra: [String] = []) -> XCUIApplication {
         let app = launch(["--seed", "voices"] + extra)
         XCTAssertTrue(app.buttons["settingsButton"].waitForExistence(within: 15))
-        app.buttons["settingsButton"].tap()
-        let row = app.buttons["savedVoicesRow"]
+        let language = app.buttons["appLanguageRow"], row = app.buttons["savedVoicesRow"]
+        XCTAssertTrue(app.buttons["settingsButton"].tap(until: { language.exists }), "Settings did not open")
         for _ in 0..<6 where !row.isHittable { app.swipeUp() }
         row.tap()
         XCTAssertTrue(app.staticTexts["Alex Moreau"].waitForExistence(within: 20))
@@ -130,6 +134,8 @@ final class AccessibilityAuditTests: XCTestCase {
     /// The same screens on the iPad, beside the Library's sidebar (an iOS-only layout).
     @MainActor func testIPadScreensPassTheAudit() throws {
         try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad, "the split view")
+        // Six screens in one test: about 160 s on a calm host, over the 300 s default when it runs 2-4x slower.
+        executionTimeAllowance = 600
         let screens: [(String, @MainActor ([String]) -> XCUIApplication)] = [
             ("library", library), ("note", note), ("recording", recording), ("settings", settings),
             ("trash", trash), ("savedVoices", savedVoices)]

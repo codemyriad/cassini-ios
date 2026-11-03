@@ -21,7 +21,9 @@
 #   CASSINI_UI_WORKERS   UI shards (default: as many as memory allows, at most 3)
 #   CASSINI_UI_IPAD      what the iPad clone runs: the tests named testIPad* (default), all (every UI test, beside
 #                        the iPhone shards; the longest step then) or 0 (nothing)
-#   CASSINI_KEEP_SIMS=0  shut the clones down afterwards (default: keep the iPhones booted for the next run)
+#   CASSINI_KEEP_SIMS    0 shuts the clones down afterwards, 1 keeps the iPhones booted for the next run (default:
+#                        0 after all, 1 after the other tiers)
+#   CASSINI_CONFORMANCE_REQUIRED  1 (the default for all) fails, rather than skips, missing conformance vectors
 #   CASSINI_IDLE_MINUTES booted clones of other worktrees that no xcodebuild has used for this long are shut down,
 #                        never deleted (default 15)
 #   CASSINI_TEST_CACHE   shared cache directory (default: .test-cache beside the main checkout's .git)
@@ -61,7 +63,11 @@ logs="$derived/test-logs"
 prefix="${CASSINI_SIM_PREFIX:-ts-$(basename "$root")}"
 iphone_type="${CASSINI_IPHONE:-iPhone 17}"
 ipad_type="${CASSINI_IPAD:-iPad Pro 13-inch (M5)}"
-keep_sims="${CASSINI_KEEP_SIMS:-1}"
+# After the whole gate the clones go (Mac and Android work on this host never reclaims their memory); after the
+# iterating tiers the iPhones stay booted for the next run.
+keep_sims="${CASSINI_KEEP_SIMS:-$( [ "$tier" = all ] && echo 0 || echo 1 )}"
+# The whole gate fails, rather than skips, the format's conformance vectors when it cannot find them.
+[ "$tier" != all ] || export CASSINI_CONFORMANCE_REQUIRED="${CASSINI_CONFORMANCE_REQUIRED:-1}"
 idle_minutes="${CASSINI_IDLE_MINUTES:-15}"
 leases="$cache/sim-leases"
 
@@ -230,17 +236,23 @@ take_heavy_lock() {
     rm -f "$lock_held_file"
     note="$(basename "$root") (test.sh $tier, pid $$, since $(date '+%Y-%m-%d %H:%M:%S'))"
     /usr/bin/python3 -I -c '
-import fcntl, os, signal, sys, time
+import fcntl, os, signal, sys, threading, time
 path, parent, held, note = sys.argv[1], int(sys.argv[2]), sys.argv[3], sys.argv[4]
 signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
 # Not os.kill(parent, 0), which a killed but unreaped parent still passes: once it is gone this helper is reparented.
 def alive(): return os.getppid() == parent
-fd = os.open(path, os.O_RDWR | os.O_CREAT, 0o644)
-while True:
-    try: fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB); break
-    except BlockingIOError:
-        if not alive(): sys.exit(1)
+# The wait is one blocking flock, so this run keeps its place among the waiters (the kernel serves them in order). A
+# try every second never had one: a lockf that queued after it took the lock each time it was let go, and a stream
+# of other runs starved the gate. A thread ends the wait if this script goes meanwhile.
+waiting = True
+def watch():
+    while waiting:
+        if not alive(): os._exit(1)
         time.sleep(1)
+threading.Thread(target=watch, daemon=True).start()
+fd = os.open(path, os.O_RDWR | os.O_CREAT, 0o644)
+fcntl.flock(fd, fcntl.LOCK_EX)
+waiting = False
 try:
     open(held, "w").close()
     os.ftruncate(fd, 0); os.write(fd, (note + "\n").encode())
@@ -307,11 +319,18 @@ for devices in json.load(sys.stdin)["devices"].values():
 # Marks a clone as used now; other worktrees' runs leave a clone alone while its lease is fresh.
 lease() { touch "$leases/$1"; }
 
-# Boots a clone and waits until it can install apps; a booted one returns at once.
+# Boots a clone and waits until it can install apps; a booted one returns at once. A boot that fails, or has not
+# finished after 5 minutes (a wedged CoreSimulatorService would otherwise hold the run and its memory for good), is
+# shut down and tried once more.
 boot() {
-    local udid="$1"
+    local udid="$1" rc=0
     lease "$udid"
-    xcrun simctl bootstatus "$udid" -b > /dev/null 2>&1 || xcrun simctl bootstatus "$udid" -b > /dev/null
+    run_limited "$logs/boot-$udid.log" 300 xcrun simctl bootstatus "$udid" -b || rc=$?
+    [ $rc != 0 ] || return 0
+    echo "  the boot of $udid $( [ $rc = 124 ] && echo 'took over 300 s' || echo "failed ($rc)" ); trying once more"
+    # The shutdown talks to the same service, so it is bounded too; one that does not finish ends the boot.
+    run_limited "$logs/boot-$udid.log" 60 xcrun simctl shutdown "$udid" || [ $? != 124 ] || return 124
+    run_limited "$logs/boot-$udid.log" 300 xcrun simctl bootstatus "$udid" -b
 }
 
 # "udid state name" of the clones whose name starts with $1- (default: this worktree's prefix).
@@ -580,8 +599,9 @@ tier_fast() {
     grep -E "^✔ Test run with|^✘ Test run with" "$logs/swift-test.log" || true
 }
 
-# swift test beside the build: it and the simulator work hardly compete (SwiftPM builds only the packages, once, and
-# its tests take a few seconds of CPU). Its time is added to the summary when it is waited for.
+# swift test beside the build, which saves its minute or two of wall time. They do compete for the CPU: beside a busy
+# build the package tests ran up to 100x slower (PR #24), so a wait in a package test allows 30 s, never a few. Its
+# time is added to the summary when it is waited for.
 fast_pid=""
 start_fast_beside() {
     ( local t0; t0=$(date +%s); rc=0; swift_test "${1:-}" 2> /dev/null || rc=$?
@@ -702,13 +722,18 @@ test_on() {
     done
     # The hosted tests start within seconds and the UI runner within a minute; a run that has not started by then
     # is stuck (once, the hosted tests hung for five minutes before xcodebuild gave up).
-    # A whole run: the hosted tests take about a minute, a UI shard about twenty.
-    local limit=90 total=900; [ "$target" = CassiniUITests ] && limit=180 total=3600
+    # A whole run: the hosted tests take about a minute; a UI shard four times what its tests took before plus ten
+    # minutes (shard_seconds, from the timing table), and at least an hour. One shard with all 90 tests planned about
+    # 26 min, so a fixed hour failed it on a host running 2-4x slower.
+    local limit=90 total=900
+    if [ "$target" = CassiniUITests ]; then
+        limit=180 total=$(( 4 * ${shard_seconds:-0} + 600 )); [ $total -ge 3600 ] || total=3600
+    fi
     run_watched "$log" "$limit" "$total" xcodebuild test-without-building \
         -xctestrun "${xctestrun%.xctestrun}.only-$target.xctestrun" \
         -destination "platform=iOS Simulator,id=$udid" \
         -resultBundlePath "$bundle" -collect-test-diagnostics never -parallel-testing-enabled NO \
-        -test-timeouts-enabled YES -maximum-test-execution-time-allowance 300 \
+        -test-timeouts-enabled YES -default-test-execution-time-allowance 300 -maximum-test-execution-time-allowance 600 \
         "$@" ${extra_xcodebuild[@]+"${extra_xcodebuild[@]}"} || rc=$?
     lease "$udid"
     return $rc
@@ -779,6 +804,16 @@ ui_tests() {
 # Shared between worktrees, so a fresh worktree balances its first run too; the committed table covers a fresh cache.
 timings_file="$cache/ui-test-durations.tsv"
 committed_timings="$root/scripts/ui-test-durations.tsv"
+# The seconds the tests on stdin took before, by the same table as plan_shards (15 for a test it has not seen).
+planned_seconds() {
+    awk -v f="$timings_file" -v c="$committed_timings" '
+        BEGIN {
+            while ((getline line < c) > 0) { split(line, p, "\t"); d[p[1]] = p[2] }
+            while ((getline line < f) > 0) { split(line, p, "\t"); d[p[1]] = p[2] }
+        }
+        NF { s += ($0 in d) ? d[$0] : 15 }
+        END { print int(s) }'
+}
 
 # Splits the tests on stdin into $1 shards, longest first onto the least loaded shard, by their measured durations
 # (15 s for a test without one). Prints "shard<TAB>test".
@@ -829,7 +864,10 @@ retry_killed_tests() {
     killed=$(killed_tests "$log")
     [ -n "$killed" ] || return 1
     grep -qE "^Test Case '.*' failed \(" "$log" && return 1
-    [ -n "$(find "$HOME/Library/Logs/DiagnosticReports" -name 'backboardd-*.ips' -newer "$logs/.ui-started" 2>/dev/null)" ] || return 1
+    # A crash of this clone's backboardd: the report names its device (coalition SimDevice.<udid>), so a crash in
+    # another worktree's clone at the same time does not count.
+    find "$HOME/Library/Logs/DiagnosticReports" -name 'backboardd-*.ips' -newer "$logs/.ui-started" \
+        -exec grep -l "SimDevice\.$udid" {} + 2>/dev/null | grep -q . || return 1
     echo "  ui-$shard: the simulator's backboardd crashed (Metal texture validation) and took the runner with it;" \
         "running again: $(echo $killed)"
     while IFS= read -r t; do args+=("-only-testing:CassiniUITests/$t"); done <<< "$killed"
@@ -895,6 +933,7 @@ tier_ui() {
             < <(printf '%s\n' "$plan" | awk -F'\t' -v k="$k" '$1 == k { print $2 }')
         [ ${#shard_args[@]} -gt 0 ] || continue
         ( udid=$(clone_udid "$prefix-iphone-$k" "$iphone_type")
+          shard_seconds=$(printf '%s\n' "$plan" | awk -F'\t' -v k="$k" '$1 == k { print $2 }' | planned_seconds)
           boot "$udid" || { echo "could not boot $prefix-iphone-$k" > "$logs/ui-$k.log"; exit 1; }
           test_on_retrying CassiniUITests "$logs/ui-$k.log" "$logs/ui-$k.xcresult" "$udid" "${shard_args[@]}" ) & pids+=("$!:$k")
     done
@@ -908,7 +947,8 @@ tier_ui() {
         ipad=$(clone_udid "$prefix-ipad-1" "$ipad_type")
         shard_args=()
         while IFS= read -r t; do shard_args+=("-only-testing:CassiniUITests/$t"); done <<< "$ipad_tests"
-        ( boot "$ipad" || { echo "could not boot $prefix-ipad-1" > "$logs/ui-ipad.log"; exit 1; }
+        ( shard_seconds=$(printf '%s\n' "$ipad_tests" | planned_seconds)
+          boot "$ipad" || { echo "could not boot $prefix-ipad-1" > "$logs/ui-ipad.log"; exit 1; }
           test_on_retrying CassiniUITests "$logs/ui-ipad.log" "$logs/ui-ipad.xcresult" "$ipad" "${shard_args[@]}" ) & pids+=("$!:ipad")
     fi
     for p in ${pids[@]+"${pids[@]}"}; do wait "${p%%:*}" || failed="$failed ${p##*:}"; done
@@ -1045,7 +1085,7 @@ extra_xcodebuild_from_extra() {
 case "$tier" in
     clean) delete_clones; echo "deleted the $prefix-* clones"; exit 0 ;;
     fast|app|ui|all|changed|build) ;;
-    *) sed -n '2,47p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+    *) sed -n '2,49p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac
 
 extra_xcodebuild_from_extra
