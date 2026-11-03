@@ -1,27 +1,44 @@
 import XCTest
 
+/// The least time any of the waits below allows, whatever its caller asks: on a busy host a step takes two to four
+/// times as long, and a 3 or 5 second limit failed tests that had nothing wrong (E1). A wait returns as soon as its
+/// condition holds, so a passing run is no slower. `TEST_RUNNER_CASSINI_UI_WAIT_FLOOR` (seconds) overrides it.
+let uiWaitFloor: TimeInterval =
+    ProcessInfo.processInfo.environment["CASSINI_UI_WAIT_FLOOR"].flatMap(TimeInterval.init) ?? 15
+
 /// Waits that look at once and then about every tenth of a second. XCTest's `waitForExistence(timeout:)` and
 /// `XCTNSPredicateExpectation` first look after a whole second, so each of them cost a test a second even when the
-/// element was already on the screen. The timeouts mean what they meant there.
+/// element was already on the screen. Each waits at least `uiWaitFloor`.
+///
+/// These are for what should happen. To check that something does not appear, use `staysAbsent(for:)`: a negative
+/// check written as `XCTAssertFalse(x.waitForExistence(within: 1))` would wait the whole floor on every passing run.
 extension XCUIElement {
     @MainActor func waitForExistence(within timeout: TimeInterval) -> Bool {
-        poll(within: timeout) { exists }
+        poll(within: max(timeout, uiWaitFloor)) { exists }
     }
 
     @MainActor func waitForNonExistence(within timeout: TimeInterval) -> Bool {
-        poll(within: timeout) { !exists }
+        poll(within: max(timeout, uiWaitFloor)) { !exists }
+    }
+
+    /// True when the element did not appear for the whole of `duration`: a check that something stays off the screen,
+    /// which no wait floor stretches.
+    @MainActor func staysAbsent(for duration: TimeInterval) -> Bool {
+        !poll(within: duration) { exists }
     }
 
     /// Waits until the element is there and enabled: the recording screen shows Pause, disabled, while the microphone
     /// starts.
     @MainActor func waitForEnabled(within timeout: TimeInterval) -> Bool {
-        poll(within: timeout) { exists && isEnabled }
+        poll(within: max(timeout, uiWaitFloor)) { exists && isEnabled }
     }
 
     /// Waits until `predicate`, over the element's attributes as for `XCTNSPredicateExpectation`, holds. While the
     /// element is missing only `exists == false` can hold (reading another attribute of it would fail the test).
     @MainActor func wait(until predicate: NSPredicate, within timeout: TimeInterval) -> Bool {
-        poll(within: timeout) { exists ? predicate.evaluate(with: self) : predicate.evaluate(with: ["exists": false]) }
+        poll(within: max(timeout, uiWaitFloor)) {
+            exists ? predicate.evaluate(with: self) : predicate.evaluate(with: ["exists": false])
+        }
     }
 
     /// Waits until this field holds `text`. Typed keys reach the app after `typeText` returns, seconds later on a busy
@@ -172,7 +189,8 @@ extension XCUIApplication {
         XCUIDevice.shared.system.open(url)
         let marker = XCUIApplication().staticTexts.matching(NSPredicate(format: "identifier == 'launchFinished' AND value == %@", token))
             .firstMatch
-        if marker.waitForExistence(within: 10) { return true }
+        // Not waitForExistence: a relaunch that did not answer falls back to a new process, so no floor here.
+        if poll(within: 10, { marker.exists }) { return true }
         let markers = XCUIApplication().staticTexts.matching(identifier: "launchFinished").allElementsBoundByIndex
         print("The relaunch inside the app did not answer (state \(XCUIApplication().state.rawValue), markers "
               + "\(markers.map { $0.value as? String ?? "?" })); launching a new process")

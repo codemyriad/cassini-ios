@@ -78,7 +78,7 @@ import CassiniSherpa
     }
 
     private func waitUntil(_ message: String, _ condition: () -> Bool) async throws {
-        let deadline = ContinuousClock.now + .seconds(10)
+        let deadline = ContinuousClock.now + .seconds(30)
         while !condition() {
             guard ContinuousClock.now < deadline else { return XCTFail(message) }
             try await Task.sleep(for: .milliseconds(10))

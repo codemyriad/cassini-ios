@@ -435,7 +435,7 @@ import CassiniEngineTesting
         return draft.words.map(\.text)
     }
 
-    private func waitUntil(timeout: Duration = .seconds(5), _ condition: @MainActor () -> Bool) async {
+    private func waitUntil(timeout: Duration = .seconds(30), _ condition: @MainActor () -> Bool) async {
         let clock = ContinuousClock()
         let deadline = clock.now + timeout
         while !condition() && clock.now < deadline { try? await Task.sleep(for: .milliseconds(10)) }
