@@ -75,7 +75,7 @@ import CassiniNotebook
         let (h, _) = try await harness()
         let stop = StopSignal()
         let transcriber = try #require(h.engine as? WindowedTranscriber)
-        transcriber.beforeWindow = { index in if index == 1 { stop.stop(.pause(.user)) } }
+        transcriber.afterWindow = WindowedTranscriber.pause(stop, afterWindows: 2)
         #expect(await h.run(stop: stop).outcome == .paused(.user))
         let checkpoint = try #require(h.checkpoints.saved.last)
         let speakers = try #require(checkpoint.speakers)

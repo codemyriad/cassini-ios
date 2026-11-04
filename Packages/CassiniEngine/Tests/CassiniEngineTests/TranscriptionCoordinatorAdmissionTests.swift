@@ -32,11 +32,14 @@ extension TranscriptionCoordinatorTests {
             let note = try await h.note("Running")
             await h.coordinator.transcribe(note)
             let run = try await h.run(0)
-            run.pauseOnStop = true
+            // The run goes on after the stop until it is finished below: ending at once, it let the trash complete
+            // before the Transcribe on a slow host, and the note was queued again.
+            run.pauseOnStop = false
 
             let trashing = Task { await h.coordinator.trash(note) { _ in true } }
             try await h.waitUntil("the running job was asked to stop") { run.stopRequest != nil }
             #expect(await h.coordinator.transcribe(note) == .refused(.trashed), "the job is still ending")
+            run.finish(.paused(.user))
             #expect(await trashing.value)
         }
 

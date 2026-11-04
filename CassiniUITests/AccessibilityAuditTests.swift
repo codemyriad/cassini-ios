@@ -70,7 +70,9 @@ final class AccessibilityAuditTests: XCTestCase {
         XCTAssertTrue(app.buttons["settingsButton"].waitForExistence(within: 15))
         let language = app.buttons["appLanguageRow"], row = app.buttons["savedVoicesRow"]
         XCTAssertTrue(app.buttons["settingsButton"].tap(until: { language.exists }), "Settings did not open")
-        for _ in 0..<6 where !row.isHittable { app.swipeUp() }
+        // At the largest text size the row is about six swipes down, more when a loaded host makes each fling shorter:
+        // six once stopped a row short of it.
+        XCTAssertTrue(app.scroll(attempts: 12) { row.exists && row.isHittable }, "Saved voices is not on the screen")
         row.tap()
         XCTAssertTrue(app.staticTexts["Alex Moreau"].waitForExistence(within: 20))
         return app

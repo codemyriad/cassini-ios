@@ -1,0 +1,81 @@
+# An off-host check of what drmeyers' gate cannot see: a clean checkout with nothing but the repository, cassini-format
+# and the network. It runs `scripts/test.sh fast` (the string catalogs and the Swift package tests, with the
+# conformance vectors required) and `scripts/test.sh build` (the app, its extension and the test bundles, built for the
+# iOS Simulator). The simulator tiers (hosted and UI tests) stay local: the merge gate is the drmeyers/test-all status
+# that `CASSINI_POST_STATUS=1 scripts/test.sh all` posts (D66).
+#
+# Not a required check: the path filter leaves a PR that changes no code without this run.
+name: CI
+
+on:
+  pull_request:
+    paths: &code
+      - 'Cassini/**'
+      - 'CassiniActivity/**'
+      - 'CassiniShared/**'
+      - 'CassiniTests/**'
+      - 'CassiniUITests/**'
+      - 'Packages/**'
+      - 'Sources/**'
+      - 'Tests/**'
+      - 'Package.swift'
+      - 'Package.resolved'
+      - 'project.yml'
+      - 'scripts/test.sh'
+      - 'scripts/check-strings.sh'
+      - '.github/workflows/ci.yml'
+  push:
+    branches: [main]
+    paths: *code
+  workflow_dispatch:
+
+# A newer push to a PR cancels that PR's older run; a push to main or a manual run is never cancelled.
+concurrency:
+  group: ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || format('run-{0}', github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  fast-and-build:
+    name: Package tests and build
+    # Xcode 27.0 (27A266a), the build drmeyers' gate uses. Hosted runners have Xcode 27 only on this preview image; the
+    # GA macos-26 image's Xcode 26.6 (Swift 6.2) does not compile the package tests.
+    runs-on: xcode-27
+    # About 3x the measured run (6.3 min from a cold runner: package tests 3.9, build 2.0), so a hang frees the org's
+    # shared macOS slot.
+    timeout-minutes: 20
+    env:
+      CASSINI_CONFORMANCE_REQUIRED: '1'
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: cassini-ios
+      # Beside the repository, where scripts/test.sh looks for the conformance vectors.
+      - uses: actions/checkout@v5
+        with:
+          repository: codemyriad/cassini-format
+          path: cassini-format
+      # A named path, not a glob or the image's default (Xcode 27.1 there): a new default must not change the toolchain.
+      - name: Select Xcode 27.0
+        run: |
+          test -d /Applications/Xcode_27.0.app || { echo "::error::Xcode 27.0 is not on this image"; ls -d /Applications/Xcode*; exit 1; }
+          sudo xcode-select -s /Applications/Xcode_27.0.app
+          xcodebuild -version
+          swift --version
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: String catalogs and package tests
+        working-directory: cassini-ios
+        run: scripts/test.sh fast
+      - name: Build for testing
+        working-directory: cassini-ios
+        run: scripts/test.sh build
+      - uses: actions/upload-artifact@v5
+        if: failure()
+        continue-on-error: true
+        with:
+          name: test-logs-${{ github.sha }}
+          path: cassini-ios/DerivedData.noindex/test-logs
+          retention-days: 14

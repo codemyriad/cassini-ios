@@ -195,6 +195,10 @@ measured time, averaged with the time stored before. Arguments after the tier go
 environment variables. `scripts/test-remote.sh [tier]` runs the same tier on the Mac named by `CASSINI_MAC`, or here
 when that is unset.
 
+On GitHub, `.github/workflows/ci.yml` runs `scripts/test.sh fast` and `scripts/test.sh build` on a hosted runner
+with Xcode 27.0, for each push to main or a pull request that changes code. The simulator tiers run only locally: the
+`drmeyers/test-all` status that `CASSINI_POST_STATUS=1 scripts/test.sh all` posts is what a merge looks for.
+
 `scripts/screenshots.sh` takes the screenshots above. It runs `CassiniUITests/ScreenshotTests` on its own iPhone 17
 and iPad Pro 13-inch (M5) clones, in light and dark, with the status bar pinned to 9:41. It then exports the named
 attachments from the result bundle and saves them, scaled down, under `docs/screenshots/`. `--locale it` (or `fr`,
