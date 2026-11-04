@@ -63,17 +63,17 @@ import CassiniNotebook
 
         let (stopped, transcriber) = try await harness()
         let stop = StopSignal()
-        transcriber.beforeWindow = { index in if index == 1 { stop.stop(.pause(.user)) } }
+        transcriber.afterWindow = WindowedTranscriber.pause(stop, afterWindows: 2)
         let (outcome, events) = await stopped.run(stop: stop)
         #expect(outcome == .paused(.user))
         #expect(events.contains(.stopping))
-        // The stop is honoured at the window it arrived in.
+        // The checkpoint holds the windows decoded before the stop.
         let checkpoint = try #require(stopped.checkpoints.saved.last)
         #expect(checkpoint.doneMs == 54_000)
         #expect(checkpoint.recognition == RecognitionCheckpoint(start: 832_000, end: 864_000, position: 864_000))
         #expect(await stopped.note()?.transcript.isEmpty == true)
 
-        transcriber.beforeWindow = { _ in }
+        transcriber.afterWindow = { _ in }
         let (resumedOutcome, resumedEvents) = await stopped.run()
         #expect(resumedOutcome == .done)
         let restored = try #require(resumedEvents.compactMap(\.started).first?.restored)
@@ -218,6 +218,20 @@ final class WindowedTranscriber: Transcribing, @unchecked Sendable {
     private var _requests: [TranscriptionRequest] = []
     var requests: [TranscriptionRequest] { lock.withLock { _requests } }
     var beforeWindow: @Sendable (Int) -> Void = { _ in }
+    /// Awaited once a window's words have gone to the job, with the number of windows decoded; the decode waits for it.
+    var afterWindow: @Sendable (Int) async throws -> Void = { _ in }
+
+    /// An `afterWindow` that pauses `stop` once `count` windows are in, and holds the decode until the job cancels it.
+    /// A stop from `beforeWindow` raced the job's stop watch: when the watch saw it while the window was decoding, the
+    /// job kept only the windows before (on a loaded host); here the windows are in first.
+    static func pause(_ stop: StopSignal, afterWindows count: Int) -> @Sendable (Int) async throws -> Void {
+        { windows in
+            guard windows == count else { return }
+            stop.stop(.pause(.user))
+            // An upper bound: the job cancels the decode once its stop watch sees the stop.
+            try await Task.sleep(for: .seconds(30))
+        }
+    }
     var beforeBlock: @Sendable (Int) -> Void = { _ in }
     var blockDelay: Duration?
     /// Thrown in place of the window at this index.
@@ -280,6 +294,7 @@ final class WindowedTranscriber: Transcribing, @unchecked Sendable {
                 events(.window(TranscriptWindow(words: state.words, recognition: RecognitionCheckpoint(state),
                                                 inferenceMs: Int64(windows) * 100, speakers: speakers?.checkpoint())))
                 events(.progress(done: TimeInterval(reported) / 1000, total: total))
+                try await afterWindow(windows)
             }
         }
         let words = try transcript.finish().words
