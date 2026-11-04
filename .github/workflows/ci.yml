@@ -43,7 +43,9 @@ jobs:
     # Xcode 27.0 (27A266a), the build drmeyers' gate uses. Hosted runners have Xcode 27 only on this preview image; the
     # GA macos-26 image's Xcode 26.6 (Swift 6.2) does not compile the package tests.
     runs-on: xcode-27
-    timeout-minutes: 40
+    # About 3x the measured run (6.3 min from a cold runner: package tests 3.9, build 2.0), so a hang frees the org's
+    # shared macOS slot.
+    timeout-minutes: 20
     env:
       CASSINI_CONFORMANCE_REQUIRED: '1'
     steps:
