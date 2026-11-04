@@ -10,7 +10,7 @@ Cassini keeps your data in its private app storage (Application Support). Other 
 - Transcripts: the words and their times, the speaker labels, the speaker names that you give, the bookmarks and the title, in `note.json`. `provenance.json` records which models made the transcript.
 - Unfinished transcription: the words found so far and how far the transcription got, in `work/`. Cassini deletes this folder when the transcription ends, when you start again, or when it deletes the note.
 - Voiceprints: a voiceprint is a list of numbers that Cassini calculates from the voice of one speaker. Cassini uses voiceprints to recognise the people that you name. They are kept in `PrivateVoices/` only, outside the note folders.
-- Settings and state: your model download decisions and their time, the queue of transcriptions (`jobs.json`), and some one-time notices, in the app's preferences.
+- Settings and state: your choices in Settings (speech language, automatic transcription, identifying speakers and naming voices automatically), your model download decisions and their time, and some one-time notices, in the app's preferences. The queue of transcriptions is in `jobs.json`.
 - Models: the downloaded models, in `CassiniModels/models/<model>/<revision>/`, each with the model host's notices (`NOTICE.txt`). They contain no personal data. iOS keeps Apple's speech models itself.
 
 When you import a file, or open a file with Cassini from a different app, Cassini copies the file into its storage. The original file stays where it is.
@@ -19,7 +19,7 @@ When you import a file, or open a file with Cassini from a different app, Cassin
 
 Cassini connects to the internet only to download models. It sends no audio, transcripts, voiceprints, names or settings.
 
-Cassini downloads no model before you agree. The "Transcribe on this device" screen lists the models it needs and the size of each download. The first download starts only when you tap "Download and transcribe" or "Download". If you tap "Not now — keep the audio", Cassini downloads nothing.
+Cassini downloads no model before you agree. The "Transcribe on this device" screen lists the models it needs and the size of each download from the model host; Apple's speech models are listed without a size. The first download starts only when you tap "Download and transcribe", "Download and identify speakers" or "Download". If you tap "Not now — keep the audio", Cassini downloads nothing.
 
 - Speech recognition (Parakeet Ultra and its speech detector, Silero VAD): `dist.gocassini.com`, Cassini's model host. On devices without the memory for Parakeet Ultra, Cassini uses Apple's on-device speech models instead: iOS downloads them from Apple and keeps them, and Cassini asks iOS to install the model for the speech language you choose.
 - Telling speakers apart (NVIDIA Nemotron-3-Diarization): `dist.gocassini.com`
@@ -40,7 +40,7 @@ Before Cassini uses a downloaded model for the first time after it starts, it ch
 ## Permissions
 
 - Microphone: Cassini uses the microphone only while you record. A Live Activity shows the recording on the Lock Screen.
-- Notifications: Cassini tells you when a transcription ends or needs you.
+- Notifications: Cassini tells you when a transcription ends or needs you, and when a recording stops because storage is running out or the microphone stopped working. The notification for a finished transcription shows the note's title.
 
 ## Backup
 
@@ -48,12 +48,12 @@ Your notes are kept in protected app storage and can be included in your iCloud 
 
 ## Copies that you save
 
-Cassini writes a file outside its storage only when you tell it to, through the share sheet. A Cassini document or an audio file has the audio, the transcripts, the speaker names and the title; the transcript as text, subtitles or JSON has the words, their times and the speaker names. These files contain no voiceprints. Cassini cannot delete a copy that you saved or sent to somebody.
+Cassini writes a file outside its storage only when you tell it to, through the share sheet. A Cassini document or an audio file has the audio, the transcripts, the speaker names and the title; the transcript as text, subtitles or JSON has the words, their times and the speaker names. These files contain no voiceprints. Cassini cannot delete a copy that you saved or sent to somebody. "Copy text" on a passage puts its text on the clipboard.
 
 ## Deletion
 
 When you move a note to Recently Deleted, Cassini keeps it for 30 days. You can restore it during this time. Cassini deletes it when it opens on or after the 30th day. "Delete now" deletes one note immediately, and "Empty" deletes them all.
 
-When Cassini deletes a note, it deletes its audio, its transcripts, its unfinished transcription and its voiceprints. A saved voice can come from a note that you delete; to remove a saved voice, use "Forget" in Saved voices. "Forget everyone" deletes all voiceprints. After you forget a voice, the speaker names in your notes stay.
+When Cassini deletes a note, it deletes its audio, its transcripts, its unfinished transcription and its voiceprints, and it removes the note's samples from your saved voices. A saved voice that only this note taught is forgotten with it. To remove any other saved voice, use "Forget" in Saved voices. "Forget everyone" deletes all voiceprints. After a voice is forgotten, the speaker names in your notes stay.
 
-If you delete Cassini, iOS deletes all Cassini data, including the downloaded models.
+If you delete Cassini, iOS deletes all Cassini data, including the downloaded models. Apple's speech models are managed by iOS, not by Cassini.
