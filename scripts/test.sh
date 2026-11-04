@@ -965,7 +965,8 @@ tier_ui() {
 
     # Every test ran exactly once on the iPhones: a shard that lost tests fails here too.
     local ran; ran=$(count_ran "$logs"/ui-[0-9].log "$logs"/ui-[0-9]-retry.log)
-    ui_counts="iPhone $ran/$count$( [ -n "$ipad" ] && echo ", iPad $(count_ran "$logs/ui-ipad.log" "$logs/ui-ipad-retry.log")/$(printf '%s\n' "$ipad_tests" | wc -l | tr -d ' ')")"
+    # `|| echo`, not `&& echo`: the assignment takes the substitution's status, and a run without the iPad ended here.
+    ui_counts="iPhone $ran/$count$( [ -z "$ipad" ] || echo ", iPad $(count_ran "$logs/ui-ipad.log" "$logs/ui-ipad-retry.log")/$(printf '%s\n' "$ipad_tests" | wc -l | tr -d ' ')")"
     echo "UI tests: $ran of $count ran on iPhone$( [ -n "$ipad" ] && echo ", $(count_ran "$logs/ui-ipad.log" "$logs/ui-ipad-retry.log") of $(printf '%s\n' "$ipad_tests" | wc -l | tr -d ' ') on iPad")"
     for p in $failed; do
         echo "shard $p failed (see $logs/ui-$p.log):" >&2
