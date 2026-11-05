@@ -42,6 +42,9 @@ out=$root/$sherpa_local
 jobs=${CASSINI_JOBS:-$(sysctl -n hw.ncpu)}
 deployment_target=15.1
 artifact=$(pin sherpa-onnx-ios file)
+# The framework's CFBundleVersion and CFBundleShortVersionString: App Store Connect accepts only up to three
+# period-separated integers (at most 18 characters), so never the lock's version such as 1.13.7-0c2ee3f-ios.2.
+bundle_version=1.13.7
 export ZERO_AR_DATE=1 LC_ALL=C SOURCE_DATE_EPOCH=315532800
 # libtool -D zeroes the members' dates and owners but keeps their modes, and zip records modes too: without a fixed
 # umask, a shell with umask 002 builds a different checksum from the same sources.
@@ -193,9 +196,9 @@ MAP
   <key>CFBundleExecutable</key>
   <string>SherpaOnnxC</string>
   <key>CFBundleVersion</key>
-  <string>$(pin sherpa-onnx-ios version)</string>
+  <string>$bundle_version</string>
   <key>CFBundleShortVersionString</key>
-  <string>1.13.7</string>
+  <string>$bundle_version</string>
   <key>MinimumOSVersion</key>
   <string>$deployment_target</string>
   <key>CFBundleSupportedPlatforms</key>

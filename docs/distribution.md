@@ -110,9 +110,17 @@ the entitlement; check it with `codesign -d --entitlements -` before uploading
 (`xcrun altool --upload-app -f build/export/Cassini.ipa -t ios --apiKey <KEY_ID> --apiIssuer <ISSUER_ID>`). The App
 Store profile for `io.codemyriad.cassini` already grants it.
 
+The archive is signed with a development identity from the login keychain, so over SSH it fails at CodeSign with
+`errSecInternalComponent` (the SSH session cannot use the keychain). Run the `xcodebuild archive` in the GUI login
+session instead (on drmeyers, `~/bin/guirun xcodebuild archive …`). The export and the upload sign in the cloud and
+work over SSH.
+
 ### Before an upload
 
-1. The archive validates with no ITMS-91053 (missing required-reason API) warning. After a change of the native
+1. `xcrun altool --validate-app` passes. Every bundled framework's `CFBundleVersion` must be up to three
+   period-separated integers, at most 18 characters (errors 90058/90059); `scripts/build-sherpa-xcframework.sh`
+   writes `1.13.7`.
+2. The archive validates with no ITMS-91053 (missing required-reason API) warning. After a change of the native
    runtime, check the app binary's imports again (`nm -u`) against `Cassini/Resources/PrivacyInfo.xcprivacy`. Last
    checked on the archive above: of Apple's required-reason symbols the binary imports only `stat` and `fstat`, which
    the runtime adds (file timestamp: `C617.1`, the model files in the app container, already declared), besides the
@@ -120,10 +128,10 @@ Store profile for `io.codemyriad.cassini` already grants it.
    `85F4.1`, `35F9.1`, all declared). It imports none of `getattrlist`, `getattrlistbulk`, `fgetattrlist`,
    `getattrlistat`, `fstatat`, `lstat`, `statfs`, `fstatfs`, `statvfs`, `fstatvfs` or `mach_absolute_time`; the
    runtime's `sysctl`, `sysctlbyname` and `clock_gettime` are not on Apple's list. No category is new.
-2. The upload goes to the App Store Connect record for `io.codemyriad.cassini` (SKU `cassini`). An earlier record for
+3. The upload goes to the App Store Connect record for `io.codemyriad.cassini` (SKU `cassini`). An earlier record for
    `app.codemyriad.cassini` (SKU `cassini-ios`, TestFlight build 0.1.0 (1)) is retired: never upload to it. Builds
    for the new record start at build number 2, so they are not confused with that build 1.
-3. A processed build is installable only by testers in a TestFlight group; the new record starts with none.
+4. A processed build is installable only by testers in a TestFlight group; the internal group "cassini" gets every build.
 
 ## App Store Connect answers
 

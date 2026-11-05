@@ -220,7 +220,7 @@ the C API and without TTS. Like Android it has speaker diarization on and applie
 are in the build; `scripts/streaming-diarization-c-api.patch` (iOS only) puts the streaming calls into the C API,
 because Android's patch adds them only to JNI. The build is published as the release
 [`v1.13.7-cassini-mobile.1`](https://github.com/codemyriad/sherpa-onnx/releases/tag/v1.13.7-cassini-mobile.1)
-(`sherpa-onnx-1.13.7-0c2ee3f-ios-no-tts.xcframework.zip`, and a mirror of csukuangfj's ONNX Runtime 1.27.1 static
+(`sherpa-onnx-1.13.7-0c2ee3f-ios.2-no-tts.xcframework.zip`, and a mirror of csukuangfj's ONNX Runtime 1.27.1 static
 xcframework), which `Package.swift` links as two binary targets by URL and checksum. Android's pure decode rules
 (windows, quiet cuts, seam merge, word gate, speech feed, incremental 28 s windows) are ported with their tests to
 CassiniNotebook/Transcription, and `ParakeetTranscriber` (CassiniInference) drives them over CassiniSherpa's
