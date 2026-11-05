@@ -14,7 +14,7 @@ let sherpaBinaries: [Target] = sherpaLocal ? [
     .binaryTarget(name: "SherpaOnnxC", path: ".tools/sherpa/SherpaOnnxC.xcframework"),
     .binaryTarget(name: "onnxruntime", path: ".tools/sherpa/onnxruntime.xcframework")
 ] : [
-    .binaryTarget(name: "SherpaOnnxC", url: "https://github.com/codemyriad/sherpa-onnx/releases/download/v1.13.7-cassini-mobile.1/sherpa-onnx-1.13.7-0c2ee3f-ios-no-tts.xcframework.zip", checksum: "6d305165927b0b2c1fa805b137fc2e345e1c128e92f800de80e90f7096a88fce"),
+    .binaryTarget(name: "SherpaOnnxC", url: "https://github.com/codemyriad/sherpa-onnx/releases/download/v1.13.7-cassini-mobile.1/sherpa-onnx-1.13.7-0c2ee3f-ios.2-no-tts.xcframework.zip", checksum: "33f254472600aba81e89f2d47821068fb24b5a0fc5548dae256ffedab00717c3"),
     .binaryTarget(name: "onnxruntime", url: "https://github.com/codemyriad/sherpa-onnx/releases/download/v1.13.7-cassini-mobile.1/onnxruntime-ios-static-xcframework-1.27.1.xcframework.zip", checksum: "985deaff345c7bcfbe4979b2daeec09d7a745b1e9cb73f37f4077364eb578e62")
 ]
 let sherpaTarget: Target = .target(

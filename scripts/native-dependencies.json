@@ -14,10 +14,10 @@
   },
   {
     "name": "sherpa-onnx-ios",
-    "version": "1.13.7-0c2ee3f-ios.1",
-    "file": "sherpa-onnx-1.13.7-0c2ee3f-ios-no-tts.xcframework.zip",
-    "url": "https://github.com/codemyriad/sherpa-onnx/releases/download/v1.13.7-cassini-mobile.1/sherpa-onnx-1.13.7-0c2ee3f-ios-no-tts.xcframework.zip",
-    "sha256": "6d305165927b0b2c1fa805b137fc2e345e1c128e92f800de80e90f7096a88fce",
+    "version": "1.13.7-0c2ee3f-ios.2",
+    "file": "sherpa-onnx-1.13.7-0c2ee3f-ios.2-no-tts.xcframework.zip",
+    "url": "https://github.com/codemyriad/sherpa-onnx/releases/download/v1.13.7-cassini-mobile.1/sherpa-onnx-1.13.7-0c2ee3f-ios.2-no-tts.xcframework.zip",
+    "sha256": "33f254472600aba81e89f2d47821068fb24b5a0fc5548dae256ffedab00717c3",
     "patchSha256": "9a3a78e4d806b5980cccee07a89c6ef5c8e6af75526bf5dda0c24faf121ded4e",
     "cApiPatchSha256": "19ad205be861863a6bbca8c10b6743578b925325f4a307251492e190c060f009"
   },

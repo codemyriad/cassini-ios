@@ -43,10 +43,23 @@ targets:
         # A higher memory limit where the device allows it, for the on-device models.
         CODE_SIGN_ENTITLEMENTS: Cassini/Cassini.entitlements
         MARKETING_VERSION: '0.1.0'
-        CURRENT_PROJECT_VERSION: '3'
+        CURRENT_PROJECT_VERSION: '4'
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         SWIFT_EMIT_LOC_STRINGS: YES
+    postBuildScripts:
+      # SherpaOnnxC and onnxruntime are static xcframeworks, linked into the app binary. Xcode still embeds a stub
+      # framework for each, which the app never loads and whose Info.plist minimum OS need not match its binary:
+      # App Store Connect rejected build 3 for that (90208). Drop them before the app is signed.
+      - name: Drop the static runtime's stub frameworks
+        basedOnDependencyAnalysis: false
+        script: |
+          set -eu
+          frameworks="${TARGET_BUILD_DIR:?}/${FRAMEWORKS_FOLDER_PATH:?}"
+          for name in SherpaOnnxC onnxruntime; do
+            rm -rf "$frameworks/$name.framework"
+          done
+          rmdir "$frameworks" 2>/dev/null || true
   # The recording's Live Activity (Lock Screen and Dynamic Island).
   CassiniActivity:
     type: app-extension
@@ -63,7 +76,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: io.codemyriad.cassini.activity
         INFOPLIST_FILE: CassiniActivity/Info.plist
         MARKETING_VERSION: '0.1.0'
-        CURRENT_PROJECT_VERSION: '3'
+        CURRENT_PROJECT_VERSION: '4'
         SWIFT_EMIT_LOC_STRINGS: YES
   CassiniUITests:
     type: bundle.ui-testing
