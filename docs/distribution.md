@@ -71,6 +71,8 @@ keychain, and with it an Apple Account signed in to Xcode, is not available.
 
 ### Every build links the runtime: uploads wait for a registered device
 
+Since 2026-11-05 the team has a registered device, so archives are signed normally ("Uploads" below); the unsigned flow in this section is only for local checks.
+
 There is no runtime-free build any more: every iOS build links the sherpa-onnx runtime and picks Parakeet Ultra on a
 device with at least 5 GiB of memory. Parakeet Ultra needs `com.apple.developer.kernel.increased-memory-limit` on
 devices with less headroom, and only a signed archive keeps that entitlement (below). So **do not upload an unsigned
