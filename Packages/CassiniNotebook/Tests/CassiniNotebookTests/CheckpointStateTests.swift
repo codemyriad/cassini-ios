@@ -15,10 +15,10 @@ import CassiniNotebook
                                             clipSamples: 16_000, voiceClips: ["P_1": [PrintWindow(0, 16_000)]])
 
     private let segments = [
-        TranscriptSegment(text: "La parte", start: 1.308, end: 1.788,
-                          words: [TimedWord(text: "La", start: 1.308, end: 1.548), TimedWord(text: " parte", start: 1.548, end: 1.788)]),
-        TranscriptSegment(text: "settentrionale", start: 1.788, end: 2.898,
-                          words: [TimedWord(text: " settentrionale", start: 1.788, end: 2.898)]),
+        TranscriptSegment(text: "The part", start: 1.308, end: 1.788,
+                          words: [TimedWord(text: "The", start: 1.308, end: 1.548), TimedWord(text: " part", start: 1.548, end: 1.788)]),
+        TranscriptSegment(text: "northern", start: 1.788, end: 2.898,
+                          words: [TimedWord(text: " northern", start: 1.788, end: 2.898)]),
     ]
 
     private func state(signature: String = "4096:1700000000000") -> CheckpointState {
@@ -114,7 +114,7 @@ import CassiniNotebook
 
     @Test func theRecognitionMemberHoldsTheWindowAndRestoresIt() throws {
         let window: [Float] = (0..<1_600).map { Float($0) }
-        let state = IncrementalState(start: 16_000, end: 16_800, window: window, words: [Word("", 1_000, 1_040, "ciao")])
+        let state = IncrementalState(start: 16_000, end: 16_800, window: window, words: [Word("", 1_000, 1_040, "hello")])
         let recognition = RecognitionCheckpoint(state)
         #expect(recognition == RecognitionCheckpoint(start: 16_000, end: 16_800, position: 17_600))
         #expect(recognition.doneMs == 1_050)
@@ -178,15 +178,15 @@ import CassiniNotebook
 
     // ports: CheckpointStateTest#recognitionRestoresWhereTheJobStopped (adapted: a resumed run hears the overlap again)
     @Test func aResumedRunKeepsOnlyTheWordsAfterTheCheckpoint() throws {
-        let overlap = TranscriptSegment(text: "settentrionale, conosciuta", start: 1.788, end: 3.468, words: [
-            TimedWord(text: " settentrionale,", start: 1.788, end: 2.898), TimedWord(text: " conosciuta", start: 2.908, end: 3.468),
+        let overlap = TranscriptSegment(text: "northern, conosciuta", start: 1.788, end: 3.468, words: [
+            TimedWord(text: " northern,", start: 1.788, end: 2.898), TimedWord(text: " conosciuta", start: 2.908, end: 3.468),
         ])
         let kept = try #require(overlap.resumed(after: 2_898))
         #expect(kept.text == "conosciuta")
         #expect(kept.start == 2.908)
         #expect(kept.words.map(\.text) == [" conosciuta"])
         #expect(segments[1].resumed(after: 2_898) == nil)
-        let later = TranscriptSegment(text: "come", start: 3.468, end: 3.708, words: [TimedWord(text: "come", start: 3.468, end: 3.708)])
+        let later = TranscriptSegment(text: "how", start: 3.468, end: 3.708, words: [TimedWord(text: "how", start: 3.468, end: 3.708)])
         #expect(later.resumed(after: 2_898) == later)
         // Without word times a segment counts from its middle.
         #expect(TranscriptSegment(text: "a", start: 2, end: 3.5).resumed(after: 2_898) == nil)

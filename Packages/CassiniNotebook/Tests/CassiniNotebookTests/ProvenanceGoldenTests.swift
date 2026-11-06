@@ -112,11 +112,11 @@ import CassiniNotebook
     }
 
     @Test func aFullRecordSurvivesProvenanceJSON() throws {
-        let words = [TranscriptSegment(text: "Ciao", start: 0, end: 1, speakerID: "x_a",
-                                       words: [TimedWord(text: "Ciao", start: 0, end: 1)])]
+        let words = [TranscriptSegment(text: "Hello", start: 0, end: 1, speakerID: "x_a",
+                                       words: [TimedWord(text: "Hello", start: 0, end: 1)])]
         let run = Self.run()
         var record = ProvenanceRecord(provenance: run, transcript: words)
-        #expect(record.provenance.speakerIdentification == nil, "the speaker records come from the speaker step")
+        #expect(record.provenance.speakerIdentification == nil, "the speaker records how from the speaker step")
         record.addSpeakers(try #require(run.speakerDiarization), identification: run.speakerIdentification,
                            transcript: words)
         let decoded = try JSONDecoder().decode(ProvenanceRecord.self, from: JSONEncoder().encode(record))

@@ -16,7 +16,7 @@ import CassiniNotebook
     }
 
     /// A live note whose capture holds `bytes` (no file when nil).
-    func liveNote(_ store: NoteStore, title: String = "Registrazione", createdAt: Date = Date(timeIntervalSince1970: 1_000),
+    func liveNote(_ store: NoteStore, title: String = "Recording", createdAt: Date = Date(timeIntervalSince1970: 1_000),
                   bytes: Data? = Data(repeating: 1, count: 64)) async throws -> Note {
         var note = Note(title: title, createdAt: createdAt, audioFilename: "capture.caf")
         note.status = .recording; note.audio = .live
@@ -200,7 +200,7 @@ import CassiniNotebook
     @Test func aRecordingStartsLiveAndEndsPlain() async throws {
         defer { try? FileManager.default.removeItem(at: root) }
         let store = try NoteStore(root: root)
-        var note = Note(title: "Registrazione 9 ott", createdAt: Date(timeIntervalSince1970: 42), audioFilename: "capture.caf")
+        var note = Note(title: "Recording 9 ott", createdAt: Date(timeIntervalSince1970: 42), audioFilename: "capture.caf")
         note.audio = .live
         try await store.create(note)
         #expect(FileManager.default.fileExists(atPath: store.directory(for: note.id).path))

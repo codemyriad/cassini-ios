@@ -8,7 +8,7 @@ public struct TranscriptMatch: Hashable, Sendable {
 }
 
 /// In-note search (Android `TranscriptSearch`): case- and diacritic-insensitive matching over each paragraph's text,
-/// with ranges on the text as shown. "giovedi" finds "giovedì", "CONSEGNA" finds "consegna".
+/// with ranges on the text as shown. "cafe" finds "café", "DELIVERY" finds "delivery".
 public enum TranscriptSearch {
     /// Every match of `query` in `turns`, in text order. A blank query matches nothing; matches do not overlap.
     public static func matches(_ turns: [NoteTurn], query: String) -> [TranscriptMatch] {

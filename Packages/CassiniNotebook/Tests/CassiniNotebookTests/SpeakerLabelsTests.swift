@@ -49,9 +49,9 @@ import Testing
     func note(_ speakers: [NoteSpeaker]) -> Note {
         var note = Note(title: "Call")
         note.speakers = speakers
-        note.transcript = [TranscriptSegment(text: "Ciao", start: 0, end: 2, speakerID: "a"),
-                           TranscriptSegment(text: "Sì", start: 2, end: 3, speakerID: "b"),
-                           TranscriptSegment(text: "Bene", start: 3, end: 5, speakerID: "b")]
+        note.transcript = [TranscriptSegment(text: "Hello", start: 0, end: 2, speakerID: "a"),
+                           TranscriptSegment(text: "Yes", start: 2, end: 3, speakerID: "b"),
+                           TranscriptSegment(text: "Good", start: 3, end: 5, speakerID: "b")]
         note.refreshSpeakerLabels()
         return note
     }

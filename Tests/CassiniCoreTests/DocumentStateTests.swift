@@ -31,7 +31,7 @@ import Testing
             #expect(CassiniDocument.readChecked(wav).state == .plainAudio)
             #expect(CassiniDocument.read(wav) == CassiniDocument.readChecked(wav))
             let opus = dir.appendingPathComponent("doc.opus")
-            try Data(try CassiniDocument.create(silence(), transcript: Transcript([Word("spk_1", 0, 20, "Ciao")]), title: "Checked",
+            try Data(try CassiniDocument.create(silence(), transcript: Transcript([Word("spk_1", 0, 20, "Hello")]), title: "Checked",
                                                 processing: JSONObject())).write(to: opus)
             #expect(CassiniDocument.readChecked(opus).state == .ok)
         }
@@ -45,7 +45,7 @@ import Testing
                 try Data(bytes).write(to: url)
                 return url
             }
-            let document = try CassiniDocument.create(silence(), transcript: Transcript([Word("spk_1", 0, 20, "Ciao")]),
+            let document = try CassiniDocument.create(silence(), transcript: Transcript([Word("spk_1", 0, 20, "Hello")]),
                                                       title: "Named", processing: JSONObject())
             #expect(try CassiniDocument.namesCassiniFormat(file(document, "doc.opus")) == true)
             #expect(try CassiniDocument.namesCassiniFormat(file(silence(["cassini_format=x"]), "lower.opus")) == true)

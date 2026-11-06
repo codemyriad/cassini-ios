@@ -24,7 +24,7 @@ import Testing
     /** Swift reads "\r\n" as one Character, so a filter over Characters kept a lone LF or CR in the chunk text. */
     @Test(arguments: ["\n", "\r", "\r\n", " \t", "\n\n\r"])
     func whitespaceInsideChunksIsStripped(_ whitespace: String) throws {
-        let text = #"{"words":["# + String(repeating: "\"ciao\",", count: 40) + #""fine"]}"#
+        let text = #"{"words":["# + String(repeating: "\"hello\",", count: 40) + #""end"]}"#
         let (ref, tags) = try CassiniPayload.encode(prefix: "TEST_", mime: CassiniPayload.mime, text: text)
         let encoded = String(tags.last!.split(separator: "=", maxSplits: 1)[1])
         let chunks = stride(from: 0, to: encoded.count, by: 7).map { start -> String in

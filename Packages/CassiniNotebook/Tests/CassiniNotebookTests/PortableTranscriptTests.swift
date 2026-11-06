@@ -51,10 +51,10 @@ import CassiniCore
     }
 
     @Test func aVerifiedDocumentKeepsItsMeeting() throws {
-        let bytes = try PortableFixtures.document([Word("S1", 100, 600, "Ciao.")], title: "Seduta", labels: ["S1": "Ada"])
+        let bytes = try PortableFixtures.document([Word("S1", 100, 600, "Hello.")], title: "Session", labels: ["S1": "Ada"])
         let portable = try #require(read(bytes))
         #expect(portable.state == .ok)
-        #expect(portable.title == "Seduta")
+        #expect(portable.title == "Session")
         #expect(portable.language == "it")
         #expect(portable.duration == 1)
         #expect(portable.createdAt != nil)
@@ -65,9 +65,9 @@ import CassiniCore
     }
 
     @Test func theFirstReadableVariantStandsInForAnUnavailableDefault() throws {
-        let first = try PortableFixtures.document([Word("S1", 0, 500, "prima")], title: "Due")
-        let second = try CassiniDocument.create(first, transcript: Transcript([Word("S1", 0, 500, "seconda")], language: "en"),
-                                                title: "Due", processing: JSONObject(), existing: CassiniDocument.read(first))
+        let first = try PortableFixtures.document([Word("S1", 0, 500, "first")], title: "Two")
+        let second = try CassiniDocument.create(first, transcript: Transcript([Word("S1", 0, 500, "second")], language: "en"),
+                                                title: "Two", processing: JSONObject(), existing: CassiniDocument.read(first))
         let sealed = CassiniDocument.read(second)
         let defaultID = try #require(sealed.defaultId)
         #expect(defaultID != "words")
@@ -78,14 +78,14 @@ import CassiniCore
 
         #expect(portable.hasTranscript)
         #expect(portable.versions.map(\.portableID) == ["words"])
-        #expect(portable.segments.map(\.text) == ["prima"])
+        #expect(portable.segments.map(\.text) == ["first"])
         #expect(portable.language == "it")
         #expect(portable.unavailableVariants.keys.sorted() == [defaultID])
         #expect(portable.unavailableVariants[defaultID]?.isEmpty == false)
     }
 
     @Test func brokenMetadataIsADocumentWithoutATranscript() throws {
-        let bytes = try PortableFixtures.document([Word("S1", 0, 200, "una"), Word("S1", 300, 500, "prova")], title: "Prova")
+        let bytes = try PortableFixtures.document([Word("S1", 0, 200, "a"), Word("S1", 300, 500, "test")], title: "Test")
         let broken = try PortableFixtures.rewritingComments(bytes) { $0.hasPrefix("CASSINI_PROFILE=") ? "CASSINI_PROFILE=other" : $0 }
         let portable = try #require(read(broken))
         #expect(portable.state == .invalidMetadata)
@@ -106,7 +106,7 @@ import CassiniCore
         let directory = try PortableFixtures.temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let url = directory.appendingPathComponent("doc.opus")
-        try Data(try PortableFixtures.document([Word("S1", 0, 500, "ciao")], title: "T")).write(to: url)
+        try Data(try PortableFixtures.document([Word("S1", 0, 500, "hello")], title: "T")).write(to: url)
         #expect(PortableTranscript.read(from: url)?.vendor == CassiniDocument.vendor)
     }
 }
@@ -159,7 +159,7 @@ struct PortableConformanceImportTests {
         defer { try? FileManager.default.removeItem(at: directory) }
         let output = directory.appendingPathComponent("export.opus")
         let portable = try imported("010-stale-audio")
-        var note = Note(title: "Riunione rinominata")
+        var note = Note(title: "Renamed meeting")
         note.language = "it-IT"
         note.transcript = portable.segments
         note.speakers = portable.speakers
@@ -169,11 +169,11 @@ struct PortableConformanceImportTests {
 
         let exported = CassiniDocument.read(output)
         #expect(exported.state == .ok)
-        #expect(exported.title == "Riunione rinominata")
+        #expect(exported.title == "Renamed meeting")
         #expect(exported.variants.count == 1)
         #expect(exported.selected()?.transcript?.language == "it-IT")
         #expect(exported.selected()?.transcript?.words.count == 900)
-        #expect(exported.comments.filter { $0.uppercased().hasPrefix("TITLE=") } == ["TITLE=Riunione rinominata"])
+        #expect(exported.comments.filter { $0.uppercased().hasPrefix("TITLE=") } == ["TITLE=Renamed meeting"])
         #expect(try OggOpus.scan(output).digest() == OggOpus.scan(source).digest())
         #expect(try Data(contentsOf: source) == before)
     }
@@ -208,7 +208,7 @@ struct PortableConformanceImportTests {
         let directory = try PortableFixtures.temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let source = directory.appendingPathComponent("doc.opus")
-        try Data(try PortableFixtures.document([Word("S1", 0, 500, "ciao")], title: "Old")).write(to: source)
+        try Data(try PortableFixtures.document([Word("S1", 0, 500, "hello")], title: "Old")).write(to: source)
         var note = Note(title: "New title")
         note.language = "en_US"
         note.transcript = [TranscriptSegment(text: "hello", start: 0, end: 0.5, speakerID: "S1")]
@@ -228,7 +228,7 @@ struct PortableConformanceImportTests {
     func exportFromAnUntrustedSourceCarriesItsPrivateData(state: DocumentState) throws {
         let directory = try PortableFixtures.temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
-        let document = try PortableFixtures.documentWithPrivateData([Word("S1", 0, 500, "prima")], title: "Note")
+        let document = try PortableFixtures.documentWithPrivateData([Word("S1", 0, 500, "first")], title: "Note")
         let bytes = state == .staleAudio ? try PortableFixtures.staleTwin(document) : try PortableFixtures.unverifiedTwin(document)
         let source = directory.appendingPathComponent("source.opus")
         try Data(bytes).write(to: source)
@@ -273,7 +273,7 @@ struct PortableConformanceImportTests {
         let directory = try PortableFixtures.temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let source = directory.appendingPathComponent("doc.opus")
-        try Data(try PortableFixtures.documentWithPrivateData([Word("S1", 0, 500, "ciao")], title: "Old")).write(to: source)
+        try Data(try PortableFixtures.documentWithPrivateData([Word("S1", 0, 500, "hello")], title: "Old")).write(to: source)
         let before = CassiniDocument.read(source)
         try #require(before.state == .ok)
         var note = Note(title: "Old")
@@ -296,14 +296,14 @@ struct PortableConformanceImportTests {
         let directory = try PortableFixtures.temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let stamp = #"{"inputSHA256":"\#(String(repeating: "a", count: 64))","turnsSHA256":"\#(String(repeating: "b", count: 64))"}"#
-        let first = try PortableFixtures.document([Word("others~2", 0, 500, "ciao")], title: "Desktop")
+        let first = try PortableFixtures.document([Word("others~2", 0, 500, "hello")], title: "Desktop")
         var base = CassiniDocument.read(first)
         base.manifest?["speakers"] = .array([.object(try JSON.parseObject(
             #"{"id":"others~2","label":"Speaker 2","voiceSource":\#(stamp),"futureMember":{"n":9007199254740993}}"#))])
         base.manifest?["x"] = .object(try JSON.parseObject(
             #"{"codemyriad.io":{"meeting":{"speakers":[{"id":"others~2","voiceSource":\#(stamp)}]}}}"#))
         let source = directory.appendingPathComponent("doc.opus")
-        try Data(try CassiniDocument.create(first, transcript: Transcript([Word("others~2", 0, 500, "ciao")], language: "it"),
+        try Data(try CassiniDocument.create(first, transcript: Transcript([Word("others~2", 0, 500, "hello")], language: "it"),
                                             title: "Desktop", processing: JSONObject(), existing: base)).write(to: source)
         let before = CassiniDocument.read(source)
         try #require(before.state == .ok)
@@ -316,7 +316,7 @@ struct PortableConformanceImportTests {
 
         // An export with a rename and a variant diarized on this device.
         var note = Note(title: "Desktop")
-        note.transcript = [TranscriptSegment(text: "ciao", start: 0, end: 0.5, speakerID: "others~2"),
+        note.transcript = [TranscriptSegment(text: "hello", start: 0, end: 0.5, speakerID: "others~2"),
                            TranscriptSegment(text: "hello", start: 0.5, end: 1, speakerID: "spk_1")]
         note.speakers = [NoteSpeaker(id: "others~2", name: "Mira"), NoteSpeaker(id: "spk_1", name: "Speaker 1")]
         let output = directory.appendingPathComponent("out.opus")
@@ -343,9 +343,9 @@ struct PortableConformanceImportTests {
         defer { try? FileManager.default.removeItem(at: directory) }
         let source = directory.appendingPathComponent("audio.opus")
         try Data(try PortableFixtures.silence()).write(to: source)
-        var note = Note(title: "Riunione")
+        var note = Note(title: "Meeting")
         note.speakers = [NoteSpeaker(id: "spk_1", name: "Ada")]
-        note.transcript = [TranscriptSegment(text: "ciao", start: 0, end: 0.4, speakerID: "spk_1"),
+        note.transcript = [TranscriptSegment(text: "hello", start: 0, end: 0.4, speakerID: "spk_1"),
                            TranscriptSegment(text: "chi parla?", start: 0.4, end: 0.9)]
         let output = directory.appendingPathComponent("out.opus")
 
@@ -388,10 +388,10 @@ struct PortableConformanceImportTests {
 
         // An Italian export that adds a passage without a speaker, and one where the shown version names no one.
         var note = Note(title: "Shared")
-        note.transcript = portable.segments + [TranscriptSegment(text: "ciao", start: 0.4, end: 0.8)]
+        note.transcript = portable.segments + [TranscriptSegment(text: "hello", start: 0.4, end: 0.8)]
         note.speakers = portable.speakers
         var nobody = Note(title: "Shared")
-        nobody.transcript = [TranscriptSegment(text: "ciao", start: 0, end: 0.8)]
+        nobody.transcript = [TranscriptSegment(text: "hello", start: 0, end: 0.8)]
         for (index, exporting) in [note, nobody].enumerated() {
             let output = directory.appendingPathComponent("out-\(index).opus")
             try PortableTranscript.export(note: exporting, opus: source, destination: output, unassignedLabel: "Voce sconosciuta")
@@ -426,16 +426,16 @@ struct PortableConformanceImportTests {
     }
 
     @Test func aNoteShowingAnImportedVersionAsReadHoldsOnlyImportedVersions() {
-        let first = imported("prima"), second = imported("seconda")
+        let first = imported("first"), second = imported("second")
         let note = note(showing: first, versions: [first, second])
         #expect(note.showsImportedVersion)
         #expect(note.holdsOnlyImportedVersions)
     }
 
     @Test func anEditOrALocalVersionIsSomethingMadeHere() {
-        let first = imported("prima")
+        let first = imported("first")
         var edited = note(showing: first, versions: [first])
-        edited.transcript[0].text = "modificata"
+        edited.transcript[0].text = "edited"
         #expect(!edited.showsImportedVersion)
         #expect(!edited.holdsOnlyImportedVersions)
 
@@ -470,23 +470,23 @@ struct PortableConformanceImportTests {
     }
 
     @Test func aDocumentBringsItsTitleDateDurationAndTranscript() throws {
-        let bytes = try PortableFixtures.document([Word("S1", 0, 500, "ciao")], title: "  Seduta del consiglio ")
+        let bytes = try PortableFixtures.document([Word("S1", 0, 500, "hello")], title: "  Council session ")
         let portable = try #require(PortableTranscript(CassiniDocument.read(bytes)))
         let note = ImportedNote.make(id: UUID(), displayName: "export.opus", fallbackTitle: "Imported audio", sha256: "s",
                                      importedAt: Date(timeIntervalSince1970: 0), audio: audio, document: portable)
-        #expect(note.title == "Seduta del consiglio")
+        #expect(note.title == "Council session")
         #expect(note.createdAt == portable.createdAt)
         #expect(note.duration == 1)
         #expect(note.origin == .importedDocument)
         #expect(note.status == .ready)
         #expect(note.language == "it")
         #expect(note.document?.state == .ok)
-        #expect(note.text == "ciao")
+        #expect(note.text == "hello")
         #expect(!ImportedNote.wantsTranscription(note))
     }
 
     @Test func aNewerFormatIsNeverTranscribedOnItsOwn() throws {
-        let bytes = try PortableFixtures.document([Word("S1", 0, 500, "ciao")], title: "T")
+        let bytes = try PortableFixtures.document([Word("S1", 0, 500, "hello")], title: "T")
         let newer = try PortableFixtures.rewritingComments(bytes) {
             $0.hasPrefix("CASSINI_FORMAT=") ? "CASSINI_FORMAT=org.cassini.portable-meeting/99" : $0
         }

@@ -15,24 +15,24 @@ struct SearchQueryTests {
 
     // ports: SearchQueryTest#golden
     @Test func golden() {
-        #expect(fts("consegna giov") == "\"consegna*\" \"giov*\"")
+        #expect(fts("delivery Thur") == "\"delivery*\" \"Thur*\"")
     }
 
     // ports: SearchQueryTest#quotesAndStarsAreDropped
     @Test func quotesAndStarsAreDropped() {
-        #expect(fts("\"consegna giov\"") == "\"consegna*\" \"giov*\"")
-        #expect(fts("cons*") == "\"cons*\"")
-        #expect(fts("*cons**") == "\"cons*\"")
-        #expect(fts("consegna \" *") == "\"consegna*\"")
+        #expect(fts("\"delivery Thur\"") == "\"delivery*\" \"Thur*\"")
+        #expect(fts("deli*") == "\"deli*\"")
+        #expect(fts("*deli**") == "\"deli*\"")
+        #expect(fts("delivery \" *") == "\"delivery*\"")
     }
 
     // ports: SearchQueryTest#ftsOperatorsAreDropped
     @Test func ftsOperatorsAreDropped() {
-        #expect(fts("^inizio") == "\"inizio*\"")
-        #expect(fts("body:prezzo") == "\"body prezzo*\"")
+        #expect(fts("^start") == "\"start*\"")
+        #expect(fts("body:price") == "\"body price*\"")
         #expect(fts("(a) (b)") == "\"a*\" \"b*\"")
-        #expect(fts("-prezzo") == "\"prezzo*\"")
-        #expect(fts("con*segna") == "\"con segna*\"")
+        #expect(fts("-price") == "\"price*\"")
+        #expect(fts("deli*very") == "\"deli very*\"")
         #expect(fts("-- : () ^ \"\" *") == nil)
     }
 
@@ -40,15 +40,15 @@ struct SearchQueryTests {
     @Test func innerPunctuationSplitsTokensAsTheTokenizerDoes() {
         #expect(fts("e-mail follow- -up") == "\"e mail*\" \"follow*\" \"up*\"")
         #expect(fts("follow-up") == "\"follow up*\"")
-        #expect(fts("l'ordine") == "\"l ordine*\"")
+        #expect(fts("we're") == "\"we re*\"")
         #expect(fts("snake_case") == "\"snake case*\"")
     }
 
     // ports: SearchQueryTest#trailingPunctuationKeepsThePrefixMatch
     @Test func trailingPunctuationKeepsThePrefixMatch() {
-        #expect(fts("consegn,") == "\"consegn*\"")
-        #expect(fts("giov.") == "\"giov*\"")
-        #expect(fts("¿davvero?!") == "\"davvero*\"")
+        #expect(fts("deliv,") == "\"deliv*\"")
+        #expect(fts("Thur.") == "\"Thur*\"")
+        #expect(fts("¿really?!") == "\"really*\"")
     }
 
     // ports: SearchQueryTest#combiningMarksStayInTheirToken
@@ -67,7 +67,7 @@ struct SearchQueryTests {
 
     // ports: SearchQueryTest#accentsAndCaseAreKept
     @Test func accentsAndCaseAreKept() {
-        #expect(fts("giovedì CONSEGNA") == "\"giovedì*\" \"CONSEGNA*\"")
+        #expect(fts("café DELIVERY") == "\"café*\" \"DELIVERY*\"")
         #expect(fts("Élodie") == "\"Élodie*\"")
     }
 
@@ -85,56 +85,56 @@ struct SearchQueryTests {
 
     // ports: SearchQueryTest#termsWithoutLettersOrDigitsAreDropped
     @Test func termsWithoutLettersOrDigitsAreDropped() {
-        #expect(fts("consegna , … ?!") == "\"consegna*\"")
+        #expect(fts("delivery , … ?!") == "\"delivery*\"")
         #expect(fts("2026") == "\"2026*\"")
     }
 
     // ports: SearchQueryTest#highlightsInTheMiddle
     @Test func highlightsInTheMiddle() {
-        let parsed = Highlighted(marked: "quindi la \u{2}consegna\u{3} slitta a \u{2}giovedì\u{3}, but")
-        #expect(parsed.text == "quindi la consegna slitta a giovedì, but")
-        #expect(parsed.ranges == [10..<18, 28..<35])
-        #expect(text(parsed, parsed.ranges[0]) == "consegna")
-        #expect(text(parsed, parsed.ranges[1]) == "giovedì")
+        let parsed = Highlighted(marked: "so the \u{2}delivery\u{3} slips to \u{2}Thursday\u{3}, but")
+        #expect(parsed.text == "so the delivery slips to Thursday, but")
+        #expect(parsed.ranges == [7..<15, 25..<33])
+        #expect(text(parsed, parsed.ranges[0]) == "delivery")
+        #expect(text(parsed, parsed.ranges[1]) == "Thursday")
         #expect(!parsed.leadingEllipsis)
         #expect(!parsed.trailingEllipsis)
     }
 
     // ports: SearchQueryTest#highlightsAtStartAndEnd
     @Test func highlightsAtStartAndEnd() {
-        let start = Highlighted(marked: "\u{2}Consegna\u{3} slitta")
-        #expect(start.text == "Consegna slitta")
+        let start = Highlighted(marked: "\u{2}Delivery\u{3} slips")
+        #expect(start.text == "Delivery slips")
         #expect(start.ranges == [0..<8])
-        let end = Highlighted(marked: "la \u{2}consegna\u{3}")
-        #expect(end.text == "la consegna")
-        #expect(end.ranges == [3..<11])
-        #expect(Highlighted(marked: "\u{2}consegna\u{3}").ranges == [0..<8])
+        let end = Highlighted(marked: "the \u{2}delivery\u{3}")
+        #expect(end.text == "the delivery")
+        #expect(end.ranges == [4..<12])
+        #expect(Highlighted(marked: "\u{2}delivery\u{3}").ranges == [0..<8])
     }
 
     // ports: SearchQueryTest#adjacentHighlightsStaySeparate
     @Test func adjacentHighlightsStaySeparate() {
-        let parsed = Highlighted(marked: "\u{2}con\u{3}\u{2}segna\u{3} x")
-        #expect(parsed.text == "consegna x")
-        #expect(parsed.ranges == [0..<3, 3..<8])
+        let parsed = Highlighted(marked: "\u{2}deli\u{3}\u{2}very\u{3} x")
+        #expect(parsed.text == "delivery x")
+        #expect(parsed.ranges == [0..<4, 4..<8])
     }
 
     // ports: SearchQueryTest#ellipsesBecomeFlags
     @Test func ellipsesBecomeFlags() {
-        let parsed = Highlighted(marked: "…prima \u{2}consegna\u{3} slitta…")
-        #expect(parsed.text == "prima consegna slitta")
+        let parsed = Highlighted(marked: "…first \u{2}delivery\u{3} slips…")
+        #expect(parsed.text == "first delivery slips")
         #expect(parsed.ranges == [6..<14])
         #expect(parsed.leadingEllipsis)
         #expect(parsed.trailingEllipsis)
-        #expect(Highlighted(marked: "…\u{2}consegna\u{3}…") == Highlighted("consegna", ranges: [0..<8], leadingEllipsis: true, trailingEllipsis: true))
+        #expect(Highlighted(marked: "…\u{2}delivery\u{3}…") == Highlighted("delivery", ranges: [0..<8], leadingEllipsis: true, trailingEllipsis: true))
         #expect(Highlighted(marked: "…") == Highlighted("", leadingEllipsis: true))
     }
 
     // ports: SearchQueryTest#malformedMarkers
     @Test func malformedMarkers() {
         #expect(Highlighted(marked: "") == Highlighted(""))
-        #expect(Highlighted(marked: "la \u{2}conse").ranges == [3..<8])
-        #expect(Highlighted(marked: "la\u{3} x\u{2}\u{3} y").ranges == [])
-        #expect(Highlighted(marked: "la\u{3} x\u{2}\u{3} y").text == "la x y")
+        #expect(Highlighted(marked: "the \u{2}deliv").ranges == [4..<9])
+        #expect(Highlighted(marked: "the\u{3} x\u{2}\u{3} y").ranges == [])
+        #expect(Highlighted(marked: "the\u{3} x\u{2}\u{3} y").text == "the x y")
         #expect(Highlighted(marked: "plain text").ranges == [])
     }
 }

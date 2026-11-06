@@ -16,7 +16,7 @@ import CassiniNotebook
     /// words are new and the shown transcript is one voice, the run's "Speaker 1" (as `TranscriptionJob.saveTranscript`
     /// leaves it, D59).
     private func transcribedAgain(nameA: String = "Anna", matchA: VoiceMatchState = .unmatched) -> Note {
-        var note = Note(title: "Riunione")
+        var note = Note(title: "Meeting")
         note.transcript = [TranscriptSegment(text: "Prima", start: 0, end: 4, speakerID: "old_a"),
                            TranscriptSegment(text: "Seconda", start: 5, end: 9, speakerID: "old_b")]
         var anna = NoteSpeaker(id: "old_a", name: nameA)
@@ -25,8 +25,8 @@ import CassiniNotebook
         note.refreshSpeakerLabels()
         note.saveCurrentVersion(.previous)
         let voice = NoteSpeaker.oneVoice(prefix: "run2_")
-        note.transcript = Note.oneVoice([TranscriptSegment(text: "Nuova prima", start: 0, end: 4),
-                                         TranscriptSegment(text: "Nuova seconda", start: 5, end: 9)], voice)
+        note.transcript = Note.oneVoice([TranscriptSegment(text: "New first", start: 0, end: 4),
+                                         TranscriptSegment(text: "New second", start: 5, end: 9)], voice)
         note.speakers = [voice]
         note.selectedVersionID = nil
         note.saveCurrentVersion(.transcription)
@@ -62,8 +62,8 @@ import CassiniNotebook
     @Test func theOneVoiceOfTranscribeAgainIsAttributedInPlaceWithTheNamesBefore() {
         var note = transcribedAgain()
         let voice = NoteSpeaker.oneVoice(prefix: "run3_")
-        note.transcript = Note.oneVoice([TranscriptSegment(text: "Terza prima", start: 0, end: 4),
-                                         TranscriptSegment(text: "Terza seconda", start: 5, end: 9)], voice)
+        note.transcript = Note.oneVoice([TranscriptSegment(text: "Third first", start: 0, end: 4),
+                                         TranscriptSegment(text: "Third second", start: 5, end: 9)], voice)
         note.speakers = [voice]
         note.selectedVersionID = nil
         note.saveCurrentVersion(.transcription)
@@ -127,7 +127,7 @@ import CassiniNotebook
     }
 
     @Test func identifySpeakersAgainCarriesTheShownNames() {
-        var note = Note(title: "Riunione")
+        var note = Note(title: "Meeting")
         note.transcript = [TranscriptSegment(text: "Prima", start: 0, end: 4, speakerID: "old_a"),
                            TranscriptSegment(text: "Seconda", start: 5, end: 9, speakerID: "old_b")]
         note.speakers = [NoteSpeaker(id: "old_a", name: "Giulia"), NoteSpeaker(id: "old_b", name: "Marco")]

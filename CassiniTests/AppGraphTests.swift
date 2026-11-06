@@ -212,9 +212,9 @@ import CassiniEngineTesting
     }
 
     func testAPausedNoteResumesInTheLanguageItBeganIn() async throws {
-        let words = [TranscriptSegment(text: "Ciao", start: 0, end: 0.8, words: [.init(text: "Ciao", start: 0, end: 0.8)]),
-                     TranscriptSegment(text: "a tutti", start: 1, end: 1.8, words: [.init(text: "a", start: 1, end: 1.2),
-                                                                                    .init(text: " tutti", start: 1.3, end: 1.8)])]
+        let words = [TranscriptSegment(text: "Hello", start: 0, end: 0.8, words: [.init(text: "Hello", start: 0, end: 0.8)]),
+                     TranscriptSegment(text: "to everyone", start: 1, end: 1.8, words: [.init(text: "to", start: 1, end: 1.2),
+                                                                                    .init(text: " everyone", start: 1.3, end: 1.8)])]
         let test = TestGraph(transcriber: FakeTranscriber(.returns(words, total: 2)))
         defer { test.tearDown() }
         let note = try await seedPlainNote(in: test)
@@ -233,7 +233,7 @@ import CassiniEngineTesting
         await graph.processing.coordinator?.awaitIdle()
         await waitUntil { graph.library.note(note.id)?.status == .ready }
         XCTAssertEqual(graph.library.note(note.id)?.language, "it-IT", "the run's language, from its checkpoint (D53.2)")
-        XCTAssertEqual(graph.library.note(note.id)?.transcript.map(\.text), ["Ciao", "a tutti"])
+        XCTAssertEqual(graph.library.note(note.id)?.transcript.map(\.text), ["Hello", "everyone"])
         XCTAssertFalse(checkpoints.exists(note.id))
     }
 

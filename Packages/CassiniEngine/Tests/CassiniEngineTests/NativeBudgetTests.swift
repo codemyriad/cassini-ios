@@ -114,7 +114,7 @@ import CassiniNotebook
 /// `WindowSpeakers` on its own: its best-effort rule and the memory it asks for before the diarizer loads.
 @Suite struct WindowSpeakersTests {
     private let chunk = PcmAudio([Float](repeating: 0, count: 16_000), sampleRate: 16_000)
-    private let words = Transcript([Word("", 100, 400, "ciao")])
+    private let words = Transcript([Word("", 100, 400, "hello")])
 
     @Test func belowTheDiarizersMemoryEveryWordIsOneVoice() throws {
         let failed = Mutex(0)

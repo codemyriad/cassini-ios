@@ -137,7 +137,7 @@ import Testing
         try withTemporaryDirectory { dir in
             let audio = dir.appendingPathComponent("audio.opus"), target = dir.appendingPathComponent("doc.opus")
             try Data(try fixture()).write(to: audio)
-            let transcript = Transcript([Word("spk_1", 0, 20, "Ciao")], language: "it")
+            let transcript = Transcript([Word("spk_1", 0, 20, "Hello")], language: "it")
             let document = try CassiniDocument.create(audio, transcript: transcript, title: "Streamed", processing: JSONObject(),
                                                       existing: nil, speakerLabels: [:], target: target)
             #expect(document.state == .ok)

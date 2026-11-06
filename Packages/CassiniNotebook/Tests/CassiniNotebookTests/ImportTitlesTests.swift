@@ -7,10 +7,10 @@ import CassiniNotebook
     @Test func titlesAndExtensionsFollowTheDisplayName() {
         #expect(ImportTitles.title(displayName: "Meeting.final.MP3") == "Meeting.final")
         #expect(ImportTitles.title(displayName: ".opus") == ".opus")
-        #expect(ImportTitles.title(displayName: "  riunione  ") == "riunione")
+        #expect(ImportTitles.title(displayName: "  meeting  ") == "meeting")
         #expect(ImportTitles.title(displayName: nil) == ImportTitles.fallbackTitle)
         #expect(ImportTitles.title(displayName: "   ") == ImportTitles.fallbackTitle)
-        #expect(ImportTitles.title(displayName: nil, fallback: "Audio importato") == "Audio importato")
+        #expect(ImportTitles.title(displayName: nil, fallback: "Imported audio") == "Imported audio")
         #expect(ImportTitles.title(displayName: String(repeating: "x", count: 300) + ".mp3").count == 200)
         #expect(ImportTitles.fileExtension(displayName: "Meeting.final.MP3", content: "mp3") == "mp3")
         #expect(ImportTitles.fileExtension(displayName: "voice", content: "m4a") == "m4a")

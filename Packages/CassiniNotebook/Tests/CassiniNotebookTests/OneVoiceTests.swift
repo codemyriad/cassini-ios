@@ -13,7 +13,7 @@ import Testing
     /// A transcription as the job saves it without a speaker step.
     func transcribed(language: String = "en", prefix: String = run) -> Note {
         let voice = NoteSpeaker.oneVoice(prefix: prefix, language: language)
-        var note = Note(title: "Riunione")
+        var note = Note(title: "Meeting")
         note.transcript = Note.oneVoice([TranscriptSegment(text: "Prima", start: 0, end: 4),
                                          TranscriptSegment(text: "Seconda", start: 5, end: 9)], voice)
         note.speakers = [voice]
@@ -93,13 +93,13 @@ import Testing
     /// The draft shows words without a speaker as the job will save them: Speaker 1. Its header names nobody: the
     /// one voice has no id until the job saves the words, unlike a streamed draft speaker.
     @Test func aDraftWithoutSpeakersIsTheOneVoice() {
-        let words = [DraftWord(speaker: "", startMs: 0, endMs: 800, text: "Ciao"),
-                     DraftWord(speaker: "", startMs: 1_000, endMs: 1_800, text: "a tutti")]
+        let words = [DraftWord(speaker: "", startMs: 0, endMs: 800, text: "Hello"),
+                     DraftWord(speaker: "", startMs: 1_000, endMs: 1_800, text: "everyone")]
         let turns = NoteTranscripts.draft(words, tentativeFromMs: nil).turns
         #expect(turns.map(\.speakerID) == [NoteTranscripts.draftOneVoice])
         #expect(turns.map(\.name) == [.placeholder(1, label: DefaultLabels.placeholder(1))])
         #expect(turns.map(\.nameableSpeakerID) == [nil])
-        let streamed = NoteTranscripts.draft([DraftWord(speaker: Self.run + "1", startMs: 0, endMs: 800, text: "Ciao")],
+        let streamed = NoteTranscripts.draft([DraftWord(speaker: Self.run + "1", startMs: 0, endMs: 800, text: "Hello")],
                                              tentativeFromMs: nil).turns
         #expect(streamed.map(\.nameableSpeakerID) == [Self.run + "1"])
         #expect(NoteTranscripts.sealed(transcribed()).turns.map(\.nameableSpeakerID) == [Self.run + "1"])

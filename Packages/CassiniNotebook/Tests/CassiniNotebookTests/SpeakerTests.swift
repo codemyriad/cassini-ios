@@ -106,7 +106,7 @@ import Testing
 /// came from; selecting a version brings its language back; the language survives a save and a reload.
 @Test func eachVersionKeepsTheLanguageOfItsWords() throws {
     var note = Note(title: "Languages")
-    note.transcript = [.init(text: "Ciao", start: 0, end: 1, speakerID: "a"), .init(text: "a tutti", start: 1, end: 2, speakerID: "b")]
+    note.transcript = [.init(text: "Hello", start: 0, end: 1, speakerID: "a"), .init(text: "everyone", start: 1, end: 2, speakerID: "b")]
     note.speakers = [NoteSpeaker(id: "a", name: "A"), NoteSpeaker(id: "b", name: "B")]
     note.language = "it-IT"
     note.saveCurrentVersion(.transcription)
@@ -116,7 +116,7 @@ import Testing
     #expect(note.language == "it-IT")
     #expect(note.versions?.last?.language == "it-IT", "a merge keeps the language of the words it came from")
     let original = try #require(note.transcript.last)
-    note.revisePassage(original, to: original.revised(text: "a tutti voi", speakerID: "a", speakers: note.speakers ?? []),
+    note.revisePassage(original, to: original.revised(text: "everyone here", speakerID: "a", speakers: note.speakers ?? []),
                        stamp: VersionStamp(date: Date()))
     #expect(note.versions?.last?.kind == .editedPassages)
     #expect(note.versions?.last?.language == "it-IT", "a passage edit keeps it too")

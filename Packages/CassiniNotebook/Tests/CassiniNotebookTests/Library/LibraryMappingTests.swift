@@ -96,16 +96,16 @@ struct LibraryMappingTests {
 
     // ports: LibraryMappingTest#searchResultsHighlightTitleAndSnippet
     @Test func searchResultsHighlightTitleAndSnippet() {
-        let a = note("Call with supplier", createdAt: Self.daysAgo(1)), b = note("Fattura marzo")
-        let hits = [LibraryIndex.Hit(entry: entry(a), snippet: "…la \u{2}consegna\u{3} slitta…", titleSnippet: "Call with supplier"),
-                    LibraryIndex.Hit(entry: entry(b), snippet: "no markers here", titleSnippet: "\u{2}Fattura\u{3} marzo")]
+        let a = note("Call with supplier", createdAt: Self.daysAgo(1)), b = note("Invoice March")
+        let hits = [LibraryIndex.Hit(entry: entry(a), snippet: "…the \u{2}delivery\u{3} slips…", titleSnippet: "Call with supplier"),
+                    LibraryIndex.Hit(entry: entry(b), snippet: "no markers here", titleSnippet: "\u{2}Invoice\u{3} March")]
         let results = LibraryMapping.results(hits, context: RowContext(), now: now, calendar: rome)
         let first = results[0]
         #expect(first.day == .yesterday)
-        #expect(first.preview == Highlighted("la consegna slitta", ranges: [3..<11], leadingEllipsis: true, trailingEllipsis: true))
+        #expect(first.preview == Highlighted("the delivery slips", ranges: [4..<12], leadingEllipsis: true, trailingEllipsis: true))
         #expect(first.titleRanges.isEmpty)
         let second = results[1]
-        #expect(second.title == "Fattura marzo")
+        #expect(second.title == "Invoice March")
         #expect(second.titleRanges == [0..<7])
         #expect(second.preview == nil, "a title-only match shows no snippet")
         #expect(second.day == .today)
@@ -122,17 +122,17 @@ struct LibraryMappingTests {
 
     // ports: LibraryMappingTest#storedPreviewKeepsItsEllipsesAndCutsTheFallbackAtAWord
     @Test func storedPreviewKeepsItsEllipsesAndCutsTheFallbackAtAWord() throws {
-        #expect(LibraryMapping.storedPreview("…quindi la consegna slitta…")
-            == Highlighted("quindi la consegna slitta", leadingEllipsis: true, trailingEllipsis: true))
+        #expect(LibraryMapping.storedPreview("…so the delivery slips…")
+            == Highlighted("so the delivery slips", leadingEllipsis: true, trailingEllipsis: true))
         #expect(LibraryMapping.storedPreview("Short transcript.") == Highlighted("Short transcript."))
         #expect(LibraryMapping.storedPreview(nil) == nil)
         #expect(LibraryMapping.storedPreview("") == nil)
-        let body = String(String(repeating: "parola ", count: 30).prefix(160))
+        let body = String(String(repeating: "sample ", count: 30).prefix(160))
         let cut = try #require(LibraryMapping.storedPreview(body))
         #expect(cut.trailingEllipsis)
         #expect(!cut.text.hasSuffix(" "))
         #expect(cut.text.count < 160 && body.hasPrefix(cut.text))
-        #expect(cut.text.hasSuffix("parola"))
+        #expect(cut.text.hasSuffix("sample"))
     }
 
     /// The row shows the preview at the saved position, from the transcript shown; a stored preview is read only

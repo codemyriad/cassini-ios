@@ -33,7 +33,7 @@ public struct Preview: Hashable, Sendable {
 /// When the saved playback position is after the first word and before the end of the last word, the excerpt starts
 /// at the word playing at that position and has a leading ellipsis. It takes whole words up to about `limit`
 /// characters and stops at the first end of a speaker's turn reached once it holds at least `minBeforeTurnEnd`
-/// characters, so one preview does not run two speakers' words together. A shorter turn ("Sì.") continues into the
+/// characters, so one preview does not run two speakers' words together. A shorter turn ("Yes.") continues into the
 /// next turns, so the row never shows a one-word excerpt while more words follow.
 ///
 /// Otherwise (position 0, before or in the first word, or at or after the end of the last word, which is where a

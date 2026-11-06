@@ -44,15 +44,15 @@ enum ImportFixtures {
     static let privateText = #"{"gocassini.com":{"notes":[{"atMs":1200,"text":"Budget next week","futureNoteField":true}]},"#
         + #""example.com":{"ticket":"OPS-14","count":9007199254740993}}"#
 
-    /// A verified document with two variants, "prima versione" then "seconda versione" (the default), a private tag
+    /// A verified document with two variants, "first version" then "second version" (the default), a private tag
     /// and `x` holding `privateData`.
-    static func documentWithPrivateData(_ privateData: String = privateText, title: String = "Due") throws -> [UInt8] {
+    static func documentWithPrivateData(_ privateData: String = privateText, title: String = "Two") throws -> [UInt8] {
         let first = try CassiniDocument.create(opus(comments: ["X_EXAMPLE_COM_TICKET=OPS-14"]),
-                                               transcript: Transcript(words("prima versione"), language: "it"), title: title,
+                                               transcript: Transcript(words("first version"), language: "it"), title: title,
                                                processing: JSONObject([("engine", .string("gocassini"))]), speakerLabels: ["S1": "Ada"])
         var base = CassiniDocument.read(first)
         base.manifest?["x"] = .object(try JSON.parseObject(privateData))
-        return try CassiniDocument.create(first, transcript: Transcript(words("seconda versione"), language: "it"), title: title,
+        return try CassiniDocument.create(first, transcript: Transcript(words("second version"), language: "it"), title: title,
                                           processing: JSONObject([("engine", .string("gocassini"))]), existing: base)
     }
 
@@ -166,11 +166,11 @@ private func sha256(_ url: URL) throws -> String {
 @Suite struct ImportServiceTests {
     @Test func aPlainFileKeepsItsBytesHashAndImportTime() async throws {
         let h = try ImportHarness()
-        let url = try h.input(ImportFixtures.m4a, "Riunione di lunedì.m4a")
+        let url = try h.input(ImportFixtures.m4a, "Monday meeting.m4a")
 
         let id = try h.created(try await h.run(url))
 
-        let note = try await h.assertPlain(id, file: "source.m4a", duration: ImportFixtures.duration, title: "Riunione di lunedì")
+        let note = try await h.assertPlain(id, file: "source.m4a", duration: ImportFixtures.duration, title: "Monday meeting")
         #expect(note.sourceSha256 == (try sha256(url)))
         #expect(note.createdAt == h.clock.now)
         #expect(note.status == .audioOnly)
@@ -220,7 +220,7 @@ private func sha256(_ url: URL) throws -> String {
     // ports: ImportRepositoryTest#aCassiniDocumentIsVerifiedOnceAndOpensFromTheCache
     @Test func aCassiniDocumentIsVerifiedOnceAndOpensFromTheCache() async throws {
         let h = try ImportHarness()
-        let bytes = try ImportFixtures.document("buongiorno a tutti oggi parliamo della consegna di giovedì", title: "Seduta del consiglio")
+        let bytes = try ImportFixtures.document("good morning everyone today we discuss Thursday delivery", title: "Council session")
         let url = try h.input(bytes, "export.opus")
 
         let id = try h.created(try await h.run(url))
@@ -230,14 +230,14 @@ private func sha256(_ url: URL) throws -> String {
         #expect(note.origin == .importedDocument)
         #expect(note.originalAudioFilename == ImportService.documentFilename)
         #expect(note.audioFilename == ImportService.playbackFilename)
-        #expect(note.title == "Seduta del consiglio")
+        #expect(note.title == "Council session")
         #expect(note.document == DocumentInfo(state: .ok, vendor: CassiniDocument.vendor,
                                               meetingID: try manifest.object("meeting").string("id")))
         #expect(note.sourceSha256 == (try sha256(url)))
         let created = try manifest.object("meeting").string("createdAtUtc")
         #expect(note.createdAt == (try Date(created, strategy: .iso8601)))
         #expect(note.duration == Double(try manifest.object("meeting").number("durationMs")) / 1000)
-        #expect(note.text == "buongiorno a tutti oggi parliamo della consegna di giovedì")
+        #expect(note.text == "good morning everyone today we discuss Thursday delivery")
         #expect(note.speakers?.map(\.name) == ["Ada"])
         #expect(note.status == .ready)
         #expect(note.language == "it")
@@ -252,7 +252,7 @@ private func sha256(_ url: URL) throws -> String {
     // ports: ImportRepositoryTest#aDocumentWithBrokenMetadataIsStillADocument
     @Test func aDocumentWithBrokenMetadataIsStillADocument() async throws {
         let h = try ImportHarness()
-        let bytes = try ImportFixtures.document("una prova", title: "Prova")
+        let bytes = try ImportFixtures.document("a test", title: "Test")
         let comments = CassiniDocument.read(bytes).comments.map { $0.hasPrefix("CASSINI_PROFILE=") ? "CASSINI_PROFILE=other" : $0 }
         let broken = try OggOpus.mux(OggOpus.read(bytes), tags: CassiniDocument.tagsPacket(comments))
 
@@ -273,7 +273,7 @@ private func sha256(_ url: URL) throws -> String {
         // The metadata of one recording over other audio: SPEC.md's stale-audio lifecycle failure.
         let stale = try OggOpus.mux(OggOpus.read(ImportFixtures.opus(packets: 100)), tags: OggOpus.read(bytes).tags)
 
-        let id = try h.created(try await h.run(try h.input(stale, "vecchia.opus")))
+        let id = try h.created(try await h.run(try h.input(stale, "old.opus")))
 
         let note = try await h.note(id)
         #expect(note.document?.state == .staleAudio)
@@ -462,8 +462,8 @@ private func sha256(_ url: URL) throws -> String {
     @Test func aTitleTagInPlainOpusDoesNotNameTheNote() async throws {
         // One source decides: the display name. An export writes the note title into the TITLE tag.
         let h = try ImportHarness()
-        let id = try h.created(try await h.run(try h.input(try ImportFixtures.opus(comments: ["TITLE=Altro titolo"]), "registrazione.opus")))
-        try await h.assertPlain(id, file: ImportService.playbackFilename, duration: 15.84, title: "registrazione")
+        let id = try h.created(try await h.run(try h.input(try ImportFixtures.opus(comments: ["TITLE=Other title"]), "recording.opus")))
+        try await h.assertPlain(id, file: ImportService.playbackFilename, duration: 15.84, title: "recording")
     }
 
     @Test func anOggOpusFileWhoseTagsDoNotParseIsRejectedAsOpen() async throws {
@@ -546,7 +546,7 @@ private func sha256(_ url: URL) throws -> String {
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let output = try await PortableExportService(audio: h.audio, provenance: FakeProvenance(), unassignedLabel: "Unknown speaker")
             .export(note, original: h.store.originalAudioURL(for: note), playable: h.store.audioURL(for: note),
-                    into: folder, filename: "Due")
+                    into: folder, filename: "Two")
         return (folder, output)
     }
 
@@ -568,7 +568,7 @@ private func sha256(_ url: URL) throws -> String {
         let h = try ImportHarness()
         let document = try ImportFixtures.documentWithPrivateData()
         let source = state == .staleAudio ? try ImportFixtures.staleTwin(document) : try ImportFixtures.unverifiedTwin(document)
-        let note = try await h.note(try h.created(try await h.run(try h.input(source, "due.opus"))))
+        let note = try await h.note(try h.created(try await h.run(try h.input(source, "two.opus"))))
         #expect(note.document?.state == state)
         #expect(note.versions?.count == 2)
         #expect(note.holdsOnlyImportedVersions)
@@ -581,7 +581,7 @@ private func sha256(_ url: URL) throws -> String {
         #expect(after.manifest?["x"]?.serialized() == before.manifest?["x"]?.serialized())
         #expect(after.variants.map(\.id) == before.variants.map(\.id))
         #expect(after.manifest?["provenance"]?.serialized() == before.manifest?["provenance"]?.serialized())
-        #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path) == ["Due.opus"])
+        #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path) == ["Two.opus"])
     }
 
     /// Such a note cannot take a new title or speaker name into its document: the document is shared as it is, as on
@@ -589,7 +589,7 @@ private func sha256(_ url: URL) throws -> String {
     @Test func anUntrustedNoteWithNothingNewKeepsItsDocumentAsItIsWhenRenamed() async throws {
         let h = try ImportHarness()
         let source = try ImportFixtures.staleTwin(try ImportFixtures.documentWithPrivateData())
-        var note = try await h.note(try h.created(try await h.run(try h.input(source, "due.opus"))))
+        var note = try await h.note(try h.created(try await h.run(try h.input(source, "two.opus"))))
         note.title = "Rinominata"
         note.renameSpeaker("S1", name: "Bea")
         #expect(note.holdsOnlyImportedVersions)
@@ -604,7 +604,7 @@ private func sha256(_ url: URL) throws -> String {
     @Test func theExportFollowsHowTheOriginalReadsNow() async throws {
         let h = try ImportHarness()
         let document = try ImportFixtures.documentWithPrivateData()
-        var note = try await h.note(try h.created(try await h.run(try h.input(document, "due.opus"))))
+        var note = try await h.note(try h.created(try await h.run(try h.input(document, "two.opus"))))
         #expect(note.document?.state == .ok)
         let stale = try ImportFixtures.staleTwin(document)
         try Data(stale).write(to: h.store.originalAudioURL(for: note))
@@ -613,12 +613,12 @@ private func sha256(_ url: URL) throws -> String {
 
         #expect(try Data(contentsOf: copied) == Data(stale))
 
-        note.versions?.append(localVersion("terza versione"))
+        note.versions?.append(localVersion("third version"))
         let (_, sealed) = try await export(note, h, folder: "sealed")
 
         let exported = CassiniDocument.read(sealed)
         #expect(exported.state == .ok)
-        #expect(texts(exported) == ["terza versione"], "no imported variant is sealed again over audio that does not vouch for it")
+        #expect(texts(exported) == ["third version"], "no imported variant is sealed again over audio that does not vouch for it")
         #expect(exported.manifest?["x"]?.serialized() == CassiniDocument.read(stale).manifest?["x"]?.serialized())
     }
 
@@ -627,9 +627,9 @@ private func sha256(_ url: URL) throws -> String {
     @Test func aStaleNoteWithANewVersionExportsOnlyThatVersionAndKeepsThePrivateData() async throws {
         let h = try ImportHarness()
         let source = try ImportFixtures.staleTwin(try ImportFixtures.documentWithPrivateData())
-        var note = try await h.note(try h.created(try await h.run(try h.input(source, "due.opus"))))
+        var note = try await h.note(try h.created(try await h.run(try h.input(source, "two.opus"))))
         #expect(note.document?.state == .staleAudio)
-        let local = localVersion("terza versione")
+        let local = localVersion("third version")
         note.versions?.append(local)
         note.selectedVersionID = local.id
         note.transcript = local.segments
@@ -639,7 +639,7 @@ private func sha256(_ url: URL) throws -> String {
 
         let before = CassiniDocument.read(source), exported = CassiniDocument.read(output)
         #expect(exported.state == .ok)
-        #expect(texts(exported) == ["terza versione"])
+        #expect(texts(exported) == ["third version"])
         #expect(exported.manifest?["x"]?.serialized() == before.manifest?["x"]?.serialized())
         #expect(exported.manifest?["x"]?.serialized().contains("9007199254740993") == true)
         #expect(exported.comments.contains("X_EXAMPLE_COM_TICKET=OPS-14"))
@@ -651,17 +651,17 @@ private func sha256(_ url: URL) throws -> String {
     @Test func aStaleNoteShowingAnImportedVersionExportsItsNewestLocalVersion() async throws {
         let h = try ImportHarness()
         let source = try ImportFixtures.staleTwin(try ImportFixtures.documentWithPrivateData())
-        var note = try await h.note(try h.created(try await h.run(try h.input(source, "due.opus"))))
-        note.versions?.append(localVersion("terza versione"))
-        note.versions?.append(localVersion("quarta versione"))
+        var note = try await h.note(try h.created(try await h.run(try h.input(source, "two.opus"))))
+        note.versions?.append(localVersion("third version"))
+        note.versions?.append(localVersion("fourth version"))
         #expect(note.showsImportedVersion)
 
         let (_, output) = try await export(note, h)
 
         let exported = CassiniDocument.read(output)
         #expect(exported.state == .ok)
-        #expect(texts(exported) == ["terza versione", "quarta versione"])
-        #expect(exported.selected()?.transcript?.words.map(\.text) == ["quarta", "versione"])
+        #expect(texts(exported) == ["third version", "fourth version"])
+        #expect(exported.selected()?.transcript?.words.map(\.text) == ["fourth", "version"])
         #expect(exported.manifest?["x"]?.serialized() == CassiniDocument.read(source).manifest?["x"]?.serialized())
     }
 
@@ -670,7 +670,7 @@ private func sha256(_ url: URL) throws -> String {
     @Test func aStaleNoteMergedFromAnImportedVersionNamesNoVariantTheExportLacks() async throws {
         let h = try ImportHarness()
         let source = try ImportFixtures.staleTwin(try ImportFixtures.documentWithPrivateData())
-        var note = try await h.note(try h.created(try await h.run(try h.input(source, "due.opus"))))
+        var note = try await h.note(try h.created(try await h.run(try h.input(source, "two.opus"))))
         let imported = try #require(note.selectedVersionID)
         note.addSpeaker(id: "S2", name: "Bea")
         note.mergeSpeaker("S2", into: "S1")
@@ -695,7 +695,7 @@ private func sha256(_ url: URL) throws -> String {
     @Test func aVerifiedNoteKeepsThePrivateDataAndEveryImportedVariant() async throws {
         let h = try ImportHarness()
         let source = try ImportFixtures.documentWithPrivateData()
-        var note = try await h.note(try h.created(try await h.run(try h.input(source, "due.opus"))))
+        var note = try await h.note(try h.created(try await h.run(try h.input(source, "two.opus"))))
         #expect(note.document?.state == .ok)
         #expect(note.holdsOnlyImportedVersions)
         note.title = "Rinominata"
@@ -721,16 +721,16 @@ private func sha256(_ url: URL) throws -> String {
         // Cover art that leaves the new file room for the words but not for the notes the source carries too.
         let cover = "METADATA_BLOCK_PICTURE=" + String(repeating: "A", count: 7_700_000)
         let notes = #"{"gocassini.com":{"notes":[{"atMs":0,"text":""# + ImportFixtures.noise(550_000) + #""}]}}"#
-        let words = Transcript([Word("S1", 0, 400, "terza"), Word("S1", 500, 900, "versione")])
+        let words = Transcript([Word("S1", 0, 400, "third"), Word("S1", 500, 900, "version")])
         // One seal makes the document (each pass over an 8 MiB header takes a second in a debug build).
-        let document = try CassiniDocument.create(ImportFixtures.opus(comments: [cover]), transcript: words, title: "Due",
+        let document = try CassiniDocument.create(ImportFixtures.opus(comments: [cover]), transcript: words, title: "Two",
                                                   processing: JSONObject(), carrying: CassiniDocument(
                                                       state: .staleAudio, manifest: JSONObject([("x", .object(try JSON.parseObject(notes)))])))
-        let original = try h.input(try ImportFixtures.staleTwin(document), "due.opus")
+        let original = try h.input(try ImportFixtures.staleTwin(document), "two.opus")
         #expect(try WordBodyBudget.fitsHeader(words, sealing: FileSource(original)), "the words alone fit beside the cover")
-        var note = Note(title: "Due")
+        var note = Note(title: "Two")
         note.document = DocumentInfo(state: .staleAudio)
-        let local = localVersion("terza versione")
+        let local = localVersion("third version")
         note.versions = [local]
         note.selectedVersionID = local.id
         note.transcript = local.segments
@@ -740,7 +740,7 @@ private func sha256(_ url: URL) throws -> String {
 
         await #expect(throws: PortableExportError.tooLong) {
             try await PortableExportService(audio: h.audio, provenance: FakeProvenance(), unassignedLabel: "Unknown speaker")
-                .export(note, original: original, playable: original, into: folder, filename: "Due")
+                .export(note, original: original, playable: original, into: folder, filename: "Two")
         }
         #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path).isEmpty)
     }

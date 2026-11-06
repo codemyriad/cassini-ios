@@ -29,66 +29,66 @@ final class NoteSearchTests {
 
     // ports: NoteSearchTest#prefixFindsTheWholeWord
     @Test func prefixFindsTheWholeWord() {
-        let a = insert("la consegna slitta a giovedì")
-        #expect(ids("consegn") == [a])
+        let a = insert("the delivery slips to Thursday")
+        #expect(ids("deliv") == [a])
     }
 
     // ports: NoteSearchTest#diacriticsAreIgnored
     @Test func diacriticsAreIgnored() {
-        let a = insert("la consegna slitta a giovedì")
-        #expect(ids("giovedi") == [a])
-        #expect(ids("GIOVEDÌ") == [a])
+        let a = insert("meet at the café on Thursday")
+        #expect(ids("cafe") == [a])
+        #expect(ids("CAFÉ") == [a])
     }
 
     // ports: NoteSearchTest#caseIsIgnored
     @Test func caseIsIgnored() {
-        let a = insert("la consegna slitta a giovedì")
-        #expect(ids("CONSEGNA") == [a])
+        let a = insert("the delivery slips to Thursday")
+        #expect(ids("DELIVERY") == [a])
     }
 
     // ports: NoteSearchTest#everyTermMustMatchAndOperatorsAreWords
     @Test func everyTermMustMatchAndOperatorsAreWords() {
-        let a = insert("la consegna slitta a giovedì")
-        _ = insert("la consegna è puntuale")
-        #expect(ids("consegna giov") == [a])
-        #expect(ids("consegna OR puntuale").isEmpty)
+        let a = insert("the delivery slips to Thursday")
+        _ = insert("the delivery is on time")
+        #expect(ids("delivery Thur") == [a])
+        #expect(ids("delivery OR timely").isEmpty)
     }
 
-    /// The acceptance examples: "e-mail" finds "e mail", "giovedi" finds "giovedì", "consegn" finds "consegna".
+    /// The acceptance examples: "e-mail" finds "e mail", "cafe" finds "café", "deliv" finds "delivery".
     @Test func punctuationInTheQuerySplitsAsInTheNotes() {
-        let a = insert("send the e mail on giovedì about the consegna")
+        let a = insert("send the e mail from the café about the delivery")
         #expect(ids("e-mail") == [a])
-        #expect(ids("giovedi") == [a])
-        #expect(ids("consegn") == [a])
+        #expect(ids("cafe") == [a])
+        #expect(ids("deliv") == [a])
         #expect(ids("mail-e").isEmpty, "the tokens of a phrase follow each other")
     }
 
     // ports: NoteSearchTest#trashedNotesAreExcluded
     @Test func trashedNotesAreExcluded() {
-        let a = insert("la consegna slitta", createdAt: 1)
-        let b = insert("nessuna consegna oggi", createdAt: 2)
+        let a = insert("the delivery slips", createdAt: 1)
+        let b = insert("no delivery today", createdAt: 2)
         let index = notes.firstIndex { $0.id == b }!
         notes[index].trashedAt = Date(timeIntervalSince1970: 5)
-        #expect(ids("consegna") == [a])
+        #expect(ids("delivery") == [a])
         notes[index].trashedAt = nil
-        #expect(ids("consegna") == [b, a])
+        #expect(ids("delivery") == [b, a])
     }
 
     // ports: NoteSearchTest#snippetMarksTheMatchWithControlCharacters
     @Test func snippetMarksTheMatchWithControlCharacters() throws {
-        _ = insert("quindi la consegna slitta a giovedì but the price stays")
-        let hit = try #require(search("consegn").first)
-        #expect(hit.snippet.contains("\u{2}consegna\u{3}"), "\(hit.snippet)")
+        _ = insert("so the delivery slips to Thursday but the price stays")
+        let hit = try #require(search("deliv").first)
+        #expect(hit.snippet.contains("\u{2}delivery\u{3}"), "\(hit.snippet)")
         let highlighted = Highlighted(marked: hit.snippet)
         #expect(!highlighted.text.contains("\u{2}"))
-        #expect(highlighted.ranges.map { String(Array(highlighted.text)[$0]) } == ["consegna"])
+        #expect(highlighted.ranges.map { String(Array(highlighted.text)[$0]) } == ["delivery"])
     }
 
     // ports: NoteSearchTest#titleOnlyMatchMarksTheTitleAndNotTheBody
     @Test func titleOnlyMatchMarksTheTitleAndNotTheBody() throws {
-        _ = insert("nothing relevant here", title: "Riunione fornitori")
-        let hit = try #require(search("fornit").first)
-        #expect(hit.titleSnippet.contains("\u{2}fornitori\u{3}"))
+        _ = insert("nothing relevant here", title: "Supplier meeting")
+        let hit = try #require(search("suppl").first)
+        #expect(hit.titleSnippet.contains("\u{2}Supplier\u{3}"))
         #expect(!hit.snippet.contains("\u{2}"))
     }
 
@@ -97,7 +97,7 @@ final class NoteSearchTests {
         let a = insert("nothing relevant", title: "Old name")
         var index = LibraryIndex(notes)
         #expect(index.search(SearchQuery("old")).count == 1)
-        notes[0].title = "Riunione budget"
+        notes[0].title = "Budget meeting"
         index.update(notes)
         #expect(index.search(SearchQuery("old")).isEmpty)
         #expect(index.search(SearchQuery("budget")).map(\.entry.note.id) == [a])
@@ -105,13 +105,13 @@ final class NoteSearchTests {
 
     // ports: NoteSearchTest#selectingAnotherVariantReindexesTheBody
     @Test func selectingAnotherVariantReindexesTheBody() {
-        let a = insert("prima versione")
+        let a = insert("first version")
         var index = LibraryIndex(notes)
-        #expect(index.search(SearchQuery("prima")).map(\.entry.note.id) == [a])
-        notes[0].transcript = [TranscriptSegment(text: "seconda stesura", start: 0, end: 5)]
+        #expect(index.search(SearchQuery("first")).map(\.entry.note.id) == [a])
+        notes[0].transcript = [TranscriptSegment(text: "second draft", start: 0, end: 5)]
         index.update(notes)
-        #expect(index.search(SearchQuery("prima")).isEmpty)
-        #expect(index.search(SearchQuery("stesura")).map(\.entry.note.id) == [a])
+        #expect(index.search(SearchQuery("first")).isEmpty)
+        #expect(index.search(SearchQuery("draft")).map(\.entry.note.id) == [a])
     }
 
     // ports: NoteSearchTest#audioOnlyNotesAreFoundByTitle
@@ -139,7 +139,7 @@ final class NoteSearchTests {
 
     /// Android `NoteRepository.search`: a query with nothing searchable lists every note, without marks.
     @Test func aQueryWithNothingSearchableListsEveryNote() {
-        let a = insert("uno", createdAt: 1), b = insert("due", createdAt: 2)
+        let a = insert("one", createdAt: 1), b = insert("two", createdAt: 2)
         let hits = search(" , ?! ")
         #expect(hits.map(\.entry.note.id) == [b, a])
         #expect(hits.allSatisfy { !$0.snippet.contains("\u{2}") })

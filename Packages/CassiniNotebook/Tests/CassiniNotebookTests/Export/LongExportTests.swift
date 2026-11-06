@@ -10,9 +10,9 @@ struct LongExportTests {
     private static let speakers = 4
     private static let turnWords = 23
     private static let prefix = "diar_0f8e2c3a_6b7d_4e1f_9a2b_3c4d5e6f7a8b_"
-    private static let text = ("Allora, partiamo dal punto principale della riunione di oggi. The quarterly numbers look better than "
-        + "expected, ma dobbiamo ancora verificare le consegne di giovedì e il budget del progetto. "
-        + "Can everyone confirm their availability for next week? Perfetto, grazie mille a tutti.").split(separator: " ").map(String.init)
+    private static let text = ("So, let us start with the main point of today’s meeting. The quarterly numbers look better than "
+        + "expected, but we still need to check Thursday’s deliveries and the project budget. "
+        + "Can everyone confirm their availability for next week? Perfect, thank you very much everyone.").split(separator: " ").map(String.init)
 
     /// Android's `LongRun.words`: about 9,500 words an hour, a new speaker each 23 words.
     private static func words(_ endMs: Int64, wordsPerHour: Int64 = 9_500) -> [Word] {

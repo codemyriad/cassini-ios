@@ -4,35 +4,35 @@ import Testing
 struct VttWriterTests {
     // ports: VttWriterTest#oneSpeakerHasNoVoiceSpan
     @Test func oneSpeakerHasNoVoiceSpan() {
-        let words = said("spk_0", 1_000, "Prova uno due tre.")
-        expectExport("WEBVTT\n\n00:00:01.000 --> 00:00:02.500\nProva uno due tre.\n", VttWriter.write(transcript(words)))
+        let words = said("spk_0", 1_000, "Testing one two three.")
+        expectExport("WEBVTT\n\n00:00:01.000 --> 00:00:02.500\nTesting one two three.\n", VttWriter.write(transcript(words)))
     }
 
     // ports: VttWriterTest#manySpeakersWrapEveryCue
     @Test func manySpeakersWrapEveryCue() {
-        let words = said("spk_0", 0, "Allora, la consegna slitta?")
-            + said("spk_1", 1_800, "Sì, a giovedì.")
-            + said("spk_1", 4_400, "Il camion è già partito.")
+        let words = said("spk_0", 0, "So, is the delivery late?")
+            + said("spk_1", 1_800, "Yes, on Thursday.")
+            + said("spk_1", 4_400, "The truck has already left.")
         expectExport("""
             WEBVTT
 
-            00:00:00.000 --> 00:00:01.500
-            <v Paolo>Allora, la consegna slitta?</v>
+            00:00:00.000 --> 00:00:01.900
+            <v Paolo>So, is the delivery late?</v>
 
             00:00:01.800 --> 00:00:02.900
-            <v Speaker 2>Sì, a giovedì.</v>
+            <v Speaker 2>Yes, on Thursday.</v>
 
             00:00:04.400 --> 00:00:06.300
-            <v Speaker 2>Il camion è già partito.</v>
+            <v Speaker 2>The truck has already left.</v>
 
             """, VttWriter.write(transcript(words)))
     }
 
     // ports: VttWriterTest#twoLinesStayInsideOneSpan
     @Test func twoLinesStayInsideOneSpan() {
-        let words = said("spk_0", 0, "Abbiamo deciso che la data è giusta, ma prima di chiudere", stepMs: 300)
+        let words = said("spk_0", 0, "We agreed that the date is right, but before closing", stepMs: 300)
             + said("spk_1", 4_000, "Ok")
-        expectExport("WEBVTT\n\n00:00:00.000 --> 00:00:03.200\n<v Paolo>Abbiamo deciso che la data è\ngiusta, ma prima di chiudere</v>\n\n"
+        expectExport("WEBVTT\n\n00:00:00.000 --> 00:00:02.900\n<v Paolo>We agreed that the date is\nright, but before closing</v>\n\n"
                      + "00:00:04.000 --> 00:00:05.000\n<v Speaker 2>Ok</v>\n", VttWriter.write(transcript(words)))
     }
 

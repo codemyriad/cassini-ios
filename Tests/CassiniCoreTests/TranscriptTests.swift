@@ -4,7 +4,7 @@ import Testing
 @Suite struct TranscriptTests {
     // ports: TranscriptTest#sessionRoundTripPreservesLanguageAndOverlappingTurnOrder
     @Test func sessionRoundTripPreservesLanguageAndOverlappingTurnOrder() throws {
-        let original = Transcript([Word("a", 2000, 2500, "perché?"), Word("b", 1000, 2200, "Ciao.")], language: "it")
+        let original = Transcript([Word("a", 2000, 2500, "why?"), Word("b", 1000, 2200, "Hello.")], language: "it")
         #expect(try Transcript.fromJSON(original.json()) == original)
     }
 
@@ -18,7 +18,7 @@ import Testing
     // ports: TranscriptTest#rejectsCorruptPersistedWordExtents
     @Test func rejectsCorruptPersistedWordExtents() {
         #expect(throws: CassiniError.self) {
-            try Transcript.fromJSON(#"{"format":"cassini.words.v1","items":[{"speaker":"a","startMs":900,"endMs":100,"text":"ciao"}]}"#)
+            try Transcript.fromJSON(#"{"format":"cassini.words.v1","items":[{"speaker":"a","startMs":900,"endMs":100,"text":"hello"}]}"#)
         }
     }
 
@@ -48,7 +48,7 @@ import Testing
 
     // ports: TranscriptTest#preservesSpeakerTurnOrderEvenWithOverlappingSpeakers
     @Test func preservesSpeakerTurnOrderEvenWithOverlappingSpeakers() throws {
-        let transcript = Transcript([Word("a", 2000, 2500, "Sì."), Word("b", 1000, 2200, "Ciao.")])
+        let transcript = Transcript([Word("a", 2000, 2500, "Yes."), Word("b", 1000, 2200, "Hello.")])
         let items = try JSON.parseObject(transcript.json()).array("items")
         #expect(items[0].object?["speaker"] == .string("a"))
         #expect(try items[1].object?.number("startMs") == 1000)
@@ -63,17 +63,17 @@ import Testing
 
     // ports: TranscriptTest#rejectsMissingAlignment
     @Test func rejectsMissingAlignment() {
-        #expect(throws: CassiniError.self) { try Transcript.fromTokens(["▁ciao"], timestamps: [], durations: []) }
+        #expect(throws: CassiniError.self) { try Transcript.fromTokens(["▁hello"], timestamps: [], durations: []) }
     }
 
     // ports: TranscriptTest#rejectsNonfiniteAlignment
     @Test func rejectsNonfiniteAlignment() {
-        #expect(throws: CassiniError.self) { try Transcript.fromTokens(["▁ciao"], timestamps: [.nan], durations: [0.1]) }
+        #expect(throws: CassiniError.self) { try Transcript.fromTokens(["▁hello"], timestamps: [.nan], durations: [0.1]) }
     }
 
     // ports: TranscriptTest#rejectsBackwardTimes
     @Test func rejectsBackwardTimes() {
-        #expect(throws: CassiniError.self) { try Transcript.fromTokens(["▁ciao", "▁ciao"], timestamps: [1, 0.5], durations: [0.1, 0.1]) }
+        #expect(throws: CassiniError.self) { try Transcript.fromTokens(["▁hello", "▁hello"], timestamps: [1, 0.5], durations: [0.1, 0.1]) }
     }
 
     /// iOS only: Android decides speech with `isLetterOrDigit`, so a superscript, fraction or Roman numeral piece is a
@@ -87,8 +87,8 @@ import Testing
     }
 
     @Test func theBodyIsCompactJsonAndALanguageIsKeptWhenKnown() {
-        let transcript = Transcript([Word("spk_1", 0, 20, "Ciao")], language: "it")
-        #expect(transcript.json() == #"{"format":"cassini.words.v1","language":"it","wordCount":1,"items":[{"speaker":"spk_1","startMs":0,"endMs":20,"text":"Ciao"}]}"#)
+        let transcript = Transcript([Word("spk_1", 0, 20, "Hello")], language: "it")
+        #expect(transcript.json() == #"{"format":"cassini.words.v1","language":"it","wordCount":1,"items":[{"speaker":"spk_1","startMs":0,"endMs":20,"text":"Hello"}]}"#)
         #expect(Transcript([]).json() == #"{"format":"cassini.words.v1","wordCount":0,"items":[]}"#)
     }
 }

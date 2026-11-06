@@ -47,7 +47,7 @@ import CassiniAudio
         let audio = root.appendingPathComponent("portable-encoder.opus")
         let document = root.appendingPathComponent("portable-document.opus")
         try OpusAudio.encode(source, to: audio)
-        let words = [Word("S1", 100, 600, "Ciao."), Word("S2", 8_000, 8_500, "Benvenuti.")]
+        let words = [Word("S1", 100, 600, "Hello."), Word("S2", 8_000, 8_500, "Welcome.")]
 
         try CassiniDocument.create(audio, transcript: Transcript(words, language: "it"), title: "Portable",
                                    processing: JSONObject([("model", .string("test"))]), existing: nil,

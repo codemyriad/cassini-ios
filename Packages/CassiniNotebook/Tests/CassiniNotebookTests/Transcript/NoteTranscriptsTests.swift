@@ -16,7 +16,7 @@ import Testing
         #expect(turns[1].name == .placeholder(2, label: "Speaker 2"))
         // Placeholders are amber and take no slot: Giulia blue, Paolo teal.
         #expect(turns.map(\.tint) == [.blue, .amber, .teal, .blue])
-        #expect(turns[0].text == "Ciao a tutti.")
+        #expect(turns[0].text == "Hello everyone.")
         #expect(turns[0].words[1].start == 0.5)
         #expect(transcript.speakers == ["a", "b", "c"])
     }
@@ -99,7 +99,7 @@ import Testing
         let turns = draft.turns
         #expect(turns.map(\.name) == [1, 2, 3, 1].map { .placeholder($0, label: "Speaker \($0)") })
         #expect(turns.allSatisfy { $0.tint == .amber && !$0.auto && $0.suggestion == nil })
-        #expect(turns[3].unsettledFrom == 1, "quindi ends after 3.6 s")
+        #expect(turns[3].unsettledFrom == 1, "so ends after 3.6 s")
         #expect(turns[0].unsettledFrom == nil)
         #expect(draft.activeWord(at: 3.1) == WordRef(turnID: "w4", index: 0))
         #expect(NoteTranscripts.draft(words, tentativeFromMs: nil).turns.allSatisfy { $0.unsettledFrom == nil },
@@ -108,16 +108,16 @@ import Testing
 
     // ports: NoteTranscriptsTest#searchIgnoresCaseAndAccents
     @Test func searchIgnoresCaseAndAccents() {
-        let turns = NoteTranscripts.sealed(F.note([.init("a", 0, 1, "Giovedì"), .init("a", 1, 2, "CONSEGNA"),
-                                                   .init("b", 2, 3, "giovedi consegna")])).turns
-        let giovedi = TranscriptSearch.matches(turns, query: "giovedi")
-        #expect(giovedi.count == 2)
-        #expect(giovedi[0].turnID == "w0")
-        #expect(giovedi[0].range == 0..<7)
-        #expect(giovedi[1].range == 0..<7)
-        #expect(TranscriptSearch.matches(turns, query: "Consegna").map(\.range) == [8..<16, 8..<16])
+        let turns = NoteTranscripts.sealed(F.note([.init("a", 0, 1, "Café"), .init("a", 1, 2, "DELIVERY"),
+                                                   .init("b", 2, 3, "cafe delivery")])).turns
+        let cafe = TranscriptSearch.matches(turns, query: "cafe")
+        #expect(cafe.count == 2)
+        #expect(cafe[0].turnID == "w0")
+        #expect(cafe[0].range == 0..<4)
+        #expect(cafe[1].range == 0..<4)
+        #expect(TranscriptSearch.matches(turns, query: "Delivery").map(\.range) == [5..<13, 5..<13])
         #expect(TranscriptSearch.matches(turns, query: "  ").isEmpty)
-        #expect(TranscriptSearch.matches(turns, query: "domani").isEmpty)
+        #expect(TranscriptSearch.matches(turns, query: "tomorrow").isEmpty)
     }
 
     // ports: NoteTranscriptsTest#aDecomposedAccentKeepsTheRangeOnTheSourceText
@@ -130,23 +130,23 @@ import Testing
     }
 
     @Test func searchStepsWrapAroundAndANewQueryStartsAgain() {
-        var search = InNoteSearch(query: " giovedi ")
-        #expect(search.query == "giovedi")
+        var search = InNoteSearch(query: " cafe ")
+        #expect(search.query == "cafe")
         search.next(of: 2)
         #expect(search.current == 1)
         search.next(of: 2)
         #expect(search.current == 0, "it wraps around")
         search.previous(of: 2)
         #expect(search.current == 1)
-        search.setQuery("domani")
+        search.setQuery("tomorrow")
         #expect(search.current == 0)
         #expect(search.current(of: 0) == 0)
     }
 
     @Test func aWordIsFoundByItsCharacterOffset() {
         let turn = NoteTranscripts.sealed(F.weeklySync).turns[0]
-        #expect(turn.offsets == [0, 5])
-        #expect(turn.range(ofWord: 1) == 5..<13)
+        #expect(turn.offsets == [0, 6])
+        #expect(turn.range(ofWord: 1) == 6..<15)
         #expect(turn.word(atOffset: 4) == 0)
         #expect(turn.word(atOffset: 7) == 1)
     }

@@ -15,7 +15,7 @@ func said(_ speaker: String, _ startMs: Int64, _ text: String, stepMs: Int64 = 4
 func transcript(_ words: [Word],
                 labels: [String: String] = ["spk_0": "Paolo", "spk_1": "Speaker 2", "spk_2": "Élodie"],
                 durationMs: Int64 = 23 * 60_000 + 50_000,
-                title: String = "Chiamata con il fornitore") -> ExportTranscript {
+                title: String = "Call with supplier") -> ExportTranscript {
     ExportTranscript(title: title, durationMs: durationMs, words: words, labels: labels)
 }
 
@@ -35,6 +35,6 @@ func expectExportShape(_ text: String, sourceLocation: SourceLocation = #_source
 
 /// `actual` equals `expected` byte for byte and has the shape every export has.
 func expectExport(_ expected: String, _ actual: String, sourceLocation: SourceLocation = #_sourceLocation) {
-    #expect(Array(actual.utf8) == Array(expected.utf8), sourceLocation: sourceLocation)
+    #expect(Array(actual.utf8) == Array(expected.utf8), "Expected: \(expected)\nActual: \(actual)", sourceLocation: sourceLocation)
     expectExportShape(actual, sourceLocation: sourceLocation)
 }
