@@ -233,7 +233,7 @@ import CassiniEngineTesting
         await graph.processing.coordinator?.awaitIdle()
         await waitUntil { graph.library.note(note.id)?.status == .ready }
         XCTAssertEqual(graph.library.note(note.id)?.language, "it-IT", "the run's language, from its checkpoint (D53.2)")
-        XCTAssertEqual(graph.library.note(note.id)?.transcript.map(\.text), ["Hello", "everyone"])
+        XCTAssertEqual(graph.library.note(note.id)?.transcript.map(\.text), ["Hello", "to everyone"])
         XCTAssertFalse(checkpoints.exists(note.id))
     }
 
