@@ -43,7 +43,7 @@ public enum SeamMerge {
         let cutMs = overlapStartMs + overlapMs / 2
         let aligned = align(acc, next, overlapStartMs: overlapStartMs, overlapEndMs: overlapEndMs, toleranceMs: duplicateToleranceMs)
         // A lone pair further apart than the singleton tolerance is still the best evidence when nothing firmer exists.
-        // Known trade-off: two distinct, quickly repeated words ("sì sì") inside the overlap can collapse into one
+        // Known trade-off: two distinct, quickly repeated words ("yes yes") inside the overlap can collapse into one
         // here, in exchange for never doubling a word the decodes timed 220-240 ms apart (measured on the phone).
         let confident = confidentMatches(aligned, acc, next, overlapEndMs: overlapEndMs)
         let agreed = confident.isEmpty ? aligned : confident
@@ -216,7 +216,7 @@ public enum SeamMerge {
     /// Comparison key for an overlap word: per-code-point simple lowercase (Go's
     /// `unicode.ToLower`, not locale or context-sensitive lowercasing), curly single quotes
     /// folded to `'`, edge spaces and bracketing punctuation trimmed, then trailing dots, so
-    /// "morning." equals "morning," while "C++", "dell'", ".NET" and "3.14" keep their marks.
+    /// "morning." equals "morning," while "C++", "we'", ".NET" and "3.14" keep their marks.
     /// Empty when no letter or number remains. Works on Unicode scalars throughout, never on graphemes.
     public static func normalize(_ text: String) -> String {
         var scalars = text.unicodeScalars.map { scalar -> Unicode.Scalar in

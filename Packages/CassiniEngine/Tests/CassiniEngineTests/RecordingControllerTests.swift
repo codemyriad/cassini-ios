@@ -21,7 +21,7 @@ import CassiniNotebook
         #expect(h.activity.started.map(\.noteID) == [active.noteID])
         h.capture.elapsed = 61
 
-        h.controller.finish(title: "Riunione di lunedì")
+        h.controller.finish(title: "Monday meeting")
         let ended = try await h.awaitEnded()
         #expect(ended == .ended(noteID: active.noteID, outcome: .saved(.transcribe)))
         #expect(await h.note(active.noteID)?.status == .queued, "a kill before the hand-off leaves it interrupted")
@@ -29,7 +29,7 @@ import CassiniNotebook
         let note = try #require(await h.note(active.noteID))
         #expect(note.audio == .plain)
         #expect(note.status == .queued, "the fake queue leaves the mark")
-        #expect(note.title == "Riunione di lunedì")
+        #expect(note.title == "Monday meeting")
         #expect(note.duration == 2, "the duration read back from the file")
         #expect(note.waveform == [0.5, 0.5])
         #expect(note.audioFilename == "audio.m4a")
@@ -48,21 +48,21 @@ import CassiniNotebook
         let active = try await h.startRecording()
         #expect(await h.note(active.noteID)?.title == active.defaultTitle)
 
-        h.controller.setTitle("Prova")
-        h.controller.setTitle("Prova del")
-        h.controller.setTitle("Prova del coro ")
-        try await h.waitFor("the title write") { await h.note(active.noteID)?.title == "Prova del coro" }
+        h.controller.setTitle("Test")
+        h.controller.setTitle("Test del")
+        h.controller.setTitle("Choir rehearsal ")
+        try await h.waitFor("the title write") { await h.note(active.noteID)?.title == "Choir rehearsal" }
         try await Task.sleep(for: RecordingHarness.debounce * 2)
         #expect(h.notes.titleWrites == 1, "one write after the last change")
-        #expect(try h.active.title == "Prova del coro ", "the state keeps the text as typed")
-        #expect(h.activity.current?.title == "Prova del coro")
+        #expect(try h.active.title == "Choir rehearsal ", "the state keeps the text as typed")
+        #expect(h.activity.current?.title == "Choir rehearsal")
 
         h.controller.setTitle(String(repeating: "x", count: 250))
         #expect(try h.active.title.count == NoteTitles.maxLength, "the field stops at the title limit")
-        h.controller.setTitle("Prova del coro")
+        h.controller.setTitle("Choir rehearsal")
         h.controller.finish()
         _ = try await h.awaitEnded()
-        #expect(await h.note(active.noteID)?.title == "Prova del coro")
+        #expect(await h.note(active.noteID)?.title == "Choir rehearsal")
     }
 
     // ports: RecordingControllerTest#aBlankTitleBecomesTheDefault

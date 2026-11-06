@@ -16,7 +16,7 @@ import Testing
 
     // ports: WordBodyBudgetTest#escapesAndWideCharactersCountAsTheyAreWritten
     @Test func escapesAndWideCharactersCountAsTheyAreWritten() {
-        let words = [Word("s1", 0, 1, "\"quoted\""), Word("s1", 1, 2, "back\\slash"), Word("s1", 2, 3, "e/o"), Word("s1", 3, 4, "giovedì"),
+        let words = [Word("s1", 0, 1, "\"quoted\""), Word("s1", 1, 2, "back\\slash"), Word("s1", 2, 3, "and/or"), Word("s1", 3, 4, "café"),
                      Word("s1", 4, 5, "東京"), Word("s1", 5, 6, "😀"), Word("s1", 6, 7, "a\u{1}b"), Word("s1", 7, 8, "a\nb")]
         #expect(WordBodyBudget.bytes(words) >= actual(words))
         let one = WordBodyBudget.bytes([Word("s1", 0, 0, "abc")])
@@ -61,7 +61,7 @@ import Testing
 
     /** A fresh seal keeps the source's foreign comments, so an imported file's cover art takes header space. */
     @Test func aFreshSealCountsTheForeignCommentsOfItsSource() throws {
-        let transcript = Transcript([Word("spk_1", 0, 20, "Ciao")])
+        let transcript = Transcript([Word("spk_1", 0, 20, "Hello")])
         // A source the reader accepts, with too little room left for even the manifest.
         let cover = "METADATA_BLOCK_PICTURE=" + String(repeating: "A", count: OggOpus.maxHeaderBytes - 512 - 23)
         let source = try silence([cover])
@@ -75,7 +75,7 @@ import Testing
 
     /** A fresh seal that carries a source's private data grows its manifest by that data, so a huge notes list does not fit. */
     @Test func aFreshSealCountsTheMembersItCarries() throws {
-        let transcript = Transcript([Word("spk_1", 0, 20, "Ciao")])
+        let transcript = Transcript([Word("spk_1", 0, 20, "Hello")])
         func carrying(_ text: String) -> CassiniDocument {
             let notes = JSON.object(JSONObject([("notes", .array([.object(JSONObject([("atMs", .int(0)), ("text", .string(text))]))]))]))
             return CassiniDocument(state: .staleAudio, manifest: JSONObject([("kind", .string("cassini-portable-meeting")),
@@ -96,7 +96,7 @@ import Testing
      * limit, so it does not fit either, however small its tags would be.
      */
     @Test func aFreshSealRefusesCarriedDataTooLargeUncompressed() throws {
-        let transcript = Transcript([Word("spk_1", 0, 20, "Ciao")])
+        let transcript = Transcript([Word("spk_1", 0, 20, "Hello")])
         let audio = try silence()
         func carrying(_ count: Int) -> CassiniDocument {
             CassiniDocument(state: .staleAudio, manifest: JSONObject([

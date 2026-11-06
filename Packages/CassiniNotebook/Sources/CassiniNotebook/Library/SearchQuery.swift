@@ -5,8 +5,8 @@ import Foundation
 ///
 /// Each whitespace-separated term is one phrase. Inside a term every character that is not a letter, a digit or a
 /// combining mark breaks a token, as the index splits the notes there: `e-mail` is the phrase `e mail`, which matches
-/// the indexed tokens `e` and `mail`, and `giov.` is `giov`. The last token of a phrase matches as a prefix
-/// (`consegn` finds `consegna`), the others as whole tokens. Every phrase must match (AND, OR, NOT and NEAR are plain
+/// the indexed tokens `e` and `mail`, and `Thur.` is `Thur`. The last token of a phrase matches as a prefix
+/// (`deliv` finds `delivery`), the others as whole tokens. Every phrase must match (AND, OR, NOT and NEAR are plain
 /// words), and case and accents are ignored when matching but kept here as typed. A term with no letter or digit is
 /// dropped; nothing searchable left means no query, and the Library shows every note.
 public struct SearchQuery: Hashable, Sendable {
@@ -54,7 +54,7 @@ enum SearchTokens {
 
     static func split(_ term: String) -> [String] { scan(term).map(\.text) }
 
-    /// Case and accents removed: `GIOVEDÌ` and `giovedi` compare equal.
+    /// Case and accents removed: `CAFÉ` and `cafe` compare equal.
     static func fold(_ token: some StringProtocol) -> String {
         token.folding(options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive], locale: nil)
     }

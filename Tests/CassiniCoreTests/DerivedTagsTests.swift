@@ -29,7 +29,7 @@ struct StaleCopiesInPublishedVectorsTests {
     func aSealBesideStaleCopiesWritesOnlyAgreeingOnes(_ name: String) throws {
         try withTemporaryDirectory { dir in
             let (url, before) = try source(name, in: dir)
-            let transcript = Transcript([Word("spk_new", 0, 20, "Ciao")])
+            let transcript = Transcript([Word("spk_new", 0, 20, "Hello")])
             let after = try CassiniDocument.create(url, transcript: transcript, title: "Ignored", processing: JSONObject(), existing: before,
                                                    speakerLabels: [:], target: dir.appendingPathComponent("sealed.opus"))
             #expect(after.state == .ok)
@@ -56,21 +56,21 @@ struct StaleCopiesInPublishedVectorsTests {
     func aRetitleOfStaleCopiesWritesOnlyAgreeingOnes(_ name: String) throws {
         try withTemporaryDirectory { dir in
             let (url, before) = try source(name, in: dir)
-            let after = try CassiniDocument.retitle(url, existing: before, title: "Nuovo", target: dir.appendingPathComponent("retitled.opus"))
+            let after = try CassiniDocument.retitle(url, existing: before, title: "New", target: dir.appendingPathComponent("retitled.opus"))
             #expect(after.state == .ok)
             #expect(disagreements(after).isEmpty, "\(after.warnings)")
-            #expect(after.title == "Nuovo")
+            #expect(after.title == "New")
             #expect(after.variants.map(\.body) == before.variants.map(\.body))
         }
     }
 }
 
 @Suite struct DerivedTagsTests {
-    let transcript = Transcript([Word("spk_1", 0, 20, "Ciao"), Word("spk_2", 20, 40, "Salve")], language: "it")
+    let transcript = Transcript([Word("spk_1", 0, 20, "Hello"), Word("spk_2", 20, 40, "Hi")], language: "it")
 
     func sealed(in dir: URL) throws -> URL {
         let url = dir.appendingPathComponent("source.opus")
-        try Data(try CassiniDocument.create(silence(), transcript: transcript, title: "Riunione", processing: JSONObject())).write(to: url)
+        try Data(try CassiniDocument.create(silence(), transcript: transcript, title: "Meeting", processing: JSONObject())).write(to: url)
         return url
     }
 
@@ -108,8 +108,8 @@ struct StaleCopiesInPublishedVectorsTests {
     /** Two speaker ids that differ in their bytes are two speakers, however Unicode would compare them. */
     @Test func canonicallyEquivalentSpeakerIdsStayApart() throws {
         let composed = "Ren\u{E9}", decomposed = "Rene\u{301}"
-        let transcript = Transcript([Word(composed, 0, 20, "Ciao"), Word(decomposed, 20, 40, "Salve")])
-        let document = CassiniDocument.read(try CassiniDocument.create(silence(), transcript: transcript, title: "Due", processing: JSONObject(),
+        let transcript = Transcript([Word(composed, 0, 20, "Hello"), Word(decomposed, 20, 40, "Hi")])
+        let document = CassiniDocument.read(try CassiniDocument.create(silence(), transcript: transcript, title: "Two", processing: JSONObject(),
                                                                          speakerLabels: [composed: "One"]))
         #expect(document.state == .ok)
         #expect(document.manifest?["speakers"]?.array?.count == 2)
@@ -136,12 +136,12 @@ struct StaleCopiesInPublishedVectorsTests {
 
 /** A write that fails after its target exists must remove it. Each case gets past the source scan and fails later. */
 @Suite struct FailedWritesLeaveNoTargetTests {
-    let transcript = Transcript([Word("spk_1", 0, 20, "Ciao")])
+    let transcript = Transcript([Word("spk_1", 0, 20, "Hello")])
 
     /** A verified document whose manifest names a different audio digest than the audio beside it. */
     func mismatched(in dir: URL) throws -> (url: URL, existing: CassiniDocument) {
         let url = dir.appendingPathComponent("source.opus")
-        try Data(try CassiniDocument.create(silence(), transcript: transcript, title: "Riunione", processing: JSONObject())).write(to: url)
+        try Data(try CassiniDocument.create(silence(), transcript: transcript, title: "Meeting", processing: JSONObject())).write(to: url)
         var existing = CassiniDocument.read(url)
         var integrity = try #require(existing.manifest?["integrity"]?.object)
         integrity["opusAudioSha256"] = .string(String(repeating: "0", count: 64))
@@ -155,7 +155,7 @@ struct StaleCopiesInPublishedVectorsTests {
             let (url, existing) = try mismatched(in: dir)
             let target = dir.appendingPathComponent("target.opus")
             #expect(throws: CassiniError.self) {
-                try CassiniDocument.create(url, transcript: transcript, title: "Riunione", processing: JSONObject(), existing: existing,
+                try CassiniDocument.create(url, transcript: transcript, title: "Meeting", processing: JSONObject(), existing: existing,
                                            speakerLabels: [:], target: target)
             }
             #expect(!FileManager.default.fileExists(atPath: target.path))
@@ -187,8 +187,8 @@ struct StaleCopiesInPublishedVectorsTests {
     let lookalike = "CASSINI_PAYLOAD_CHUN\u{212A}_COUNT=9"
 
     @Test func aForeignTagThatLooksLikeADerivedOneSurvivesARelabel() throws {
-        let sealed = CassiniDocument.read(try CassiniDocument.create(silence(), transcript: Transcript([Word("spk_1", 0, 20, "Ciao")]),
-                                                                     title: "Riunione", processing: JSONObject()))
+        let sealed = CassiniDocument.read(try CassiniDocument.create(silence(), transcript: Transcript([Word("spk_1", 0, 20, "Hello")]),
+                                                                     title: "Meeting", processing: JSONObject()))
         let out = ArraySink()
         try OggOpus.rewrite(ArraySource(silence()), tags: CassiniDocument.tagsPacket([lookalike] + sealed.comments), to: out)
         try withTemporaryDirectory { dir in

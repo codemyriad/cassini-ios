@@ -6,7 +6,7 @@ struct ExportNamesTests {
 
     // ports: ExportNamesTest#plainTitleKeepsAccentsAndGetsTheExtension
     @Test func plainTitleKeepsAccentsAndGetsTheExtension() {
-        #expect(ExportNames.file("Consegna di giovedì — prezzo €", ext: "opus") == "Consegna di giovedì — prezzo €.opus")
+        #expect(ExportNames.file("Café delivery — price €", ext: "opus") == "Café delivery — price €.opus")
     }
 
     // ports: ExportNamesTest#forbiddenCharactersBecomeUnderscores
@@ -21,13 +21,13 @@ struct ExportNamesTests {
 
     // ports: ExportNamesTest#whitespaceRunsCollapse
     @Test func whitespaceRunsCollapse() {
-        #expect(ExportNames.file("Riunione   di   lunedì", ext: "vtt") == "Riunione di lunedì.vtt")
+        #expect(ExportNames.file("Monday   meeting", ext: "vtt") == "Monday meeting.vtt")
     }
 
     // ports: ExportNamesTest#dotsAndSpacesAreTrimmedAtBothEnds
     @Test func dotsAndSpacesAreTrimmedAtBothEnds() {
-        #expect(ExportNames.file(" ..nota. . ", ext: "txt") == "nota.txt")
-        #expect(ExportNames.file("v1.2 bozza", ext: "txt") == "v1.2 bozza.txt")
+        #expect(ExportNames.file(" ..note. . ", ext: "txt") == "note.txt")
+        #expect(ExportNames.file("v1.2 draft", ext: "txt") == "v1.2 draft.txt")
     }
 
     // ports: ExportNamesTest#nothingLeftFallsBack

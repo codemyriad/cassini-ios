@@ -24,7 +24,7 @@ import CassiniEngineTesting
     func testTheLaunchFillsTheRowsAndTheEmptyStateWaitsForIt() async throws {
         let test = TestGraph(); defer { test.tearDown() }
         var note = Note(title: "Call with supplier", createdAt: test.clock.now)
-        note.transcript = [TranscriptSegment(text: "quindi la consegna slitta a giovedì", start: 0, end: 3)]
+        note.transcript = [TranscriptSegment(text: "so the delivery slips to Thursday", start: 0, end: 3)]
         note.status = .ready
         try NoteRepository(root: test.root).save(note)
         let model = test.graph.libraryScreen
@@ -35,7 +35,7 @@ import CassiniEngineTesting
         let row = try XCTUnwrap(model.content.sections.first?.rows.first)
         XCTAssertEqual(row.title, "Call with supplier")
         XCTAssertEqual(row.status, .transcribed(speakers: 0, hasWords: true))
-        XCTAssertEqual(row.preview?.text, "quindi la consegna slitta a giovedì")
+        XCTAssertEqual(row.preview?.text, "so the delivery slips to Thursday")
     }
 
     func testALibraryThatCannotBeOpenedSaysSo() async throws {
@@ -51,7 +51,7 @@ import CassiniEngineTesting
     /// Library's content: the flat results while searching, the day sections once the query is cleared. The search
     /// itself runs off the main actor once its tokens are cached.
     func testAThousandNotesFilterWithoutDroppingFrames() async {
-        let words = ["consegna", "giovedì", "prezzo", "fornitore", "ordine", "magazzino", "riunione", "budget"]
+        let words = ["delivery", "Thursday", "price", "supplier", "order", "warehouse", "meeting", "budget"]
         let notes = Notes((0..<1_000).map { index -> Note in
             var note = Note(title: "Note \(index) \(words[index % words.count])",
                             createdAt: Date(timeIntervalSince1970: 1_791_452_460 - Double(index) * 3_600))
@@ -74,7 +74,7 @@ import CassiniEngineTesting
         let clock = ContinuousClock()
         var slowestIndex = Duration.zero, slowestContent = Duration.zero, slowestSearch = Duration.zero
         var index = LibraryIndex(notes.all)
-        for (step, query) in ["c", "co", "cons", "consegna", "consegna gio", "zzz", ""].enumerated() {
+        for (step, query) in ["d", "de", "deli", "delivery", "delivery thu", "zzz", ""].enumerated() {
             // One note changes between keystrokes; the model indexes the new array on the main actor.
             notes.all[step * 97].title += " edited"
             let changed = notes.all

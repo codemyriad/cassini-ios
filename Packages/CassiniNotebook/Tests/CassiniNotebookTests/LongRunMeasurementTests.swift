@@ -84,10 +84,10 @@ struct LongRun {
     static let speakers = 4
     static let turnWords = 23
 
-    /// Real word lengths: Italian and English words, some with the punctuation Parakeet attaches.
-    static let text = ("Allora, partiamo dal punto principale della riunione di oggi. The quarterly numbers look better than " +
-        "expected, ma dobbiamo ancora verificare le consegne di giovedì e il budget del progetto. " +
-        "Can everyone confirm their availability for next week? Perfetto, grazie mille a tutti.").split(separator: " ").map(String.init)
+    /// Real word lengths: English words, some with the punctuation Parakeet attaches.
+    static let text = ("So, let us start with the main point of today’s meeting. The quarterly numbers look better than " +
+        "expected, but we still need to check Thursday’s deliveries and the project budget. " +
+        "Can everyone confirm their availability for next week? Perfect, thank you very much everyone.").split(separator: " ").map(String.init)
 
     let prefix = "diar_0f8e2c3a_6b7d_4e1f_9a2b_3c4d5e6f7a8b_"
 

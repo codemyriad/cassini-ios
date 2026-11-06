@@ -82,7 +82,7 @@ import Testing
 
     /// A token list the words cannot be built from is TIMINGS, as on Android.
     @Test func malformedTokensAreATimingsFailure() {
-        #expect(throws: JobFailure.timings) { try TokenWords.timedWordsFromTokens(["▁ciao"], timestamps: [], durations: []) }
-        #expect(throws: JobFailure.timings) { try TokenWords.timedWordsFromTokens(["▁ciao"], timestamps: [.nan], durations: [0.1]) }
+        #expect(throws: JobFailure.timings) { try TokenWords.timedWordsFromTokens(["▁hello"], timestamps: [], durations: []) }
+        #expect(throws: JobFailure.timings) { try TokenWords.timedWordsFromTokens(["▁hello"], timestamps: [.nan], durations: [0.1]) }
     }
 }

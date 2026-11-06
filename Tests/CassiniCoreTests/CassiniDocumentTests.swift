@@ -28,7 +28,7 @@ private func rewritten(_ data: [UInt8], tags: ([String]) -> [String] = { $0 }, m
 }
 
 @Suite struct CassiniDocumentTests {
-    let transcript = Transcript([Word("spk_1", 0, 20, "Ciao")], language: "it")
+    let transcript = Transcript([Word("spk_1", 0, 20, "Hello")], language: "it")
 
     // ports: CassiniDocumentTest#retiredAsrProvenanceSurvivesAnInt8Retranscription
     @Test func retiredAsrProvenanceSurvivesAnInt8Retranscription() throws {
@@ -78,7 +78,7 @@ private func rewritten(_ data: [UInt8], tags: ([String]) -> [String] = { $0 }, m
 
     // ports: CassiniDocumentTest#relabelChangesOnlyTheLabels
     @Test func relabelChangesOnlyTheLabels() throws {
-        let transcript = Transcript([Word("spk_1", 0, 20, "Ciao"), Word("spk_2", 20, 40, "Salve")], language: "it")
+        let transcript = Transcript([Word("spk_1", 0, 20, "Hello"), Word("spk_2", 20, 40, "Hi")], language: "it")
         let first = try CassiniDocument.create(silence(), transcript: transcript, title: "Two", processing: JSONObject([("engine", .string("sherpa-onnx"))]))
         var base = CassiniDocument.read(first)
         base.manifest!["x"] = .object(JSONObject([("keep", .bool(true))]))
@@ -147,9 +147,9 @@ private func rewritten(_ data: [UInt8], tags: ([String]) -> [String] = { $0 }, m
     }
 
     @Test func tokensBecomeWordsWithoutStretchingOverPunctuation() throws {
-        let words = try Transcript.timedWordsFromTokens(["▁Ciao", ",", "▁come", "▁va", "?"],
+        let words = try Transcript.timedWordsFromTokens(["▁Hello", ",", "▁how", "▁goes", "?"],
                                                         timestamps: [0.0, 0.9, 1.0, 1.4, 2.0], durations: [0.4, 0.0, 0.3, 0.2, 0.08])
-        #expect(words.map { $0.word } == [Word("spk_1", 0, 400, "Ciao,"), Word("spk_1", 1000, 1300, "come"), Word("spk_1", 1400, 1600, "va?")])
+        #expect(words.map { $0.word } == [Word("spk_1", 0, 400, "Hello,"), Word("spk_1", 1000, 1300, "how"), Word("spk_1", 1400, 1600, "goes?")])
         #expect(words.map { $0.capMs } == [900, 1300, 2080])
     }
 }
@@ -184,7 +184,7 @@ struct VerificationGateTests {
     func aFreshSealDropsEveryCassiniTagOfTheSource(vector: String) throws {
         let source = try Conformance.vector(vector)
         let foreign = CassiniDocument.read(source).comments.filter { !CassiniDocument.tagName($0).hasPrefix("CASSINI_") }
-        let transcript = Transcript([Word("spk_1", 0, 20, "Ciao")])
+        let transcript = Transcript([Word("spk_1", 0, 20, "Hello")])
         let sealed = CassiniDocument.read(try CassiniDocument.create(source, transcript: transcript, title: "Resealed", processing: JSONObject()))
         #expect(sealed.state == .ok)
         #expect(sealed.variants.map { $0.id } == ["words"])
@@ -210,11 +210,11 @@ struct VerificationGateTests {
 
     @Test func aSealCarriesForeignBytesForwardAndReplacesAnUndecodableTitle() throws {
         let sealed = try CassiniDocument.create(silence(["X_CUSTOM=keep=me"], opaque: [latin1Title, latin1Artist]),
-                                                transcript: Transcript([Word("spk_1", 0, 20, "Ciao")]), title: "Riunione", processing: JSONObject())
+                                                transcript: Transcript([Word("spk_1", 0, 20, "Hello")]), title: "Meeting", processing: JSONObject())
         let document = CassiniDocument.read(sealed)
         #expect(document.state == .ok)
         #expect(document.opaqueComments == [latin1Artist])
-        #expect(comments(document) { $0 == "TITLE" } == ["TITLE=Riunione"])
+        #expect(comments(document) { $0 == "TITLE" } == ["TITLE=Meeting"])
         #expect(document.comments.contains("X_CUSTOM=keep=me"))
     }
 
@@ -234,7 +234,7 @@ struct VerificationGateTests {
 
 @Suite struct SealTitleTests {
     @Test func aSealWritesTheManifestTitleIntoTheTitleTag() throws {
-        let first = try CassiniDocument.create(silence(["TITLE=voice-memo", "X_CUSTOM=keep=me"]), transcript: Transcript([Word("spk_1", 0, 20, "Ciao")]),
+        let first = try CassiniDocument.create(silence(["TITLE=voice-memo", "X_CUSTOM=keep=me"]), transcript: Transcript([Word("spk_1", 0, 20, "Hello")]),
                                                title: "  Call with Luca \n", processing: JSONObject())
         let original = CassiniDocument.read(first)
         #expect(original.title == "Call with Luca")
@@ -244,14 +244,14 @@ struct VerificationGateTests {
         var meeting = try #require(renamed.manifest?["meeting"]?.object)
         meeting["title"] = .string("Standup")
         renamed.manifest!["meeting"] = .object(meeting)
-        let next = CassiniDocument.read(try CassiniDocument.create(first, transcript: Transcript([Word("spk_1", 0, 20, "Salve")]),
+        let next = CassiniDocument.read(try CassiniDocument.create(first, transcript: Transcript([Word("spk_1", 0, 20, "Hi")]),
                                                                    title: "Ignored", processing: JSONObject(), existing: renamed))
         #expect(next.state == .ok)
         #expect(comments(next) { $0 == "TITLE" } == ["TITLE=Standup"])
     }
 
     @Test func theWordBodyIsCompactAndTheDescriptorOmitsAnUnknownLanguage() throws {
-        let document = CassiniDocument.read(try CassiniDocument.create(silence(), transcript: Transcript([Word("spk_1", 0, 20, "Ciao")]),
+        let document = CassiniDocument.read(try CassiniDocument.create(silence(), transcript: Transcript([Word("spk_1", 0, 20, "Hello")]),
                                                                        title: "Compact", processing: JSONObject()))
         let body = try #require(document.selected()?.body)
         #expect(!body.contains("\n") && !body.contains(" "))
@@ -262,7 +262,7 @@ struct VerificationGateTests {
 @Suite struct TranscriptMediaTypeTests {
     /** The words format decides whether a body can be read; a different media type is only a warning. */
     @Test func anUnexpectedMimeIsAWarningNotAnUnavailableTranscript() throws {
-        let transcript = Transcript([Word("spk_1", 0, 20, "Ciao")])
+        let transcript = Transcript([Word("spk_1", 0, 20, "Hello")])
         let source = try CassiniDocument.create(silence(), transcript: transcript, title: "Hint", processing: JSONObject())
         let data = try rewritten(source, tags: { tags in
             tags.map { CassiniDocument.tagName($0) == "CASSINI_TX_WORDS_PAYLOAD_MIME" ? "CASSINI_TX_WORDS_PAYLOAD_MIME=application/json" : $0 }

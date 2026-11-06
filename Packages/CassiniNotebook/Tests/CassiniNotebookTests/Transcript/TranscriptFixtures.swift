@@ -36,12 +36,12 @@ enum TranscriptFixtures {
 
     /// Android's six words of three speakers: Giulia, the placeholder "Speaker 2", Paolo Ferri, then Giulia again.
     static let words: [W] = [
-        W("a", 0, 400, "Ciao"),
-        W("a", 500, 900, "a tutti."),
-        W("b", 1_000, 1_400, "Buongiorno"),
-        W("c", 2_000, 2_300, "Eccomi"),
-        W("a", 3_000, 3_500, "Bene,"),
-        W("a", 3_500, 3_900, "quindi"),
+        W("a", 0, 400, "Hello"),
+        W("a", 500, 900, "everyone."),
+        W("b", 1_000, 1_400, "Welcome"),
+        W("c", 2_000, 2_300, "Here"),
+        W("a", 3_000, 3_500, "Good,"),
+        W("a", 3_500, 3_900, "so"),
     ]
 
     static let speakers = [

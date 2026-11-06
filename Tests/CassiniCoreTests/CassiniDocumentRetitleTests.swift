@@ -3,9 +3,9 @@ import Foundation
 import Testing
 
 @Suite struct CassiniDocumentRetitleTests {
-    let transcript = Transcript([Word("spk_1", 0, 20, "Ciao"), Word("spk_2", 20, 40, "Salve")], language: "it")
+    let transcript = Transcript([Word("spk_1", 0, 20, "Hello"), Word("spk_2", 20, 40, "Hi")], language: "it")
 
-    func document(in dir: URL, sourceTags: [String] = ["X_CUSTOM=keep=me", "ARTIST=Anna"], title: String = "Riunione") throws -> URL {
+    func document(in dir: URL, sourceTags: [String] = ["X_CUSTOM=keep=me", "ARTIST=Anna"], title: String = "Meeting") throws -> URL {
         let bytes = try CassiniDocument.create(silence(sourceTags), transcript: transcript, title: title,
                                                processing: JSONObject([("engine", .string("sherpa-onnx"))]))
         let source = dir.appendingPathComponent("source.opus")
@@ -30,12 +30,12 @@ import Testing
     @Test func theTitleChangesInTheManifestAndTheTag() throws {
         try withTemporaryDirectory { dir in
             let source = try document(in: dir)
-            #expect(titleTags(CassiniDocument.read(source)) == ["TITLE=Riunione"])
-            let after = try retitle(source, "Standup del lunedì")
+            #expect(titleTags(CassiniDocument.read(source)) == ["TITLE=Meeting"])
+            let after = try retitle(source, "Monday standup")
             #expect(after.state == .ok)
             #expect(after.warnings.isEmpty)
-            #expect(after.title == "Standup del lunedì")
-            #expect(titleTags(after) == ["TITLE=Standup del lunedì"])
+            #expect(after.title == "Monday standup")
+            #expect(titleTags(after) == ["TITLE=Monday standup"])
         }
     }
 
@@ -44,7 +44,7 @@ import Testing
         try withTemporaryDirectory { dir in
             let source = try document(in: dir)
             let before = CassiniDocument.read(source)
-            let after = try retitle(source, "Nuovo titolo")
+            let after = try retitle(source, "New title")
             #expect(try OggOpus.read(bytes(source)).digest() == OggOpus.read(bytes(dir.appendingPathComponent("target.opus"))).digest())
             #expect(before.manifest?["integrity"]?.serialized() == after.manifest?["integrity"]?.serialized())
             #expect(before.manifest?["audio"]?.serialized() == after.manifest?["audio"]?.serialized())
@@ -83,7 +83,7 @@ import Testing
     // ports: CassiniDocumentRetitleTest#accentsAndQuotesAreKeptExactlyAndTheTitleIsTrimmed
     @Test func accentsAndQuotesAreKeptExactlyAndTheTitleIsTrimmed() throws {
         try withTemporaryDirectory { dir in
-            let title = "Riunione “caffè” con l'équipe \"Q3\" — 日本 = ok"
+            let title = "Meeting “café” with the team \"Q3\" — 日本 = ok"
             let after = try retitle(try document(in: dir), "  \(title) \n")
             #expect(after.title == title)
             #expect(titleTags(after) == ["TITLE=\(title)"])
@@ -112,15 +112,15 @@ import Testing
     @Test func extraTitleTagsAreDroppedAndAMissingOneIsAdded() throws {
         try withTemporaryDirectory { dir in
             let source = try document(in: dir, sourceTags: ["TITLE=one", "title=two", "X_CUSTOM=keep=me"])
-            #expect(titleTags(CassiniDocument.read(source)) == ["TITLE=Riunione"])
+            #expect(titleTags(CassiniDocument.read(source)) == ["TITLE=Meeting"])
             var repeated = CassiniDocument.read(source)
             repeated.comments.insert("title=two", at: 1)
-            #expect(titleTags(try retitle(source, "Uno", existing: repeated)) == ["TITLE=Uno"])
+            #expect(titleTags(try retitle(source, "One", existing: repeated)) == ["TITLE=One"])
             var untitled = CassiniDocument.read(source)
             untitled.comments.removeAll { CassiniDocument.tagName($0) == "TITLE" }
-            let added = try retitle(source, "Due", existing: untitled)
-            #expect(titleTags(added) == ["TITLE=Due"])
-            #expect(added.title == "Due")
+            let added = try retitle(source, "Two", existing: untitled)
+            #expect(titleTags(added) == ["TITLE=Two"])
+            #expect(added.title == "Two")
         }
     }
 
@@ -130,8 +130,8 @@ import Testing
             let source = try document(in: dir)
             let attempts: [() throws -> Void] = [
                 { try retitle(source, "  ") },
-                { try retitle(source, "Titolo", existing: CassiniDocument.read(source, verify: false)) },
-                { try retitle(source, "Titolo", existing: CassiniDocument(state: .plainAudio)) },
+                { try retitle(source, "Title", existing: CassiniDocument.read(source, verify: false)) },
+                { try retitle(source, "Title", existing: CassiniDocument(state: .plainAudio)) },
             ]
             for attempt in attempts {
                 #expect(throws: CassiniError.self) { try attempt() }
@@ -148,15 +148,15 @@ import Testing
     @Test(.enabled(if: Conformance.available && PythonReader.available, "Needs cassini-format's tools and python3"))
     func theIndependentPythonReaderAcceptsTheResult() throws {
         try withTemporaryDirectory { dir in
-            try retitle(try document(in: dir), "Verifica è fatta")
+            try retitle(try document(in: dir), "Verification is done")
             let (status, output) = try PythonReader.run(dir.appendingPathComponent("target.opus"))
             #expect(status == 0, "\(output)")
             let lines = output.components(separatedBy: "\n")
             // The metadata profile verifies every payload digest but never the audio, so its best state is unverified.
             #expect(lines.first == "state: unverified", "\(output)")
-            #expect(lines.count > 1 && lines[1].hasPrefix("Verifica è fatta - "), "\(output)")
-            #expect(lines.contains { fullMatch($0, #"\s+0 ms\s+spk_1\s+Ciao"#) }, "\(output)")
-            #expect(lines.contains { fullMatch($0, #"\s+20 ms\s+spk_2\s+Salve"#) }, "\(output)")
+            #expect(lines.count > 1 && lines[1].hasPrefix("Verification is done - "), "\(output)")
+            #expect(lines.contains { fullMatch($0, #"\s+0 ms\s+spk_1\s+Hello"#) }, "\(output)")
+            #expect(lines.contains { fullMatch($0, #"\s+20 ms\s+spk_2\s+Hi"#) }, "\(output)")
         }
     }
 

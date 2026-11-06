@@ -11,10 +11,10 @@ struct PreviewTextTests {
         }
     }
 
-    /// The words of board 03 ("Call with supplier"). Paolo's turn starts at 11:41 and "quindi" plays at 11:44.
+    /// The words of board 03 ("Call with supplier"). Paolo's turn starts at 11:41 and "so" plays at 11:44.
     private var board03: [PreviewWord] {
         turn("spk_0", 692_000, "Ok, then let's confirm the quantities first. We said four hundred units for the first batch, right?")
-            + turn("spk_1", 701_000, "Sì, quattrocento. Il problema è la seconda consegna: quindi la consegna slitta a giovedì, "
+            + turn("spk_1", 701_000, "Yes, four hundred. The issue is next delivery: so the delivery slips to Thursday, "
                 + "but the price stays as agreed in the March order.")
             + turn("spk_2", 740_000, "Can you send that in writing? I need it for the purchase order before Friday.")
     }
@@ -22,7 +22,7 @@ struct PreviewTextTests {
     // ports: PreviewTextTest#reproducesBoard00
     @Test func reproducesBoard00() throws {
         let preview = try #require(PreviewText.of(board03, positionMs: (11 * 60 + 44) * 1000))
-        let board00 = "quindi la consegna slitta a giovedì, but the price stays as agreed in the March order"
+        let board00 = "so the delivery slips to Thursday, but the price stays as agreed in the March order"
         #expect(preview.display == "…\(board00)…")
         #expect(preview.text == board00)
         #expect(preview.leadingEllipsis)
@@ -33,7 +33,7 @@ struct PreviewTextTests {
     @Test func positionZeroGivesTheTranscriptStart() throws {
         let preview = try #require(PreviewText.of(board03, positionMs: 0))
         #expect(preview.display == "Ok, then let's confirm the quantities first. We said four hundred units for the first batch, right? "
-            + "Sì, quattrocento. Il problema è la seconda consegna: quindi…")
+            + "Yes, four hundred. The issue is next delivery: so the…")
         #expect(!preview.leadingEllipsis)
         #expect(preview.text.utf16.count <= PreviewText.limit)
         // Before the first word and inside it are the start too.
@@ -61,19 +61,19 @@ struct PreviewTextTests {
 
     // ports: PreviewTextTest#aShortTurnContinuesIntoTheNextTurns
     @Test func aShortTurnContinuesIntoTheNextTurns() throws {
-        let words = turn("spk_0", 0, "Allora, quando arriva la seconda consegna?") + turn("spk_1", 5_000, "Sì.")
-            + turn("spk_0", 6_000, "Quindi giovedì va bene per tutti, anche per il magazzino.") + turn("spk_1", 12_000, "Va bene.")
+        let words = turn("spk_0", 0, "So, when does the second delivery arrive?") + turn("spk_1", 5_000, "Yes.")
+            + turn("spk_0", 6_000, "So Thursday works for everyone, including the warehouse.") + turn("spk_1", 12_000, "All right.")
         let preview = try #require(PreviewText.of(words, positionMs: 5_000))
-        #expect(preview.display == "…Sì. Quindi giovedì va bene per tutti, anche per il magazzino…")
+        #expect(preview.display == "…Yes. So Thursday works for everyone, including the warehouse…")
         #expect(preview.text.utf16.count >= PreviewText.minBeforeTurnEnd)
     }
 
     // ports: PreviewTextTest#cutAtAWordWithPunctuationDropped
     @Test func cutAtAWordWithPunctuationDropped() throws {
-        let long = turn("spk_0", 0, (1...40).map { "parola\($0)," }.joined(separator: " "))
+        let long = turn("spk_0", 0, (1...40).map { "sample\($0)," }.joined(separator: " "))
         let preview = try #require(PreviewText.of(long, positionMs: long[5].startMs))
         #expect(preview.text.utf16.count <= PreviewText.limit, "\(preview.display)")
-        #expect(preview.text.hasPrefix("parola6, parola7, "))
+        #expect(preview.text.hasPrefix("sample6, sample7, "))
         // Whole words only: the excerpt is a prefix of the words from the playing one.
         let words = long.dropFirst(5).map { $0.text.trimmingCharacters(in: CharacterSet(charactersIn: ",")) }
         #expect(words.joined(separator: ", ").hasPrefix(preview.text))
@@ -96,7 +96,7 @@ struct PreviewTextTests {
 
     // ports: PreviewTextTest#shortTranscriptHasNoEllipses
     @Test func shortTranscriptHasNoEllipses() {
-        #expect(PreviewText.of(turn("spk_0", 0, "Ciao mondo."), positionMs: 0) == Preview("Ciao mondo."))
+        #expect(PreviewText.of(turn("spk_0", 0, "Hello world."), positionMs: 0) == Preview("Hello world."))
     }
 
     // ports: PreviewTextTest#noTranscriptNoPreview

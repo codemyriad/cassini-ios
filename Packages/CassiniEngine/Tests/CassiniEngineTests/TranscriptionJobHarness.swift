@@ -49,7 +49,7 @@ extension TranscriptionJobTests {
              limits: TranscriptionJob.Limits = .init(), engine: (any Transcribing)? = nil) async throws {
             root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
             notes = try NoteStore(root: root)
-            var note = Note(id: noteID, title: "Riunione", audioFilename: "audio.m4a")
+            var note = Note(id: noteID, title: "Meeting", audioFilename: "audio.m4a")
             note.duration = duration
             note.language = "it-IT"
             try await notes.save(note)

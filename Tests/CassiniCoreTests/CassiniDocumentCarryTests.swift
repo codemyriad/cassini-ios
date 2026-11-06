@@ -16,8 +16,8 @@ import Testing
     static let futureText = #"{"since":"v1.4","flags":[true,null]}"#
     static let futureMeetingText = #"{"room":"Sala 2","seats":9007199254740993}"#
 
-    let words = Transcript([Word("spk_1", 0, 20, "Ciao")], language: "it")
-    let fresh = Transcript([Word("spk_9", 0, 20, "Salve")], language: "it")
+    let words = Transcript([Word("spk_1", 0, 20, "Hello")], language: "it")
+    let fresh = Transcript([Word("spk_9", 0, 20, "Hi")], language: "it")
 
     /** A verified document over [silence] with two variants, `x` and a member no schema defines. */
     func documentWithPrivateData() throws -> [UInt8] {

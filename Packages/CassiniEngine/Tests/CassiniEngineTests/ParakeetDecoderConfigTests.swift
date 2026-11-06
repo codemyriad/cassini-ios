@@ -72,13 +72,13 @@ import CassiniNotebook
     }
 
     @Test func theWordDecoderPadsTheSamplesAndTimesTheWords() throws {
-        let recognizer = Recognizer(RecognizedTokens(text: " Ciao mondo", tokens: ["▁Ci", "ao", "▁mondo"],
+        let recognizer = Recognizer(RecognizedTokens(text: " Hello world", tokens: ["▁Hel", "lo", "▁world"],
                                                      timestamps: [0.5, 0.6, 0.9], durations: [0.1, 0.2, 0.3]))
         let decoder = SpeechWordDecoder(recognizer)
         let audio = PcmAudio([1, 2, 3, 4, 5], sampleRate: 16_000)
         let words = try decoder.decode(audio, start: 1, length: 3, headPad: 2, tailPad: 1)
         #expect(recognizer.heard == [[0, 0, 2, 3, 4, 0]])
-        #expect(words.map(\.word) == [Word("spk_1", 500, 800, "Ciao"), Word("spk_1", 900, 1_200, "mondo")])
+        #expect(words.map(\.word) == [Word("spk_1", 500, 800, "Hello"), Word("spk_1", 900, 1_200, "world")])
         _ = try decoder.decode(audio, start: 0, length: 5, headPad: 0, tailPad: 0)
         #expect(recognizer.heard.last == [1, 2, 3, 4, 5], "the whole input as it is")
     }
@@ -88,9 +88,9 @@ import CassiniNotebook
         let audio = PcmAudio([0, 0], sampleRate: 16_000)
         let blank = SpeechWordDecoder(Recognizer(RecognizedTokens(text: "  ", tokens: [], timestamps: [], durations: [])))
         #expect(try blank.decode(audio, start: 0, length: 2, headPad: 0, tailPad: 0).isEmpty)
-        let untimed = SpeechWordDecoder(Recognizer(RecognizedTokens(text: "ciao", tokens: [], timestamps: [], durations: [])))
+        let untimed = SpeechWordDecoder(Recognizer(RecognizedTokens(text: "hello", tokens: [], timestamps: [], durations: [])))
         #expect(throws: JobFailure.timings) { try untimed.decode(audio, start: 0, length: 2, headPad: 0, tailPad: 0) }
-        let mismatched = SpeechWordDecoder(Recognizer(RecognizedTokens(text: "ciao", tokens: ["▁ciao"], timestamps: [0, 1], durations: [0])))
+        let mismatched = SpeechWordDecoder(Recognizer(RecognizedTokens(text: "hello", tokens: ["▁hello"], timestamps: [0, 1], durations: [0])))
         #expect(throws: JobFailure.timings) { try mismatched.decode(audio, start: 0, length: 2, headPad: 0, tailPad: 0) }
     }
 

@@ -6,7 +6,7 @@ import Testing
 /// Android's SpeakerStatsTest in seconds; the draft cases read the format's words in milliseconds, as Android's.
 @Suite struct SpeakerStatsTests {
     /// One passage per word, as Android's words.
-    func w(_ speaker: String, _ start: Double, _ end: Double, _ text: String = "parola") -> TranscriptSegment {
+    func w(_ speaker: String, _ start: Double, _ end: Double, _ text: String = "sample") -> TranscriptSegment {
         TranscriptSegment(text: text, start: start, end: end, speakerID: speaker,
                           words: [TimedWord(text: text, start: start, end: end)])
     }
@@ -22,8 +22,8 @@ import Testing
 
     // ports: SpeakerStatsTest#countsComeFromTheTurns
     @Test func countsComeFromTheTurns() throws {
-        let words = [w("b", 0.5, 0.9, "Allora,"), w("b", 1.0, 2.5, "giovedì."), w("a", 2.6, 3.0, "Sì."),
-                     w("b", 3.1, 3.6, "Bene."), w("a", 3.7, 4.0, "Certo"), w("a", 4.1, 4.6, "Élodie.")]
+        let words = [w("b", 0.5, 0.9, "So,"), w("b", 1.0, 2.5, "Thursday."), w("a", 2.6, 3.0, "Yes."),
+                     w("b", 3.1, 3.6, "Good."), w("a", 3.7, 4.0, "Sure"), w("a", 4.1, 4.6, "Élodie.")]
         let stats = SpeakerStats.of(words)
         #expect(stats.map(\.speakerID) == ["b", "a"])
 
@@ -72,8 +72,8 @@ import Testing
 
     // ports: SpeakerStatsTest#aDraftAppliesItsMergesFirst
     @Test func aDraftAppliesItsMergesFirst() throws {
-        let transcript = Transcript([Word("x1", 0, 1000, "parola"), Word("x2", 1100, 1500, "parola"),
-                                     Word("x3", 1600, 2000, "parola"), Word("x1", 2100, 2500, "parola")])
+        let transcript = Transcript([Word("x1", 0, 1000, "sample"), Word("x2", 1100, 1500, "sample"),
+                                     Word("x3", 1600, 2000, "sample"), Word("x1", 2100, 2500, "sample")])
         let stats = try SpeakerStats.of(draft: transcript, merges: ["x2": "x1"])
         #expect(stats.map(\.speakerID) == ["x1", "x3"])
         let x1 = stats[0]
@@ -87,7 +87,7 @@ import Testing
 
     // ports: SpeakerStatsTest#withoutMergesTheDraftOverloadMatchesThePlainOne
     @Test func withoutMergesTheDraftOverloadMatchesThePlainOne() throws {
-        let words = [Word("a", 0, 1000, "parola"), Word("b", 1000, 3000, "parola"), Word("a", 3000, 3500, "parola")]
+        let words = [Word("a", 0, 1000, "sample"), Word("b", 1000, 3000, "sample"), Word("a", 3000, 3500, "sample")]
         #expect(SpeakerStats.of(words: words) == (try SpeakerStats.of(draft: Transcript(words), merges: [:])))
         #expect(SpeakerStats.of(words: words).map(\.speakerID) == ["a", "b"])
     }

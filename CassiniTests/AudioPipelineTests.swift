@@ -150,8 +150,8 @@ final class AudioPipelineTests: XCTestCase {
         await test.graph.imports.importFile(source, opensNote: false).value
         let id = try XCTUnwrap(store.notes.first?.id)
         await store.commit(id) { note in
-            note.transcript = [.init(text: "Pronto", start: 0, end: 1, speaker: "Alex", speakerID: "a"),
-                               .init(text: "Chi è?", start: 1, end: 2)]
+            note.transcript = [.init(text: "Hello", start: 0, end: 1, speaker: "Alex", speakerID: "a"),
+                               .init(text: "Who is it?", start: 1, end: 2)]
             note.speakers = [NoteSpeaker(id: "a", name: "Alex")]; note.status = .ready
         }
         let english = ExportCopy.texts(locale: Locale(identifier: "en_US"), timeZone: TimeZone(identifier: "UTC")!)
@@ -170,7 +170,7 @@ final class AudioPipelineTests: XCTestCase {
         let sources = try makeRoot(); defer { try? FileManager.default.removeItem(at: sources) }
         let test = TestGraph(); defer { test.tearDown() }
         var files: [URL] = []
-        for (index, name) in ["Uno.caf", "Due.caf", "Tre.caf"].enumerated() {
+        for (index, name) in ["One.caf", "Two.caf", "Three.caf"].enumerated() {
             let url = sources.appendingPathComponent(name)
             try writeSignal(to: url, frequency: 220 * Double(index + 1))
             files.append(url)
@@ -179,16 +179,16 @@ final class AudioPipelineTests: XCTestCase {
         test.graph.settings.autoTranscribe = false
         // As the picker does: every import starts before any ends.
         let imports = files.map { test.graph.imports.importFile($0, opensNote: false) }
-        XCTAssertEqual(test.graph.imports.tracker.running, ["Uno.caf", "Due.caf", "Tre.caf"])
+        XCTAssertEqual(test.graph.imports.tracker.running, ["One.caf", "Two.caf", "Three.caf"])
         var outcomes: [ImportOutcome?] = []
         for running in imports { outcomes.append(await running.value) }
         XCTAssertEqual(outcomes.compactMap { $0?.noteID }.count, 3)
-        XCTAssertEqual(Set(test.graph.library.notes.map(\.title)), ["Uno", "Due", "Tre"])
+        XCTAssertEqual(Set(test.graph.library.notes.map(\.title)), ["One", "Two", "Three"])
         XCTAssertTrue(test.graph.imports.tracker.running.isEmpty)
         XCTAssertEqual(test.graph.router.path, [])
 
         let again = await test.graph.imports.importFile(files[1], opensNote: true).value
-        let existing = try XCTUnwrap(test.graph.library.notes.first { $0.title == "Due" })
+        let existing = try XCTUnwrap(test.graph.library.notes.first { $0.title == "Two" })
         XCTAssertEqual(again, .existing(existing.id))
         XCTAssertEqual(test.graph.library.notes.count, 3)
         XCTAssertEqual(test.graph.router.path, [.note(existing.id)])
@@ -211,7 +211,7 @@ final class AudioPipelineTests: XCTestCase {
     @MainActor func testAFileOpenedDuringLaunchWaitsForTheLibraryAndOpensTheNoteItAlreadyHas() async throws {
         let sources = try makeRoot(); defer { try? FileManager.default.removeItem(at: sources) }
         let first = TestGraph(); defer { first.tearDown() }
-        let url = sources.appendingPathComponent("Riunione.caf")
+        let url = sources.appendingPathComponent("Meeting.caf")
         try writeSignal(to: url)
         await first.graph.start()
         first.graph.settings.autoTranscribe = false
@@ -222,7 +222,7 @@ final class AudioPipelineTests: XCTestCase {
         // A cold launch from Files: the open arrives before the launch work has read the notes.
         let relaunch = first.reopened()
         let opening = relaunch.graph.imports.importFile(url, opensNote: true)
-        XCTAssertEqual(relaunch.graph.imports.tracker.running, ["Riunione.caf"])
+        XCTAssertEqual(relaunch.graph.imports.tracker.running, ["Meeting.caf"])
         await relaunch.graph.start()
         let outcome = await opening.value
 

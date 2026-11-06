@@ -144,13 +144,13 @@ import Testing
 
     // ports: NoteViewModelTest#searchFromTheLibraryIsPrefilledAndStepsThroughMatches
     @Test func searchFromTheLibraryIsPrefilledAndStepsThroughMatches() {
-        let note = F.note([.init("a", 0, 400, "Giovedì"), .init("b", 1_000, 1_400, "Buongiorno"),
-                           .init("c", 2_000, 2_300, "Eccomi"), .init("a", 3_000, 3_500, "giovedi")])
+        let note = F.note([.init("a", 0, 400, "Café"), .init("b", 1_000, 1_400, "Welcome"),
+                           .init("c", 2_000, 2_300, "Here"), .init("a", 3_000, 3_500, "cafe")])
         let turns = NoteTranscripts.sealed(note).turns
-        var screen = NoteScreenState(query: " giovedi ")
-        #expect(screen.search?.query == "giovedi")
+        var screen = NoteScreenState(query: " cafe ")
+        #expect(screen.search?.query == "cafe")
         let matches = TranscriptSearch.matches(turns, query: screen.search!.query)
-        #expect(matches.map(\.turnID) == ["w0", "w3"], "giovedì and giovedi")
+        #expect(matches.map(\.turnID) == ["w0", "w3"], "Café and cafe")
         #expect(screen.search?.current == 0)
         screen.search?.next(of: matches.count)
         #expect(screen.search?.current == 1)
@@ -158,9 +158,9 @@ import Testing
         #expect(screen.search?.current == 0, "it wraps around")
         screen.search?.previous(of: matches.count)
         #expect(screen.search?.current == 1)
-        screen.search?.setQuery("BUONGIORNO")
+        screen.search?.setQuery("WELCOME")
         #expect(TranscriptSearch.matches(turns, query: screen.search!.query).map(\.turnID) == ["w1"])
-        #expect(TranscriptSearch.matches(turns, query: "domani").isEmpty)
+        #expect(TranscriptSearch.matches(turns, query: "tomorrow").isEmpty)
         screen.closeSearch()
         #expect(screen.search == nil)
         #expect(NoteScreenState(query: "  ").search == nil, "a blank query opens no search")
@@ -280,8 +280,8 @@ import Testing
         let same = original.revised(text: " \(original.text) ", speakerID: "c", speakers: note.speakers!)
         #expect(same.words == original.words, "the text did not change")
         #expect(same.speakerID == "c" && same.speaker == "Paolo Ferri")
-        let edited = original.revised(text: "Ciao a tutti voi.", speakerID: nil, speakers: note.speakers!)
-        #expect(edited.text == "Ciao a tutti voi." && edited.words.isEmpty)
+        let edited = original.revised(text: "Hello to all of you.", speakerID: nil, speakers: note.speakers!)
+        #expect(edited.text == "Hello to all of you." && edited.words.isEmpty)
         #expect(edited.speakerID == nil && edited.speaker == nil)
         #expect(!TranscriptSegment.isSavable("  \n"))
     }
@@ -289,7 +289,7 @@ import Testing
     @Test func savingReportsAPassageThatChangedMeanwhileAndKeepsTheVersionBefore() {
         var note = F.weeklySync
         let original = note.transcript[0]
-        let edited = original.revised(text: "Salve.", speakerID: "a", speakers: note.speakers!)
+        let edited = original.revised(text: "Hi.", speakerID: "a", speakers: note.speakers!)
         let stamp = VersionStamp(date: Date(timeIntervalSince1970: 5))
         #expect(note.revisePassage(original, to: original, stamp: stamp) == .unchanged)
         #expect(note.revisePassage(original, to: edited, stamp: stamp) == .saved)
@@ -306,13 +306,13 @@ import Testing
         var note = F.weeklySync
         note.saveCurrentVersion(.transcription)
         let first = note.transcript[0], second = note.transcript[1]
-        note.revisePassage(first, to: first.revised(text: "Salve.", speakerID: first.speakerID, speakers: note.speakers!),
+        note.revisePassage(first, to: first.revised(text: "Hi.", speakerID: first.speakerID, speakers: note.speakers!),
                            stamp: VersionStamp(date: Date()))
         #expect(note.versions?.count == 2, "the kept transcription is the version before")
-        note.revisePassage(second, to: second.revised(text: "Bene.", speakerID: second.speakerID, speakers: note.speakers!),
+        note.revisePassage(second, to: second.revised(text: "Good.", speakerID: second.speakerID, speakers: note.speakers!),
                            stamp: VersionStamp(date: Date()))
         #expect(note.versions?.map(\.kind) == [.transcription, .editedPassages])
-        #expect(note.versions?[1].segments == note.transcript && note.transcript[1].text == "Bene.")
+        #expect(note.versions?[1].segments == note.transcript && note.transcript[1].text == "Good.")
         #expect(note.versions?[0].segments[0] == first, "the version before keeps the passage as it was")
         #expect(NoteChips.of(note)?.version == VersionChip(index: 2, count: 2, kind: .edited))
         #expect(DocumentInfoFacts.of(note, provenance: nil, fileBytes: nil, speechModels: [:]).versions == 2)
@@ -376,7 +376,7 @@ import Testing
         note.saveCurrentVersion(.speakerAnalysis)
         note.selectVersion(firstID)
         let passage = note.transcript[0]
-        note.revisePassage(passage, to: passage.revised(text: "Salve.", speakerID: passage.speakerID, speakers: note.speakers!),
+        note.revisePassage(passage, to: passage.revised(text: "Hi.", speakerID: passage.speakerID, speakers: note.speakers!),
                            stamp: VersionStamp(date: Date()))
         #expect(note.versions?.map(\.kind) == [.transcription, .speakerAnalysis, .editedPassages])
         #expect(NoteChips.of(note)?.version == VersionChip(index: 3, count: 3, kind: .edited))

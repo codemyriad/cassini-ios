@@ -16,11 +16,11 @@ import CassiniNotebook
 /// `everyExpectationIsChecked`, so a new vector cannot pass on the keys the tests happen to know.
 @Suite struct CrossAppVectorTests {
     /// SHA-256 of the committed `expected.json`. Update it only together with a byte-identical copy of the shared file.
-    static let expectedPin = "ed8248eec38a9df2a05f770469c85ac7c1f9494e4a6b7cf52a0551746627f4b6"
+    static let expectedPin = "024eb5841fde51d3654425d91cba8573e0ff7d8c4323800ca4d6c8ae38f05665"
     /// SHA-256 of each committed vector file, as coordination `ux-draft/cross-app-vectors/SHA256.json` gives it.
     static let filePins = [
         "two-versions-default-switched.opus": "d4bffa94eec9481f19668e53ee247f8e5a107402a0740094a0cc29b3252b9f6d",
-        "android-written-v1.opus": "29d8a4666d37fe01cee999652470b7c1ba5893af4dbc92a04092005bc777f725",
+        "android-written-v1.opus": "9779dafeeb3348eb21be0caf933335e2bba158e9ff3ae01c0baf028ca04e93aa",
     ]
 
     /// The `expect` keys these tests check.

@@ -7,7 +7,7 @@ import Testing
         let first = try SpeakerMerges.merge([:], source: "b", into: "a")
         let next = try SpeakerMerges.merge(first, source: "a", into: "c")
         #expect(next == ["b": "c", "a": "c"])
-        let raw = Transcript([Word("b", 200, 400, "Ciao"), Word("a", 300, 500, "mondo"), Word("d", 600, 700, "!")], language: "it")
+        let raw = Transcript([Word("b", 200, 400, "Hello"), Word("a", 300, 500, "world"), Word("d", 600, 700, "!")], language: "it")
         let edited = try SpeakerMerges.apply(raw, aliases: next)
         #expect(edited.words.map(\.speaker) == ["c", "c", "d"])
         var restored = edited

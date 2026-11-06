@@ -7,7 +7,7 @@ import CassiniNotebook
 @Suite struct TranscriptLanguageTests {
     // ports: TranscriptTest#undIsWrittenAndRoundTripsButIsNoKnownLanguage
     @Test func undIsWrittenAndRoundTripsButIsNoKnownLanguage() throws {
-        let und = Transcript([Word("s", 0, 1, "ciao")], language: TranscriptLanguage.undetermined)
+        let und = Transcript([Word("s", 0, 1, "hello")], language: TranscriptLanguage.undetermined)
         #expect(try JSON.parseObject(und.json())["language"]?.string == "und")
         #expect(try Transcript.fromJSON(und.json()).language == "und")
         #expect(TranscriptLanguage.known("und") == nil)

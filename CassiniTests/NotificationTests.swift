@@ -43,12 +43,12 @@ private final class RecordingCenter: UserNotificationCenter, @unchecked Sendable
     @Test func resultsAreReplacedPerNoteAndHideTheTitleInPublic() async throws {
         let center = RecordingCenter(status: .authorized)
         let notifier = UNNotifier(center: center)
-        await notifier.post(ResultNotification(noteID: note, title: "Riunione", kind: .readyToTranscribe))
-        await notifier.post(ResultNotification(noteID: note, title: "Riunione", kind: .failed(.checkpointMismatch)))
+        await notifier.post(ResultNotification(noteID: note, title: "Meeting", kind: .readyToTranscribe))
+        await notifier.post(ResultNotification(noteID: note, title: "Meeting", kind: .failed(.checkpointMismatch)))
         let failed = try #require(center.delivered.first)
         #expect(center.delivered.count == 1, "one notification per note: the newer replaces the older")
         #expect(failed.identifier == note.uuidString)
-        #expect(failed.content.title == "Couldn’t transcribe Riunione")
+        #expect(failed.content.title == "Couldn’t transcribe Meeting")
         #expect(failed.content.body == "Saved progress no longer matches. Your recording is kept.")
         #expect(failed.content.threadIdentifier == UNNotifier.thread)
         #expect(failed.content.sound == nil)
@@ -59,7 +59,7 @@ private final class RecordingCenter: UserNotificationCenter, @unchecked Sendable
         #expect(category.hiddenPreviewsBodyPlaceholder == "A note couldn’t be transcribed")
         #expect(!category.options.contains(.hiddenPreviewsShowTitle))
         for kind in NotificationCategory.allCases {
-            #expect(!kind.category.hiddenPreviewsBodyPlaceholder.contains("Riunione"))
+            #expect(!kind.category.hiddenPreviewsBodyPlaceholder.contains("Meeting"))
         }
 
         await notifier.remove(noteID: note)
@@ -68,7 +68,7 @@ private final class RecordingCenter: UserNotificationCenter, @unchecked Sendable
 
     // ports: ProcessingNotificationsTest#pausedByAndroidWithoutWordsDoesNotShowZeroTimes
     @Test func pausedByIOSShowsNoTimesAndOffersResume() throws {
-        let paused = UNNotifier.request(ResultNotification(noteID: note, title: "Riunione", kind: .pausedBySystem))
+        let paused = UNNotifier.request(ResultNotification(noteID: note, title: "Meeting", kind: .pausedBySystem))
         #expect(paused.content.title == "Transcription paused by iOS")
         #expect(paused.content.body == "iOS needed the time back. Open Cassini to resume.")
         #expect(!paused.content.body.contains("00:00"))
@@ -81,14 +81,14 @@ private final class RecordingCenter: UserNotificationCenter, @unchecked Sendable
 
     @Test func everyKindHasItsCopy() {
         let text = { (kind: ResultNotification.Kind) in
-            NotificationCopy.text(ResultNotification(noteID: note, title: "Riunione", kind: kind))
+            NotificationCopy.text(ResultNotification(noteID: note, title: "Meeting", kind: kind))
         }
         #expect(text(.transcribed(speakers: 3, duration: 48 * 60 + 13))
-                == .init(title: "Transcribed: Riunione", body: "3 speakers · 48:13"))
+                == .init(title: "Transcribed: Meeting", body: "3 speakers · 48:13"))
         #expect(text(.transcribed(speakers: 1, duration: 3723)).body == "1 speaker · 1:02:03")
-        #expect(text(.readyToTranscribe) == .init(title: "Ready to transcribe", body: "Riunione is waiting. Open Cassini to start."))
+        #expect(text(.readyToTranscribe) == .init(title: "Ready to transcribe", body: "Meeting is waiting. Open Cassini to start."))
         #expect(text(.transcriptionStopped)
-                == .init(title: "Transcription stopped", body: "Cassini closed while transcribing Riunione."))
+                == .init(title: "Transcription stopped", body: "Cassini closed while transcribing Meeting."))
         #expect(text(.recordingStopped)
                 == .init(title: "Recording stopped", body: "Less than 200 MB free. The recording so far is saved."))
         #expect(text(.microphoneFailed)

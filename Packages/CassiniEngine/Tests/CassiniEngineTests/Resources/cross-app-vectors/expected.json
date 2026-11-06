@@ -35,20 +35,21 @@
    "audioTrust": "verified",
    "transcriptIds": [
     "words",
-    "words-78fd7ee6"
+    "words-50285e50"
    ],
-   "defaultTranscriptId": "words-78fd7ee6",
-   "opensOn": "words-78fd7ee6",
+   "defaultTranscriptId": "words-50285e50",
+   "opensOn": "words-50285e50",
    "openingWords": [
-    "Buongiorno",
-    "a",
-    "tutti.",
-    "Grazie,",
-    "iniziamo."
+    "Good",
+    "morning",
+    "everyone.",
+    "Thanks,",
+    "let’s",
+    "begin."
    ],
    "wordCounts": {
-    "words": 5,
-    "words-78fd7ee6": 5
+    "words": 6,
+    "words-50285e50": 6
    },
    "speakers": [
     {
@@ -62,7 +63,7 @@
    ],
    "shownLabels": {
     "note": "stored labels shown as stored in every UI language (D47): 'Voce 2' stays 'Voce 2' under English",
-    "words-78fd7ee6": [
+    "words-50285e50": [
      "Anna"
     ],
     "words": [
@@ -76,9 +77,11 @@
      "diar_3f2a9c1e_7b4d_4e21_9a6f_0c8d2b5e1f47_1",
      "diar_3f2a9c1e_7b4d_4e21_9a6f_0c8d2b5e1f47_1",
      "diar_3f2a9c1e_7b4d_4e21_9a6f_0c8d2b5e1f47_2",
+     "diar_3f2a9c1e_7b4d_4e21_9a6f_0c8d2b5e1f47_2",
      "diar_3f2a9c1e_7b4d_4e21_9a6f_0c8d2b5e1f47_2"
     ],
-    "words-78fd7ee6": [
+    "words-50285e50": [
+     "diar_3f2a9c1e_7b4d_4e21_9a6f_0c8d2b5e1f47_1",
      "diar_3f2a9c1e_7b4d_4e21_9a6f_0c8d2b5e1f47_1",
      "diar_3f2a9c1e_7b4d_4e21_9a6f_0c8d2b5e1f47_1",
      "diar_3f2a9c1e_7b4d_4e21_9a6f_0c8d2b5e1f47_1",
@@ -88,16 +91,16 @@
    },
    "language": {
     "words": "und",
-    "words-78fd7ee6": "und"
+    "words-50285e50": "und"
    },
-   "title": "Riunione di prova",
+   "title": "Test meeting",
    "tags": {
-    "TITLE": "Riunione di prova",
+    "TITLE": "Test meeting",
     "DATE": null
    },
    "bodyJsonIndented": true,
    "provenance": {
-    "words-78fd7ee6": {
+    "words-50285e50": {
      "x-derivedFromTranscript": "words",
      "x-speakerMerges": {
       "diar_3f2a9c1e_7b4d_4e21_9a6f_0c8d2b5e1f47_2": "diar_3f2a9c1e_7b4d_4e21_9a6f_0c8d2b5e1f47_1"

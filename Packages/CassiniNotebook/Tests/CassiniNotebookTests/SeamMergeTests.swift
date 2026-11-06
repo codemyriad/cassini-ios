@@ -141,12 +141,12 @@ import Testing
         #expect(got[2].text == "first")
     }
 
-    // ports: SeamMergeTest#italianApostropheVariantsMergeOnce
-    @Test func italianApostropheVariantsMergeOnce() {
-        let acc = [w("prima", 9000, 9200), w("dell\u{2019}anno.", 9700, 9900)]
-        let next = [w("dell'anno,", 9720, 9920), w("dopo", 10100, 10300)]
+    // ports: SeamMergeTest#apostropheVariantsMergeOnce
+    @Test func apostropheVariantsMergeOnce() {
+        let acc = [w("first", 9000, 9200), w("year\u{2019}s.", 9700, 9900)]
+        let next = [w("year's,", 9720, 9920), w("after", 10100, 10300)]
         // The newer copy's midpoint sits 320 ms past the window start versus 200 ms before the overlap end.
-        #expect(merge(acc, next, 9500, 500).map(\.text) == ["prima", "dell'anno,", "dopo"])
+        #expect(merge(acc, next, 9500, 500).map(\.text) == ["first", "year's,", "after"])
     }
 
     // ports: SeamMergeTest#keepsStableSourceOrderForEqualStarts
@@ -206,8 +206,8 @@ import Testing
 
     // ports: SeamMergeTest#alignmentPrefersMoreMatchesThenSmallerDistance
     @Test func alignmentPrefersMoreMatchesThenSmallerDistance() {
-        let acc = [w("si", 9600, 9700), w("si", 9800, 9900)]
-        let next = [w("si", 9790, 9890)]
+        let acc = [w("yes", 9600, 9700), w("yes", 9800, 9900)]
+        let next = [w("yes", 9790, 9890)]
         #expect(SeamMerge.align(acc, next, overlapStartMs: 9500, overlapEndMs: 10000, toleranceMs: SeamMerge.duplicateToleranceMs) ==
                 [SeamMerge.Match(1, 0)])
         #expect(SeamMerge.midpointMs(w("x", 1, 2)) == 1)
@@ -222,11 +222,11 @@ import Testing
 
     // ports: SeamMergeTest#aWordTheCutRunsThroughIsKeptOnceAndEachEdgeComesFromTheOtherDecode
     @Test func aWordTheCutRunsThroughIsKeptOnceAndEachEdgeComesFromTheOtherDecode() {
-        let acc = [w("prima", 9_000, 9_400), w("la", 10_600, 10_750), w("batterica.", 10_780, 11_300), w("poi", 11_350, 11_600),
-                   w("tronc", 11_800, 12_000)]
-        let next = [w("ella", 10_050, 10_300), w("la", 10_620, 10_760), w("batterica.", 10_800, 11_310), w("poi", 11_360, 11_610),
-                    w("troncato", 11_790, 12_300), w("dopo", 12_350, 12_600)]
-        #expect(splice(acc, next).map(\.text) == ["prima", "la", "batterica.", "poi", "troncato", "dopo"])
+        let acc = [w("first", 9_000, 9_400), w("the", 10_600, 10_750), w("batteries.", 10_780, 11_300), w("then", 11_350, 11_600),
+                   w("trunc", 11_800, 12_000)]
+        let next = [w("he", 10_050, 10_300), w("the", 10_620, 10_760), w("batteries.", 10_800, 11_310), w("then", 11_360, 11_610),
+                    w("truncated", 11_790, 12_300), w("after", 12_350, 12_600)]
+        #expect(splice(acc, next).map(\.text) == ["first", "the", "batteries.", "then", "truncated", "after"])
         // Joined at the agreed word nearest the cut: the earlier decode up to it, the later one after it.
         let from = splicedOrigins(acc, next)
         #expect(from[2] == "acc2")
@@ -235,60 +235,60 @@ import Testing
 
     // ports: SeamMergeTest#twoReadingsOfTheSameAudioAtACutKeepOne
     @Test func twoReadingsOfTheSameAudioAtACutKeepOne() {
-        let got = splice([w("della", 10_400, 10_700), w("batterica.", 10_780, 11_300)],
-                         [w("della", 10_410, 10_700), w("batteria", 10_790, 11_250), w("dopo", 11_400, 11_700)])
-        #expect(got.map(\.text) == ["della", "batteria", "dopo"])
+        let got = splice([w("the", 10_400, 10_700), w("batteries.", 10_780, 11_300)],
+                         [w("the", 10_410, 10_700), w("battery", 10_790, 11_250), w("after", 11_400, 11_700)])
+        #expect(got.map(\.text) == ["the", "battery", "after"])
     }
 
     // ports: SeamMergeTest#aWordTimedOnOppositeSidesOfTheCutIsNeitherLostNorDoubled
     @Test func aWordTimedOnOppositeSidesOfTheCutIsNeitherLostNorDoubled() {
         // The same short word 240 ms apart: too far for a lone pair in the window merge, and with no time in common.
         for (early, late) in [(Int64(11_040), Int64(10_800)), (10_800, 11_040)] {
-            let got = splice([w("prima", 9_000, 9_400), w("sì", early, early + 80)], [w("sì", late, late + 80), w("dopo", 12_100, 12_400)])
-            #expect(got.map(\.text) == ["prima", "sì", "dopo"])
+            let got = splice([w("first", 9_000, 9_400), w("yes", early, early + 80)], [w("yes", late, late + 80), w("after", 12_100, 12_400)])
+            #expect(got.map(\.text) == ["first", "yes", "after"])
         }
     }
 
     // ports: SeamMergeTest#oneReadingOfASplitWordIsTakenWhole
     @Test func oneReadingOfASplitWordIsTakenWhole() {
         // One decode hears a word, the other two shorter ones: never half of each.
-        let acc = [w("che", 10_300, 10_500), w("alimento", 10_800, 11_240)]
-        let next = [w("che", 10_310, 10_500), w("a", 10_840, 10_920), w("lento", 10_920, 11_280), w("dopo", 11_500, 11_800)]
-        #expect(splice(acc, next).map(\.text) == ["che", "a", "lento", "dopo"])
+        let acc = [w("that", 10_300, 10_500), w("ahead", 10_800, 11_240)]
+        let next = [w("that", 10_310, 10_500), w("a", 10_840, 10_920), w("head", 10_920, 11_280), w("after", 11_500, 11_800)]
+        #expect(splice(acc, next).map(\.text) == ["that", "a", "head", "after"])
         // Without any agreed word the join is an instant outside every word: again one whole reading.
-        let alone = splice([w("alimento", 10_800, 11_240)], [w("a", 10_840, 10_920), w("lento", 10_920, 11_280)]).map(\.text)
-        #expect([["alimento"], ["a", "lento"]].contains(alone), "\(alone)")
+        let alone = splice([w("ahead", 10_800, 11_240)], [w("a", 10_840, 10_920), w("head", 10_920, 11_280)]).map(\.text)
+        #expect([["ahead"], ["a", "head"]].contains(alone), "\(alone)")
     }
 
     // ports: SeamMergeTest#wordsOnlyOneDecodeFoundStayOnItsOwnSideOfTheJoin
     @Test func wordsOnlyOneDecodeFoundStayOnItsOwnSideOfTheJoin() {
-        let acc = [w("prima", 10_200, 10_500), w("fantasma", 11_500, 11_700)]
-        let next = [w("eco", 10_550, 10_700), w("dopo", 11_800, 12_100)]
+        let acc = [w("first", 10_200, 10_500), w("ghost", 11_500, 11_700)]
+        let next = [w("echo", 10_550, 10_700), w("after", 11_800, 12_100)]
         let got = splice(acc, next).map(\.text)
-        #expect(got.first == "prima" && got.last == "dopo" && (2...3).contains(got.count), "\(got)")
-        #expect(splice([w("solo", 10_200, 10_500)], []).map(\.text) == ["solo"])
+        #expect(got.first == "first" && got.last == "after" && (2...3).contains(got.count), "\(got)")
+        #expect(splice([w("alone", 10_200, 10_500)], []).map(\.text) == ["alone"])
     }
 
     // ports: SeamMergeTest#aRepeatedWordShiftedByMoreThanTheLoneToleranceIsStillOneWordAtACut
     @Test func aRepeatedWordShiftedByMoreThanTheLoneToleranceIsStillOneWordAtACut() {
         // Measured on the phone: copies of one word 220 ms apart, above the 200 ms the desktop accepts for a lone pair.
-        let got = splice([w("di", 10_368, 10_448), w("cronometro.", 10_448, 10_928)], [w("Cronometro", 10_668, 11_228), w("che", 11_228, 11_388)])
-        #expect(got.map { SeamMerge.normalize($0.text) } == ["di", "cronometro", "che"])
+        let got = splice([w("of", 10_368, 10_448), w("stopwatch.", 10_448, 10_928)], [w("Stopwatch", 10_668, 11_228), w("that", 11_228, 11_388)])
+        #expect(got.map { SeamMerge.normalize($0.text) } == ["of", "stopwatch", "that"])
     }
 
     // ports: SeamMergeTest#aZeroLengthCopyAtTheJoinGivesWayToTheOtherDecodesCopyWithDuration
     @Test func aZeroLengthCopyAtTheJoinGivesWayToTheOtherDecodesCopyWithDuration() {
-        // The earlier decode stamped "sì" in padding and it was clamped to the overlap end; the later one heard it whole.
-        let clamped = w("sì", 12_000, 12_000)
-        let whole = w("sì", 11_800, 12_320)
-        let acc = [w("prima", 9_000, 9_400), clamped]
-        let next = [whole, w("dopo", 12_400, 12_700)]
-        #expect(splice(acc, next).map(\.text) == ["prima", "sì", "dopo"])
+        // The earlier decode stamped "yes" in padding and it was clamped to the overlap end; the later one heard it whole.
+        let clamped = w("yes", 12_000, 12_000)
+        let whole = w("yes", 11_800, 12_320)
+        let acc = [w("first", 9_000, 9_400), clamped]
+        let next = [whole, w("after", 12_400, 12_700)]
+        #expect(splice(acc, next).map(\.text) == ["first", "yes", "after"])
         #expect(splicedOrigins(acc, next)[1] == "next0")
         // The other way round the copy with duration is already the earlier decode's and stays.
-        let kept = w("sì", 11_800, 12_320)
-        let backAcc = [w("prima", 9_000, 9_400), kept]
-        let backNext = [w("sì", 12_000, 12_000), w("dopo", 12_400, 12_700)]
+        let kept = w("yes", 11_800, 12_320)
+        let backAcc = [w("first", 9_000, 9_400), kept]
+        let backNext = [w("yes", 12_000, 12_000), w("after", 12_400, 12_700)]
         #expect(splicedOrigins(backAcc, backNext)[1] == "acc1")
         #expect(splice(backAcc, backNext).count == 3)
     }

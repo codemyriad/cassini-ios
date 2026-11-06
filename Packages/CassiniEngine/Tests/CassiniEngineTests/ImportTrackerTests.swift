@@ -26,11 +26,11 @@ private actor Gate {
     @Test func importsRunSideBySideAndEachIsShownWhileItRuns() async {
         let tracker = ImportTracker(clock: clock)
         let gate = Gate()
-        let first = tracker.start(displayName: "uno.m4a") { await gate.wait(); return .created(UUID()) }
-        let second = tracker.start(displayName: "due.m4a") { await gate.wait(); return .created(UUID()) }
-        let third = tracker.start(displayName: "tre.m4a") { await gate.wait(); return .created(UUID()) }
+        let first = tracker.start(displayName: "one.m4a") { await gate.wait(); return .created(UUID()) }
+        let second = tracker.start(displayName: "two.m4a") { await gate.wait(); return .created(UUID()) }
+        let third = tracker.start(displayName: "three.m4a") { await gate.wait(); return .created(UUID()) }
 
-        #expect(tracker.running == ["uno.m4a", "due.m4a", "tre.m4a"])
+        #expect(tracker.running == ["one.m4a", "two.m4a", "three.m4a"])
         await gate.release()
         let outcomes = [await first.value, await second.value, await third.value]
 

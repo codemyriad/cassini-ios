@@ -8,44 +8,44 @@ struct TranscriptExportsTests {
                                     emptyText: "No words were found in this recording.", unassignedLabel: "Unknown speaker")
 
     private func note(_ segments: [TranscriptSegment], speakers: [NoteSpeaker] = []) -> Note {
-        var note = Note(title: "Consegna: giovedì?")
+        var note = Note(title: "Delivery: Thursday?")
         note.duration = 12.5; note.status = .ready; note.transcript = segments; note.speakers = speakers
         return note
     }
 
     @Test func timedWordsKeepTheirSpeakersAndTimesInCanonicalOrder() {
         let segments = [
-            TranscriptSegment(text: "Sì, certo.", start: 0, end: 0.9, speakerID: "S1",
-                              words: [.init(text: " Sì,", start: 0, end: 0.3), .init(text: "certo.", start: 0.4, end: 0.9)]),
-            TranscriptSegment(text: "Bene.", start: 0.8, end: 1.2, speakerID: "S2", words: [.init(text: "Bene.", start: 0.8, end: 1.2)])
+            TranscriptSegment(text: "Yes, sure.", start: 0, end: 0.9, speakerID: "S1",
+                              words: [.init(text: " Yes,", start: 0, end: 0.3), .init(text: "sure.", start: 0.4, end: 0.9)]),
+            TranscriptSegment(text: "Good.", start: 0.8, end: 1.2, speakerID: "S2", words: [.init(text: "Good.", start: 0.8, end: 1.2)])
         ]
         let export = ExportTranscript(note: note(segments, speakers: [.init(id: "S1", name: "Giulia"), .init(id: "S2", name: "Speaker 2")]),
                                       unassignedLabel: "?")
-        #expect(export.words == [Word("S1", 0, 300, "Sì,"), Word("S1", 400, 900, "certo."), Word("S2", 800, 1200, "Bene.")])
+        #expect(export.words == [Word("S1", 0, 300, "Yes,"), Word("S1", 400, 900, "sure."), Word("S2", 800, 1200, "Good.")])
         #expect(export.labels["S1"] == "Giulia")
         #expect(export.durationMs == 12_500)
-        #expect(export.title == "Consegna: giovedì?")
+        #expect(export.title == "Delivery: Thursday?")
     }
 
     @Test func anEditedPassageSharesItsSpanAmongItsWords() {
-        let segments = [TranscriptSegment(text: "Testo  corretto\na mano", start: 2, end: 9.5, speakerID: "S1")]
+        let segments = [TranscriptSegment(text: "Words  revised\nby hand", start: 2, end: 9.5, speakerID: "S1")]
         let export = ExportTranscript(note: note(segments), unassignedLabel: "?")
-        #expect(export.words == [Word("S1", 2_000, 4_083, "Testo"), Word("S1", 4_083, 7_416, "corretto"),
-                                 Word("S1", 7_416, 7_833, "a"), Word("S1", 7_833, 9_500, "mano")])
+        #expect(export.words == [Word("S1", 2_000, 4_083, "Words"), Word("S1", 4_083, 7_000, "revised"),
+                                 Word("S1", 7_000, 7_833, "by"), Word("S1", 7_833, 9_500, "hand")])
         #expect(SrtWriter.write(export) == """
             1
             00:00:02,000 --> 00:00:07,833
-            Testo corretto a
+            Words revised by
 
             2
             00:00:07,833 --> 00:00:09,500
-            mano
+            hand
 
             """)
     }
 
     @Test func aLongEditedPassageIsCutIntoCuesLikeATimedOne() {
-        let text = (1...30).map { "parola\($0)" }.joined(separator: " ")
+        let text = (1...30).map { "sample\($0)" }.joined(separator: " ")
         #expect(text.utf16.count > SubtitleCues.maxText)
         let export = ExportTranscript(note: note([TranscriptSegment(text: text, start: 1, end: 21, speakerID: "S1")]),
                                       unassignedLabel: "?")
@@ -63,24 +63,24 @@ struct TranscriptExportsTests {
 
     @Test func passagesWithoutASpeakerAreLabelledAsUnknown() throws {
         let segments = [
-            TranscriptSegment(text: "Ciao", start: 0, end: 1, speakerID: "S1", words: [.init(text: "Ciao", start: 0, end: 1)]),
-            TranscriptSegment(text: "Chi parla?", start: 3, end: 4)
+            TranscriptSegment(text: "Hello", start: 0, end: 1, speakerID: "S1", words: [.init(text: "Hello", start: 0, end: 1)]),
+            TranscriptSegment(text: "Who speaks?", start: 3, end: 4)
         ]
         let text = String(decoding: try TranscriptExports.data(note(segments, speakers: [.init(id: "S1", name: "Giulia")]),
                                                                 format: .text, texts: texts), as: UTF8.self)
-        #expect(text == "Consegna: giovedì?\nsub 12500 2\n\n[00:00] Giulia\nCiao\n\n[00:03] Unknown speaker\nChi parla?\n")
+        #expect(text == "Delivery: Thursday?\nsub 12500 2\n\n[00:00] Giulia\nHello\n\n[00:03] Unknown speaker\nWho speaks?\n")
     }
 
     @Test func aListedSpeakerWithoutWordsIsNotCounted() throws {
-        let segments = [TranscriptSegment(text: "Ciao", start: 0, end: 1, speakerID: "S1", words: [.init(text: "Ciao", start: 0, end: 1)])]
+        let segments = [TranscriptSegment(text: "Hello", start: 0, end: 1, speakerID: "S1", words: [.init(text: "Hello", start: 0, end: 1)])]
         let speakers: [NoteSpeaker] = [.init(id: "S1", name: "Giulia"), .init(id: "S2", name: "Marco")]
         let text = String(decoding: try TranscriptExports.data(note(segments, speakers: speakers), format: .text, texts: texts),
                           as: UTF8.self)
-        #expect(text == "Consegna: giovedì?\nsub 12500 1\n\n[00:00]\nCiao\n")
+        #expect(text == "Delivery: Thursday?\nsub 12500 1\n\n[00:00]\nHello\n")
     }
 
     @Test func aVersionExportsItsOwnWordsAndNames() throws {
-        var source = note([TranscriptSegment(text: "Nuovo", start: 0, end: 1, speakerID: "S1")], speakers: [.init(id: "S1", name: "Anna")])
+        var source = note([TranscriptSegment(text: "New", start: 0, end: 1, speakerID: "S1")], speakers: [.init(id: "S1", name: "Anna")])
         let version = TranscriptVersion(kind: .previous, segments: [TranscriptSegment(text: "Vecchio", start: 1, end: 2, speakerID: "S1")],
                                         speakers: [.init(id: "S1", name: "Bruno")])
         source.versions = [version]
@@ -92,7 +92,7 @@ struct TranscriptExportsTests {
 
     /// The JSON of a version that is not shown names that version's language, not the shown words' (D53.2).
     @Test func aVersionExportsItsOwnLanguage() throws {
-        var source = note([TranscriptSegment(text: "Nuovo", start: 0, end: 1, speakerID: "S1")])
+        var source = note([TranscriptSegment(text: "New", start: 0, end: 1, speakerID: "S1")])
         source.language = "und"
         let version = TranscriptVersion(kind: .imported, segments: [TranscriptSegment(text: "Vecchio", start: 1, end: 2, speakerID: "S1")],
                                         speakers: [], language: "it-IT")
@@ -105,7 +105,7 @@ struct TranscriptExportsTests {
 
     @Test func aFinishedTranscriptWithoutWordsWritesTheEmptyText() throws {
         let text = String(decoding: try TranscriptExports.data(note([]), format: .text, texts: texts), as: UTF8.self)
-        #expect(text == "Consegna: giovedì?\nsub 12500 0\n\nNo words were found in this recording.\n")
+        #expect(text == "Delivery: Thursday?\nsub 12500 0\n\nNo words were found in this recording.\n")
         #expect(TranscriptExports.availability(of: note([])) == .available)
     }
 
@@ -133,7 +133,7 @@ struct TranscriptExportsTests {
     }
 
     @Test func exportsAreUTF8WithoutBOMOrCarriageReturns() throws {
-        let segments = [TranscriptSegment(text: "Riga\r\nnuova", start: 0, end: 1, speakerID: "S1")]
+        let segments = [TranscriptSegment(text: "New\r\nline", start: 0, end: 1, speakerID: "S1")]
         for format in [TranscriptFormat.text, .subtitles, .webVTT] {
             let data = try TranscriptExports.data(note(segments), format: format, texts: texts)
             let text = try #require(String(data: data, encoding: .utf8))

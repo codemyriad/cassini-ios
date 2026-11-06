@@ -15,11 +15,11 @@ import Testing
     // ports: TranscriptTurnsTest#turnsAreMaximalRunsOfOneSpeaker
     @Test func turnsAreMaximalRunsOfOneSpeaker() {
         let turns = TranscriptTurns.of([
-            w("a", 0, 300, "Sì,"), w("a", 400, 900, "certo."), w("b", 800, 1200, "Bene."),
-            w("a", 1500, 1900, "Allora"), w("a", 2000, 2400, "giovedì."),
+            w("a", 0, 300, "Yes,"), w("a", 400, 900, "sure."), w("b", 800, 1200, "Good."),
+            w("a", 1500, 1900, "So"), w("a", 2000, 2400, "Thursday."),
         ])
         #expect(turns.map(\.speaker) == ["a", "b", "a"])
-        #expect(turns.map(\.text) == ["Sì, certo.", "Bene.", "Allora giovedì."])
+        #expect(turns.map(\.text) == ["Yes, sure.", "Good.", "So Thursday."])
         #expect(turns.map(\.start) == [0, 0.8, 1.5])
         #expect(turns.map(\.end) == [0.9, 1.2, 2.4])
     }
@@ -39,16 +39,16 @@ import Testing
             TimedWord(text: "Hello", start: 0, end: 0.5), TimedWord(text: " world", start: 0.6, end: 1.2),
             TimedWord(text: ".", start: 1.2, end: 1.3),
         ])
-        let trimmed = TranscriptSegment(text: "Ciao a tutti", start: 2, end: 3, speakerID: "a", words: [
-            TimedWord(text: "Ciao", start: 2, end: 2.3), TimedWord(text: "a", start: 2.3, end: 2.4),
-            TimedWord(text: "tutti", start: 2.4, end: 3),
+        let trimmed = TranscriptSegment(text: "Hello to everyone", start: 2, end: 3, speakerID: "a", words: [
+            TimedWord(text: "Hello", start: 2, end: 2.3), TimedWord(text: "to", start: 2.3, end: 2.4),
+            TimedWord(text: "everyone", start: 2.4, end: 3),
         ])
         let plain = TranscriptSegment(text: "  An edited passage. ", start: 3, end: 5, speakerID: "b")
         let words = [timed, trimmed, plain].transcriptWords
-        #expect(words.map(\.text) == ["Hello", "world", ".", "Ciao", "a", "tutti", "An edited passage."])
+        #expect(words.map(\.text) == ["Hello", "world", ".", "Hello", "to", "everyone", "An edited passage."])
         #expect(words.map(\.segmentID) == [timed.id, timed.id, timed.id, trimmed.id, trimmed.id, trimmed.id, plain.id])
         let turns = TranscriptTurns.of(words)
-        #expect(turns.map(\.text) == ["Hello world. Ciao a tutti", "An edited passage."])
+        #expect(turns.map(\.text) == ["Hello world. Hello to everyone", "An edited passage."])
         #expect(words.last?.start == 3)
     }
 }

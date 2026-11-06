@@ -17,15 +17,15 @@ struct ExportServiceTests {
     }
 
     private func transcribedNote() -> Note {
-        var note = Note(title: "Consegna: giovedì?", audioFilename: "audio.m4a")
+        var note = Note(title: "Delivery: Thursday?", audioFilename: "audio.m4a")
         note.duration = 9.25; note.status = .ready
         note.speakers = [NoteSpeaker(id: "S1", name: "Giulia"), NoteSpeaker(id: "S2", name: "Speaker 2")]
         note.transcript = [
-            TranscriptSegment(text: "Allora, la consegna slitta?", start: 0, end: 1.5, speakerID: "S1", words: [
-                .init(text: "Allora,", start: 0, end: 0.3), .init(text: "la", start: 0.4, end: 0.7),
-                .init(text: "consegna", start: 0.8, end: 1.1), .init(text: "slitta?", start: 1.2, end: 1.5)]),
-            TranscriptSegment(text: "Sì, a giovedì.", start: 1.8, end: 2.9, speakerID: "S2", words: [
-                .init(text: "Sì,", start: 1.8, end: 2.1), .init(text: "a", start: 2.2, end: 2.5), .init(text: "giovedì.", start: 2.6, end: 2.9)])
+            TranscriptSegment(text: "So, is the delivery late?", start: 0, end: 1.5, speakerID: "S1", words: [
+                .init(text: "So,", start: 0, end: 0.3), .init(text: "the", start: 0.4, end: 0.7),
+                .init(text: "delivery", start: 0.8, end: 1.1), .init(text: "slips?", start: 1.2, end: 1.5)]),
+            TranscriptSegment(text: "Yes, on Thursday.", start: 1.8, end: 2.9, speakerID: "S2", words: [
+                .init(text: "Yes,", start: 1.8, end: 2.1), .init(text: "a", start: 2.2, end: 2.5), .init(text: "Thursday.", start: 2.6, end: 2.9)])
         ]
         return note
     }
@@ -37,13 +37,13 @@ struct ExportServiceTests {
         try await notes.save(note)
         try Data([7, 8, 9]).write(to: notes.originalAudioURL(for: note))
         let copy = try await service.copyAudio(note.id)
-        #expect(copy.lastPathComponent == "Consegna_ giovedì_.m4a")
+        #expect(copy.lastPathComponent == "Delivery_ Thursday_.m4a")
         #expect(try Data(contentsOf: copy) == Data([7, 8, 9]))
         service.discard(copy)
-        let words = [Word("S1", 0, 300, "Allora,"), Word("S1", 400, 700, "la"), Word("S1", 800, 1100, "consegna"),
-                     Word("S1", 1200, 1500, "slitta?"), Word("S2", 1800, 2100, "Sì,"), Word("S2", 2200, 2500, "a"),
-                     Word("S2", 2600, 2900, "giovedì.")]
-        let expected = ExportTranscript(title: "Consegna: giovedì?", durationMs: 9_250, words: words,
+        let words = [Word("S1", 0, 300, "So,"), Word("S1", 400, 700, "the"), Word("S1", 800, 1100, "delivery"),
+                     Word("S1", 1200, 1500, "slips?"), Word("S2", 1800, 2100, "Yes,"), Word("S2", 2200, 2500, "a"),
+                     Word("S2", 2600, 2900, "Thursday.")]
+        let expected = ExportTranscript(title: "Delivery: Thursday?", durationMs: 9_250, words: words,
                                         labels: ["S1": "Giulia", "S2": "Speaker 2"])
         let cases: [(TranscriptFormat, String)] = [
             (.text, TextExport.write(expected, subtitle: "8 Oct 2026, 15:10", emptyText: "No words")),
@@ -52,7 +52,7 @@ struct ExportServiceTests {
         ]
         for (format, text) in cases {
             let url = try await service.exportTranscript(note.id, format: format, texts: texts)
-            #expect(url.lastPathComponent == "Consegna_ giovedì_.\(format.fileExtension)")
+            #expect(url.lastPathComponent == "Delivery_ Thursday_.\(format.fileExtension)")
             #expect(try Data(contentsOf: url) == Data(text.utf8), "\(format)")
             service.discard(url)
             #expect(!FileManager.default.fileExists(atPath: url.deletingLastPathComponent().path))
