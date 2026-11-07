@@ -35,9 +35,9 @@ import CassiniSherpa
                        "the job downloads Ultra with consent")
     }
 
-    func testA4GBDeviceStaysOnAppleSpeech() {
+    func testA4GBDeviceUsesTheCapabilityCheckedAppleCandidate() {
         XCTAssertEqual(AppEnvironment.speechTranscriber(models: models(), physicalMemory: 4 << 30).recognizer, .appleSpeech,
-                       "a 4 GB device stays on Apple Speech until the device gate says otherwise")
+                       "the adapter checks hardware, locale and assets before choosing Apple")
     }
 
     /// The speech download and the speaker models go through one installer: while Ultra downloads, the installer

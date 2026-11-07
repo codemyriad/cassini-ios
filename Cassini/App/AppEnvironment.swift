@@ -66,18 +66,18 @@ import CassiniEngineTesting
 
     /// Parakeet Ultra when this build links the native runtime and the device can hold it (`SpeechCapability`),
     /// whether or not its model is installed: a job downloads Ultra and its speech detector through the shared
-    /// installer with consent, and the model download screen's Download does too. Apple Speech otherwise (decision D2).
-    /// Chosen once at launch.
+    /// installer with consent, and the model download screen's Download does too. Otherwise prepare an Apple candidate
+    /// whose eligibility depends on the requested locale and live public availability checks (D75.2).
     static func speechTranscriber(models: PinnedModels,
                                   physicalMemory: UInt64 = ProcessInfo.processInfo.physicalMemory) -> any Transcribing {
-        switch SpeechCapability.choose(linked: SherpaRuntime.isLinked,
-                                       capable: SpeechCapability.parakeetCapable(physicalMemory: physicalMemory)) {
-        case .parakeet:
-            ParakeetTranscriber(models: .init(installer: models.installer, root: models.root,
-                                              online: { NetworkPath.shared.isOnline }),
-                                runtime: SherpaRuntime.speech)
-        case .appleSpeech: AppleSpeechTranscriber()
+        if SherpaRuntime.isLinked && SpeechCapability.parakeetCapable(physicalMemory: physicalMemory) {
+            return ParakeetTranscriber(models: .init(installer: models.installer, root: models.root,
+                                                    online: { NetworkPath.shared.isOnline }),
+                                      runtime: SherpaRuntime.speech)
         }
+        // This is a candidate adapter, not a claim of availability. Its public Speech checks select Apple only
+        // when this device and the requested locale support it, before consent/queue admission and before decode.
+        return AppleSpeechTranscriber()
     }
 
     /// Android's speaker pipeline (streaming Sortformer and CAM++) over the catalog's pinned files, which the shared

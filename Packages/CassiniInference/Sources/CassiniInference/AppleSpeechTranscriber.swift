@@ -9,13 +9,34 @@ import CassiniNotebook
 /// words is reported as an empty one so that the finalized audio still moves on. A file that cannot be read to its end
 /// fails with `OPEN`; one read to its end reports its whole duration as done before the transcriber returns.
 public actor AppleSpeechTranscriber: Transcribing {
-    public init() {}
+    private let probe: AppleSpeechProbe
+    public init() { probe = .live }
+    init(probe: AppleSpeechProbe) { self.probe = probe }
+
+    private func capability(locale requested: Locale) async -> (locale: Locale?, value: AppleSpeechCapability) {
+        guard probe.isAvailable() else {
+            return (nil, .init(hardwareAvailable: false, localeSupported: false, assets: .unsupported))
+        }
+        guard let locale = await probe.supportedLocale(requested) else {
+            return (nil, .init(hardwareAvailable: true, localeSupported: false, assets: .unsupported))
+        }
+        return (locale, .init(hardwareAvailable: true, localeSupported: true, assets: await probe.assetStatus(locale)))
+    }
+
+    private func selected(_ capability: AppleSpeechCapability) -> Bool {
+        SpeechCapability.choose(linked: false, capable: false, apple: capability) == .appleSpeech
+    }
+
+    public func unavailability(locale: Locale) async -> JobFailure? {
+        let state = await capability(locale: locale)
+        return selected(state.value) ? nil : state.value.failure
+    }
 
     public func transcribe(_ request: TranscriptionRequest,
                            events: @escaping @Sendable (TranscriptionEvent) -> Void) async throws -> TranscriptionResult {
-        guard SpeechTranscriber.isAvailable else { throw TranscriptionError.failed(.model) }
-        guard let locale = await SpeechTranscriber.supportedLocale(equivalentTo: Locale(identifier: request.language)) else {
-            throw TranscriptionError.failed(.unsupportedLanguage)
+        let state = await capability(locale: Locale(identifier: request.language))
+        guard selected(state.value), let locale = state.locale else {
+            throw TranscriptionError.failed(state.value.failure ?? .model)
         }
         let transcriber = SpeechTranscriber(locale: locale, transcriptionOptions: [], reportingOptions: [.volatileResults],
                                             attributeOptions: [.audioTimeRange])
@@ -65,39 +86,36 @@ public actor AppleSpeechTranscriber: Transcribing {
 
     /// Throws `TranscriptionError.failed(.download(_))` when the download or the install fails.
     public func installAssets(locale requested: Locale, progress: @escaping @Sendable (InstallProgress) -> Void) async throws {
-        guard SpeechTranscriber.isAvailable,
-              let locale = await SpeechTranscriber.supportedLocale(equivalentTo: requested) else { return }
+        let state = await capability(locale: requested)
+        guard selected(state.value), let locale = state.locale else {
+            throw TranscriptionError.failed(state.value.failure ?? .model)
+        }
+        guard state.value.assets != .ready else { return }
         let module = SpeechTranscriber(locale: locale, transcriptionOptions: [], reportingOptions: [], attributeOptions: [])
-        guard await AssetInventory.status(forModules: [module]) != .installed else { return }
         try await Self.install(module, locale: locale) { if let fraction = $0 { progress(.downloading(fraction)) } }
     }
 
     public func assetStatus(locale: Locale) async -> ModelPartStatus {
-        guard SpeechTranscriber.isAvailable,
-              let supported = await SpeechTranscriber.supportedLocale(equivalentTo: locale) else { return .unsupported }
-        let transcriber = SpeechTranscriber(locale: supported, transcriptionOptions: [], reportingOptions: [], attributeOptions: [])
-        switch await AssetInventory.status(forModules: [transcriber]) {
-        case .installed: return .ready
-        case .downloading: return .downloading(nil)
-        case .supported: return .notDownloaded
-        default: return .unsupported
-        }
+        let state = await capability(locale: locale)
+        return selected(state.value) ? state.value.assets : .unsupported
     }
 
     /// "Apple SpeechTranscriber it-IT": the module and the locale whose assets it runs. Apple names no model version,
     /// so the OS build in the provenance's `version` stands in for it.
     public func modelName(locale: Locale) async -> String? {
-        guard SpeechTranscriber.isAvailable,
-              let supported = await SpeechTranscriber.supportedLocale(equivalentTo: locale) else { return nil }
+        let state = await capability(locale: locale)
+        guard selected(state.value), let supported = state.locale else { return nil }
         return "Apple SpeechTranscriber \(supported.identifier(.bcp47))"
     }
 
     /// The locale `supportedLocale(equivalentTo:)` picks for `requested`, the one a run transcribes in.
     public func runLanguage(requested: String) async -> String? {
-        await SpeechTranscriber.supportedLocale(equivalentTo: Locale(identifier: requested))?.identifier(.bcp47)
+        let state = await capability(locale: Locale(identifier: requested))
+        return selected(state.value) ? state.locale?.identifier(.bcp47) : nil
     }
 
     public func speechLanguages() async -> [SpeechLanguage] {
+        guard probe.isAvailable() else { return [] }
         let installed = Set(await SpeechTranscriber.installedLocales.map { $0.identifier(.bcp47) })
         return await SpeechTranscriber.supportedLocales.map { locale in
             let id = locale.identifier(.bcp47)
@@ -239,4 +257,23 @@ enum InstallErrors {
             return .install
         }
     }
+}
+
+/// Public framework probes are injected only for adapter tests; policy stays in CassiniEngine.
+struct AppleSpeechProbe: Sendable {
+    var isAvailable: @Sendable () -> Bool
+    var supportedLocale: @Sendable (Locale) async -> Locale?
+    var assetStatus: @Sendable (Locale) async -> ModelPartStatus
+
+    static let live = Self(isAvailable: { SpeechTranscriber.isAvailable }, supportedLocale: {
+        await SpeechTranscriber.supportedLocale(equivalentTo: $0)
+    }, assetStatus: { locale in
+        let module = SpeechTranscriber(locale: locale, transcriptionOptions: [], reportingOptions: [], attributeOptions: [])
+        switch await AssetInventory.status(forModules: [module]) {
+        case .installed: return .ready
+        case .downloading: return .downloading(nil)
+        case .supported: return .notDownloaded
+        default: return .unsupported
+        }
+    })
 }

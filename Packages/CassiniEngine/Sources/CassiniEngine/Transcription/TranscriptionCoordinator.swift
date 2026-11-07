@@ -122,6 +122,9 @@ public final class TranscriptionCoordinator {
         if let refusal = EnqueueRules.refusal(for: note) { return .refused(refusal) }
         guard await parts.jobs.isWritable else { return .refused(.queueUnavailable) }
         let language = await language(for: noteID, kind: kind)
+        if let failure = await parts.consent.unavailability(kind, language ?? "") {
+            return .refused(.speechUnavailable(failure))
+        }
         guard await parts.consent.allows(kind, language ?? "") else {
             return await lock.run { await needConsent(noteID, kind: kind, language: language) }
         }

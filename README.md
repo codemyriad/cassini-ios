@@ -139,7 +139,10 @@ TestFlight still need.
 [docs/differences.md](docs/differences.md) describes each difference in detail. In summary:
 
 - **Engines and thresholds.** iOS uses Parakeet Ultra for words, as Android does, on devices with the memory for it
-  (at least 5 GiB, a provisional rule until a device is measured), and Apple's `SpeechTranscriber` on the others.
+  (at least 5 GiB, a provisional rule until a device is measured). Other devices use Apple's `SpeechTranscriber`
+  only when its public hardware, equivalent-locale and asset checks allow it. Unsupported devices/languages show
+  Not available and refuse transcription before queueing or download consent; recording, playback and audio export
+  remain available. Supported missing Apple assets still download with consent.
   Speakers
   use Android's streaming Sortformer and CAM++ with Android's thresholds (0.72 automatic, 0.50 suggest, 0.08 margin,
   4 s of speech), so the voiceprints are Android's; voices saved by earlier iOS builds are named again. iOS keeps

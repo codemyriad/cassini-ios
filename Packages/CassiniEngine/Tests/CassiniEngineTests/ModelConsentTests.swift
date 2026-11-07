@@ -26,6 +26,17 @@ import CassiniNotebook
                               parakeetReady: { parakeet })
     }
 
+    @Test func consentNeverMakesAnUnsupportedSpeechCandidateAvailable() async {
+        defer { cleanUp() }
+        let settings = settings()
+        let blocked = consent(settings, speech: .unsupported, speakers: true)
+        #expect(await blocked.unavailability(.transcribe, "en-US") == .unsupportedLanguage)
+        settings.recordConsent()
+        #expect(await blocked.unavailability(.transcribeAgain, "en-US") == .unsupportedLanguage)
+        #expect(await blocked.unavailability(.speakersOnly, "en-US") == nil)
+        #expect(await consent(settings, speech: .notDownloaded, speakers: true).unavailability(.transcribe, "en-US") == nil)
+    }
+
     // ports (Apple Speech fallback, ModelRepositoryTests has the port): ModelRepositoryTest#nothingInstalledAndNoConsent
     @Test func nothingInstalledAndNoConsent() async {
         defer { cleanUp() }

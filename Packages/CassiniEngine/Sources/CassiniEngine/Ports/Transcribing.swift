@@ -86,13 +86,15 @@ public enum TranscriptionError: Error, Hashable {
 /// A transcriber that read its input to the end reports `.progress(done: total, total: total)` before it returns; one
 /// that cannot read the input to the end throws `TranscriptionError.failed(.open)` rather than returning what it has.
 public protocol Transcribing: Sendable {
-    /// The recognizer behind this transcriber: the job checks a checkpoint against it and writes its provenance.
+    /// The candidate backend identity for checkpoints/provenance; it does not promise device/locale availability.
     var recognizer: SpeechRecognizer { get }
     /// How a run would cut the recording now (Parakeet's `x-segmentation`); nil for Apple Speech.
     func segmentation() async -> String?
     func transcribe(_ request: TranscriptionRequest,
                     events: @escaping @Sendable (TranscriptionEvent) -> Void) async throws -> TranscriptionResult
     func assetStatus(locale: Locale) async -> ModelPartStatus
+    /// Why this device/locale cannot use the candidate, separately from downloadable/installed assets.
+    func unavailability(locale: Locale) async -> JobFailure?
     /// Downloads and installs the speech model for `locale` now, as the model download screen's Download does,
     /// reporting the fraction done and then Checking files (Parakeet; Apple's assets report only the fraction). Does
     /// nothing when it is installed or not offered for `locale`; a failed download or install throws
@@ -113,6 +115,9 @@ public protocol Transcribing: Sendable {
 }
 
 extension Transcribing {
+    public func unavailability(locale: Locale) async -> JobFailure? {
+        await assetStatus(locale: locale) == .unsupported ? .unsupportedLanguage : nil
+    }
     public func modelName(locale: Locale) async -> String? { nil }
     /// The requested language for a recognizer that is given one, else nil.
     public func runLanguage(requested: String) async -> String? {

@@ -21,8 +21,8 @@ public enum SpeechRecognizer: String, Hashable, Sendable {
     public var usesLanguage: Bool { self == .appleSpeech }
 }
 
-/// Which recognizer this device gets (decision D2). Pure, so the rule is tested on the host; the app asks it once at
-/// launch with what the device reports.
+/// Which recognizer this device gets (decision D2). Pure, so the rule is tested on the host; Apple eligibility is
+/// checked again for the requested locale at admission and execution.
 public enum SpeechCapability {
     /// The least physical memory a device needs for Parakeet Ultra. **Provisional until the WP0 device gate:** on the
     /// simulator one 28 s window peaked at 0.96 to 1.1 GiB (docs ultra-wp0-results, the Pixel 8 measured 1138 MiB), and
@@ -33,10 +33,27 @@ public enum SpeechCapability {
     /// Whether a device with `physicalMemory` bytes can hold Ultra.
     public static func parakeetCapable(physicalMemory: UInt64) -> Bool { physicalMemory >= minimumPhysicalMemory }
 
-    /// Parakeet when the native runtime is linked and the device can hold it, whether or not its model is installed
-    /// (a job downloads it with consent, as on Android); else Apple Speech.
-    public static func choose(linked: Bool, capable: Bool) -> SpeechRecognizer {
-        linked && capable ? .parakeet : .appleSpeech
+    /// A supported downloadable Apple model remains eligible, but cannot decode until its assets are installed.
+    /// The caller must probe hardware, the equivalent locale and asset status; RAM alone cannot select Apple.
+    public static func choose(linked: Bool, capable: Bool, apple: AppleSpeechCapability) -> SpeechRecognizer? {
+        if linked && capable { return .parakeet }
+        return apple.failure == nil ? .appleSpeech : nil
+    }
+
+}
+
+/// Public Apple availability checks expressed without importing Speech, for capability and admission tests.
+public struct AppleSpeechCapability: Hashable, Sendable {
+    public var hardwareAvailable: Bool
+    public var localeSupported: Bool
+    public var assets: ModelPartStatus
+    public init(hardwareAvailable: Bool, localeSupported: Bool, assets: ModelPartStatus) {
+        self.hardwareAvailable = hardwareAvailable; self.localeSupported = localeSupported; self.assets = assets
+    }
+    public var failure: JobFailure? {
+        if !hardwareAvailable { return .model }
+        if !localeSupported { return .unsupportedLanguage }
+        return assets == .unsupported ? .model : nil
     }
 }
 
