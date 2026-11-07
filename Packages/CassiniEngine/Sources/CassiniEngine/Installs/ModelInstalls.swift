@@ -102,6 +102,7 @@ import CassiniNotebook
     /// part has not been read.
     public func status(of part: ModelPart) -> ModelPartStatus? {
         let part = part == .voices ? .speakers : part
+        if part == .speech, stored[part] == .unsupported { return .unsupported }
         if let download, download.failure == nil, download.part == part {
             return download.checking ? .checking : .downloading(download.fraction)
         }
@@ -123,7 +124,10 @@ import CassiniNotebook
         guard let job else { return standalone }
         var statuses = standalone
         let parts: [ModelPart] = job.part == .speech ? [.speech] : [.speakers, .voices]
-        for part in parts where statuses[part] != nil { statuses[part] = ModelRows.status(of: job) }
+        for part in parts where statuses[part] != nil {
+            if part == .speech, statuses[part] == .unsupported { continue }
+            statuses[part] = ModelRows.status(of: job)
+        }
         return statuses
     }
 

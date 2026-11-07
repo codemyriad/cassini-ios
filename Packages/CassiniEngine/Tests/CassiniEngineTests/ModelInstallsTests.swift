@@ -8,6 +8,22 @@ import CassiniNotebook
 
 /// The standalone model installs and the stored model status, over fake models.
 @MainActor @Suite struct ModelInstallsTests {
+    @Test func unavailableSpeechWinsOverAStaleDownloadFailureOrProgress() async throws {
+        let transcriber = LanguageTranscriber(["en-US": .notDownloaded], failsInstall: true)
+        let installs = ModelInstalls(transcriber: transcriber, analyzer: ScriptedAnalyzer(status: .ready),
+                                     clock: FakeClock()) { "en-US" }
+        await installs.refresh()
+        installs.install([.speech])
+        try await until { !installs.isInstalling }
+        #expect(installs.status(of: .speech) == .failed(.noConnection))
+        transcriber.set("en-US", .unsupported)
+        await installs.refresh()
+        #expect(installs.status(of: .speech) == .unsupported)
+        #expect(ModelRows.status(installs.status(of: .speech)!, consented: true) == .unavailable)
+        let progress = DownloadProgress(part: .speech, doneBytes: 1, totalBytes: 2)
+        #expect(ModelInstalls.statuses(installs.statuses, during: progress)[.speech] == .unsupported)
+    }
+
     @Test func aRefreshReadsEveryPartAndVoicesFollowTheSpeakerModels() async {
         let installs = ModelInstalls(transcriber: FakeTranscriber(.returns([], total: 0), status: .notDownloaded),
                                      analyzer: ScriptedAnalyzer(status: .ready), clock: FakeClock()) { "en-US" }

@@ -97,7 +97,8 @@ public protocol Transcribing: Sendable {
     func unavailability(locale: Locale) async -> JobFailure?
     /// Downloads and installs the speech model for `locale` now, as the model download screen's Download does,
     /// reporting the fraction done and then Checking files (Parakeet; Apple's assets report only the fraction). Does
-    /// nothing when it is installed or not offered for `locale`; a failed download or install throws
+    /// nothing when it is installed; an unavailable Apple device/locale throws its model/language failure.
+    /// A failed download or install throws
     /// `TranscriptionError.failed(.download(_))`, and a cancelled one `CancellationError`. Cancelling the caller
     /// ends its wait: an install that another caller (a job) waits on goes on, and the files fetched so far stay.
     func installAssets(locale: Locale, progress: @escaping @Sendable (InstallProgress) -> Void) async throws
