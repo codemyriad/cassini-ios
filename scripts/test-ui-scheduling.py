@@ -13,6 +13,7 @@ logs="$TMPDIR_CASE"; prefix=own; iphone_type=phone; ipad_type=pad; extra=()
 selected_ui_tests() { printf 'Example/testA\nExample/testB\nExample/testIPadC\n'; }
 step_start() { :; }; step_end() { :; }; reap_idle_clones() { :; }
 wait_first_boot() { :; }; wait_for_room() { :; }; record_durations() { :; }
+wait_fast_beside() { echo 'wait fast' >> "$logs/trace"; }
 auto_workers() { echo "$BUDGET"; }; die() { echo "$*" >&2; exit 1; }
 our_clones() { for f in "$logs"/*.state; do [ -f "$f" ] || continue; n=${f##*/}; n=${n%.state}; echo "$n $(cat "$f") $n"; done; }
 clone_udid() { echo "$1"; }
@@ -42,6 +43,7 @@ count_ran() { local total=0 f; for f in "$@"; do [ ! -f "$f" ] || total=$((total
         assert run.returncode == 0, (run.stdout, run.stderr)
         active = set()
         trace = Path(tmp, 'trace').read_text().splitlines()
+        assert trace[0] == 'wait fast', trace
         for line in trace:
             event, name = line.split()
             if event == 'boot': active.add(name)

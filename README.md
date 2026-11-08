@@ -211,7 +211,8 @@ environment variables. `scripts/test-remote.sh [tier]` runs the same tier on the
 when that is unset.
 
 On a shared 16 GB Mac, `CASSINI_UI_WORKERS=2 CASSINI_UI_IPAD_AFTER=1 scripts/test.sh all` opts into up to two
-phone shards, capped by the available memory budget, followed by the iPad. The phones shut down before the iPad
+phone shards, capped by the available memory budget, followed by the iPad. The package suite finishes before the
+UI phase. The phones shut down before the iPad
 boots; a simulator crash retry runs alone and shuts down afterwards. The shared heavy lock and all test counts
 still apply. Without this opt-in, scheduling is unchanged.
 

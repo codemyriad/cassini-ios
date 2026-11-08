@@ -875,6 +875,9 @@ selected_ui_tests() {
 }
 
 tier_ui() {
+    # A slow package suite may outlive build-for-testing. The two-phone budget reserves memory for the host,
+    # so finish that background job before admitting this opt-in UI phase.
+    [ "${CASSINI_UI_IPAD_AFTER:-0}" != 1 ] || wait_fast_beside
     local tests; tests=$(selected_ui_tests)
     [ -n "$tests" ] || die "no UI test matches the selection"
     local count; count=$(printf '%s\n' "$tests" | wc -l | tr -d ' ')
