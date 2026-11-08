@@ -8,6 +8,30 @@ import CassiniEngineTesting
 /// Recording through the app graph: the Library's note mirror, the router, real CAF repair, inspection and M4A
 /// compression.
 @MainActor final class RecordingTests: XCTestCase {
+    func testUnavailableSpeechFinishesAudioOnlyWithoutAQueueOrConsentScreen() async throws {
+        for consented in [false, true] {
+            let test = TestGraph(transcriber: FakeTranscriber(.returns([], total: 1), status: .unsupported))
+            defer { test.tearDown() }
+            let graph = test.graph
+            await graph.start()
+            if consented { graph.settings.recordConsent() }
+            await graph.recording.start()
+            await waitUntil { graph.recording.state.isActive }
+            let id = try XCTUnwrap(graph.recording.state.noteID)
+            graph.recording.screen.finish()
+            await waitUntil { graph.router.path == [.note(id)] }
+            await graph.recording.controller.settle()
+            await graph.library.settle()
+            XCTAssertEqual(graph.router.path, [.note(id)])
+            XCTAssertEqual(graph.library.note(id)?.status, .audioOnly)
+            XCTAssertNil(graph.library.note(id)?.failure)
+            XCTAssertTrue(try JobRepository(root: test.root).load().isEmpty)
+            try await graph.processing.reconcileOnStart(activeNoteID: nil)
+            XCTAssertNil(graph.library.note(id)?.failure, "launch repair must not invent an interrupted transcription")
+            XCTAssertFalse(graph.notices.library(LibraryFacts(liveNotes: 1, audioOnly: true)).contains { $0.kind == .dlRecordNow })
+        }
+    }
+
     /// Two seconds of a tone in the recorder's format: 48 kHz 16-bit mono PCM in CAF.
     private func writeCapture(to url: URL) throws {
         let settings: [String: Any] = [AVFormatIDKey: kAudioFormatLinearPCM, AVSampleRateKey: 48_000, AVNumberOfChannelsKey: 1,

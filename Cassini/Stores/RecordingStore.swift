@@ -47,7 +47,10 @@ import CassiniNotebook
         let transcriber = environment.transcriber, settings = parts.settings
         screen = RecordingScreenModel(controller: controller, ports: .init(
             permission: environment.microphone,
-            modelsMissing: { await transcriber.assetStatus(locale: Locale(identifier: settings.speechLanguage)) != .ready },
+            modelsMissing: {
+                let status = await transcriber.assetStatus(locale: Locale(identifier: settings.speechLanguage))
+                return status != .ready && status != .unsupported
+            },
             askNotificationsOnce: { [notices = parts.notices] in await notices.askNotificationsOnce() }))
         recovery = CaptureRecovery(audio: environment.audio, repairer: CAFCaptureRepairer(), clock: environment.clock,
                                    recoveredTitle: { RecordingCopy.recoveredTitle(RecordingTitles.day($0, locale: locale, timeZone: timeZone)) })

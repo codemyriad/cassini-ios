@@ -52,14 +52,14 @@ import CassiniNotebook
 
     // ports (Apple Speech fallback, ModelRepositoryTests has the port): ModelRepositoryTest#markerFilesDecideReadiness
     /// An installed model counts as consent for its own kind: the speech model for transcriptions, the speaker models
-    /// for Identify speakers. A language Apple does not offer asks nothing; its job says so.
+    /// for Identify speakers. Unavailable speech is refused before the consent decision.
     @Test func anInstalledModelCountsAsConsentForItsKind() async {
         defer { cleanUp() }
         let settings = settings()
         let speech = consent(settings, speech: .ready, speakers: false)
         #expect(await speech.allows(.transcribe, "en-US"))
         #expect(await !speech.allows(.speakersOnly, "en-US"))
-        #expect(await consent(settings, speech: .unsupported, speakers: false).allows(.transcribe, "en-US"))
+        #expect(await !consent(settings, speech: .unsupported, speakers: false).allows(.transcribe, "en-US"))
         #expect(await consent(settings, speech: .notDownloaded, speakers: true).allows(.speakersOnly, "en-US"))
         let plan = ModelDownloadPlan.plan(speech: .ready, speakers: .notDownloaded, forNote: true,
                                           identifySpeakers: true, speakersInstallBytes: 100)

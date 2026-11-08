@@ -59,6 +59,7 @@ extension RecordingController {
     func next(tooLong: Bool) async -> AfterFinish {
         let settings = parts.settings
         guard !tooLong, settings.autoTranscribe else { return .audioOnly }
+        guard await parts.consent.unavailability(.transcribe, settings.speechLanguage) == nil else { return .audioOnly }
         if await parts.consent.allows(.transcribe, settings.speechLanguage) { return .transcribe }
         return settings.modelsDeclinedAt != nil ? .audioOnly : .askConsent
     }

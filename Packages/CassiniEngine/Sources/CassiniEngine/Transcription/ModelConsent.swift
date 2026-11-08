@@ -30,7 +30,7 @@ public struct ModelConsent: Sendable {
                 if settings.modelsConsentAt != nil || parakeetReady() { return true }
                 guard speech.recognizer == .appleSpeech else { return false }
                 let status = await speech.assetStatus(locale: Locale(identifier: language))
-                return status == .ready || status == .unsupported
+                return status == .ready
             case .speakersOnly:
                 if settings.speakerModelsConsentAt != nil { return true }
                 return await speakers.modelStatus() == .ready
