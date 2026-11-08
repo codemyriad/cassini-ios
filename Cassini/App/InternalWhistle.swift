@@ -8,8 +8,8 @@ import CassiniEngine
 import CassiniInference
 import CassiniWhistle
 
-/// Regular Release/App Store builds never consult the experimental preference. Internal archives must export
-/// with testFlightInternalTestingOnly=true; the selected backend is frozen until the next app launch.
+/// Internal-only memory diagnostics and isolated lab support. D78's normal model selection lives in
+/// SpeechModelsStore and does not depend on this flag or on a receipt. Internal archives export internal-only.
 enum InternalWhistle {
     private static let jobMeasurement = Mutex<WhistleMemoryMonitor?>(nil)
     static let preference = "cassini.internal.whistleEnabled"

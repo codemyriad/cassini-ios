@@ -1,8 +1,9 @@
 import CryptoKit
 import Foundation
 
-/// The code/data pin survives Apple distribution re-signing and symbol stripping. Apple's loader also validates
-/// the complete code signature (including link-edit metadata) before any constructor executes. Read-only parsing.
+/// Build/export fingerprint for the clear runtime, before Apple processes it. Not an installed-runtime gate:
+/// App Store encryption changes the code bytes. iOS authenticates the distributed framework at load.
+/// This remains a strict, read-only check for pre-distribution artifacts and rejects encrypted inputs.
 public enum WhistleBinaryIdentity {
     public static func digest(_ data: Data) throws -> String {
         func u32(_ at: Int) throws -> UInt32 {
