@@ -1,7 +1,8 @@
-"""Signing-stable identity of arm64 Mach-O code/data; never modifies the input.
+"""Pre-Apple build/export identity of clear arm64 Mach-O code/data; read-only.
 
-Apple validates the whole signed image at load. This extra pin covers file-backed
-sections and dependency/platform commands, excluding mutable signing/link-edit data.
+Apple may encrypt its distributed copy; installed apps use iOS signed-code loading.
+This build check covers file-backed sections and dependency/platform commands,
+excluding mutable signing/link-edit data. Encrypted build inputs still fail closed.
 """
 import hashlib
 import struct

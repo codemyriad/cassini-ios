@@ -9,6 +9,8 @@ final class WhistleRuntimeTests: XCTestCase {
     func testPinnedPrivateBundleLoadsThroughTheGuardedCAPI() async throws {
         #if arch(arm64)
         let bundle = Bundle.main
+        let verified = await WhistleRuntime.verifyBundle(bundle)
+        XCTAssertTrue(verified, "production asset/path gate accepts the app-bundled runtime before guarded loading")
         let root = try XCTUnwrap(bundle.resourceURL?.appendingPathComponent("Whistle"))
         let weights = try Data(contentsOf: root.appendingPathComponent("whistle.cact"), options: .mappedIfSafe)
         XCTAssertEqual(weights.count, 16_919_407)

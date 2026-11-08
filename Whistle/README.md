@@ -59,21 +59,31 @@ memory reports; lab fixtures are never included in TestFlight exports.
 
 ## Distribution integrity
 
-Distribution re-signing/stripping changes a complete Mach-O file hash. The manifest now pins
-`cassini-whistle-sections-v1`: arm64 dylib code/data section bytes and metadata, plus platform/dependency/UUID/source
-version commands. Unknown commands, malformed ranges and encrypted images fail closed. Mutable signing/linkedit
-metadata is excluded from this additional pin; Apple’s normal loader verifies the complete code signature before
-constructors. This section identity supplements code signing, never replaces it. No load commands are rewritten.
-Actual build5 archive/export section identities match despite their different signed-file hashes; Swift/Python
-parsers agree through actual bundled native tests. The original source-archive/weights pins are unchanged.
+Runtime input pinning happens before Apple distribution: the build verifies the source archives, import closure
+and weights/VAD hashes, signs the private framework, and records its clear code/data fingerprint as
+`runtimeIdentity` / `cassini-whistle-sections-v1`. The strict Swift/Python fingerprint utility remains suitable
+for clear build/export artifacts and rejects encrypted input. It is not an installed-runtime gate.
 
-Archive/export verification does not establish that Apple's processed TestFlight copy passes the same check.
-At startup, `io.codemyriad.cassini` / `WhistleBundle` logs a successful verification or its first failing stage
-(manifest, weights, VAD, runtime read/parse/pin), followed by the selected recognizer and physical memory.
-An encrypted runtime has a distinct `encryptedRuntime` failure and still fails closed. These diagnostics contain
-no note names, audio, transcripts or recording paths. Native load failures additionally log dyld's engine/dependency
-error. Confirm the installed build's TestFlight signer and capture
-Cassini's logs during its first launch after installation; a sideloaded build with the same version is not proof.
+Actual TestFlight8 on the A12/3GB iPad failed at `runtimeIdentityParse`, `encryptedRuntime`, before loading native
+code. The source/export pins passed, but Apple had encrypted its distributed copy. The old runtime check therefore
+disabled Whistle and selected unavailable Apple Speech. This was a packaging-verification bug, not a RAM refusal.
+
+The app now verifies the complete weights/VAD hashes and provenance metadata, and requires the regular runtime
+file at its fixed path inside the running app's bundle. Another bundle and symlinks escaping that path are refused.
+It then sets the privacy environment before `dlopen`; iOS authenticates the signed executable code when loading it.
+Apple's encryption is opaque to Cassini. There is no receipt/DEBUG bypass, code decryption, load-command rewriting
+or warning suppression. The minos27 exception and all source-archive/model pins remain unchanged.
+
+This separates pre-Apple input provenance from installed executable authentication. Apple documents
+[TestFlight/App Store re-signing and custom tamper-check limitations](https://developer.apple.com/documentation/technotes/tn3161-inside-code-signing-certificates)
+and [iOS code-signature validation for embedded frameworks](https://support.apple.com/guide/security/app-code-signing-process-sec7c917bf14/web).
+The startup gate verifies assets/location; the native loader authenticates code at first use. A missing runtime,
+bad model hash or load/signature failure stays unavailable. No arbitrary or system runtime is searched.
+
+`io.codemyriad.cassini` / `WhistleBundle` logs startup success or the first failed asset/location stage, the selected
+recognizer and physical memory, and native load errors/model readiness. No recording content enters these logs.
+Distribution acceptance requires a TestFlight-installed build (Beta signer, `get-task-allow=false`) to transcribe
+the controlled English sample; an archive/export or sideloaded success is not that proof.
 
 ## Validation and cache
 

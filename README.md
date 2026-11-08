@@ -152,6 +152,9 @@ TestFlight still need.
   production pipeline and default-limit A12/3GB memory gate passed. Apple Speech remains a separately checked
   fallback candidate when neither bundled nor verified downloaded speech is available; unsupported devices/locales
   are refused before queueing or download consent. Recording, playback and audio export remain available.
+  Apple's distributed Mach-O runtime may be encrypted: iOS pins its clear runtime at build/export and relies on
+  the iOS signed-code loader for the installed private framework, with full weights/VAD hashes still checked
+  on-device. This distribution constraint differs from Android's ELF packaging; see [Whistle/README.md](Whistle/README.md).
   Speakers
   use Android's streaming Sortformer and CAM++ with Android's thresholds (0.72 automatic, 0.50 suggest, 0.08 margin,
   4 s of speech), so the voiceprints are Android's; voices saved by earlier iOS builds are named again. iOS keeps

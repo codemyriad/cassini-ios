@@ -139,7 +139,8 @@ def bundle(cache, offline=False):
         if signing_identity or platform == "iphonesimulator":
             run(["codesign", "--force", "--sign", signing_identity or "-", "--timestamp=none", staged])
             run(["codesign", "--verify", "--strict", staged])
-        # Section identity survives distribution re-signing; the OS verifies the complete code signature.
+        # Pre-Apple build/export fingerprint, not an installed-runtime check: Apple can encrypt the image.
+        # iOS validates the distributed framework's code signature when loading the app-bundled image.
         manifest = {"engineRevision": PINS["engineRevision"], "modelSha256": PINS["artifacts"]["whistle.cact"]["sha256"],
                     "runtimeIdentity": identity(binary.read_bytes()), "identitySchema": "cassini-whistle-sections-v1", "target": kind, "minimumOS": "26.0", "sourceArchiveMinimumOS": "27.0"}
         verify(archive, PINS["artifacts"][kind + "/libneedle.a"])

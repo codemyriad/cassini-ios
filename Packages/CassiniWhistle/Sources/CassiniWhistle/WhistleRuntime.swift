@@ -23,8 +23,6 @@ public actor WhistleRuntime {
     private struct Manifest: Decodable {
         var engineRevision: String
         var modelSha256: String
-        var runtimeIdentity: String
-        var identitySchema: String
         var target: String
         var minimumOS: String
         var sourceArchiveMinimumOS: String
@@ -53,13 +51,15 @@ public actor WhistleRuntime {
         #endif
         var stage = "bundlePaths"
         do {
-            guard let resources = bundle.resourceURL, let frameworks = bundle.privateFrameworksURL else { throw WhistleError.unavailable }
+            guard let resources = bundle.resourceURL else { throw WhistleError.unavailable }
+            stage = "runtimeLocation"
+            _ = try WhistleRuntimeLocation.binary(application: bundle.bundleURL, trustedApplication: Bundle.main.bundleURL)
             let root = resources.appendingPathComponent("Whistle")
             stage = "manifestRead"
             let manifest = try JSONDecoder().decode(Manifest.self, from: Data(contentsOf: root.appendingPathComponent("manifest.json")))
             stage = "manifestPins"
             guard manifest.engineRevision == engineRevision, manifest.modelSha256 == modelSHA256,
-                  manifest.target == target, manifest.identitySchema == "cassini-whistle-sections-v1",
+                  manifest.target == target,
                   manifest.minimumOS == "26.0", manifest.sourceArchiveMinimumOS == "27.0" else { throw WhistleError.integrity }
             func hash(_ data: Data) -> String { SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined() }
             stage = "weightsRead"
@@ -70,17 +70,10 @@ public actor WhistleRuntime {
             let vad = try Data(contentsOf: root.appendingPathComponent("silero-vad-6.2.1.onnx"), options: .mappedIfSafe)
             stage = "vadPin"
             guard vad.count == 2_327_524, hash(vad) == WhistleVAD.modelSHA256 else { throw WhistleError.integrity }
-            let binary = frameworks.appendingPathComponent("CassiniWhistleRuntime.framework/CassiniWhistleRuntime")
-            stage = "runtimeRead"
-            let image = try Data(contentsOf: binary, options: .mappedIfSafe)
-            stage = "runtimeIdentityParse"
-            let actualIdentity = try WhistleBinaryIdentity.digest(image)
-            stage = "runtimeIdentityPin"
-            guard actualIdentity == manifest.runtimeIdentity else {
-                logger.error("Whistle runtime identity differs: actual=\(actualIdentity, privacy: .public) expected=\(manifest.runtimeIdentity, privacy: .public)")
-                throw WhistleError.integrity
-            }
-            logger.notice("Bundled Whistle verified; target=\(target, privacy: .public)")
+            // The source archive and clear runtime are pinned before Apple distribution. Apple may encrypt
+            // its re-signed copy, so its on-disk code is not a plaintext fingerprint input. iOS authenticates
+            // the private framework when dlopen maps it, before any constructor can execute.
+            logger.notice("Bundled Whistle verified; target=\(target, privacy: .public) runtimeAuthentication=iOS-code-signing")
             return true
         } catch {
             // Fixed stage names, error domains/codes and engine errors only. Never log audio, note data or paths.
@@ -116,19 +109,19 @@ public actor WhistleRuntime {
         throw WhistleError.unavailable
         #endif
         #if os(iOS) && arch(arm64)
-        guard let resources = bundle.resourceURL, let frameworks = bundle.privateFrameworksURL else { throw WhistleError.unavailable }
+        guard let resources = bundle.resourceURL else { throw WhistleError.unavailable }
+        let binary = try WhistleRuntimeLocation.binary(application: bundle.bundleURL, trustedApplication: Bundle.main.bundleURL)
         let root = resources.appendingPathComponent("Whistle", isDirectory: true)
         let manifest = try JSONDecoder().decode(Manifest.self, from: Data(contentsOf: root.appendingPathComponent("manifest.json")))
         guard manifest.engineRevision == Self.engineRevision, manifest.modelSha256 == Self.modelSHA256,
-              manifest.identitySchema == "cassini-whistle-sections-v1", manifest.target == target, manifest.minimumOS == "26.0", manifest.sourceArchiveMinimumOS == "27.0" else {
+              manifest.target == target, manifest.minimumOS == "26.0", manifest.sourceArchiveMinimumOS == "27.0" else {
             throw WhistleError.integrity
         }
-        let binary = frameworks.appendingPathComponent("CassiniWhistleRuntime.framework/CassiniWhistleRuntime")
         let weights = try Data(contentsOf: root.appendingPathComponent("whistle.cact"), options: .mappedIfSafe)
         func hash(_ data: Data) -> String { SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined() }
-        guard weights.count == 16_919_407, hash(weights) == Self.modelSHA256,
-              try WhistleBinaryIdentity.digest(Data(contentsOf: binary, options: .mappedIfSafe)) == manifest.runtimeIdentity else { throw WhistleError.integrity }
-        // This is the first operation that can execute engine constructors. Flags and both pins precede it.
+        guard weights.count == 16_919_407, hash(weights) == Self.modelSHA256 else { throw WhistleError.integrity }
+        // First operation that can execute engine constructors. Resource pins and privacy flags precede it;
+        // iOS validates this app-bundled framework's code signature before executing its code.
         let loaded = try WhistlePrivacy.enter(environment: privacyEnvironment()) {
             guard let loaded = dlopen(binary.path, RTLD_NOW | RTLD_LOCAL) else {
                 // dyld's message concerns this fixed engine path/dependencies, never a recording path.
