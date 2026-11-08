@@ -1,0 +1,2197 @@
+{
+  "provenance": "Xcode26.0/17A324 SDK26 strict link audit; D75.2 spike c65073c; source archives bound by pins.json",
+  "targets": {
+    "ios-arm64": {
+      "__DefaultRuneLocale": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "__Unwind_Resume": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "__ZNKSt3__119__shared_weak_count13__get_deleterERKSt9type_info": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNKSt3__123__match_any_but_newlineIcE6__execERNS_7__stateIcEE": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNKSt3__16locale4nameEv": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNKSt3__16locale9use_facetERNS0_2idE": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt11logic_errorC2EPKc": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt12length_errorD1Ev": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd",
+        "usr/lib/libc++abi.tbd"
+      ],
+      "__ZNSt12out_of_rangeD1Ev": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd",
+        "usr/lib/libc++abi.tbd"
+      ],
+      "__ZNSt20bad_array_new_lengthC1Ev": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd",
+        "usr/lib/libc++abi.tbd"
+      ],
+      "__ZNSt20bad_array_new_lengthD1Ev": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd",
+        "usr/lib/libc++abi.tbd"
+      ],
+      "__ZNSt3__111regex_errorC1ENS_15regex_constants10error_typeE": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__111regex_errorD1Ev": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__112basic_stringIcNS_11char_traitsIcEENS_9allocatorIcEEE5eraseEmm": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__112basic_stringIcNS_11char_traitsIcEENS_9allocatorIcEEE6appendEPKc": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__112basic_stringIcNS_11char_traitsIcEENS_9allocatorIcEEE6appendEPKcm": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__112basic_stringIcNS_11char_traitsIcEENS_9allocatorIcEEE6appendERKS5_mm": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__112basic_stringIcNS_11char_traitsIcEENS_9allocatorIcEEE6appendEmc": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__112basic_stringIcNS_11char_traitsIcEENS_9allocatorIcEEE6assignEPKc": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__112basic_stringIcNS_11char_traitsIcEENS_9allocatorIcEEE6assignEmc": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__112basic_stringIcNS_11char_traitsIcEENS_9allocatorIcEEE6insertEmPKc": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__112basic_stringIcNS_11char_traitsIcEENS_9allocatorIcEEE7replaceEmmPKc": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__112basic_stringIcNS_11char_traitsIcEENS_9allocatorIcEEE7replaceEmmPKcm": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__112basic_stringIcNS_11char_traitsIcEENS_9allocatorIcEEE7reserveEm": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__112basic_stringIcNS_11char_traitsIcEENS_9allocatorIcEEE9push_backEc": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__112basic_stringIcNS_11char_traitsIcEENS_9allocatorIcEEED1Ev": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__112basic_stringIcNS_11char_traitsIcEENS_9allocatorIcEEEaSERKS5_": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__112basic_stringIcNS_11char_traitsIcEENS_9allocatorIcEEEaSEc": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__115__get_classnameEPKcb": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__115__thread_structC1Ev": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__115__thread_structD1Ev": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__118condition_variable10notify_allEv": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__118condition_variable4waitERNS_11unique_lockINS_5mutexEEE": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__118condition_variableD1Ev": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__119__shared_weak_count14__release_weakEv": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__119__shared_weak_countD2Ev": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__119__thread_local_dataEv": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__120__get_collation_nameEPKc": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__120__throw_system_errorEiPKc": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__15ctypeIcE2idE": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__15mutex4lockEv": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__15mutex6unlockEv": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__15mutexD1Ev": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__16__sortIRNS_6__lessIddEEPdEEvT0_S5_T_": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__16__sortIRNS_6__lessIiiEEPiEEvT0_S5_T_": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__16chrono12steady_clock3nowEv": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__16localeC1ERKS0_": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__16localeC1Ev": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__16localeD1Ev": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__16thread20hardware_concurrencyEv": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__16thread4joinEv": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__16threadD1Ev": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__17collateIcE2idE": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__19to_stringEi": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__19to_stringEl": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__1plIcNS_11char_traitsIcEENS_9allocatorIcEEEENS_12basic_stringIT_T0_T1_EEPKS6_RKS9_": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZSt7nothrow": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZSt9terminatev": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd",
+        "usr/lib/libc++abi.tbd"
+      ],
+      "__ZTVN10__cxxabiv117__class_type_infoE": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd",
+        "usr/lib/libc++abi.tbd"
+      ],
+      "__ZTVN10__cxxabiv120__si_class_type_infoE": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd",
+        "usr/lib/libc++abi.tbd"
+      ],
+      "__ZTVSt12length_error": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd",
+        "usr/lib/libc++abi.tbd"
+      ],
+      "__ZTVSt12out_of_range": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd",
+        "usr/lib/libc++abi.tbd"
+      ],
+      "__ZdaPvSt11align_val_t": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd",
+        "usr/lib/libc++abi.tbd"
+      ],
+      "__ZdlPv": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd",
+        "usr/lib/libc++abi.tbd"
+      ],
+      "__ZnamSt11align_val_t": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd",
+        "usr/lib/libc++abi.tbd"
+      ],
+      "__Znwm": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd",
+        "usr/lib/libc++abi.tbd"
+      ],
+      "__ZnwmRKSt9nothrow_t": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd",
+        "usr/lib/libc++abi.tbd"
+      ],
+      "___chkstk_darwin": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "___cxa_allocate_exception": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd",
+        "usr/lib/libc++abi.tbd"
+      ],
+      "___cxa_atexit": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "___cxa_begin_catch": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd",
+        "usr/lib/libc++abi.tbd"
+      ],
+      "___cxa_end_catch": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd",
+        "usr/lib/libc++abi.tbd"
+      ],
+      "___cxa_free_exception": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd",
+        "usr/lib/libc++abi.tbd"
+      ],
+      "___cxa_guard_abort": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd",
+        "usr/lib/libc++abi.tbd"
+      ],
+      "___cxa_guard_acquire": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd",
+        "usr/lib/libc++abi.tbd"
+      ],
+      "___cxa_guard_release": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd",
+        "usr/lib/libc++abi.tbd"
+      ],
+      "___cxa_throw": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd",
+        "usr/lib/libc++abi.tbd"
+      ],
+      "___gxx_personality_v0": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd",
+        "usr/lib/libc++abi.tbd"
+      ],
+      "___maskrune": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "___sincosf_stret": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "___stack_chk_fail": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "___stack_chk_guard": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "___stderrp": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "___tolower": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "___toupper": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "__tlv_atexit": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "__tlv_bootstrap": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_atof": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_atoi": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_bzero": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_cos": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_cosf": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_exp": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_expf": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_fclose": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_fopen": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_fprintf": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_fread": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_fwrite": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_getrusage": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_log": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_log10": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_logf": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_malloc_zone_pressure_relief": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_memchr": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_memcmp": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_memcpy": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_memmove": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_memset": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_memset_pattern16": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_mmap": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_munmap": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_powf": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_pthread_create": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_pthread_setspecific": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_remove": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_sin": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_sinf": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_snprintf": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_strchr": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_strcmp": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_strlen": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_strncmp": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_strstr": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_strtod": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_sysctlbyname": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ]
+    },
+    "ios-sim-arm64": {
+      "__DefaultRuneLocale": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "__Unwind_Resume": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "__ZNKSt3__119__shared_weak_count13__get_deleterERKSt9type_info": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNKSt3__123__match_any_but_newlineIcE6__execERNS_7__stateIcEE": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNKSt3__16locale4nameEv": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNKSt3__16locale9use_facetERNS0_2idE": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt11logic_errorC2EPKc": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt12length_errorD1Ev": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd",
+        "usr/lib/libc++abi.tbd"
+      ],
+      "__ZNSt12out_of_rangeD1Ev": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd",
+        "usr/lib/libc++abi.tbd"
+      ],
+      "__ZNSt20bad_array_new_lengthC1Ev": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd",
+        "usr/lib/libc++abi.tbd"
+      ],
+      "__ZNSt20bad_array_new_lengthD1Ev": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd",
+        "usr/lib/libc++abi.tbd"
+      ],
+      "__ZNSt3__111regex_errorC1ENS_15regex_constants10error_typeE": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__111regex_errorD1Ev": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__112basic_stringIcNS_11char_traitsIcEENS_9allocatorIcEEE5eraseEmm": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__112basic_stringIcNS_11char_traitsIcEENS_9allocatorIcEEE6appendEPKc": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__112basic_stringIcNS_11char_traitsIcEENS_9allocatorIcEEE6appendEPKcm": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__112basic_stringIcNS_11char_traitsIcEENS_9allocatorIcEEE6appendERKS5_mm": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__112basic_stringIcNS_11char_traitsIcEENS_9allocatorIcEEE6appendEmc": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__112basic_stringIcNS_11char_traitsIcEENS_9allocatorIcEEE6assignEPKc": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__112basic_stringIcNS_11char_traitsIcEENS_9allocatorIcEEE6assignEmc": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__112basic_stringIcNS_11char_traitsIcEENS_9allocatorIcEEE6insertEmPKc": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__112basic_stringIcNS_11char_traitsIcEENS_9allocatorIcEEE7replaceEmmPKc": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__112basic_stringIcNS_11char_traitsIcEENS_9allocatorIcEEE7replaceEmmPKcm": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__112basic_stringIcNS_11char_traitsIcEENS_9allocatorIcEEE7reserveEm": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__112basic_stringIcNS_11char_traitsIcEENS_9allocatorIcEEE9push_backEc": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__112basic_stringIcNS_11char_traitsIcEENS_9allocatorIcEEED1Ev": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__112basic_stringIcNS_11char_traitsIcEENS_9allocatorIcEEEaSERKS5_": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__112basic_stringIcNS_11char_traitsIcEENS_9allocatorIcEEEaSEc": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__115__get_classnameEPKcb": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__115__thread_structC1Ev": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__115__thread_structD1Ev": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__118condition_variable10notify_allEv": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__118condition_variable4waitERNS_11unique_lockINS_5mutexEEE": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__118condition_variableD1Ev": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__119__shared_weak_count14__release_weakEv": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__119__shared_weak_countD2Ev": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__119__thread_local_dataEv": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__120__get_collation_nameEPKc": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__120__throw_system_errorEiPKc": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__15ctypeIcE2idE": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__15mutex4lockEv": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__15mutex6unlockEv": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__15mutexD1Ev": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__16__sortIRNS_6__lessIddEEPdEEvT0_S5_T_": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__16__sortIRNS_6__lessIiiEEPiEEvT0_S5_T_": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__16chrono12steady_clock3nowEv": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__16localeC1ERKS0_": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__16localeC1Ev": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__16localeD1Ev": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__16thread20hardware_concurrencyEv": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__16thread4joinEv": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__16threadD1Ev": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__17collateIcE2idE": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__19to_stringEi": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__19to_stringEl": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZNSt3__1plIcNS_11char_traitsIcEENS_9allocatorIcEEEENS_12basic_stringIT_T0_T1_EEPKS6_RKS9_": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZSt7nothrow": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd"
+      ],
+      "__ZSt9terminatev": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd",
+        "usr/lib/libc++abi.tbd"
+      ],
+      "__ZTVN10__cxxabiv117__class_type_infoE": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd",
+        "usr/lib/libc++abi.tbd"
+      ],
+      "__ZTVN10__cxxabiv120__si_class_type_infoE": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd",
+        "usr/lib/libc++abi.tbd"
+      ],
+      "__ZTVSt12length_error": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd",
+        "usr/lib/libc++abi.tbd"
+      ],
+      "__ZTVSt12out_of_range": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd",
+        "usr/lib/libc++abi.tbd"
+      ],
+      "__ZdaPvSt11align_val_t": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd",
+        "usr/lib/libc++abi.tbd"
+      ],
+      "__ZdlPv": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd",
+        "usr/lib/libc++abi.tbd"
+      ],
+      "__ZnamSt11align_val_t": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd",
+        "usr/lib/libc++abi.tbd"
+      ],
+      "__Znwm": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd",
+        "usr/lib/libc++abi.tbd"
+      ],
+      "__ZnwmRKSt9nothrow_t": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd",
+        "usr/lib/libc++abi.tbd"
+      ],
+      "___cxa_allocate_exception": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd",
+        "usr/lib/libc++abi.tbd"
+      ],
+      "___cxa_atexit": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "___cxa_begin_catch": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd",
+        "usr/lib/libc++abi.tbd"
+      ],
+      "___cxa_end_catch": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd",
+        "usr/lib/libc++abi.tbd"
+      ],
+      "___cxa_free_exception": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd",
+        "usr/lib/libc++abi.tbd"
+      ],
+      "___cxa_guard_abort": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd",
+        "usr/lib/libc++abi.tbd"
+      ],
+      "___cxa_guard_acquire": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd",
+        "usr/lib/libc++abi.tbd"
+      ],
+      "___cxa_guard_release": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd",
+        "usr/lib/libc++abi.tbd"
+      ],
+      "___cxa_throw": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd",
+        "usr/lib/libc++abi.tbd"
+      ],
+      "___gxx_personality_v0": [
+        "usr/lib/libc++.1.tbd",
+        "usr/lib/libc++.tbd",
+        "usr/lib/libc++abi.tbd"
+      ],
+      "___maskrune": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "___sincosf_stret": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "___stack_chk_fail": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "___stack_chk_guard": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "___stderrp": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "___tolower": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "___toupper": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "__tlv_atexit": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "__tlv_bootstrap": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_atof": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_atoi": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_bzero": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_cos": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_cosf": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_exp": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_expf": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_fclose": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_fopen": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_fprintf": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_fread": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_fwrite": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_getrusage": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_log": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_log10": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_logf": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_malloc_zone_pressure_relief": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_memchr": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_memcmp": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_memcpy": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_memmove": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_memset": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_memset_pattern16": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_mmap": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_munmap": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_powf": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_pthread_create": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_pthread_setspecific": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_remove": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_sin": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_sinf": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_snprintf": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_strchr": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_strcmp": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_strlen": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_strncmp": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_strstr": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_strtod": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ],
+      "_sysctlbyname": [
+        "usr/lib/libm.tbd",
+        "usr/lib/libdl.tbd",
+        "usr/lib/libSystem_asan.tbd",
+        "usr/lib/librpcsvc.tbd",
+        "usr/lib/libinfo.tbd",
+        "usr/lib/libpthread.tbd",
+        "usr/lib/libSystem.B.tbd",
+        "usr/lib/libdbm.tbd",
+        "usr/lib/libSystem.B_asan.tbd",
+        "usr/lib/libSystem.tbd",
+        "usr/lib/libproc.tbd",
+        "usr/lib/libc.tbd",
+        "usr/lib/libpoll.tbd"
+      ]
+    }
+  },
+  "engineRevision": "93e88ede867e4311c39151285e74df513e4b835b",
+  "sourceArchiveSha256": {
+    "ios-arm64": "e1dd5a4c59dc78aea54bcef91f4ba751ee30382adb92b8831ed2832833d76837",
+    "ios-sim-arm64": "adc37ff4a88a928e581f670b4323e7f49f6d6886e37f832b015fea0885c5e177"
+  }
+}

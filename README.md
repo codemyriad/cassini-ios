@@ -43,6 +43,11 @@ Voiceprints
 stay in the app's private storage, are excluded from backups, and are never written into a document or an export.
 System backups may include recordings and transcripts.
 
+The build also bundles pinned Whistle weights and a private Needle runtime (D75.2); they are never downloaded by
+the running app. Whistle selection remains gated pending production pipeline and lab-device acceptance, including
+the 3 GB memory gate. See [Whistle/README.md](Whistle/README.md) for the documented minos27 archive exception,
+SDK26/simulator evidence, guarded C API and capability policy. No Included/default option is enabled yet.
+
 ## Run
 
 You need Xcode 26 or newer (the project is developed with Xcode 27), Swift 6.2 or newer, and
