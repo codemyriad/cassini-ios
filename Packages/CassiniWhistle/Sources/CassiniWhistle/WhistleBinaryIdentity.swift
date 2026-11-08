@@ -42,7 +42,8 @@ public enum WhistleBinaryIdentity {
                 withUnsafeBytes(of: &little) { hashed.append(contentsOf: $0) }
                 hashed.append(data[at..<at+length])
             } else if cmd == 0x2c {
-                guard length >= 24, try u32(at+16) == 0 else { throw WhistleError.integrity }
+                guard length >= 24 else { throw WhistleError.integrity }
+                guard try u32(at+16) == 0 else { throw WhistleError.encryptedRuntime }
                 var little = UInt32(length).littleEndian
                 withUnsafeBytes(of: &little) { hashed.append(contentsOf: $0) }
                 hashed.append(data[at..<at+length])

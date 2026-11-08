@@ -69,4 +69,21 @@ import Testing
         #expect(throws: WhistleError.self) { try WhistleBinaryIdentity.digest(image) }
         #expect(throws: WhistleError.self) { try WhistleBinaryIdentity.digest(Data()) }
     }
+
+    @Test func binaryIdentityDistinguishesEncryptionFromMalformedImagesWithoutAcceptingIt() throws {
+        var image = Data(repeating: 0, count: 320)
+        func put(_ value: UInt32, _ at: Int) {
+            var little = value.littleEndian
+            withUnsafeBytes(of: &little) { image.replaceSubrange(at..<at+4, with: $0) }
+        }
+        put(0xfeedfacf, 0); put(0x100000c, 4); put(6, 12); put(2, 16); put(176, 20)
+        put(0x19, 32); put(152, 36); put(1, 96)
+        put(16, 144); put(224, 152); put(0x80000400, 168)
+        put(0x2c, 184); put(24, 188); put(224, 192); put(16, 196)
+        _ = try WhistleBinaryIdentity.digest(image)
+        put(1, 200)
+        #expect(throws: WhistleError.encryptedRuntime) { try WhistleBinaryIdentity.digest(image) }
+        put(16, 188) // A truncated encryption command remains a malformed image, not an accepted exception.
+        #expect(throws: WhistleError.integrity) { try WhistleBinaryIdentity.digest(image) }
+    }
 }

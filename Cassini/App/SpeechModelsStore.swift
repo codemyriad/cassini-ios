@@ -61,6 +61,9 @@ import CassiniWhistle
     func verifyBundledSpeech() async {
         let verified = await WhistleRuntime.verifyBundle()
         whistle.withLock { $0.bundleVerified = verified }
+        let recognizer = selectedRecognizer().rawValue
+        Logger(subsystem: "io.codemyriad.cassini", category: "WhistleBundle")
+            .notice("Speech selection after bundle verification; verified=\(verified, privacy: .public) physicalMemory=\(self.physicalMemory, privacy: .public) recognizer=\(recognizer, privacy: .public)")
         onChange()
     }
 
