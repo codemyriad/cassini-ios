@@ -4,12 +4,15 @@ import Foundation
 /// that SwiftUI builds again (a size-class change, a stack rebuilt) neither runs its start action again nor loses its
 /// search. It goes when the screen leaves the stack.
 public struct NoteSession: Hashable, Sendable {
+    /// Advances for each explicit Library open, even when its route is unchanged; zero for a restored session.
+    public let opening: UInt64
     /// The start action ran.
     public var started = false
     /// The search as the screen last had it; "" once closed, nil while the screen has not touched the route's query.
     public var search: String?
 
-    public init(started: Bool = false, search: String? = nil) {
+    public init(started: Bool = false, search: String? = nil, opening: UInt64 = 0) {
+        self.opening = opening
         self.started = started
         self.search = search
     }
@@ -53,7 +56,7 @@ public struct ScreenStack: Hashable, Sendable {
 
     /// A note the Library opens is a fresh screen: its start action runs and its search is the route's.
     private mutating func opened(_ route: Route) {
-        if let id = route.noteID { sessions[id] = nil }
+        if let id = route.noteID { sessions[id] = NoteSession(opening: (sessions[id]?.opening ?? 0) &+ 1) }
     }
 
     public func session(_ noteID: UUID) -> NoteSession { sessions[noteID] ?? NoteSession() }
@@ -96,7 +99,7 @@ public struct ScreenStack: Hashable, Sendable {
 
     /// In split view the detail column's first screen has no back button: the Library it came from is beside it, and
     /// under it is only the column's placeholder.
-    public func hidesBackButton(_ route: Route) -> Bool { isSplit && path.first == route }
+    public func hidesBackButton(_ route: Route) -> Bool { isSplit && path.first?.isSameScreen(as: route) == true }
 
     /// The screen under the topmost `route`, for its back label.
     public func below(_ route: Route) -> Route? { BackStack.below(route, in: stack) }

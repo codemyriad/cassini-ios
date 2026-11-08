@@ -17,6 +17,29 @@ import CassiniEngine
         #expect(screens.path == [.note(b)])
     }
 
+    @Test func reopeningTheSameRouteHasANewRequestButEditsAndPoppingBackKeepIt() throws {
+        var screens = ScreenStack(isSplit: true)
+        screens.show(.note(a, query: "Thursday"))
+        let first = screens.session(a).opening
+        #expect(first > 0)
+        screens.markStarted(a)
+        screens.keepSearch("changed", for: a)
+        screens.push(.settings)
+        screens.openNote(a)
+        #expect(screens.session(a).opening == first)
+        #expect(screens.session(a).search == "changed")
+        screens.show(.note(a, query: "Thursday"))
+        #expect(screens.path == [.note(a, query: "Thursday")])
+        #expect(screens.session(a).opening != first)
+        #expect(!screens.session(a).started && screens.session(a).search == nil)
+        let second = screens.session(a).opening
+        screens.show(.note(a, query: "Thursday"))
+        #expect(screens.session(a).opening != second, "equal route values are still distinct requests")
+        var restored = ScreenStack()
+        restored.restore(screens.encodedPath)
+        #expect(restored.session(a).opening == 0, "request identities are never persisted")
+    }
+
     @Test func inSplitViewTheDetailsFirstScreenIsSelectedAndHasNoBackButton() {
         var screens = ScreenStack(path: [.note(a), .savedVoices])
         #expect(screens.selectedNoteID == nil, "a phone has no selection")
@@ -25,6 +48,9 @@ import CassiniEngine
         #expect(screens.selectedNoteID == a)
         #expect(screens.hidesBackButton(.note(a)))
         #expect(!screens.hidesBackButton(.savedVoices), "a screen pushed over it goes back to it")
+        screens.path = [.note(a, query: "Thursday", start: .documentInfo)]
+        #expect(screens.hidesBackButton(.note(a)), "a fresh payload is still the same split-view root screen")
+        #expect(!screens.hidesBackButton(.note(b)))
         screens.show(.settings)
         #expect(screens.selectedNoteID == nil)
         #expect(screens.hidesBackButton(.settings))
