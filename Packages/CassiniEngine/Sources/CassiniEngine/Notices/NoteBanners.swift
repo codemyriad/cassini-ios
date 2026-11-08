@@ -33,8 +33,9 @@ public enum NoteBanners {
             // Audio longer than one transcription takes says why, and offers no Transcribe; nor does a capture.
             let tooLong = note.duration > Limits.maxTranscribeDuration
             let noTranscribe = note.audio == .live || tooLong
-            specs.append(BannerSpec(.plainAudio, BannerArgs(text: tooLong ? failureText(.long) : nil),
-                                    actions: noTranscribe ? [] : nil))
+            specs.append(BannerSpec(.plainAudio, BannerArgs(text: tooLong ? failureText(.long) : facts.speechUnavailableText),
+                                    actions: noTranscribe ? [] : nil,
+                                    disabledActions: facts.speechUnavailableText == nil ? [] : [.transcribe]))
         case .unplayable:
             if case .unplayable(let reason) = note.audio {
                 specs.append(BannerSpec(.unplayable, BannerArgs(text: unplayableText(reason))))

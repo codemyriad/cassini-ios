@@ -180,7 +180,8 @@ struct NoteSectionView: View {
         let state = processing.state
         return NoteBannerFacts(trustToggled: model.screen.trustToggled, queueHold: state.hold, waitingJobs: state.queue.count,
                                dismissed: model.screen.dismissed, speechInstallBytes: installBytes.speech,
-                               speakersInstallBytes: installBytes.speakers)
+                               speakersInstallBytes: installBytes.speakers,
+                               speechUnavailableText: processing.models.statuses[.speech] == .unsupported ? NoteCopy.speechUnavailable : nil)
     }
 
     /// The free-space figures of a model download that failed for want of room: Parakeet's (nil keeps the estimate of

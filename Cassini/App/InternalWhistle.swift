@@ -1,4 +1,6 @@
 import Foundation
+import Darwin
+import AVFoundation
 import os
 import Synchronization
 import CassiniNotebook
@@ -48,8 +50,64 @@ enum InternalWhistle {
             if ProcessInfo.processInfo.arguments.contains("--internal-whistle-lab") {
                 let compact = try JSONEncoder().encode(report)
                 print("CASSINI_WHISTLE_MEMORY " + String(decoding: compact, as: UTF8.self))
+                fflush(nil)
             }
         } catch { /* A diagnostic write never changes the job outcome or a recording. */ }
+    }
+    /// Public English fixture only: longest permitted ASR input, repeated with the VAD session resident.
+    /// Cancellation is requested synchronously at the model-ready event, without sleeps or a scheduling race.
+    static func runLabSoak() async {
+        guard isInternalBuild, ProcessInfo.processInfo.arguments.contains("--internal-whistle-lab-soak") else { return }
+        do {
+            try await NativeBudget.shared.withBudget {
+                let measurement = WhistleMemoryMonitor()
+                var released = false
+                do {
+                    let acceptance = capability()
+                    guard acceptance.available,
+                          let resources = Bundle.main.resourceURL else { throw WhistleError.unavailable }
+                    let file = try AVAudioFile(forReading: resources.appendingPathComponent("WhistleTests/jfk.wav"))
+                    guard file.processingFormat.sampleRate == 16000, file.processingFormat.channelCount == 1,
+                          let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: AVAudioFrameCount(file.length)) else {
+                        throw WhistleError.invalidInput
+                    }
+                    try file.read(into: buffer)
+                    guard let pointer = buffer.floatChannelData?.pointee, buffer.frameLength > 0 else { throw WhistleError.invalidInput }
+                    let source = Array(UnsafeBufferPointer(start: pointer, count: Int(buffer.frameLength)))
+                    let pcm = (0..<240128).map { source[$0 % source.count] }
+                    let vad = try WhistleVAD(model: resources.appendingPathComponent("Whistle/silero-vad-6.2.1.onnx"))
+                    var first: WhistleResult?
+                    for _ in 0..<10 {
+                        try Task.checkCancellation()
+                        _ = try vad.probability(Array(pcm.prefix(512)))
+                        let result = try await WhistleRuntime.shared.transcribe(pcm, acceptance: acceptance)
+                        guard !result.words.isEmpty, result.language == "en" else { throw WhistleError.invalidOutput }
+                        if let first { guard result == first else { throw WhistleError.invalidOutput } }
+                        else { first = result }
+                        released = await WhistleRuntime.shared.close()
+                    }
+                    // Keep the recurrent VAD allocation alive through every largest-window decode.
+                    _ = try vad.probability(Array(pcm.suffix(512)))
+                    let cancelled = Task {
+                        try await WhistleTranscriber(acceptance: acceptance).transcribe(
+                            .init(url: resources.appendingPathComponent("WhistleTests/jfk.wav"), language: "", allowDownload: false)) {
+                                if case .progress(let done, _) = $0, done == 0 {
+                                    withUnsafeCurrentTask { $0?.cancel() }
+                                }
+                            }
+                    }
+                    do { _ = try await cancelled.value; throw WhistleError.nativeFailure }
+                    catch is CancellationError { }
+                    var report = measurement.finish(succeeded: true, nativeModelReleased: released, scope: "maximum-window-soak")
+                    report.completedWindows = 10; report.samplesPerWindow = 240128; report.cancelledAtModelReady = true
+                    writeReport(report)
+                } catch {
+                    released = await WhistleRuntime.shared.close()
+                    writeReport(measurement.finish(succeeded: false, nativeModelReleased: released, scope: "maximum-window-soak"))
+                    print("CASSINI_WHISTLE_LAB_ERROR " + String(describing: error)); fflush(nil)
+                }
+            }
+        } catch { print("CASSINI_WHISTLE_LAB_ERROR " + String(describing: error)); fflush(nil) }
     }
     static func capability() -> WhistleCapability {
         #if arch(arm64)

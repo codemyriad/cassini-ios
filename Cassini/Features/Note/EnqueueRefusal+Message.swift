@@ -21,7 +21,7 @@ extension EnqueueRefusal {
             String(localized: "Cassini can’t play this audio, so there is nothing to transcribe.", table: "Transcription",
                    comment: "A Transcribe was refused: the audio cannot be decoded")
         case .speechUnavailable(let failure):
-            failure.transcriptionMessage
+            failure == .model ? NoteCopy.speechUnavailable : failure.transcriptionMessage
         case .queueUnavailable:
             String(localized: "The transcription queue was saved by a newer version of Cassini, or can’t be read. Update Cassini to transcribe.",
                    table: "Transcription", comment: "A Transcribe was refused: the stored queue cannot be used")

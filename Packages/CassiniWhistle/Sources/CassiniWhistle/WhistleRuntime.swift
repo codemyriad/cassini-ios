@@ -15,6 +15,7 @@ public actor WhistleRuntime {
     private var decode: Decode?
     private var model: UnsafeMutableBufferPointer<UInt8>?
     private var binaryPath: String?
+    private var loadFailed = false
     private init() {}
 
     private struct Manifest: Decodable {
@@ -66,6 +67,7 @@ public actor WhistleRuntime {
     }
 
     private func open(bundle: Bundle) throws {
+        guard !loadFailed else { throw WhistleError.nativeFailure }
         guard handle == nil else { return }
         #if os(iOS) && arch(arm64)
         #if targetEnvironment(simulator)
@@ -98,6 +100,7 @@ public actor WhistleRuntime {
         // explicitly owned storage rather than retaining Data and relying on an incidental backing pointer.
         let bytes = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: weights.count)
         _ = weights.copyBytes(to: bytes)
+        var loadAttempted = false
         do {
             guard let loadSymbol = dlsym(loaded, "needle_load"), let decodeSymbol = dlsym(loaded, "needle_transcribe"),
                   let modelsSymbol = dlsym(loaded, "needle_models") else {
@@ -107,6 +110,7 @@ public actor WhistleRuntime {
             // Also fail closed if another image already owns this process-global native runtime.
             guard models() == 0 else { throw WhistleError.nativeFailure }
             let load = unsafeBitCast(loadSymbol, to: Load.self)
+            loadAttempted = true
             guard load(bytes.baseAddress, UInt64(bytes.count)) >= 0, models() & 2 == 2 else {
                 throw WhistleError.nativeFailure
             }
@@ -115,8 +119,15 @@ public actor WhistleRuntime {
             handle = loaded
             binaryPath = binary.path
         } catch {
-            dlclose(loaded)
-            bytes.deallocate()
+            if loadAttempted {
+                // A failed native load can leave a partially constructed global model borrowing the bytes.
+                // The API has no partial-load cleanup guarantee. Retain this bounded allocation until process exit;
+                // decode stays nil and all future prepares fail. Never borrow freed storage or reuse a failed load.
+                model = bytes; handle = loaded; binaryPath = binary.path
+                loadFailed = true
+            } else {
+                dlclose(loaded); bytes.deallocate()
+            }
             throw error
         }
         #endif
@@ -160,6 +171,7 @@ public actor WhistleRuntime {
     /// while that model remains alive. Reuse that single resident model on the next session; memory measurements
     /// must include this retained allocation and speaker preflights see it in os_proc_available_memory().
     @discardableResult public func close() -> Bool {
+        guard !loadFailed else { return false }
         guard let previous = handle else { return true }
         guard let binaryPath, dlclose(previous) == 0 else { return false }
         if let resident = dlopen(binaryPath, RTLD_NOW | RTLD_LOCAL | RTLD_NOLOAD) {

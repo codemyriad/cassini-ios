@@ -6,9 +6,20 @@ import CassiniNotebook
 /// Touches: `parts.jobs`, `parts.notes` and `parts.checkpoints` (writes), `trashed` (an enqueue takes the note out),
 /// `refresh()`.
 extension TranscriptionCoordinator {
+    /// A failed attempt without any saved work may use the newly selected model on explicit retry.
+    /// Saved, paused, active and unknown-backend jobs keep their identity. Caller holds the queue serial section.
+    func adoptsSelectedRecognizer(_ existing: Job?) async -> Bool {
+        guard let existing, existing.state == .failed, existing.kind != .speakersOnly,
+              let selected = parts.recognizer, SpeechRecognizer(rawValue: selected) != nil,
+              existing.recognizer != selected,
+              existing.recognizer.map({ SpeechRecognizer(rawValue: $0) != nil }) ?? true else { return false }
+        return await parts.checkpoints.status(of: existing.noteID) == .missing
+    }
     func consent(for noteID: UUID) async -> ModelConsent {
         guard let resolve = parts.consentForRecognizer else { return parts.consent }
-        if let existing = await parts.jobs.job(noteID) { return resolve(existing.recognizer) }
+        if let existing = await parts.jobs.job(noteID) {
+            return resolve(await adoptsSelectedRecognizer(existing) ? parts.recognizer : existing.recognizer)
+        }
         return resolve(parts.recognizer)
     }
 
@@ -29,7 +40,9 @@ extension TranscriptionCoordinator {
     func enqueue(_ noteID: UUID, kind: JobKind, language: String?) async -> TranscribeOutcome {
         let existing = await parts.jobs.job(noteID)
         if let existing, existing.state == .queued || existing.state == .running { return .queued(changed: false) }
-        guard await write({ try await $0.enqueue(noteID, kind: kind, language: language, now: self.parts.clock.now, recognizer: self.parts.recognizer) }) != nil else {
+        let adopts = await adoptsSelectedRecognizer(existing)
+        guard await write({ try await $0.enqueue(noteID, kind: kind, language: language, now: self.parts.clock.now,
+            recognizer: self.parts.recognizer, replacingFailedRecognizer: adopts) }) != nil else {
             return .queued(changed: false)
         }
         trashed.remove(noteID)
@@ -40,13 +53,15 @@ extension TranscriptionCoordinator {
 
     func needConsent(_ noteID: UUID, kind: JobKind, language: String?) async -> TranscribeOutcome {
         let now = parts.clock.now
-        switch await parts.jobs.job(noteID)?.state {
+        let existing = await parts.jobs.job(noteID)
+        let adopts = await adoptsSelectedRecognizer(existing)
+        switch existing?.state {
         case .running:
             return .queued(changed: false)
         case .queued:
             await write { try await $0.transition(noteID, now: now) { $0.state = .needsConsent } }
         default:
-            await write { try await $0.enqueue(noteID, kind: kind, language: language, now: now, waitingForConsent: true, recognizer: self.parts.recognizer) }
+            await write { try await $0.enqueue(noteID, kind: kind, language: language, now: now, waitingForConsent: true, recognizer: self.parts.recognizer, replacingFailedRecognizer: adopts) }
         }
         await mirror(noteID)
         await refresh()

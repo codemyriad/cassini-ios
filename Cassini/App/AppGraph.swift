@@ -162,6 +162,9 @@ import CassiniNotebook
     @discardableResult func start() async -> StartupReport {
         let report = await startup.run()
         #if CASSINI_INTERNAL_TESTFLIGHT
+        if environment.launch.whistleLab, ProcessInfo.processInfo.arguments.contains("--internal-whistle-lab-soak") {
+            Task { await InternalWhistle.runLabSoak() }
+        }
         if environment.launch.whistleLab, library.notes.isEmpty,
            let fixture = Bundle.main.resourceURL?.appendingPathComponent("WhistleTests/jfk.wav"),
            FileManager.default.fileExists(atPath: fixture.path) {

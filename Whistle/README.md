@@ -80,7 +80,7 @@ state, elapsed time, outcome and model residency. A whole-job observer includes 
 no audio, words, note IDs or paths. `--internal-whistle-lab` selects a separate library/preferences/models/exports
 root; an explicitly bundled lab-only English fixture exercises the real app without opening the user’s recordings.
 `CASSINI_WHISTLE_LAB_FIXTURES=1` is a local diagnostic build input, never enabled for TestFlight export. Do not disable
-jetsam or attach LLDB for memory acceptance. The physical3GB acceptance gate remains pending until measured/reviewed.
+jetsam or attach LLDB for memory acceptance. The authorized A12/3GB iPad (iPad11,6, iPadOS26.6.1) passed the physical measurement: cold whole-app words transcription peaked at95274464B physical footprint/170754048B RSS; ten maximum240128-sample windows with VAD resident peaked at91244000B footprint/175931392B RSS with1853422112B minimum available. Ten exact repeat results and model-ready cancellation passed; zero memory warnings, nominal thermal state. The separate lab sandbox used a public English fixture, Release optimization and default memory limit, without a debugger or jetsam override. Downloaded speaker models were absent. These measurements await review; acceptance flags and regular Release defaults remain unchanged.
 
 ## Distribution integrity
 

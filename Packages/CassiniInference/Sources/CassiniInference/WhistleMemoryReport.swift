@@ -8,6 +8,9 @@ import os
 /// Diagnostic numbers only: no audio, words, note identifiers or paths. Peaks are the kernel's process high-water
 /// marks, not just timer observations; the timer additionally records low headroom and thermal/warning events.
 public struct WhistleMemoryReport: Codable, Sendable {
+    public var completedWindows: Int?
+    public var samplesPerWindow: Int?
+    public var cancelledAtModelReady: Bool?
     public var scope: String
     public var jobKind: String?
     public var physicalMemoryBytes: UInt64
@@ -78,7 +81,7 @@ public final class WhistleMemoryMonitor: @unchecked Sendable {
     public func finish(succeeded: Bool, nativeModelReleased: Bool, scope: String = "transcription-stage") -> WhistleMemoryReport {
         timer.cancel(); sample()
         return state.withLock {
-            WhistleMemoryReport(scope: scope, jobKind: nil, physicalMemoryBytes: ProcessInfo.processInfo.physicalMemory,
+            WhistleMemoryReport(completedWindows: nil, samplesPerWindow: nil, cancelledAtModelReady: nil, scope: scope, jobKind: nil, physicalMemoryBytes: ProcessInfo.processInfo.physicalMemory,
                 operatingSystem: ProcessInfo.processInfo.operatingSystemVersionString,
                 baselineFootprintBytes: $0.baseline, peakFootprintBytes: $0.peakFootprint,
                 peakResidentBytes: $0.peakResident, minimumAvailableBytes: $0.minimumAvailable,
