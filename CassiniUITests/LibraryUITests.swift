@@ -20,10 +20,25 @@ final class LibraryUITests: XCTestCase {
         app.scrollViews.containing(.button, identifier: "noteRow").firstMatch
     }
 
-    /// The row titled `title`, scrolled to when the list has not built it yet or it is under the bottom bar.
+    /// The row titled `title`, fully between the navigation and capture bars before a tap or long-press.
     @MainActor private func scrolledRow(_ app: XCUIApplication, _ title: String) -> XCUIElement {
         let element = row(app, title), bar = app.buttons["recordButton"]
-        list(app).scroll { element.exists && element.isHittable && element.frame.maxY <= bar.frame.minY }
+        let viewport = list(app), navigation = app.navigationBars.firstMatch
+        for _ in 0..<12 {
+            if element.exists {
+                let frame = element.frame
+                let top = navigation.exists ? navigation.frame.maxY : viewport.frame.minY
+                if !frame.isEmpty {
+                    if frame.minY >= top && frame.maxY <= bar.frame.minY && element.isHittable { return element }
+                    if frame.minY < top {
+                        viewport.swipeDown(velocity: .slow)
+                        continue
+                    }
+                }
+            }
+            viewport.swipeUp(velocity: .slow)
+        }
+        XCTFail("The row \(title) did not become clear of the navigation and capture bars")
         return element
     }
 
