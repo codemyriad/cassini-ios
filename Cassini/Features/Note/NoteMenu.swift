@@ -67,13 +67,13 @@ struct NoteMenu: View {
             Button(NoteCopy.transcribe, systemImage: "text.badge.waveform") { perform(.transcribe) }.disabled(disabled)
         case .transcribeAgain:
             Button { perform(.transcribeAgain) } label: {
-                Label(NoteCopy.transcribeAgain, systemImage: "arrow.clockwise")
-                if case .transcribeAgain(let version, let namesCarry)? = transcribeAction {
-                    Text(LibraryCopy.addsVersion(version) + (namesCarry ? " " + LibraryCopy.namesCarry : ""))
-                }
+                Text(NoteCopy.transcribeAgain)
+                if let againCaption { Text(againCaption) }
+                Image(systemName: "arrow.clockwise")
             }
             .disabled(disabled)
             .accessibilityIdentifier("transcribeAgain")
+            .accessibilityLabel(Text(verbatim: [NoteCopy.transcribeAgain, againCaption].compactMap { $0 }.joined(separator: ". ")))
         case .transcribeAgainUnavailable:
             Button {} label: {
                 Text(NoteCopy.transcribeAgain)
@@ -89,5 +89,10 @@ struct NoteMenu: View {
             Button(NoteCopy.resume, systemImage: "play.circle") { perform(.resume) }
             Button(NoteCopy.startOver, systemImage: "arrow.counterclockwise") { perform(.startOver) }
         }
+    }
+
+    private var againCaption: String? {
+        guard case .transcribeAgain(let version, let namesCarry)? = transcribeAction else { return nil }
+        return LibraryCopy.addsVersion(version) + (namesCarry ? " " + LibraryCopy.namesCarry : "")
     }
 }

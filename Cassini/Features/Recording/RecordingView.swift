@@ -72,23 +72,39 @@ private struct RecordingHeader: View {
     let phase: RecordingPhase
     let format: CaptureFormat
     let minimise: () -> Void
+    @Environment(\.dynamicTypeSize) private var dynamicType
 
     var body: some View {
-        HStack {
-            Button(action: minimise) {
-                Image(systemName: "chevron.down").font(.headline)
-                    .frame(width: HitTarget.minimum, height: HitTarget.minimum)
-                    .background(.white.opacity(0.08), in: Circle())
+        if dynamicType.isAccessibilitySize {
+            VStack(spacing: 8) {
+                HStack { minimiseButton; Spacer(); formatLabel }
+                if phase == .recording || phase == .paused { RecordingStatus(isPaused: phase == .paused) }
             }
-            .accessibilityLabel(Text("Minimise to library (recording continues)", tableName: "Recording"))
-            Spacer()
-            if phase == .recording || phase == .paused { RecordingStatus(isPaused: phase == .paused) }
-            Spacer()
-            Text(RecordingCopy.format(format)).font(.caption.weight(.semibold)).monospacedDigit()
-                .padding(.horizontal, 10).padding(.vertical, 6)
-                .background(.white.opacity(0.1), in: Capsule())
+        } else {
+            HStack {
+                minimiseButton
+                Spacer()
+                if phase == .recording || phase == .paused { RecordingStatus(isPaused: phase == .paused) }
+                Spacer()
+                formatLabel
+            }
+            .frame(minHeight: 48)
         }
-        .frame(minHeight: 48)
+    }
+
+    private var minimiseButton: some View {
+        Button(action: minimise) {
+            Image(systemName: "chevron.down").font(.headline)
+                .frame(width: HitTarget.minimum, height: HitTarget.minimum)
+                .background(.white.opacity(0.08), in: Circle())
+        }
+        .accessibilityLabel(Text("Minimise to library (recording continues)", tableName: "Recording"))
+    }
+
+    private var formatLabel: some View {
+        Text(RecordingCopy.format(format)).font(.caption.weight(.semibold)).monospacedDigit()
+            .padding(.horizontal, 10).padding(.vertical, 6)
+            .background(.white.opacity(0.1), in: Capsule())
     }
 }
 
