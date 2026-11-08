@@ -39,6 +39,8 @@ public struct WhistleResult: Decodable, Equatable, Sendable {
 
 public enum WhistleError: Error, Equatable, Sendable {
     case unavailable, integrity, privacy, missingAPI, invalidInput, invalidOutput, nativeFailure
+    /// Apple-processed images need separate acceptance; never silently skip their integrity check.
+    case encryptedRuntime
 }
 
 /// Testable admission boundary. Even an existing runtime is not entered with missing or changed flags.

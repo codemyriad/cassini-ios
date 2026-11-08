@@ -67,6 +67,14 @@ constructors. This section identity supplements code signing, never replaces it.
 Actual build5 archive/export section identities match despite their different signed-file hashes; Swift/Python
 parsers agree through actual bundled native tests. The original source-archive/weights pins are unchanged.
 
+Archive/export verification does not establish that Apple's processed TestFlight copy passes the same check.
+At startup, `io.codemyriad.cassini` / `WhistleBundle` logs a successful verification or its first failing stage
+(manifest, weights, VAD, runtime read/parse/pin), followed by the selected recognizer and physical memory.
+An encrypted runtime has a distinct `encryptedRuntime` failure and still fails closed. These diagnostics contain
+no note names, audio, transcripts or recording paths. Native load failures additionally log dyld's engine/dependency
+error. Confirm the installed build's TestFlight signer and capture
+Cassini's logs during its first launch after installation; a sideloaded build with the same version is not proof.
+
 ## Validation and cache
 
 `python3 scripts/test-bundle-whistle.py` covers missing/corrupt inputs and unproven imports. Swift package tests

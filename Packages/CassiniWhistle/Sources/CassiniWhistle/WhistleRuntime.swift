@@ -1,6 +1,7 @@
 import CryptoKit
 import Darwin
 import Foundation
+import os
 
 /// One owner of Needle's process-global model. This low-level, bounded raw-segment API is not the production
 /// recording/VAD adapter. No app launch loads this framework, and rollout remains gated by WhistleCapability.
@@ -8,6 +9,7 @@ public actor WhistleRuntime {
     public static let shared = WhistleRuntime()
     public static let engineRevision = "93e88ede867e4311c39151285e74df513e4b835b"
     public static let modelSHA256 = "b6e02f048568ac5d01a2042556c658061e699acbc0aa2a1439f52f3d461dffeb"
+    private static let logger = Logger(subsystem: "io.codemyriad.cassini", category: "WhistleBundle")
     private typealias Load = @convention(c) (UnsafePointer<UInt8>?, UInt64) -> Int32
     private typealias Models = @convention(c) () -> Int32
     private typealias Decode = @convention(c) (UnsafePointer<Float>?, Int32, UnsafePointer<CChar>?, UnsafePointer<CChar>?, Int32, UnsafeMutablePointer<CChar>?, Int32) -> Int32
@@ -49,22 +51,44 @@ public actor WhistleRuntime {
         #else
         let target = "ios-arm64"
         #endif
+        var stage = "bundlePaths"
         do {
-            guard let resources = bundle.resourceURL, let frameworks = bundle.privateFrameworksURL else { return false }
+            guard let resources = bundle.resourceURL, let frameworks = bundle.privateFrameworksURL else { throw WhistleError.unavailable }
             let root = resources.appendingPathComponent("Whistle")
+            stage = "manifestRead"
             let manifest = try JSONDecoder().decode(Manifest.self, from: Data(contentsOf: root.appendingPathComponent("manifest.json")))
+            stage = "manifestPins"
             guard manifest.engineRevision == engineRevision, manifest.modelSha256 == modelSHA256,
                   manifest.target == target, manifest.identitySchema == "cassini-whistle-sections-v1",
-                  manifest.minimumOS == "26.0", manifest.sourceArchiveMinimumOS == "27.0" else { return false }
+                  manifest.minimumOS == "26.0", manifest.sourceArchiveMinimumOS == "27.0" else { throw WhistleError.integrity }
             func hash(_ data: Data) -> String { SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined() }
+            stage = "weightsRead"
             let weights = try Data(contentsOf: root.appendingPathComponent("whistle.cact"), options: .mappedIfSafe)
+            stage = "weightsPin"
+            guard weights.count == 16_919_407, hash(weights) == modelSHA256 else { throw WhistleError.integrity }
+            stage = "vadRead"
             let vad = try Data(contentsOf: root.appendingPathComponent("silero-vad-6.2.1.onnx"), options: .mappedIfSafe)
+            stage = "vadPin"
+            guard vad.count == 2_327_524, hash(vad) == WhistleVAD.modelSHA256 else { throw WhistleError.integrity }
             let binary = frameworks.appendingPathComponent("CassiniWhistleRuntime.framework/CassiniWhistleRuntime")
-            let actualIdentity = try WhistleBinaryIdentity.digest(Data(contentsOf: binary, options: .mappedIfSafe))
-            return weights.count == 16_919_407 && hash(weights) == modelSHA256
-                && vad.count == 2_327_524 && hash(vad) == WhistleVAD.modelSHA256
-                && actualIdentity == manifest.runtimeIdentity
-        } catch { return false }
+            stage = "runtimeRead"
+            let image = try Data(contentsOf: binary, options: .mappedIfSafe)
+            stage = "runtimeIdentityParse"
+            let actualIdentity = try WhistleBinaryIdentity.digest(image)
+            stage = "runtimeIdentityPin"
+            guard actualIdentity == manifest.runtimeIdentity else {
+                logger.error("Whistle runtime identity differs: actual=\(actualIdentity, privacy: .public) expected=\(manifest.runtimeIdentity, privacy: .public)")
+                throw WhistleError.integrity
+            }
+            logger.notice("Bundled Whistle verified; target=\(target, privacy: .public)")
+            return true
+        } catch {
+            // Fixed stage names, error domains/codes and engine errors only. Never log audio, note data or paths.
+            let failure = (error as? WhistleError).map { String(describing: $0) } ?? "resourceError"
+            let native = error as NSError
+            logger.error("Bundled Whistle unavailable; stage=\(stage, privacy: .public) failure=\(failure, privacy: .public) domain=\(native.domain, privacy: .public) code=\(native.code, privacy: .public)")
+            return false
+        }
         #else
         return false
         #endif
@@ -106,7 +130,12 @@ public actor WhistleRuntime {
               try WhistleBinaryIdentity.digest(Data(contentsOf: binary, options: .mappedIfSafe)) == manifest.runtimeIdentity else { throw WhistleError.integrity }
         // This is the first operation that can execute engine constructors. Flags and both pins precede it.
         let loaded = try WhistlePrivacy.enter(environment: privacyEnvironment()) {
-            guard let loaded = dlopen(binary.path, RTLD_NOW | RTLD_LOCAL) else { throw WhistleError.unavailable }
+            guard let loaded = dlopen(binary.path, RTLD_NOW | RTLD_LOCAL) else {
+                // dyld's message concerns this fixed engine path/dependencies, never a recording path.
+                let detail = dlerror().map { String(cString: $0) } ?? "unknown loader error"
+                Self.logger.error("Whistle runtime load failed; dyld=\(detail, privacy: .public)")
+                throw WhistleError.unavailable
+            }
             return loaded
         }
         // withUnsafeBytes only promises a pointer during its closure. Needle borrows beyond needle_load, so use
@@ -131,6 +160,7 @@ public actor WhistleRuntime {
             decode = unsafeBitCast(decodeSymbol, to: Decode.self)
             handle = loaded
             binaryPath = binary.path
+            Self.logger.notice("Whistle runtime model prepared")
         } catch {
             if loadAttempted {
                 // A failed native load can leave a partially constructed global model borrowing the bytes.
