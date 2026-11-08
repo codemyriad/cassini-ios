@@ -36,6 +36,8 @@ let package = Package(
         // Fakes for tests and UI-test launches. Every source is under `#if DEBUG`, so a Release build links an empty module.
         .library(name: "CassiniEngineTesting", targets: ["CassiniEngineTesting"]),
         .library(name: "CassiniInference", targets: ["CassiniInference"]),
+        // The lazy, private bundled Needle C API; no native framework is linked into the app at launch.
+        .library(name: "CassiniWhistle", targets: ["CassiniWhistle"]),
         .library(name: "CassiniAudio", targets: ["CassiniAudio"]),
         // The only importer of SherpaOnnxC, which iOS builds link (see above); on macOS it has no native code.
         .library(name: "CassiniSherpa", targets: ["CassiniSherpa"])
@@ -45,6 +47,9 @@ let package = Package(
     dependencies: [.package(url: "https://github.com/facebook/zstd.git", revision: "f8745da6ff1ad1e7bab384bd1f9d742439278e99"),
         .package(url: "https://github.com/alta/swift-opus.git", revision: "6f3cb6bd3ffed1fe5f06d00a962d5c191a50daf8")],
     targets: [
+        .target(name: "CassiniWhistle", path: "Packages/CassiniWhistle/Sources/CassiniWhistle"),
+        .testTarget(name: "CassiniWhistleTests", dependencies: ["CassiniWhistle"],
+                    path: "Packages/CassiniWhistle/Tests/CassiniWhistleTests"),
         .testTarget(name: "CassiniAudioTests", dependencies: ["CassiniAudio", "CassiniCore"], path: "Packages/CassiniAudio/Tests/CassiniAudioTests"),
         .target(name: "COpusBridge", dependencies: [.product(name: "Copus", package: "swift-opus")]),
         .target(name: "CassiniAudio", dependencies: ["CassiniCore", "COpusBridge"], path: "Packages/CassiniAudio/Sources/CassiniAudio"),

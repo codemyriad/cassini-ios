@@ -16,6 +16,7 @@ on:
       - 'CassiniTests/**'
       - 'CassiniUITests/**'
       - 'Packages/**'
+      - 'Whistle/**'
       - 'Sources/**'
       - 'Tests/**'
       - 'Package.swift'
@@ -23,6 +24,7 @@ on:
       - 'project.yml'
       - 'scripts/test.sh'
       - 'scripts/check-strings.sh'
+      - 'scripts/*whistle*.py'
       - '.github/workflows/ci.yml'
   push:
     branches: [main]
@@ -69,6 +71,9 @@ jobs:
       - name: String catalogs and package tests
         working-directory: cassini-ios
         run: scripts/test.sh fast
+      - name: Whistle pinned-input and SDK closure regressions
+        working-directory: cassini-ios
+        run: python3 scripts/test-bundle-whistle.py
       - name: Build for testing
         working-directory: cassini-ios
         run: scripts/test.sh build

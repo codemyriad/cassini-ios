@@ -989,3 +989,11 @@ Cassini downloads its models only from dist.gocassini.com, Cassini's model host,
 Each model is installed with the model host's notices, https://dist.gocassini.com/NOTICE.txt, which name each model's source, licence and changes and carry the licence texts they ask to keep. Once a model is installed they follow this section.
 
 Each file is checked against its pinned size and SHA-256 hashes before it is installed, and again before its first use each time Cassini starts.
+
+The JFK test recording is public-domain US federal government material, included only in Debug test builds.
+
+Whistle weights and Needle engine 3.3.0 — Cactus Compute
+
+Licensed under the Apache License, Version 2.0 (Whistle-Apache-2.0.txt).
+Engine revision93e88ede867e4311c39151285e74df513e4b835b; weights revisionca5287601bef25af26dcf2e1b2bdc0843a7c19e5.
+Published hash-verified inputs are used unchanged; see Whistle/pins.json and the documented minos exception.

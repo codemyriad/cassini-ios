@@ -32,7 +32,9 @@ import CassiniNotebook
         settings = SettingsStore(defaults: environment.defaults, clock: environment.clock,
                                  defaultLanguage: environment.locale.identifier(.bcp47))
         noticeCenter = NoticeCenter(settings: settings, notifier: environment.notifier) { [settings, transcriber = environment.transcriber] in
-            await transcriber.assetStatus(locale: Locale(identifier: settings.speechLanguage)) == .ready
+            // The shared notice rule must not offer an impossible download. This never records consent.
+            let status = await transcriber.assetStatus(locale: Locale(identifier: settings.speechLanguage))
+            return status == .ready || status == .unsupported
         }
         library = LibraryStore(root: environment.root, errors: errors)
         voices = VoicesStore(library: library, settings: settings, clock: environment.clock)

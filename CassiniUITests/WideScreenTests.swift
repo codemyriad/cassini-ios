@@ -87,10 +87,10 @@ final class WideScreenTests: XCTestCase {
 
     @MainActor func testIPadSavedVoicesAreCappedAndCentred() throws {
         let app = try launch(["--seed", "voices"])
-        app.buttons["Settings"].tap()
+        let language = app.buttons["appLanguageRow"]
+        XCTAssertTrue(app.buttons["settingsButton"].tap(until: { language.exists }), "Settings did not open")
         let row = app.buttons["savedVoicesRow"]
-        XCTAssertTrue(row.waitForExistence(within: 5))
-        for _ in 0..<6 where !row.isHittable { app.swipeUp() }
+        XCTAssertTrue(app.scroll(attempts: 12) { row.exists && row.isHittable }, "Saved voices is not on the screen")
         row.tap()
         let person = app.buttons["Options for Alex Moreau"]
         XCTAssertTrue(person.waitForExistence(within: 5))
@@ -101,6 +101,13 @@ final class WideScreenTests: XCTestCase {
         let app = try launch(["--seed", "library"])
         let row = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Thoughts from the morning walk")).firstMatch
         XCTAssertTrue(row.waitForExistence(within: 5))
+        let list = app.scrollViews.containing(.button, identifier: "noteRow").firstMatch
+        let capture = app.otherElements["captureBar"]
+        // A short landscape window can put this row below the fixed capture bar even though it exists in AX.
+        XCTAssertTrue(list.scroll(attempts: 12) {
+            row.exists && row.isHittable && !row.frame.isEmpty
+                && row.frame.minY >= app.navigationBars.firstMatch.frame.maxY && row.frame.maxY <= capture.frame.minY
+        }, "the row is clear of the capture bar before the long press")
         row.press(forDuration: 1)
         app.buttons["Rename"].tapWhenSettled()
         let field = app.textFields["renameField"]

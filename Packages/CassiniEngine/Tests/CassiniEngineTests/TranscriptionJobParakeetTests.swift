@@ -184,9 +184,9 @@ import CassiniNotebook
         let gib: UInt64 = 1 << 30
         #expect(!SpeechCapability.parakeetCapable(physicalMemory: 4 * gib))
         #expect(SpeechCapability.parakeetCapable(physicalMemory: 5_900_000_000))
-        #expect(SpeechCapability.choose(linked: true, capable: true) == .parakeet)
-        #expect(SpeechCapability.choose(linked: false, capable: true) == .appleSpeech)
-        #expect(SpeechCapability.choose(linked: true, capable: false) == .appleSpeech)
+        #expect(SpeechCapability.choose(linked: true, capable: true, apple: .init(hardwareAvailable: true, localeSupported: true, assets: .ready)) == .parakeet)
+        #expect(SpeechCapability.choose(linked: false, capable: true, apple: .init(hardwareAvailable: true, localeSupported: true, assets: .ready)) == .appleSpeech)
+        #expect(SpeechCapability.choose(linked: true, capable: false, apple: .init(hardwareAvailable: true, localeSupported: true, assets: .ready)) == .appleSpeech)
         #expect(SpeechRecognizer.parakeet.checkpointModel(language: "it-IT") == ModelCatalog.parakeetRevision)
         #expect(SpeechRecognizer.appleSpeech.checkpointModel(language: "it-IT") == "apple-speechtranscriber it-IT")
     }

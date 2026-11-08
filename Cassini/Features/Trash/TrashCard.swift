@@ -11,8 +11,9 @@ struct TrashCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(item.title).font(.headline).foregroundStyle(Color.ink).frame(maxWidth: .infinity, alignment: .leading)
+            headerLayout {
+                Text(item.title).font(.headline).foregroundStyle(Color.ink)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 Text(TimeText.clock(item.duration)).font(.caption.monospacedDigit()).foregroundStyle(Color.muted)
             }
             Text(meta).font(.caption).foregroundStyle(Color.muted)
@@ -23,6 +24,12 @@ struct TrashCard: View {
         }
         .padding(.horizontal, 14).padding(.top, 14).padding(.bottom, 10)
         .cardBackground(radius: Radius.control)
+    }
+
+    private var headerLayout: AnyLayout {
+        dynamicType.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4))
+            : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 8))
     }
 
     private var buttonsLayout: AnyLayout {

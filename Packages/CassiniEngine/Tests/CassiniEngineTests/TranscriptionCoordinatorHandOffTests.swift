@@ -7,6 +7,27 @@ import CassiniNotebook
 extension TranscriptionCoordinatorTests {
     /// Consent, the hand-off of a saved recording, and the language a job is queued with.
     @MainActor @Suite struct HandOff {
+        @Test func unavailableSpeechRefusesBeforeConsentAndDoesNotQueue() async throws {
+            let h = try QueueHarness(); defer { h.tearDown() }
+            try await h.start()
+            let id = try await h.note("Meeting")
+            for consented in [false, true] {
+                h.consented = consented
+                for failure in [JobFailure.model, .unsupportedLanguage] {
+                    h.speechFailure = failure
+                    #expect(await h.coordinator.transcribe(id) == .refused(.speechUnavailable(failure)))
+                    #expect(await h.coordinator.handOff(id) == .audioOnly)
+                    #expect(await h.jobs.all().isEmpty)
+                    #expect(h.runner.runs.isEmpty)
+                    #expect(await h.notes.note(id)?.status == .audioOnly)
+                }
+            }
+            h.speechFailure = nil
+            #expect(await h.coordinator.transcribe(id) == .queued(changed: true))
+            try await h.run(0).finish(.done)
+            await h.coordinator.awaitIdle()
+        }
+
         // ports: ProcessingCoordinatorTest#withoutConsentTranscribeEndsNeedsConsentWithoutAnyJobOrNetwork
         @Test func withoutConsentTranscribeEndsReadyToTranscribeWithoutAnyJobRun() async throws {
             let h = try QueueHarness(); defer { h.tearDown() }

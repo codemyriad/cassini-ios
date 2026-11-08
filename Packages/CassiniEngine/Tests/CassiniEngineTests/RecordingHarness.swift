@@ -26,7 +26,7 @@ import CassiniNotebook
 
     static let debounce: Duration = .milliseconds(50)
 
-    init(consented: Bool = true) throws {
+    init(consented: Bool = true, consent: ModelConsent? = nil) throws {
         settings = SettingsStore(defaults: UserDefaults(suiteName: suite)!, clock: clock, defaultLanguage: "en-US")
         if consented { settings.recordConsent() }
         store = try NoteStore(root: root)
@@ -36,7 +36,7 @@ import CassiniNotebook
             ready: {
                 while harness?.isReady == false { harness?.readyChecks += 1; try? await Task.sleep(for: .milliseconds(5)) }
             },
-            notes: notes, capture: capture, storage: storage, audio: audio, settings: settings, handoff: handoff,
+            notes: notes, capture: capture, storage: storage, audio: audio, settings: settings, handoff: handoff, consent: consent,
             liveActivity: activity, notifier: notifier, clock: clock,
             defaultTitle: { "Voice note \(RecordingTitles.dateTime($0, locale: Locale(identifier: "en_US"), timeZone: .gmt))" },
             timing: .init(tick: .milliseconds(10), titleDebounce: Self.debounce)))

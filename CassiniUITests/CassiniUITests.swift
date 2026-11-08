@@ -23,7 +23,8 @@ final class CassiniUITests: XCTestCase {
     @MainActor func testEmptyLibraryAndSettings() {
         let app = launch(seed: false)
         XCTAssertTrue(app.buttons["recordButton"].exists)
-        XCTAssertEqual(app.descendants(matching: .any)["wordmark"].label, "Cassini talk", "the Library names the product")
+        // iOS 26 projects the identifier onto both the combined text and its framework container.
+        XCTAssertEqual(Set(labels(in: app, identifier: "wordmark")), ["Cassini talk"], "the Library names the product")
         capture("Empty library")
         app.buttons["Settings"].tap()
         XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(within: 5))

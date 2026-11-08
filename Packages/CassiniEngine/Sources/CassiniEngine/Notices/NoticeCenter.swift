@@ -16,8 +16,9 @@ import CassiniNotebook
 
     /// The app may not post notifications: the user turned them off.
     public private(set) var notificationsOff = false
-    /// The speech model is installed for the speech language, which counts as consent.
+    /// No speech download offer is needed: installed, or unavailable on this platform/locale.
     private var speechReady = false
+    private var speechLanguage: String
     /// Lasting notices closed in this run.
     private var closed: Set<BannerKind> = []
 
@@ -26,13 +27,28 @@ import CassiniNotebook
     @ObservationIgnored private let settings: SettingsStore
     @ObservationIgnored private let notifier: any Notifier
     @ObservationIgnored private let speechModelReady: @MainActor () async -> Bool
+    @ObservationIgnored private var languageFollower: Task<Void, Never>?
 
-    /// `speechModelReady` answers whether the speech model is installed for the speech language.
+    /// `speechModelReady` suppresses the speech download offer: installed, or unavailable on this platform/locale.
+    /// The resulting notice fact never writes the user's recorded consent.
     public init(settings: SettingsStore, notifier: any Notifier, speechModelReady: @escaping @MainActor () async -> Bool) {
         self.settings = settings
         self.notifier = notifier
         self.speechModelReady = speechModelReady
+        speechLanguage = settings.speechLanguage
+        let initialLanguage = settings.speechLanguage
+        languageFollower = Task { [weak self, settings] in
+            var previous = initialLanguage
+            for await language in Observations({ settings.speechLanguage }) {
+                guard language != previous else { continue }
+                previous = language
+                guard let self else { return }
+                await self.refresh()
+            }
+        }
     }
+
+    deinit { languageFollower?.cancel() }
 
     /// Adds a source: `contribute` adds its facts each time they are read, `dismiss` hears every banner closed.
     public func register(_ contribute: @escaping Contributor, dismiss: DismissHandler? = nil) {
@@ -46,7 +62,8 @@ import CassiniNotebook
         for contribute in contributors { contribute(&facts) }
         if let ack = settings.recoveredAck { facts.recovered.removeAll { $0.recoveredAt <= ack } }
         if closed.contains(.notesUnreadable) { facts.unreadableNotes = 0 }
-        facts.consented = settings.modelsConsentAt != nil || speechReady
+        // Suppress download offers while the newly selected locale's eligibility is being read.
+        facts.consented = settings.modelsConsentAt != nil || speechReady || speechLanguage != settings.speechLanguage
         facts.notificationsOff = notificationsOff
         return facts
     }
@@ -58,7 +75,11 @@ import CassiniNotebook
     /// the screen, as the user may have changed them in Settings.
     public func refresh() async {
         notificationsOff = await notifier.authorizationStatus() == .denied
-        speechReady = await speechModelReady()
+        let language = settings.speechLanguage
+        let ready = await speechModelReady()
+        guard language == settings.speechLanguage else { return }
+        speechReady = ready
+        speechLanguage = language
     }
 
     /// Asks for permission to notify the first time the user records, transcribes or downloads, and only then: never

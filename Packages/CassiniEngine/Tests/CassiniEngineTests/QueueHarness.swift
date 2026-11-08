@@ -6,6 +6,7 @@ import CassiniNotebook
 
 @MainActor private final class ConsentSwitch {
     var allowed = true
+    var failure: JobFailure?
 }
 
 /// A transcription coordinator over real `NoteStore` and `JobStore` files in a temporary root, with a fake job
@@ -25,6 +26,11 @@ import CassiniNotebook
     let coordinator: TranscriptionCoordinator
     private let consent: ConsentSwitch
 
+    var speechFailure: JobFailure? {
+        get { consent.failure }
+        set { consent.failure = newValue }
+    }
+
     /// Whether the models may be downloaded.
     var consented: Bool {
         get { consent.allowed }
@@ -43,7 +49,7 @@ import CassiniNotebook
         self.consent = consent
         let parts = TranscriptionCoordinator.Parts(
             jobs: jobs, notes: notes, runner: runner, checkpoints: checkpoints,
-            consent: ModelConsent { _, _ in consent.allowed }, notifier: notifier, background: background, clock: clock,
+            consent: ModelConsent(unavailability: { kind, _ in kind == .speakersOnly ? nil : consent.failure }) { _, _ in consent.allowed }, notifier: notifier, background: background, clock: clock,
             progress: progress)
         coordinator = TranscriptionCoordinator(parts, settings: settings)
     }

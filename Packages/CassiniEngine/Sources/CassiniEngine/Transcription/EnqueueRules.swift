@@ -25,6 +25,8 @@ public enum EnqueueRefusal: Hashable, Sendable {
     /// The stored queue was written by a newer Cassini, or could not be read or moved aside, so it takes no jobs in
     /// this run (see `JobStore.Failure`).
     case queueUnavailable
+    /// The requested speech recognizer cannot run on this device or in this language.
+    case speechUnavailable(JobFailure)
 }
 
 /// The result of a Transcribe, Transcribe again, Resume or Try again.

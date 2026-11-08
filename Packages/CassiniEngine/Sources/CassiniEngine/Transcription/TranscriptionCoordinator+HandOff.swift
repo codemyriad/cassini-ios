@@ -16,6 +16,7 @@ extension TranscriptionCoordinator {
             return .audioOnly
         }
         let language = EnqueueRules.language(for: .transcribe, speechLanguage: settings.speechLanguage) ?? ""
+        guard await parts.consent.unavailability(.transcribe, language) == nil else { return .audioOnly }
         guard await parts.consent.allows(.transcribe, language) else {
             return settings.modelsDeclinedAt == nil ? .askConsent : .audioOnly
         }

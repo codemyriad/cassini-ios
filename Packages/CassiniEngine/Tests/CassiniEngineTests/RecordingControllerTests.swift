@@ -8,6 +8,28 @@ import CassiniNotebook
 @MainActor @Suite(.serialized) struct RecordingControllerTests {
     let floor = Limits.minRecordingFreeBytes
 
+    @Test(arguments: [JobFailure.model, .unsupportedLanguage], [false, true])
+    func unavailableSpeechIsSealedAudioOnlyBeforeCompression(_ failure: JobFailure, _ consented: Bool) async throws {
+        let consent = ModelConsent(unavailability: { _, _ in failure }) { _, _ in
+            Issue.record("Unavailable speech reached the consent decision")
+            return consented
+        }
+        let h = try RecordingHarness(consented: consented, consent: consent)
+        defer { h.audio.set(held: false); h.tearDown() }
+        h.audio.set(held: true)
+        let active = try await h.startRecording()
+        h.controller.finish()
+        #expect(try await h.awaitEnded() == .ended(noteID: active.noteID, outcome: .saved(.audioOnly)))
+        try await h.waitFor("compression to inspect the sealed recording") { h.audio.inspections > 0 }
+        #expect(h.controller.finalizing.contains(active.noteID))
+        #expect(await h.note(active.noteID)?.status == .audioOnly)
+        #expect(await h.note(active.noteID)?.failure == nil)
+        h.audio.set(held: false)
+        await h.controller.settle()
+        #expect(h.handoff.handedOff.isEmpty)
+        #expect(await h.note(active.noteID)?.status == .audioOnly)
+    }
+
     // ports: RecordingControllerTest#finishNeverRunsOnTheMainThread (the iOS finish seals, compresses, then hands off)
     @Test func finishSealsTheNoteCompressesItAndHandsItOff() async throws {
         let h = try RecordingHarness(); defer { h.tearDown() }

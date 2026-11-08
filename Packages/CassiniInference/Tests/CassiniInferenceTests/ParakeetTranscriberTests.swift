@@ -368,7 +368,7 @@ import CassiniEngineTesting
         #expect(await parakeet.assetStatus(locale: Locale(identifier: "it-IT")) == .notDownloaded)
         await #expect(throws: TranscriptionError.failed(.model)) { try await run(parakeet, url) }
         await #expect(throws: TranscriptionError.needsConsent) { try await run(parakeet, url, allowDownload: false) }
-        #expect(SpeechCapability.choose(linked: true, capable: true) == .parakeet, "the device keeps Parakeet")
+        #expect(SpeechCapability.choose(linked: true, capable: true, apple: .init(hardwareAvailable: true, localeSupported: true, assets: .ready)) == .parakeet, "the device keeps Parakeet")
     }
 
     /// After a failed check the next run downloads Ultra again through the shared installer, as for a model that was

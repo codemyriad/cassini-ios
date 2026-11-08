@@ -65,6 +65,11 @@ import CassiniNotebook
     func load(url: URL, at position: TimeInterval, title: String) throws {
         closePlayer()
         let audio = try AVAudioPlayer(contentsOf: url)
+        #if targetEnvironment(simulator)
+        // Simulator tests exercise real playback clocks without sending audible samples to the Mac's output.
+        // Never rely on changing the host volume or mute setting.
+        audio.volume = 0
+        #endif
         // The rate only takes effect when it is enabled before the player is prepared.
         audio.enableRate = true; audio.rate = rate; audio.delegate = ending
         guard audio.duration > 0, audio.prepareToPlay() else { throw AudioError.unreadable }

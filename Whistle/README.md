@@ -1,0 +1,59 @@
+# Private bundled Whistle: D75.2 production increment
+
+This app bundles the unchanged published Needle 3.3.0 device/simulator arm64 archives and the D5 Whistle weights,
+with immutable Hugging Face revisions, lengths and SHA256 in `pins.json`. Build-time fetching is the only download;
+missing or corrupt inputs fail the build. Cached corruption is never silently repaired. Models, generated binaries,
+archives and cache contents stay out of Git. `scripts/bundle-whistle.py` makes a private signed framework and copies
+the verified weights into the app; it is not linked for pre-main loading. x86_64 simulators have no pinned artifact
+and omit the bundle rather than pretending to support it. The existing Parakeet runtime is retained independently.
+
+## Documented source-archive minos exception
+
+The original device and simulator objects declare **minos27.0**. They are deliberately unmodified. Following the
+coordinator's 2026-11-08 authorization after the compatibility spike, the private framework links with target26.0;
+all original newer-object warnings remain visible. No deployment-warning suppression or Mach-O rewriting is used.
+
+The unchanged spike at c65073cf07b493c4e0be4c3a898ecabacde13de8 used actual Apple Xcode26.0/17A324 SDK26 device and
+simulator links, with undefined-symbol errors and no weak imports. Every runtime import was found in SDK26 stubs
+(126 device/125 simulator). `sdk26-imports.json` records that exact closure. Each production link rejects imports
+outside it; a toolchain/pin change adding any import requires fresh SDK26 evidence, not an expanded guessed list.
+
+On actual simulator26.0/build23A343, all13 public/shared fixtures matched their frozen Mac counterparts exactly in
+text, language, count and104 word strings, with maximum80ms word-time delta. Frozen manifest SHA256:
+`8b64ff835753ddb97414a7fb48f050c375a13e7dd3ef410c33eae449d3b7e51d`.
+The full original reports/logs are in coordination `evidence/ios/d75-2-2026-11-08/`. These are SDK/simulator
+compatibility results, not physical A12/3GB, production-VAD, thermal or distribution-signing results.
+
+## Loading and capability selection
+
+`CassiniWhistle.WhistleRuntime.shared` is the only process-global engine owner. It hashes the weights and
+the signed framework before `dlopen`, sets and checks all three privacy flags before engine constructors, resolves
+the narrow C API, and copies weights into explicitly owned storage retained until after native teardown. Raw-segment calls are serial,
+bounded to15s of finite16kHz mono PCM and1MiB of JSON, use automatic language detection and word timestamps, validate
+finite/ordered/in-range words, and discard a result after cancellation. No microphone, playback, network client,
+Python runtime or system-library search is involved. The app does not load the native framework at launch.
+
+`WhistleCapability` separates artifact compatibility from accepted device/pipeline evidence. Pending acceptance is
+false even when a bundle is present and hash-correct; no invented physical-RAM threshold claims support. The pure
+`WhistleSelection` policy chooses an accepted Whistle where Apple is unavailable or the device is too small for
+Parakeet, otherwise retaining eligible Parakeet/Apple candidates. An unaccepted bundle cannot make Apple eligible.
+
+**Rollout remains gated in this increment.** There is no new Included/default UI or production recording adapter.
+Existing app selection stays on its validated Parakeet/Apple policy; the new bounded C API and capability policy
+are the production foundation for the desktop-equivalent FIR/VAD adapter. Before enabling it, finish iOS VAD and
+end-to-end pipeline parity, the load-constructor/network privacy tests, and reviewed device memory/thermal
+acceptance. The lab3GB gate stays pending; no Silvio device/data is used. This bundle PR does not claim that the
+simulator's206520320-byte RSS proves physical-device suitability or crash isolation. iOS native execution is
+in-process and a native abort can terminate the app.
+
+## Validation and cache
+
+`python3 scripts/test-bundle-whistle.py` covers missing/corrupt inputs and unproven imports. Swift package tests
+cover every eligibility gate, fallback selection, refusal before load for six missing/wrong flag cases, and invalid
+native output. The hosted `WhistleRuntimeTests` is mandatory on arm64 and loads the actual app-bundled engine. The immutable public JFK WAV is hash-identical to the frozen spike input,
+fetched only for Debug builds and compared to the frozen Mac text/language/22 words and80ms timestamp bounds;
+it is absent from Release. Neither waveform nor model weights are committed.
+
+Builds default to ignored `.tools/whistle` for inputs. Set `CASSINI_WHISTLE_CACHE` to another cache root if needed.
+On drmeyers all tools/build outputs/caches live on `/Volumes/DrMeyers2`, and the build runs under the shared heavy
+lock. Never nest a lock around `scripts/test.sh`, which already takes it. No generated framework or model is committed.

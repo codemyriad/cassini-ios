@@ -191,7 +191,8 @@ public struct TranscriptionJob: TranscriptionJobRunning {
             if recognizer == .parakeet, checkpoint?.wordsComplete == false, checkpoint?.recognition == nil { checkpoint = nil }
             if checkpoint?.wordsComplete != true {
                 switch await transcriber.assetStatus(locale: Locale(identifier: language)) {
-                case .unsupported: return .failed(.unsupportedLanguage)
+                case .unsupported:
+                    return .failed(await transcriber.unavailability(locale: Locale(identifier: language)) ?? .unsupportedLanguage)
                 case .ready, .downloading, .checking: break
                 case .notDownloaded, .failed: if !settings.allowSpeechDownload { return .needsConsent(missingBytes: 0) }
                 }

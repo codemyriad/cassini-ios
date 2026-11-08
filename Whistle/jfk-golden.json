@@ -1,0 +1,145 @@
+{
+  "modelSha256": "b6e02f048568ac5d01a2042556c658061e699acbc0aa2a1439f52f3d461dffeb",
+  "inputSha256": "ebd52851100536db02d12c49fddd010372dcdc70243562e057553d476b706ae0",
+  "samples": 176000,
+  "result": {
+    "text": "And so, my fellow Americans, ask not what your country can do for you, ask what you can do for your country.",
+    "language": "en",
+    "words": [
+      {
+        "word": "And",
+        "start": 0.4,
+        "end": 0.72,
+        "probability": 0.582
+      },
+      {
+        "word": "so,",
+        "start": 0.72,
+        "end": 1.04,
+        "probability": 0.99
+      },
+      {
+        "word": "my",
+        "start": 1.12,
+        "end": 1.28,
+        "probability": 0.995
+      },
+      {
+        "word": "fellow",
+        "start": 1.28,
+        "end": 1.68,
+        "probability": 0.938
+      },
+      {
+        "word": "Americans,",
+        "start": 1.68,
+        "end": 2.24,
+        "probability": 0.969
+      },
+      {
+        "word": "ask",
+        "start": 3.44,
+        "end": 3.84,
+        "probability": 0.955
+      },
+      {
+        "word": "not",
+        "start": 3.84,
+        "end": 4.4,
+        "probability": 0.938
+      },
+      {
+        "word": "what",
+        "start": 4.4,
+        "end": 5.6,
+        "probability": 0.932
+      },
+      {
+        "word": "your",
+        "start": 5.6,
+        "end": 6.0,
+        "probability": 0.996
+      },
+      {
+        "word": "country",
+        "start": 6.0,
+        "end": 6.4,
+        "probability": 0.998
+      },
+      {
+        "word": "can",
+        "start": 6.4,
+        "end": 6.72,
+        "probability": 0.996
+      },
+      {
+        "word": "do",
+        "start": 6.72,
+        "end": 6.96,
+        "probability": 1.0
+      },
+      {
+        "word": "for",
+        "start": 6.96,
+        "end": 7.2,
+        "probability": 0.995
+      },
+      {
+        "word": "you,",
+        "start": 7.2,
+        "end": 7.68,
+        "probability": 0.996
+      },
+      {
+        "word": "ask",
+        "start": 8.48,
+        "end": 8.56,
+        "probability": 0.958
+      },
+      {
+        "word": "what",
+        "start": 8.56,
+        "end": 8.88,
+        "probability": 0.99
+      },
+      {
+        "word": "you",
+        "start": 8.88,
+        "end": 9.2,
+        "probability": 0.998
+      },
+      {
+        "word": "can",
+        "start": 9.2,
+        "end": 9.44,
+        "probability": 0.995
+      },
+      {
+        "word": "do",
+        "start": 9.44,
+        "end": 9.68,
+        "probability": 0.999
+      },
+      {
+        "word": "for",
+        "start": 9.68,
+        "end": 9.92,
+        "probability": 0.998
+      },
+      {
+        "word": "your",
+        "start": 9.92,
+        "end": 10.16,
+        "probability": 0.997
+      },
+      {
+        "word": "country.",
+        "start": 10.16,
+        "end": 10.48,
+        "probability": 0.998
+      }
+    ],
+    "ttft_ms": 17.2,
+    "decode_tps": 1218.3
+  }
+}
