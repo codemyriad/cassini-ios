@@ -6,6 +6,7 @@ import CassiniNotebook
 
 /// `SettingsPorts` over the app's stores. Its properties read observable stores, so the Settings screen follows them.
 @MainActor @Observable final class SettingsAdapter: SettingsPorts {
+    @ObservationIgnored let defaults: UserDefaults
     @ObservationIgnored private let settings: SettingsStore
     @ObservationIgnored private let library: LibraryStore
     @ObservationIgnored private let voicesStore: VoicesStore
@@ -14,25 +15,33 @@ import CassiniNotebook
     @ObservationIgnored private let transcriber: any Transcribing
 
     init(settings: SettingsStore, library: LibraryStore, voices: VoicesStore, processing: ProcessingStore,
-         notices: NoticeCenter, transcriber: any Transcribing) {
+         notices: NoticeCenter, transcriber: any Transcribing, defaults: UserDefaults = .standard) {
         self.settings = settings; self.library = library; self.voicesStore = voices; self.processing = processing
-        self.notices = notices; self.transcriber = transcriber
+        self.notices = notices; self.transcriber = transcriber; self.defaults = defaults
     }
 
     /// The stored status of each part, with the standalone install and the running job's model download over it.
-    var modelStatuses: [ModelPart: ModelPartStatus] { processing.models.statuses }
+    var speechModels: SpeechModelsStore? { processing.speechModels }
+    var modelStatuses: [ModelPart: ModelPartStatus] {
+        var statuses = processing.models.statuses
+        if let speechModels, speechModels.parakeetCapable {
+            if speechModels.installation == .checking { statuses[.speech] = .checking }
+            if speechModels.installation == .unavailable { statuses[.speech] = .failed(.fileCheckFailed) }
+        }
+        return statuses
+    }
 
     func consented(to part: ModelPart) -> Bool {
         part == .speech ? settings.downloadsAllowed : settings.speakerDownloadsAllowed
     }
 
-    func size(of part: ModelPart) -> ModelSize { ModelRows.size(of: part, recognizer: transcriber.recognizer) }
+    func size(of part: ModelPart) -> ModelSize { ModelRows.size(of: part, recognizer: recognizer) }
 
-    func refreshModels() async { await processing.models.refresh() }
+    func refreshModels() async { speechModels?.refresh(); await processing.models.refresh() }
 
     func speechLanguages() async -> [SpeechLanguage] { await transcriber.speechLanguages() }
 
-    var recognizer: SpeechRecognizer { transcriber.recognizer }
+    var recognizer: SpeechRecognizer { speechModels?.parakeetCapable == true ? .parakeet : transcriber.recognizer }
 
     var voices: Int { voicesStore.savedVoices.count }
     var trash: Int { library.notes.count { $0.trashedAt != nil } }

@@ -60,10 +60,13 @@ public actor JobStore {
     /// With `waitingForConsent` the job is written as `needsConsent` in the same write ("Ready to transcribe").
     @discardableResult
     public func enqueue(_ noteID: UUID, kind: JobKind, language: String?, now: Date,
-                        waitingForConsent: Bool = false) throws -> Job {
+                        waitingForConsent: Bool = false, recognizer: String? = nil, replacingFailedRecognizer: Bool = false) throws -> Job {
         if let existing = jobs[noteID], existing.state == .queued || existing.state == .running { return existing }
         var job = jobs[noteID]?.requeued(seq: nextSeq, kind: kind, language: language, now: now)
-            ?? Job(noteID: noteID, seq: nextSeq, kind: kind, language: language ?? "", enqueuedAt: now)
+            ?? Job(noteID: noteID, seq: nextSeq, kind: kind, language: language ?? "", enqueuedAt: now, recognizer: recognizer)
+        if replacingFailedRecognizer, jobs[noteID]?.state == .failed {
+            job.recognizer = recognizer; job.doneMs = 0; job.totalMs = nil; job.words = 0
+        }
         if waitingForConsent { job.state = .needsConsent }
         try write([job])
         return job
@@ -73,14 +76,14 @@ public actor JobStore {
     /// job takes the numbers of `checkpoint`, which stayed in `work/` meanwhile. A running job is left alone.
     @discardableResult
     public func requeueAtBack(_ noteID: UUID, kind: JobKind, language: String, checkpoint: CheckpointStatus,
-                              now: Date) throws -> Job? {
+                              now: Date, recognizer: String? = nil) throws -> Job? {
         if let existing = jobs[noteID] {
             guard existing.state != .running else { return existing }
             let job = existing.requeued(seq: nextSeq, kind: kind, language: nil, now: now)
             try write([job])
             return job
         }
-        let job = Job(noteID: noteID, seq: nextSeq, kind: kind, language: language, enqueuedAt: now)
+        let job = Job(noteID: noteID, seq: nextSeq, kind: kind, language: language, enqueuedAt: now, recognizer: recognizer)
             .withNumbers(of: checkpoint)
         try write([job])
         return job

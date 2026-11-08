@@ -13,6 +13,8 @@ struct NoteMenu: View {
     let exportingDocument: Bool
     let perform: (NoteMenuAction) -> Void
     @Environment(RecordingStore.self) private var recording
+    @Environment(ProcessingStore.self) private var processing
+    private var speechUnavailable: Bool { processing.models.speechUnavailability == .model }
 
     var body: some View {
         let finishing = recording.finishingNoteID == note.id
@@ -64,16 +66,23 @@ struct NoteMenu: View {
     @ViewBuilder private func transcription(_ row: TranscribeRow, disabled: Bool) -> some View {
         switch row {
         case .transcribe:
-            Button(NoteCopy.transcribe, systemImage: "text.badge.waveform") { perform(.transcribe) }.disabled(disabled)
+            Button { perform(.transcribe) } label: {
+                Text(NoteCopy.transcribe)
+                if speechUnavailable { Text(NoteCopy.speechUnavailable) }
+                Image(systemName: "text.badge.waveform")
+            }
+            .disabled(disabled || speechUnavailable)
+            .accessibilityLabel(Text(verbatim: [NoteCopy.transcribe, speechUnavailable ? NoteCopy.speechUnavailable : nil].compactMap { $0 }.joined(separator: ". ")))
         case .transcribeAgain:
             Button { perform(.transcribeAgain) } label: {
                 Text(NoteCopy.transcribeAgain)
-                if let againCaption { Text(againCaption) }
+                if speechUnavailable { Text(NoteCopy.speechUnavailable) }
+                else if let againCaption { Text(againCaption) }
                 Image(systemName: "arrow.clockwise")
             }
-            .disabled(disabled)
+            .disabled(disabled || speechUnavailable)
             .accessibilityIdentifier("transcribeAgain")
-            .accessibilityLabel(Text(verbatim: [NoteCopy.transcribeAgain, againCaption].compactMap { $0 }.joined(separator: ". ")))
+            .accessibilityLabel(Text(verbatim: [NoteCopy.transcribeAgain, speechUnavailable ? NoteCopy.speechUnavailable : againCaption].compactMap { $0 }.joined(separator: ". ")))
         case .transcribeAgainUnavailable:
             Button {} label: {
                 Text(NoteCopy.transcribeAgain)

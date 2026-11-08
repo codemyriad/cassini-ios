@@ -3,6 +3,8 @@
 import importlib.util
 import hashlib
 import io
+import struct
+from whistle_binary_identity import identity
 from pathlib import Path
 import tempfile
 import unittest
@@ -49,6 +51,28 @@ class IntegrityTests(unittest.TestCase):
         with mock.patch.dict(bundle.PINS["artifacts"]["ios-arm64/libneedle.a"], {"sha256": "0" * 64}):
             with self.assertRaises(ValueError):
                 bundle.check_imports("ios-arm64", ["_memcpy"])
+
+
+class SectionIdentityTests(unittest.TestCase):
+    def image(self):
+        image = bytearray(320)
+        def put(value, offset): struct.pack_into("<I", image, offset, value)
+        for value, offset in [(0xfeedfacf,0),(0x100000c,4),(6,12),(1,16),(152,20),
+                              (0x19,32),(152,36),(1,96),(16,144),(192,152),(0x80000400,168)]: put(value,offset)
+        return image
+
+    def test_payload_tampering_changes_identity_but_signing_tail_does_not(self):
+        image = self.image(); before = identity(image)
+        image[319] = 91
+        self.assertEqual(identity(image), before)
+        image[192] = 1
+        self.assertNotEqual(identity(image), before)
+
+    def test_unknown_command_or_out_of_range_section_is_refused(self):
+        image = self.image(); struct.pack_into("<I",image,32,0x77777777)
+        with self.assertRaises(ValueError): identity(image)
+        image = self.image(); struct.pack_into("<I",image,152,0xffffffff)
+        with self.assertRaises(ValueError): identity(image)
 
 
 if __name__ == "__main__":

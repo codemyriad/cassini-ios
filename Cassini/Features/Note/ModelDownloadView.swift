@@ -5,6 +5,7 @@ import CassiniNotebook
 /// "Transcribe on this device": consent for downloading the models a note, or a standalone download, needs.
 struct ModelDownloadView: View {
     let noteID: UUID?
+    var parakeetOnly = false
     @Environment(ProcessingStore.self) private var processing
     @Environment(Router.self) private var router
     @Environment(\.dismiss) private var dismiss
@@ -21,7 +22,8 @@ struct ModelDownloadView: View {
         .background(Color.paper)
         .navigationBarTitleDisplayMode(.inline)
         .task {
-            guard model == nil, let ports = processing.modelDownload else { return }
+            guard model == nil else { return }
+            guard let ports = parakeetOnly ? processing.parakeetDownload : processing.modelDownload else { dismiss(); return }
             let model = ModelDownloadModel(noteID: noteID, ports: ports)
             model.onEffect = { effect in
                 switch effect {

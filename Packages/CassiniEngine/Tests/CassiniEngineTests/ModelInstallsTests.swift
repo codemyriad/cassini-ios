@@ -8,6 +8,15 @@ import CassiniNotebook
 
 /// The standalone model installs and the stored model status, over fake models.
 @MainActor @Suite struct ModelInstallsTests {
+    @Test func hardwareAndLocaleFailuresStayDistinctEvenWithTheSameAssetStatus() async {
+        for failure in [JobFailure.model, .unsupportedLanguage] {
+            let models = ModelInstalls(transcriber: FakeUnavailableTranscriber(failure), analyzer: FakeAnalyzer(), clock: FakeClock()) { "en-US" }
+            await models.refresh()
+            #expect(models.status(of: .speech) == .unsupported)
+            #expect(models.speechUnavailability == failure)
+        }
+    }
+
     @Test func unavailableSpeechWinsOverAStaleDownloadFailureOrProgress() async throws {
         let transcriber = LanguageTranscriber(["en-US": .notDownloaded], failsInstall: true)
         let installs = ModelInstalls(transcriber: transcriber, analyzer: ScriptedAnalyzer(status: .ready),

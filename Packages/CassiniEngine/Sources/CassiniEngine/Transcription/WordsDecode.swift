@@ -95,6 +95,10 @@ final class WordsDecode: Sendable {
             guard s.ended == nil else { return }
             if case .preparingModel = event {} else if s.analyzerStartedAt == nil { s.analyzerStartedAt = uptimeMs() }
             switch event {
+            case .detectedLanguage(let reported):
+                guard recognizer == .whistle, let known = TranscriptLanguage.known(reported) else { break }
+                let previous = s.checkpoint.reportedLanguage
+                s.checkpoint.reportedLanguage = previous == nil || previous == known ? known : "mul"
             case .preparingModel(let fraction):
                 s.outbox.append(.downloading(fraction.map(TranscriptionJob.fractionProgress(.speech))))
             case .progress(let done, let total):

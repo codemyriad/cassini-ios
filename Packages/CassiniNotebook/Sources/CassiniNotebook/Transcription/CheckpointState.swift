@@ -47,6 +47,8 @@ public struct CheckpointState: Hashable, Sendable {
     /// The streaming speakers of a Parakeet run (Android's `diarizer`, `speakerPrefix`, `speakerFailure`,
     /// `clipSamples` and `voiceClips` members); nil when the run does not tell speakers apart as it goes.
     public var speakers: SpeakerCheckpoint?
+    /// Detected language of Whistle words; nil in legacy checkpoints.
+    public var reportedLanguage: String?
 
     public init(source: String, signature: String, model: String, segments: [TranscriptSegment], doneMs: Int64,
                 totalMs: Int64, elapsedMs: Int64, inferenceMs: Int64 = 0, resumedFromMs: Int64 = 0,
@@ -55,6 +57,7 @@ public struct CheckpointState: Hashable, Sendable {
         self.doneMs = doneMs; self.totalMs = totalMs; self.elapsedMs = elapsedMs; self.inferenceMs = inferenceMs
         self.resumedFromMs = resumedFromMs; self.wordsComplete = wordsComplete; self.recognition = recognition
         self.speakers = speakers
+        self.reportedLanguage = nil
     }
 
     /// The `model` of an Apple Speech run in `language` (BCP-47): the words of another language do not resume.
@@ -159,7 +162,7 @@ public struct RecognitionCheckpoint: Codable, Hashable, Sendable {
 extension CheckpointState: Codable {
     private enum CodingKeys: String, CodingKey {
         case version, source, signature, model, segments, doneMs, totalMs, elapsedMs, inferenceMs, resumedFromMs
-        case wordsComplete, recognition, speakers
+        case wordsComplete, recognition, speakers, reportedLanguage
     }
 
     public init(from decoder: any Decoder) throws {
@@ -178,6 +181,7 @@ extension CheckpointState: Codable {
         wordsComplete = try c.decode(Bool.self, forKey: .wordsComplete)
         recognition = try c.decodeIfPresent(RecognitionCheckpoint.self, forKey: .recognition)
         speakers = try c.decodeIfPresent(SpeakerCheckpoint.self, forKey: .speakers)
+        reportedLanguage = try c.decodeIfPresent(String.self, forKey: .reportedLanguage)
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -195,6 +199,7 @@ extension CheckpointState: Codable {
         try c.encode(wordsComplete, forKey: .wordsComplete)
         try c.encodeIfPresent(recognition, forKey: .recognition)
         try c.encodeIfPresent(speakers, forKey: .speakers)
+        try c.encodeIfPresent(reportedLanguage, forKey: .reportedLanguage)
     }
 
     /// Compact JSON with sorted members.

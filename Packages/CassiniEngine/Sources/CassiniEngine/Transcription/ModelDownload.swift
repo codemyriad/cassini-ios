@@ -45,12 +45,14 @@ public struct ModelDownloadPlan: Hashable, Sendable {
     /// `catalog` is what the catalog still has to install (`ModelPlan.of(root:)`): it gives each part's download, and
     /// on a Parakeet device (`recognizer`) the free space too. Without it a part shows no size.
     public static func plan(speech: ModelPartStatus, speakers: ModelPartStatus, forNote: Bool, identifySpeakers: Bool,
-                            speakersOnly: Bool = false, speakersInstallBytes: Int64,
+                            speakersOnly: Bool = false, speakersInstallBytes: Int64, speechInstallBytes: Int64 = Self.speechInstallBytes,
                             recognizer: SpeechRecognizer = .appleSpeech, catalog: ModelPlan? = nil) -> ModelDownloadPlan {
         var missing: [ModelPart] = []
         if speech != .ready, speech != .unsupported, !speakersOnly { missing.append(.speech) }
         if speakers != .ready, !forNote || identifySpeakers || speakersOnly { missing.append(.speakers) }
-        var plan = ModelDownloadPlan(missing: missing, speakersInstallBytes: speakersInstallBytes, speakersOnly: speakersOnly)
+        var plan = ModelDownloadPlan(missing: missing, requiredFreeBytes:
+            (missing.contains(.speech) ? speechInstallBytes : 0) + (missing.contains(.speakers) ? speakersInstallBytes : 0),
+            speakersOnly: speakersOnly)
         guard let catalog else { return plan }
         let parakeet = recognizer == .parakeet
         // The catalog's items of each missing part; the speakers row stands for both speaker models.
@@ -109,6 +111,7 @@ public struct ModelDownloadPlan: Hashable, Sendable {
     /// The language the recognizer is set to hear (`SettingsStore.speechLanguage`, BCP 47) on a device that keeps
     /// Apple Speech; nil where the recognizer hears the language itself (Parakeet).
     func speechLanguage() -> String?
+    func speechLanguage(for noteID: UUID?) async -> String?
     /// Free bytes where the models go.
     func usableBytes() async -> Int64
     /// Agrees to downloading `parts`.
@@ -122,6 +125,10 @@ public struct ModelDownloadPlan: Hashable, Sendable {
     /// Asks for notifications once (`NoticeCenter.askNotificationsOnce`) and waits for the answer; a denial blocks
     /// nothing.
     func askNotificationsOnce() async
+}
+
+extension ModelDownloadPorts {
+    public func speechLanguage(for noteID: UUID?) async -> String? { speechLanguage() }
 }
 
 /// The model download screen ("Transcribe on this device"). With a note it offers "Download and transcribe" (for a
@@ -174,7 +181,8 @@ public final class ModelDownloadModel {
     public func load() async {
         let plan = await ports.plan(for: noteID)
         if plan.isEmpty { await closeStale(); return }
-        speechLanguage = plan.speakersOnly ? nil : ports.speechLanguage()
+        if plan.speakersOnly { speechLanguage = nil }
+        else { speechLanguage = await ports.speechLanguage(for: noteID) }
         self.plan = plan
     }
 

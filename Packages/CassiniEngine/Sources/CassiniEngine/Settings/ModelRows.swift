@@ -38,6 +38,8 @@ public enum ModelRowStatus: Hashable, Sendable {
 public enum ModelSize: Hashable, Sendable {
     /// Apple's speech assets: iOS downloads and keeps them, and does not tell their size first.
     case managedBySystem
+    /// Bundled with the application; no model download.
+    case included
     case bytes(Int64)
     /// A model with its precision, as Android's speech row: "INT8 · 443 MB".
     case precision(String, bytes: Int64)
@@ -72,6 +74,7 @@ public enum ModelRows {
         switch part {
         case .speech where recognizer == .parakeet:
             .precision(ModelCatalog.parakeetPrecision, bytes: ModelDownloadPlan.fullDownloadBytes(.speech))
+        case .speech where recognizer == .whistle: .included
         case .speech: .managedBySystem
         case .speakers: .bytes(ModelDownloadPlan.fullDownloadBytes(.speakers))
         case .voices: .includedWith(.speakers)

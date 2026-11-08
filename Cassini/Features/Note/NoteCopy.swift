@@ -18,6 +18,7 @@ enum NoteCopy {
     static let exportDocument = String(localized: "Export Cassini document", table: "Note")
     static let preparingDocument = String(localized: "Preparing Cassini document…", table: "Note")
     static let shareAudio = String(localized: "Share original audio", table: "Note")
+    static let speechUnavailable = String(localized: "No on-device speech model is available for this device and language.", table: "Note")
     static let transcribe = String(localized: "Transcribe", table: "Note")
     static let transcribeAgain = String(localized: "Transcribe again", table: "Note")
     static let noNewVersion = String(localized: "This file can’t take a new version here.", table: "Note")

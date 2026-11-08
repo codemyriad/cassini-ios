@@ -31,6 +31,11 @@ public struct NoteWorkFolders: JobCheckpoints {
         (try? files.load(noteID))??.appleLanguage
     }
 
+    public func recognizer(of noteID: UUID) async -> String? {
+        guard let checkpoint = (try? files.load(noteID)) ?? nil else { return nil }
+        return SpeechRecognizer.fromCheckpoint(model: checkpoint.model)?.rawValue
+    }
+
     public func discard(_ noteID: UUID) async throws {
         try files.discard(noteID)
         drafts?.release(noteID)

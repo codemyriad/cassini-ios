@@ -23,6 +23,13 @@ public final class TranscriptionCoordinator {
         public var runner: any TranscriptionJobRunning
         public var checkpoints: any JobCheckpoints
         public var consent: ModelConsent
+        public var recognizer: String?
+        public var recognizerChoice: (@MainActor @Sendable () -> String?)?
+        @MainActor var selectedRecognizer: String? {
+            if let recognizerChoice { return recognizerChoice() }
+            return recognizer
+        }
+        public var consentForRecognizer: (@MainActor @Sendable (String?) -> ModelConsent)?
         public var notifier: any Notifier
         public var background: any BackgroundRunner
         public var clock: any AppClock
@@ -39,11 +46,13 @@ public final class TranscriptionCoordinator {
                     background: any BackgroundRunner, clock: any AppClock,
                     backgroundTitle: @escaping @MainActor (_ noteTitle: String) -> String = { "Transcribing “\($0)”" },
                     backgroundSubtitle: String = "Your audio stays on this device",
-                    progress: JobProgress? = nil) {
+                    progress: JobProgress? = nil, recognizer: String? = nil,
+                    recognizerChoice: (@MainActor @Sendable () -> String?)? = nil,
+                    consentForRecognizer: (@MainActor @Sendable (String?) -> ModelConsent)? = nil) {
             self.jobs = jobs; self.notes = notes; self.runner = runner; self.checkpoints = checkpoints
             self.consent = consent; self.notifier = notifier; self.background = background; self.clock = clock
             self.backgroundTitle = backgroundTitle; self.backgroundSubtitle = backgroundSubtitle
-            self.progress = progress
+            self.progress = progress; self.recognizer = recognizer; self.recognizerChoice = recognizerChoice; self.consentForRecognizer = consentForRecognizer
         }
     }
 
@@ -121,16 +130,20 @@ public final class TranscriptionCoordinator {
         guard let note = await parts.notes.note(noteID) else { return .refused(.noNote) }
         if let refusal = EnqueueRules.refusal(for: note) { return .refused(refusal) }
         guard await parts.jobs.isWritable else { return .refused(.queueUnavailable) }
+        // Freeze one default before any asynchronous eligibility/consent checks. Verification or a preference
+        // change during those checks applies to the next request, never to the job whose consent we just checked.
+        let selectedRecognizer = parts.selectedRecognizer
         let language = await language(for: noteID, kind: kind)
-        if let failure = await parts.consent.unavailability(kind, language ?? "") {
+        let consent = await consent(for: noteID, selected: selectedRecognizer)
+        if let failure = await consent.unavailability(kind, language ?? "") {
             return .refused(.speechUnavailable(failure))
         }
-        guard await parts.consent.allows(kind, language ?? "") else {
-            return await lock.run { await needConsent(noteID, kind: kind, language: language) }
+        guard await consent.allows(kind, language ?? "") else {
+            return await lock.run { await needConsent(noteID, kind: kind, language: language, selected: selectedRecognizer) }
         }
         let resume = await parts.jobs.job(noteID)?.state == .paused
         if EnqueueRules.clears(settings.queueHold, origin: origin, resume: resume) { setHold(nil) }
-        let outcome = await lock.run { await enqueue(noteID, kind: kind, language: language) }
+        let outcome = await lock.run { await enqueue(noteID, kind: kind, language: language, selected: selectedRecognizer) }
         if case .queued = outcome, settings.queueHold == nil { drain() }
         return outcome
     }

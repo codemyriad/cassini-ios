@@ -28,7 +28,7 @@ public struct ModelConsent: Sendable {
             switch kind {
             case .transcribe, .transcribeAgain:
                 if settings.modelsConsentAt != nil || parakeetReady() { return true }
-                guard speech.recognizer == .appleSpeech else { return false }
+                guard speech.recognizer == .appleSpeech || speech.recognizer == .whistle else { return false }
                 let status = await speech.assetStatus(locale: Locale(identifier: language))
                 return status == .ready
             case .speakersOnly:

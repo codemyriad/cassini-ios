@@ -43,10 +43,13 @@ Voiceprints
 stay in the app's private storage, are excluded from backups, and are never written into a document or an export.
 System backups may include recordings and transcripts.
 
-The build also bundles pinned Whistle weights and a private Needle runtime (D75.2); they are never downloaded by
-the running app. Whistle selection remains gated pending production pipeline and lab-device acceptance, including
-the 3 GB memory gate. See [Whistle/README.md](Whistle/README.md) for the documented minos27 archive exception,
-SDK26/simulator evidence, guarded C API and capability policy. No Included/default option is enabled yet.
+The build bundles pinned Whistle weights and a private Needle runtime (D75.2). Whistle transcribes immediately
+without a speech-model download. On supported devices, a calm, dismissible suggestion offers the more accurate
+Parakeet Ultra with its actual pinned download size. Once Parakeet is installed and hash-verified, new jobs use it
+automatically; Whistle remains selectable. Devices below Parakeet's capability/memory/disk requirements never see
+the suggestion. Existing queued and paused jobs keep their recognizer. See [Whistle/README.md](Whistle/README.md)
+for the documented minos27 archive exception, iOS26 parity and A12/3GB measurements. Internal TestFlight builds
+retain private memory diagnostics and must export with testFlightInternalTestingOnly=true.
 
 ## Run
 
@@ -143,11 +146,12 @@ TestFlight still need.
 
 [docs/differences.md](docs/differences.md) describes each difference in detail. In summary:
 
-- **Engines and thresholds.** iOS uses Parakeet Ultra for words, as Android does, on devices with the memory for it
-  (at least 5 GiB, a provisional rule until a device is measured). Other devices use Apple's `SpeechTranscriber`
-  only when its public hardware, equivalent-locale and asset checks allow it. Unsupported devices/languages show
-  Not available and refuse transcription before queueing or download consent; recording, playback and audio export
-  remain available. Supported missing Apple assets still download with consent.
+- **Engines and thresholds.** D78 starts with bundled Whistle and promotes Parakeet Ultra after its pinned files
+  are verified. Parakeet needs at least 5 GiB physical RAM (the existing provisional rule) and the normal runtime
+  memory preflight; its download suggestion also checks the pinned install's actual disk requirement. Whistle's
+  production pipeline and default-limit A12/3GB memory gate passed. Apple Speech remains a separately checked
+  fallback candidate when neither bundled nor verified downloaded speech is available; unsupported devices/locales
+  are refused before queueing or download consent. Recording, playback and audio export remain available.
   Speakers
   use Android's streaming Sortformer and CAM++ with Android's thresholds (0.72 automatic, 0.50 suggest, 0.08 margin,
   4 s of speech), so the voiceprints are Android's; voices saved by earlier iOS builds are named again. iOS keeps

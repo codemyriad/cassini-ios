@@ -38,6 +38,7 @@ private struct SettingsForm: View {
     let model: SettingsModel
     @Environment(SettingsStore.self) private var settings
     @Environment(NoticesStore.self) private var notices
+    @Environment(SettingsAdapter.self) private var ports
 
     var body: some View {
         @Bindable var settings = settings
@@ -52,8 +53,20 @@ private struct SettingsForm: View {
                 }
                 .listRowInsets(EdgeInsets()).listRowBackground(Color.clear)
             }
+            if let speechModels = ports.speechModels {
+                if speechModels.shows(.settings) || speechModels.promotionVisible {
+                    Section { ParakeetSuggestionView(store: speechModels, placement: .settings) }
+                }
+            }
             Section {
-                ForEach(model.models) { row in ModelRowView(row: row) { model.openModel(row.part) } }
+                if let speechModels = ports.speechModels { SpeechModelChoiceRow(store: speechModels) }
+                ForEach(model.models) { row in
+                    ModelRowView(row: row, modelName: row.part == .speech && ports.speechModels != nil
+                        ? (ports.speechModels?.parakeetCapable == true ? "Parakeet Ultra" : (ports.speechModels?.policy.whistleAvailable == true ? "Whistle" : nil)) : nil) {
+                        if row.part == .speech, ports.speechModels?.installation == .unavailable { ports.speechModels?.refresh() }
+                        else { model.openModel(row.part) }
+                    }
+                }
             } header: {
                 Text("On-device models", tableName: "Settings").foregroundStyle(Color.muted)
             } footer: {

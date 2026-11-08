@@ -11,7 +11,7 @@ import CassiniNotebook
 /// recognizer run that made its words, the same in the word body, the descriptor and the processing step; Parakeet
 /// writes `und`, Apple Speech the locale that ran; derived versions keep the language of their words and imported ones
 /// their stored value. Run cases of the recognizers iOS has go through the real job (twice for a `laterRun`), the
-/// version history and the export; Whistle's are checked against the pure rule only. iOS leaves an empty language out
+/// version history and the export, including bundled Whistle. iOS leaves an empty language out
 /// of the body and the descriptor, which the cases allow. Android pins the Parakeet case with
 /// `TranscriptionJobTest#theRecognizersLanguageIsWrittenAlikeInBodyDescriptorAndProvenance`, ported in
 /// `TranscriptionJobParakeetTests`.
@@ -122,7 +122,7 @@ import CassiniNotebook
                 "the case states one language in all three places")
     }
 
-    @Test(arguments: writers.filter { if case .run(let run, let later) = $0.origin { ![run.engine, later?.engine].contains("whistle") } else { true } })
+    @Test(arguments: writers)
     func theExportCarriesTheLanguageOfTheWords(_ c: Writer) async throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("cassini-language-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -134,8 +134,11 @@ import CassiniNotebook
         var root: URL?
         switch c.origin {
         case .run(let run, let later):
-            let h = try await run.engine == "parakeet" ? TranscriptionJobTests.Harness(engine: WindowedTranscriber())
-                : TranscriptionJobTests.Harness()
+            let initial: (any Transcribing)?
+            if run.engine == "parakeet" { initial = WindowedTranscriber() }
+            else if run.engine == "whistle" { initial = WhistleJobTestTranscriber(language: run.ranLocale) }
+            else { initial = nil }
+            let h = try await TranscriptionJobTests.Harness(engine: initial)
             root = h.root
             h.transcriber.ranLocale = run.ranLocale
             #expect(await h.run(language: run.picker ?? "").outcome == .done)
@@ -149,7 +152,10 @@ import CassiniNotebook
                 other.ranLocale = later.ranLocale
                 let parakeet = WindowedTranscriber()
                 parakeet.word = "v"
-                let engine: any Transcribing = later.engine == "parakeet" ? parakeet : other
+                let engine: any Transcribing
+                if later.engine == "parakeet" { engine = parakeet }
+                else if later.engine == "whistle" { engine = WhistleJobTestTranscriber(language: later.ranLocale) }
+                else { engine = other }
                 #expect(await h.run(language: later.picker ?? "", using: engine).outcome == .done)
                 let shown = try #require(await h.note())
                 #expect(shown.language == TranscriptLanguage.ofRun(reported: later.engine == "parakeet" ? nil : later.ranLocale),

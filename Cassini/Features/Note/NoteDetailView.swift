@@ -170,6 +170,9 @@ struct NoteSectionView: View {
             }
         case .banners:
             RecordingNotices(noteID: noteID)
+            if let speechModels = processing.speechModels, mode.showsReading {
+                ParakeetSuggestionView(store: speechModels, placement: .afterWhistle)
+            }
             NoteBannersView(note: note, job: model.job, mode: mode, facts: bannerFacts,
                             act: { _, action in model.bannerAction(action) },
                             dismiss: { model.dismiss($0) })
@@ -180,7 +183,8 @@ struct NoteSectionView: View {
         let state = processing.state
         return NoteBannerFacts(trustToggled: model.screen.trustToggled, queueHold: state.hold, waitingJobs: state.queue.count,
                                dismissed: model.screen.dismissed, speechInstallBytes: installBytes.speech,
-                               speakersInstallBytes: installBytes.speakers)
+                               speakersInstallBytes: installBytes.speakers,
+                               speechUnavailableText: processing.models.speechUnavailability == .model ? NoteCopy.speechUnavailable : nil)
     }
 
     /// The free-space figures of a model download that failed for want of room: Parakeet's (nil keeps the estimate of

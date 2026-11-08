@@ -6,6 +6,7 @@ import CassiniNotebook
 /// Pending amber, Failed red, Not downloaded plain). Only a Not downloaded and a Failed row are buttons.
 struct ModelRowView: View {
     let row: ModelRow
+    var modelName: String? = nil
     let open: () -> Void
     @Environment(\.locale) private var locale
 
@@ -21,7 +22,9 @@ struct ModelRowView: View {
     private func content(chevron: Bool) -> some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(row.part.settingsLabel).foregroundStyle(Color.ink)
+                Group {
+                    if let modelName { Text(verbatim: modelName) } else { Text(row.part.settingsLabel) }
+                }.foregroundStyle(Color.ink)
                 Text(row.size.label(locale: locale)).font(.subheadline).foregroundStyle(Color.muted)
             }
             Spacer(minLength: 8)
@@ -50,6 +53,7 @@ extension ModelPart {
 extension ModelSize {
     func label(locale: Locale) -> String {
         switch self {
+        case .included: String(localized: "Included with Cassini", table: "Settings")
         case .managedBySystem: String(localized: "Managed by iOS", table: "Settings")
         case .bytes(let bytes): SizeCopy.text(bytes, locale: locale)
         case .precision(let precision, let bytes):

@@ -69,6 +69,7 @@ struct Banner: View {
         ForEach(Array(spec.actions.enumerated()), id: \.element) { index, action in
             Button(BannerCopy.action(action)) { onAction(action) }
                 .buttonStyle(BannerButtonStyle(filled: index == 0))
+                .disabled(spec.disabledActions.contains(action))
                 .accessibilityIdentifier("bannerAction.\(action.rawValue)")
         }
     }

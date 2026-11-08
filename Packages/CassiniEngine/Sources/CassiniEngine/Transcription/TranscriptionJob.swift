@@ -83,6 +83,17 @@ extension TranscriptionJobHost {
 /// - **Work.** A transcribing job removes `work/` once the note is saved; a speakers-only job never touches it, so a
 ///   paused transcription keeps its checkpoint.
 public struct TranscriptionJob: TranscriptionJobRunning {
+    /// Optional platform diagnostics. They observe job boundaries and never decide a job's outcome.
+    public struct Diagnostics: Sendable {
+        public var started: @Sendable (Job) -> Void
+        public var finished: @Sendable (Job, JobOutcome) -> Void
+        public init(started: @escaping @Sendable (Job) -> Void,
+                    finished: @escaping @Sendable (Job, JobOutcome) -> Void) {
+            self.started = started; self.finished = finished
+        }
+    }
+    private let diagnostics: Diagnostics?
+
     public struct Limits: Hashable, Sendable {
         public var maxDurationMs: Int64
         public var maxBodyBytes: Int64
@@ -117,11 +128,11 @@ public struct TranscriptionJob: TranscriptionJobRunning {
                 drafts: DraftNamesStore? = nil,
                 uptimeMs: @escaping @Sendable () -> Int64 = TranscriptionJob.uptimeMs,
                 availableMemory: @escaping @Sendable () -> Int64? = TranscriptionJob.availableMemory,
-                device: @escaping @Sendable () -> RunDevice = RunDevice.current) {
+                device: @escaping @Sendable () -> RunDevice = RunDevice.current, diagnostics: Diagnostics? = nil) {
         self.notes = notes; self.transcriber = transcriber; self.analyzer = analyzer; self.checkpoints = checkpoints
         self.provenance = provenance; self.host = host; self.clock = clock; self.limits = limits; self.budget = budget
         self.uptimeMs = uptimeMs; self.availableMemory = availableMemory; self.device = device
-        self.drafts = drafts
+        self.drafts = drafts; self.diagnostics = diagnostics
     }
 
     /// `os_proc_available_memory()`: what Cassini can still allocate before iOS ends it; nil where the system does not
@@ -141,6 +152,7 @@ public struct TranscriptionJob: TranscriptionJobRunning {
     }
 
     public func run(_ job: Job, stop: StopSignal, events: @escaping @Sendable (JobEvent) -> Void) async -> JobOutcome {
+        diagnostics?.started(job)
         let outcome = await withTaskCancellationHandler {
             await pipeline(job, stop: stop, events: events)
         } onCancel: {
@@ -154,6 +166,7 @@ public struct TranscriptionJob: TranscriptionJobRunning {
             default: drafts.open(job.noteID)
             }
         }
+        diagnostics?.finished(job, outcome)
         events(.ended(outcome))
         return outcome
     }
@@ -168,6 +181,9 @@ public struct TranscriptionJob: TranscriptionJobRunning {
         let knownMs = CheckpointState.ms(note.duration)
         guard knownMs <= limits.maxDurationMs else { return .failed(.long) }
         guard knownMs == 0 || knownMs >= limits.minDurationMs else { return .failed(.short) }
+        let transcriber: any Transcribing
+        do { transcriber = try self.transcriber.forJob(recognizer: job.recognizer) }
+        catch { return .failed(.model) }
         let settings = await host.jobSettings()
         let recognizer = transcriber.recognizer
         // Parakeet hears the language; only the Apple Speech fallback is given one: the job's, else the one its saved
@@ -203,6 +219,7 @@ public struct TranscriptionJob: TranscriptionJobRunning {
 
         var context = Context(noteID: job.noteID, url: url, source: note.audioFilename, language: language,
                               recognizer: recognizer, knownMs: knownMs, settings: settings, stop: stop, events: events)
+        context.transcriber = transcriber
         context.signature = CheckpointState.signature(of: url)
         if transcribes {
             context.wordsLanguage = TranscriptLanguage.ofRun(reported: await transcriber.runLanguage(requested: language))
@@ -226,7 +243,7 @@ public struct TranscriptionJob: TranscriptionJobRunning {
         let decodes = transcribes && checkpoint?.wordsComplete != true
         // The decode holds the native budget from before the run starts, so a job that waits for the previous one's
         // models to go shows "Finishing the previous note…".
-        let holdsBudget = decodes && recognizer == .parakeet
+        let holdsBudget = decodes && recognizer != .appleSpeech
         if holdsBudget, let request = await takeBudget(context) { return Self.outcome(of: request) }
         var released = !holdsBudget
         defer { if !released { budget.release() } }
@@ -332,7 +349,7 @@ public struct TranscriptionJob: TranscriptionJobRunning {
         let resumeDoneMs = checkpoint?.doneMs ?? 0
         let parakeet = context.recognizer == .parakeet
         // Apple Speech starts again 1 s before the checkpoint; Parakeet reads up to its window and goes on from there.
-        let startMs = resumeDoneMs == 0 ? 0
+        let startMs = resumeDoneMs == 0 || context.recognizer == .whistle ? 0
             : parakeet ? (checkpoint?.recognition?.start ?? 0) * 1000 / Int64(CassiniNotebook.Limits.asrRate)
             : AppleSpeechWindows.resumeStartMs(doneMs: resumeDoneMs)
         let decode = WordsDecode(
@@ -349,7 +366,7 @@ public struct TranscriptionJob: TranscriptionJobRunning {
                                            startOffset: parakeet ? 0 : TimeInterval(startMs) / 1000, resume: resume,
                                            allowDownload: context.settings.allowSpeechDownload,
                                            speakers: parakeet ? speakers : nil)
-        let transcriber = transcriber
+        let transcriber = context.transcriber ?? transcriber
         let task = Task { try await transcriber.transcribe(request) { decode.handle($0) } }
         decode.attach(task)
         let watch = StopWatch.start(context.stop) { decode.stopRequested($0) }
@@ -373,7 +390,8 @@ public struct TranscriptionJob: TranscriptionJobRunning {
         let voice = NoteSpeaker.oneVoice(prefix: prefix)
         let segments = Note.oneVoice(words.segments, voice)
         if resumed, provenance.load(context.noteID)?.describes(segments) == true { return true }
-        let language = context.wordsLanguage
+        let language = context.recognizer == .whistle ? TranscriptLanguage.ofRun(reported: words.reportedLanguage) : context.wordsLanguage
+        let transcriber = context.transcriber ?? transcriber
         let run: TranscriptProvenance
         switch context.recognizer {
         case .parakeet:
@@ -382,6 +400,13 @@ public struct TranscriptionJob: TranscriptionJobRunning {
             run = .parakeetRun(model: ModelCatalog.parakeetProvenanceModel,
                                revision: ModelCatalog.parakeetRevision, segmentation: segmentation ?? "",
                                inferenceMs: words.inferenceMs, resumedFromMs: words.resumedFromMs, device: device())
+        case .whistle:
+            run = TranscriptProvenance(backend: "Needle C API (CPU, on-device)", engine: "Whistle",
+                model: context.recognizer.checkpointModel(language: ""), device: device().description,
+                source: TranscriptProvenance.recordingSource, version: "Needle 3.3.0; Silero 6.2.1; ONNX Runtime 1.27.1",
+                language: language, inferenceMs: words.inferenceMs,
+                segmentation: "centred FIR97 48k/16k; raw ASR; HPF100 VAD; Silero512; gate .5/.35, votes2/3, pre5120, quiet9600, pause224000/2048, limit240128; deterministic reread on resume",
+                resumedFromMs: words.resumedFromMs)
         case .appleSpeech:
             let model = await transcriber.modelName(locale: Locale(identifier: context.language))
             run = .appleRun(language: language, inferenceMs: words.inferenceMs, resumedFromMs: words.resumedFromMs,
@@ -705,6 +730,7 @@ public struct TranscriptionJob: TranscriptionJobRunning {
         /// The language the run's words are written with (D53.2): the locale Apple Speech runs in, `und` for Parakeet.
         var wordsLanguage = TranscriptLanguage.undetermined
         let recognizer: SpeechRecognizer
+        var transcriber: (any Transcribing)?
         let knownMs: Int64
         let settings: JobSettings
         let stop: StopSignal

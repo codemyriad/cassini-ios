@@ -26,6 +26,17 @@ import CassiniNotebook
                               parakeetReady: { parakeet })
     }
 
+    @Test func bundledWhistleNeedsNoDownloadConsentButCannotEnableAnUnavailableCandidate() async {
+        defer { cleanUp() }
+        let settings = settings()
+        let ready = consent(settings, speech: .ready, speakers: false, recognizer: .whistle)
+        #expect(await ready.allows(.transcribe, ""))
+        #expect(await !ready.allows(.speakersOnly, ""))
+        let blocked = consent(settings, speech: .unsupported, speakers: false, recognizer: .whistle)
+        #expect(await blocked.unavailability(.transcribe, "") != nil)
+        #expect(await !blocked.allows(.transcribe, ""))
+    }
+
     @Test func consentNeverMakesAnUnsupportedSpeechCandidateAvailable() async {
         defer { cleanUp() }
         let settings = settings()

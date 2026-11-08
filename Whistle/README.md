@@ -27,33 +27,64 @@ compatibility results, not physical A12/3GB, production-VAD, thermal or distribu
 ## Loading and capability selection
 
 `CassiniWhistle.WhistleRuntime.shared` is the only process-global engine owner. It hashes the weights and
-the signed framework before `dlopen`, sets and checks all three privacy flags before engine constructors, resolves
-the narrow C API, and copies weights into explicitly owned storage retained until after native teardown. Raw-segment calls are serial,
-bounded to15s of finite16kHz mono PCM and1MiB of JSON, use automatic language detection and word timestamps, validate
+the framework’s signing-stable section identity before `dlopen`, sets and checks all three privacy flags before engine constructors, resolves
+the narrow C API, and copies weights into explicitly owned storage retained for every native borrow, including dyld-retained C++ images. Raw-segment calls are serial,
+bounded to240128 samples (15.008s: the desktop’s15s limit rounded to a512-sample frame) of finite16kHz mono PCM and1MiB of JSON, use automatic language detection and word timestamps, validate
 finite/ordered/in-range words, and discard a result after cancellation. No microphone, playback, network client,
-Python runtime or system-library search is involved. The app does not load the native framework at launch.
+Python runtime or system-library search is involved. The app does not load the native framework at launch. Bundle integrity is verified once per bundle URL on a utility queue; startup awaits that shared result before queue readiness. Views and synchronous capability reads use cached state only.
 
-`WhistleCapability` separates artifact compatibility from accepted device/pipeline evidence. Pending acceptance is
-false even when a bundle is present and hash-correct; no invented physical-RAM threshold claims support. The pure
-`WhistleSelection` policy chooses an accepted Whistle where Apple is unavailable or the device is too small for
-Parakeet, otherwise retaining eligible Parakeet/Apple candidates. An unaccepted bundle cannot make Apple eligible.
+## D78 starter model and verified upgrade
 
-**Rollout remains gated in this increment.** There is no new Included/default UI or production recording adapter.
-Existing app selection stays on its validated Parakeet/Apple policy; the new bounded C API and capability policy
-are the production foundation for the desktop-equivalent FIR/VAD adapter. Before enabling it, finish iOS VAD and
-end-to-end pipeline parity, the load-constructor/network privacy tests, and reviewed device memory/thermal
-acceptance. The lab3GB gate stays pending; no Silvio device/data is used. This bundle PR does not claim that the
-simulator's206520320-byte RSS proves physical-device suitability or crash isolation. iOS native execution is
-in-process and a native abort can terminate the app.
+Whistle is the immediate bundled default on compatible arm64/iOS26 devices with verified assets and the measured
+3GB-class memory floor (at least2GiB reported physical RAM,512MiB available before load,256MiB per window). The
+physical A12/3GB gate and iOS26 adapter/DC gates below back this rollout. The pending capability factory remains
+unavailable; the D78 bundled factory is separate from the earlier explicit internal experiment.
+
+`SpeechModelPolicy` uses Whistle until Parakeet is installed and hash-verified, then defaults new jobs to Parakeet
+when the native runtime and memory preflight permit it. File existence/size alone never promotes a model. An
+asynchronous utility-queue verifier keeps Whistle usable while checking installed weights. The installer's verified
+publication is visible immediately to new selection, without relaunching. An explicit Whistle choice remains valid.
+
+Settings and the first completed Whistle result show the coordinator's calm Parakeet suggestion only on capable
+devices, with the pinned compressed speech download size and sufficient install disk space. The result suggestion
+is presented once; dismissal is persisted across both placements. The download action opens the existing consent
+and progress flow with speech alone, so unrelated speaker downloads cannot change the advertised size. The
+coordinator's once-only confirmation follows verified promotion. A12/3GB never sees a Parakeet suggestion.
+
+New jobs freeze their backend before asynchronous consent checks, so an install or preference change during
+admission affects the next request. Queued/paused jobs and checkpoints keep their concrete recognizer; legacy jobs
+keep the pre-Whistle device backend. Consent sheets resolve the pinned job backend, saved language and install size, independently of the current Settings choice. Trash metadata preserves the identity; queue rebuild recovers it from known checkpoint model families. Unknown or unregistered identities fail closed. Bundled speech needs no
+network consent; speaker downloads keep their independent consent. Internal builds retain the isolated lab and
+memory reports; lab fixtures are never included in TestFlight exports.
+
+## Distribution integrity
+
+Distribution re-signing/stripping changes a complete Mach-O file hash. The manifest now pins
+`cassini-whistle-sections-v1`: arm64 dylib code/data section bytes and metadata, plus platform/dependency/UUID/source
+version commands. Unknown commands, malformed ranges and encrypted images fail closed. Mutable signing/linkedit
+metadata is excluded from this additional pin; Apple’s normal loader verifies the complete code signature before
+constructors. This section identity supplements code signing, never replaces it. No load commands are rewritten.
+Actual build5 archive/export section identities match despite their different signed-file hashes; Swift/Python
+parsers agree through actual bundled native tests. The original source-archive/weights pins are unchanged.
 
 ## Validation and cache
 
 `python3 scripts/test-bundle-whistle.py` covers missing/corrupt inputs and unproven imports. Swift package tests
 cover every eligibility gate, fallback selection, refusal before load for six missing/wrong flag cases, and invalid
 native output. The hosted `WhistleRuntimeTests` is mandatory on arm64 and loads the actual app-bundled engine. The immutable public JFK WAV is hash-identical to the frozen spike input,
-fetched only for Debug builds and compared to the frozen Mac text/language/22 words and80ms timestamp bounds;
-it is absent from Release. Neither waveform nor model weights are committed.
+fetched only for Debug or explicit local lab builds and compared to the frozen Mac text/language/22 words and80ms timestamp bounds;
+it is absent from normal Release and internal TestFlight exports. Neither waveform nor model weights are committed.
 
 Builds default to ignored `.tools/whistle` for inputs. Set `CASSINI_WHISTLE_CACHE` to another cache root if needed.
 On drmeyers all tools/build outputs/caches live on `/Volumes/DrMeyers2`, and the build runs under the shared heavy
 lock. Never nest a lock around `scripts/test.sh`, which already takes it. No generated framework or model is committed.
+
+## PR45 review regression coverage
+
+The review fixes exercise needs-consent and paused legacy/Apple/Parakeet jobs while Whistle is selected, including
+the real download sheet and consent-to-start transition. Event-driven tests cover queued Whistle trash/restore,
+corrupt queue reconstruction, checkpoint/resume and mixed-language `mul` provenance. Shared language writer vectors
+include Whistle. Bundle-cache tests hold the utility worker on an event, proving concurrent callers share one check
+and synchronous cached reads perform no hashing. Live low-headroom admission recovers without a relaunch and is
+checked again before opening audio. Hardware failure disables both Transcribe and Transcribe again; unsupported
+locale keeps the language-refusal path. D78 Settings and first-result suggestion tests use the coordinator strings.

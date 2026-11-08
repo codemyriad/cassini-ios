@@ -38,6 +38,16 @@ import CassiniNotebook
                             unplayableText: unplayableText)
     }
 
+    @Test func unavailableSpeechExplainsAndDisablesTheVisibleTranscribeAction() throws {
+        let available = try #require(banners(plain).first)
+        #expect(available.actions.contains(.transcribe))
+        #expect(available.disabledActions.isEmpty)
+        let unavailable = try #require(banners(plain, facts: NoteBannerFacts(speechUnavailableText: "No speech model.")).first)
+        #expect(unavailable.args.text == "No speech model.")
+        #expect(unavailable.actions.contains(.transcribe))
+        #expect(unavailable.disabledActions == [.transcribe])
+    }
+
     // ports: NoteViewModelTest#pausedRowsResumeOrStartOverWithConfirmation (its banner)
     @Test func pausedRowsResumeOrStartOverWithConfirmation() throws {
         let paused = job(.paused, .transcribeAgain, doneMs: 1_000)

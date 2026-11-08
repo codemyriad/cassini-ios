@@ -10,6 +10,18 @@ import CassiniNotebook
     private func store() -> JobStore { JobStore(repository: JobRepository(root: root)) }
     private func ids(_ count: Int) -> [UUID] { (0..<count).map { _ in UUID() } }
 
+    @Test func aPersistedJobKeepsItsBackendWhenThePreferenceChanges() async throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        let jobs = store(), id = UUID()
+        try await jobs.enqueue(id, kind: .transcribe, language: "", now: now, recognizer: "whistle")
+        try await jobs.transition(id, now: now) { $0.state = .paused }
+        let resumed = try await jobs.enqueue(id, kind: .transcribe, language: "", now: now, recognizer: "appleSpeech")
+        #expect(resumed.recognizer == "whistle")
+        let reopened = store()
+        _ = try await reopened.load()
+        #expect(await reopened.job(id)?.recognizer == "whistle")
+    }
+
     // ports: JobRepositoryTest#enqueueAddsAtTheBack
     @Test func enqueueAddsAtTheBack() async throws {
         defer { try? FileManager.default.removeItem(at: root) }

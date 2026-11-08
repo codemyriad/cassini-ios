@@ -1,4 +1,8 @@
 name: Cassini
+configs:
+  Debug: debug
+  Release: release
+  Internal: release
 options:
   bundleIdPrefix: io.codemyriad
   deploymentTarget:
@@ -12,6 +16,9 @@ settings:
     TARGETED_DEVICE_FAMILY: '1,2'
     CODE_SIGN_STYLE: Automatic
     DEVELOPMENT_TEAM: '4LS8W738Y3'
+  configs:
+    Internal:
+      SWIFT_ACTIVE_COMPILATION_CONDITIONS: '$(inherited) CASSINI_INTERNAL_TESTFLIGHT'
 targets:
   Cassini:
     type: application
@@ -128,3 +135,11 @@ schemes:
         CassiniTests: [test]
     test:
       targets: [CassiniTests, CassiniUITests]
+  CassiniInternal:
+    build:
+      targets:
+        Cassini: all
+    run:
+      config: Internal
+    archive:
+      config: Internal

@@ -2336,6 +2336,206 @@
           }
         }
       }
+    },
+    "Included with Cassini": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Included with Cassini"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Incluso in Cassini"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inclus avec Cassini"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Incluido con Cassini"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Incluído no Cassini"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Incluído no Cassini"
+          }
+        }
+      }
+    },
+    "Get better transcripts with Parakeet Ultra": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Get better transcripts with Parakeet Ultra"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascrizioni migliori con Parakeet Ultra"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "De meilleures transcriptions avec Parakeet Ultra"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mejores transcripciones con Parakeet Ultra"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcrições melhores com o Parakeet Ultra"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcrições melhores com o Parakeet Ultra"
+          }
+        }
+      }
+    },
+    "Whistle is built in so you can start right away. Parakeet Ultra is more accurate. It’s a %@ download.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Whistle is built in so you can start right away. Parakeet Ultra is more accurate. It’s a %@ download."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Whistle è incluso per iniziare subito. Parakeet Ultra è più preciso. Il download è di %@."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Whistle est inclus pour commencer tout de suite. Parakeet Ultra est plus précis. Le téléchargement fait %@."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Whistle viene incluido para que empieces enseguida. Parakeet Ultra es más preciso. La descarga ocupa %@."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O Whistle vem incluído para você começar na hora. O Parakeet Ultra é mais preciso. O download tem %@."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O Whistle vem incluído para começar de imediato. O Parakeet Ultra é mais preciso. A transferência tem %@."
+          }
+        }
+      }
+    },
+    "New meetings now use Parakeet Ultra.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New meetings now use Parakeet Ultra."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le nuove riunioni ora usano Parakeet Ultra."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les nouvelles réunions utilisent désormais Parakeet Ultra."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Las reuniones nuevas ahora usan Parakeet Ultra."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "As novas reuniões agora usam o Parakeet Ultra."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "As novas reuniões passam a usar o Parakeet Ultra."
+          }
+        }
+      }
+    },
+    "Not now": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not now"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non ora"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plus tard"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ahora no"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agora não"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agora não"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

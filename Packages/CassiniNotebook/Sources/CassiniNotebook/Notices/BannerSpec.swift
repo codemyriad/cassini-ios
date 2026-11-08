@@ -39,14 +39,16 @@ public struct BannerSpec: Hashable, Sendable, Identifiable {
     public var kind: BannerKind
     public var args: BannerArgs
     public var actions: [BannerAction]
+    public var disabledActions: Set<BannerAction>
     public var announce: Bool
     public var dismissible: Bool
     public var id: String
 
     public init(_ kind: BannerKind, _ args: BannerArgs = BannerArgs(), actions: [BannerAction]? = nil,
-                announce: Bool = false, dismissible: Bool? = nil, id: String? = nil) {
+                announce: Bool = false, dismissible: Bool? = nil, id: String? = nil, disabledActions: Set<BannerAction> = []) {
         self.kind = kind; self.args = args
         self.actions = actions ?? kind.actions
+        self.disabledActions = disabledActions
         self.announce = announce
         self.dismissible = dismissible ?? kind.dismissible
         self.id = id ?? kind.rawValue
