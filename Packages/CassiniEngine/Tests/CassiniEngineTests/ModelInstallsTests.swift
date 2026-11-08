@@ -19,9 +19,45 @@ import CassiniNotebook
         transcriber.set("en-US", .unsupported)
         await installs.refresh()
         #expect(installs.status(of: .speech) == .unsupported)
+        #expect(installs.failures[.speech] == nil)
+        #expect(installs.download == nil, "the Library must not keep an impossible retry banner")
         #expect(ModelRows.status(installs.status(of: .speech)!, consented: true) == .unavailable)
         let progress = DownloadProgress(part: .speech, doneBytes: 1, totalBytes: 2, verifying: false)
         #expect(ModelInstalls.statuses(installs.statuses, during: progress)[.speech] == .unsupported)
+        installs.install([.speech])
+        #expect(!installs.isInstalling)
+        #expect(transcriber.installs == 1, "a stale retry cannot install unsupported speech")
+        transcriber.set("en-US", .notDownloaded)
+        await installs.refresh()
+        #expect(installs.status(of: .speech) == .notDownloaded, "the obsolete failure cannot return")
+    }
+
+    @Test(arguments: [ModelPartStatus.ready, .unsupported])
+    func aClosingRefreshCannotRestoreAnObsoleteSpeechFailure(_ status: ModelPartStatus) async throws {
+        let transcriber = LanguageTranscriber(["en-US": status], failsInstall: true)
+        let installs = ModelInstalls(transcriber: transcriber, analyzer: ScriptedAnalyzer(status: .ready),
+                                     clock: FakeClock()) { "en-US" }
+        // No cached status yet: the install discovers the new capability in its closing refresh.
+        installs.install([.speech])
+        try await until { installs.installsEnded == 1 }
+        #expect(installs.status(of: .speech) == status)
+        #expect(installs.failures[.speech] == nil)
+        #expect(installs.download == nil)
+        let facts = NoticeFacts(download: installs.download)
+        #expect(!Notices.library(facts, LibraryFacts()).contains { $0.kind.isDownloadFailure })
+    }
+
+    @Test func unsupportedSpeechDoesNotPreventAnExplicitSpeakerInstall() async throws {
+        let transcriber = LanguageTranscriber(["en-US": .unsupported])
+        let analyzer = ScriptedAnalyzer(status: .notDownloaded, gated: true)
+        let installs = ModelInstalls(transcriber: transcriber, analyzer: analyzer, clock: FakeClock()) { "en-US" }
+        await installs.refresh()
+        installs.install([.speech, .speakers])
+        try await until { analyzer.installs == 1 }
+        #expect(transcriber.installs == 0)
+        analyzer.finish(with: nil, status: .ready)
+        try await until { !installs.isInstalling }
+        #expect(installs.download == nil)
     }
 
     @Test func aRefreshReadsEveryPartAndVoicesFollowTheSpeakerModels() async {
@@ -383,6 +419,7 @@ import CassiniNotebook
 
         language.value = "en-US"
         try await until { installs.status(of: .speech) == .ready }
+        #expect(installs.download == nil, "the previous language's failed-download notice is obsolete")
         transcriber.set("en-US", .notDownloaded)
         await installs.refresh()
         #expect(installs.status(of: .speech) == .notDownloaded, "Italian's failure is not English's")

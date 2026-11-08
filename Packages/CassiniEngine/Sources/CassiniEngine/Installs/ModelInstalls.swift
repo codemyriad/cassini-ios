@@ -156,9 +156,13 @@ import CassiniNotebook
         let language = language()
         let speech = await transcriber.assetStatus(locale: Locale(identifier: language))
         let speakers = await analyzer.refreshModelStatus()
-        if speechFailureLanguage != language { failures[.speech] = nil }
+        if speechFailureLanguage != language || speech == .ready || speech == .unsupported {
+            failures[.speech] = nil
+            speechFailureLanguage = nil
+            installFailures.removeAll { $0.part == .speech }
+            if download?.part == .speech, download?.failure != nil { download = nil }
+        }
         stored = [.speech: speech, .speakers: speakers, .voices: speakers]
-        if speech == .ready { failures[.speech] = nil }
         if speakers == .ready { failures[.speakers] = nil }
     }
 
@@ -166,7 +170,9 @@ import CassiniNotebook
     /// installed after it, even when they are asked for during its closing refresh.
     public func install(_ parts: [ModelPart]) {
         let parts = ModelPart.allCases.filter { $0 != .voices && (parts.contains($0) || ($0 == .speakers && parts.contains(.voices))) }
-        let added = parts.filter { !queued.contains($0) && $0 != inFlight }
+        let added = parts.filter {
+            !queued.contains($0) && $0 != inFlight && ($0 != .speech || stored[.speech] != .unsupported)
+        }
         guard !added.isEmpty else { return }
         for part in added { failures[part] = nil }
         installFailures.removeAll { added.contains($0.part) }
