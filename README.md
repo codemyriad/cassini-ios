@@ -210,6 +210,11 @@ measured time, averaged with the time stored before. Arguments after the tier go
 environment variables. `scripts/test-remote.sh [tier]` runs the same tier on the Mac named by `CASSINI_MAC`, or here
 when that is unset.
 
+On a shared 16 GB Mac, `CASSINI_UI_WORKERS=2 CASSINI_UI_IPAD_AFTER=1 scripts/test.sh all` opts into up to two
+phone shards, capped by the available memory budget, followed by the iPad. The phones shut down before the iPad
+boots; a simulator crash retry runs alone and shuts down afterwards. The shared heavy lock and all test counts
+still apply. Without this opt-in, scheduling is unchanged.
+
 On GitHub, `.github/workflows/ci.yml` runs `scripts/test.sh fast` and `scripts/test.sh build` on a hosted runner
 with Xcode 27.0, for each push to main or a pull request that changes code. The simulator tiers run only locally: the
 `drmeyers/test-all` status that `CASSINI_POST_STATUS=1 scripts/test.sh all` posts is what a merge looks for.

@@ -21,6 +21,8 @@
 #   CASSINI_UI_WORKERS   UI shards (default: as many as memory allows, at most 3)
 #   CASSINI_UI_IPAD      what the iPad clone runs: the tests named testIPad* (default), all (every UI test, beside
 #                        the iPhone shards; the longest step then) or 0 (nothing)
+#   CASSINI_UI_IPAD_AFTER  1 runs the iPad after shutting down the iPhone shards; caps phones at 2 and the current
+#                        memory budget, even with CASSINI_UI_WORKERS set. Default 0 keeps the usual scheduling.
 #   CASSINI_KEEP_SIMS    0 shuts the clones down afterwards, 1 keeps the iPhones booted for the next run (default:
 #                        0 after all, 1 after the other tiers)
 #   CASSINI_CONFORMANCE_REQUIRED  1 (the default for all) fails, rather than skips, missing conformance vectors
@@ -329,6 +331,17 @@ shutdown_clones() {
     our_clones | while read -r udid state _; do
         [ "$state" = "Booted" ] && xcrun simctl shutdown "$udid" 2>/dev/null || true
     done
+}
+
+# Serial UI phases must release their memory before the next phase boots. Only this worktree's clones qualify;
+# a shutdown failure stops the run instead of accidentally booting the iPad beside the phone shards.
+shutdown_ui_clones() {
+    local kind="$1" udid state name
+    while read -r udid state name; do
+        case "$name" in "$prefix-$kind-"*) ;; *) continue ;; esac
+        [ "$state" = Booted ] || continue
+        run_limited "$logs/shutdown-$udid.log" 60 xcrun simctl shutdown "$udid" || return 1
+    done < <(our_clones)
 }
 
 delete_clones() {
@@ -842,6 +855,7 @@ retry_killed_tests() {
     echo "  ui-$shard: the simulator's backboardd crashed (Metal texture validation) and took the runner with it;" \
         "running again: $(echo $killed)"
     while IFS= read -r t; do args+=("-only-testing:CassiniUITests/$t"); done <<< "$killed"
+    boot "$udid" || return 1
     test_on CassiniUITests "$logs/ui-$shard-retry.log" "$logs/ui-$shard-retry.xcresult" "$udid" "${args[@]}" || return 1
     [ "$(count_ran "$logs/ui-$shard-retry.log")" = "$(printf '%s\n' "$killed" | wc -l | tr -d ' ')" ]
 }
@@ -877,7 +891,20 @@ tier_ui() {
     esac
     # The iPad clone (an iPad Pro, about 2 GB) is budgeted before the iPhone shards; when not even one shard fits
     # beside it, it runs after the shards instead of beside them.
-    local workers="${CASSINI_UI_WORKERS:-$(auto_workers "$( [ -n "$ipad_tests" ] && echo 2048 || echo 0)")}" ipad_after=0
+    local workers ipad_after=0 budget
+    case "${CASSINI_UI_IPAD_AFTER:-0}" in
+        0) workers="${CASSINI_UI_WORKERS:-$(auto_workers "$( [ -n "$ipad_tests" ] && echo 2048 || echo 0)")}" ;;
+        1)
+            ipad_after=1
+            shutdown_ui_clones ipad
+            budget=$(auto_workers 0)
+            [ "$budget" -gt 0 ] || die "not enough free memory for an iPhone shard; retry when the host has room"
+            workers="${CASSINI_UI_WORKERS:-$budget}"
+            [ "$workers" -le "$budget" ] || workers=$budget
+            [ "$workers" -le 2 ] || workers=2
+            ;;
+        *) die "CASSINI_UI_IPAD_AFTER must be 0 or 1" ;;
+    esac
     if [ "$workers" -lt 1 ]; then
         workers=1
         if [ -n "$ipad_tests" ]; then ipad_after=1; echo "  memory is short: the iPad runs after the iPhone shard"; fi
@@ -912,6 +939,7 @@ tier_ui() {
     if [ $ipad_after = 1 ]; then
         for p in ${pids[@]+"${pids[@]}"}; do wait "${p%%:*}" || failed="$failed ${p##*:}"; done
         pids=()
+        shutdown_ui_clones iphone
     fi
     local ipad=""
     if [ -n "$ipad_tests" ]; then
@@ -923,12 +951,19 @@ tier_ui() {
           test_on_retrying CassiniUITests "$logs/ui-ipad.log" "$logs/ui-ipad.xcresult" "$ipad" "${shard_args[@]}" ) & pids+=("$!:ipad")
     fi
     for p in ${pids[@]+"${pids[@]}"}; do wait "${p%%:*}" || failed="$failed ${p##*:}"; done
-    local still=""
+    [ $ipad_after != 1 ] || shutdown_ui_clones ipad
+    local still="" retry_udid retry_rc
     for p in $failed; do
-        if [ "$p" = ipad ]; then retry_killed_tests ipad "$ipad" && continue
-        else retry_killed_tests "$p" "$(clone_udid "$prefix-iphone-$p" "$iphone_type")" && continue
+        if [ "$p" = ipad ]; then retry_udid=$ipad
+        else retry_udid=$(clone_udid "$prefix-iphone-$p" "$iphone_type")
         fi
-        still="$still $p"
+        retry_rc=0
+        retry_killed_tests "$p" "$retry_udid" || retry_rc=$?
+        if [ $ipad_after = 1 ]; then
+            shutdown_ui_clones iphone
+            shutdown_ui_clones ipad
+        fi
+        [ "$retry_rc" = 0 ] || still="$still $p"
     done
     failed=$still
     record_durations
