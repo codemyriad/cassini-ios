@@ -26,7 +26,7 @@ struct RenameSheet: View {
     @State private var text = ""
     @FocusState private var focused: Bool
 
-    private var cleaned: String? { clean(text) }
+    private var cleaned: String? { clean(String(text.prefix(limit))) }
     private var canSave: Bool { cleaned.map { $0 != original } ?? false }
 
     var body: some View {
@@ -37,7 +37,14 @@ struct RenameSheet: View {
                         .focused($focused).submitLabel(.done).onSubmit(confirm)
                         .textInputAutocapitalization(capitalization)
                         .onChange(of: text) { _, typed in
-                            if typed.count > limit { text = String(typed.prefix(limit)) } else { textChanged(typed) }
+                            if typed.count > limit {
+                                // Finish the native paste transaction before writing its shortened value back.
+                                // A synchronous write here can leave the field showing the uncut paste on iOS 26.
+                                DispatchQueue.main.async {
+                                    guard text == typed else { return }
+                                    text = String(typed.prefix(limit))
+                                }
+                            } else { textChanged(typed) }
                         }
                         .accessibilityIdentifier(fieldIdentifier)
                 } footer: {
