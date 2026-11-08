@@ -988,3 +988,13 @@ each native call where Android checks the thread's interrupt.
 - **Restoration after process death** is covered by unit tests of the restore rules (`SavedNoteOverlay`,
   `NoteOverlay`, `SavedLibraryDialog`), not by a UI test. XCUITest's `terminate()` after sending the app to the
   background discards the scene's saved state.
+## Whistle production bundle (D75.2)
+
+iOS bundles the pinned published device/simulator arm64 Needle archives and Whistle weights in a private lazy-loaded
+framework/resource set. The source archives retain minos27.0; strict target26 links, SDK26 import closure and native
+runtime26 parity evidence justify the documented exception. Android uses its own pinned arm64 input; neither mobile
+platform claims x86_64 support from an arm64 archive. See [the bundle contract](../Whistle/README.md).
+
+The iOS C API is in-process because ordinary iOS apps cannot spawn a recognition worker. A native abort can terminate
+the app. Capability selection remains gated until device and production-pipeline acceptance; the lab3GB gate is
+pending. Existing Parakeet/Apple selection and model-download behavior are retained during that gate.

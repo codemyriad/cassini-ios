@@ -30,6 +30,8 @@ targets:
         product: CassiniAudio
       - package: Cassini
         product: CassiniInference
+      - package: Cassini
+        product: CassiniWhistle
       # The sherpa-onnx runtime: the release xcframeworks, or the local build with CASSINI_SHERPA_LOCAL=1 (Package.swift).
       - package: Cassini
         product: CassiniSherpa
@@ -48,6 +50,11 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         SWIFT_EMIT_LOC_STRINGS: YES
     postBuildScripts:
+      - name: Bundle the pinned private Whistle runtime and weights
+        basedOnDependencyAnalysis: false
+        script: |
+          set -eu
+          /usr/bin/python3 "$SRCROOT/scripts/bundle-whistle.py" --cache "${CASSINI_WHISTLE_CACHE:-$SRCROOT/.tools/whistle}"
       # SherpaOnnxC and onnxruntime are static xcframeworks, linked into the app binary. Xcode still embeds a stub
       # framework for each, which the app never loads and whose Info.plist minimum OS need not match its binary:
       # App Store Connect rejected build 3 for that (90208). Drop them before the app is signed.
@@ -107,6 +114,8 @@ targets:
         product: CassiniInference
       - package: Cassini
         product: CassiniSherpa
+      - package: Cassini
+        product: CassiniWhistle
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
