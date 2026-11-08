@@ -6,6 +6,22 @@ import CassiniNotebook
 import CassiniWhistle
 
 final class WhistleRecordingAdapterTests: XCTestCase {
+    func testAdmissionHeadroomCanRecoverWithoutRelaunchAndLoadChecksItAgain() async throws {
+        let free = Mutex<Int64>(1)
+        let transcriber = WhistleTranscriber(acceptance: .init(arm64: true, operatingSystemSupported: true,
+            bundleVerified: true, pipelineAccepted: true, deviceAccepted: true), availableMemory: { free.withLock { $0 } })
+        let first = await transcriber.unavailability(locale: .current)
+        XCTAssertEqual(first, .memory)
+        free.withLock { $0 = Int64(WhistleCapability.loadHeadroom) }
+        let recovered = await transcriber.unavailability(locale: .current)
+        XCTAssertNil(recovered)
+        free.withLock { $0 = 1 }
+        do {
+            _ = try await transcriber.transcribe(.init(url: URL(fileURLWithPath: "/must-not-open.wav"), language: "", allowDownload: false)) { _ in }
+            XCTFail("Low live headroom must refuse before opening the audio or loading a model")
+        } catch { XCTAssertEqual(error as? TranscriptionError, .failed(.memory)) }
+    }
+
     private func transcriber() -> WhistleTranscriber {
         WhistleTranscriber(acceptance: .init(arm64: true, operatingSystemSupported: true, bundleVerified: true,
                                             pipelineAccepted: false, deviceAccepted: false, internalExperiment: true),

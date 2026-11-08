@@ -1,0 +1,59 @@
+import Foundation
+import Testing
+import CassiniEngine
+import CassiniNotebook
+
+/// Real job/checkpoint/version/provenance pipeline, with an event-driven fake of the bounded recognizer.
+struct WhistleJobTestTranscriber: Transcribing {
+    var language: String? = "en"
+    var mixed = false
+    var pause: StopSignal?
+    var recognizer: SpeechRecognizer { .whistle }
+    func assetStatus(locale: Locale) async -> ModelPartStatus { .ready }
+    func speechLanguages() async -> [SpeechLanguage] { [] }
+    func runLanguage(requested: String) async -> String? { nil }
+    func modelName(locale: Locale) async -> String? { SpeechRecognizer.whistle.checkpointModel(language: "") }
+    func installAssets(locale: Locale, progress: @escaping @Sendable (InstallProgress) -> Void) async throws {}
+    func transcribe(_ request: TranscriptionRequest, events: @escaping @Sendable (TranscriptionEvent) -> Void) async throws -> TranscriptionResult {
+        let script = TranscriptionJobTests.ScriptedTranscriber.seventySeconds
+        events(.progress(done: 0, total: 70))
+        for (index, segment) in script.enumerated() {
+            try Task.checkCancellation()
+            if let reported = mixed ? (index < 7 ? "en" : "es") : language { events(.detectedLanguage(reported)) }
+            events(.finalized(segment))
+            events(.progress(done: segment.end, total: 70))
+            if index == 6, let pause {
+                pause.stop(.pause(.user))
+                throw CancellationError()
+            }
+        }
+        return TranscriptionResult(segments: script)
+    }
+}
+
+@Suite struct WhistleJobTests {
+    @Test func pauseResumePersistsDetectedLanguageAndFoldsLaterLanguagesWithoutDuplicateWords() async throws {
+        let h = try await TranscriptionJobTests.Harness(settings: JobSettings(allowSpeechDownload: false,
+            identifySpeakers: false, allowSpeakerDownload: false))
+        defer { try? FileManager.default.removeItem(at: h.root) }
+        let stop = StopSignal()
+        let first = await h.run(stop: stop, using: WhistleJobTestTranscriber(pause: stop))
+        #expect(first.outcome == .paused(.user))
+        let checkpoint = try #require(try h.files.load(h.noteID))
+        #expect(checkpoint.model == SpeechRecognizer.whistle.checkpointModel(language: ""))
+        #expect(checkpoint.reportedLanguage == "en")
+        #expect(checkpoint.doneMs > 0)
+        #expect(await h.run(using: WhistleJobTestTranscriber(mixed: true)).outcome == .done)
+        let note = try #require(await h.note())
+        #expect(note.language == "mul")
+        #expect(note.versions?.last?.language == "mul")
+        let provenance = try #require(h.provenance(of: note))
+        #expect(provenance.engine == "Whistle")
+        #expect(provenance.model == SpeechRecognizer.whistle.checkpointModel(language: ""))
+        #expect(provenance.language == "mul")
+        #expect(provenance.resumedFromMs == checkpoint.doneMs)
+        let words = note.transcript.flatMap(\.draftWords)
+        #expect(words.count == 70)
+        #expect(Set(words.map(\.startMs)).count == words.count)
+    }
+}

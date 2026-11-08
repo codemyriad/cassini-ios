@@ -5,7 +5,26 @@ import CassiniNotebook
 ///
 /// Touches: `parts.jobs`, `parts.notes` and `parts.checkpoints` (writes), `trashed` (an enqueue takes the note out),
 /// `refresh()`.
+public struct SpeechDownloadContext: Sendable {
+    public var recognizer: String?
+    public var language: String
+    public var kind: JobKind
+}
+
 extension TranscriptionCoordinator {
+    /// The same identity/language rule as admission, including a fresh failed attempt without checkpoints.
+    public func modelDownloadContext(for noteID: UUID) async -> SpeechDownloadContext {
+        await readiness.wait()
+        let selected = parts.selectedRecognizer
+        let job = await parts.jobs.job(noteID)
+        let kind = job?.kind ?? .transcribe
+        let identity: String?
+        if let job, !(await adoptsSelectedRecognizer(job, selected: selected)) { identity = job.recognizer }
+        else { identity = selected }
+        return SpeechDownloadContext(recognizer: identity,
+            language: await language(for: noteID, kind: kind) ?? "", kind: kind)
+    }
+
     /// A failed attempt without any saved work may use the newly selected model on explicit retry.
     /// Saved, paused, active and unknown-backend jobs keep their identity. Caller holds the queue serial section.
     func adoptsSelectedRecognizer(_ existing: Job?) async -> Bool {

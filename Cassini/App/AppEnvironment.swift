@@ -106,14 +106,15 @@ import CassiniEngineTesting
         #endif
         let whistleCapability = WhistleCapability.bundled(arm64: arm64,
             osSupported: ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 26,
-            bundleVerified: WhistleRuntime.bundleIsVerified(), physicalMemory: ProcessInfo.processInfo.physicalMemory)
+            bundleVerified: WhistleRuntime.cachedBundleVerification() == true, physicalMemory: ProcessInfo.processInfo.physicalMemory)
         let speechModels = SpeechModelsStore(root: modelRoot, defaults: defaults, storage: storage,
             whistle: whistleCapability, parakeetLinked: SherpaRuntime.isLinked)
         let models = PinnedModels(root: modelRoot, defaults: defaults, storage: storage,
             onInstallChange: { status in Task { @MainActor in speechModels.installerChanged(status) } })
         let legacy = speechTranscriber(models: models, defaults: defaults)
         let apple = AppleSpeechTranscriber()
-        let whistle = WhistleTranscriber(acceptance: whistleCapability, memoryReport: InternalWhistle.writeReport)
+        let whistle = WhistleTranscriber(acceptance: whistleCapability, memoryReport: InternalWhistle.writeReport,
+            acceptanceProvider: { speechModels.whistleCapability })
         var candidates: [any Transcribing] = [apple, whistle]
         if legacy.recognizer == .parakeet { candidates.append(legacy) }
         let speech = RoutedTranscriber(legacy: legacy, candidates: candidates) { speechModels.selectedRecognizer() }
@@ -164,7 +165,7 @@ extension AppEnvironment {
                   parakeet: arguments.contains("--parakeet"),
                   notificationsDenied: arguments.contains("--notifications-denied"),
                   heldCapture: arguments.contains("--capture-held"), region: value(after: "-AppleLocale", in: arguments),
-                  bundledSpeech: arguments.contains("--d78"),
+                  speechFailure: value(after: "--speech-unavailability", in: arguments), bundledSpeech: arguments.contains("--d78"),
                   bundledCapable: arguments.contains("--d78-capable"), bundledVerified: arguments.contains("--d78-verified"),
                   inProcess: inProcess, token: token)
     }
@@ -185,7 +186,7 @@ extension AppEnvironment {
                           modelsMissing: Bool = false, modelDownloading: Bool = false, draftGrowing: Bool = false,
                           speakersReady: Bool = false, parakeet: Bool = false,
                           notificationsDenied: Bool = false, heldCapture: Bool = false, region: String? = nil,
-                          bundledSpeech: Bool = false, bundledCapable: Bool = false, bundledVerified: Bool = false,
+                          speechFailure: String? = nil, bundledSpeech: Bool = false, bundledCapable: Bool = false, bundledVerified: Bool = false,
                           inProcess: Bool = false, token: String = "") -> AppEnvironment {
         let storage = UITestStorage.generation(reset: reset, inProcess: inProcess)
         let root = storage.root
@@ -240,6 +241,7 @@ extension AppEnvironment {
             value.downloadTranscriber = bundledCapable ? parakeet : speech
             value.speechModels = speechModels
         }
+        if let speechFailure { value.transcriber = FakeUnavailableTranscriber(speechFailure == "hardware" ? .model : .unsupportedLanguage) }
         return value
     }
 

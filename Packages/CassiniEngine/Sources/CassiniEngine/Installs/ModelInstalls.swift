@@ -27,6 +27,8 @@ import CassiniNotebook
     /// The parts whose last standalone install failed, until the next install of them.
     public private(set) var failures: [ModelPart: DownloadError] = [:]
 
+    public private(set) var speechUnavailability: JobFailure?
+    @ObservationIgnored private let availabilityTranscriber: (any Transcribing)?
     @ObservationIgnored private let transcriber: any Transcribing
     @ObservationIgnored private let analyzer: any SpeakerAnalyzing
     @ObservationIgnored private let language: @MainActor () -> String
@@ -67,11 +69,12 @@ import CassiniNotebook
     /// download the rows show. `background` gives the standalone install its time after Cassini leaves the screen,
     /// under `backgroundTitle` and `backgroundSubtitle`.
     public init(transcriber: any Transcribing, analyzer: any SpeakerAnalyzing, clock: any AppClock,
-                job: JobProgress? = nil, background: (any BackgroundRunner)? = nil,
+                job: JobProgress? = nil, availabilityTranscriber: (any Transcribing)? = nil, background: (any BackgroundRunner)? = nil,
                 backgroundTitle: @escaping @MainActor () -> String = { "Downloading models" },
                 backgroundSubtitle: @escaping @MainActor () -> String = { "They run on this device" },
                 language: @escaping @MainActor () -> String) {
         self.transcriber = transcriber
+        self.availabilityTranscriber = availabilityTranscriber
         self.analyzer = analyzer
         self.clock = clock
         self.job = job
@@ -154,14 +157,20 @@ import CassiniNotebook
 
     private func read() async {
         let language = language()
-        let speech = await transcriber.assetStatus(locale: Locale(identifier: language))
+        let snapshot = await transcriber.availability(locale: Locale(identifier: language))
+        let speech = snapshot.assets
+        let unavailability: JobFailure?
+        if let availabilityTranscriber { unavailability = await availabilityTranscriber.availability(locale: Locale(identifier: language)).failure }
+        else { unavailability = snapshot.failure }
         let speakers = await analyzer.refreshModelStatus()
+        guard language == self.language() else { return }
         if speechFailureLanguage != language || speech == .ready || speech == .unsupported {
             failures[.speech] = nil
             speechFailureLanguage = nil
             installFailures.removeAll { $0.part == .speech }
             if download?.part == .speech, download?.failure != nil { download = nil }
         }
+        speechUnavailability = unavailability
         stored = [.speech: speech, .speakers: speakers, .voices: speakers]
         if speakers == .ready { failures[.speakers] = nil }
     }

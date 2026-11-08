@@ -81,13 +81,13 @@ public enum Reconcile {
     /// and kept at the next launch, and Resume goes on from it (as Android's catalogue rebuild turns such work into a
     /// paused job). The job's language is empty: a Resume and the run take the checkpoint's.
     public static func rebuilt(work: Set<UUID>, checkpoints: [UUID: CheckpointStatus], trashed: Set<UUID>,
-                               existing: Set<UUID>, activeNoteID: UUID?, now: Date) -> [Job] {
+                               existing: Set<UUID>, activeNoteID: UUID?, now: Date, recognizers: [UUID: String] = [:]) -> [Job] {
         let resumable = work.intersection(existing).subtracting(trashed).filter { id in
             guard id != activeNoteID, case .saved? = checkpoints[id] else { return false }
             return true
         }
         return resumable.sorted { $0.uuidString < $1.uuidString }.enumerated().map { index, id in
-            Job(noteID: id, seq: index + 1, kind: .transcribe, state: .paused, pauseReason: .user, enqueuedAt: now)
+            Job(noteID: id, seq: index + 1, kind: .transcribe, state: .paused, pauseReason: .user, enqueuedAt: now, recognizer: recognizers[id])
                 .withNumbers(of: checkpoints[id] ?? .missing)
         }
     }

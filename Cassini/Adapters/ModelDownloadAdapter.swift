@@ -32,21 +32,32 @@ import CassiniNotebook
             return ModelDownloadPlan(missing: plan.parts, requiredFreeBytes: plan.requiredFreeBytes,
                                      downloadBytes: plan.downloadBytes)
         }
-        let job = noteID.flatMap { processing.state.jobs[$0] }
-        let speakersOnly = job?.kind == .speakersOnly
+        let context: SpeechDownloadContext?
+        if let noteID { context = await processing.coordinator?.modelDownloadContext(for: noteID) }
+        else { context = nil }
+        let speakersOnly = context?.kind == .speakersOnly
         let speech: any Transcribing
         if noteID == nil { speech = downloadTranscriber }
-        else if let job {
-            guard let candidate = try? transcriber.forJob(recognizer: job.recognizer) else {
+        else if let context {
+            guard let candidate = try? transcriber.forJob(recognizer: context.recognizer) else {
                 return ModelDownloadPlan(missing: [], requiredFreeBytes: 0)
             }
             speech = candidate
         } else { speech = transcriber }
-        return ModelDownloadPlan.plan(speech: await speech.assetStatus(locale: Locale(identifier: job?.language ?? settings.speechLanguage)),
+        return ModelDownloadPlan.plan(speech: await speech.assetStatus(locale: Locale(identifier: context?.language ?? settings.speechLanguage)),
                                       speakers: await analyzer.modelStatus(), forNote: noteID != nil,
                                       identifySpeakers: settings.identifySpeakers, speakersOnly: speakersOnly,
-                                      speakersInstallBytes: analyzer.modelInstallBytes,
+                                      speakersInstallBytes: analyzer.modelInstallBytes, speechInstallBytes: speech.assetInstallBytes,
                                       recognizer: speech.recognizer, catalog: ModelPlan.of(root: models))
+    }
+
+    func speechLanguage(for noteID: UUID?) async -> String? {
+        guard let noteID else { return speechLanguage() }
+        if let context = await processing.coordinator?.modelDownloadContext(for: noteID),
+           let speech = try? transcriber.forJob(recognizer: context.recognizer) {
+            return speech.recognizer.usesLanguage ? context.language : nil
+        }
+        return transcriber.recognizer.usesLanguage ? settings.speechLanguage : nil
     }
 
     func speechLanguage() -> String? { downloadTranscriber.recognizer.usesLanguage ? settings.speechLanguage : nil }

@@ -12,7 +12,7 @@ extension TranscriptionCoordinator {
         markTrashed(noteID)
         if let current = active, current.noteID == noteID {
             current.stop.stop(.pause(.user))
-            return TrashedJob(state: .paused, kind: current.job.kind)
+            return TrashedJob(state: .paused, kind: current.job.kind, recognizer: current.job.recognizer)
         }
         guard let job = state.jobs[noteID] else { return nil }
         if job.state == .queued {
@@ -26,7 +26,7 @@ extension TranscriptionCoordinator {
                 }
             }
         }
-        return TrashedJob(state: job.state, kind: job.kind)
+        return TrashedJob(state: job.state, kind: job.kind, recognizer: job.recognizer)
     }
 
     /// Undo and Restore: a job that was queued when the note was trashed is queued again at the back, in the language
@@ -41,9 +41,12 @@ extension TranscriptionCoordinator {
         let language = await language(for: noteID, kind: trashedJob.kind) ?? ""
         let requeued = await lock.run {
             let checkpoint = await parts.checkpoints.status(of: noteID)
+            let recognizer: String?
+            if let stored = trashedJob.recognizer { recognizer = stored }
+            else { recognizer = await parts.checkpoints.recognizer(of: noteID) }
             let job = await write {
                 try await $0.requeueAtBack(noteID, kind: trashedJob.kind, language: language,
-                                           checkpoint: checkpoint, now: parts.clock.now)
+                                           checkpoint: checkpoint, now: parts.clock.now, recognizer: recognizer)
             }
             await mirror(noteID)
             await refresh()

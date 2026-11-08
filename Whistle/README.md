@@ -31,7 +31,7 @@ the framework’s signing-stable section identity before `dlopen`, sets and chec
 the narrow C API, and copies weights into explicitly owned storage retained for every native borrow, including dyld-retained C++ images. Raw-segment calls are serial,
 bounded to240128 samples (15.008s: the desktop’s15s limit rounded to a512-sample frame) of finite16kHz mono PCM and1MiB of JSON, use automatic language detection and word timestamps, validate
 finite/ordered/in-range words, and discard a result after cancellation. No microphone, playback, network client,
-Python runtime or system-library search is involved. The app does not load the native framework at launch.
+Python runtime or system-library search is involved. The app does not load the native framework at launch. Bundle integrity is verified once per bundle URL on a utility queue; startup awaits that shared result before queue readiness. Views and synchronous capability reads use cached state only.
 
 ## D78 starter model and verified upgrade
 
@@ -53,7 +53,7 @@ coordinator's once-only confirmation follows verified promotion. A12/3GB never s
 
 New jobs freeze their backend before asynchronous consent checks, so an install or preference change during
 admission affects the next request. Queued/paused jobs and checkpoints keep their concrete recognizer; legacy jobs
-keep the pre-Whistle device backend. Unknown or unregistered identities fail closed. Bundled speech needs no
+keep the pre-Whistle device backend. Consent sheets resolve the pinned job backend, saved language and install size, independently of the current Settings choice. Trash metadata preserves the identity; queue rebuild recovers it from known checkpoint model families. Unknown or unregistered identities fail closed. Bundled speech needs no
 network consent; speaker downloads keep their independent consent. Internal builds retain the isolated lab and
 memory reports; lab fixtures are never included in TestFlight exports.
 
@@ -78,3 +78,13 @@ it is absent from normal Release and internal TestFlight exports. Neither wavefo
 Builds default to ignored `.tools/whistle` for inputs. Set `CASSINI_WHISTLE_CACHE` to another cache root if needed.
 On drmeyers all tools/build outputs/caches live on `/Volumes/DrMeyers2`, and the build runs under the shared heavy
 lock. Never nest a lock around `scripts/test.sh`, which already takes it. No generated framework or model is committed.
+
+## PR45 review regression coverage
+
+The review fixes exercise needs-consent and paused legacy/Apple/Parakeet jobs while Whistle is selected, including
+the real download sheet and consent-to-start transition. Event-driven tests cover queued Whistle trash/restore,
+corrupt queue reconstruction, checkpoint/resume and mixed-language `mul` provenance. Shared language writer vectors
+include Whistle. Bundle-cache tests hold the utility worker on an event, proving concurrent callers share one check
+and synchronous cached reads perform no hashing. Live low-headroom admission recovers without a relaunch and is
+checked again before opening audio. Hardware failure disables both Transcribe and Transcribe again; unsupported
+locale keeps the language-refusal path. D78 Settings and first-result suggestion tests use the coordinator strings.

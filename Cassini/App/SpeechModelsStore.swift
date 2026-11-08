@@ -18,7 +18,7 @@ import CassiniWhistle
         static let announced = "speech.parakeetDefaultAnnounced"
     }
     nonisolated private let selection = Mutex(Selection())
-    nonisolated private let whistle: WhistleCapability
+    nonisolated private let whistle: Mutex<WhistleCapability>
     nonisolated let parakeetCapable: Bool
     nonisolated private let physicalMemory: UInt64
     nonisolated private let availableMemory: @Sendable () -> Int64?
@@ -42,7 +42,7 @@ import CassiniWhistle
          availableMemory: @escaping @Sendable () -> Int64? = { let n = os_proc_available_memory(); return n > 0 ? Int64(n) : nil },
          installed: (@Sendable () -> Bool)? = nil, verified: (@Sendable () -> Bool)? = nil,
          verify: (@Sendable () throws -> Bool)? = nil) {
-        self.root = root; self.defaults = defaults; self.storage = storage; self.whistle = whistle
+        self.root = root; self.defaults = defaults; self.storage = storage; self.whistle = Mutex(whistle)
         self.physicalMemory = physicalMemory; self.availableMemory = availableMemory
         parakeetCapable = parakeetLinked && SpeechCapability.parakeetCapable(physicalMemory: physicalMemory)
         self.installed = installed ?? { ModelCatalog.parakeet.ready(in: root) }
@@ -57,8 +57,15 @@ import CassiniWhistle
         selection.withLock { $0.preference = initial }
     }
 
+    nonisolated var whistleCapability: WhistleCapability { whistle.withLock { $0 } }
+    func verifyBundledSpeech() async {
+        let verified = await WhistleRuntime.verifyBundle()
+        whistle.withLock { $0.bundleVerified = verified }
+        onChange()
+    }
+
     var policy: SpeechModelPolicy {
-        SpeechModelPolicy(whistleAvailable: whistle.available, parakeetLinked: parakeetCapable,
+        SpeechModelPolicy(whistleAvailable: whistle.withLock { $0.available }, parakeetLinked: parakeetCapable,
             physicalMemory: physicalMemory, availableMemory: availableMemory(), parakeetInstallation: effectiveInstallation(installation),
             availableDiskBytes: storage.availableBytes(at: root), downloadPlan: ModelPlan.of(root: root))
     }
@@ -66,7 +73,7 @@ import CassiniWhistle
     nonisolated func selectedRecognizer() -> SpeechRecognizer {
         var current = selection.withLock { $0 }
         current.installation = effectiveInstallation(current.installation)
-        let facts = SpeechModelPolicy(whistleAvailable: whistle.available, parakeetLinked: parakeetCapable,
+        let facts = SpeechModelPolicy(whistleAvailable: whistle.withLock { $0.available }, parakeetLinked: parakeetCapable,
             physicalMemory: physicalMemory, availableMemory: availableMemory(), parakeetInstallation: current.installation,
             availableDiskBytes: 0, downloadPlan: ModelPlan([]))
         // Apple remains a candidate whose adapter checks live hardware/locale eligibility before queue admission.
@@ -79,7 +86,7 @@ import CassiniWhistle
     }
 
     func choose(_ recognizer: SpeechRecognizer) {
-        guard recognizer == .whistle && whistle.available || recognizer == .parakeet && policy.parakeetInstallation == .verified && policy.parakeetRunnable else { return }
+        guard recognizer == .whistle && whistle.withLock({ $0.available }) || recognizer == .parakeet && policy.parakeetInstallation == .verified && policy.parakeetRunnable else { return }
         preference = recognizer == .whistle ? .whistle : .parakeet
         defaults.set(preference.rawValue, forKey: Key.preference)
         let value = preference

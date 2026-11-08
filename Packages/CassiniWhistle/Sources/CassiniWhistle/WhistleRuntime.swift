@@ -28,8 +28,21 @@ public actor WhistleRuntime {
         var sourceArchiveMinimumOS: String
     }
 
-    /// Read-only admission check; this never dlopens the runtime or constructs an inference session.
+    private static let bundleVerification = WhistleBundleVerification { url in
+        guard let bundle = Bundle(url: url) else { return false }
+        return verifyBundleResources(bundle)
+    }
+    public static func cachedBundleVerification(_ bundle: Bundle = .main) -> Bool? {
+        bundleVerification.cached(bundle.bundleURL)
+    }
+    public static func verifyBundle(_ bundle: Bundle = .main) async -> Bool {
+        await bundleVerification.verify(bundle.bundleURL)
+    }
+    /// Compatibility lookup only. A caller needing readiness awaits verifyBundle, whose work is off the UI thread.
     public static func bundleIsVerified(_ bundle: Bundle = .main) -> Bool {
+        cachedBundleVerification(bundle) == true
+    }
+    private static func verifyBundleResources(_ bundle: Bundle) -> Bool {
         #if os(iOS) && arch(arm64)
         #if targetEnvironment(simulator)
         let target = "ios-sim-arm64"

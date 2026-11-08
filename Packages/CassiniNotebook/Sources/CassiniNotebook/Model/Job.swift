@@ -171,7 +171,10 @@ public struct Job: Codable, Hashable, Identifiable, Sendable {
 public struct TrashedJob: Codable, Hashable, Sendable {
     public var state: JobState
     public var kind: JobKind
-    public init(state: JobState, kind: JobKind) { self.state = state; self.kind = kind }
+    public var recognizer: String?
+    public init(state: JobState, kind: JobKind, recognizer: String? = nil) {
+        self.state = state; self.kind = kind; self.recognizer = recognizer
+    }
 }
 
 extension DownloadError {

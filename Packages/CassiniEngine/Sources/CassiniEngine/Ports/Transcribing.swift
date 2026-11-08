@@ -87,6 +87,12 @@ public enum TranscriptionError: Error, Hashable {
 
 /// A transcriber that read its input to the end reports `.progress(done: total, total: total)` before it returns; one
 /// that cannot read the input to the end throws `TranscriptionError.failed(.open)` rather than returning what it has.
+public struct SpeechAvailability: Hashable, Sendable {
+    public var assets: ModelPartStatus
+    public var failure: JobFailure?
+    public init(assets: ModelPartStatus, failure: JobFailure? = nil) { self.assets = assets; self.failure = failure }
+}
+
 public protocol Transcribing: Sendable {
     /// The candidate backend identity for checkpoints/provenance; it does not promise device/locale availability.
     var recognizer: SpeechRecognizer { get }
@@ -97,6 +103,7 @@ public protocol Transcribing: Sendable {
     func transcribe(_ request: TranscriptionRequest,
                     events: @escaping @Sendable (TranscriptionEvent) -> Void) async throws -> TranscriptionResult
     func assetStatus(locale: Locale) async -> ModelPartStatus
+    func availability(locale: Locale) async -> SpeechAvailability
     /// Why this device/locale cannot use the candidate, separately from downloadable/installed assets.
     func unavailability(locale: Locale) async -> JobFailure?
     /// Downloads and installs the speech model for `locale` now, as the model download screen's Download does,
@@ -125,9 +132,11 @@ extension Transcribing {
         return self
     }
 
-    public func unavailability(locale: Locale) async -> JobFailure? {
-        await assetStatus(locale: locale) == .unsupported ? .unsupportedLanguage : nil
+    public func availability(locale: Locale) async -> SpeechAvailability {
+        let assets = await assetStatus(locale: locale)
+        return SpeechAvailability(assets: assets, failure: assets == .unsupported ? .unsupportedLanguage : nil)
     }
+    public func unavailability(locale: Locale) async -> JobFailure? { await availability(locale: locale).failure }
     public func modelName(locale: Locale) async -> String? { nil }
     /// The requested language for a recognizer that is given one, else nil.
     public func runLanguage(requested: String) async -> String? {

@@ -4,19 +4,20 @@ import CassiniEngine
 import CassiniNotebook
 import CassiniWhistle
 
-/// Internal experiment: bounded file streaming through the desktop FIR/HPF/Silero gate. The ASR branch stays raw.
+/// Bundled recognizer: bounded file streaming through the desktop FIR/HPF/Silero gate. The ASR branch stays raw.
 /// Every resume rereads from zero to restore FIR, filter and recurrent VAD state; finalized words are deduplicated
 /// by WordsDecode at the saved boundary. The private session budget prevents two callers interleaving model lifetime.
 public struct WhistleTranscriber: Transcribing {
     private static let sessions = NativeBudget()
-    private let acceptance: WhistleCapability
+    private let acceptance: @Sendable () -> WhistleCapability
     private let bundle: Bundle
     private let memoryReport: (@Sendable (WhistleMemoryReport) -> Void)?
     private let availableMemory: @Sendable () -> Int64?
     public init(acceptance: WhistleCapability, bundle: Bundle = .main,
                 availableMemory: @escaping @Sendable () -> Int64? = TranscriptionJob.availableMemory,
-                memoryReport: (@Sendable (WhistleMemoryReport) -> Void)? = nil) {
-        self.acceptance = acceptance; self.bundle = bundle; self.availableMemory = availableMemory; self.memoryReport = memoryReport
+                memoryReport: (@Sendable (WhistleMemoryReport) -> Void)? = nil,
+                acceptanceProvider: (@Sendable () -> WhistleCapability)? = nil) {
+        self.acceptance = acceptanceProvider ?? { acceptance }; self.bundle = bundle; self.availableMemory = availableMemory; self.memoryReport = memoryReport
     }
     public var recognizer: SpeechRecognizer { .whistle }
     public var assetInstallBytes: Int64 { 0 }
@@ -24,17 +25,24 @@ public struct WhistleTranscriber: Transcribing {
     public func speechLanguages() async -> [SpeechLanguage] { [] }
     public func runLanguage(requested: String) async -> String? { nil }
     public func modelName(locale: Locale) async -> String? { SpeechRecognizer.whistle.checkpointModel(language: "") }
-    public func assetStatus(locale: Locale) async -> ModelPartStatus {
-        acceptance.available && WhistleRuntime.bundleIsVerified(bundle) ? .ready : .unsupported
+    public func availability(locale: Locale) async -> SpeechAvailability {
+        var capability = acceptance()
+        capability.bundleVerified = await WhistleRuntime.verifyBundle(bundle)
+        guard capability.available else { return SpeechAvailability(assets: .unsupported, failure: .model) }
+        let free = availableMemory()
+        let enough = free.map { $0 > 0 && UInt64($0) >= WhistleCapability.loadHeadroom } ?? false
+        return SpeechAvailability(assets: .ready, failure: enough ? nil : .memory)
     }
-    public func unavailability(locale: Locale) async -> JobFailure? {
-        await assetStatus(locale: locale) == .ready ? nil : .model
-    }
+    public func assetStatus(locale: Locale) async -> ModelPartStatus { await availability(locale: locale).assets }
+    public func unavailability(locale: Locale) async -> JobFailure? { await availability(locale: locale).failure }
     public func installAssets(locale: Locale, progress: @escaping @Sendable (InstallProgress) -> Void) async throws {
         guard await assetStatus(locale: locale) == .ready else { throw TranscriptionError.failed(.model) }
     }
     public func transcribe(_ request: TranscriptionRequest,
                            events: @escaping @Sendable (TranscriptionEvent) -> Void) async throws -> TranscriptionResult {
+        var candidate = self.acceptance()
+        candidate.bundleVerified = await WhistleRuntime.verifyBundle(bundle)
+        let acceptance = candidate
         guard acceptance.available else { throw TranscriptionError.failed(.model) }
         return try await Self.sessions.withBudget {
             let measurement = WhistleMemoryMonitor()

@@ -142,7 +142,7 @@ import CassiniNotebook
             return TranscriptionCoordinator(parts, settings: settings)
         }
         let models = ModelInstalls(transcriber: environment.downloadTranscriber ?? environment.transcriber, analyzer: environment.analyzer,
-                                   clock: environment.clock, job: progress, background: environment.background,
+                                   clock: environment.clock, job: progress, availabilityTranscriber: environment.downloadTranscriber.map { _ in environment.transcriber }, background: environment.background,
                                    backgroundTitle: { String(localized: "Downloading models", table: "Processing") },
                                    backgroundSubtitle: {
                                        String(localized: "They run on this device", table: "Processing",
@@ -222,6 +222,9 @@ import CassiniNotebook
     }
 
     private func registerStartup() {
+        if let speechModels = environment.speechModels {
+            startup.register(.load) { await speechModels.verifyBundledSpeech() }
+        }
         #if DEBUG
         if let seed = environment.launch.seed, let store = library.noteStore {
             startup.register(.load) { [environment] in

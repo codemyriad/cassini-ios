@@ -18,6 +18,14 @@ public enum SpeechRecognizer: String, Hashable, Sendable {
         }
     }
 
+    /// Recover identity only from a known checkpoint model family; the run still validates the full model pin.
+    public static func fromCheckpoint(model: String) -> SpeechRecognizer? {
+        if model.hasPrefix("whistle ") { return .whistle }
+        if model == ModelCatalog.parakeetRevision { return .parakeet }
+        if model.hasPrefix(CheckpointState.appleModel(language: "")) { return .appleSpeech }
+        return nil
+    }
+
     /// Whether the recognizer takes a language. Parakeet hears it: its jobs and checkpoints carry `""`, and its words
     /// are written as `und` (`TranscriptLanguage`).
     public var usesLanguage: Bool { self == .appleSpeech }

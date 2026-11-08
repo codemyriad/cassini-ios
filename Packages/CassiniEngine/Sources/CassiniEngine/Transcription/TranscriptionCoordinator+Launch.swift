@@ -43,8 +43,10 @@ extension TranscriptionCoordinator {
         // A queue moved aside starts empty but takes writes: the saved progress becomes paused jobs again.
         var rebuilt: [Job] = []
         if case .unreadable(movedTo: _?)? = loadFailure {
+            var recognizers: [UUID: String] = [:]
+            for id in work { recognizers[id] = await parts.checkpoints.recognizer(of: id) }
             rebuilt = Reconcile.rebuilt(work: work, checkpoints: checkpoints, trashed: trashed,
-                                        existing: Set(notes.map(\.id)), activeNoteID: activeNoteID, now: parts.clock.now)
+                                        existing: Set(notes.map(\.id)), activeNoteID: activeNoteID, now: parts.clock.now, recognizers: recognizers)
         }
         do { try await parts.jobs.replace(plan.jobs, adding: rebuilt, removing: plan.removeJobs) } catch {
             // The repair goes on in memory, so no job stays running without a run; the next write saves it.

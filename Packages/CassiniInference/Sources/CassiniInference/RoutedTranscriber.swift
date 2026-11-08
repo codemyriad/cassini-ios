@@ -38,6 +38,10 @@ public struct RoutedTranscriber: Transcribing {
     }
     public var assetInstallBytes: Int64 { selected?.assetInstallBytes ?? 0 }
     public func segmentation() async -> String? { await selected?.segmentation() }
+    public func availability(locale: Locale) async -> SpeechAvailability {
+        guard let selected else { return SpeechAvailability(assets: .unsupported, failure: .model) }
+        return await selected.availability(locale: locale)
+    }
     public func assetStatus(locale: Locale) async -> ModelPartStatus {
         guard let selected else { return .unsupported }
         return await selected.assetStatus(locale: locale)

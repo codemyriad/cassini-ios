@@ -48,7 +48,7 @@ that were not ported, with the reason for each.
     an Ultra that fails is removed and the run fails with `VERIFY`; the next run downloads it again through the shared
     installer, as a missing model, with consent
     (`ParakeetTranscriberTests.aModelThatFailedItsCheckIsDownloadedAgainByTheNextRun`). D16 §6's copy and
-    Whistle-style fallback setting do not apply to iOS, whose recognizer is chosen at launch. Android has no such check
+    older fallback copy is superseded by D78's live Whistle/verified-Parakeet choice. Android has no such check
     yet. A resumed run whose detector is removed between its windows cuts the rest at quiet points, as it already did
     when the detector was installed between runs, and its `x-segmentation` names quiet points for the whole
     transcript: the checkpoint does not record how its earlier windows were cut (nor does Android's).
@@ -996,5 +996,9 @@ runtime26 parity evidence justify the documented exception. Android uses its own
 platform claims x86_64 support from an arm64 archive. See [the bundle contract](../Whistle/README.md).
 
 The iOS C API is in-process because ordinary iOS apps cannot spawn a recognition worker. A native abort can terminate
-the app. Capability selection remains gated until device and production-pipeline acceptance; the lab3GB gate is
-pending. Existing Parakeet/Apple selection and model-download behavior are retained during that gate.
+the app. The production FIR/HPF/Silero pipeline and default-limit A12/3GB memory gate passed. D78 starts new jobs
+with bundled Whistle, then verified Parakeet on eligible devices. Jobs retain their backend across consent, restore
+and queue rebuild. Low live memory is checked at admission/load/window and can recover without restarting. Apple's
+hardware/locale/assets probe remains separate. The physical measurement did not include downloaded speaker models.
+Settings and the first Whistle result use the coordinator's dismissible Parakeet suggestion only when the device
+passes capability, memory and disk checks; its size comes from the speech-only pinned download plan.

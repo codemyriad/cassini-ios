@@ -95,6 +95,12 @@ public actor AppleSpeechTranscriber: Transcribing {
         try await Self.install(module, locale: locale) { if let fraction = $0 { progress(.downloading(fraction)) } }
     }
 
+    public func availability(locale: Locale) async -> SpeechAvailability {
+        let state = await capability(locale: locale)
+        return SpeechAvailability(assets: selected(state.value) ? state.value.assets : .unsupported,
+                                  failure: state.value.failure)
+    }
+
     public func assetStatus(locale: Locale) async -> ModelPartStatus {
         let state = await capability(locale: locale)
         return selected(state.value) ? state.value.assets : .unsupported

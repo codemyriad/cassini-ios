@@ -120,7 +120,7 @@ enum InternalWhistle {
             osSupported: ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 26,
             physicalMemory: ProcessInfo.processInfo.physicalMemory,
             availableMemory: available > 0 ? UInt64(available) : nil,
-            bundleVerified: WhistleRuntime.bundleIsVerified())
+            bundleVerified: WhistleRuntime.cachedBundleVerification() == true)
     }
     static func route(_ legacy: any Transcribing, defaults: UserDefaults) -> any Transcribing {
         guard isInternalBuild else { return legacy }

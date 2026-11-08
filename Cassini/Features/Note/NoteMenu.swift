@@ -14,7 +14,7 @@ struct NoteMenu: View {
     let perform: (NoteMenuAction) -> Void
     @Environment(RecordingStore.self) private var recording
     @Environment(ProcessingStore.self) private var processing
-    private var speechUnavailable: Bool { processing.models.statuses[.speech] == .unsupported }
+    private var speechUnavailable: Bool { processing.models.speechUnavailability == .model }
 
     var body: some View {
         let finishing = recording.finishingNoteID == note.id
@@ -76,12 +76,13 @@ struct NoteMenu: View {
         case .transcribeAgain:
             Button { perform(.transcribeAgain) } label: {
                 Text(NoteCopy.transcribeAgain)
-                if let againCaption { Text(againCaption) }
+                if speechUnavailable { Text(NoteCopy.speechUnavailable) }
+                else if let againCaption { Text(againCaption) }
                 Image(systemName: "arrow.clockwise")
             }
-            .disabled(disabled)
+            .disabled(disabled || speechUnavailable)
             .accessibilityIdentifier("transcribeAgain")
-            .accessibilityLabel(Text(verbatim: [NoteCopy.transcribeAgain, againCaption].compactMap { $0 }.joined(separator: ". ")))
+            .accessibilityLabel(Text(verbatim: [NoteCopy.transcribeAgain, speechUnavailable ? NoteCopy.speechUnavailable : againCaption].compactMap { $0 }.joined(separator: ". ")))
         case .transcribeAgainUnavailable:
             Button {} label: {
                 Text(NoteCopy.transcribeAgain)
