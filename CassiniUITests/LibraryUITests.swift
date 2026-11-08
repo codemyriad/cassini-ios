@@ -309,7 +309,7 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(shareSheet.waitForExistence(within: 10), "the note shares the exported subtitles")
         // iOS 27 sometimes draws the sheet's Close in a floating bar outside the activity list, and the sheet's
         // contents come from another process a moment after the sheet itself: on a clone just booted, many seconds.
-        let close = app.buttons["Close"].firstMatch
+        let close = app.shareSheetCloseButton
         XCTAssertTrue(close.waitForExistence(within: 30))
         close.tap()
         XCTAssertTrue(shareSheet.waitForNonExistence(within: 5))

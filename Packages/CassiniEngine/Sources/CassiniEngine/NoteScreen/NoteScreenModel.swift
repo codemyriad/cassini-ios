@@ -468,6 +468,13 @@ public final class NoteScreenModel {
         }
     }
 
+    /// A fresh Library request can reuse this note's view. Reset its route query and consume the new start action.
+    public func reopened(query: String?, start: NoteStartAction?) {
+        guard ports.isOpen(noteID) else { return }
+        screen.search = NoteScreenState(query: query).search
+        runStart(start)
+    }
+
     /// Runs the Library's start action once for the screen: the router remembers that it ran, and a route restored
     /// with the scene carries none. A screen leaving the stack forgets it ran, and runs nothing.
     public func runStart(_ start: NoteStartAction?) {

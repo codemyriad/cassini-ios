@@ -14,8 +14,6 @@ import CassiniNotebook
 /// chip do, so a tick redraws only them.
 struct NoteDetailView: View {
     let noteID: UUID
-    /// What the Library asked the screen to do once it opens (an export, Document info, Rename).
-    let start: NoteStartAction?
     @Environment(ProcessingStore.self) private var processing
     @Environment(Router.self) private var router
     @Environment(VoicesStore.self) private var voices
@@ -24,11 +22,16 @@ struct NoteDetailView: View {
     @State private var model: NoteScreenModel
     @State private var cache = TranscriptCache()
 
-    init(model: @autoclosure () -> NoteScreenModel, start: NoteStartAction? = nil) {
+    init(model: @autoclosure () -> NoteScreenModel) {
         let model = model()
         self.noteID = model.noteID
-        self.start = start
         _model = State(initialValue: model)
+    }
+
+    /// Read the current route when appearing; a reused destination can retain old initializer arguments.
+    private var requestedStart: NoteStartAction? {
+        guard case .note(_, _, let start)? = router.path.last(where: { $0.noteID == noteID }) else { return nil }
+        return start
     }
 
     private var note: Note? { model.note }
@@ -54,8 +57,12 @@ struct NoteDetailView: View {
         .task(id: model.playerKey) { model.updatePlayer() }
         .task(id: job.map { "\($0.state)-\($0.doneMs)" }) { await model.loadSavedDraft() }
         .onDisappear { model.disappeared() }
-        .onAppear { model.appeared(start: start) }
-        .onChange(of: router.session(noteID).started) { _, started in if !started { model.runStart(start) } }
+        .onAppear { model.appeared(start: requestedStart) }
+        .onChange(of: router.session(noteID).opening) { _, _ in
+            // The reused destination can still carry its previous route arguments during this update.
+            guard case .note(_, let query, let start)? = router.path.last(where: { $0.noteID == noteID }) else { return }
+            model.reopened(query: query, start: start)
+        }
         .onChange(of: NoteScreenState.isGone(note)) { _, gone in if gone { router.close(noteID: noteID) } }
         .onChange(of: model.screen.search?.query) { _, query in router.keepSearch(query, for: noteID) }
         .backButtonTitle(router.below(noteID: noteID) == .library ? NoteCopy.backToLibrary : nil)

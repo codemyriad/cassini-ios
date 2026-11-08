@@ -63,14 +63,14 @@ private struct RouteDestination: View {
     @ViewBuilder private var screen: some View {
         switch route {
         case .library: LibraryView()
-        case .note(let id, let query, let start):
+        case .note(let id, let query, _):
             // Split-view selection replaces a destination at the same stack depth. Its state belongs to this note.
-            NoteDetailView(model: notes.model(id, query: query), start: start).id(id)
+            NoteDetailView(model: notes.model(id, query: query)).id(id)
         case .settings: SettingsView()
         case .savedVoices: SavedVoicesView()
         case .trash: TrashView()
         case .licenses: LicensesView(models: modelRoot)
-        case .modelDownload(let noteID): ModelDownloadView(noteID: noteID)
+        case .modelDownload(let noteID): ModelDownloadView(noteID: noteID).id(noteID)
         case .parakeetDownload: ModelDownloadView(noteID: nil, parakeetOnly: true)
         }
     }

@@ -177,6 +177,34 @@ import CassiniNotebook
         #expect(fake.calls.filter { $0.hasPrefix("exportTranscript") }.count == 1, "a restored screen does not ask again")
     }
 
+    @Test func reopeningTheVisibleNoteRefreshesQueryAndRunsEachFreshStartOnce() {
+        fake.note?.document = DocumentInfo(state: .ok)
+        model.appeared(start: nil)
+        model.reopened(query: "Thursday", start: .documentInfo)
+        #expect(model.screen.search?.query == "Thursday")
+        #expect(model.sheet == .documentInfo)
+        model.sheet = nil
+        model.runStart(.documentInfo)
+        #expect(model.sheet == nil, "a layout update must not repeat the consumed action")
+        model.screen.search?.setQuery("changed")
+        fake.session = NoteSession(opening: fake.session.opening &+ 1)
+        model.reopened(query: "Thursday", start: .documentInfo)
+        #expect(model.screen.search?.query == "Thursday" && model.sheet == .documentInfo)
+        #expect(fake.calls.filter { $0 == "markStarted" }.count == 2)
+    }
+
+    @Test func reopeningWithoutAStartStillRefreshesTheSameQueryAndAClosedNoteDoesNothing() {
+        model.appeared(start: nil)
+        model.reopened(query: "Thursday", start: nil)
+        model.screen.closeSearch()
+        model.reopened(query: "Thursday", start: nil)
+        #expect(model.screen.search?.query == "Thursday")
+        #expect(!fake.calls.contains("markStarted"))
+        fake.isOpen = false
+        model.reopened(query: "ignore", start: .documentInfo)
+        #expect(model.screen.search?.query == "Thursday" && model.sheet == nil)
+    }
+
     // ports: NoteViewModelTest#documentInfoCanStartFromTheLibrary
     @Test func documentInfoCanStartFromTheLibrary() {
         fake.note?.origin = .importedDocument
