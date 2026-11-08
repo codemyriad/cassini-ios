@@ -62,7 +62,8 @@ existing statically linked ORT image is already present at app launch; this is n
 isolation. Needle stays separately lazy-loaded after pin/privacy checks. iOS native execution remains in process.
 
 The gate uses512-sample votes/hysteresis, pre-roll and desktop silence/duration cuts. Recognition receives raw FIR
-samples, never the high-passed copy. Both full DC recordings passed all six exact desktop boundaries on an actual
+samples, never the high-passed copy. Finite FIR ringing above full scale is preserved as on desktop; valid PCM16
+can overshoot 1.0 after filtering, so the native input contract checks finiteness and length without clipping. Both full DC recordings passed all six exact desktop boundaries on an actual
 26.0 simulator, and the English bundled recording passed the real adapter. The native raw-segment13-fixture frozen
 reference remains unchanged. Resume deterministically rereads from zero to restore FIR/filter/recurrent VAD state;
 finalized words are deduplicated at the checkpoint. Detected languages survive checkpoints and exports report actual

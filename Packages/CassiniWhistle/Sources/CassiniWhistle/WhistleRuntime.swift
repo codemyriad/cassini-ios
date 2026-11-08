@@ -140,14 +140,20 @@ public actor WhistleRuntime {
         try open(bundle: bundle)
     }
 
+    /// Centred FIR ringing can exceed full scale even for valid PCM16. Match the desktop's finite-input contract;
+    /// do not clip its raw ASR input or reject legitimate full-scale recordings after resampling.
+    nonisolated static func validatePCM(_ pcm: [Float]) throws {
+        guard !pcm.isEmpty, pcm.count <= 240_128, pcm.allSatisfy(\.isFinite) else {
+            throw WhistleError.invalidInput
+        }
+    }
+
     /// Actual C API, automatic language detection, no keywords; callers supply already segmented raw 16kHz PCM.
     /// Cancellation discards a late synchronous result. The serial actor cannot overlap model ownership/calls.
     public func transcribe(_ pcm: [Float], acceptance: WhistleCapability, bundle: Bundle = .main) throws -> WhistleResult {
         guard acceptance.available else { throw WhistleError.unavailable }
         try Task.checkCancellation()
-        guard !pcm.isEmpty, pcm.count <= 240_128, pcm.allSatisfy({ $0.isFinite && abs($0) <= 1 }) else {
-            throw WhistleError.invalidInput
-        }
+        try Self.validatePCM(pcm)
         try open(bundle: bundle)
         guard let decode else { throw WhistleError.missingAPI }
         let result = try WhistlePrivacy.enter(environment: privacyEnvironment()) {

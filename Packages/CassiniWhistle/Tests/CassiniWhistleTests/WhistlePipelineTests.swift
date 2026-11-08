@@ -3,6 +3,19 @@ import Testing
 @testable import CassiniWhistle
 
 @Suite struct WhistlePipelineTests {
+    @Test func validFullScalePCMRetainsFIRRingingAndPassesTheNativeInputContract() throws {
+        var resampler = try WhistleResampler(rate: 48000)
+        let pcm = resampler.feed([Float](repeating: Float(Int16.max) / 32768, count: 512), final: true)
+        let peak = try #require(pcm.max())
+        #expect(peak > 1.08, "The pinned FIR can overshoot full scale")
+        try WhistleRuntime.validatePCM(pcm)
+        let invalidInputs: [[Float]] = [[], [.nan], [.infinity], [-.infinity], [Float](repeating: 0, count: 240129)]
+        for invalid in invalidInputs {
+            #expect(throws: WhistleError.invalidInput) { try WhistleRuntime.validatePCM(invalid) }
+        }
+        try WhistleRuntime.validatePCM([Float](repeating: 0, count: 240128))
+    }
+
     @Test func resamplingIsChunkInvariantAndRetainsOnlyTheFIRTail() throws {
         let input = (0..<48001).map { Float(sin(Double($0)*0.043))*0.4 }
         var whole = try WhistleResampler(rate: 48000)
