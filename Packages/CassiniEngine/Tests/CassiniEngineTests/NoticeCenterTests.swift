@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 import Testing
 import CassiniEngine
 import CassiniEngineTesting
@@ -14,6 +15,33 @@ import CassiniNotebook
         SettingsStore(defaults: UserDefaults(suiteName: suite)!, clock: clock, defaultLanguage: "en-US")
     }
     private func cleanUp() { UserDefaults(suiteName: suite)!.removePersistentDomain(forName: suite) }
+
+    @Test(.timeLimit(.minutes(1)))
+    func theDownloadOfferFollowsSpeechLanguageEligibilityWithoutAnAppRelaunch() async {
+        defer { cleanUp() }
+        let store = settings(), reads = Box("")
+        let center = NoticeCenter(settings: store, notifier: notifier) {
+            reads.value = store.speechLanguage
+            return store.speechLanguage == "en-GB" // This fixture's unavailable locale offers no download.
+        }
+        let library = LibraryFacts(liveNotes: 1, audioOnly: true)
+        await center.refresh()
+        #expect(center.library(library).contains { $0.kind == .dlRecordNow })
+
+        store.speechLanguage = "en-GB"
+        #expect(!center.library(library).contains { $0.kind == .dlRecordNow }, "no stale offer while probing")
+        for await language in Observations({ reads.value }) {
+            if language == "en-GB" { break }
+        }
+        #expect(!center.library(library).contains { $0.kind == .dlRecordNow })
+
+        store.speechLanguage = "en-US"
+        for await consented in Observations({ center.facts.consented }) {
+            if !consented { break }
+        }
+        #expect(center.library(library).contains { $0.kind == .dlRecordNow })
+        #expect(store.modelsConsentAt == nil)
+    }
     private func recovered(createdAt: TimeInterval, recoveredAt: TimeInterval, duration: TimeInterval) -> RecoveredRecording {
         RecoveredRecording(noteID: UUID(), createdAt: Date(timeIntervalSince1970: createdAt),
                            recoveredAt: Date(timeIntervalSince1970: recoveredAt), duration: duration)
@@ -136,7 +164,7 @@ import CassiniNotebook
 }
 
 /// A value the closures under test read while the test changes it.
-@MainActor private final class Box<Value> {
+@MainActor @Observable private final class Box<Value> {
     var value: Value
     init(_ value: Value) { self.value = value }
 }

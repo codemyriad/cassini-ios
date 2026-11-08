@@ -5,6 +5,18 @@ import CassiniEngineTesting
 @testable import Cassini
 
 @MainActor final class AppGraphTests: XCTestCase {
+    func testOnlySupportedMissingSpeechAdvertisesAOneTimeDownload() async throws {
+        for status in [ModelPartStatus.unsupported, .ready, .notDownloaded] {
+            let test = TestGraph(transcriber: FakeTranscriber(.returns([], total: 1), status: status))
+            defer { test.tearDown() }
+            let note = try await seedPlainNote(in: test)
+            XCTAssertEqual(test.graph.library.note(note.id)?.status, .audioOnly)
+            let banners = test.graph.notices.library(LibraryFacts(liveNotes: 1, audioOnly: true))
+            XCTAssertEqual(banners.contains { $0.kind == .dlRecordNow }, status == .notDownloaded)
+            XCTAssertNil(test.graph.settings.modelsConsentAt, "notice eligibility never records consent")
+        }
+    }
+
     // ports: AppGraphTest#theGraphBuildsOnAScratchRootAndReadyCompletes
     func testTheGraphBuildsOnAScratchRootAndReadyCompletes() async throws {
         let test = TestGraph(); defer { test.tearDown() }
