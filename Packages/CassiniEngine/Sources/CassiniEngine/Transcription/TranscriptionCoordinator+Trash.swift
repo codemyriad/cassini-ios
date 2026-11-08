@@ -49,7 +49,7 @@ extension TranscriptionCoordinator {
             await refresh()
             return job != nil
         }
-        if requeued, await parts.consent.allows(trashedJob.kind, language), settings.queueHold == nil { drain() }
+        if requeued, await consent(for: noteID).allows(trashedJob.kind, language), settings.queueHold == nil { drain() }
     }
 
     /// The first step of a permanent delete: stops the job if it runs, then removes it.

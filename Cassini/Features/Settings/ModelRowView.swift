@@ -50,6 +50,7 @@ extension ModelPart {
 extension ModelSize {
     func label(locale: Locale) -> String {
         switch self {
+        case .included: String(localized: "Included with Cassini", table: "Settings")
         case .managedBySystem: String(localized: "Managed by iOS", table: "Settings")
         case .bytes(let bytes): SizeCopy.text(bytes, locale: locale)
         case .precision(let precision, let bytes):

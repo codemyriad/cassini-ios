@@ -44,8 +44,9 @@ stay in the app's private storage, are excluded from backups, and are never writ
 System backups may include recordings and transcripts.
 
 The build also bundles pinned Whistle weights and a private Needle runtime (D75.2); they are never downloaded by
-the running app. Whistle selection remains gated pending production pipeline and lab-device acceptance, including
-the 3 GB memory gate. See [Whistle/README.md](Whistle/README.md) for the documented minos27 archive exception,
+the running app. Regular Release/App Store Whistle selection remains gated pending device/pipeline acceptance, including
+the 3 GB memory gate. The explicit CassiniInternal configuration offers an off-by-default experimental selector;
+its archive must export for internal TestFlight testing only. See [Whistle/README.md](Whistle/README.md) for the documented minos27 archive exception,
 SDK26/simulator evidence, guarded C API and capability policy. No Included/default option is enabled yet.
 
 ## Run

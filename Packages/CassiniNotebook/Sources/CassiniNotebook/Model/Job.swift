@@ -150,6 +150,8 @@ public struct Job: Codable, Hashable, Identifiable, Sendable {
     public var words: Int
     /// BCP-47; set only for transcribe kinds.
     public var language: String
+    /// Frozen backend for new jobs. Absent in legacy jobs, which retain the legacy recognizer.
+    public var recognizer: String?
     public var enqueuedAt: Date
     public var updatedAt: Date
 
@@ -157,9 +159,10 @@ public struct Job: Codable, Hashable, Identifiable, Sendable {
 
     public init(noteID: UUID, seq: Int, kind: JobKind, state: JobState = .queued, pauseReason: PauseReason? = nil,
                 failure: JobFailure? = nil, attempts: Int = 0, doneMs: Int64 = 0, totalMs: Int64? = nil, words: Int = 0,
-                language: String = "", enqueuedAt: Date, updatedAt: Date? = nil) {
+                language: String = "", enqueuedAt: Date, updatedAt: Date? = nil, recognizer: String? = nil) {
         self.noteID = noteID; self.seq = seq; self.kind = kind; self.state = state; self.pauseReason = pauseReason
         self.failure = failure; self.attempts = attempts; self.doneMs = doneMs; self.totalMs = totalMs; self.words = words
+        self.recognizer = recognizer
         self.language = language; self.enqueuedAt = enqueuedAt; self.updatedAt = updatedAt ?? enqueuedAt
     }
 }

@@ -64,7 +64,9 @@ struct WhistleTests {
             #expect(throws: WhistleError.invalidOutput) { try WhistleResult.parse(bad, samples: 16_000) }
         }
         #expect(throws: WhistleError.invalidInput) { try WhistleResult.parse(data("0", "1"), samples: 0) }
-        #expect(throws: WhistleError.invalidInput) { try WhistleResult.parse(data("0", "1"), samples: 240_001) }
+        // Desktop's 15 s cut is rounded up to its 512-sample VAD frame, yielding 240128 samples.
+        #expect(try WhistleResult.parse(data("0", "1"), samples: 240_128).words.count == 1)
+        #expect(throws: WhistleError.invalidInput) { try WhistleResult.parse(data("0", "1"), samples: 240_129) }
     }
 
     @Test func unacceptedDeviceCannotEnterNativeCode() async {

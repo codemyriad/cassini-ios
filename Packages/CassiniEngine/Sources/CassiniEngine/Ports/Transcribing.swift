@@ -49,6 +49,8 @@ public struct TranscriptWindow: Hashable, Sendable {
 }
 
 public enum TranscriptionEvent: Hashable, Sendable {
+    /// Automatically detected language of a finalized Whistle segment; never the requested UI locale.
+    case detectedLanguage(String)
     /// The speech model is being prepared or downloaded; the fraction is nil while unknown.
     case preparingModel(Double?)
     /// Audio up to `done` seconds of `total` is transcribed.
@@ -88,6 +90,8 @@ public enum TranscriptionError: Error, Hashable {
 public protocol Transcribing: Sendable {
     /// The candidate backend identity for checkpoints/provenance; it does not promise device/locale availability.
     var recognizer: SpeechRecognizer { get }
+    /// Resolve the persisted job identity once; nil is a legacy job, never a new preference.
+    func forJob(recognizer: String?) throws -> any Transcribing
     /// How a run would cut the recording now (Parakeet's `x-segmentation`); nil for Apple Speech.
     func segmentation() async -> String?
     func transcribe(_ request: TranscriptionRequest,
@@ -116,6 +120,11 @@ public protocol Transcribing: Sendable {
 }
 
 extension Transcribing {
+    public func forJob(recognizer identity: String?) throws -> any Transcribing {
+        guard identity == nil || identity == recognizer.rawValue else { throw TranscriptionError.failed(.model) }
+        return self
+    }
+
     public func unavailability(locale: Locale) async -> JobFailure? {
         await assetStatus(locale: locale) == .unsupported ? .unsupportedLanguage : nil
     }

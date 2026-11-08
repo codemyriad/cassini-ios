@@ -2336,6 +2336,206 @@
           }
         }
       }
+    },
+    "Included with Cassini": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Included with Cassini"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Incluso in Cassini"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inclus avec Cassini"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Incluido con Cassini"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Incluído no Cassini"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Incluído no Cassini"
+          }
+        }
+      }
+    },
+    "Whistle (experimental)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Whistle (experimental)"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Whistle (sperimentale)"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Whistle (expérimental)"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Whistle (experimental)"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Whistle (experimental)"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Whistle (experimental)"
+          }
+        }
+      }
+    },
+    "Internal testing": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Internal testing"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Test interni"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tests internes"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pruebas internas"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Testes internos"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Testes internos"
+          }
+        }
+      }
+    },
+    "Quit Cassini from the app switcher, then reopen it to apply this choice. Pending transcriptions keep their original model.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quit Cassini from the app switcher, then reopen it to apply this choice. Pending transcriptions keep their original model."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chiudi Cassini dal selettore app, poi riaprilo per applicare questa scelta. Le trascrizioni in sospeso mantengono il modello originale."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fermez Cassini dans le sélecteur d’apps, puis rouvrez-le pour appliquer ce choix. Les transcriptions en attente conservent leur modèle d’origine."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cierra Cassini desde el selector de apps y vuelve a abrirlo para aplicar esta opción. Las transcripciones pendientes conservan su modelo original."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Feche o Cassini no seletor de apps e abra-o novamente para aplicar esta escolha. As transcrições pendentes mantêm o modelo original."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Feche o Cassini no seletor de aplicações e volte a abri-lo para aplicar esta escolha. As transcrições pendentes mantêm o modelo original."
+          }
+        }
+      }
+    },
+    "Whistle is unavailable on this device right now.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Whistle is unavailable on this device right now."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Whistle non è disponibile su questo dispositivo al momento."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Whistle n’est pas disponible sur cet appareil pour le moment."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Whistle no está disponible en este dispositivo en este momento."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No momento, o Whistle não está disponível neste dispositivo."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O Whistle não está disponível neste dispositivo de momento."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

@@ -6,6 +6,12 @@ import CassiniNotebook
 /// Touches: `parts.jobs`, `parts.notes` and `parts.checkpoints` (writes), `trashed` (an enqueue takes the note out),
 /// `refresh()`.
 extension TranscriptionCoordinator {
+    func consent(for noteID: UUID) async -> ModelConsent {
+        guard let resolve = parts.consentForRecognizer else { return parts.consent }
+        if let existing = await parts.jobs.job(noteID) { return resolve(existing.recognizer) }
+        return resolve(parts.recognizer)
+    }
+
     /// The language a job is queued with: the Settings language for the transcribe kinds, except that saved progress
     /// resumes in the language it began in (its job's, else its checkpoint's), which the checkpoint must match. Nil for
     /// a speakers-only job, which decodes nothing and keeps its job's. The note's language is never read or set here:
@@ -23,7 +29,7 @@ extension TranscriptionCoordinator {
     func enqueue(_ noteID: UUID, kind: JobKind, language: String?) async -> TranscribeOutcome {
         let existing = await parts.jobs.job(noteID)
         if let existing, existing.state == .queued || existing.state == .running { return .queued(changed: false) }
-        guard await write({ try await $0.enqueue(noteID, kind: kind, language: language, now: self.parts.clock.now) }) != nil else {
+        guard await write({ try await $0.enqueue(noteID, kind: kind, language: language, now: self.parts.clock.now, recognizer: self.parts.recognizer) }) != nil else {
             return .queued(changed: false)
         }
         trashed.remove(noteID)
@@ -40,7 +46,7 @@ extension TranscriptionCoordinator {
         case .queued:
             await write { try await $0.transition(noteID, now: now) { $0.state = .needsConsent } }
         default:
-            await write { try await $0.enqueue(noteID, kind: kind, language: language, now: now, waitingForConsent: true) }
+            await write { try await $0.enqueue(noteID, kind: kind, language: language, now: now, waitingForConsent: true, recognizer: self.parts.recognizer) }
         }
         await mirror(noteID)
         await refresh()

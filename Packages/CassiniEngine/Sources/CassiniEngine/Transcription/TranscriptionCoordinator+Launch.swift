@@ -76,7 +76,7 @@ extension TranscriptionCoordinator {
         await readiness.wait()
         guard visible, active == nil, drainTask == nil, settings.queueHold == nil,
               let head = await parts.jobs.all().first(where: { $0.state == .queued && !trashed.contains($0.noteID) }),
-              await parts.consent.allows(head.kind, head.language) else { return }
+              await consent(for: head.noteID).allows(head.kind, head.language) else { return }
         drain()
     }
 }

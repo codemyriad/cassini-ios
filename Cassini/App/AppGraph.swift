@@ -75,7 +75,7 @@ import CassiniNotebook
             analyzer: environment.analyzer, storage: environment.storage, notices: noticeCenter,
             root: environment.root, models: environment.models)
         settingsPorts = SettingsAdapter(settings: settings, library: library, voices: voices, processing: processing,
-                                        notices: noticeCenter, transcriber: environment.transcriber)
+                                        notices: noticeCenter, transcriber: environment.transcriber, defaults: environment.defaults)
         notices = NoticesStore(center: noticeCenter, router: router, processing: processing, recording: recording)
         registerNotices()
         registerStartup()
@@ -109,7 +109,7 @@ import CassiniNotebook
             let job = TranscriptionJob(notes: notes, transcriber: environment.transcriber, analyzer: environment.analyzer,
                                        checkpoints: checkpoints, provenance: ProvenanceFiles(notes: notes),
                                        host: AppJobHost(settings: settings, voices: voices), clock: environment.clock,
-                                       drafts: drafts)
+                                       drafts: drafts, diagnostics: InternalWhistle.diagnostics)
             let parts = TranscriptionCoordinator.Parts(
                 jobs: JobStore(repository: JobRepository(root: environment.root)), notes: notes, runner: job,
                 checkpoints: NoteWorkFolders(notes: notes, drafts: drafts),
@@ -120,7 +120,14 @@ import CassiniNotebook
                                           comment: "The system's progress while a note is transcribed") },
                 backgroundSubtitle: String(localized: "Your audio stays on this device", table: "Transcription",
                                            comment: "Subtitle of the system's progress while a note is transcribed"),
-                progress: progress)
+                progress: progress, recognizer: environment.transcriber.recognizer.rawValue,
+                consentForRecognizer: { identity in
+                    guard let speech = try? environment.transcriber.forJob(recognizer: identity) else {
+                        return ModelConsent(unavailability: { _, _ in .model }) { _, _ in false }
+                    }
+                    return .recorded(settings: settings, speech: speech, speakers: environment.analyzer,
+                        parakeetReady: { [models = environment.models] in ModelCatalog.parakeet.ready(in: models) })
+                })
             return TranscriptionCoordinator(parts, settings: settings)
         }
         let models = ModelInstalls(transcriber: environment.transcriber, analyzer: environment.analyzer,
@@ -154,6 +161,13 @@ import CassiniNotebook
     /// Runs the launch steps once; the app is ready when it returns.
     @discardableResult func start() async -> StartupReport {
         let report = await startup.run()
+        #if CASSINI_INTERNAL_TESTFLIGHT
+        if environment.launch.whistleLab, library.notes.isEmpty,
+           let fixture = Bundle.main.resourceURL?.appendingPathComponent("WhistleTests/jfk.wav"),
+           FileManager.default.fileExists(atPath: fixture.path) {
+            _ = await imports.importFile(fixture, opensNote: true).value
+        }
+        #endif
         // The models' status is read once the library is ready, without holding the launch for it.
         Task { [models = processing.models] in await models.refresh() }
         #if DEBUG

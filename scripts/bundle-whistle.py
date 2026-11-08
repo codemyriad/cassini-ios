@@ -15,6 +15,7 @@ import shutil
 import subprocess
 import tempfile
 import urllib.request
+from whistle_binary_identity import identity
 
 ROOT = Path(__file__).resolve().parents[1]
 PINS = json.loads((ROOT / "Whistle/pins.json").read_text())
@@ -98,6 +99,7 @@ def bundle(cache, offline=False):
     archive = fetch(cache, kind + "/libneedle.a", offline)
     fetch(cache, kind + "/needle.h", offline)
     model = fetch(cache, "whistle.cact", offline)
+    vad = fetch(cache, "silero-vad-6.2.1.onnx", offline)
     framework.parent.mkdir(parents=True, exist_ok=True)
     # Stage on the same filesystem as the build products. Never leave a partial embedded bundle.
     with tempfile.TemporaryDirectory(prefix="whistle-", dir=framework.parent) as staging:
@@ -131,24 +133,26 @@ def bundle(cache, offline=False):
             "CFBundlePackageType": "FMWK", "CFBundleVersion": "1", "CFBundleShortVersionString": "3.3.0",
             "MinimumOSVersion": "26.0", "CFBundleSupportedPlatforms": ["iPhoneSimulator" if kind == "ios-sim-arm64" else "iPhoneOS"],
         }))
-        identity = env.get("EXPANDED_CODE_SIGN_IDENTITY", "")
-        if platform == "iphoneos" and env.get("CODE_SIGNING_ALLOWED") != "NO" and not identity:
+        signing_identity = env.get("EXPANDED_CODE_SIGN_IDENTITY", "")
+        if platform == "iphoneos" and env.get("CODE_SIGNING_ALLOWED") != "NO" and not signing_identity:
             raise ValueError("Whistle device framework requires the build's signing identity")
-        if identity or platform == "iphonesimulator":
-            run(["codesign", "--force", "--sign", identity or "-", "--timestamp=none", staged])
+        if signing_identity or platform == "iphonesimulator":
+            run(["codesign", "--force", "--sign", signing_identity or "-", "--timestamp=none", staged])
             run(["codesign", "--verify", "--strict", staged])
-        # Manifest hashes the signed output, after any codesign mutation.
+        # Section identity survives distribution re-signing; the OS verifies the complete code signature.
         manifest = {"engineRevision": PINS["engineRevision"], "modelSha256": PINS["artifacts"]["whistle.cact"]["sha256"],
-                    "runtimeSha256": digest(binary), "target": kind, "minimumOS": "26.0", "sourceArchiveMinimumOS": "27.0"}
+                    "runtimeIdentity": identity(binary.read_bytes()), "identitySchema": "cassini-whistle-sections-v1", "target": kind, "minimumOS": "26.0", "sourceArchiveMinimumOS": "27.0"}
         verify(archive, PINS["artifacts"][kind + "/libneedle.a"])
         shutil.rmtree(framework, ignore_errors=True)
         shutil.move(staged, framework)
         resources.mkdir(exist_ok=True)
         shutil.copyfile(model, resources / "whistle.cact")
         verify(resources / "whistle.cact", PINS["artifacts"]["whistle.cact"])
+        shutil.copyfile(vad, resources / "silero-vad-6.2.1.onnx")
+        verify(resources / "silero-vad-6.2.1.onnx", PINS["artifacts"]["silero-vad-6.2.1.onnx"])
         (resources / "manifest.json").write_text(json.dumps(manifest, sort_keys=True) + "\n")
     fixtures = app / "WhistleTests"
-    if env["CONFIGURATION"] == "Debug":
+    if env["CONFIGURATION"] == "Debug" or env.get("CASSINI_WHISTLE_LAB_FIXTURES") == "1":
         fixtures.mkdir(exist_ok=True)
         shutil.copyfile(fetch(cache, "jfk.wav", offline), fixtures / "jfk.wav")
         verify(fixtures / "jfk.wav", PINS["artifacts"]["jfk.wav"])

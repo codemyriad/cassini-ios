@@ -22,7 +22,7 @@ public struct WhistleResult: Decodable, Equatable, Sendable {
     }
 
     public static func parse(_ data: Data, samples: Int) throws -> Self {
-        guard samples > 0, samples <= 16_000 * 15, data.count <= 1_048_576 else { throw WhistleError.invalidInput }
+        guard samples > 0, samples <= 240_128, data.count <= 1_048_576 else { throw WhistleError.invalidInput }
         let result = try JSONDecoder().decode(Self.self, from: data)
         guard result.language.utf8.count <= 64, result.words.count <= 16_000 else { throw WhistleError.invalidOutput }
         var previous = 0.0

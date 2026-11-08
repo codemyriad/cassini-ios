@@ -6,6 +6,7 @@ import CassiniNotebook
 
 /// `SettingsPorts` over the app's stores. Its properties read observable stores, so the Settings screen follows them.
 @MainActor @Observable final class SettingsAdapter: SettingsPorts {
+    @ObservationIgnored let defaults: UserDefaults
     @ObservationIgnored private let settings: SettingsStore
     @ObservationIgnored private let library: LibraryStore
     @ObservationIgnored private let voicesStore: VoicesStore
@@ -14,9 +15,9 @@ import CassiniNotebook
     @ObservationIgnored private let transcriber: any Transcribing
 
     init(settings: SettingsStore, library: LibraryStore, voices: VoicesStore, processing: ProcessingStore,
-         notices: NoticeCenter, transcriber: any Transcribing) {
+         notices: NoticeCenter, transcriber: any Transcribing, defaults: UserDefaults = .standard) {
         self.settings = settings; self.library = library; self.voicesStore = voices; self.processing = processing
-        self.notices = notices; self.transcriber = transcriber
+        self.notices = notices; self.transcriber = transcriber; self.defaults = defaults
     }
 
     /// The stored status of each part, with the standalone install and the running job's model download over it.

@@ -60,10 +60,10 @@ public actor JobStore {
     /// With `waitingForConsent` the job is written as `needsConsent` in the same write ("Ready to transcribe").
     @discardableResult
     public func enqueue(_ noteID: UUID, kind: JobKind, language: String?, now: Date,
-                        waitingForConsent: Bool = false) throws -> Job {
+                        waitingForConsent: Bool = false, recognizer: String? = nil) throws -> Job {
         if let existing = jobs[noteID], existing.state == .queued || existing.state == .running { return existing }
         var job = jobs[noteID]?.requeued(seq: nextSeq, kind: kind, language: language, now: now)
-            ?? Job(noteID: noteID, seq: nextSeq, kind: kind, language: language ?? "", enqueuedAt: now)
+            ?? Job(noteID: noteID, seq: nextSeq, kind: kind, language: language ?? "", enqueuedAt: now, recognizer: recognizer)
         if waitingForConsent { job.state = .needsConsent }
         try write([job])
         return job

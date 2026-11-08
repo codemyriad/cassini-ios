@@ -38,6 +38,7 @@ private struct SettingsForm: View {
     let model: SettingsModel
     @Environment(SettingsStore.self) private var settings
     @Environment(NoticesStore.self) private var notices
+    @Environment(SettingsAdapter.self) private var ports
 
     var body: some View {
         @Bindable var settings = settings
@@ -67,6 +68,9 @@ private struct SettingsForm: View {
             } footer: {
                 Text("Matches can be wrong; check the names. Only voices you save are used to recognise people.", tableName: "Settings").foregroundStyle(Color.muted)
             }
+            #if CASSINI_INTERNAL_TESTFLIGHT
+            InternalWhistleSection(defaults: ports.defaults)
+            #endif
             PrivacySection(model: model)
             LibrarySection(totals: model.library)
             Section {
@@ -258,3 +262,27 @@ private struct AboutCard: View {
         .padding(.vertical, 6)
     }
 }
+
+#if CASSINI_INTERNAL_TESTFLIGHT
+private struct InternalWhistleSection: View {
+    @AppStorage private var optedIn: Bool
+    init(defaults: UserDefaults) {
+        _optedIn = AppStorage(wrappedValue: false, InternalWhistle.preference, store: defaults)
+    }
+    var body: some View {
+        Section {
+            Toggle(isOn: $optedIn) { Text("Whistle (experimental)", tableName: "Settings") }
+                .disabled(!InternalWhistle.capability().available)
+                .accessibilityIdentifier("internalWhistleOptIn")
+        } header: {
+            Text("Internal testing", tableName: "Settings")
+        } footer: {
+            if InternalWhistle.capability().available {
+                Text("Quit Cassini from the app switcher, then reopen it to apply this choice. Pending transcriptions keep their original model.", tableName: "Settings")
+            } else {
+                Text("Whistle is unavailable on this device right now.", tableName: "Settings")
+            }
+        }
+    }
+}
+#endif

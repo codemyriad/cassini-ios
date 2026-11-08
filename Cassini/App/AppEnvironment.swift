@@ -35,6 +35,8 @@ import CassiniEngineTesting
     /// What a UI-test launch asks for.
     struct LaunchOptions {
         var seed: Seed?
+        /// Internal-only isolated library for device diagnostics; never the person's recordings.
+        var whistleLab = false
         /// A note to open once the library is ready.
         var openFixture: OpenFixture?
         /// Restores the navigation stack saved with the scene.
@@ -69,15 +71,17 @@ import CassiniEngineTesting
     /// installer with consent, and the model download screen's Download does too. Otherwise prepare an Apple candidate
     /// whose eligibility depends on the requested locale and live public availability checks (D75.2).
     static func speechTranscriber(models: PinnedModels,
-                                  physicalMemory: UInt64 = ProcessInfo.processInfo.physicalMemory) -> any Transcribing {
+                                  physicalMemory: UInt64 = ProcessInfo.processInfo.physicalMemory,
+                                  defaults: UserDefaults = .standard) -> any Transcribing {
         if SherpaRuntime.isLinked && SpeechCapability.parakeetCapable(physicalMemory: physicalMemory) {
-            return ParakeetTranscriber(models: .init(installer: models.installer, root: models.root,
+            let parakeet = ParakeetTranscriber(models: .init(installer: models.installer, root: models.root,
                                                     online: { NetworkPath.shared.isOnline }),
                                       runtime: SherpaRuntime.speech)
+            return InternalWhistle.route(parakeet, defaults: defaults)
         }
         // This is a candidate adapter, not a claim of availability. Its public Speech checks select Apple only
         // when this device and the requested locale support it, before consent/queue admission and before decode.
-        return AppleSpeechTranscriber()
+        return InternalWhistle.route(AppleSpeechTranscriber(), defaults: defaults)
     }
 
     /// Android's speaker pipeline (streaming Sortformer and CAM++) over the catalog's pinned files, which the shared
@@ -88,15 +92,26 @@ import CassiniEngineTesting
     }
 
     static func live() -> AppEnvironment {
+        let laboratory = InternalWhistle.isInternalBuild && ProcessInfo.processInfo.arguments.contains("--internal-whistle-lab")
+        let root = URL.applicationSupportDirectory.appendingPathComponent(laboratory ? "WhistleLab" : "Cassini", isDirectory: true)
+        let defaults = laboratory ? UserDefaults(suiteName: "io.codemyriad.cassini.whistle-lab")! : .standard
+        let modelRoot = laboratory ? root.appendingPathComponent("Models", isDirectory: true) : ModelCatalog.defaultRoot
         let storage = FileSystemStorageProbe()
-        let models = PinnedModels(root: ModelCatalog.defaultRoot, defaults: .standard, storage: storage)
-        return AppEnvironment(
-            root: URL.applicationSupportDirectory.appendingPathComponent("Cassini", isDirectory: true),
-            defaults: .standard, clock: SystemClock(), locale: .autoupdatingCurrent, timeZone: .autoupdatingCurrent,
-            transcriber: speechTranscriber(models: models), analyzer: speakerAnalyzer(models: models),
+        let models = PinnedModels(root: modelRoot, defaults: defaults, storage: storage)
+        var value = AppEnvironment(
+            root: root,
+            defaults: defaults, clock: SystemClock(), locale: .autoupdatingCurrent, timeZone: .autoupdatingCurrent,
+            transcriber: speechTranscriber(models: models, defaults: defaults), analyzer: speakerAnalyzer(models: models),
             capture: AVCaptureAdapter(), microphone: AVMicrophonePermission(), liveActivity: ActivityKitAdapter(),
             playback: AVPlaybackAdapter(), audio: LocalAudioProcessing(), storage: storage,
             background: UIKitBackgroundRunner(), notifier: UNNotifier())
+        if laboratory {
+            value.models = modelRoot
+            value.exports = root.appendingPathComponent("Exports", isDirectory: true)
+            value.launch.whistleLab = true
+            value.launch.restoresNavigation = false
+        }
+        return value
     }
 
     /// The environment the process arguments ask for.

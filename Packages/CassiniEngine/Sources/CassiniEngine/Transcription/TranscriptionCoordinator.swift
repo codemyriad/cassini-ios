@@ -23,6 +23,8 @@ public final class TranscriptionCoordinator {
         public var runner: any TranscriptionJobRunning
         public var checkpoints: any JobCheckpoints
         public var consent: ModelConsent
+        public var recognizer: String?
+        public var consentForRecognizer: (@MainActor @Sendable (String?) -> ModelConsent)?
         public var notifier: any Notifier
         public var background: any BackgroundRunner
         public var clock: any AppClock
@@ -39,11 +41,12 @@ public final class TranscriptionCoordinator {
                     background: any BackgroundRunner, clock: any AppClock,
                     backgroundTitle: @escaping @MainActor (_ noteTitle: String) -> String = { "Transcribing “\($0)”" },
                     backgroundSubtitle: String = "Your audio stays on this device",
-                    progress: JobProgress? = nil) {
+                    progress: JobProgress? = nil, recognizer: String? = nil,
+                    consentForRecognizer: (@MainActor @Sendable (String?) -> ModelConsent)? = nil) {
             self.jobs = jobs; self.notes = notes; self.runner = runner; self.checkpoints = checkpoints
             self.consent = consent; self.notifier = notifier; self.background = background; self.clock = clock
             self.backgroundTitle = backgroundTitle; self.backgroundSubtitle = backgroundSubtitle
-            self.progress = progress
+            self.progress = progress; self.recognizer = recognizer; self.consentForRecognizer = consentForRecognizer
         }
     }
 
@@ -122,10 +125,11 @@ public final class TranscriptionCoordinator {
         if let refusal = EnqueueRules.refusal(for: note) { return .refused(refusal) }
         guard await parts.jobs.isWritable else { return .refused(.queueUnavailable) }
         let language = await language(for: noteID, kind: kind)
-        if let failure = await parts.consent.unavailability(kind, language ?? "") {
+        let consent = await consent(for: noteID)
+        if let failure = await consent.unavailability(kind, language ?? "") {
             return .refused(.speechUnavailable(failure))
         }
-        guard await parts.consent.allows(kind, language ?? "") else {
+        guard await consent.allows(kind, language ?? "") else {
             return await lock.run { await needConsent(noteID, kind: kind, language: language) }
         }
         let resume = await parts.jobs.job(noteID)?.state == .paused

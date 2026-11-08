@@ -37,6 +37,8 @@ A host receives the IP address of your device, the name of the file, and Cassini
 
 Before Cassini uses a downloaded model for the first time after it starts, it checks the SHA-256 hash of every file again. A model that fails this check is deleted and has to be downloaded again.
 
+Internal test builds may offer bundled Whistle as an experimental option. It runs on this device without downloading a speech model. Internal memory diagnostics contain only memory, thermal and outcome numbers, with no audio, transcript text or recording identifiers.
+
 ## Permissions
 
 - Microphone: Cassini uses the microphone only while you record. A Live Activity shows the recording on the Lock Screen.
