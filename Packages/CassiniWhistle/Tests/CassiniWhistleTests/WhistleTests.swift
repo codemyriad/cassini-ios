@@ -6,6 +6,18 @@ struct WhistleTests {
     private let accepted = WhistleCapability(arm64: true, operatingSystemSupported: true, bundleVerified: true,
                                               pipelineAccepted: true, deviceAccepted: true)
 
+    @Test func bundledRolloutRetainsTheMeasuredClassFloorAndVerifiedPins() {
+        func fact(arm64: Bool = true, os: Bool = true, pins: Bool = true, ram: UInt64 = 3 << 30) -> WhistleCapability {
+            .bundled(arm64: arm64, osSupported: os, bundleVerified: pins, physicalMemory: ram)
+        }
+        #expect(fact().available)
+        #expect(!fact(arm64: false).available)
+        #expect(!fact(os: false).available)
+        #expect(!fact(pins: false).available)
+        #expect(!fact(ram: (2 << 30) - 1).available)
+        #expect(!fact().internalExperiment)
+    }
+
     @Test func everyEligibilityFactIsRequired() {
         for bit in 0..<5 {
             var facts = accepted

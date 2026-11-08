@@ -9,18 +9,24 @@ extension TranscriptionCoordinator {
     /// A failed attempt without any saved work may use the newly selected model on explicit retry.
     /// Saved, paused, active and unknown-backend jobs keep their identity. Caller holds the queue serial section.
     func adoptsSelectedRecognizer(_ existing: Job?) async -> Bool {
+        await adoptsSelectedRecognizer(existing, selected: parts.selectedRecognizer)
+    }
+    func adoptsSelectedRecognizer(_ existing: Job?, selected: String?) async -> Bool {
         guard let existing, existing.state == .failed, existing.kind != .speakersOnly,
-              let selected = parts.recognizer, SpeechRecognizer(rawValue: selected) != nil,
+              let selected, SpeechRecognizer(rawValue: selected) != nil,
               existing.recognizer != selected,
               existing.recognizer.map({ SpeechRecognizer(rawValue: $0) != nil }) ?? true else { return false }
         return await parts.checkpoints.status(of: existing.noteID) == .missing
     }
     func consent(for noteID: UUID) async -> ModelConsent {
+        await consent(for: noteID, selected: parts.selectedRecognizer)
+    }
+    func consent(for noteID: UUID, selected: String?) async -> ModelConsent {
         guard let resolve = parts.consentForRecognizer else { return parts.consent }
         if let existing = await parts.jobs.job(noteID) {
-            return resolve(await adoptsSelectedRecognizer(existing) ? parts.recognizer : existing.recognizer)
+            return resolve(await adoptsSelectedRecognizer(existing, selected: selected) ? selected : existing.recognizer)
         }
-        return resolve(parts.recognizer)
+        return resolve(selected)
     }
 
     /// The language a job is queued with: the Settings language for the transcribe kinds, except that saved progress
@@ -38,11 +44,14 @@ extension TranscriptionCoordinator {
     }
 
     func enqueue(_ noteID: UUID, kind: JobKind, language: String?) async -> TranscribeOutcome {
+        await enqueue(noteID, kind: kind, language: language, selected: parts.selectedRecognizer)
+    }
+    func enqueue(_ noteID: UUID, kind: JobKind, language: String?, selected: String?) async -> TranscribeOutcome {
         let existing = await parts.jobs.job(noteID)
         if let existing, existing.state == .queued || existing.state == .running { return .queued(changed: false) }
-        let adopts = await adoptsSelectedRecognizer(existing)
+        let adopts = await adoptsSelectedRecognizer(existing, selected: selected)
         guard await write({ try await $0.enqueue(noteID, kind: kind, language: language, now: self.parts.clock.now,
-            recognizer: self.parts.recognizer, replacingFailedRecognizer: adopts) }) != nil else {
+            recognizer: selected, replacingFailedRecognizer: adopts) }) != nil else {
             return .queued(changed: false)
         }
         trashed.remove(noteID)
@@ -52,16 +61,19 @@ extension TranscriptionCoordinator {
     }
 
     func needConsent(_ noteID: UUID, kind: JobKind, language: String?) async -> TranscribeOutcome {
+        await needConsent(noteID, kind: kind, language: language, selected: parts.selectedRecognizer)
+    }
+    func needConsent(_ noteID: UUID, kind: JobKind, language: String?, selected: String?) async -> TranscribeOutcome {
         let now = parts.clock.now
         let existing = await parts.jobs.job(noteID)
-        let adopts = await adoptsSelectedRecognizer(existing)
+        let adopts = await adoptsSelectedRecognizer(existing, selected: selected)
         switch existing?.state {
         case .running:
             return .queued(changed: false)
         case .queued:
             await write { try await $0.transition(noteID, now: now) { $0.state = .needsConsent } }
         default:
-            await write { try await $0.enqueue(noteID, kind: kind, language: language, now: now, waitingForConsent: true, recognizer: self.parts.recognizer, replacingFailedRecognizer: adopts) }
+            await write { try await $0.enqueue(noteID, kind: kind, language: language, now: now, waitingForConsent: true, recognizer: selected, replacingFailedRecognizer: adopts) }
         }
         await mirror(noteID)
         await refresh()

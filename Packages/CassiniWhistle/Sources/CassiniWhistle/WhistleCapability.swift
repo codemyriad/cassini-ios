@@ -1,5 +1,5 @@
-/// Production rollout is separate from artifact compatibility. Simulator parity proves neither a physical
-/// device's memory headroom nor the production VAD/pipeline. The initial bundle ships with acceptance pending.
+/// Compatibility and reviewed pipeline/device evidence are independent. D78 uses the iOS26 parity and
+/// physical A12/3GB evidence; transient load/window headroom is checked by the recording adapter.
 public struct WhistleCapability: Hashable, Sendable {
     public var arm64: Bool
     public var operatingSystemSupported: Bool
@@ -30,11 +30,19 @@ public struct WhistleCapability: Hashable, Sendable {
         return .init(arm64: arm64, operatingSystemSupported: osSupported, bundleVerified: bundleVerified,
                      pipelineAccepted: false, deviceAccepted: false, internalExperiment: admitted)
     }
+    /// D78 rollout after iOS26 DC/adapter parity and the default-limit A12/3GB physical memory gate.
+    /// The minimum reported physical memory admits the measured 3GB class; runtime preflights recheck headroom.
+    public static func bundled(arm64: Bool, osSupported: Bool, bundleVerified: Bool,
+                               physicalMemory: UInt64) -> Self {
+        .init(arm64: arm64, operatingSystemSupported: osSupported, bundleVerified: bundleVerified,
+              pipelineAccepted: true, deviceAccepted: physicalMemory >= 2 << 30)
+    }
+
     public static let loadHeadroom: UInt64 = 512 << 20
     public static let windowHeadroom: UInt64 = 256 << 20
 
-    /// No RAM threshold invents a successful device measurement. This remains false until reviewed evidence
-    /// identifies an accepted device class and production pipeline; the 3 GB lab gate is explicitly pending.
+    /// An explicitly unaccepted bundle stays unavailable. D78 uses the separate bundled factory after the
+    /// iOS26 pipeline and physical3GB measurement; a pending input never grants support.
     public static func pending(bundleVerified: Bool) -> Self {
         #if arch(arm64) && os(iOS)
         let supported = true

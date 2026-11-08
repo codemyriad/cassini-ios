@@ -2377,162 +2377,162 @@
         }
       }
     },
-    "Whistle (experimental)": {
+    "Get better transcripts with Parakeet Ultra": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Whistle (experimental)"
+            "value": "Get better transcripts with Parakeet Ultra"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Whistle (sperimentale)"
+            "value": "Trascrizioni migliori con Parakeet Ultra"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Whistle (expérimental)"
+            "value": "De meilleures transcriptions avec Parakeet Ultra"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Whistle (experimental)"
+            "value": "Mejores transcripciones con Parakeet Ultra"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Whistle (experimental)"
+            "value": "Transcrições melhores com o Parakeet Ultra"
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "Whistle (experimental)"
+            "value": "Transcrições melhores com o Parakeet Ultra"
           }
         }
       }
     },
-    "Internal testing": {
+    "Whistle is built in so you can start right away. Parakeet Ultra is more accurate. It’s a %@ download.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Internal testing"
+            "value": "Whistle is built in so you can start right away. Parakeet Ultra is more accurate. It’s a %@ download."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Test interni"
+            "value": "Whistle è incluso per iniziare subito. Parakeet Ultra è più preciso. Il download è di %@."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Tests internes"
+            "value": "Whistle est inclus pour commencer tout de suite. Parakeet Ultra est plus précis. Le téléchargement fait %@."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pruebas internas"
+            "value": "Whistle viene incluido para que empieces enseguida. Parakeet Ultra es más preciso. La descarga ocupa %@."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Testes internos"
+            "value": "O Whistle vem incluído para você começar na hora. O Parakeet Ultra é mais preciso. O download tem %@."
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "Testes internos"
+            "value": "O Whistle vem incluído para começar de imediato. O Parakeet Ultra é mais preciso. A transferência tem %@."
           }
         }
       }
     },
-    "Quit Cassini from the app switcher, then reopen it to apply this choice. Pending transcriptions keep their original model.": {
+    "New meetings now use Parakeet Ultra.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Quit Cassini from the app switcher, then reopen it to apply this choice. Pending transcriptions keep their original model."
+            "value": "New meetings now use Parakeet Ultra."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Chiudi Cassini dal selettore app, poi riaprilo per applicare questa scelta. Le trascrizioni in sospeso mantengono il modello originale."
+            "value": "Le nuove riunioni ora usano Parakeet Ultra."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Fermez Cassini dans le sélecteur d’apps, puis rouvrez-le pour appliquer ce choix. Les transcriptions en attente conservent leur modèle d’origine."
+            "value": "Les nouvelles réunions utilisent désormais Parakeet Ultra."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Cierra Cassini desde el selector de apps y vuelve a abrirlo para aplicar esta opción. Las transcripciones pendientes conservan su modelo original."
+            "value": "Las reuniones nuevas ahora usan Parakeet Ultra."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Feche o Cassini no seletor de apps e abra-o novamente para aplicar esta escolha. As transcrições pendentes mantêm o modelo original."
+            "value": "As novas reuniões agora usam o Parakeet Ultra."
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "Feche o Cassini no seletor de aplicações e volte a abri-lo para aplicar esta escolha. As transcrições pendentes mantêm o modelo original."
+            "value": "As novas reuniões passam a usar o Parakeet Ultra."
           }
         }
       }
     },
-    "Whistle is unavailable on this device right now.": {
+    "Not now": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Whistle is unavailable on this device right now."
+            "value": "Not now"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Whistle non è disponibile su questo dispositivo al momento."
+            "value": "Non ora"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Whistle n’est pas disponible sur cet appareil pour le moment."
+            "value": "Plus tard"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Whistle no está disponible en este dispositivo en este momento."
+            "value": "Ahora no"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "No momento, o Whistle não está disponível neste dispositivo."
+            "value": "Agora não"
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "O Whistle não está disponível neste dispositivo de momento."
+            "value": "Agora não"
           }
         }
       }

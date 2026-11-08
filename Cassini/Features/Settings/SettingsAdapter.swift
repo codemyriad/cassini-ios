@@ -21,19 +21,27 @@ import CassiniNotebook
     }
 
     /// The stored status of each part, with the standalone install and the running job's model download over it.
-    var modelStatuses: [ModelPart: ModelPartStatus] { processing.models.statuses }
+    var speechModels: SpeechModelsStore? { processing.speechModels }
+    var modelStatuses: [ModelPart: ModelPartStatus] {
+        var statuses = processing.models.statuses
+        if let speechModels, speechModels.parakeetCapable {
+            if speechModels.installation == .checking { statuses[.speech] = .checking }
+            if speechModels.installation == .unavailable { statuses[.speech] = .failed(.fileCheckFailed) }
+        }
+        return statuses
+    }
 
     func consented(to part: ModelPart) -> Bool {
         part == .speech ? settings.downloadsAllowed : settings.speakerDownloadsAllowed
     }
 
-    func size(of part: ModelPart) -> ModelSize { ModelRows.size(of: part, recognizer: transcriber.recognizer) }
+    func size(of part: ModelPart) -> ModelSize { ModelRows.size(of: part, recognizer: recognizer) }
 
-    func refreshModels() async { await processing.models.refresh() }
+    func refreshModels() async { speechModels?.refresh(); await processing.models.refresh() }
 
     func speechLanguages() async -> [SpeechLanguage] { await transcriber.speechLanguages() }
 
-    var recognizer: SpeechRecognizer { transcriber.recognizer }
+    var recognizer: SpeechRecognizer { speechModels?.parakeetCapable == true ? .parakeet : transcriber.recognizer }
 
     var voices: Int { voicesStore.savedVoices.count }
     var trash: Int { library.notes.count { $0.trashedAt != nil } }

@@ -15,6 +15,8 @@ import CassiniNotebook
     @ObservationIgnored let progress: JobProgress
     /// What the model download screen works with; set once the graph is built.
     @ObservationIgnored var modelDownload: (any ModelDownloadPorts)?
+    @ObservationIgnored var parakeetDownload: (any ModelDownloadPorts)?
+    var speechModels: SpeechModelsStore?
     /// The models outside any job: their stored status and the model download screen's standalone Download.
     @ObservationIgnored let models: ModelInstalls
     @ObservationIgnored private let checkpoints: any CheckpointStoring

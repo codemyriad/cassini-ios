@@ -18,7 +18,8 @@ import CassiniEngineTesting
     let graph: AppGraph
 
     init(root: URL? = nil, suite: String? = nil, clock: FakeClock = FakeClock(),
-         transcriber: any Transcribing = FakeTranscriber(.returns([], total: 1)), analyzer: any SpeakerAnalyzing = FakeAnalyzer()) {
+         transcriber: any Transcribing = FakeTranscriber(.returns([], total: 1)), analyzer: any SpeakerAnalyzing = FakeAnalyzer(), speechModels: SpeechModelsStore? = nil,
+         downloadTranscriber: (any Transcribing)? = nil, modelRoot: URL? = nil) {
         self.root = root ?? FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         self.suite = suite ?? "cassini.tests.\(UUID().uuidString)"
         self.clock = clock
@@ -29,6 +30,9 @@ import CassiniEngineTesting
             liveActivity: liveActivity, playback: playback,
             audio: LocalAudioProcessing(), storage: FakeStorage(), background: background, notifier: notifier)
         environment.exports = self.root.appendingPathComponent("tmp/Exports", isDirectory: true)
+        environment.speechModels = speechModels
+        environment.downloadTranscriber = downloadTranscriber
+        if let modelRoot { environment.models = modelRoot }
         graph = AppGraph(environment: environment)
     }
 

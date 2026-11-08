@@ -170,6 +170,9 @@ struct NoteSectionView: View {
             }
         case .banners:
             RecordingNotices(noteID: noteID)
+            if let speechModels = processing.speechModels, mode.showsReading {
+                ParakeetSuggestionView(store: speechModels, placement: .afterWhistle)
+            }
             NoteBannersView(note: note, job: model.job, mode: mode, facts: bannerFacts,
                             act: { _, action in model.bannerAction(action) },
                             dismiss: { model.dismiss($0) })

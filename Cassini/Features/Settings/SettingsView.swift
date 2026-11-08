@@ -53,8 +53,20 @@ private struct SettingsForm: View {
                 }
                 .listRowInsets(EdgeInsets()).listRowBackground(Color.clear)
             }
+            if let speechModels = ports.speechModels {
+                if speechModels.shows(.settings) || speechModels.promotionVisible {
+                    Section { ParakeetSuggestionView(store: speechModels, placement: .settings) }
+                }
+            }
             Section {
-                ForEach(model.models) { row in ModelRowView(row: row) { model.openModel(row.part) } }
+                if let speechModels = ports.speechModels { SpeechModelChoiceRow(store: speechModels) }
+                ForEach(model.models) { row in
+                    ModelRowView(row: row, modelName: row.part == .speech && ports.speechModels != nil
+                        ? (ports.speechModels?.parakeetCapable == true ? "Parakeet Ultra" : (ports.speechModels?.policy.whistleAvailable == true ? "Whistle" : nil)) : nil) {
+                        if row.part == .speech, ports.speechModels?.installation == .unavailable { ports.speechModels?.refresh() }
+                        else { model.openModel(row.part) }
+                    }
+                }
             } header: {
                 Text("On-device models", tableName: "Settings").foregroundStyle(Color.muted)
             } footer: {
@@ -68,9 +80,6 @@ private struct SettingsForm: View {
             } footer: {
                 Text("Matches can be wrong; check the names. Only voices you save are used to recognise people.", tableName: "Settings").foregroundStyle(Color.muted)
             }
-            #if CASSINI_INTERNAL_TESTFLIGHT
-            InternalWhistleSection(defaults: ports.defaults)
-            #endif
             PrivacySection(model: model)
             LibrarySection(totals: model.library)
             Section {
@@ -262,27 +271,3 @@ private struct AboutCard: View {
         .padding(.vertical, 6)
     }
 }
-
-#if CASSINI_INTERNAL_TESTFLIGHT
-private struct InternalWhistleSection: View {
-    @AppStorage private var optedIn: Bool
-    init(defaults: UserDefaults) {
-        _optedIn = AppStorage(wrappedValue: false, InternalWhistle.preference, store: defaults)
-    }
-    var body: some View {
-        Section {
-            Toggle(isOn: $optedIn) { Text("Whistle (experimental)", tableName: "Settings") }
-                .disabled(!InternalWhistle.capability().available)
-                .accessibilityIdentifier("internalWhistleOptIn")
-        } header: {
-            Text("Internal testing", tableName: "Settings")
-        } footer: {
-            if InternalWhistle.capability().available {
-                Text("Quit Cassini from the app switcher, then reopen it to apply this choice. Pending transcriptions keep their original model.", tableName: "Settings")
-            } else {
-                Text("Whistle is unavailable on this device right now.", tableName: "Settings")
-            }
-        }
-    }
-}
-#endif

@@ -33,55 +33,29 @@ bounded to240128 samples (15.008s: the desktop’s15s limit rounded to a512-samp
 finite/ordered/in-range words, and discard a result after cancellation. No microphone, playback, network client,
 Python runtime or system-library search is involved. The app does not load the native framework at launch.
 
-`WhistleCapability` separates artifact compatibility from accepted device/pipeline evidence. Pending acceptance is
-false even when a bundle is present and hash-correct; no invented physical-RAM threshold claims support. The pure
-`WhistleSelection` policy chooses an accepted Whistle where Apple is unavailable or the device is too small for
-Parakeet, otherwise retaining eligible Parakeet/Apple candidates. An unaccepted bundle cannot make Apple eligible.
+## D78 starter model and verified upgrade
 
-## Internal recording adapter and selection
+Whistle is the immediate bundled default on compatible arm64/iOS26 devices with verified assets and the measured
+3GB-class memory floor (at least2GiB reported physical RAM,512MiB available before load,256MiB per window). The
+physical A12/3GB gate and iOS26 adapter/DC gates below back this rollout. The pending capability factory remains
+unavailable; the D78 bundled factory is separate from the earlier explicit internal experiment.
 
-The regular Release/App Store build remains gated and ignores the experimental preference. The explicit
-`CassiniInternal` scheme archives configuration `Internal` with `CASSINI_INTERNAL_TESTFLIGHT`; its export must set
-`testFlightInternalTestingOnly=true`. Internal Settings offers Whistle off by default, only while arm64/iOS26,
-verified runtime/weights/VAD and conservative memory headroom permit the experiment. A12/3GB passes the ABI/OS/RAM
-criteria (>=2GiB physical RAM, >=512MiB available before load); this is permission to measure, not a device-class
-acceptance claim. Every segment rechecks >=256MiB headroom. No acceptance flag becomes true for this experiment.
+`SpeechModelPolicy` uses Whistle until Parakeet is installed and hash-verified, then defaults new jobs to Parakeet
+when the native runtime and memory preflight permit it. File existence/size alone never promotes a model. An
+asynchronous utility-queue verifier keeps Whistle usable while checking installed weights. The installer's verified
+publication is visible immediately to new selection, without relaunching. An explicit Whistle choice remains valid.
 
-A preference change takes effect on the next process launch. New jobs persist `recognizer`; resumed jobs keep it,
-even after changing the default. Legacy jobs without this field stay with the legacy Parakeet/Apple candidate.
-Admission and execution resolve the same persisted backend. Unknown identities, or Whistle jobs in a regular
-Release build, fail closed. Start over explicitly discards the old checkpoint before adopting the new default.
-Bundled Whistle needs no model-download consent; speaker download consent remains separate.
+Settings and the first completed Whistle result show the coordinator's calm Parakeet suggestion only on capable
+devices, with the pinned compressed speech download size and sufficient install disk space. The result suggestion
+is presented once; dismissal is persisted across both placements. The download action opens the existing consent
+and progress flow with speech alone, so unrelated speaker downloads cannot change the advertised size. The
+coordinator's once-only confirmation follows verified promotion. A12/3GB never sees a Parakeet suggestion.
 
-`WhistleTranscriber` reads files in bounded batches. Native16k input passes through;48k input uses the desktop’s
-97-tap centred FIR with contraction off. Other rates/downmix use AVFoundation before that48k FIR (an iOS platform
-difference, not an exact-resampler parity claim for those inputs). HPF100 runs continuously only on the VAD branch.
-Silero6.2.1 is pinned at2327524 bytes/SHA1a153a22…; its CPU runtime is the app’s existing pinned ONNX Runtime1.27.1,
-versus desktop1.23.2. Flags precede VAD environment/session creation and telemetry is disabled explicitly. The
-existing statically linked ORT image is already present at app launch; this is not a new claim of pre-main network
-isolation. Needle stays separately lazy-loaded after pin/privacy checks. iOS native execution remains in process.
-
-The gate uses512-sample votes/hysteresis, pre-roll and desktop silence/duration cuts. Recognition receives raw FIR
-samples, never the high-passed copy. Finite FIR ringing above full scale is preserved as on desktop; valid PCM16
-can overshoot 1.0 after filtering, so the native input contract checks finiteness and length without clipping. Both full DC recordings passed all six exact desktop boundaries on an actual
-26.0 simulator, and the English bundled recording passed the real adapter. The native raw-segment13-fixture frozen
-reference remains unchanged. Resume deterministically rereads from zero to restore FIR/filter/recurrent VAD state;
-finalized words are deduplicated at the checkpoint. Detected languages survive checkpoints and exports report actual
-Whistle/Needle/model/pipeline identity rather than Apple Speech.
-
-**Native lifetime:** the C API has no documented model-unload operation. dyld can retain an image with C++ TLS
-(`__tlv_atexit`) after `dlclose`. Cleanup checks `RTLD_NOLOAD` and `needle_models`; it never frees weights still
-borrowed by a resident model. That single owned model is reused on subsequent sessions. VAD/session allocations
-are released normally. Retained ASR memory counts toward the device test and subsequent speaker-memory preflights;
-releasing `NativeBudget` serializes execution but does not promise that dyld discarded the image. A repeated-session
-regression exposed this and passes with ownership preserved. Do not infer physical suitability from simulator RSS.
-
-Internal diagnostics record kernel peak physical footprint/RSS, observed low headroom, memory warnings, thermal
-state, elapsed time, outcome and model residency. A whole-job observer includes the speaker step. Reports contain
-no audio, words, note IDs or paths. `--internal-whistle-lab` selects a separate library/preferences/models/exports
-root; an explicitly bundled lab-only English fixture exercises the real app without opening the user’s recordings.
-`CASSINI_WHISTLE_LAB_FIXTURES=1` is a local diagnostic build input, never enabled for TestFlight export. Do not disable
-jetsam or attach LLDB for memory acceptance. The authorized A12/3GB iPad (iPad11,6, iPadOS26.6.1) passed the physical measurement: cold whole-app words transcription peaked at95274464B physical footprint/170754048B RSS; ten maximum240128-sample windows with VAD resident peaked at91244000B footprint/175931392B RSS with1853422112B minimum available. Ten exact repeat results and model-ready cancellation passed; zero memory warnings, nominal thermal state. The separate lab sandbox used a public English fixture, Release optimization and default memory limit, without a debugger or jetsam override. Downloaded speaker models were absent. These measurements await review; acceptance flags and regular Release defaults remain unchanged.
+New jobs freeze their backend before asynchronous consent checks, so an install or preference change during
+admission affects the next request. Queued/paused jobs and checkpoints keep their concrete recognizer; legacy jobs
+keep the pre-Whistle device backend. Unknown or unregistered identities fail closed. Bundled speech needs no
+network consent; speaker downloads keep their independent consent. Internal builds retain the isolated lab and
+memory reports; lab fixtures are never included in TestFlight exports.
 
 ## Distribution integrity
 

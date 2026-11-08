@@ -1,6 +1,8 @@
 import SwiftUI
 import CassiniEngine
 import CassiniInference
+import CassiniWhistle
+import os
 import CassiniSherpa
 import CassiniNotebook
 #if DEBUG
@@ -31,6 +33,8 @@ import CassiniEngineTesting
     var exports = URL.temporaryDirectory.appendingPathComponent("Exports", isDirectory: true)
     /// Where the pinned models (Parakeet Ultra, Silero VAD) are installed, excluded from backups.
     var models = ModelCatalog.defaultRoot
+    var speechModels: SpeechModelsStore?
+    var downloadTranscriber: (any Transcribing)?
 
     /// What a UI-test launch asks for.
     struct LaunchOptions {
@@ -66,10 +70,8 @@ import CassiniEngineTesting
         return calendar
     }
 
-    /// Parakeet Ultra when this build links the native runtime and the device can hold it (`SpeechCapability`),
-    /// whether or not its model is installed: a job downloads Ultra and its speech detector through the shared
-    /// installer with consent, and the model download screen's Download does too. Otherwise prepare an Apple candidate
-    /// whose eligibility depends on the requested locale and live public availability checks (D75.2).
+    /// The pre-Whistle device backend, retained for legacy jobs and as the downloadable Parakeet candidate.
+    /// New defaults are chosen by the live D78 router, independently of file presence or download consent.
     static func speechTranscriber(models: PinnedModels,
                                   physicalMemory: UInt64 = ProcessInfo.processInfo.physicalMemory,
                                   defaults: UserDefaults = .standard) -> any Transcribing {
@@ -77,11 +79,11 @@ import CassiniEngineTesting
             let parakeet = ParakeetTranscriber(models: .init(installer: models.installer, root: models.root,
                                                     online: { NetworkPath.shared.isOnline }),
                                       runtime: SherpaRuntime.speech)
-            return InternalWhistle.route(parakeet, defaults: defaults)
+            return parakeet
         }
         // This is a candidate adapter, not a claim of availability. Its public Speech checks select Apple only
         // when this device and the requested locale support it, before consent/queue admission and before decode.
-        return InternalWhistle.route(AppleSpeechTranscriber(), defaults: defaults)
+        return AppleSpeechTranscriber()
     }
 
     /// Android's speaker pipeline (streaming Sortformer and CAM++) over the catalog's pinned files, which the shared
@@ -97,14 +99,33 @@ import CassiniEngineTesting
         let defaults = laboratory ? UserDefaults(suiteName: "io.codemyriad.cassini.whistle-lab")! : .standard
         let modelRoot = laboratory ? root.appendingPathComponent("Models", isDirectory: true) : ModelCatalog.defaultRoot
         let storage = FileSystemStorageProbe()
-        let models = PinnedModels(root: modelRoot, defaults: defaults, storage: storage)
+        #if arch(arm64)
+        let arm64 = true
+        #else
+        let arm64 = false
+        #endif
+        let whistleCapability = WhistleCapability.bundled(arm64: arm64,
+            osSupported: ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 26,
+            bundleVerified: WhistleRuntime.bundleIsVerified(), physicalMemory: ProcessInfo.processInfo.physicalMemory)
+        let speechModels = SpeechModelsStore(root: modelRoot, defaults: defaults, storage: storage,
+            whistle: whistleCapability, parakeetLinked: SherpaRuntime.isLinked)
+        let models = PinnedModels(root: modelRoot, defaults: defaults, storage: storage,
+            onInstallChange: { status in Task { @MainActor in speechModels.installerChanged(status) } })
+        let legacy = speechTranscriber(models: models, defaults: defaults)
+        let apple = AppleSpeechTranscriber()
+        let whistle = WhistleTranscriber(acceptance: whistleCapability, memoryReport: InternalWhistle.writeReport)
+        var candidates: [any Transcribing] = [apple, whistle]
+        if legacy.recognizer == .parakeet { candidates.append(legacy) }
+        let speech = RoutedTranscriber(legacy: legacy, candidates: candidates) { speechModels.selectedRecognizer() }
         var value = AppEnvironment(
             root: root,
             defaults: defaults, clock: SystemClock(), locale: .autoupdatingCurrent, timeZone: .autoupdatingCurrent,
-            transcriber: speechTranscriber(models: models, defaults: defaults), analyzer: speakerAnalyzer(models: models),
+            transcriber: speech, analyzer: speakerAnalyzer(models: models),
             capture: AVCaptureAdapter(), microphone: AVMicrophonePermission(), liveActivity: ActivityKitAdapter(),
             playback: AVPlaybackAdapter(), audio: LocalAudioProcessing(), storage: storage,
             background: UIKitBackgroundRunner(), notifier: UNNotifier())
+        value.speechModels = speechModels
+        value.downloadTranscriber = legacy.recognizer == .parakeet ? legacy : speech
         if laboratory {
             value.models = modelRoot
             value.exports = root.appendingPathComponent("Exports", isDirectory: true)
@@ -143,6 +164,8 @@ extension AppEnvironment {
                   parakeet: arguments.contains("--parakeet"),
                   notificationsDenied: arguments.contains("--notifications-denied"),
                   heldCapture: arguments.contains("--capture-held"), region: value(after: "-AppleLocale", in: arguments),
+                  bundledSpeech: arguments.contains("--d78"),
+                  bundledCapable: arguments.contains("--d78-capable"), bundledVerified: arguments.contains("--d78-verified"),
                   inProcess: inProcess, token: token)
     }
 
@@ -162,12 +185,13 @@ extension AppEnvironment {
                           modelsMissing: Bool = false, modelDownloading: Bool = false, draftGrowing: Bool = false,
                           speakersReady: Bool = false, parakeet: Bool = false,
                           notificationsDenied: Bool = false, heldCapture: Bool = false, region: String? = nil,
+                          bundledSpeech: Bool = false, bundledCapable: Bool = false, bundledVerified: Bool = false,
                           inProcess: Bool = false, token: String = "") -> AppEnvironment {
         let storage = UITestStorage.generation(reset: reset, inProcess: inProcess)
         let root = storage.root
         let defaults = UserDefaults(suiteName: storage.suite) ?? .standard
-        let status: ModelPartStatus = modelsMissing ? .notDownloaded : .ready
-        let recognizer: SpeechRecognizer = parakeet ? .parakeet : .appleSpeech
+        let status: ModelPartStatus = modelsMissing && !bundledSpeech ? .notDownloaded : .ready
+        let recognizer: SpeechRecognizer = bundledSpeech ? .whistle : (parakeet ? .parakeet : .appleSpeech)
         let script: FakeTranscriber.Script = switch seed {
         case .processing where modelDownloading: .downloading(fraction: 0.46)
         case .processing where draftGrowing:
@@ -188,7 +212,7 @@ extension AppEnvironment {
         case .processing where !modelsMissing: FakeAnalyzer()
         default: FakeAnalyzer(modelIdentity: nil)
         }
-        return AppEnvironment(
+        var value = AppEnvironment(
             root: root, defaults: defaults, clock: FixedClock(now: uiTestingNow),
             locale: Locale(identifier: region ?? "en_US"), timeZone: TimeZone(identifier: "UTC") ?? .gmt,
             transcriber: transcriber, analyzer: analyzer,
@@ -202,6 +226,21 @@ extension AppEnvironment {
             launch: LaunchOptions(seed: seed, openFixture: openFixture, restoresNavigation: false, marksLaunchFinished: true,
                                   token: token),
             models: root.appendingPathComponent("CassiniModels", isDirectory: true))
+        if bundledSpeech {
+            let capability = WhistleCapability(arm64: true, operatingSystemSupported: true, bundleVerified: true,
+                pipelineAccepted: true, deviceAccepted: true)
+            let speechModels = SpeechModelsStore(root: value.models, defaults: defaults, storage: FakeStorage(),
+                whistle: capability, parakeetLinked: true, physicalMemory: (bundledCapable ? 6 : 3) << 30,
+                availableMemory: { ParakeetMemory.beforeLoadBytes }, installed: { bundledVerified },
+                verified: { bundledVerified }, verify: { bundledVerified })
+            let parakeet = FakeTranscriber(script, status: bundledVerified ? .ready : .notDownloaded, recognizer: .parakeet)
+            let apple = FakeTranscriber(script, recognizer: .appleSpeech)
+            let speech = RoutedTranscriber(legacy: apple, candidates: [transcriber, parakeet]) { speechModels.selectedRecognizer() }
+            value.transcriber = speech
+            value.downloadTranscriber = bundledCapable ? parakeet : speech
+            value.speechModels = speechModels
+        }
+        return value
     }
 
     /// `--seed <name>`; `--seed-test-data` is the library seed.
@@ -236,13 +275,14 @@ struct PinnedModels: Sendable {
 
     /// `fetcher` replaces the model host in tests.
     init(root: URL, defaults: UserDefaults, storage: any StorageProbe, userAgent: String = PinnedModels.userAgent,
-         fetcher: (any ModelFetching)? = nil) {
+         fetcher: (any ModelFetching)? = nil,
+         onInstallChange: @escaping @Sendable (PinnedModelInstaller.Status) -> Void = { _ in }) {
         let fetcher = fetcher ?? NetworkModelFetcher(
             fetcher: ArtifactFetcher(transport: URLSessionTransport(userAgent: userAgent), storage: storage),
             decoder: ZstdDecompressor())
         self.root = root
         repository = ModelRepository(root: root, consent: DefaultsModelConsent(defaults: defaults), fetcher: fetcher)
-        installer = PinnedModelInstaller(models: repository, storage: storage, online: { NetworkPath.shared.isOnline })
+        installer = PinnedModelInstaller(models: repository, storage: storage, online: { NetworkPath.shared.isOnline }, onChange: onInstallChange)
     }
 }
 

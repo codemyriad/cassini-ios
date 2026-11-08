@@ -69,6 +69,7 @@ private struct RouteDestination: View {
         case .trash: TrashView()
         case .licenses: LicensesView(models: modelRoot)
         case .modelDownload(let noteID): ModelDownloadView(noteID: noteID)
+        case .parakeetDownload: ModelDownloadView(noteID: nil, parakeetOnly: true)
         }
     }
 }

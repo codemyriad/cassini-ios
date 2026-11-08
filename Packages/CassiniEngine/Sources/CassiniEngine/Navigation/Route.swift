@@ -33,6 +33,8 @@ public enum Route: Codable, Hashable, Sendable {
     case licenses
     /// Consent for the model download, before transcribing `noteID` or on its own.
     case modelDownload(noteID: UUID?)
+    /// D78: the speech-only upgrade advertised by the Parakeet suggestion.
+    case parakeetDownload
 
     public var noteID: UUID? {
         if case .note(let id, _, _) = self { id } else { nil }

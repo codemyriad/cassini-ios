@@ -73,7 +73,17 @@ import CassiniNotebook
         processing.modelDownload = ModelDownloadAdapter(
             settings: settings, processing: processing, transcriber: environment.transcriber,
             analyzer: environment.analyzer, storage: environment.storage, notices: noticeCenter,
-            root: environment.root, models: environment.models)
+            root: environment.root, models: environment.models, downloadTranscriber: environment.downloadTranscriber)
+        if let speechModels = environment.speechModels {
+            if speechModels.parakeetCapable {
+                processing.parakeetDownload = ModelDownloadAdapter(settings: settings, processing: processing,
+                    transcriber: environment.transcriber, analyzer: environment.analyzer, storage: environment.storage,
+                    notices: noticeCenter, root: environment.root, models: environment.models,
+                    downloadTranscriber: environment.downloadTranscriber, speechOnly: true)
+            }
+            speechModels.onDownload = { [weak router] in router?.push(.parakeetDownload) }
+            speechModels.onChange = { [weak processing] in Task { await processing?.models.refresh() } }
+        }
         settingsPorts = SettingsAdapter(settings: settings, library: library, voices: voices, processing: processing,
                                         notices: noticeCenter, transcriber: environment.transcriber, defaults: environment.defaults)
         notices = NoticesStore(center: noticeCenter, router: router, processing: processing, recording: recording)
@@ -109,7 +119,7 @@ import CassiniNotebook
             let job = TranscriptionJob(notes: notes, transcriber: environment.transcriber, analyzer: environment.analyzer,
                                        checkpoints: checkpoints, provenance: ProvenanceFiles(notes: notes),
                                        host: AppJobHost(settings: settings, voices: voices), clock: environment.clock,
-                                       drafts: drafts, diagnostics: InternalWhistle.diagnostics)
+                                       drafts: drafts, diagnostics: environment.speechModels?.diagnostics(base: InternalWhistle.diagnostics) ?? InternalWhistle.diagnostics)
             let parts = TranscriptionCoordinator.Parts(
                 jobs: JobStore(repository: JobRepository(root: environment.root)), notes: notes, runner: job,
                 checkpoints: NoteWorkFolders(notes: notes, drafts: drafts),
@@ -121,6 +131,7 @@ import CassiniNotebook
                 backgroundSubtitle: String(localized: "Your audio stays on this device", table: "Transcription",
                                            comment: "Subtitle of the system's progress while a note is transcribed"),
                 progress: progress, recognizer: environment.transcriber.recognizer.rawValue,
+                recognizerChoice: { environment.transcriber.recognizer.rawValue },
                 consentForRecognizer: { identity in
                     guard let speech = try? environment.transcriber.forJob(recognizer: identity) else {
                         return ModelConsent(unavailability: { _, _ in .model }) { _, _ in false }
@@ -130,7 +141,7 @@ import CassiniNotebook
                 })
             return TranscriptionCoordinator(parts, settings: settings)
         }
-        let models = ModelInstalls(transcriber: environment.transcriber, analyzer: environment.analyzer,
+        let models = ModelInstalls(transcriber: environment.downloadTranscriber ?? environment.transcriber, analyzer: environment.analyzer,
                                    clock: environment.clock, job: progress, background: environment.background,
                                    backgroundTitle: { String(localized: "Downloading models", table: "Processing") },
                                    backgroundSubtitle: {
@@ -138,8 +149,10 @@ import CassiniNotebook
                                               comment: "Subtitle of the system's progress while models download")
                                    },
                                    language: { [settings] in settings.speechLanguage })
-        return ProcessingStore(coordinator: coordinator, progress: progress, checkpoints: checkpoints, models: models,
-                               analyzer: environment.analyzer, notices: notices, drafts: drafts)
+        let processing = ProcessingStore(coordinator: coordinator, progress: progress, checkpoints: checkpoints, models: models,
+                                         analyzer: environment.analyzer, notices: notices, drafts: drafts)
+        processing.speechModels = environment.speechModels
+        return processing
     }
 
     /// The Library over the notes, the queue and the recorder.
@@ -161,6 +174,7 @@ import CassiniNotebook
     /// Runs the launch steps once; the app is ready when it returns.
     @discardableResult func start() async -> StartupReport {
         let report = await startup.run()
+        environment.speechModels?.refresh()
         #if CASSINI_INTERNAL_TESTFLIGHT
         if environment.launch.whistleLab, ProcessInfo.processInfo.arguments.contains("--internal-whistle-lab-soak") {
             Task { await InternalWhistle.runLabSoak() }
