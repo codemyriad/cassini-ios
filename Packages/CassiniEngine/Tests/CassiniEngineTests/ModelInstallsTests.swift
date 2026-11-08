@@ -20,7 +20,7 @@ import CassiniNotebook
         await installs.refresh()
         #expect(installs.status(of: .speech) == .unsupported)
         #expect(ModelRows.status(installs.status(of: .speech)!, consented: true) == .unavailable)
-        let progress = DownloadProgress(part: .speech, doneBytes: 1, totalBytes: 2)
+        let progress = DownloadProgress(part: .speech, doneBytes: 1, totalBytes: 2, verifying: false)
         #expect(ModelInstalls.statuses(installs.statuses, during: progress)[.speech] == .unsupported)
     }
 
