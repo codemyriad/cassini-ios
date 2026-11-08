@@ -1,0 +1,161 @@
+#!/usr/bin/env python3
+"""Lightweight real-kqueue lifecycle regressions; no builds or simulators."""
+import fcntl
+import importlib.util
+import os
+from pathlib import Path
+import signal
+import subprocess
+import sys
+import tempfile
+import time
+import unittest
+from types import SimpleNamespace
+from unittest import mock
+
+ROOT = Path(__file__).resolve().parent.parent
+HELPER = ROOT / "scripts/test-events.py"
+spec = importlib.util.spec_from_file_location("events", HELPER)
+events = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(events)
+SOURCE = (ROOT / "scripts/test.sh").read_text()
+
+
+def function(name):
+    start = SOURCE.index(name + "() {")
+    return SOURCE[start:SOURCE.index("\n}\n", start) + 3]
+
+
+def finish(process, seconds=5):
+    with events.Events() as queue:
+        if queue.process(process.pid):
+            if not queue.until(time.monotonic() + seconds):
+                process.kill()
+                process.wait()
+                raise AssertionError("process missed lifecycle deadline")
+    return process.wait()
+
+
+class LifecycleTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(prefix="cassini events ")
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        self.log = self.root / "log"
+
+    def shell(self, code):
+        functions = "\n".join(function(name) for name in (
+            "process_tree", "signal_all", "end_tree", "run_limited", "run_watched"))
+        process = subprocess.Popen(["/bin/bash", "-c", f'root={str(ROOT)!r}\n' + functions + "\n" + code],
+                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        self.addCleanup(process.stdout.close)
+        self.addCleanup(process.stderr.close)
+        return process
+
+    def test_immediate_exit_preserves_status_without_one_second_poll(self):
+        process = self.shell(f'run_limited {str(self.log)!r} 5 /bin/sh -c "exit 23"')
+        self.assertEqual(finish(process), 23)
+
+    def test_timeout_ends_entire_command_tree(self):
+        child = self.root / "child"
+        script = self.root / "tree.py"
+        script.write_text("import subprocess,sys,signal\n"
+            "p=subprocess.Popen([sys.executable,'-c','import signal; signal.pause()'])\n"
+            f"open({str(child)!r},'w').write(str(p.pid))\n"
+            "signal.pause()\n")
+        process = self.shell(f'run_limited {str(self.log)!r} 0.3 {sys.executable!r} {str(script)!r}')
+        self.assertEqual(finish(process), 124)
+        pid = int(child.read_text())
+        # An unreaped zombie is harmless; ps state must never show a live orphan.
+        state = subprocess.run(["/bin/ps", "-p", str(pid), "-o", "stat="],
+                               capture_output=True, text=True).stdout.strip()
+        self.assertTrue(not state or state.startswith("Z"), state)
+
+    def test_no_start_and_started_total_deadlines_have_distinct_statuses(self):
+        for output, expected in [("", 124), ("Test Case 'example' started.\\n", 125),
+                                 ("noise Test Case 'example' started.\\n", 124)]:
+            with self.subTest(output=output):
+                command = "import signal,sys;sys.stdout.write(" + repr(output.replace('\\n', '\n')) + ");sys.stdout.flush();signal.pause()"
+                import shlex
+                process = self.shell(f'run_watched {str(self.log)!r} 0.15 0.3 {shlex.join([sys.executable,"-c",command])}')
+                self.assertEqual(finish(process), expected, process.stderr.read().decode())
+
+    def test_parent_death_releases_fair_lock_without_parent_reaping(self):
+        path, held = self.root / "lock", self.root / "held"
+        parent = subprocess.Popen([sys.executable, "-c",
+            "import subprocess,sys,os; a=sys.argv[1:];a[a.index('PARENT')]=str(os.getpid());"
+            "p=subprocess.Popen(a);print(p.pid,flush=True);sys.stdin.read()",
+            sys.executable, "-I", str(HELPER), "hold", str(path), "PARENT", str(held), "fixture"],
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        self.addCleanup(parent.stdin.close)
+        self.addCleanup(parent.stdout.close)
+        self.addCleanup(parent.stderr.close)
+        helper = int(parent.stdout.readline())
+        ready = subprocess.Popen([sys.executable, "-I", str(HELPER), "lock-ready", str(helper),
+                                  str(path), str(held), "5"], stdout=subprocess.PIPE)
+        self.addCleanup(ready.stdout.close)
+        self.assertEqual(finish(ready), 0)
+        with path.open("r+") as lock:
+            with self.assertRaises(BlockingIOError):
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            with events.Events() as queue:
+                self.assertTrue(queue.process(helper))
+                parent.kill()  # Deliberately leave the parent unreaped until helper exit.
+                self.assertTrue(queue.until(time.monotonic() + 5))
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            self.assertEqual(path.read_text(), "")
+        parent.wait()
+
+    def test_waiting_lock_helper_exits_when_parent_dies(self):
+        path, held = self.root / "busy-lock", self.root / "held"
+        with path.open("w+") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            parent = subprocess.Popen([sys.executable, "-c",
+                "import subprocess,sys,os;a=sys.argv[1:];a[a.index('PARENT')]=str(os.getpid());"
+                "p=subprocess.Popen(a);print(p.pid,flush=True);sys.stdin.read()",
+                sys.executable, "-I", str(HELPER), "hold", str(path), "PARENT", str(held), "waiting"],
+                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            for stream in (parent.stdin, parent.stdout, parent.stderr):
+                self.addCleanup(stream.close)
+            helper = int(parent.stdout.readline())
+            with events.Events() as queue:
+                self.assertTrue(queue.process(helper))
+                parent.kill()
+                self.assertTrue(queue.until(time.monotonic() + 5))
+            parent.wait()
+            self.assertFalse(held.exists())
+
+    def test_resource_wait_wakes_on_process_exit(self):
+        child = subprocess.Popen([sys.executable, "-c", "import sys;sys.stdin.read()"], stdin=subprocess.PIPE)
+        original = events.Events.until
+        def release_then_wait(queue, deadline):
+            child.stdin.close()
+            result = original(queue, deadline)
+            self.assertTrue(any(event.filter == events.select.KQ_FILTER_PROC for event in result))
+            return result
+        with mock.patch.object(events.subprocess, "check_output", return_value=f"{child.pid} {os.getuid()} S\n".encode()), \
+             mock.patch.object(events.Events, "until", release_then_wait):
+            self.assertEqual(events.resource_event(SimpleNamespace(deadline=time.time() + 5)), 0)
+        self.assertEqual(child.wait(), 0)
+
+    def test_admission_healthy_immediate_and_unhealthy_deadline_fails_closed(self):
+        for free, expected in [(4096, 0), (1024, 1)]:
+            with self.subTest(free=free):
+                stamp = self.root / "stamp"
+                stamp.unlink(missing_ok=True)
+                code = function("wait_for_room") + "\n" + f"""
+                    admit_minutes=1; prefix=fixture
+                    our_clones() {{ :; }}
+                    free_mb() {{ echo {free}; }}
+                    cpu_idle() {{ echo 100; }}
+                    die() {{ echo "$*" >&2; exit 1; }}
+                    date() {{ if [ -e {str(stamp)!r} ]; then echo 160; else touch {str(stamp)!r}; echo 100; fi; }}
+                    wait_for_room
+                """
+                process = self.shell(code)
+                self.assertEqual(finish(process), expected, process.stderr.read().decode())
+
+
+
+if __name__ == "__main__":
+    unittest.main()

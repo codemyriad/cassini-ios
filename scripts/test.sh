@@ -38,7 +38,7 @@
 #
 # One heavy run at a time per host: every tier but fast and clean takes the host-wide lock before it boots or builds
 # anything, and waits while another run (of any worktree) holds it; the lock file names the holder. Before the UI
-# clones boot, the run also waits until the CPU and free memory leave room for them, then goes on regardless.
+# clones boot, the run also waits until the CPU and free memory leave room for them, failing closed at its deadline.
 #
 # Builds go to <worktree>/DerivedData.noindex (DerivedData links to it; Spotlight skips a .noindex directory), which
 # persists between runs so later builds are incremental. Package checkouts are shared between worktrees under the
@@ -182,7 +182,7 @@ end_tree() {
     pids=$(process_tree "$pid")
     # shellcheck disable=SC2086
     signal_all TERM $pids
-    for _ in 1 2 3 4 5; do kill -0 "$pid" 2>/dev/null || break; sleep 1; done
+    /usr/bin/python3 -I "$root/scripts/test-events.py" watch "$pid" /dev/null 5 5 || true
     # shellcheck disable=SC2086
     signal_all KILL $pids
     wait "$pid" 2>/dev/null || true
@@ -192,17 +192,17 @@ end_tree() {
 # run instead of holding it (once xcodebuild -resolvePackageDependencies deadlocked and held a run for two hours).
 # Returns the command's status, or 124 when it was ended.
 run_limited() {
-    local log="$1" limit="$2" pid waited=0; shift 2
-    "$@" > "$log" 2>&1 & pid=$!
-    while kill -0 "$pid" 2>/dev/null; do
-        if [ $waited -ge "$limit" ]; then
-            echo "test.sh: still running after ${limit}s; ended" >> "$log"
-            end_tree "$pid"
-            return 124
-        fi
-        sleep 1; waited=$(( waited + 1 ))
-    done
-    wait "$pid"
+    local log="$1" limit="$2" pid rc; shift 2
+    : > "$log"
+    "$@" >> "$log" 2>&1 & pid=$!
+    if /usr/bin/python3 -I "$root/scripts/test-events.py" watch "$pid" "$log" "$limit" "$limit"; then
+        wait "$pid"
+    else
+        rc=$?
+        echo "test.sh: still running after ${limit}s; ended" >> "$log"
+        end_tree "$pid"
+        return "$rc"
+    fi
 }
 
 # A step's output goes to its log; on failure the tail is shown. $2 is its time limit in seconds (run_limited).
@@ -230,53 +230,22 @@ lock_pid="" lock_held_file=""
 take_heavy_lock() {
     [ -z "$lock_pid" ] || return 0
     [ "${CASSINI_HEAVY_LOCK_HELD:-}" != 1 ] || return 0
-    local note waited=0 shown="-"
+    local note rc
     # Named for this run: two runs of one worktree must not take each other's lock for their own.
     lock_held_file="${TMPDIR:-/tmp}/cassini-heavy-lock-held.$$"
     rm -f "$lock_held_file"
     note="$(basename "$root") (test.sh $tier, pid $$, since $(date '+%Y-%m-%d %H:%M:%S'))"
-    /usr/bin/python3 -I -c '
-import fcntl, os, signal, sys, threading, time
-path, parent, held, note = sys.argv[1], int(sys.argv[2]), sys.argv[3], sys.argv[4]
-signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
-# Not os.kill(parent, 0), which a killed but unreaped parent still passes: once it is gone this helper is reparented.
-def alive(): return os.getppid() == parent
-# The wait is one blocking flock, so this run keeps its place among the waiters (the kernel serves them in order). A
-# try every second never had one: a lockf that queued after it took the lock each time it was let go, and a stream
-# of other runs starved the gate. A thread ends the wait if this script goes meanwhile.
-waiting = True
-def watch():
-    while waiting:
-        if not alive(): os._exit(1)
-        time.sleep(1)
-threading.Thread(target=watch, daemon=True).start()
-fd = os.open(path, os.O_RDWR | os.O_CREAT, 0o644)
-fcntl.flock(fd, fcntl.LOCK_EX)
-waiting = False
-try:
-    open(held, "w").close()
-    os.ftruncate(fd, 0); os.write(fd, (note + "\n").encode())
-    while alive(): time.sleep(1)
-finally:
-    os.ftruncate(fd, 0)
-' "$heavy_lock" "$$" "$lock_held_file" "$note" < /dev/null & lock_pid=$!
-    while [ ! -e "$lock_held_file" ]; do
-        kill -0 "$lock_pid" 2>/dev/null || { lock_pid=""; die "could not take the host lock $heavy_lock"; }
-        local holder; holder=$(cat "$heavy_lock" 2>/dev/null || true)
-        # An empty note is a holder that writes none (lockf), or the moment between two holders; this run's own note
-        # is its helper that has just taken the lock.
-        if [ $waited -ge 1 ] && [ "$holder" != "$shown" ] && [ "$holder" != "$note" ] \
-            && { [ -n "$holder" ] || [ "$shown" = "-" ]; }; then
-            echo "waiting for the host: ${holder:-another run} holds $heavy_lock"; shown=$holder
-        fi
-        # The helper gets a few seconds to start, so a limit of 0 means "do not wait", not "fail on a free lock".
-        if [ $waited -ge $(( lock_minutes * 60 )) ] && [ $waited -ge 5 ]; then
-            release_heavy_lock
-            die "host busy: ${holder:-another run} has held $heavy_lock for over $lock_minutes min"
-        fi
-        sleep 1; waited=$(( waited + 1 ))
-    done
-    [ $waited -lt 2 ] || echo "took the host lock after $(( waited / 60 )) min $(( waited % 60 )) s"
+    /usr/bin/python3 -I "$root/scripts/test-events.py" hold "$heavy_lock" "$$" "$lock_held_file" "$note" \
+        < /dev/null & lock_pid=$!
+    if /usr/bin/python3 -I "$root/scripts/test-events.py" lock-ready \
+        "$lock_pid" "$heavy_lock" "$lock_held_file" "$(( lock_minutes * 60 ))"; then
+        return 0
+    else
+        rc=$?
+        release_heavy_lock
+        [ "$rc" != 124 ] || die "host busy: could not take $heavy_lock within $lock_minutes min"
+        die "could not take the host lock $heavy_lock"
+    fi
 }
 release_heavy_lock() {
     [ -n "$lock_pid" ] || return 0
@@ -404,7 +373,7 @@ reap_idle_clones() {
 
 # Waits, up to CASSINI_ADMIT_MINUTES, until a quarter of the CPU is idle and there is memory for one more simulator
 # (the iPad, or a second shard), so the UI clones do not boot into a host that another run already keeps busy or
-# swapping. It then goes on regardless, with a warning: a busy host is never a reason to fail. The CPU is sampled over
+# swapping. It fails closed at the bounded deadline if resources are still low. The CPU is sampled over
 # two seconds rather than read from the load average, which lags by minutes and would still count this run's own
 # hosted tests; while this run's own swift test (beside the build) is still going, only the memory counts. The first
 # clone's boot is waited for before, so its own boot is not counted either.
@@ -421,22 +390,26 @@ cpu_idle() {
 }
 wait_for_room() {
     [ "$admit_minutes" -gt 0 ] || return 0
-    local t0 waited=0 idle free booted
-    t0=$(date +%s)
+    local t0 waited=0 idle free booted deadline announced=0
+    t0=$(date +%s); deadline=$(( t0 + admit_minutes * 60 ))
     # This run's own booted iPhones count as free, as in auto_workers: tier_ui shuts down the ones it does not use.
     booted=$(our_clones | grep -c "Booted $prefix-iphone-" || true)
     while :; do
-        idle=$(cpu_idle); free=$(( $(free_mb) + booted * 1536 ))
+        idle=$(cpu_idle); free=$(( $(free_mb) + booted * 1536 )); waited=$(( $(date +%s) - t0 ))
         if [ "$idle" -ge 25 ] && [ "$free" -ge 2048 ]; then
             [ $waited -eq 0 ] || echo "  the host has room after $(( waited / 60 )) min $(( waited % 60 )) s (CPU $idle% idle, $free MB free)"
             return 0
         fi
         if [ $waited -ge $(( admit_minutes * 60 )) ]; then
-            echo "  warning: the host is still busy after $admit_minutes min (CPU $idle% idle, $free MB free); going on"
-            return 0
+            die "host still busy after $admit_minutes min (CPU $idle% idle, $free MB free); retry when resources are available"
         fi
-        [ $waited -gt 0 ] || echo "  waiting for room: CPU $idle% idle, $free MB free"
-        sleep 3; waited=$(( $(date +%s) - t0 ))
+        if [ "$announced" = 0 ]; then
+            echo "  waiting for room: CPU $idle% idle, $free MB free"; announced=1
+        fi
+        # Exact CPU/free-memory thresholds have no recovery notification. Recheck on a same-user
+        # process exit, or once at the deadline; never admit an unhealthy host after that bound.
+        /usr/bin/python3 -I "$root/scripts/test-events.py" resource-event "$deadline"
+        waited=$(( $(date +%s) - t0 ))
     done
 }
 
@@ -688,24 +661,22 @@ PY
 # ends it and returns 124. Once a test runs, xcodebuild's own per-test time limit applies, and the whole run is ended
 # $3 seconds in, returning 125.
 run_watched() {
-    local log="$1" limit="$2" total="$3" pid waited=0 started=0; shift 3
-    "$@" > "$log" 2>&1 & pid=$!
-    while kill -0 "$pid" 2>/dev/null; do
-        if [ $started = 0 ] && grep -q "^Test Case '" "$log" 2>/dev/null; then started=1; fi
-        if [ $started = 0 ] && [ $waited -ge "$limit" ]; then
+    local log="$1" limit="$2" total="$3" pid rc; shift 3
+    : > "$log"
+    "$@" >> "$log" 2>&1 & pid=$!
+    if /usr/bin/python3 -I "$root/scripts/test-events.py" watch "$pid" "$log" "$limit" "$total" \
+        --start "Test Case '" --total-status 125; then
+        wait "$pid"
+    else
+        rc=$?
+        if [ "$rc" = 124 ]; then
             echo "test.sh: no test started within ${limit}s; ending xcodebuild" >> "$log"
-            end_tree "$pid"
-            return 124
-        fi
-        # Each test has its own allowance; this catches xcodebuild itself hanging between or after tests.
-        if [ $waited -ge "$total" ]; then
+        else
             echo "test.sh: still running after ${total}s; ending xcodebuild" >> "$log"
-            end_tree "$pid"
-            return 125
         fi
-        sleep 1; waited=$(( waited + 1 ))
-    done
-    wait "$pid"
+        end_tree "$pid"
+        return "$rc"
+    fi
 }
 
 # xcodebuild test-without-building of one test target on one simulator; $1 target, $2 log, $3 result bundle,
