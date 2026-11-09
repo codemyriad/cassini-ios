@@ -20,6 +20,7 @@ import CassiniWhistle
     nonisolated private let selection = Mutex(Selection())
     nonisolated private let whistle: Mutex<WhistleCapability>
     nonisolated let parakeetCapable: Bool
+    nonisolated private let platform: PlatformFacts
     nonisolated private let physicalMemory: UInt64
     nonisolated private let availableMemory: @Sendable () -> Int64?
     @ObservationIgnored private let defaults: UserDefaults
@@ -38,12 +39,12 @@ import CassiniWhistle
     private(set) var preference: SpeechModelPreference
 
     init(root: URL, defaults: UserDefaults, storage: any StorageProbe, whistle: WhistleCapability,
-         parakeetLinked: Bool, physicalMemory: UInt64 = ProcessInfo.processInfo.physicalMemory,
+         parakeetLinked: Bool, platform: PlatformFacts, physicalMemory: UInt64 = ProcessInfo.processInfo.physicalMemory,
          availableMemory: @escaping @Sendable () -> Int64? = { let n = os_proc_available_memory(); return n > 0 ? Int64(n) : nil },
          installed: (@Sendable () -> Bool)? = nil, verified: (@Sendable () -> Bool)? = nil,
          verify: (@Sendable () throws -> Bool)? = nil) {
         self.root = root; self.defaults = defaults; self.storage = storage; self.whistle = Mutex(whistle)
-        self.physicalMemory = physicalMemory; self.availableMemory = availableMemory
+        self.physicalMemory = physicalMemory; self.availableMemory = availableMemory; self.platform = platform
         parakeetCapable = parakeetLinked && SpeechCapability.parakeetCapable(physicalMemory: physicalMemory)
         self.installed = installed ?? { ModelCatalog.parakeet.ready(in: root) }
         self.verified = verified ?? { ModelVerifier.shared.isChecked(ModelCatalog.parakeet, in: root) }
@@ -79,8 +80,9 @@ import CassiniWhistle
         let facts = SpeechModelPolicy(whistleAvailable: whistle.withLock { $0.available }, parakeetLinked: parakeetCapable,
             physicalMemory: physicalMemory, availableMemory: availableMemory(), parakeetInstallation: current.installation,
             availableDiskBytes: 0, downloadPlan: ModelPlan([]))
-        // Apple remains a candidate whose adapter checks live hardware/locale eligibility before queue admission.
-        return facts.selected(preference: current.preference) ?? .appleSpeech
+        // Apple remains a candidate whose adapter checks live hardware/locale eligibility before queue admission. Where
+        // nothing can run, the Apple identity reaches the unavailable candidate, which refuses the job.
+        return facts.recognizer(preference: current.preference, platform: platform) ?? .appleSpeech
     }
 
     nonisolated private func effectiveInstallation(_ published: ParakeetInstallation) -> ParakeetInstallation {

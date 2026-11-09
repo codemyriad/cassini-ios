@@ -85,7 +85,8 @@ import CassiniNotebook
             speechModels.onChange = { [weak processing] in Task { await processing?.models.refresh() } }
         }
         settingsPorts = SettingsAdapter(settings: settings, library: library, voices: voices, processing: processing,
-                                        notices: noticeCenter, transcriber: environment.transcriber, defaults: environment.defaults)
+                                        notices: noticeCenter, transcriber: environment.transcriber,
+                                        platform: environment.platform, defaults: environment.defaults)
         notices = NoticesStore(center: noticeCenter, router: router, processing: processing, recording: recording)
         registerNotices()
         registerStartup()

@@ -28,6 +28,8 @@ import CassiniEngineTesting
     var background: any BackgroundRunner
     /// Result notifications, posted while Cassini is hidden.
     var notifier: any Notifier
+    /// What the system offers (`LivePlatform`, or the iOS 18 facts of a UI-test launch).
+    var platform: PlatformFacts
     var launch = LaunchOptions()
     /// Where exports wait for the share sheet; the launch sweep empties it.
     var exports = URL.temporaryDirectory.appendingPathComponent("Exports", isDirectory: true)
@@ -74,7 +76,8 @@ import CassiniEngineTesting
     /// New defaults are chosen by the live D78 router, independently of file presence or download consent.
     static func speechTranscriber(models: PinnedModels,
                                   physicalMemory: UInt64 = ProcessInfo.processInfo.physicalMemory,
-                                  defaults: UserDefaults = .standard) -> any Transcribing {
+                                  defaults: UserDefaults = .standard,
+                                  platform: PlatformFacts = LivePlatform.facts) -> any Transcribing {
         if SherpaRuntime.isLinked && SpeechCapability.parakeetCapable(physicalMemory: physicalMemory) {
             let parakeet = ParakeetTranscriber(models: .init(installer: models.installer, root: models.root,
                                                     online: { NetworkPath.shared.isOnline }),
@@ -83,7 +86,12 @@ import CassiniEngineTesting
         }
         // This is a candidate adapter, not a claim of availability. Its public Speech checks select Apple only
         // when this device and the requested locale support it, before consent/queue admission and before decode.
-        return AppleSpeechTranscriber()
+        return appleSpeechCandidate(platform: platform)
+    }
+
+    /// Apple's adapter where the system has Apple speech, else the candidate that refuses every job.
+    static func appleSpeechCandidate(platform: PlatformFacts) -> any Transcribing {
+        platform.appleSpeech ? AppleSpeechTranscriber() : UnavailableSpeechTranscriber()
     }
 
     /// Android's speaker pipeline (streaming Sortformer and CAM++) over the catalog's pinned files, which the shared
@@ -99,6 +107,7 @@ import CassiniEngineTesting
         let defaults = laboratory ? UserDefaults(suiteName: "io.codemyriad.cassini.whistle-lab")! : .standard
         let modelRoot = laboratory ? root.appendingPathComponent("Models", isDirectory: true) : ModelCatalog.defaultRoot
         let storage = FileSystemStorageProbe()
+        let platform = LivePlatform.facts
         #if arch(arm64)
         let arm64 = true
         #else
@@ -108,11 +117,11 @@ import CassiniEngineTesting
             osSupported: LivePlatform.whistleOperatingSystemSupported, cpuSupported: LivePlatform.whistleCPUSupported,
             bundleVerified: WhistleRuntime.cachedBundleVerification() == true, physicalMemory: ProcessInfo.processInfo.physicalMemory)
         let speechModels = SpeechModelsStore(root: modelRoot, defaults: defaults, storage: storage,
-            whistle: whistleCapability, parakeetLinked: SherpaRuntime.isLinked)
+            whistle: whistleCapability, parakeetLinked: SherpaRuntime.isLinked, platform: platform)
         let models = PinnedModels(root: modelRoot, defaults: defaults, storage: storage,
             onInstallChange: { status in Task { @MainActor in speechModels.installerChanged(status) } })
-        let legacy = speechTranscriber(models: models, defaults: defaults)
-        let apple = AppleSpeechTranscriber()
+        let legacy = speechTranscriber(models: models, defaults: defaults, platform: platform)
+        let apple = appleSpeechCandidate(platform: platform)
         let whistle = WhistleTranscriber(acceptance: whistleCapability, memoryReport: InternalWhistle.writeReport,
             acceptanceProvider: { speechModels.whistleCapability })
         var candidates: [any Transcribing] = [apple, whistle]
@@ -124,7 +133,7 @@ import CassiniEngineTesting
             transcriber: speech, analyzer: speakerAnalyzer(models: models),
             capture: AVCaptureAdapter(), microphone: AVMicrophonePermission(), liveActivity: ActivityKitAdapter(),
             playback: AVPlaybackAdapter(), audio: LocalAudioProcessing(), storage: storage,
-            background: UIKitBackgroundRunner(), notifier: UNNotifier())
+            background: UIKitBackgroundRunner(platform: platform), notifier: UNNotifier(), platform: platform)
         value.speechModels = speechModels
         value.downloadTranscriber = legacy.recognizer == .parakeet ? legacy : speech
         if laboratory {
@@ -151,8 +160,10 @@ extension AppEnvironment {
     static let uiTestingNow = Date(timeIntervalSince1970: 1_791_452_460)
 
     /// One runner for every graph of the process: BGTaskScheduler takes a task identifier's handler once a process,
-    /// and a relaunch inside the app builds a second graph.
-    private static let uiTestingBackground = UIKitBackgroundRunner()
+    /// and a relaunch inside the app builds a second graph. The iOS 18 facts get one that never asks for continued
+    /// processing.
+    private static let uiTestingBackground = UIKitBackgroundRunner(platform: LivePlatform.facts)
+    private static let uiTestingFiniteBackground = UIKitBackgroundRunner(platform: .iOS18)
 
     /// The environment of UI-test launch arguments. A relaunch inside the running app (`UITestRelaunch`) passes
     /// `inProcess` and its `token`.
@@ -167,6 +178,7 @@ extension AppEnvironment {
                   heldCapture: arguments.contains("--capture-held"), region: value(after: "-AppleLocale", in: arguments),
                   speechFailure: value(after: "--speech-unavailability", in: arguments), bundledSpeech: arguments.contains("--d78"),
                   bundledCapable: arguments.contains("--d78-capable"), bundledVerified: arguments.contains("--d78-verified"),
+                  platform: arguments.contains("--ios18-platform") ? .iOS18 : LivePlatform.facts,
                   inProcess: inProcess, token: token)
     }
 
@@ -181,12 +193,15 @@ extension AppEnvironment {
     /// Notifications are never asked for and count as allowed, so no banner says they are off, unless
     /// `notificationsDenied` (`--notifications-denied`) turns them off. With `parakeet` (`--parakeet`) the fake
     /// transcriber stands for Parakeet Ultra, as on a device that can hold it: the model download screen and the
-    /// speech row show Ultra's sizes.
+    /// speech row show Ultra's sizes. `platform` (`--ios18-platform` for the iOS 18 facts) is what the system offers:
+    /// without Apple speech the default device has no recognizer that can run, so its transcriber refuses every job,
+    /// and the background runner never asks for continued processing.
     static func uiTesting(reset: Bool, seed: Seed?, openFixture: OpenFixture? = nil,
                           modelsMissing: Bool = false, modelDownloading: Bool = false, draftGrowing: Bool = false,
                           speakersReady: Bool = false, parakeet: Bool = false,
                           notificationsDenied: Bool = false, heldCapture: Bool = false, region: String? = nil,
                           speechFailure: String? = nil, bundledSpeech: Bool = false, bundledCapable: Bool = false, bundledVerified: Bool = false,
+                          platform: PlatformFacts = LivePlatform.facts,
                           inProcess: Bool = false, token: String = "") -> AppEnvironment {
         let storage = UITestStorage.generation(reset: reset, inProcess: inProcess)
         let root = storage.root
@@ -206,6 +221,8 @@ extension AppEnvironment {
             .returns(TestFixtures.transcribedSegments, total: TestFixtures.fixtureDuration)
         }
         let transcriber = FakeTranscriber(script, status: status, recognizer: recognizer)
+        // Without Apple speech the Apple slot holds the candidate that refuses every job.
+        let unavailable: (any Transcribing)? = platform.appleSpeech ? nil : UnavailableSpeechTranscriber()
         // The recording seed tells the speakers apart, as a walk from recording to naming needs; the processing seed's
         // job has its speaker step ahead.
         let analyzer = switch seed {
@@ -216,14 +233,15 @@ extension AppEnvironment {
         var value = AppEnvironment(
             root: root, defaults: defaults, clock: FixedClock(now: uiTestingNow),
             locale: Locale(identifier: region ?? "en_US"), timeZone: TimeZone(identifier: "UTC") ?? .gmt,
-            transcriber: transcriber, analyzer: analyzer,
+            transcriber: recognizer == .appleSpeech ? unavailable ?? transcriber : transcriber, analyzer: analyzer,
             capture: seed != .recording ? AVCaptureAdapter()
                 : heldCapture ? FakeCapture(levels: TestFixtures.speechLevels, heldAt: TestFixtures.heldCaptureStart) : FakeCapture(),
             microphone: seed == .recording ? FakeMicrophonePermission() : AVMicrophonePermission(),
             liveActivity: ActivityKitAdapter(), playback: AVPlaybackAdapter(), audio: LocalAudioProcessing(),
             // A held capture also holds the free space, so its hint reads the same on every run.
             storage: heldCapture ? FakeStorage() : FileSystemStorageProbe(),
-            background: uiTestingBackground, notifier: FakeNotifier(auth: notificationsDenied ? .denied : .authorized),
+            background: platform.continuedProcessing ? uiTestingBackground : uiTestingFiniteBackground,
+            notifier: FakeNotifier(auth: notificationsDenied ? .denied : .authorized), platform: platform,
             launch: LaunchOptions(seed: seed, openFixture: openFixture, restoresNavigation: false, marksLaunchFinished: true,
                                   token: token),
             models: root.appendingPathComponent("CassiniModels", isDirectory: true))
@@ -231,12 +249,12 @@ extension AppEnvironment {
             let capability = WhistleCapability(arm64: true, operatingSystemSupported: true, bundleVerified: true,
                 pipelineAccepted: true, deviceAccepted: true)
             let speechModels = SpeechModelsStore(root: value.models, defaults: defaults, storage: FakeStorage(),
-                whistle: capability, parakeetLinked: true, physicalMemory: (bundledCapable ? 6 : 3) << 30,
+                whistle: capability, parakeetLinked: true, platform: platform, physicalMemory: (bundledCapable ? 6 : 3) << 30,
                 availableMemory: { ParakeetMemory.beforeLoadBytes }, installed: { bundledVerified },
                 verified: { bundledVerified }, verify: { bundledVerified })
             let parakeet = FakeTranscriber(script, status: bundledVerified ? .ready : .notDownloaded, recognizer: .parakeet)
-            let apple = FakeTranscriber(script, recognizer: .appleSpeech)
-            let speech = RoutedTranscriber(legacy: apple, candidates: [transcriber, parakeet]) { speechModels.selectedRecognizer() }
+            let legacy = unavailable ?? FakeTranscriber(script, recognizer: .appleSpeech)
+            let speech = RoutedTranscriber(legacy: legacy, candidates: [transcriber, parakeet]) { speechModels.selectedRecognizer() }
             value.transcriber = speech
             value.downloadTranscriber = bundledCapable ? parakeet : speech
             value.speechModels = speechModels
