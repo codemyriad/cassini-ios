@@ -24,6 +24,8 @@ final class AccessibilityAuditTests: XCTestCase {
     @MainActor private func launch(_ arguments: [String]) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing", "--reset-test-data"] + arguments
+        // Within a screen group, launchAndWait resets the graph, library and preferences in-process. A changed
+        // language or text size still starts a fresh process; each group terminates its final process afterwards.
         app.launchAndWait()
         return app
     }
@@ -149,6 +151,7 @@ final class AccessibilityAuditTests: XCTestCase {
     /// The same screens on the iPad, beside the Library's sidebar (an iOS-only layout).
     @MainActor func testIPadScreensPassTheAudit() throws {
         try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad, "the split view")
+        defer { XCUIApplication().terminate() }
         // Six screens in one test: about 160 s on a calm host, over the 300 s default when it runs 2-4x slower.
         executionTimeAllowance = 600
         let screens: [(String, @MainActor ([String]) -> XCUIApplication)] = [
@@ -157,7 +160,6 @@ final class AccessibilityAuditTests: XCTestCase {
         for (name, open) in screens {
             let app = open([])
             XCTContext.runActivity(named: name) { _ in audit(app, screen: "ipad-\(name)", transcript: name == "note") }
-            app.terminate()
         }
     }
 
@@ -166,12 +168,12 @@ final class AccessibilityAuditTests: XCTestCase {
     /// At AX5 no text is cut: rows, the player, the cards and the capture bar grow or wrap instead.
     // ports: LargeFontScaleTest#theRowSuffixIsNotCutAtFontScale2 (AX5; every text, through the audit's clipping check)
     @MainActor func testNoTextIsClippedAtTheLargestTextSize() {
+        defer { XCUIApplication().terminate() }
         let screens: [(String, @MainActor ([String]) -> XCUIApplication)] = [
             ("library", library), ("note", note), ("settings", settings), ("trash", trash), ("savedVoices", savedVoices)]
         for (name, open) in screens {
             let app = open(Self.largestText)
             audit(app, screen: "largest-\(name)", .textClipped)
-            app.terminate()
         }
     }
 
@@ -184,6 +186,7 @@ final class AccessibilityAuditTests: XCTestCase {
     @MainActor func testNoTextIsClippedInBrazilianPortuguese() { auditClipping(language: "pt-BR", region: "pt_BR") }
 
     @MainActor private func auditClipping(language: String, region: String) {
+        defer { XCUIApplication().terminate() }
         let screens: [(String, @MainActor ([String]) -> XCUIApplication)] = [
             ("library", library), ("note", note), ("recording", recording), ("settings", settings), ("trash", trash),
             ("savedVoices", savedVoices)]
@@ -193,7 +196,6 @@ final class AccessibilityAuditTests: XCTestCase {
                 XCTAssertNotEqual(app.buttons["settingsButton"].label, "Settings", "the app is not in \(language)")
             }
             audit(app, screen: "\(language)-\(name)", .textClipped)
-            app.terminate()
         }
     }
 
