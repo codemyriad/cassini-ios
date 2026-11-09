@@ -101,6 +101,19 @@ final class AccessibilityAuditTests: XCTestCase {
         let passes = [detection, types.subtracting(.elementDetection)].filter { !$0.isEmpty }
         do {
             for pass in passes {
+                #if targetEnvironment(simulator)
+                // The failed iPad audit screenshot shows this first-boot system banner covering the
+                // Recording header. Its interference is observed; attributing the unowned OCR text
+                // finding specifically to the banner remains an inference. Wait for this exact setup
+                // message before each pass; keep every audit and allow all other notifications to fail.
+                let setupBanner = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+                    .staticTexts["Ready for Apple Intelligence"]
+                if setupBanner.exists {
+                    XCTAssertTrue(setupBanner.waitForNonExistence(within: 30),
+                                  "SpringBoard's first-boot setup banner still covers the audit screen",
+                                  file: file, line: line)
+                }
+                #endif
                 try app.performAccessibilityAudit(for: pass) { issue in
                     if AuditFilter.isNavigationTitle(issue, in: app, alreadySeen: titleClipped) {
                         titleClipped = true
