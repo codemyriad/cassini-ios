@@ -164,7 +164,7 @@ public struct SearchFields: Sendable {
     }
 
     public init(_ note: Note) {
-        self.init(title: note.title, body: note.text, bookmarks: note.bookmarks.compactMap(\.label))
+        self.init(title: note.title, body: NoteTranscripts.sealed(note).turns.map(\.text).joined(separator: "\n\n"), bookmarks: note.bookmarks.compactMap(\.label))
     }
 
     /// Whether every phrase is in one of the fields (each phrase may be in another).

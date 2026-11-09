@@ -86,8 +86,8 @@ import Testing
     @Test func oneLongSpeakerIsSplitIntoParagraphs() {
         let long = (0..<450).map { i in F.W("a", i * 100, i * 100 + 90, i == 129 ? "end." : "w\(i)") }
         let turns = NoteTranscripts.sealed(F.note(long)).turns
-        #expect(turns.map(\.words.count) == [130, 200, 120], "a sentence end after 120 words, then at most 200")
-        #expect(turns.map(\.id) == ["w0", "w130", "w330"])
+        #expect(turns.map(\.words.count) == [130, 140, 140, 40], "viewer readable blocks use a 96-word sentence target and 140-word limit")
+        #expect(turns.map(\.id) == ["w0", "w130", "w270", "w410"])
         #expect(turns.allSatisfy { $0.speakerID == "a" })
     }
 

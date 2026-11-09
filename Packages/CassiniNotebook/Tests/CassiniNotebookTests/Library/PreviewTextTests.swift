@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import CassiniNotebook
 
-/// Android `PreviewTextTest`, plus the transcript preview of a note that reads only the words it can show.
+/// Preview budgets and playback positions, plus D84 reading order and interjection seams.
 struct PreviewTextTests {
     private func turn(_ speaker: String, _ startMs: Int64, _ text: String, msPerWord: Int64 = 350) -> [PreviewWord] {
         text.split(separator: " ").enumerated().map { i, word in
@@ -132,7 +132,7 @@ struct PreviewTextTests {
             segments.append(TranscriptSegment(
                 text: turnWords.map(\.text).joined(separator: " "), start: Double(first.startMs) / 1000,
                 end: Double(last.endMs) / 1000, speakerID: first.speaker,
-                words: turnWords.map { TimedWord(text: " " + $0.text, start: Double($0.startMs) / 1000, end: Double($0.endMs) / 1000) }))
+                words: turnWords.map { TimedWord(text: $0.text, start: Double($0.startMs) / 1000, end: Double($0.endMs) / 1000) }))
             turnWords = []
         }
         for word in board03 {
@@ -162,5 +162,47 @@ struct PreviewTextTests {
         note.playbackPosition = 0
         #expect(note.transcriptPreview?.display == "one two three four five six")
         #expect(Note(title: "Empty").transcriptPreview == nil)
+    }
+}
+
+
+extension PreviewTextTests {
+    @Test func acknowledgmentPreviewKeepsTheChipAndDoesNotStopAtItsSpeakerChange() throws {
+        let vector = try D84IntegrationVector.load("acknowledgment")
+        let words = vector.words.map { PreviewWord($0.text, startMs: $0.startMs, endMs: $0.endMs, speaker: $0.speaker) }
+        let expected = "The release candidate is ready for testing, (Ben: Sounds good.) and I will send the download link after this call."
+        #expect(PreviewText.of(words, positionMs: 0, labels: ["ben": "Ben"])?.display == expected)
+        // Starting after the first word must still carry the host's words after the interjection.
+        let preview = try #require(PreviewText.of(words, positionMs: words[1].startMs, labels: ["ben": "Ben"]))
+        #expect(preview.display == "…" + String(expected.dropFirst("The ".count)))
+        #expect(!preview.trailingEllipsis)
+    }
+
+    @Test func competingPreviewReadsWholeRowsRatherThanInterleavingSpeakers() throws {
+        let vector = try D84IntegrationVector.load("competing")
+        let words = vector.words.map { PreviewWord($0.text, startMs: $0.startMs, endMs: $0.endMs, speaker: $0.speaker) }
+        let first = "I can check the Linux build and report any problems today."
+        let second = "I will test the browser connection and check the microphone settings."
+        #expect(PreviewText.of(words, positionMs: 0)?.display == first + " " + second)
+        let preview = try #require(PreviewText.of(words, positionMs: words[2].startMs))
+        #expect(preview.display == "…" + String(first.dropFirst("I ".count).dropLast()) + "…")
+        #expect(preview.trailingEllipsis)
+    }
+
+    @Test func notePreviewUsesSpeakerLabelsInItsInlineChip() throws {
+        let vector = try D84IntegrationVector.load("acknowledgment")
+        var note = Note(title: "Weekly check-in")
+        note.transcript = TranscriptSegment.segments(of: vector.words)
+        note.speakers = [.init(id: "ada", name: "Ada"), .init(id: "ben", name: "Ben")]
+        #expect(note.transcriptPreview?.display.contains("(Ben: Sounds good.)") == true)
+        #expect(note.transcriptPreview?.display.contains("and I will send") == true)
+    }
+}
+
+extension PreviewTextTests {
+    @Test func equalStartPlaybackUsesTheLaterCanonicalAtom() {
+        let words = [PreviewWord("First.", startMs: 0, endMs: 1000, speaker: "ada"),
+                     PreviewWord("Second.", startMs: 0, endMs: 1000, speaker: "ben")]
+        #expect(PreviewText.of(words, positionMs: 100)?.display == "…Second.")
     }
 }

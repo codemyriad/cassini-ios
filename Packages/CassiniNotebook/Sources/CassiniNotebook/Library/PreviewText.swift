@@ -7,8 +7,10 @@ public struct PreviewWord: Hashable, Sendable {
     public var endMs: Int64
     /// Who says it; nil when the passage has no speaker.
     public var speaker: String?
-    public init(_ text: String, startMs: Int64, endMs: Int64, speaker: String? = nil) {
+    public var lowConfidenceSpeaker: Bool
+    public init(_ text: String, startMs: Int64, endMs: Int64, speaker: String? = nil, lowConfidenceSpeaker: Bool = false) {
         self.text = text; self.startMs = startMs; self.endMs = endMs; self.speaker = speaker
+        self.lowConfidenceSpeaker = lowConfidenceSpeaker
     }
 }
 
@@ -31,8 +33,8 @@ public struct Preview: Hashable, Sendable {
 /// The Library preview of a transcript without a search query (Android `PreviewText`, features.md section 1).
 ///
 /// When the saved playback position is after the first word and before the end of the last word, the excerpt starts
-/// at the word playing at that position and has a leading ellipsis. It takes whole words up to about `limit`
-/// characters and stops at the first end of a speaker's turn reached once it holds at least `minBeforeTurnEnd`
+/// at the word playing at that position and has a leading ellipsis. It takes whole words and inline chips up to about `limit`
+/// characters and stops at the first model row end reached once it holds at least `minBeforeTurnEnd`
 /// characters, so one preview does not run two speakers' words together. A shorter turn ("Yes.") continues into the
 /// next turns, so the row never shows a one-word excerpt while more words follow.
 ///
@@ -50,44 +52,71 @@ public enum PreviewText {
 
     static let cutPunctuation: Set<Character> = [".", ",", ";", ":", "!", "?", "…"]
 
-    /// The preview of `words` (one transcript, in order) at `positionMs`; nil without words.
-    public static func of(_ words: [PreviewWord], positionMs: Int64) -> Preview? {
-        guard let last = words.last else { return nil }
-        let first = positionMs >= last.endMs ? 0 : playing(words, positionMs)
-        return excerpt(words[first...], leading: first > 0, reachesEnd: true)
+    /// The preview follows model reading order. Canonical indices, rather than the reordered rows' timestamps,
+    /// locate the playing word; interjections remain one parenthesized excerpt item at their seam.
+    public static func of(_ words: [PreviewWord], positionMs: Int64, labels: [String: String] = [:],
+                          endsBoundedByAudio: Bool = false) -> Preview? {
+        guard !words.isEmpty else { return nil }
+        let rows = TurnModel.rows(of: words.map {
+            TurnModel.Word(speaker: $0.speaker, startMs: Double($0.startMs), endMs: Double($0.endMs), text: $0.text,
+                           lowConfidenceSpeaker: $0.lowConfidenceSpeaker)
+        }, endsBoundedByAudio: endsBoundedByAudio)
+        let entries = rows.enumerated().flatMap { rowIndex, row in
+            row.members.flatMap { member -> [Entry] in
+                if member.kind == .interjection {
+                    let label = member.speaker.map { labels[$0] ?? $0 } ?? "Unknown speaker"
+                    return [Entry(text: "(\(label): \(member.text))", indices: member.wordIndices, row: rowIndex, spaceBefore: true)]
+                }
+                return member.wordIndices.enumerated().map { offset, index in
+                    let text = words[index].text.trimmingCharacters(in: .whitespacesAndNewlines)
+                    // Use the viewer's existing word-to-text spacing; source atoms and their indices stay untouched.
+                    let spaced = offset == 0 || !TurnModel.matches(text, #"^[,.;:!?)]"#)
+                    return Entry(text: text, indices: [index], row: rowIndex, spaceBefore: spaced)
+                }
+            }
+        }
+        guard !entries.isEmpty else { return nil }
+        let lastEnd = words.map(\.endMs).max() ?? 0
+        let playing: Int
+        if positionMs >= lastEnd {
+            playing = 0
+        } else if let active = words.indices.filter({ words[$0].startMs <= positionMs && words[$0].endMs > positionMs })
+            .max(by: { words[$0].startMs == words[$1].startMs ? $0 < $1 : words[$0].startMs < words[$1].startMs }) {
+            playing = active
+        } else {
+            playing = words.indices.filter { words[$0].startMs > positionMs }
+                .min(by: { words[$0].startMs == words[$1].startMs ? $0 < $1 : words[$0].startMs < words[$1].startMs }) ?? 0
+        }
+        let first = entries.firstIndex { $0.indices.contains(playing) } ?? 0
+        return excerpt(entries[first...], leading: first > 0)
     }
 
-    /// The excerpt that starts with the first of `words`. `leading` when words come before it; `reachesEnd` when
-    /// `words` run to the transcript end, so running out of them is not a cut.
-    static func excerpt(_ words: ArraySlice<PreviewWord>, leading: Bool, reachesEnd: Bool) -> Preview {
+    private struct Entry {
+        var text: String
+        var indices: [Int]
+        var row: Int
+        var spaceBefore: Bool
+    }
+
+    private static func excerpt(_ entries: ArraySlice<Entry>, leading: Bool) -> Preview {
         var text = ""
         var length = 0
-        var next = words.startIndex
-        while next < words.endIndex, next == words.startIndex || length + 1 + words[next].text.utf16.count <= limit {
-            if leading, next > words.startIndex, stopsBefore(words, next, length) { break }
-            if next > words.startIndex { text += " "; length += 1 }
-            text += words[next].text
-            length += words[next].text.utf16.count
+        var next = entries.startIndex
+        while next < entries.endIndex, next == entries.startIndex || length + (entries[next].spaceBefore ? 1 : 0) + entries[next].text.utf16.count <= limit {
+            if leading, next > entries.startIndex, length >= minBeforeTurnEnd,
+               entries[next].row != entries[next - 1].row { break }
+            if next > entries.startIndex, entries[next].spaceBefore { text += " "; length += 1 }
+            text += entries[next].text
+            length += entries[next].text.utf16.count
             next += 1
         }
-        let cut = next < words.endIndex || !reachesEnd
+        let cut = next < entries.endIndex
         var shown = cutAt(text, limit)
         if cut {
             let trimmed = String(shown.reversed().drop { cutPunctuation.contains($0) }.reversed())
             if !trimmed.isEmpty { shown = trimmed }
         }
         return Preview(shown, leadingEllipsis: leading, trailingEllipsis: cut || shown.utf16.count < length)
-    }
-
-    /// The word playing at `positionMs`: the first word that has not ended there. Within a word that is the word
-    /// itself; in a pause it is the next word to play. `of` handles a position after the last word.
-    private static func playing(_ words: [PreviewWord], _ positionMs: Int64) -> Int {
-        words.firstIndex { $0.endMs > positionMs } ?? 0
-    }
-
-    /// Whether an excerpt of `length` units ends before `index`, which starts another speaker's turn.
-    private static func stopsBefore(_ words: ArraySlice<PreviewWord>, _ index: Int, _ length: Int) -> Bool {
-        length >= minBeforeTurnEnd && words[index].speaker != words[index - 1].speaker
     }
 
     /// `text` cut to at most `limit` UTF-16 units, never inside a surrogate pair (only one giant word needs it).
@@ -100,59 +129,37 @@ public enum PreviewText {
 }
 
 extension Note {
-    /// The Library preview at the saved playback position, from the transcript shown. Only the words it can show are
-    /// read: the transcript start, or the words from the one playing at the position.
+    /// The Library preview uses the complete model, so an interjection or a competing speaker is placed as it is
+    /// in the note. Building a prefix before grouping could mistake a partial run for a short interjection.
     public var transcriptPreview: Preview? {
         let positionMs = Int64((playbackPosition * 1000).rounded())
-        let segments = transcript.lazy.map(PreviewWord.of)
-        guard let lastEnd = segments.last(where: { !$0.isEmpty })?.last?.endMs else { return nil }
-        let fromStart = positionMs >= lastEnd
-        // The first passage with a word still to end at the position, and that word in it.
-        let segment = fromStart ? 0 : transcript.firstIndex { passage in
-            passage.end * 1000 >= Double(positionMs) && PreviewWord.of(passage).contains { $0.endMs > positionMs }
-        } ?? 0
-        let firstInSegment = PreviewWord.of(transcript[segment]).firstIndex { fromStart || $0.endMs > positionMs } ?? 0
-        let earlierWords = firstInSegment > 0 || transcript[..<segment].contains { $0.text.contains { !$0.isWhitespace } }
-        var words = Array(PreviewWord.of(transcript[segment]).dropFirst(firstInSegment))
-        var next = segment + 1
-        // Enough words for the budget and one more, so the excerpt's cut is decided by the words themselves.
-        while next < transcript.endIndex, words.reduce(0, { $0 + $1.text.utf16.count + 1 }) <= PreviewText.limit + 1 {
-            words += PreviewWord.of(transcript[next])
-            next += 1
-        }
-        guard !words.isEmpty else { return nil }
-        return PreviewText.excerpt(words[...], leading: earlierWords && !fromStart, reachesEnd: next == transcript.endIndex)
+        let labels = Dictionary((speakers ?? []).map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
+        return PreviewText.of(transcript.flatMap(PreviewWord.of), positionMs: positionMs, labels: labels,
+                              endsBoundedByAudio: !transcript.isEmpty && transcript.allSatisfy { $0.wordEndsBoundedByAudio == true })
     }
 }
 
 extension PreviewWord {
-    /// The words of a passage: its text split at whitespace, each timed from the recognised words it overlaps, or
-    /// spread over the passage when it has none (an edited passage keeps no word times).
+    /// Timed words keep their stored atoms. An edited passage without word times spreads its display words over
+    /// the passage, so its saved playback position can still select a preview word.
     static func of(_ segment: TranscriptSegment) -> [PreviewWord] {
+        if !segment.words.isEmpty {
+            return segment.words.map {
+                PreviewWord($0.text, startMs: Int64(($0.start * 1000).rounded()), endMs: Int64(($0.end * 1000).rounded()),
+                            speaker: segment.speakerID ?? segment.speaker, lowConfidenceSpeaker: $0.lowConfidenceSpeaker == true)
+            }
+        }
+
         let text = segment.text
         let speaker = segment.speakerID ?? segment.speaker
-        var timed: [(range: Range<String.Index>, start: Double, end: Double)] = []
-        var cursor = text.startIndex
-        for word in segment.words {
-            let piece = word.text.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !piece.isEmpty, let range = text.range(of: piece, range: cursor..<text.endIndex) else { continue }
-            timed.append((range, word.start, word.end))
-            cursor = range.upperBound
-        }
         let pieces = text.split(whereSeparator: \.isWhitespace)
         let length = Double(max(1, text.count))
         return pieces.map { piece in
             let range = piece.startIndex..<piece.endIndex
-            let overlapping = timed.filter { $0.range.overlaps(range) }
-            let start: Double, end: Double
-            if let first = overlapping.first, let last = overlapping.last {
-                start = first.start; end = last.end
-            } else {
-                let offset = Double(text.distance(from: text.startIndex, to: range.lowerBound))
-                let span = segment.end - segment.start
-                start = segment.start + span * offset / length
-                end = segment.start + span * (offset + Double(piece.count)) / length
-            }
+            let offset = Double(text.distance(from: text.startIndex, to: range.lowerBound))
+            let span = segment.end - segment.start
+            let start = segment.start + span * offset / length
+            let end = segment.start + span * (offset + Double(piece.count)) / length
             return PreviewWord(String(piece), startMs: Int64((start * 1000).rounded()), endMs: Int64((end * 1000).rounded()),
                                speaker: speaker)
         }

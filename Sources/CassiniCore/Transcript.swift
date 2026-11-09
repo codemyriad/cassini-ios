@@ -2,8 +2,10 @@ import Foundation
 
 public struct Word: Hashable, Sendable {
     public let speaker: String, startMs: Int64, endMs: Int64, text: String
-    public init(_ speaker: String, _ startMs: Int64, _ endMs: Int64, _ text: String) {
+    public let lowConfidenceSpeaker: Bool
+    public init(_ speaker: String, _ startMs: Int64, _ endMs: Int64, _ text: String, lowConfidenceSpeaker: Bool = false) {
         self.speaker = speaker; self.startMs = startMs; self.endMs = endMs; self.text = text
+        self.lowConfidenceSpeaker = lowConfidenceSpeaker
     }
 }
 
@@ -37,8 +39,10 @@ public struct Transcript: Hashable, Sendable {
         if !language.isEmpty { body["language"] = .string(language) }
         body["wordCount"] = .int(words.count)
         body["items"] = .array(words.map { w in
-            .object(JSONObject([("speaker", .string(w.speaker)), ("startMs", .int(w.startMs)),
-                                ("endMs", .int(w.endMs)), ("text", .string(w.text))]))
+            var item = JSONObject([("speaker", .string(w.speaker)), ("startMs", .int(w.startMs)),
+                                   ("endMs", .int(w.endMs)), ("text", .string(w.text))])
+            if w.lowConfidenceSpeaker { item["lowConfidenceSpeaker"] = .bool(true) }
+            return .object(item)
         })
         return body.serialized()
     }
@@ -56,7 +60,8 @@ public struct Transcript: Hashable, Sendable {
             guard let o = item.object, let speaker = o["speaker"]?.string, let text = o["text"]?.string else {
                 throw CassiniError("Malformed transcript word")
             }
-            let word = Word(speaker, try o.number("startMs"), try o.number("endMs"), text)
+            let word = Word(speaker, try o.number("startMs"), try o.number("endMs"), text,
+                            lowConfidenceSpeaker: o["lowConfidenceSpeaker"]?.bool == true)
             try check(word.endMs >= word.startMs && !word.speaker.isEmpty && !text.isEmpty &&
                       !text.contains { $0.isWhitespace }, "Invalid word timings")
             return word

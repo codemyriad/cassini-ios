@@ -29,7 +29,7 @@ public enum SpeakerMerges {
     public static func apply(_ transcript: Transcript, aliases: [String: String]) throws -> Transcript {
         guard !aliases.isEmpty else { return transcript }
         var merged = transcript
-        merged.words = try transcript.words.map { Word(try resolve($0.speaker, aliases: aliases), $0.startMs, $0.endMs, $0.text) }
+        merged.words = try transcript.words.map { Word(try resolve($0.speaker, aliases: aliases), $0.startMs, $0.endMs, $0.text, lowConfidenceSpeaker: $0.lowConfidenceSpeaker) }
         return merged
     }
 

@@ -1,43 +1,29 @@
 import CassiniCore
 
-/// The plain-text transcript export (`.txt`, features.md section 9).
+/// The plain-text transcript export, using the same rows and interjection seams as the note.
 public enum TextExport {
-    /// The title line, the `subtitle` line ("8 Oct 2026, 15:10 · 23:50 · 3 speakers", made by the caller), a blank
-    /// line, then one block per turn: `[<clock>] <label>` and the turn's words on the next line. Blocks are separated
-    /// by one blank line. With one distinct speaker the label is left out (`[<clock>]` only). Without words the body
-    /// is `emptyText`. The result uses `\n` line endings and ends with exactly one `\n`.
     public static func write(_ t: ExportTranscript, subtitle: String, emptyText: String) -> String {
         var out = t.title + "\n" + subtitle + "\n\n"
-        let turns = Turn.of(t.words)
-        if turns.isEmpty { return out + emptyText + "\n" }
+        let rows = TurnModel.rows(of: t.words.map {
+            TurnModel.Word(speaker: $0.speaker, startMs: Double($0.startMs), endMs: Double($0.endMs), text: $0.text,
+                           lowConfidenceSpeaker: $0.lowConfidenceSpeaker)
+        }, endsBoundedByAudio: t.endsBoundedByAudio)
+        if rows.isEmpty { return out + emptyText + "\n" }
         let labelled = t.speakerCount >= 2
-        for (index, turn) in turns.enumerated() {
+        for (index, row) in rows.enumerated() {
             if index > 0 { out += "\n" }
-            out += "[" + ExportClock.clock(turn.startMs, durationMs: t.durationMs) + "]"
-            if labelled { out += " " + t.label(turn.speaker) }
-            out += "\n" + turn.text + "\n"
+            out += "[" + ExportClock.clock(Int64(row.startMs.rounded()), durationMs: t.durationMs) + "]"
+            if labelled, !row.continuation, let speaker = row.speaker { out += " " + t.label(speaker) }
+            if !row.over.isEmpty { out += " (over " + speakerList(row.over.map(t.label)) + ")" }
+            if row.crosstalk { out += " (probably crosstalk)" }
+            out += "\n" + TranscriptTurns.text(of: row.members) { t.label($0 ?? "") } + "\n"
         }
         return out
     }
 
-    /// A maximal run of consecutive words (canonical order) with the same speaker. It starts at its first word's
-    /// start, even when an earlier word of the turn ends later.
-    struct Turn {
-        let speaker: String
-        let startMs: Int64
-        let text: String
-
-        static func of(_ words: [Word]) -> [Turn] {
-            var turns: [Turn] = []
-            var from = 0
-            while from < words.count {
-                var to = from + 1
-                while to < words.count && words[to].speaker == words[from].speaker { to += 1 }
-                turns.append(Turn(speaker: words[from].speaker, startMs: words[from].startMs,
-                                  text: words[from..<to].lazy.map(\.text).joined(separator: " ")))
-                from = to
-            }
-            return turns
-        }
+    /// The viewer's English list form; exports retain their existing English structural labels.
+    private static func speakerList(_ names: [String]) -> String {
+        guard names.count > 1 else { return names.first ?? "" }
+        return names.dropLast().joined(separator: ", ") + " and " + names.last!
     }
 }

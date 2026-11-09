@@ -14,11 +14,29 @@ public enum SpeakerName: Hashable, Sendable {
 public struct TurnWord: Hashable, Sendable {
     public var text: String
     public var start: TimeInterval
-    public init(text: String, start: TimeInterval) { self.text = text; self.start = start }
+    public var end: TimeInterval
+    /// Index in the canonical input, independent of its reading position (including chips).
+    public var sourceIndex: Int
+    public var speakerID: String?
+    public init(text: String, start: TimeInterval, end: TimeInterval? = nil,
+                sourceIndex: Int = 0, speakerID: String? = nil) {
+        self.text = text; self.start = start; self.end = end ?? start
+        self.sourceIndex = sourceIndex; self.speakerID = speakerID
+    }
 }
 
-/// One paragraph of the transcript (Android `TurnUi`): the words of one speaker in a row, cut into paragraphs of at
-/// most `NoteTranscripts.maxTurnWords` words.
+/// An inline aside. Character ranges include its spoken label and parentheses; wordRange indexes actual atoms.
+public struct TurnInterjection: Hashable, Sendable {
+    public let speakerID: String?
+    public let name: SpeakerName
+    public let tint: SpeakerTint
+    public let wordRange: Range<Int>
+    public let textRange: Range<Int>
+    public let nameRange: Range<Int>
+    public let crosstalk: Bool
+}
+
+/// One viewer-defined reading paragraph. The host's speech and inline chips share one searchable, seekable text.
 ///
 /// `id` is `w<index>` of its first word in the whole transcript, so it stays the same while later words change.
 /// `text` joins the words; `offsets` gives each word's first character in it, so search ranges and the active word
@@ -34,9 +52,15 @@ public struct NoteTurn: Identifiable, Hashable, Sendable {
     public let words: [TurnWord]
     public let text: String
     public let offsets: [Int]
-    public let unsettledFrom: Int?
+    public private(set) var unsettledFrom: Int?
+    /// Rejoined words need not be chronological, so tentative words are tracked individually.
+    public private(set) var unsettledWordIndices: Set<Int>
+    public let continuation: Bool
+    public let over: [SpeakerName]
+    public let crosstalk: Bool
+    public let interjections: [TurnInterjection]
     /// "Is this Luca?" above this paragraph: the speaker's first one, while it is a placeholder.
-    public let suggestion: SpeakerSuggestion?
+    public private(set) var suggestion: SpeakerSuggestion?
     /// The passages the paragraph shows, in order, each with where it starts in the paragraph (for Edit passage).
     public let passages: [PassageRef]
 
@@ -53,6 +77,8 @@ public struct NoteTurn: Identifiable, Hashable, Sendable {
     /// The word whose characters hold or precede `offset`.
     public func word(atOffset offset: Int) -> Int? {
         guard !offsets.isEmpty else { return nil }
+        if let chip = interjections.first(where: { $0.textRange.contains(offset) }),
+           offset < offsets[chip.wordRange.lowerBound] { return chip.wordRange.lowerBound }
         var low = 0, high = offsets.count - 1
         while low < high {
             let mid = (low + high + 1) / 2
@@ -97,7 +123,14 @@ public struct NoteTranscript: Hashable, Sendable {
                 starts.append(word.start); turnOf.append(position); inTurn.append(index)
             }
         }
-        self.starts = starts; self.turnOf = turnOf; self.inTurn = inTurn; self.positions = positions
+        // Reading order keeps each turn together; playback order remains chronological.
+        // Equal starts retain canonical source order rather than the chips' display positions.
+        let order = starts.indices.sorted {
+            if starts[$0] != starts[$1] { return starts[$0] < starts[$1] }
+            return turns[turnOf[$0]].words[inTurn[$0]].sourceIndex < turns[turnOf[$1]].words[inTurn[$1]].sourceIndex
+        }
+        self.starts = order.map { starts[$0] }; self.turnOf = order.map { turnOf[$0] }
+        self.inTurn = order.map { inTurn[$0] }; self.positions = positions
     }
 
     public var isEmpty: Bool { turns.isEmpty }
@@ -133,7 +166,9 @@ public struct NoteTranscript: Hashable, Sendable {
     /// The speakers in order of their first paragraph.
     public var speakers: [String] {
         var seen = Set<String>(), order: [String] = []
-        for turn in turns { if let id = turn.speakerID, seen.insert(id).inserted { order.append(id) } }
+        for word in turns.flatMap(\.words).sorted(by: { $0.sourceIndex < $1.sourceIndex }) {
+            if let id = word.speakerID, seen.insert(id).inserted { order.append(id) }
+        }
         return order
     }
 }
@@ -141,13 +176,6 @@ public struct NoteTranscript: Hashable, Sendable {
 /// The pure mapping from a note's passages (sealed) or a job's draft words to `NoteTranscript` (Android
 /// `NoteTranscripts`).
 public enum NoteTranscripts {
-    /// A turn is cut into paragraphs of at most this many words, so one long speaker does not make one huge item. A
-    /// paragraph also ends at a sentence end after `softTurnWords` words.
-    public static let maxTurnWords = 200
-    public static let softTurnWords = 120
-
-    private static let sentenceEnds: Set<Character> = [".", "?", "!", "…", "。", "？", "！"]
-
     /// The name a speaker shows: its label as stored, a placeholder in whichever language it was written in (D47). A
     /// speaker without a label (none, blank, or its id) is "Speaker `ordinal + 1`" in the app's language.
     public static func name(label: String?, id: String, ordinal: Int) -> SpeakerName {
@@ -178,7 +206,7 @@ public enum NoteTranscripts {
         let voiceNames = Dictionary(voices.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
         let cards = Dictionary(suggestions.map { ($0.speakerID, $0) }, uniquingKeysWith: { first, _ in first })
         var suggested = Set<String>()
-        return build(words) { speaker, first in
+        return build(words, endsBoundedByAudio: !note.transcript.isEmpty && note.transcript.allSatisfy { $0.wordEndsBoundedByAudio == true }) { speaker, first in
             guard let speaker else { return Template(name: .unknown, tint: .amber) }
             let name = names[speaker] ?? unlabeled(1)
             var auto = false
@@ -200,7 +228,7 @@ public enum NoteTranscripts {
                              automatic: Set<String> = [], suggestions: [DraftSuggestion] = []) -> NoteTranscript {
         let transcriptWords = words.map {
             TranscriptWord(speaker: $0.speaker.isEmpty ? draftOneVoice : $0.speaker, start: Double($0.startMs) / 1000,
-                           end: Double($0.endMs) / 1000, text: $0.text)
+                           end: Double($0.endMs) / 1000, text: $0.text, lowConfidenceSpeaker: $0.lowConfidenceSpeaker == true)
         }
         let order = orderOfAppearance(transcriptWords)
         var names: [String: SpeakerName] = [:]
@@ -223,11 +251,8 @@ public enum NoteTranscripts {
         })
         guard let tentativeFromMs else { return placed }
         let tentativeFrom = Double(tentativeFromMs) / 1000
-        var position = 0
-        let turns = placed.turns.map { turn -> NoteTurn in
-            defer { position += turn.words.count }
-            let unsettled = (0..<turn.words.count).first { transcriptWords[position + $0].end > tentativeFrom }
-            return turn.with(unsettledFrom: unsettled)
+        let turns = placed.turns.map { turn in
+            turn.with(unsettledWordIndices: Set(turn.words.indices.filter { turn.words[$0].end > tentativeFrom }))
         }
         return NoteTranscript(turns: turns)
     }
@@ -256,63 +281,102 @@ public enum NoteTranscripts {
         return order
     }
 
-    /// The paragraphs of `words`, each from `template` (speaker, whether it is the speaker's first paragraph).
-    private static func build(_ words: [TranscriptWord], template: (String?, Bool) -> Template) -> NoteTranscript {
-        var turns: [NoteTurn] = []
+    /// The exact viewer pipeline decides rows. Source indices, not contiguous slices, preserve playback and edits.
+    private static func build(_ words: [TranscriptWord], endsBoundedByAudio: Bool = false, template: (String?, Bool) -> Template) -> NoteTranscript {
+        let rows = TurnModel.rows(of: words.map {
+            TurnModel.Word(speaker: $0.speaker, startMs: ($0.start * 1000).rounded(), endMs: ($0.end * 1000).rounded(), text: $0.text,
+                           lowConfidenceSpeaker: $0.lowConfidenceSpeaker)
+        }, endsBoundedByAudio: endsBoundedByAudio)
         var seen = Set<String?>()
-        var from = 0
-        while from < words.count {
-            let to = paragraphEnd(words, from: from)
-            let run = words[from..<to]
-            let made = template(run.first!.speaker, seen.insert(run.first!.speaker).inserted)
-            var passages: [PassageRef] = []
-            for word in run {
-                if let id = word.segmentID, passages.last?.id != id { passages.append(PassageRef(id: id, start: word.start)) }
+        let speakerIDs = Set(words.compactMap(\.speaker))
+        func sourceSpeaker(_ id: String?) -> String? {
+            id == "Unknown speaker" && !speakerIDs.contains("Unknown speaker") ? nil : id
+        }
+        let turns = rows.map { row in
+            let speaker = sourceSpeaker(row.speaker)
+            let made = template(speaker, seen.insert(speaker).inserted)
+            let indices = row.members.flatMap(\.wordIndices)
+            var passages: [PassageRef] = [], seenPassages = Set<UUID>()
+            for index in indices {
+                let word = words[index]
+                if let id = word.segmentID, seenPassages.insert(id).inserted {
+                    passages.append(PassageRef(id: id, start: word.start))
+                }
             }
-            turns.append(NoteTurn(id: "w\(from)", speakerID: run.first!.speaker, name: made.name, tint: made.tint,
-                                  start: run.first!.start, auto: made.auto, words: Array(run),
-                                  suggestion: made.suggestion, passages: passages))
-            from = to
+            let over = row.over.map { template(sourceSpeaker($0), false).name }
+            return NoteTurn(id: "w\(indices.min()!)", speakerID: speaker, name: made.name, tint: made.tint,
+                            start: row.startMs / 1000, auto: made.auto, source: words, row: row,
+                            over: over, suggestion: made.suggestion, passages: passages, template: {
+                let value = template(sourceSpeaker($0), false)
+                return (value.name, value.tint)
+            })
         }
         return NoteTranscript(turns: turns)
     }
+}
 
-    /// The end (exclusive) of the paragraph from `from`: the speaker's run, cut as `maxTurnWords` says.
-    private static func paragraphEnd(_ words: [TranscriptWord], from: Int) -> Int {
-        var to = from + 1
-        while to < words.count, words[to].speaker == words[from].speaker, !paragraphFull(words, from: from, to: to) { to += 1 }
-        return to
-    }
-
-    private static func paragraphFull(_ words: [TranscriptWord], from: Int, to: Int) -> Bool {
-        let length = to - from
-        let sentenceEnd = words[to - 1].text.last.map(sentenceEnds.contains) ?? false
-        return length >= maxTurnWords || (length >= softTurnWords && sentenceEnd)
+extension SpeakerName {
+    /// Stored label for plain text, export, copy and inline chips; the viewer supplies the unknown fallback.
+    public var label: String {
+        switch self {
+        case .named(let label), .placeholder(_, let label): label
+        case .unknown: "Unknown speaker"
+        }
     }
 }
 
 extension NoteTurn {
     init(id: String, speakerID: String?, name: SpeakerName, tint: SpeakerTint, start: TimeInterval, auto: Bool,
-         words: [TranscriptWord], unsettledFrom: Int? = nil, suggestion: SpeakerSuggestion?, passages: [PassageRef]) {
-        var text = "", offsets: [Int] = [], length = 0
-        for (index, word) in words.enumerated() {
-            if index > 0, word.spaceBefore { text += " "; length += 1 }
-            offsets.append(length)
-            text += word.text; length += word.text.count
+         source: [TranscriptWord], row: TurnModel.Row, over: [SpeakerName], suggestion: SpeakerSuggestion?,
+         passages: [PassageRef], template: (String?) -> (SpeakerName, SpeakerTint)) {
+        var text = "", offsets: [Int] = [], words: [TurnWord] = [], chips: [TurnInterjection] = []
+        for member in row.members {
+            guard !member.wordIndices.isEmpty else { continue }
+            if !text.isEmpty { text += " " }
+            let from = text.count, wordFrom = words.count
+            let (chipName, chipTint) = template(member.speaker)
+            let chip = member.kind == .interjection
+            if chip { text += "(\(chipName.label): " }
+            let nameRange = (from + 1)..<(from + 1 + chipName.label.count)
+            let proseStart = text.count
+            var cursor = member.text.startIndex
+            for index in member.wordIndices {
+                let word = source[index]
+                // The viewer chooses spaces between atoms (including standalone punctuation).
+                // Locate each original atom in that projection; its text and source time stay intact.
+                let span = member.text.range(of: word.text, options: .literal, range: cursor..<member.text.endIndex)
+                let offset = span.map { member.text.distance(from: member.text.startIndex, to: $0.lowerBound) }
+                    ?? member.text.distance(from: member.text.startIndex, to: cursor)
+                offsets.append(proseStart + offset)
+                if let span { cursor = span.upperBound }
+                words.append(TurnWord(text: word.text, start: word.start, end: word.end,
+                                      sourceIndex: index, speakerID: word.speaker))
+            }
+            text += member.text
+            if chip {
+                text += ")"
+                chips.append(TurnInterjection(speakerID: member.speaker, name: chipName, tint: chipTint,
+                                              wordRange: wordFrom..<words.count, textRange: from..<text.count,
+                                              nameRange: nameRange, crosstalk: member.crosstalk))
+            }
         }
         self.id = id; self.speakerID = speakerID; self.name = name; self.tint = tint; self.start = start
-        self.auto = auto; self.words = words.map { TurnWord(text: $0.text, start: $0.start) }
-        self.text = text; self.offsets = offsets; self.unsettledFrom = unsettledFrom
-        self.suggestion = suggestion; self.passages = passages
+        self.auto = auto; self.words = words; self.text = text; self.offsets = offsets
+        self.unsettledFrom = nil; self.unsettledWordIndices = []
+        self.continuation = row.continuation; self.over = over; self.crosstalk = row.crosstalk
+        self.interjections = chips; self.suggestion = suggestion; self.passages = passages
     }
 
-    func with(unsettledFrom: Int?) -> NoteTurn {
-        NoteTurn(id: id, speakerID: speakerID, name: name, tint: tint, start: start, auto: auto, words: words,
-                 text: text, offsets: offsets, unsettledFrom: unsettledFrom, suggestion: suggestion, passages: passages)
+    func with(unsettledWordIndices: Set<Int>) -> NoteTurn {
+        var copy = self
+        copy.unsettledWordIndices = unsettledWordIndices
+        copy.unsettledFrom = unsettledWordIndices.min()
+        return copy
     }
 
     func with(suggestion: SpeakerSuggestion?) -> NoteTurn {
-        NoteTurn(id: id, speakerID: speakerID, name: name, tint: tint, start: start, auto: auto, words: words,
-                 text: text, offsets: offsets, unsettledFrom: unsettledFrom, suggestion: suggestion, passages: passages)
+        var copy = self
+        copy.suggestion = suggestion
+        return copy
     }
 }

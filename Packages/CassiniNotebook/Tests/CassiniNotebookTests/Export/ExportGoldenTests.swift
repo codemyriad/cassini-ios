@@ -4,7 +4,7 @@ import Testing
 
 /// A 1 h 03 min call in English with three speakers: a named one, a placeholder and a named one with an
 /// accent. Speaker 2's "Yes, yes." comes after Élodie's turn in canonical order but starts while she speaks, so the
-/// subtitles sort it into her cues. The expected files are Android's, byte for byte.
+/// subtitles sort it into her cues. Subtitle goldens remain Android's; TXT adds D84's competing labels.
 struct ExportGoldenTests {
     private let meeting: ExportTranscript
 

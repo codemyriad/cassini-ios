@@ -65,7 +65,10 @@ struct TurnView: View, Equatable {
             }
             .onDisappear { geometry?.frames[turn.id] = nil }
             // Assistive technologies see the plain paragraph: its word links would each be an element of their own.
-            .accessibilityRepresentation { Text(verbatim: turn.text) }
+            .accessibilityRepresentation {
+                Text(verbatim: turn.text + (turn.interjections.contains(where: \.crosstalk)
+                    ? " (" + NoteCopy.probablyCrosstalk + ")" : ""))
+            }
             .accessibilityIdentifier("turn-\(turn.id)")
         switch style {
         case .reading:
@@ -124,15 +127,24 @@ struct TurnView: View, Equatable {
             let start = characters.index(characters.startIndex, offsetBy: offsets.lowerBound)
             return start..<characters.index(start, offsetBy: offsets.count)
         }
+        // The chip is inline prose, including its label for VoiceOver and Copy. Its actual words keep their links.
+        for chip in turn.interjections {
+            if let span = range(chip.textRange) {
+                result[span].backgroundColor = chip.crosstalk ? Color.toneWarn.opacity(0.22) : chip.tint.color.opacity(0.12)
+            }
+            if let name = range(chip.nameRange) {
+                result[name].foregroundColor = chip.tint.color
+                result[name].font = .system(.body, design: .serif, weight: .semibold)
+            }
+        }
         switch style {
         case .reading:
             for index in turn.words.indices where index != activeIndex {
                 if let word = range(turn.range(ofWord: index)) { result[word].link = URL(string: "\(Self.scheme):\(index)") }
             }
         case .draft:
-            if let from = turn.unsettledFrom, turn.words.indices.contains(from),
-               let rest = range(turn.offsets[from]..<turn.text.count) {
-                result[rest].foregroundColor = Color.faint
+            for index in turn.unsettledWordIndices {
+                if let word = range(turn.range(ofWord: index)) { result[word].foregroundColor = Color.faint }
             }
         }
         for match in matches {
@@ -161,10 +173,19 @@ private struct TurnHeader: View {
     var body: some View {
         let name = NoteCopy.speakerName(turn.name)
         let line = HStack(spacing: 6) {
-            Circle().fill(turn.tint.color).frame(width: 8, height: 8)
-            Text(name).font(.subheadline.weight(.semibold)).foregroundStyle(turn.tint.color).lineLimit(1)
+            if !turn.continuation {
+                Circle().fill(turn.tint.color).frame(width: 8, height: 8)
+                Text(name).font(.subheadline.weight(.semibold)).foregroundStyle(turn.tint.color).lineLimit(1)
+            }
             Text(TimeText.clock(turn.start)).font(.caption.monospacedDigit()).foregroundStyle(Color.muted)
-            if turn.auto {
+            if !turn.over.isEmpty {
+                Text(NoteCopy.over(turn.over.map(NoteCopy.speakerName)))
+                    .font(.caption).foregroundStyle(Color.muted)
+            }
+            if turn.crosstalk {
+                Text(NoteCopy.probablyCrosstalk).font(.caption).foregroundStyle(Color.muted)
+            }
+            if turn.auto && !turn.continuation {
                 Text(NoteCopy.auto).font(.caption2.weight(.semibold)).foregroundStyle(Color.muted)
                     .padding(.horizontal, 6).padding(.vertical, 1)
                     .overlay(Capsule().stroke(Color.muted.opacity(0.5), lineWidth: 1))
@@ -173,7 +194,9 @@ private struct TurnHeader: View {
         }
         .frame(minHeight: HitTarget.minimum, alignment: .bottomLeading)
         .contentShape(Rectangle())
-        let label = NoteCopy.turn(name, start: turn.start, auto: turn.auto)
+        let label = [(turn.continuation ? NoteCopy.spokenTime(turn.start) : NoteCopy.turn(name, start: turn.start, auto: turn.auto)),
+                     turn.over.isEmpty ? "" : NoteCopy.over(turn.over.map(NoteCopy.speakerName)),
+                     turn.crosstalk ? NoteCopy.probablyCrosstalk : ""].filter { !$0.isEmpty }.joined(separator: " ")
         if button {
             Button(action: action) { line }
                 .buttonStyle(.plain)
