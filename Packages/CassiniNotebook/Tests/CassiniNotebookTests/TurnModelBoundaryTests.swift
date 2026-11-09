@@ -19,11 +19,11 @@ import Testing
         #expect(try #require(rows.last).continuation == (gap == 60_000))
     }
 
-    @Test func unknownSpeakerNeverHidesItsBadgeAsContinuation() {
+    @Test func unknownSpeakerUsesTheViewersFallbackIdentity() {
         let rows = TurnModel.rows(of: [word(nil, 0, 200, "First"), word(nil, 10_000, 10_200, "Later")])
         #expect(rows.count == 2)
-        #expect(rows.map(\.speaker) == [nil, nil])
-        #expect(rows.allSatisfy { !$0.continuation })
+        #expect(rows.map(\.speaker) == ["Unknown speaker", "Unknown speaker"])
+        #expect(rows.map(\.continuation) == [false, true])
     }
 
     // overlap.ts repairTurnFinalWordInflation: conservative 1000 ms floor when reference

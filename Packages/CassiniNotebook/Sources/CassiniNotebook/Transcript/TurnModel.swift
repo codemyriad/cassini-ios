@@ -101,13 +101,13 @@ public enum TurnModel {
             for (paragraphIndex, paragraph) in paragraphs.enumerated() {
                 let blocks = paragraph.flatMap(\.blocks)
                 let ownWords = paragraph.filter { $0.kind == .words }.flatMap(\.blocks).flatMap(\.words)
-                rows.append(Row(speaker: run.speaker, continuation: false,
+                rows.append(Row(speaker: run.key, continuation: false,
                     startMs: blocks.map(\.startMs).min() ?? run.startMs,
                     endMs: blocks.map(\.endMs).max() ?? run.endMs,
                     over: paragraphIndex == 0 ? over[runIndex] ?? [] : [],
                     crosstalk: likelyCrosstalk(ownWords), members: paragraph.map { member in
                         Member(kind: member.kind,
-                            speaker: member.kind == .interjection ? member.blocks.first?.speaker : nil,
+                            speaker: member.kind == .interjection ? (member.blocks.first?.speaker ?? "Unknown speaker") : nil,
                             crosstalk: member.kind == .interjection && likelyCrosstalk(member.blocks.flatMap(\.words)),
                             wordIndices: member.blocks.flatMap(\.words).map(\.index),
                             text: member.blocks.map(\.text).joined(separator: " "))
