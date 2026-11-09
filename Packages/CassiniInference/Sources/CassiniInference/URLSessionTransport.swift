@@ -31,6 +31,11 @@ public final class URLSessionTransport: HTTPTransport {
 
     deinit { session.invalidateAndCancel() }
 
+    /// A separate session for one bounded metadata retry; existing transfers keep their own session and delegate.
+    public func freshForRetry() -> (any HTTPTransport)? {
+        URLSessionTransport(userAgent: userAgent, configuration: session.configuration)
+    }
+
     public func get(_ url: URL, headers: [String: String], timeout: TimeInterval) async throws -> HTTPAnswer {
         var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: timeout)
         request.httpMethod = "GET"

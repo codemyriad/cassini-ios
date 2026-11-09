@@ -192,4 +192,197 @@ import CassiniEngineTesting
         #expect(verifier.isChecked(model, in: root))
         #expect(try verifier.verify(model, in: root), "the real digest agrees")
     }
+    private func retryFetcher(_ transport: any HTTPTransport) -> NetworkModelFetcher {
+        NetworkModelFetcher(fetcher: ArtifactFetcher(transport: transport, storage: FakeStorage()), redirects: loopback,
+                            decoder: InvertedBytes(), manifestURL: "\(Self.base)/manifest.json",
+                            noticeURL: "\(Self.base)/NOTICE.txt", base: Self.base)
+    }
+
+    @Test(arguments: ["/manifest.json", "/NOTICE.txt"], [URLError.Code.timedOut, .networkConnectionLost])
+    func transientMetadataFailureUsesOneFreshTransportForTheRemainingInstall(_ path: String, _ code: URLError.Code) async throws {
+        let folder = TemporaryFolder()
+        defer { folder.remove() }
+        let fresh = MetadataRetryTransport(server: host())
+        let original = MetadataRetryTransport(server: host(), failurePath: path, failureCode: code, fresh: fresh)
+        let directory = folder.newFolder("staging")
+        try await retryFetcher(original).fetch(model, into: directory) { _, _ in }
+        #expect(original.paths == (path == "/manifest.json" ? [path] : ["/manifest.json", path]))
+        #expect(original.freshCalls.value == 1)
+        #expect(fresh.paths == ["/manifest.json", "/NOTICE.txt"] + model.artifacts.map { URL(string: $0.download!.url)!.path })
+        #expect(fresh.freshCalls.value == 0)
+        #expect(model.complete(directory))
+        for (name, bytes) in files { #expect(try Data(contentsOf: directory.appendingPathComponent(name)) == bytes) }
+        #expect(try Data(contentsOf: directory.appendingPathComponent("NOTICE.txt")) == notice)
+    }
+
+    @Test func aSecondMetadataTimeoutEndsTheInstallWithoutAThirdSession() async throws {
+        let folder = TemporaryFolder()
+        defer { folder.remove() }
+        let forbiddenThird = MetadataRetryTransport(server: host())
+        let fresh = MetadataRetryTransport(server: host(), failurePath: "/manifest.json", failureCode: .timedOut, fresh: forbiddenThird)
+        let original = MetadataRetryTransport(server: host(), failurePath: "/manifest.json", failureCode: .timedOut, fresh: fresh)
+        let directory = folder.newFolder("staging")
+        await expectNetworkError(.timedOut) { try await retryFetcher(original).fetch(model, into: directory) { _, _ in } }
+        #expect(original.paths == ["/manifest.json"])
+        #expect(fresh.paths == ["/manifest.json"])
+        #expect(original.freshCalls.value == 1)
+        #expect(fresh.freshCalls.value == 0)
+        #expect(forbiddenThird.paths.isEmpty)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: directory.path).isEmpty)
+    }
+
+    @Test func cancellationWhileMetadataIsPendingCannotCreateAFreshSession() async throws {
+        let folder = TemporaryFolder()
+        defer { folder.remove() }
+        let gate = MetadataRequestGate()
+        let fresh = MetadataRetryTransport(server: host())
+        let original = MetadataRetryTransport(server: host(), failurePath: "/manifest.json", failureCode: .timedOut,
+                                             fresh: fresh, gate: gate)
+        let directory = folder.newFolder("staging")
+        let operation = Task { try await retryFetcher(original).fetch(model, into: directory) { _, _ in } }
+        await gate.waitUntilEntered()
+        operation.cancel()
+        gate.release()
+        // A late timeout after cancellation still belongs to the cancelled operation, not a retry.
+        do { try await operation.value; Issue.record("Expected the cancelled request to fail") }
+        catch is CancellationError { }
+        catch let error as URLError { #expect(error.code == .timedOut || error.code == .cancelled) }
+        catch { Issue.record("Unexpected cancellation failure: \(error)") }
+        #expect(original.freshCalls.value == 0)
+        #expect(fresh.paths.isEmpty)
+        #expect(original.paths == ["/manifest.json"])
+    }
+
+    @Test(arguments: [URLError.Code.cancelled, .cannotFindHost, .notConnectedToInternet])
+    func otherNetworkErrorsDoNotStartAFreshSession(_ code: URLError.Code) async throws {
+        let folder = TemporaryFolder()
+        defer { folder.remove() }
+        let fresh = MetadataRetryTransport(server: host())
+        let original = MetadataRetryTransport(server: host(), failurePath: "/manifest.json", failureCode: code, fresh: fresh)
+        await expectNetworkError(code) {
+            try await retryFetcher(original).fetch(model, into: folder.newFolder("staging")) { _, _ in }
+        }
+        #expect(original.freshCalls.value == 0)
+        #expect(fresh.paths.isEmpty)
+    }
+
+    @Test func badMetadataPinsHTTPAndIntegrityFailuresAreNeverRetried() async throws {
+        let scenarios: [(FakeServer, JobFailure, [String])] = [
+            (host(manifest: Data("not JSON".utf8)), .download(.pinUnavailable), ["/manifest.json"]),
+            (host(manifest: manifest(sourceSha256: String(repeating: "0", count: 64))), .download(.pinUnavailable), ["/manifest.json"]),
+            (host { $0 == "/manifest.json" ? FakeServer.Answer(503, Data()) : nil }, .modelDownload, ["/manifest.json"]),
+            (host { $0 == "/manifest.json" ? FakeServer.Answer(302, Data(), headers: ["Location": "https://other.example/manifest.json"]) : nil }, .modelDownload, ["/manifest.json"]),
+            (host { $0 == "/NOTICE.txt" ? FakeServer.Answer(200, Data()) : nil }, .modelVerify, ["/manifest.json", "/NOTICE.txt"])
+        ]
+        for (server, expected, paths) in scenarios {
+            let folder = TemporaryFolder()
+            defer { folder.remove() }
+            let fresh = MetadataRetryTransport(server: host())
+            let original = MetadataRetryTransport(server: server, fresh: fresh)
+            #expect(await failure { try await retryFetcher(original).fetch(model, into: folder.newFolder("staging")) { _, _ in } } == expected)
+            #expect(original.paths == paths)
+            #expect(original.freshCalls.value == 0)
+            #expect(fresh.paths.isEmpty)
+        }
+    }
+
+    @Test func metadataBodyTimeoutAlsoUsesTheFreshTransport() async throws {
+        let folder = TemporaryFolder()
+        defer { folder.remove() }
+        let fresh = MetadataRetryTransport(server: host())
+        let original = MetadataRetryTransport(server: host(), bodyTimeoutPath: "/manifest.json", fresh: fresh)
+        let directory = folder.newFolder("staging")
+        try await retryFetcher(original).fetch(model, into: directory) { _, _ in }
+        #expect(original.paths == ["/manifest.json"])
+        #expect(original.freshCalls.value == 1)
+        #expect(fresh.paths == ["/manifest.json", "/NOTICE.txt"] + model.artifacts.map { URL(string: $0.download!.url)!.path })
+        #expect(model.complete(directory))
+    }
+
+    @Test func failurePublishingTheNoticeIsNotANetworkRetry() async throws {
+        let folder = TemporaryFolder()
+        defer { folder.remove() }
+        let directory = folder.newFolder("staging")
+        try FileManager.default.createDirectory(at: directory.appendingPathComponent("NOTICE.txt"), withIntermediateDirectories: false)
+        let fresh = MetadataRetryTransport(server: host())
+        let original = MetadataRetryTransport(server: host(), fresh: fresh)
+        #expect(await failure { try await retryFetcher(original).fetch(model, into: directory) { _, _ in } } == .modelInstall)
+        #expect(original.paths == ["/manifest.json", "/NOTICE.txt"])
+        #expect(original.freshCalls.value == 0)
+        #expect(fresh.paths.isEmpty)
+    }
+
+    @Test func anArtifactBodyTimeoutKeepsItsPartialWithoutMetadataRetry() async throws {
+        let folder = TemporaryFolder()
+        defer { folder.remove() }
+        let artifact = model.artifacts[0].download!
+        let path = URL(string: artifact.url)!.path
+        let fresh = MetadataRetryTransport(server: host())
+        let original = MetadataRetryTransport(server: host(), bodyTimeoutPath: path, fresh: fresh)
+        let directory = folder.newFolder("staging")
+        await expectNetworkError(.timedOut) { try await retryFetcher(original).fetch(model, into: directory) { _, _ in } }
+        #expect(original.paths == ["/manifest.json", "/NOTICE.txt", path])
+        #expect(original.freshCalls.value == 0)
+        #expect(fresh.paths.isEmpty)
+        #expect(length(directory.appendingPathComponent("\(artifact.sha256).part")) == 1)
+        #expect(!model.complete(directory))
+    }
+
+    private func expectNetworkError(_ code: URLError.Code, _ operation: () async throws -> Void) async {
+        do { try await operation(); Issue.record("Expected network error \(code)") }
+        catch let error as URLError { #expect(error.code == code) }
+        catch { Issue.record("Expected URLError, got \(error)") }
+    }
+
+}
+
+
+/// No network, timers or polling: each attempted request and session renewal is observed directly.
+private final class MetadataRetryTransport: HTTPTransport, Sendable {
+    let server: FakeServer
+    let failurePath: String?
+    let failureCode: URLError.Code
+    let bodyTimeoutPath: String?
+    let fresh: (any HTTPTransport)?
+    let gate: MetadataRequestGate?
+    let freshCalls = Counter()
+    private let requests = Mutex<[String]>([])
+    var paths: [String] { requests.withLock { $0 } }
+
+    init(server: FakeServer, failurePath: String? = nil, failureCode: URLError.Code = .timedOut,
+         bodyTimeoutPath: String? = nil, fresh: (any HTTPTransport)? = nil, gate: MetadataRequestGate? = nil) {
+        self.server = server; self.failurePath = failurePath; self.failureCode = failureCode
+        self.bodyTimeoutPath = bodyTimeoutPath; self.fresh = fresh; self.gate = gate
+    }
+    func freshForRetry() -> (any HTTPTransport)? {
+        _ = freshCalls.next()
+        return fresh
+    }
+    func get(_ url: URL, headers: [String: String], timeout: TimeInterval) async throws -> HTTPAnswer {
+        requests.withLock { $0.append(url.path) }
+        if url.path == failurePath {
+            if let gate { await gate.enterAndWait() }
+            throw URLError(failureCode)
+        }
+        var answer = try await server.get(url, headers: headers, timeout: timeout)
+        if url.path == bodyTimeoutPath {
+            answer.body = AsyncThrowingStream { continuation in
+                continuation.yield(Data([0]))
+                continuation.finish(throwing: URLError(.timedOut))
+            }
+        }
+        return answer
+    }
+}
+
+private final class MetadataRequestGate: Sendable {
+    private let entered = AsyncStream<Void>.makeStream()
+    private let permitted = AsyncStream<Void>.makeStream()
+    func enterAndWait() async {
+        entered.continuation.yield(())
+        entered.continuation.finish()
+        for await _ in permitted.stream { break }
+    }
+    func waitUntilEntered() async { for await _ in entered.stream { break } }
+    func release() { permitted.continuation.yield(()); permitted.continuation.finish() }
 }

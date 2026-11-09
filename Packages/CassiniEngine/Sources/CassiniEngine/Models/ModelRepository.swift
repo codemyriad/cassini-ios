@@ -69,22 +69,34 @@ public struct NetworkModelFetcher: ModelFetching {
     public func fetch(_ model: ModelDescriptor, into directory: URL,
                       progress: @escaping @Sendable (Int64, Bool) -> Void) async throws {
         guard let decoder else { throw ModelError(.modelInstall, "No Zstandard decoder") }
+        var activeFetcher = fetcher
         let urls: [String: String]
         do {
-            ModelInstallDiagnostics.begin(model: model.id, stage: "manifest")
-            urls = try await manifest().urls(model, allowed: redirects)
+            urls = try await metadata(model, into: directory, using: activeFetcher)
         } catch {
-            ModelInstallDiagnostics.failure(model: model.id, stage: "manifest", error: error)
-            throw error
+            ModelInstallDiagnostics.failure(model: model.id, stage: "metadata.initial", error: error)
+            guard !ModelInstaller.isCancellation(error),
+                  let network = error as? URLError,
+                  network.code == .timedOut || network.code == .networkConnectionLost,
+                  let fresh = fetcher.transport.freshForRetry() else { throw error }
+            try Task.checkCancellation()
+            activeFetcher = ArtifactFetcher(transport: fresh, storage: fetcher.storage)
+            ModelInstallDiagnostics.begin(model: model.id, stage: "metadata.retry")
+            do {
+                // Re-read both metadata objects and repeat pin/redirect checks using the independent transport session.
+                urls = try await metadata(model, into: directory, using: activeFetcher)
+            } catch {
+                ModelInstallDiagnostics.failure(model: model.id, stage: "metadata.retry", error: error)
+                throw error
+            }
         }
-        try await fetcher.fetchNotice(noticeURL, into: directory, redirects: redirects)
         var completed: Int64 = 0
         for (index, artifact) in model.artifacts.enumerated() {
             guard let download = artifact.download, let url = urls[artifact.name] else {
                 throw ModelError(.modelInstall, "\(artifact.name) has no pinned download")
             }
             let done = completed, last = index == model.artifacts.count - 1
-            try await fetcher.fetchCompressed(url, download: download, artifact: artifact, into: directory,
+            try await activeFetcher.fetchCompressed(url, download: download, artifact: artifact, into: directory,
                                               decoder: decoder, redirects: redirects) { bytes, verifying in
                 if verifying && !last {
                     progress(done + download.size, false)
@@ -96,9 +108,24 @@ public struct NetworkModelFetcher: ModelFetching {
         }
     }
 
+    /// The only retryable scope: no artifact bytes have been requested yet.
+    private func metadata(_ model: ModelDescriptor, into directory: URL,
+                          using fetcher: ArtifactFetcher) async throws -> [String: String] {
+        let urls: [String: String]
+        do {
+            ModelInstallDiagnostics.begin(model: model.id, stage: "manifest")
+            urls = try await manifest(using: fetcher).urls(model, allowed: redirects)
+        } catch {
+            ModelInstallDiagnostics.failure(model: model.id, stage: "manifest", error: error)
+            throw error
+        }
+        try await fetcher.fetchNotice(noticeURL, into: directory, redirects: redirects)
+        return urls
+    }
+
     /// The host's manifest. One that is too long cannot be the host's: it is refused as a model the host does not
     /// offer, not as a damaged download.
-    private func manifest() async throws -> DistManifest {
+    private func manifest(using fetcher: ArtifactFetcher) async throws -> DistManifest {
         let data: Data
         do {
             data = try await fetcher.read(manifestURL, limit: DistManifest.maxBytes, redirects: redirects)
