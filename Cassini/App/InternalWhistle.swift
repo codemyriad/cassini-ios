@@ -117,7 +117,7 @@ enum InternalWhistle {
         #endif
         let available = os_proc_available_memory()
         return .experiment(internalBuild: isInternalBuild, optedIn: true, arm64: arm64,
-            osSupported: ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 26,
+            osSupported: LivePlatform.whistleOperatingSystemSupported, cpuSupported: LivePlatform.whistleCPUSupported,
             physicalMemory: ProcessInfo.processInfo.physicalMemory,
             availableMemory: available > 0 ? UInt64(available) : nil,
             bundleVerified: WhistleRuntime.cachedBundleVerification() == true)

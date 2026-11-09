@@ -105,7 +105,7 @@ import CassiniEngineTesting
         let arm64 = false
         #endif
         let whistleCapability = WhistleCapability.bundled(arm64: arm64,
-            osSupported: ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 26,
+            osSupported: LivePlatform.whistleOperatingSystemSupported, cpuSupported: LivePlatform.whistleCPUSupported,
             bundleVerified: WhistleRuntime.cachedBundleVerification() == true, physicalMemory: ProcessInfo.processInfo.physicalMemory)
         let speechModels = SpeechModelsStore(root: modelRoot, defaults: defaults, storage: storage,
             whistle: whistleCapability, parakeetLinked: SherpaRuntime.isLinked)
