@@ -103,26 +103,45 @@ public struct ArtifactFetcher: Sendable {
     /// further on. On a size or SHA-256 mismatch the `.part` is deleted.
     public func fetch(_ url: String, _ artifact: Artifact, into directory: URL,
                       redirects: RedirectPolicy = .downloads, progress: (Int64, Bool) -> Void) async throws {
-        let destination = directory.appendingPathComponent(artifact.name)
-        if ModelFiles.length(of: destination) == artifact.size,
-           try Self.digest(destination, onBytes: { progress($0, true) }) == artifact.sha256 {
+        var stage = "download.cached-sha256"
+        do {
+            let destination = directory.appendingPathComponent(artifact.name)
+            if ModelFiles.length(of: destination) == artifact.size,
+               try Self.digest(destination, onBytes: { progress($0, true) }) == artifact.sha256 {
+                progress(artifact.size, true)
+                return
+            }
+            let partial = Self.partial(artifact, in: directory)
+            // A longer file cannot be a prefix of the artifact.
+            if ModelFiles.length(of: partial) > artifact.size { Self.remove(partial) }
+            let offset = ModelFiles.length(of: partial)
+            stage = "download.space"
+            try ModelError.require(storage.availableBytes(at: directory) > artifact.size - offset + Self.slackBytes, .space)
+            stage = "download.transfer"
+            if offset < artifact.size { try await download(url, artifact, partial, redirects, progress) }
+            progress(0, true)
+            stage = "download.size"
+            guard ModelFiles.length(of: partial) == artifact.size else {
+                Self.remove(partial)
+                throw ModelError(.modelVerify)
+            }
+            stage = "download.sha256"
+            ModelInstallDiagnostics.begin(model: artifact.name, stage: stage)
+            guard try Self.digest(partial, onBytes: { progress($0, true) }) == artifact.sha256 else {
+                Self.remove(partial)
+                throw ModelError(.modelVerify)
+            }
+            stage = "download.rename"
+            if rename(partial.path, destination.path) != 0 {
+                ModelInstallDiagnostics.failure(model: artifact.name, stage: stage,
+                                                error: POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO))
+                throw ModelError(.modelInstall)
+            }
             progress(artifact.size, true)
-            return
+        } catch {
+            ModelInstallDiagnostics.failure(model: artifact.name, stage: stage, error: error)
+            throw error
         }
-        let partial = Self.partial(artifact, in: directory)
-        // A longer file cannot be a prefix of the artifact.
-        if ModelFiles.length(of: partial) > artifact.size { Self.remove(partial) }
-        let offset = ModelFiles.length(of: partial)
-        try ModelError.require(storage.availableBytes(at: directory) > artifact.size - offset + Self.slackBytes, .space)
-        if offset < artifact.size { try await download(url, artifact, partial, redirects, progress) }
-        progress(0, true)
-        guard ModelFiles.length(of: partial) == artifact.size,
-              try Self.digest(partial, onBytes: { progress($0, true) }) == artifact.sha256 else {
-            Self.remove(partial)
-            throw ModelError(.modelVerify)
-        }
-        try ModelError.require(rename(partial.path, destination.path) == 0, .modelInstall)
-        progress(artifact.size, true)
     }
 
     /// Downloads the rest of `artifact` into `partial`, from its current length on.
@@ -326,35 +345,61 @@ public struct ArtifactFetcher: Sendable {
         let destination = directory.appendingPathComponent(artifact.name)
         let partial = partial(artifact, in: directory)
         defer { remove(partial) }
+        var stage = "output.create"
+        var reported = false
+        func report(_ error: any Error) {
+            guard !reported else { return }
+            reported = true
+            ModelInstallDiagnostics.failure(model: artifact.name, stage: stage, error: error)
+        }
         do {
             let output: FileHandle
-            do { output = try writer(partial, append: false) } catch { throw writing(error) }
+            do { output = try writer(partial, append: false) } catch { report(error); throw writing(error) }
             var count: Int64 = 0
             var throttle = Throttle()
             do {
+                stage = "decode"
+                ModelInstallDiagnostics.begin(model: artifact.name, stage: stage)
                 try decoder.decompress(source) { block in
                     try ModelError.require(!Task.isCancelled, .cancelled)
+                    stage = "output.size"
                     count += Int64(block.count)
                     try ModelError.require(count <= artifact.size, .modelVerify)
-                    do { try output.write(contentsOf: block) } catch { throw writing(error) }
+                    stage = "output.write"
+                    do { try output.write(contentsOf: block) } catch { report(error); throw writing(error) }
                     if throttle.due() { progress(count) }
+                    stage = "decode"
                 }
             } catch {
                 try? output.close()
                 throw error
             }
-            do { try output.close() } catch { throw writing(error) }
+            stage = "output.close"
+            do { try output.close() } catch { report(error); throw writing(error) }
+            stage = "output.size"
             try ModelError.require(ModelFiles.length(of: partial) == artifact.size, .modelVerify)
+            stage = "output.sha256"
+            ModelInstallDiagnostics.begin(model: artifact.name, stage: stage)
             try ModelError.require(try digest(partial) { progress(artifact.size + $0) } == artifact.sha256, .modelVerify)
-            do { try ModelFiles.sync(partial) } catch { throw writing(error) }
-            try ModelError.require(rename(partial.path, destination.path) == 0, .modelInstall)
+            stage = "file.sync"
+            ModelInstallDiagnostics.begin(model: artifact.name, stage: stage)
+            do { try ModelFiles.sync(partial) } catch { report(error); throw writing(error) }
+            stage = "file.rename"
+            ModelInstallDiagnostics.begin(model: artifact.name, stage: stage)
+            if rename(partial.path, destination.path) != 0 {
+                report(POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO))
+                throw ModelError(.modelInstall)
+            }
         } catch let error as ModelError {
+            report(error)
             throw error
         } catch is CancellationError {
             throw ModelError(.cancelled)
         } catch where CheckpointFiles.isOutOfSpace(error) {
+            report(error)
             throw ModelError(.space, "Decompression: \(error)")
         } catch {
+            report(error)
             // What is left comes from the decoder: the stream is not what was checked.
             throw ModelError(.modelVerify, "Decompression: \(error)")
         }

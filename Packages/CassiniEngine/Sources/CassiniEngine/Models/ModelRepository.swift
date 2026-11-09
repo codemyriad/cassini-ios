@@ -262,20 +262,34 @@ public final class ModelRepository: Sendable {
         do {
             try await fetcher.fetch(model, into: staging, progress: progress)
         } catch let error as ModelError {
+            ModelInstallDiagnostics.failure(model: model.id, stage: "artifact-fetch", error: error)
             throw error
         } catch {
+            ModelInstallDiagnostics.failure(model: model.id, stage: "artifact-fetch", error: error)
             if ModelInstaller.isCancellation(error) { throw error }
             // iOS reports a full disk as its own error: NOT_ENOUGH_STORAGE, where Android reads it as an I/O error.
             if CheckpointFiles.isOutOfSpace(error) { throw ModelError(.space, "\(error)") }
             throw ModelError(.modelDownload, "\(error)")
         }
-        guard model.complete(staging) else { throw ModelError(.modelInstall, "\(model.pin) is incomplete") }
+        guard model.complete(staging) else {
+            let error = ModelError(.modelInstall, "\(model.pin) is incomplete")
+            ModelInstallDiagnostics.failure(model: model.id, stage: "complete", error: error)
+            throw error
+        }
+        var stage = "removeLeftovers"
         do {
             try Self.removeLeftovers(of: model, in: staging)
+            stage = "staging-directory-sync"
+            ModelInstallDiagnostics.begin(model: model.id, stage: stage)
             try ModelFiles.sync(staging)
+            stage = "revision-rename"
+            ModelInstallDiagnostics.begin(model: model.id, stage: stage)
             try ModelFiles.renameExclusive(staging, final)
+            stage = "parent-directory-sync"
+            ModelInstallDiagnostics.begin(model: model.id, stage: stage)
             try ModelFiles.sync(final.deletingLastPathComponent())
         } catch {
+            ModelInstallDiagnostics.failure(model: model.id, stage: stage, error: error)
             throw ModelError(.modelInstall, "\(error)")
         }
         verifier.markVerified(model, in: root)
