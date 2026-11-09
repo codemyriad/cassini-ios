@@ -69,7 +69,7 @@ let package = Package(
         .testTarget(name: "CassiniCoreTests", dependencies: ["CassiniCore"]),
         .target(name: "CassiniNotebook", dependencies: ["CassiniCore"], path: "Packages/CassiniNotebook/Sources/CassiniNotebook"),
         .testTarget(name: "CassiniNotebookTests", dependencies: ["CassiniNotebook", "CassiniCore"], path: "Packages/CassiniNotebook/Tests/CassiniNotebookTests",
-                    resources: [.copy("Resources/export")]),
+                    resources: [.copy("Resources/export"), .copy("Resources/interjections")]),
         .target(name: "CassiniEngine", dependencies: ["CassiniCore", "CassiniNotebook"], path: "Packages/CassiniEngine/Sources/CassiniEngine"),
         .target(name: "CassiniEngineTesting", dependencies: ["CassiniCore", "CassiniEngine", "CassiniNotebook"], path: "Packages/CassiniEngine/Sources/CassiniEngineTesting"),
         .testTarget(name: "CassiniEngineTests", dependencies: ["CassiniCore", "CassiniEngine", "CassiniEngineTesting", "CassiniNotebook"], path: "Packages/CassiniEngine/Tests/CassiniEngineTests",
