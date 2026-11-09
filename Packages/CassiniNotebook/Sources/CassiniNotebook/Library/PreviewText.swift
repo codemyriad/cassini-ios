@@ -79,7 +79,9 @@ public enum PreviewText {
         let lastEnd = words.map(\.endMs).max() ?? 0
         let playing: Int
         if positionMs >= lastEnd {
-            playing = 0
+            // Finishing playback resets the excerpt to reading order's first atom, even if
+            // the producer appended an earlier turn after canonical word zero.
+            playing = entries[0].indices[0]
         } else if let active = words.indices.filter({ words[$0].startMs <= positionMs && words[$0].endMs > positionMs })
             .max(by: { words[$0].startMs == words[$1].startMs ? $0 < $1 : words[$0].startMs < words[$1].startMs }) {
             playing = active

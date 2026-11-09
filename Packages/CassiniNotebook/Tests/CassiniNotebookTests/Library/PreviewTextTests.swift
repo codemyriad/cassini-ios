@@ -167,6 +167,13 @@ struct PreviewTextTests {
 
 
 extension PreviewTextTests {
+    @Test func finishedPlaybackReturnsToReadingStartForOutOfOrderCanonicalWords() {
+        let words = [PreviewWord("Later", startMs: 5000, endMs: 5100, speaker: "ada"),
+                     PreviewWord("First", startMs: 0, endMs: 100, speaker: "ben")]
+        #expect(PreviewText.of(words, positionMs: 0)?.display == "First Later")
+        #expect(PreviewText.of(words, positionMs: 5100)?.display == "First Later")
+    }
+
     @Test func acknowledgmentPreviewKeepsTheChipAndDoesNotStopAtItsSpeakerChange() throws {
         let vector = try D84IntegrationVector.load("acknowledgment")
         let words = vector.words.map { PreviewWord($0.text, startMs: $0.startMs, endMs: $0.endMs, speaker: $0.speaker) }
