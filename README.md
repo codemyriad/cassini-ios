@@ -172,6 +172,15 @@ TestFlight still need.
   speaker. The cross-app vectors are checked through the reader and the import. Android keeps the transcript in a
   sealed document and a Room catalogue. The queue is `jobs.json`, and checkpoints use iOS's own format. Search
   uses an in-memory index instead of FTS4. Saved voices keep one sample per note instead of a running mean.
+- **Transcript rendering (D84).** The pure `CassiniNotebook.TurnModel` ports the gocassini viewer pipeline at
+  `1111155cb0017b47c072a8662c54f28ad7c44223`: readable grouping, display-only timing repair, continuity-based
+  turn reconstruction, inline interjections, competing-speaker labels and continuation headers. The sealed note,
+  live draft, reader, Library previews, search excerpts and text export use that projection. Canonical words and
+  timestamps stay unchanged; playback and editing keep the original word indices even when reading order differs.
+  The six shared vectors in `CassiniNotebookTests/Resources/interjections` are copied unchanged from coordination
+  and checked with `swift test --filter CassiniNotebookTests` (no simulator or e2e). This viewer contract supersedes
+  the older per-app paragraph rules, including iOS's former 200/120-word paragraph limits. SRT/VTT retain their
+  subtitle cue rules; portable `.opus`/JSON exports retain canonical word order.
 - **Recording.** iOS captures PCM CAF and compresses it to M4A, so there is no 1 GiB AAC limit, and the storage floor
   includes the room for that compression. The audio session does not mix with other apps, so a call pauses the
   recording. Losing the input pauses it too. A Live Activity replaces Android's ongoing notification, and recovery

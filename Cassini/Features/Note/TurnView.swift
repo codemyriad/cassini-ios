@@ -48,6 +48,28 @@ struct TurnView: View, Equatable {
             TurnHeader(turn: turn, button: renamable && turn.nameableSpeakerID != nil) {
                 if let id = turn.nameableSpeakerID { actions.nameSpeaker(id) }
             }
+            // A draft has no Speakers sheet. Every inline speaker needs a naming control even without a voice card.
+            ForEach(turn.inlineSpeakersForNaming(isDraft: style == .draft, renamable: renamable), id: \.speakerID) { chip in
+                if let id = chip.speakerID {
+                    Button { actions.nameSpeaker(id) } label: {
+                        HStack(spacing: 6) {
+                            Circle().fill(chip.tint.color).frame(width: 8, height: 8)
+                            Text(NoteCopy.speakerName(chip.name)).font(.subheadline.weight(.semibold))
+                            Text(TimeText.clock(turn.words[chip.wordRange.lowerBound].start))
+                                .font(.caption.monospacedDigit()).foregroundStyle(Color.muted)
+                            Image(systemName: "pencil").font(.caption)
+                            Spacer(minLength: 0)
+                        }
+                        .foregroundStyle(chip.tint.color)
+                        .frame(minHeight: HitTarget.minimum, alignment: .leading).contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(Text(verbatim: NoteCopy.turn(NoteCopy.speakerName(chip.name),
+                        start: turn.words[chip.wordRange.lowerBound].start, auto: false)))
+                    .accessibilityHint(NoteCopy.nameThisSpeaker)
+                    .accessibilityIdentifier("inlineSpeakerHeader-\(turn.id)-\(id)")
+                }
+            }
             paragraph
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -65,13 +87,14 @@ struct TurnView: View, Equatable {
             }
             .onDisappear { geometry?.frames[turn.id] = nil }
             // Assistive technologies see the plain paragraph: its word links would each be an element of their own.
-            .accessibilityRepresentation { Text(verbatim: turn.text) }
+            .accessibilityRepresentation {
+                Text(verbatim: turn.text + (turn.interjections.contains(where: \.crosstalk)
+                    ? " (" + NoteCopy.probablyCrosstalk + ")" : ""))
+            }
             .accessibilityIdentifier("turn-\(turn.id)")
         switch style {
         case .reading:
             text
-                .foregroundStyle(placeholder ? Color.muted : Color.ink)
-                .tint(placeholder ? Color.muted : Color.ink)
                 .environment(\.openURL, OpenURLAction { url in
                     guard let index = Self.wordIndex(url) else { return .systemAction }
                     actions.wordTap(WordRef(turnID: turn.id, index: index))
@@ -117,22 +140,33 @@ struct TurnView: View, Equatable {
 
     /// The paragraph with its word links (reading), its unsettled words (draft), the active word and the search hits.
     private var attributed: AttributedString {
-        var result = AttributedString(turn.text)
+        var result = style == .reading
+            ? turn.linkedText(activeWord: activeIndex, scheme: Self.scheme)
+            : AttributedString(turn.text)
+        // Use per-run foregrounds: a paragraph-wide link tint would color named chips like an unnamed host.
+        result.foregroundColor = style == .draft || placeholder ? Color.muted : Color.ink
         let characters = result.characters
         func range(_ offsets: Range<Int>) -> Range<AttributedString.Index>? {
             guard offsets.lowerBound >= 0, offsets.upperBound <= characters.count else { return nil }
             let start = characters.index(characters.startIndex, offsetBy: offsets.lowerBound)
             return start..<characters.index(start, offsetBy: offsets.count)
         }
-        switch style {
-        case .reading:
-            for index in turn.words.indices where index != activeIndex {
-                if let word = range(turn.range(ofWord: index)) { result[word].link = URL(string: "\(Self.scheme):\(index)") }
+        // The full chip tint includes its internal spaces; active-word colors are applied after every decoration.
+        for chip in turn.interjections {
+            if let span = range(chip.textRange) {
+                result[span].foregroundColor = chip.name.isNamed ? Color.ink : Color.muted
+                result[span].backgroundColor = chip.crosstalk ? Color.toneWarn.opacity(0.22) : chip.tint.color.opacity(0.12)
             }
+            if let name = range(chip.nameRange) {
+                result[name].foregroundColor = chip.tint.color
+                result[name].font = .system(.body, design: .serif, weight: .semibold)
+            }
+        }
+        switch style {
+        case .reading: break
         case .draft:
-            if let from = turn.unsettledFrom, turn.words.indices.contains(from),
-               let rest = range(turn.offsets[from]..<turn.text.count) {
-                result[rest].foregroundColor = Color.faint
+            for index in turn.unsettledWordIndices {
+                if let word = range(turn.range(ofWord: index)) { result[word].foregroundColor = Color.faint }
             }
         }
         for match in matches {
@@ -161,10 +195,19 @@ private struct TurnHeader: View {
     var body: some View {
         let name = NoteCopy.speakerName(turn.name)
         let line = HStack(spacing: 6) {
-            Circle().fill(turn.tint.color).frame(width: 8, height: 8)
-            Text(name).font(.subheadline.weight(.semibold)).foregroundStyle(turn.tint.color).lineLimit(1)
+            if !turn.continuation {
+                Circle().fill(turn.tint.color).frame(width: 8, height: 8)
+                Text(name).font(.subheadline.weight(.semibold)).foregroundStyle(turn.tint.color).lineLimit(1)
+            }
             Text(TimeText.clock(turn.start)).font(.caption.monospacedDigit()).foregroundStyle(Color.muted)
-            if turn.auto {
+            if !turn.over.isEmpty {
+                Text(NoteCopy.over(turn.over.map(NoteCopy.speakerName)))
+                    .font(.caption).foregroundStyle(Color.muted)
+            }
+            if turn.crosstalk {
+                Text(NoteCopy.probablyCrosstalk).font(.caption).foregroundStyle(Color.muted)
+            }
+            if turn.auto && !turn.continuation {
                 Text(NoteCopy.auto).font(.caption2.weight(.semibold)).foregroundStyle(Color.muted)
                     .padding(.horizontal, 6).padding(.vertical, 1)
                     .overlay(Capsule().stroke(Color.muted.opacity(0.5), lineWidth: 1))
@@ -173,7 +216,9 @@ private struct TurnHeader: View {
         }
         .frame(minHeight: HitTarget.minimum, alignment: .bottomLeading)
         .contentShape(Rectangle())
-        let label = NoteCopy.turn(name, start: turn.start, auto: turn.auto)
+        let label = [(turn.continuation ? NoteCopy.spokenTime(turn.start) : NoteCopy.turn(name, start: turn.start, auto: turn.auto)),
+                     turn.over.isEmpty ? "" : NoteCopy.over(turn.over.map(NoteCopy.speakerName)),
+                     turn.crosstalk ? NoteCopy.probablyCrosstalk : ""].filter { !$0.isEmpty }.joined(separator: " ")
         if button {
             Button(action: action) { line }
                 .buttonStyle(.plain)

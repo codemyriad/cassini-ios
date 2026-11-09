@@ -12,9 +12,11 @@ public struct ExportTranscript: Hashable, Sendable {
     public var durationMs: Int64
     public var words: [Word]
     public var labels: [String: String]
+    public var endsBoundedByAudio: Bool
 
-    public init(title: String, durationMs: Int64, words: [Word], labels: [String: String]) {
+    public init(title: String, durationMs: Int64, words: [Word], labels: [String: String], endsBoundedByAudio: Bool = false) {
         self.title = title; self.durationMs = durationMs; self.words = words; self.labels = labels
+        self.endsBoundedByAudio = endsBoundedByAudio
     }
 
     /// The number of distinct speakers that say at least one word.

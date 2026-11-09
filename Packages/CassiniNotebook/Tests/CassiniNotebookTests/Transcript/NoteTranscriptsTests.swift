@@ -1,3 +1,4 @@
+import CassiniCore
 import Foundation
 import Testing
 @testable import CassiniNotebook
@@ -86,8 +87,8 @@ import Testing
     @Test func oneLongSpeakerIsSplitIntoParagraphs() {
         let long = (0..<450).map { i in F.W("a", i * 100, i * 100 + 90, i == 129 ? "end." : "w\(i)") }
         let turns = NoteTranscripts.sealed(F.note(long)).turns
-        #expect(turns.map(\.words.count) == [130, 200, 120], "a sentence end after 120 words, then at most 200")
-        #expect(turns.map(\.id) == ["w0", "w130", "w330"])
+        #expect(turns.map(\.words.count) == [130, 140, 140, 40], "viewer readable blocks use a 96-word sentence target and 140-word limit")
+        #expect(turns.map(\.id) == ["w0", "w130", "w270", "w410"])
         #expect(turns.allSatisfy { $0.speakerID == "a" })
     }
 
@@ -149,5 +150,79 @@ import Testing
         #expect(turn.range(ofWord: 1) == 6..<15)
         #expect(turn.word(atOffset: 4) == 0)
         #expect(turn.word(atOffset: 7) == 1)
+    }
+}
+
+extension NoteTranscriptsTests {
+    @Test func sealedChipOnlySuggestionKeepsItsSpeakerTintAndNamingTargets() throws {
+        let vector = try D84IntegrationVector.load("acknowledgment")
+        let voice = F.voice("Ben Carter")
+        var note = Note(title: "Release check-in")
+        note.transcript = TranscriptSegment.segments(of: vector.words)
+        note.speakers = [.init(id: "ada", name: "Ada"),
+                         .init(id: "ben", name: "Speaker 2", match: .suggested(voice: voice.id, score: 0.7))]
+        let cards = SpeakerSuggestions.of(note, voices: [voice])
+        let transcript = NoteTranscripts.sealed(note, voices: [voice], suggestions: cards)
+        let row = try #require(transcript.turns.first)
+        #expect(transcript.turns.count == 1 && row.speakerID == "ada")
+        #expect(transcript.speakers == ["ada", "ben"])
+        #expect(row.suggestion == nil)
+        #expect(row.inlineSuggestions == cards)
+        #expect(row.allSuggestions.map(\.speakerID) == ["ben"])
+        #expect(row.allSuggestions.first?.start == 3.05)
+        #expect(row.interjections.first?.name == .placeholder(2, label: "Speaker 2"))
+        #expect(row.interjections.first?.tint == .amber)
+        let ben = try #require(NamingInput.of(note, speakerID: "ben", print: nil, voices: [voice],
+                                              voicesReadOnly: false, voiceModelReady: false))
+        let ada = try #require(NamingInput.of(note, speakerID: "ada", print: nil, voices: [voice],
+                                              voicesReadOnly: false, voiceModelReady: false))
+        #expect(ben.mergeTargets.map(\.speakerID) == ["ada"])
+        #expect(ada.mergeTargets.map(\.speakerID) == ["ben"])
+        #expect(ben.ordinal == 1 && ben.label == "Speaker 2")
+        note.speakers?[1].name = "Ben"
+        let named = NoteTranscripts.sealed(note, voices: [voice], suggestions: SpeakerSuggestions.of(note, voices: [voice]))
+        #expect(named.turns[0].allSuggestions.isEmpty)
+        #expect(named.speakers == ["ada", "ben"])
+        #expect(named.turns[0].interjections.first?.tint == .teal)
+    }
+
+    @Test func aRepeatedChipSpeakerGetsOneSealedCardAndItsLatestDraftCard() throws {
+        let vector = try D84IntegrationVector.load("acknowledgment")
+        let later = vector.words.map { CassiniCore.Word($0.speaker, $0.startMs + 20_000, $0.endMs + 20_000, $0.text) }
+        let words = vector.words + later
+        let voice = F.voice("Ben Carter")
+        var note = Note(title: "Two updates")
+        note.transcript = TranscriptSegment.segments(of: words)
+        note.speakers = [.init(id: "ada", name: "Ada"),
+                         .init(id: "ben", name: "Speaker 2", match: .suggested(voice: voice.id, score: 0.7))]
+        let sealed = NoteTranscripts.sealed(note, voices: [voice], suggestions: SpeakerSuggestions.of(note, voices: [voice]))
+        #expect(sealed.turns.flatMap(\.interjections).count == 2)
+        #expect(sealed.turns.flatMap(\.allSuggestions).map(\.speakerID) == ["ben"])
+        #expect(sealed.turns.flatMap(\.allSuggestions).first?.start == 3.05)
+        let raw = words.map { DraftWord(speaker: $0.speaker, startMs: $0.startMs, endMs: $0.endMs, text: $0.text) }
+        let card = DraftSuggestion(speakerID: "ben", voiceID: voice.id, name: voice.name, score: 0.7, atMs: 23_050)
+        let draft = NoteTranscripts.draft(raw, tentativeFromMs: 23_000, labels: ["ada": "Ada"], suggestions: [card, card])
+        let placed = draft.turns.filter { !$0.allSuggestions.isEmpty }
+        #expect(placed.count == 1)
+        #expect(placed.first?.inlineSuggestions.map(\.speakerID) == ["ben"])
+        #expect(placed.first?.allSuggestions.first?.start == 23.05)
+        #expect(placed.first?.start == 20)
+        #expect(placed.first?.unsettledWordIndices.isEmpty == false, "Placing tentative words retains its cards")
+    }
+
+    @Test func draftCardsUseActualSpeakerWordsInsideARejoinedRow() throws {
+        let vector = try D84IntegrationVector.load("acknowledgment")
+        let raw = vector.words.map { DraftWord(speaker: $0.speaker, startMs: $0.startMs, endMs: $0.endMs, text: $0.text) }
+        let ada = UUID(), ben = UUID()
+        let cards = [DraftSuggestion(speakerID: "ada", voiceID: ada, name: "Ada", score: 0.7, atMs: 3500),
+                     DraftSuggestion(speakerID: "ben", voiceID: ben, name: "Ben", score: 0.7, atMs: 3050)]
+        let draft = NoteTranscripts.draft(raw, tentativeFromMs: nil, suggestions: cards)
+        let row = try #require(draft.turns.first)
+        #expect(draft.turns.count == 1)
+        #expect(row.start == 0)
+        #expect(row.suggestion?.speakerID == "ada" && row.suggestion?.start == 3.5)
+        #expect(row.inlineSuggestions.map(\.speakerID) == ["ben"])
+        #expect(row.allSuggestions.map(\.speakerID) == ["ada", "ben"])
+        #expect(row.allSuggestions.map(\.start) == [3.5, 3.05])
     }
 }

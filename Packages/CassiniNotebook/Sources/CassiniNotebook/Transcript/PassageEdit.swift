@@ -10,6 +10,7 @@ extension TranscriptSegment {
         if trimmed != self.text {
             revised.text = trimmed
             revised.words = []
+            revised.wordEndsBoundedByAudio = nil
         }
         let speaker = speakerID.flatMap { id in speakers.first { $0.id == id } }
         revised.speakerID = speaker?.id

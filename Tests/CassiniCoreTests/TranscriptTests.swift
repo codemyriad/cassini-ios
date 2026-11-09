@@ -92,3 +92,19 @@ import Testing
         #expect(Transcript([]).json() == #"{"format":"cassini.words.v1","wordCount":0,"items":[]}"#)
     }
 }
+
+extension TranscriptTests {
+    @Test func speakerConfidenceMetadataRoundTripsWithoutChangingLegacyWordBodies() throws {
+        let ordinary = Word("ada", 0, 500, "Ready.")
+        let uncertain = Word("ben", 300, 800, "Maybe.", lowConfidenceSpeaker: true)
+        let source = Transcript([ordinary, uncertain])
+        let items = try JSON.parseObject(source.json()).array("items")
+        #expect(items[0].object?["lowConfidenceSpeaker"] == nil)
+        #expect(items[1].object?["lowConfidenceSpeaker"] == .bool(true))
+        #expect(try Transcript.fromJSON(source.json()) == source)
+        let legacy = try Transcript.fromJSON(#"{"format":"cassini.words.v1","items":[{"speaker":"ada","startMs":0,"endMs":500,"text":"Ready."}]}"#)
+        #expect(legacy.words == [ordinary])
+        #expect(!legacy.words[0].lowConfidenceSpeaker)
+        #expect(try SpeakerMerges.apply(source, aliases: ["ben": "ada"]).words[1].lowConfidenceSpeaker)
+    }
+}

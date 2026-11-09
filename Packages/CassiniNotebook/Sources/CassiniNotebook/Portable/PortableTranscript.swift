@@ -112,7 +112,12 @@ public struct PortableTranscript: Hashable, Sendable {
 
     /// Words grouped into segments (`TranscriptSegment.segments(of:label:)`), named by the manifest's labels.
     private static func segments(_ transcript: Transcript, _ document: CassiniDocument) -> [TranscriptSegment] {
-        TranscriptSegment.segments(of: transcript.words) { document.speakerLabel($0) }
+        let bounded = document.manifest?["provenance"]?.object?["wordTimings"]?.object?["endsBoundedByAudio"]?.bool == true
+        return TranscriptSegment.segments(of: transcript.words) { document.speakerLabel($0) }.map { original in
+            var segment = original
+            segment.wordEndsBoundedByAudio = bounded ? true : nil
+            return segment
+        }
     }
 }
 
@@ -190,7 +195,8 @@ extension PortableTranscript {
             // A source run may contain several words. Each keeps the run's range; never invent subword timing.
             return source.flatMap { word in
                 word.text.split(whereSeparator: \.isWhitespace).map {
-                    Word(id, Int64((word.start * 1000).rounded()), Int64((word.end * 1000).rounded()), String($0))
+                    Word(id, Int64((word.start * 1000).rounded()), Int64((word.end * 1000).rounded()), String($0),
+                         lowConfidenceSpeaker: word.lowConfidenceSpeaker == true)
                 }
             }
         }

@@ -3,7 +3,7 @@ import Foundation
 
 extension Word {
     func with(startMs: Int64? = nil, endMs: Int64? = nil) -> Word {
-        Word(speaker, startMs ?? self.startMs, endMs ?? self.endMs, text)
+        Word(speaker, startMs ?? self.startMs, endMs ?? self.endMs, text, lowConfidenceSpeaker: lowConfidenceSpeaker)
     }
 }
 

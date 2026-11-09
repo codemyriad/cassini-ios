@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import CassiniNotebook
 
-/// Android `PreviewTextTest`, plus the transcript preview of a note that reads only the words it can show.
+/// Preview budgets and playback positions, plus D84 reading order and interjection seams.
 struct PreviewTextTests {
     private func turn(_ speaker: String, _ startMs: Int64, _ text: String, msPerWord: Int64 = 350) -> [PreviewWord] {
         text.split(separator: " ").enumerated().map { i, word in
@@ -22,7 +22,7 @@ struct PreviewTextTests {
     // ports: PreviewTextTest#reproducesBoard00
     @Test func reproducesBoard00() throws {
         let preview = try #require(PreviewText.of(board03, positionMs: (11 * 60 + 44) * 1000))
-        let board00 = "so the delivery slips to Thursday, but the price stays as agreed in the March order"
+        let board00 = "so the delivery slips to Thursday, but the price stays as agreed in the March order."
         #expect(preview.display == "…\(board00)…")
         #expect(preview.text == board00)
         #expect(preview.leadingEllipsis)
@@ -64,30 +64,30 @@ struct PreviewTextTests {
         let words = turn("spk_0", 0, "So, when does the second delivery arrive?") + turn("spk_1", 5_000, "Yes.")
             + turn("spk_0", 6_000, "So Thursday works for everyone, including the warehouse.") + turn("spk_1", 12_000, "All right.")
         let preview = try #require(PreviewText.of(words, positionMs: 5_000))
-        #expect(preview.display == "…Yes. So Thursday works for everyone, including the warehouse…")
+        #expect(preview.display == "…Yes. So Thursday works for everyone, including the warehouse.…")
         #expect(preview.text.utf16.count >= PreviewText.minBeforeTurnEnd)
     }
 
-    // ports: PreviewTextTest#cutAtAWordWithPunctuationDropped
-    @Test func cutAtAWordWithPunctuationDropped() throws {
+    // ports: PreviewTextTest#cutAtAWordPreservesStoredPunctuation
+    @Test func cutAtAWordPreservesStoredPunctuation() throws {
         let long = turn("spk_0", 0, (1...40).map { "sample\($0)," }.joined(separator: " "))
         let preview = try #require(PreviewText.of(long, positionMs: long[5].startMs))
         #expect(preview.text.utf16.count <= PreviewText.limit, "\(preview.display)")
         #expect(preview.text.hasPrefix("sample6, sample7, "))
         // Whole words only: the excerpt is a prefix of the words from the playing one.
-        let words = long.dropFirst(5).map { $0.text.trimmingCharacters(in: CharacterSet(charactersIn: ",")) }
-        #expect(words.joined(separator: ", ").hasPrefix(preview.text))
+        let words = long.dropFirst(5).map(\.text)
+        #expect(words.joined(separator: " ").hasPrefix(preview.text))
         #expect(preview.display.hasSuffix("…"))
-        #expect(!preview.display.hasSuffix(",…"))
-        // One more word would not fit (the dropped comma counted).
+        #expect(preview.display.hasSuffix(",…"))
+        // One more whole atom would exceed the budget.
         let next = long[5 + preview.text.split(separator: " ").count].text
-        #expect((preview.text + ",").utf16.count + 1 + next.utf16.count > PreviewText.limit)
+        #expect(preview.text.utf16.count + 1 + next.utf16.count > PreviewText.limit)
     }
 
-    // ports: PreviewTextTest#sentencePunctuationIsDroppedOnlyWhenCut
-    @Test func sentencePunctuationIsDroppedOnlyWhenCut() {
+    // ports: PreviewTextTest#sentencePunctuationIsPreservedWhenCut
+    @Test func sentencePunctuationIsPreservedWhenCut() {
         let long = turn("spk_0", 0, "Then we agreed on the quantities for the first batch.") + turn("spk_1", 9_000, "Ok.")
-        #expect(PreviewText.of(long, positionMs: long[1].startMs)?.display == "…we agreed on the quantities for the first batch…")
+        #expect(PreviewText.of(long, positionMs: long[1].startMs)?.display == "…we agreed on the quantities for the first batch.…")
         let words = turn("spk_0", 0, "Fine. Next.") + turn("spk_1", 2_000, "Yes!")
         #expect(PreviewText.of(words, positionMs: words[1].startMs)?.display == "…Next. Yes!")
         #expect(PreviewText.of(words, positionMs: words[2].startMs)?.display == "…Yes!")
@@ -105,12 +105,12 @@ struct PreviewTextTests {
         #expect(PreviewText.of([], positionMs: 10_000) == nil)
     }
 
-    // ports: PreviewTextTest#aGiantWordIsCutOnACodePoint
-    @Test func aGiantWordIsCutOnACodePoint() throws {
+    // ports: PreviewTextTest#aGiantWordRemainsOneStoredAtom
+    @Test func aGiantWordRemainsOneStoredAtom() throws {
         let giant = String(repeating: "a", count: PreviewText.limit - 1) + "😀" + "tail"
         let preview = try #require(PreviewText.of([PreviewWord(giant, startMs: 0, endMs: 1_000, speaker: "spk_0")], positionMs: 0))
-        #expect(preview.text == String(repeating: "a", count: PreviewText.limit - 1))
-        #expect(preview.trailingEllipsis)
+        #expect(preview.text == giant)
+        #expect(!preview.trailingEllipsis)
     }
 
     // ports: PreviewTextTest#storedPreviewReadsBack
@@ -132,7 +132,7 @@ struct PreviewTextTests {
             segments.append(TranscriptSegment(
                 text: turnWords.map(\.text).joined(separator: " "), start: Double(first.startMs) / 1000,
                 end: Double(last.endMs) / 1000, speakerID: first.speaker,
-                words: turnWords.map { TimedWord(text: " " + $0.text, start: Double($0.startMs) / 1000, end: Double($0.endMs) / 1000) }))
+                words: turnWords.map { TimedWord(text: $0.text, start: Double($0.startMs) / 1000, end: Double($0.endMs) / 1000) }))
             turnWords = []
         }
         for word in board03 {
@@ -162,5 +162,147 @@ struct PreviewTextTests {
         note.playbackPosition = 0
         #expect(note.transcriptPreview?.display == "one two three four five six")
         #expect(Note(title: "Empty").transcriptPreview == nil)
+    }
+}
+
+
+extension PreviewTextTests {
+    @Test func finishedPlaybackReturnsToReadingStartForOutOfOrderCanonicalWords() {
+        let words = [PreviewWord("Later", startMs: 5000, endMs: 5100, speaker: "ada"),
+                     PreviewWord("First", startMs: 0, endMs: 100, speaker: "ben")]
+        #expect(PreviewText.of(words, positionMs: 0)?.display == "First Later")
+        #expect(PreviewText.of(words, positionMs: 5100)?.display == "First Later")
+    }
+
+    @Test func acknowledgmentPreviewKeepsTheChipAndDoesNotStopAtItsSpeakerChange() throws {
+        let vector = try D84IntegrationVector.load("acknowledgment")
+        let words = vector.words.map { PreviewWord($0.text, startMs: $0.startMs, endMs: $0.endMs, speaker: $0.speaker) }
+        let expected = "The release candidate is ready for testing, (Ben: Sounds good.) and I will send the download link after this call."
+        #expect(PreviewText.of(words, positionMs: 0, labels: ["ben": "Ben"])?.display == expected)
+        // Starting after the first word must still carry the host's words after the interjection.
+        let preview = try #require(PreviewText.of(words, positionMs: words[1].startMs, labels: ["ben": "Ben"]))
+        #expect(preview.display == "…" + String(expected.dropFirst("The ".count)))
+        #expect(!preview.trailingEllipsis)
+    }
+
+    @Test func competingPreviewReadsWholeRowsRatherThanInterleavingSpeakers() throws {
+        let vector = try D84IntegrationVector.load("competing")
+        let words = vector.words.map { PreviewWord($0.text, startMs: $0.startMs, endMs: $0.endMs, speaker: $0.speaker) }
+        let first = "I can check the Linux build and report any problems today."
+        let second = "I will test the browser connection and check the microphone settings."
+        #expect(PreviewText.of(words, positionMs: 0)?.display == first + " " + second)
+        let preview = try #require(PreviewText.of(words, positionMs: words[2].startMs))
+        #expect(preview.display == "…" + String(first.dropFirst("I ".count)) + "…")
+        #expect(preview.trailingEllipsis)
+    }
+
+    @Test func notePreviewUsesSpeakerLabelsInItsInlineChip() throws {
+        let vector = try D84IntegrationVector.load("acknowledgment")
+        var note = Note(title: "Weekly check-in")
+        note.transcript = TranscriptSegment.segments(of: vector.words)
+        note.speakers = [.init(id: "ada", name: "Ada"), .init(id: "ben", name: "Ben")]
+        #expect(note.transcriptPreview?.display.contains("(Ben: Sounds good.)") == true)
+        #expect(note.transcriptPreview?.display.contains("and I will send") == true)
+    }
+}
+
+extension PreviewTextTests {
+    @Test func equalStartPlaybackUsesTheLaterCanonicalAtom() {
+        let words = [PreviewWord("First.", startMs: 0, endMs: 1000, speaker: "ada"),
+                     PreviewWord("Second.", startMs: 0, endMs: 1000, speaker: "ben")]
+        #expect(PreviewText.of(words, positionMs: 100)?.display == "…Second.")
+    }
+}
+
+extension PreviewTextTests {
+    @Test func unplayedNotesKeepReadingStartAcrossTiesUnsortedStartsAndZeroLengthAtoms() {
+        let cases = [
+            [PreviewWord("First.", startMs: 0, endMs: 1000, speaker: "ada"),
+             PreviewWord("Second.", startMs: 0, endMs: 1000, speaker: "ben")],
+            [PreviewWord("long", startMs: 1000, endMs: 3000, speaker: "ada"),
+             PreviewWord("short", startMs: 900, endMs: 1500, speaker: "ada")],
+            [PreviewWord("Opening", startMs: 0, endMs: 0, speaker: "ada"),
+             PreviewWord("word.", startMs: 0, endMs: 200, speaker: "ada")],
+        ]
+        for words in cases {
+            for position: Int64 in [0, -1] {
+                #expect(PreviewText.of(words, positionMs: position) == Preview(words.map(\.text).joined(separator: " ")))
+            }
+        }
+        let delayed = [PreviewWord("First.", startMs: 1000, endMs: 2000, speaker: "ada"),
+                       PreviewWord("Second.", startMs: 1000, endMs: 2000, speaker: "ben")]
+        #expect(PreviewText.of(delayed, positionMs: 1000) == Preview("First. Second."))
+    }
+
+    @Test func startingInsideASecondChipWordReintroducesItsLabelWithoutEarlierWords() throws {
+        var words = try D84IntegrationVector.load("acknowledgment").words.map {
+            PreviewWord($0.text, startMs: $0.startMs, endMs: $0.endMs, speaker: $0.speaker)
+        }
+        // Leave the host's next fragment after the second chip word, making that word the latest active atom.
+        let after = words[9].startMs
+        let position = words[8].startMs + (after - words[8].startMs) / 2
+        let preview = try #require(PreviewText.of(words, positionMs: position, labels: ["ben": "Ben"]))
+        #expect(preview.display == "…(Ben: good.) and I will send the download link after this call.")
+        #expect(!preview.text.contains("Sounds"))
+        // A first oversized chip atom stays whole, including its wrapper, like Android.
+        words[8].text = String(repeating: "x", count: PreviewText.limit + 1)
+        let oversized = try #require(PreviewText.of(words, positionMs: position, labels: ["ben": "Ben"]))
+        #expect(oversized.text == "(Ben: " + words[8].text + ")")
+        #expect(oversized.trailingEllipsis)
+    }
+
+    private func paddedAcknowledgment(_ hostLength: Int) throws -> [PreviewWord] {
+        var words = try D84IntegrationVector.load("acknowledgment").words.map {
+            PreviewWord($0.text, startMs: $0.startMs, endMs: $0.endMs, speaker: $0.speaker)
+        }
+        let host = words.prefix(7).map(\.text).joined(separator: " ")
+        words[0].text += String(repeating: "x", count: hostLength - host.utf16.count)
+        return words
+    }
+
+    @Test func cuttingInsideAChipClosesItsParenthesisWithinTheUtf16Budget() throws {
+        let words = try paddedAcknowledgment(PreviewText.limit - " (Ben: Sounds)".utf16.count)
+        let preview = try #require(PreviewText.of(words, positionMs: 0, labels: ["ben": "Ben"]))
+        #expect(preview.text == words.prefix(7).map(\.text).joined(separator: " ") + " (Ben: Sounds)")
+        #expect(preview.text.utf16.count == PreviewText.limit)
+        #expect(preview.trailingEllipsis && !preview.leadingEllipsis)
+    }
+
+    @Test func aNonfinalChipWordReservesRoomForTheClosingParenthesis() throws {
+        let words = try paddedAcknowledgment(PreviewText.limit - " (Ben: Sounds".utf16.count)
+        let preview = try #require(PreviewText.of(words, positionMs: 0, labels: ["ben": "Ben"]))
+        #expect(preview.text == words.prefix(7).map(\.text).joined(separator: " "))
+        #expect(preview.trailingEllipsis)
+    }
+
+    @Test func canonicalEndStillSelectsAWordAfterDisplayOnlyTimingRepair() {
+        let words = [PreviewWord("Before", startMs: 0, endMs: 500, speaker: "ada"),
+                     PreviewWord("finished.", startMs: 5000, endMs: 8000, speaker: "ada")]
+        #expect(PreviewText.of(words, positionMs: 6500) == Preview("finished.", leadingEllipsis: true))
+        #expect(PreviewText.of(words, positionMs: 8000) == PreviewText.of(words, positionMs: 0))
+    }
+
+    @Test func notePreviewResolvesMissingRawIdAndStoredPlaceholderSpeakerNames() throws {
+        let words = try D84IntegrationVector.load("acknowledgment").words
+        var note = Note(title: "Names")
+        note.transcript = TranscriptSegment.segments(of: words)
+        for speakers: [NoteSpeaker]? in [nil, [.init(id: "ada", name: "ada"), .init(id: "ben", name: "ben")]] {
+            note.speakers = speakers
+            #expect(note.transcriptPreview?.text.contains("(\(DefaultLabels.placeholder(2)): Sounds good.)") == true)
+            #expect(note.transcriptPreview?.text.contains("(ben:") == false)
+        }
+        note.speakers = [.init(id: "ben", name: "Voce 9")]
+        #expect(note.transcriptPreview?.text.contains("(Voce 9: Sounds good.)") == true)
+    }
+}
+
+extension PreviewTextTests {
+    @Test func anUnknownChipUsesTheSharedLocalizedSpeakerLabel() throws {
+        var words = try D84IntegrationVector.load("acknowledgment").words.map {
+            PreviewWord($0.text, startMs: $0.startMs, endMs: $0.endMs, speaker: $0.speaker)
+        }
+        words[7].speaker = nil
+        words[8].speaker = nil
+        #expect(PreviewText.of(words, positionMs: 0)?.text.contains("(\(SpeakerName.unknown.label): Sounds good.)") == true)
     }
 }

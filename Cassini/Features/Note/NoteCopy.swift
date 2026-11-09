@@ -92,6 +92,20 @@ enum NoteCopy {
         }
     }
 
+    /// The viewer names genuine competing stretches once, on the turn's first paragraph.
+    static func over(_ names: [String]) -> String {
+        let labels: String
+        if names.count > 1 {
+            let first = names.dropLast().joined(separator: ", "), last = names.last!
+            labels = String(localized: "\(first) and \(last)", table: "Note", comment: "List of competing speakers")
+        } else {
+            labels = names.first ?? ""
+        }
+        return String(localized: "(over \(labels))", table: "Note", comment: "Competing overlapping speakers")
+    }
+
+    static let probablyCrosstalk = String(localized: "probably crosstalk", table: "Note")
+
     /// "Giulia, named automatically, at 11 minutes 41 seconds".
     static func turn(_ name: String, start: TimeInterval, auto: Bool) -> String {
         let time = spokenTime(start)

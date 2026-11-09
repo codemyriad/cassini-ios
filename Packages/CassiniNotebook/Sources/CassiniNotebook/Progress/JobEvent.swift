@@ -12,8 +12,10 @@ public struct DraftWord: Hashable, Sendable {
     public var startMs: Int64
     public var endMs: Int64
     public var text: String
-    public init(speaker: String, startMs: Int64, endMs: Int64, text: String) {
+    public var lowConfidenceSpeaker: Bool?
+    public init(speaker: String, startMs: Int64, endMs: Int64, text: String, lowConfidenceSpeaker: Bool? = nil) {
         self.speaker = speaker; self.startMs = startMs; self.endMs = endMs; self.text = text
+        self.lowConfidenceSpeaker = lowConfidenceSpeaker
     }
 }
 

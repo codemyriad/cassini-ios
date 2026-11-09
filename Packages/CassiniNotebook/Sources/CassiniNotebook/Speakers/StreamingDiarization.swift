@@ -101,7 +101,7 @@ public enum Diarization {
                 id = "\(prefix)\(ids.count + 1)"
                 ids[speaker] = id
             }
-            return Word(id, word.startMs, word.endMs, word.text)
+            return Word(id, word.startMs, word.endMs, word.text, lowConfidenceSpeaker: word.lowConfidenceSpeaker)
         }
     }
 

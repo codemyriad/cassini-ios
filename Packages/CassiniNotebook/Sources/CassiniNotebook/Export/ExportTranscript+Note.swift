@@ -17,7 +17,8 @@ extension ExportTranscript {
         let speakers = version?.speakers ?? note.speakers ?? []
         var labels = Dictionary(speakers.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
         labels[Self.unassignedSpeaker] = unassignedLabel
-        self.init(title: note.title, durationMs: Self.ms(note.duration), words: segments.flatMap(Self.words), labels: labels)
+        self.init(title: note.title, durationMs: Self.ms(note.duration), words: segments.flatMap(Self.words), labels: labels,
+                  endsBoundedByAudio: !segments.isEmpty && segments.allSatisfy { $0.wordEndsBoundedByAudio == true })
     }
 
     private static func words(of segment: TranscriptSegment) -> [Word] {
@@ -26,7 +27,8 @@ extension ExportTranscript {
             return untimedWords(parts(segment.text), speaker: speaker, startMs: ms(segment.start), endMs: ms(segment.end))
         }
         return segment.words.flatMap { word in
-            parts(word.text).map { Word(speaker, ms(word.start), ms(word.end), $0) }
+            parts(word.text).map { Word(speaker, ms(word.start), ms(word.end), $0,
+                                        lowConfidenceSpeaker: word.lowConfidenceSpeaker == true) }
         }
     }
 

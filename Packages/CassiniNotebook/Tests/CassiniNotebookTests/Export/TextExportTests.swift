@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import CassiniNotebook
 
@@ -50,11 +51,36 @@ struct TextExportTests {
                      TextExport.write(transcript(words, durationMs: 3_800_000, title: "Meeting"), subtitle: "sub", emptyText: "-"))
     }
 
-    // ports: TextExportTest#overlappingSpeakersKeepCanonicalOrder
-    @Test func overlappingSpeakersKeepCanonicalOrder() {
+    // ports: TextExportTest#overlappingSpeakersHaveWholeRowsAndCompetingLabels
+    @Test func overlappingSpeakersHaveWholeRowsAndCompetingLabels() {
         // The second turn starts before the first one ends; the text follows the canonical word order.
         let words = said("spk_0", 10_000, "I would say yes") + said("spk_1", 10_500, "No wait")
-        expectExport("T\ns\n\n[00:10] Paolo\nI would say yes\n\n[00:10] Speaker 2\nNo wait\n",
+        expectExport("T\ns\n\n[00:10] Paolo (over Speaker 2)\nI would say yes\n\n[00:10] Speaker 2 (over Paolo)\nNo wait\n",
                      TextExport.write(transcript(words, title: "T"), subtitle: "s", emptyText: "-"))
+    }
+}
+
+
+extension TextExportTests {
+    @Test(arguments: D84IntegrationVector.names)
+    func textExportUsesViewerRowsAndInlineChips(_ name: String) throws {
+        let vector = try D84IntegrationVector.load(name)
+        let output = TextExport.write(transcript(vector.words, labels: [:], title: name), subtitle: "sub", emptyText: "-")
+        let blocks = output.components(separatedBy: "\n\n").dropFirst()
+        #expect(blocks.count == vector.rows.count)
+        for (block, expected) in zip(blocks, vector.rows) {
+            let lines = block.split(separator: "\n", omittingEmptySubsequences: false)
+            #expect(lines.dropFirst().joined(separator: "\n").trimmingCharacters(in: .newlines) == expected.text)
+            let header = String(lines[0])
+            if !expected.over.isEmpty {
+                #expect(header.contains("(over " + expected.over.joined(separator: " and ") + ")"))
+            } else {
+                #expect(!header.contains("(over "))
+            }
+            if expected.continuation, let speaker = expected.speaker {
+                #expect(!header.contains(speaker), "Continuation rows keep their clock without repeating the speaker")
+            }
+        }
+        expectExportShape(output)
     }
 }

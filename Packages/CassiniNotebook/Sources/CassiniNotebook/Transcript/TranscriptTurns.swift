@@ -1,65 +1,73 @@
 import Foundation
 
-/// One transcript word as the Note screen reads it: its text without surrounding white space, when it starts and ends
+/// One transcript word as the Note screen reads it: its stored text, when it starts and ends
 /// in the audio, its speaker (nil for a passage without one) and the passage it came from.
 public struct TranscriptWord: Hashable, Sendable {
     public var speaker: String?
     public var start: TimeInterval
     public var end: TimeInterval
     public var text: String
-    /// Whether the word is set apart from the one before it by a space. False only where the source wrote the two
-    /// together, such as a full stop given as its own word.
+    /// Legacy source hint, retained for callers; the viewer pipeline decides separators between stored atoms.
+    public var lowConfidenceSpeaker: Bool
     public var spaceBefore: Bool
     /// The passage the word belongs to; nil for draft words.
     public var segmentID: UUID?
 
     public init(speaker: String?, start: TimeInterval, end: TimeInterval, text: String, spaceBefore: Bool = true,
-                segmentID: UUID? = nil) {
+                segmentID: UUID? = nil, lowConfidenceSpeaker: Bool = false) {
         self.speaker = speaker; self.start = start; self.end = end; self.text = text
         self.spaceBefore = spaceBefore; self.segmentID = segmentID
+        self.lowConfidenceSpeaker = lowConfidenceSpeaker
     }
 }
 
-/// A maximal run of consecutive words with the same speaker (Android core `Turn`).
+/// One reading row of the shared turn model. The source word array stays in canonical order; `wordIndices`
+/// and the members map the reading layout back to those original atoms for identity and playback.
 public struct TranscriptTurn: Hashable, Sendable {
     public var speaker: String?
     public var start: TimeInterval
     public var end: TimeInterval
     public var words: [TranscriptWord]
+    public var wordIndices: [Int]
+    public var continuation: Bool
+    public var over: [String]
+    public var crosstalk: Bool
+    public var members: [TurnModel.Member]
 
-    /// The words joined as the paragraph shows them.
-    public var text: String { TranscriptTurns.text(of: words) }
+    /// Stored words, with interjections at their model seam. Callers with display labels can render `members` instead.
+    public var text: String {
+        TranscriptTurns.text(of: members) { $0 ?? "Unknown speaker" }
+    }
 }
 
-/// Splits a transcript into turns (Android core `TranscriptTurns`).
+/// Adapters to the same turn model used by the note, preview and text export.
 public enum TranscriptTurns {
-    /// The turns of `words`, in order. A turn starts at its first word's start and ends at its last word's end, even
-    /// when an earlier word of the turn ends later.
-    public static func of(_ words: [TranscriptWord]) -> [TranscriptTurn] {
-        var turns: [TranscriptTurn] = []
-        var from = 0
-        while from < words.count {
-            var to = from + 1
-            while to < words.count, words[to].speaker == words[from].speaker { to += 1 }
-            let run = Array(words[from..<to])
-            turns.append(TranscriptTurn(speaker: run[0].speaker, start: run[0].start, end: run[run.count - 1].end, words: run))
-            from = to
-        }
-        return turns
+    public static func rows(of words: [TranscriptWord], endsBoundedByAudio: Bool = false) -> [TurnModel.Row] {
+        TurnModel.rows(of: words.map {
+            TurnModel.Word(speaker: $0.speaker, startMs: ($0.start * 1000).rounded(), endMs: ($0.end * 1000).rounded(), text: $0.text,
+                           lowConfidenceSpeaker: $0.lowConfidenceSpeaker)
+        }, endsBoundedByAudio: endsBoundedByAudio)
     }
 
-    /// `words` joined: a space before each word but the first, unless the word is written onto the one before.
+    public static func of(_ words: [TranscriptWord], endsBoundedByAudio: Bool = false) -> [TranscriptTurn] {
+        rows(of: words, endsBoundedByAudio: endsBoundedByAudio).map { row in
+            let indices = row.members.flatMap(\.wordIndices)
+            return TranscriptTurn(speaker: row.speaker, start: row.startMs / 1000, end: row.endMs / 1000,
+                                  words: indices.map { words[$0] }, wordIndices: indices, continuation: row.continuation,
+                                  over: row.over, crosstalk: row.crosstalk, members: row.members)
+        }
+    }
+
+    /// The viewer's spacing of stored atoms. Word text is never rewritten and quotes are never paired.
     public static func text(of words: [TranscriptWord]) -> String {
-        var text = ""
-        for (index, word) in words.enumerated() {
-            if index > 0, word.spaceBefore { text += " " }
-            text += word.text
-        }
-        return text
+        TurnModel.joinedText(words.map(\.text))
     }
 
-    /// Punctuation that closes onto the word before it when the source gives it as a word of its own.
-    static let closing: Set<Character> = [".", ",", ";", ":", "!", "?", "…", ")", "]", "»", "”", "’", "%", "。", "，", "？", "！"]
+    public static func text(of members: [TurnModel.Member], label: (String?) -> String) -> String {
+        members.map { member in
+            member.kind == .interjection ? "(\(label(member.speaker)): \(member.text))" : member.text
+        }.joined(separator: " ")
+    }
 }
 
 extension Note {
@@ -80,19 +88,11 @@ extension Array where Element == TranscriptSegment {
                                             segmentID: segment.id))
                 continue
             }
-            // A passage starts apart from the one before. Inside it, a word joins the one before only when the source
-            // put no space between them and it starts with closing punctuation.
-            var spaced = true
-            var first = true
             for word in segment.words {
                 let text = word.text.trimmingCharacters(in: .whitespacesAndNewlines)
-                if word.text.first?.isWhitespace == true { spaced = true }
                 guard !text.isEmpty else { continue }
-                let joins = !first && !spaced && text.first.map(TranscriptTurns.closing.contains) == true
                 words.append(TranscriptWord(speaker: segment.speakerID, start: word.start, end: word.end, text: text,
-                                            spaceBefore: !joins, segmentID: segment.id))
-                first = false
-                spaced = word.text.last?.isWhitespace ?? false
+                                            segmentID: segment.id, lowConfidenceSpeaker: word.lowConfidenceSpeaker == true))
             }
         }
         return words

@@ -1,6 +1,47 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "%@ and %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ and %@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ y %@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ et %@"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ e %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ e %@"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ e %@"
+          }
+        }
+      }
+    },
     "%@, %@ · %@": {
       "extractionState": "manual",
       "localizations": {
@@ -736,6 +777,47 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "(over %@)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "(over %@)"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "(a la vez que %@)"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "(en même temps que %@)"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "(in sovrapposizione a %@)"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "(ao mesmo tempo que %@)"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "(ao mesmo tempo que %@)"
           }
         }
       }
@@ -1875,6 +1957,46 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sem resultados"
+          }
+        }
+      }
+    },
+    "No on-device speech model is available for this device and language.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No on-device speech model is available for this device and language."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nessun modello vocale sul dispositivo è disponibile per questo dispositivo e questa lingua."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucun modèle vocal local n’est disponible pour cet appareil et cette langue."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No hay ningún modelo de voz local disponible para este dispositivo y este idioma."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nenhum modelo de fala local está disponível para este dispositivo e idioma."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não está disponível nenhum modelo de voz local para este dispositivo e idioma."
           }
         }
       }
@@ -3839,6 +3961,47 @@
       },
       "comment": "Badge of a speaker named automatically from a saved voice"
     },
+    "probably crosstalk": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "probably crosstalk"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "probablemente voces superpuestas"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "probablement des voix superposées"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "probabilmente voci sovrapposte"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "provavelmente vozes sobrepostas"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "provavelmente vozes sobrepostas"
+          }
+        }
+      }
+    },
     "· edited": {
       "extractionState": "manual",
       "localizations": {
@@ -3958,46 +4121,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "· transcrita novamente"
-          }
-        }
-      }
-    },
-    "No on-device speech model is available for this device and language.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No on-device speech model is available for this device and language."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nessun modello vocale sul dispositivo è disponibile per questo dispositivo e questa lingua."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Aucun modèle vocal local n’est disponible pour cet appareil et cette langue."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No hay ningún modelo de voz local disponible para este dispositivo y este idioma."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nenhum modelo de fala local está disponível para este dispositivo e idioma."
-          }
-        },
-        "pt-PT": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Não está disponível nenhum modelo de voz local para este dispositivo e idioma."
           }
         }
       }

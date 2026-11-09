@@ -122,7 +122,7 @@ public struct CheckpointState: Hashable, Sendable {
     public var draftWords: [DraftWord] { segments.flatMap(\.draftWords) }
 
     /// The words as the recognizer keeps them: the streaming speaker id or none, recording-clock milliseconds.
-    public var words: [Word] { draftWords.map { Word($0.speaker, $0.startMs, $0.endMs, $0.text) } }
+    public var words: [Word] { draftWords.map { Word($0.speaker, $0.startMs, $0.endMs, $0.text, lowConfidenceSpeaker: $0.lowConfidenceSpeaker == true) } }
 }
 
 /// The `recognition` member: where `IncrementalTranscript` stood at the checkpoint, in samples at the recognition rate
@@ -226,7 +226,7 @@ extension TranscriptSegment {
         }
         return words.map { word in
             DraftWord(speaker: speaker, startMs: CheckpointState.ms(word.start), endMs: CheckpointState.ms(word.end),
-                      text: word.text.trimmingCharacters(in: .whitespacesAndNewlines))
+                      text: word.text.trimmingCharacters(in: .whitespacesAndNewlines), lowConfidenceSpeaker: word.lowConfidenceSpeaker)
         }
     }
 
@@ -258,9 +258,9 @@ extension TranscriptSegment {
         var group: [Word] = []
         func flush() {
             guard let first = group.first else { return }
-            let timed = group.enumerated().map { index, word in
-                TimedWord(text: word.text + (index == group.count - 1 ? "" : " "),
-                          start: Double(word.startMs) / 1000, end: Double(word.endMs) / 1000)
+            let timed = group.map { word in
+                TimedWord(text: word.text, start: Double(word.startMs) / 1000, end: Double(word.endMs) / 1000,
+                          lowConfidenceSpeaker: word.lowConfidenceSpeaker ? true : nil)
             }
             segments.append(TranscriptSegment(
                 text: group.map(\.text).joined(separator: " "), start: Double(first.startMs) / 1000,

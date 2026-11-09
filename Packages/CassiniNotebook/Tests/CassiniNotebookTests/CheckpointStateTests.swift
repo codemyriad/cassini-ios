@@ -133,7 +133,7 @@ import CassiniNotebook
         let segments = TranscriptSegment.segments(of: words) { $0 == "spk_2" ? "Anna" : nil }
         #expect(segments.map(\.words.count) == [45, 5, 1, 1])
         #expect(segments[0].text.hasPrefix("w0 w1 w2"))
-        #expect(segments[0].words[0].text == "w0 " && segments[0].words[44].text == "w44")
+        #expect(segments[0].words[0].text == "w0" && segments[0].words[44].text == "w44")
         #expect(segments[0].speakerID == nil && segments[0].speaker == nil)
         #expect(segments[3].speakerID == "spk_2" && segments[3].speaker == "Anna")
         #expect(segments[2].start == 20 && segments[2].end == 20.4)
