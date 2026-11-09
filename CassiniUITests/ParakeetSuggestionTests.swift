@@ -66,4 +66,23 @@ final class ParakeetSuggestionTests: XCTestCase {
         XCTAssertTrue(app.staticTexts[title].staysAbsent(for: 1))
         XCTAssertTrue(app.staticTexts["Parakeet Ultra"].staysAbsent(for: 1))
     }
+
+    /// The iOS 18 facts: a 3 GB device transcribes with Whistle, its job running in the finite background time, and
+    /// Settings shows Whistle with no Speech language picker.
+    @MainActor func testWithoutAppleSpeechAThreeGigabyteDeviceTranscribesWithWhistle() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed-test-data", "--d78", "--ios18-platform",
+                               "--open-fixture", walk]
+        app.launchAndWait()
+        let transcribe = app.buttons["Transcribe"].firstMatch
+        XCTAssertTrue(transcribe.waitForExistence(within: 15))
+        transcribe.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["turn-w0"].waitForExistence(within: 15))
+        app.navigationBars.buttons.firstMatch.tap()
+        XCTAssertTrue(app.buttons["settingsButton"].waitForExistence(within: 15))
+        app.buttons["settingsButton"].tap()
+        XCTAssertTrue(app.staticTexts["Whistle"].firstMatch.waitForExistence(within: 15))
+        XCTAssertFalse(app.descendants(matching: .any)["speechLanguagePicker"].exists)
+        XCTAssertTrue(app.staticTexts["Managed by iOS"].staysAbsent(for: 1))
+    }
 }

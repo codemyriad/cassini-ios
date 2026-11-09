@@ -5,10 +5,11 @@ import XCTest
 /// and "Download and transcribe" transcribes the note. Nothing is downloaded: the models are faked.
 final class ModelDownloadFlowTests: XCTestCase {
     /// With `parakeet` the fake transcriber stands for Parakeet Ultra, as on a device that can hold it.
-    @MainActor private func launchWithoutModels(parakeet: Bool = false) -> XCUIApplication {
+    /// With `ios18` the system has no Apple speech (`--ios18-platform`).
+    @MainActor private func launchWithoutModels(parakeet: Bool = false, ios18: Bool = false) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed", "library", "--models-missing"]
-            + (parakeet ? ["--parakeet"] : [])
+            + (parakeet ? ["--parakeet"] : []) + (ios18 ? ["--ios18-platform"] : [])
         app.launchAndWait()
         XCTAssertTrue(app.textFields["librarySearch"].waitForExistence(within: 15))
         return app
@@ -66,6 +67,15 @@ final class ModelDownloadFlowTests: XCTestCase {
         // The figure keeps its unit on its line: a no-break space.
         XCTAssertTrue(text(app, containing: "Cassini needs a one-time download of about 531\u{00A0}MB.").exists)
         XCTAssertTrue(text(app, containing: "Needs about 1.2 GB free while installing.").exists)
+        XCTAssertFalse(app.staticTexts["speechLanguageLine"].exists, "Parakeet hears the language")
+        XCTAssertTrue(app.buttons["Download and transcribe"].exists)
+    }
+
+    /// Without Apple speech a device that can hold Parakeet transcribes with it: a Transcribe asks for its download.
+    @MainActor func testWithoutAppleSpeechAParakeetDeviceAsksForTheParakeetDownload() {
+        let app = launchWithoutModels(parakeet: true, ios18: true)
+        transcribeTheWalk(app)
+        XCTAssertEqual(part(app, "Speech recognition").label, "Speech recognition, 443 MB")
         XCTAssertFalse(app.staticTexts["speechLanguageLine"].exists, "Parakeet hears the language")
         XCTAssertTrue(app.buttons["Download and transcribe"].exists)
     }
