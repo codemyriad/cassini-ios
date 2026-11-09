@@ -48,6 +48,28 @@ struct TurnView: View, Equatable {
             TurnHeader(turn: turn, button: renamable && turn.nameableSpeakerID != nil) {
                 if let id = turn.nameableSpeakerID { actions.nameSpeaker(id) }
             }
+            // A draft has no Speakers sheet. Every inline speaker needs a naming control even without a voice card.
+            ForEach(turn.inlineSpeakersForNaming(isDraft: style == .draft, renamable: renamable), id: \.speakerID) { chip in
+                if let id = chip.speakerID {
+                    Button { actions.nameSpeaker(id) } label: {
+                        HStack(spacing: 6) {
+                            Circle().fill(chip.tint.color).frame(width: 8, height: 8)
+                            Text(NoteCopy.speakerName(chip.name)).font(.subheadline.weight(.semibold))
+                            Text(TimeText.clock(turn.words[chip.wordRange.lowerBound].start))
+                                .font(.caption.monospacedDigit()).foregroundStyle(Color.muted)
+                            Image(systemName: "pencil").font(.caption)
+                            Spacer(minLength: 0)
+                        }
+                        .foregroundStyle(chip.tint.color)
+                        .frame(minHeight: HitTarget.minimum, alignment: .leading).contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(Text(verbatim: NoteCopy.turn(NoteCopy.speakerName(chip.name),
+                        start: turn.words[chip.wordRange.lowerBound].start, auto: false)))
+                    .accessibilityHint(NoteCopy.nameThisSpeaker)
+                    .accessibilityIdentifier("inlineSpeakerHeader-\(turn.id)-\(id)")
+                }
+            }
             paragraph
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -73,8 +95,6 @@ struct TurnView: View, Equatable {
         switch style {
         case .reading:
             text
-                .foregroundStyle(placeholder ? Color.muted : Color.ink)
-                .tint(placeholder ? Color.muted : Color.ink)
                 .environment(\.openURL, OpenURLAction { url in
                     guard let index = Self.wordIndex(url) else { return .systemAction }
                     actions.wordTap(WordRef(turnID: turn.id, index: index))
@@ -123,6 +143,8 @@ struct TurnView: View, Equatable {
         var result = style == .reading
             ? turn.linkedText(activeWord: activeIndex, scheme: Self.scheme)
             : AttributedString(turn.text)
+        // Use per-run foregrounds: a paragraph-wide link tint would color named chips like an unnamed host.
+        result.foregroundColor = style == .draft || placeholder ? Color.muted : Color.ink
         let characters = result.characters
         func range(_ offsets: Range<Int>) -> Range<AttributedString.Index>? {
             guard offsets.lowerBound >= 0, offsets.upperBound <= characters.count else { return nil }
@@ -132,6 +154,7 @@ struct TurnView: View, Equatable {
         // The full chip tint includes its internal spaces; active-word colors are applied after every decoration.
         for chip in turn.interjections {
             if let span = range(chip.textRange) {
+                result[span].foregroundColor = chip.name.isNamed ? Color.ink : Color.muted
                 result[span].backgroundColor = chip.crosstalk ? Color.toneWarn.opacity(0.22) : chip.tint.color.opacity(0.12)
             }
             if let name = range(chip.nameRange) {

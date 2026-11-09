@@ -21,6 +21,18 @@ public enum DefaultLabels {
         "\(words[language] ?? "Speaker") \(number)"
     }
 
+    /// The same unknown-speaker copy as the Note catalog, available to pure projections (chips/previews).
+    public static func unknown(language: String = appLanguage) -> String {
+        switch language {
+        case "it": "Voce sconosciuta"
+        case "fr": "Intervenant inconnu"
+        case "es": "Hablante desconocido"
+        case "pt-BR": "Locutor desconhecido"
+        case "pt-PT": "Orador desconhecido"
+        default: "Unknown speaker"
+        }
+    }
+
     /// True for the speaker id itself, a blank label, or a placeholder prefix followed by a number.
     public static func isDefault(id: String, label: String) -> Bool {
         label == id || label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || placeholderNumber(label) != nil

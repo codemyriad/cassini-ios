@@ -38,22 +38,20 @@ public struct Preview: Hashable, Sendable {
 /// characters, so one preview does not run two speakers' words together. A shorter turn ("Yes.") continues into the
 /// next turns, so the row never shows a one-word excerpt while more words follow.
 ///
-/// Otherwise (position 0, before or in the first word, or at or after the end of the last word, which is where a
+/// Otherwise (position 0, before the first word starts, or at or after the end of the last word, which is where a
 /// finished playback leaves it) the excerpt is the transcript start: the first `limit` characters of the words joined
 /// by spaces, cut at a word.
 ///
-/// An excerpt that ends before the transcript end gets a trailing ellipsis, and the sentence punctuation at its end is
-/// dropped first ("order." becomes "order…"). Lengths are UTF-16 units, as on Android.
+/// An excerpt that ends before the transcript end gets a trailing ellipsis. Stored punctuation and whole atoms stay
+/// intact, as on Android. Lengths are UTF-16 units; a single oversized first atom can exceed the approximate budget.
 public enum PreviewText {
-    /// The excerpt budget in UTF-16 units, without the ellipses.
+    /// Approximate excerpt budget in UTF-16 units, without ellipses; an oversized first atom stays whole.
     public static let limit = 160
     /// An excerpt from the playing word stops at a turn end only once it has at least this many UTF-16 units.
     public static let minBeforeTurnEnd = 40
 
-    static let cutPunctuation: Set<Character> = [".", ",", ";", ":", "!", "?", "…"]
-
     /// The preview follows model reading order. Canonical indices, rather than the reordered rows' timestamps,
-    /// locate the playing word; interjections remain one parenthesized excerpt item at their seam.
+    /// locate the playing word; each chip word remains a separate excerpt atom at its model seam.
     public static func of(_ words: [PreviewWord], positionMs: Int64, labels: [String: String] = [:],
                           endsBoundedByAudio: Bool = false) -> Preview? {
         guard !words.isEmpty else { return nil }
@@ -61,27 +59,28 @@ public enum PreviewText {
             TurnModel.Word(speaker: $0.speaker, startMs: Double($0.startMs), endMs: Double($0.endMs), text: $0.text,
                            lowConfidenceSpeaker: $0.lowConfidenceSpeaker)
         }, endsBoundedByAudio: endsBoundedByAudio)
+        let speakerIDs = Set(words.compactMap(\.speaker))
         let entries = rows.enumerated().flatMap { rowIndex, row in
             row.members.flatMap { member -> [Entry] in
-                if member.kind == .interjection {
-                    let label = member.speaker.map { labels[$0] ?? $0 } ?? "Unknown speaker"
-                    return [Entry(text: "(\(label): \(member.text))", indices: member.wordIndices, row: rowIndex, spaceBefore: true)]
-                }
+                let chip = member.kind == .interjection
+                let id = member.speaker == "Unknown speaker" && !speakerIDs.contains("Unknown speaker") ? nil : member.speaker
+                let label = chip ? id.map { labels[$0] ?? $0 } ?? SpeakerName.unknown.label : nil
                 return member.wordIndices.enumerated().map { offset, index in
                     let text = words[index].text.trimmingCharacters(in: .whitespacesAndNewlines)
-                    // Use the viewer's existing word-to-text spacing; source atoms and their indices stay untouched.
                     let spaced = offset == 0 || !TurnModel.matches(text, #"^[,.;:!?)]"#)
-                    return Entry(text: text, indices: [index], row: rowIndex, spaceBefore: spaced)
+                    return Entry(text: text, canonical: index, row: rowIndex, spaceBefore: spaced,
+                                 prefix: label.flatMap { offset == 0 ? "(\($0): " : nil } ?? "",
+                                 suffix: chip && offset == member.wordIndices.count - 1 ? ")" : "", chipLabel: label)
                 }
             }
         }
         guard !entries.isEmpty else { return nil }
         let lastEnd = words.map(\.endMs).max() ?? 0
         let playing: Int
-        if positionMs >= lastEnd {
-            // Finishing playback resets the excerpt to reading order's first atom, even if
-            // the producer appended an earlier turn after canonical word zero.
-            playing = entries[0].indices[0]
+        if positionMs <= 0 || positionMs <= (words.map(\.startMs).min() ?? 0) || positionMs >= lastEnd {
+            // Unplayed notes and finished playback start in reading order, independently of source-index ties
+            // or an earlier turn appended after canonical word zero.
+            playing = entries[0].canonical
         } else if let active = words.indices.filter({ words[$0].startMs <= positionMs && words[$0].endMs > positionMs })
             .max(by: { words[$0].startMs == words[$1].startMs ? $0 < $1 : words[$0].startMs < words[$1].startMs }) {
             playing = active
@@ -89,45 +88,43 @@ public enum PreviewText {
             playing = words.indices.filter { words[$0].startMs > positionMs }
                 .min(by: { words[$0].startMs == words[$1].startMs ? $0 < $1 : words[$0].startMs < words[$1].startMs }) ?? 0
         }
-        let first = entries.firstIndex { $0.indices.contains(playing) } ?? 0
+        let first = entries.firstIndex { $0.canonical == playing } ?? 0
         return excerpt(entries[first...], leading: first > 0)
     }
 
     private struct Entry {
         var text: String
-        var indices: [Int]
+        var canonical: Int
         var row: Int
         var spaceBefore: Bool
+        var prefix: String
+        var suffix: String
+        var chipLabel: String?
+        /// A truncated chip still closes after the last whole atom, within the reserved budget.
+        var closingIfCut: String { chipLabel != nil && suffix.isEmpty ? ")" : "" }
     }
 
     private static func excerpt(_ entries: ArraySlice<Entry>, leading: Bool) -> Preview {
         var text = ""
-        var length = 0
         var next = entries.startIndex
-        while next < entries.endIndex, next == entries.startIndex || length + (entries[next].spaceBefore ? 1 : 0) + entries[next].text.utf16.count <= limit {
-            if leading, next > entries.startIndex, length >= minBeforeTurnEnd,
-               entries[next].row != entries[next - 1].row { break }
-            if next > entries.startIndex, entries[next].spaceBefore { text += " "; length += 1 }
-            text += entries[next].text
-            length += entries[next].text.utf16.count
+        while next < entries.endIndex {
+            let entry = entries[next]
+            // Starting part-way through a chip reintroduces its label without rewinding to earlier words.
+            let prefix = next == entries.startIndex ? entry.chipLabel.map { "(\($0): " } ?? entry.prefix : entry.prefix
+            let part = prefix + entry.text + entry.suffix
+            let separator = next > entries.startIndex && entry.spaceBefore ? " " : ""
+            let budgetReached = next > entries.startIndex
+                && text.utf16.count + separator.utf16.count + part.utf16.count + entry.closingIfCut.utf16.count > limit
+            let rowEnd = leading && next > entries.startIndex && text.utf16.count >= minBeforeTurnEnd
+                && entry.row != entries[next - 1].row
+            if budgetReached || rowEnd { break }
+            text += separator + part
             next += 1
         }
-        let cut = next < entries.endIndex
-        var shown = cutAt(text, limit)
-        if cut {
-            let trimmed = String(shown.reversed().drop { cutPunctuation.contains($0) }.reversed())
-            if !trimmed.isEmpty { shown = trimmed }
-        }
-        return Preview(shown, leadingEllipsis: leading, trailingEllipsis: cut || shown.utf16.count < length)
+        text += entries[next - 1].closingIfCut
+        return Preview(text, leadingEllipsis: leading, trailingEllipsis: next < entries.endIndex)
     }
 
-    /// `text` cut to at most `limit` UTF-16 units, never inside a surrogate pair (only one giant word needs it).
-    private static func cutAt(_ text: String, _ limit: Int) -> String {
-        let units = Array(text.utf16)
-        guard units.count > limit else { return text }
-        let end = UTF16.isLeadSurrogate(units[limit - 1]) ? limit - 1 : limit
-        return String(decoding: units[..<end], as: UTF16.self)
-    }
 }
 
 extension Note {
@@ -135,8 +132,19 @@ extension Note {
     /// in the note. Building a prefix before grouping could mistake a partial run for a short interjection.
     public var transcriptPreview: Preview? {
         let positionMs = Int64((playbackPosition * 1000).rounded())
-        let labels = Dictionary((speakers ?? []).map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
-        return PreviewText.of(transcript.flatMap(PreviewWord.of), positionMs: positionMs, labels: labels,
+        let words = transcript.flatMap(PreviewWord.of)
+        let stored = Dictionary((speakers ?? []).map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
+        let passageLabels = Dictionary(transcript.compactMap { segment in
+            segment.speakerID.flatMap { id in segment.speaker.map { (id, $0) } }
+        }, uniquingKeysWith: { first, _ in first })
+        var seen = Set<String>(), order: [String] = []
+        for word in words {
+            if let id = word.speaker, seen.insert(id).inserted { order.append(id) }
+        }
+        let labels = Dictionary(uniqueKeysWithValues: order.enumerated().map { ordinal, id in
+            (id, NoteTranscripts.name(label: stored[id] ?? passageLabels[id], id: id, ordinal: ordinal).label)
+        })
+        return PreviewText.of(words, positionMs: positionMs, labels: labels,
                               endsBoundedByAudio: !transcript.isEmpty && transcript.allSatisfy { $0.wordEndsBoundedByAudio == true })
     }
 }

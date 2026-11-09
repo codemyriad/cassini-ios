@@ -262,7 +262,8 @@ public enum LibraryMapping {
 
     private static func cutAtWord(_ text: String) -> String {
         let end = text.lastIndex(of: " ").flatMap { $0 > text.startIndex ? $0 : nil } ?? text.endIndex
-        let cut = String(text[..<end].reversed().drop { PreviewText.cutPunctuation.contains($0) || $0.isWhitespace }.reversed())
+        // Only the old cached-text fallback shortens punctuation; live atom previews preserve it.
+        let cut = String(text[..<end].reversed().drop { ".,;:!?…".contains($0) || $0.isWhitespace }.reversed())
         return cut.isEmpty ? text : cut
     }
 

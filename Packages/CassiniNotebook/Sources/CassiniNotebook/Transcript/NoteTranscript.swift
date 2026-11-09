@@ -334,11 +334,13 @@ public enum NoteTranscripts {
 }
 
 extension SpeakerName {
-    /// Stored label for plain text, export, copy and inline chips; the viewer supplies the unknown fallback.
-    public var label: String {
+    /// Stored labels stay unchanged; a speaker without one uses the app's localized fallback everywhere.
+    public var label: String { label(language: DefaultLabels.appLanguage) }
+
+    public func label(language: String) -> String {
         switch self {
         case .named(let label), .placeholder(_, let label): label
-        case .unknown: "Unknown speaker"
+        case .unknown: DefaultLabels.unknown(language: language)
         }
     }
 }
