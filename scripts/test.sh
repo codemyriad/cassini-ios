@@ -238,7 +238,7 @@ take_heavy_lock() {
     /usr/bin/python3 -I "$root/scripts/test-events.py" hold "$heavy_lock" "$$" "$lock_held_file" "$note" \
         < /dev/null & lock_pid=$!
     if /usr/bin/python3 -I "$root/scripts/test-events.py" lock-ready \
-        "$lock_pid" "$heavy_lock" "$lock_held_file" "$(( lock_minutes * 60 ))"; then
+        "$lock_pid" "$heavy_lock" "$lock_held_file" "$(( lock_minutes * 60 ))" --note "$note"; then
         return 0
     else
         rc=$?
@@ -384,7 +384,8 @@ free_mb() {
 }
 # Percent of the CPU idle over two seconds; 100 when it cannot be sampled, so a missing tool never holds a run.
 cpu_idle() {
-    if [ -n "${fast_pid:-}" ] && kill -0 "$fast_pid" 2>/dev/null; then echo 100; return; fi
+    # Rechecks sample CPU even beside swift test: its short-lived children must not spin admission.
+    if [ "${1:-0}" != 1 ] && [ -n "${fast_pid:-}" ] && kill -0 "$fast_pid" 2>/dev/null; then echo 100; return; fi
     local idle; idle=$(iostat -n 0 -c 2 -w 2 2>/dev/null | tail -1 | awk '{ print int($3) }')
     case "$idle" in ''|*[!0-9]*) echo 100 ;; *) echo "$idle" ;; esac
 }
@@ -395,7 +396,8 @@ wait_for_room() {
     # This run's own booted iPhones count as free, as in auto_workers: tier_ui shuts down the ones it does not use.
     booted=$(our_clones | grep -c "Booted $prefix-iphone-" || true)
     while :; do
-        idle=$(cpu_idle); free=$(( $(free_mb) + booted * 1536 )); waited=$(( $(date +%s) - t0 ))
+        # After the first wait, measure CPU even if this run's Swift suite is still alive.
+        idle=$(cpu_idle "$announced"); free=$(( $(free_mb) + booted * 1536 )); waited=$(( $(date +%s) - t0 ))
         if [ "$idle" -ge 25 ] && [ "$free" -ge 2048 ]; then
             [ $waited -eq 0 ] || echo "  the host has room after $(( waited / 60 )) min $(( waited % 60 )) s (CPU $idle% idle, $free MB free)"
             return 0

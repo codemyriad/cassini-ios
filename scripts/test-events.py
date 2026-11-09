@@ -38,6 +38,12 @@ class Events:
         self.queue.control([select.kevent(fd, filter=select.KQ_FILTER_VNODE,
             flags=select.KQ_EV_ADD | select.KQ_EV_CLEAR,
             fflags=select.KQ_NOTE_WRITE | select.KQ_NOTE_EXTEND)], 0, 0)
+        return fd
+
+    def unwatch_file(self, fd):
+        # Closing the descriptor removes its vnode knote; keep close() from closing it twice.
+        self.files.remove(fd)
+        os.close(fd)
 
     def until(self, deadline):
         return self.queue.control(None, 128, max(0, deadline - time.monotonic()))
@@ -56,16 +62,19 @@ def watch(args):
     with Events() as events:
         if not events.process(args.pid):
             return 0
-        if args.start:
-            events.file(args.log)
+        log_event = events.file(args.log) if not started else None
         with open(args.log, "rb") as log:
             pending = b""
             while True:
                 if not started:
                     pending += log.read()
-                    started = any(line.startswith(args.start.encode()) for line in pending.splitlines())
-                    # Keep partial lines only; a marker may be split across writes.
-                    pending = pending.rsplit(b"\n", 1)[-1]
+                    lines = pending.split(b"\n")
+                    # Only LF starts a new line; retain a marker split across writes.
+                    pending = lines.pop()
+                    started = any(line.startswith(args.start.encode()) for line in lines)
+                    if started:
+                        events.unwatch_file(log_event)
+                        log_event = None
                 elapsed = time.monotonic() - began
                 if not started and elapsed >= args.limit:
                     return 124
@@ -121,8 +130,8 @@ def lock_ready(args):
                 return 0
             if not alive:
                 return 1
-            holder = Path(args.path).read_text().strip() or "another run"
-            if holder != shown:
+            holder = Path(args.path).read_text().strip()
+            if holder and holder != args.note and holder != shown:
                 print(f"waiting for the host: {holder} holds {args.path}", flush=True)
                 shown = holder
             if time.monotonic() >= deadline:
@@ -171,6 +180,7 @@ def main():
     command.add_argument("path")
     command.add_argument("held")
     command.add_argument("seconds", type=float)
+    command.add_argument("--note", default=None)
     command = commands.add_parser("resource-event")
     command.add_argument("deadline", type=float)
     args = parser.parse_args()

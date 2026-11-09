@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Lightweight real-kqueue lifecycle regressions; no builds or simulators."""
+import contextlib
 import fcntl
 import importlib.util
+import io
 import os
 from pathlib import Path
 import signal
@@ -73,12 +75,84 @@ class LifecycleTests(unittest.TestCase):
 
     def test_no_start_and_started_total_deadlines_have_distinct_statuses(self):
         for output, expected in [("", 124), ("Test Case 'example' started.\\n", 125),
-                                 ("noise Test Case 'example' started.\\n", 124)]:
+                                 ("noise Test Case 'example' started.\\n", 124),
+                                 ("noise\rTest Case 'example' started.\\n", 124)]:
             with self.subTest(output=output):
                 command = "import signal,sys;sys.stdout.write(" + repr(output.replace('\\n', '\n')) + ");sys.stdout.flush();signal.pause()"
                 import shlex
                 process = self.shell(f'run_watched {str(self.log)!r} 0.15 0.3 {shlex.join([sys.executable,"-c",command])}')
                 self.assertEqual(finish(process), expected, process.stderr.read().decode())
+
+    def test_started_watch_ignores_further_log_writes_and_keeps_process_exit(self):
+        child = subprocess.Popen([sys.executable, "-c", "import sys;sys.stdin.read()"],
+                                 stdin=subprocess.PIPE)
+        self.log.write_bytes(b"Test Case 'example' started.\n")
+        original = events.Events.until
+        def write_then_exit(queue, deadline):
+            with self.log.open("ab") as log:
+                log.write(b"later xcodebuild output\n")
+            child.stdin.close()
+            result = original(queue, deadline)
+            self.assertTrue(result)
+            self.assertTrue(all(event.filter == events.select.KQ_FILTER_PROC for event in result))
+            return result
+        try:
+            with mock.patch.object(events.Events, "until", write_then_exit):
+                self.assertEqual(events.watch(SimpleNamespace(pid=child.pid, log=self.log,
+                    start="Test Case '", limit=5, total=5, total_status=125)), 0)
+        finally:
+            if not child.stdin.closed:
+                child.stdin.close()
+            finish(child)
+
+    def test_fragmented_start_marker_is_retained_until_newline(self):
+        child = subprocess.Popen([sys.executable, "-c", "import sys;sys.stdin.read()"],
+                                 stdin=subprocess.PIPE)
+        self.log.write_bytes(b"Test C")
+        original = events.Events.until
+        wakes = []
+        def advance(queue, deadline):
+            wakes.append(True)
+            if len(wakes) == 1:
+                with self.log.open("ab") as log:
+                    log.write(b"ase 'example' started.\n")
+            else:
+                child.stdin.close()
+            return original(queue, deadline)
+        try:
+            with mock.patch.object(events.Events, "until", advance):
+                self.assertEqual(events.watch(SimpleNamespace(pid=child.pid, log=self.log,
+                    start="Test Case '", limit=5, total=5, total_status=125)), 0)
+            self.assertEqual(len(wakes), 2)
+        finally:
+            if not child.stdin.closed:
+                child.stdin.close()
+            finish(child)
+
+    def test_lock_ready_only_reports_a_different_nonempty_holder(self):
+        for note, expected in [("our note", ""), ("", ""), ("another holder", "another holder")]:
+            with self.subTest(note=note):
+                lock, held = self.root / "lock", self.root / "ready"
+                held.unlink(missing_ok=True)
+                lock.write_text(note)
+                child = subprocess.Popen([sys.executable, "-c", "import sys;sys.stdin.read()"],
+                                         stdin=subprocess.PIPE)
+                def become_ready(queue, deadline):
+                    held.touch()
+                    return []
+                output = io.StringIO()
+                try:
+                    with contextlib.redirect_stdout(output), \
+                         mock.patch.object(events.Events, "until", become_ready):
+                        self.assertEqual(events.lock_ready(SimpleNamespace(pid=child.pid,
+                            path=lock, held=held, seconds=5, note="our note")), 0)
+                    if expected:
+                        self.assertIn("waiting for the host: " + expected, output.getvalue())
+                    else:
+                        self.assertEqual(output.getvalue(), "")
+                finally:
+                    child.stdin.close()
+                    finish(child)
 
     def test_parent_death_releases_fair_lock_without_parent_reaping(self):
         path, held = self.root / "lock", self.root / "held"
@@ -154,6 +228,36 @@ class LifecycleTests(unittest.TestCase):
                 """
                 process = self.shell(code)
                 self.assertEqual(finish(process), expected, process.stderr.read().decode())
+
+    def test_cpu_recheck_samples_iostat_while_fast_suite_is_alive(self):
+        sampled = self.root / "sampled"
+        code = function("cpu_idle") + "\n" + f"""
+            fast_pid=$$
+            iostat() {{ touch {str(sampled)!r}; echo '0 0 37'; }}
+            [ "$(cpu_idle)" = 100 ] || exit 11
+            [ ! -e {str(sampled)!r} ] || exit 12
+            [ "$(cpu_idle 1)" = 37 ] || exit 13
+            [ -e {str(sampled)!r} ] || exit 14
+        """
+        process = self.shell(code)
+        self.assertEqual(finish(process), 0, process.stderr.read().decode())
+
+    def test_admission_requests_real_cpu_sample_after_resource_wake(self):
+        wake, samples = self.root / "wake", self.root / "samples"
+        scripts = self.root / "scripts"
+        scripts.mkdir()
+        (scripts / "test-events.py").write_text(f"from pathlib import Path\nPath({str(wake)!r}).touch()\n")
+        code = function("wait_for_room") + "\n" + f"""
+            root={str(self.root)!r}; admit_minutes=1; prefix=fixture
+            our_clones() {{ :; }}
+            free_mb() {{ if [ -e {str(wake)!r} ]; then echo 4096; else echo 1024; fi; }}
+            cpu_idle() {{ echo "$1" >> {str(samples)!r}; echo 100; }}
+            die() {{ echo "$*" >&2; exit 1; }}
+            wait_for_room
+        """
+        process = self.shell(code)
+        self.assertEqual(finish(process), 0, process.stderr.read().decode())
+        self.assertEqual(samples.read_text().splitlines(), ["0", "1"])
 
 
 
