@@ -25,6 +25,7 @@ on:
       - 'scripts/test.sh'
       - 'scripts/test-events.py'
       - 'scripts/test-test-events.py'
+      - 'scripts/test-swift-test-product.py'
       - 'scripts/check-strings.sh'
       - 'scripts/*whistle*.py'
       - '.github/workflows/ci.yml'
@@ -70,9 +71,11 @@ jobs:
           swift --version
       - name: Install XcodeGen
         run: brew install xcodegen
-      - name: Test harness event lifecycle regressions
+      - name: Test harness regressions
         working-directory: cassini-ios
-        run: python3 scripts/test-test-events.py
+        run: |
+          python3 scripts/test-test-events.py
+          python3 scripts/test-swift-test-product.py
       - name: String catalogs and package tests
         working-directory: cassini-ios
         run: scripts/test.sh fast
