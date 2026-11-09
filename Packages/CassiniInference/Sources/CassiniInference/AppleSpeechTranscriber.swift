@@ -8,6 +8,7 @@ import CassiniNotebook
 /// Volatile results are reported for the draft; finalized ones are what a checkpoint keeps, and a final result without
 /// words is reported as an empty one so that the finalized audio still moves on. A file that cannot be read to its end
 /// fails with `OPEN`; one read to its end reports its whole duration as done before the transcriber returns.
+@available(iOS 26.0, macOS 26.0, *)
 public actor AppleSpeechTranscriber: Transcribing {
     private let probe: AppleSpeechProbe
     public init() { probe = .live }
@@ -207,6 +208,7 @@ public actor AppleSpeechTranscriber: Transcribing {
 /// The file from a start time on, as analyzer input in the analyzer's format: one block per `next()`, read when the
 /// analyzer asks for it. A read or conversion error ends the input and sets `failed`; the end of the file sets
 /// `reachedEnd`.
+@available(iOS 26.0, macOS 26.0, *)
 struct FileInput: AsyncSequence, Sendable {
     typealias Element = AnalyzerInput
 
@@ -234,6 +236,7 @@ struct FileInput: AsyncSequence, Sendable {
     }
 }
 
+@available(iOS 26.0, macOS 26.0, *)
 extension FileReader {
     /// The next block as analyzer input; nil at the end of the file or after a failure. The first carries its time on
     /// the recording's clock, so the results keep it.
@@ -266,6 +269,7 @@ enum InstallErrors {
 }
 
 /// Public framework probes are injected only for adapter tests; policy stays in CassiniEngine.
+@available(iOS 26.0, macOS 26.0, *)
 struct AppleSpeechProbe: Sendable {
     var isAvailable: @Sendable () -> Bool
     var supportedLocale: @Sendable (Locale) async -> Locale?
