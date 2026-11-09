@@ -553,15 +553,36 @@ check_strings() {
     step_end
 }
 
+# `changed` already selects exact test-target names (swift_targets_for). Swift Build exposes one test product per
+# target; the older native backend exposes one package-wide product instead. Probe help only for one known name,
+# and retain the existing all-products build for arbitrary filters, multiple targets and other toolchains.
+swift_test_product() {
+    case "${1:-}" in
+        CassiniCoreTests|CassiniNotebookTests|CassiniEngineTests|CassiniInferenceTests|CassiniAudioTests|CassiniSherpaTests|CassiniWhistleTests) ;;
+        *) return 0 ;;
+    esac
+    local help
+    help=$(swift test --help-hidden 2>&1) || return 0
+    case "$help" in *"--test-product <test-product>"*) ;; *) return 0 ;; esac
+    case "$help" in
+        *"Specify the build system to use. (default: swiftbuild)"*) printf '%s' "$1" ;;
+    esac
+    return 0
+}
+
 # swift test, filtered by $1 when given (a regular expression over Target.Suite/test).
 swift_test() {
-    local filter="${1:-}"
+    local filter="${1:-}" product
+    local args=(test)
     conformance_env
     seed_swiftpm
+    product=$(swift_test_product "$filter")
+    [ -z "$product" ] || args+=(--test-product "$product")
+    [ -z "$filter" ] || args+=(--filter "$filter")
     # The checkouts are saved whatever the tests did; the tests' failure is the function's, also where it is called
     # as `swift_test || rc=$?`, which turns errexit off inside it.
     local rc=0
-    run_logged "$logs/swift-test.log" 1800 swift test ${filter:+--filter "$filter"} || rc=$?
+    run_logged "$logs/swift-test.log" 1800 swift "${args[@]}" || rc=$?
     save_swiftpm
     return "$rc"
 }
