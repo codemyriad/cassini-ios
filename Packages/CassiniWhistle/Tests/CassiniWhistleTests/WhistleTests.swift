@@ -8,7 +8,7 @@ struct WhistleTests {
 
     @Test func bundledRolloutRetainsTheMeasuredClassFloorAndVerifiedPins() {
         func fact(arm64: Bool = true, os: Bool = true, pins: Bool = true, ram: UInt64 = 3 << 30) -> WhistleCapability {
-            .bundled(arm64: arm64, osSupported: os, bundleVerified: pins, physicalMemory: ram)
+            .bundled(arm64: arm64, osSupported: os, cpuSupported: true, bundleVerified: pins, physicalMemory: ram)
         }
         #expect(fact().available)
         #expect(!fact(arm64: false).available)

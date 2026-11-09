@@ -77,7 +77,7 @@ import CassiniEngineTesting
     static func speechTranscriber(models: PinnedModels,
                                   physicalMemory: UInt64 = ProcessInfo.processInfo.physicalMemory,
                                   defaults: UserDefaults = .standard,
-                                  platform: PlatformFacts = LivePlatform.facts) -> any Transcribing {
+                                  platform: PlatformFacts) -> any Transcribing {
         if SherpaRuntime.isLinked && SpeechCapability.parakeetCapable(physicalMemory: physicalMemory) {
             let parakeet = ParakeetTranscriber(models: .init(installer: models.installer, root: models.root,
                                                     online: { NetworkPath.shared.isOnline }),

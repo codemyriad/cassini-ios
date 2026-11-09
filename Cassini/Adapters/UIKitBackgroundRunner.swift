@@ -71,11 +71,6 @@ import CassiniEngine
         return token
     }
 
-    /// Whether the token's work runs as continued processing rather than in the finite time.
-    func holdsContinuedProcessing(_ token: BackgroundToken) -> Bool {
-        if case .continued = held[token] { true } else { false }
-    }
-
     func update(_ token: BackgroundToken, title: String) {
         guard case .continued(let continued) = held[token] else { return }
         continued.title = title

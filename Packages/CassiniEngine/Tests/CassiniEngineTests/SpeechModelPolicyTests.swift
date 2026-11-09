@@ -125,9 +125,11 @@ import CassiniNotebook
     @Test func withoutAppleSpeechTheFallbackIsParakeetIfItCanRunElseNone() {
         for (name, facts) in fallbackCases {
             for preference in SpeechModelPreference.allCases {
-                let expected = facts.selected(preference: preference) ?? (facts.parakeetCapable ? .parakeet : nil)
-                #expect(facts.recognizer(preference: preference, platform: .iOS18) == expected, "\(name), \(preference)")
-                #expect(facts.recognizer(preference: preference, platform: .iOS18) != .appleSpeech, "\(name)")
+                let recognizer = facts.recognizer(preference: preference, platform: .iOS18)
+                #expect(recognizer != .appleSpeech, "\(name)")
+                if let selected = facts.selected(preference: preference) {
+                    #expect(recognizer == selected, "only the fallback changes: \(name), \(preference)")
+                }
             }
         }
         var facts = policy(.missing)

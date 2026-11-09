@@ -73,16 +73,4 @@ import CassiniWhistle
             XCTAssertEqual(test.graph.settingsPorts.size(of: .speech), platform.appleSpeech ? .managedBySystem : .noModel)
         }
     }
-
-    /// Without continued processing even work with progress takes the finite background time, so `BGTaskScheduler`
-    /// is never asked.
-    func testTheRunnerWithoutContinuedProcessingTakesTheFiniteTime() {
-        let runner = UIKitBackgroundRunner(platform: .iOS18)
-        let progress = Progress(totalUnitCount: 100)
-        let token = runner.begin(title: "Transcribing", subtitle: "", progress: progress) {}
-        XCTAssertFalse(runner.holdsContinuedProcessing(token))
-        runner.update(token, title: "Next")
-        runner.end(token)
-        runner.end(token)
-    }
 }

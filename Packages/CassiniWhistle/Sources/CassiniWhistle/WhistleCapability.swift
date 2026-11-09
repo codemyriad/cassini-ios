@@ -26,7 +26,7 @@ public struct WhistleCapability: Hashable, Sendable {
     /// Conservative experiment admission, not a measured device-class support claim. Recheck window headroom
     /// during inference; a remembered preference cannot enable an App Store build or bypass missing assets.
     public static func experiment(internalBuild: Bool, optedIn: Bool, arm64: Bool, osSupported: Bool,
-                                  cpuSupported: Bool = true, physicalMemory: UInt64, availableMemory: UInt64?,
+                                  cpuSupported: Bool, physicalMemory: UInt64, availableMemory: UInt64?,
                                   bundleVerified: Bool) -> Self {
         let admitted = internalBuild && optedIn && physicalMemory >= 2 << 30
             && (availableMemory.map { $0 >= loadHeadroom } ?? false)
@@ -36,7 +36,7 @@ public struct WhistleCapability: Hashable, Sendable {
     }
     /// D78 rollout after iOS26 DC/adapter parity and the default-limit A12/3GB physical memory gate.
     /// The minimum reported physical memory admits the measured 3GB class; runtime preflights recheck headroom.
-    public static func bundled(arm64: Bool, osSupported: Bool, cpuSupported: Bool = true, bundleVerified: Bool,
+    public static func bundled(arm64: Bool, osSupported: Bool, cpuSupported: Bool, bundleVerified: Bool,
                                physicalMemory: UInt64) -> Self {
         .init(arm64: arm64, operatingSystemSupported: osSupported, cpuSupported: cpuSupported, bundleVerified: bundleVerified,
               pipelineAccepted: true, deviceAccepted: physicalMemory >= 2 << 30)
@@ -71,7 +71,8 @@ public struct WhistleCapability: Hashable, Sendable {
     }
 }
 
-/// The CPU features the Whistle rule reads (`WhistleCapability.supports(cpu:)`), as the system reports them.
+/// The CPU features the Whistle rule reads (`WhistleCapability.supports(cpu:)`), as the system reports them. A feature
+/// the system does not report (a missing or failing `sysctl` key) counts as absent, so the device is refused.
 public struct WhistleCPUFeatures: Hashable, Sendable {
     /// FEAT_LSE, the Armv8.1 large-system-extension atomics (`hw.optional.arm.FEAT_LSE`).
     public var atomics: Bool
