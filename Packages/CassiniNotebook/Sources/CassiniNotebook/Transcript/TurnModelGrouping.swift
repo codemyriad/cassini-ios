@@ -127,10 +127,11 @@ extension TurnModel {
             }
         }
         let meetingMedian = all.count >= 8 ? median(all) : 250
+        let fallbackBudget = max(1000, 4 * meetingMedian)
         let budgets = durations.mapValues { max(1000, 4 * ($0.count >= 8 ? median($0) : meetingMedian)) }
         return blocks.map { original in
             var block = original
-            let budget = budgets[block.speaker ?? "Unknown speaker"] ?? 1000
+            let budget = budgets[block.speaker ?? "Unknown speaker"] ?? fallbackBudget
             var changed = false
             for candidate in candidates(block.words) where candidate.end - candidate.start > budget {
                 for index in candidate.indices {

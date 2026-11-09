@@ -56,24 +56,8 @@ import Testing
                 }
             }
         }
-        // Adjacent own-speech block seams are explicitly informative in the shared README. Only
-        // those seams may disappear; chips, ordering and every row field still compare exactly.
-        #expect(actual.map(coalescingWords) == expected.rows.map(coalescingWords))
-    }
-
-    private func coalescingWords(_ row: ComparedRow) -> ComparedRow {
-        var result = row
-        result.members = []
-        for member in row.members {
-            if member.kind == "words", result.members.last?.kind == "words" {
-                let index = result.members.count - 1
-                result.members[index].wordIndices += member.wordIndices
-                result.members[index].text += " " + member.text
-            } else {
-                result.members.append(member)
-            }
-        }
-        return result
+        // Compare the raw members, including every block seam. These goldens are not normalized.
+        #expect(actual == expected.rows)
     }
 
     private func load<T: Decodable>(_ filename: String) throws -> T {
