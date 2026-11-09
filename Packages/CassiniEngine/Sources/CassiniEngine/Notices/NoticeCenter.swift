@@ -39,7 +39,7 @@ import CassiniNotebook
         let initialLanguage = settings.speechLanguage
         languageFollower = Task { [weak self, settings] in
             var previous = initialLanguage
-            for await language in Observations({ settings.speechLanguage }) {
+            for await language in ObservedValues({ settings.speechLanguage }) {
                 guard language != previous else { continue }
                 previous = language
                 guard let self else { return }

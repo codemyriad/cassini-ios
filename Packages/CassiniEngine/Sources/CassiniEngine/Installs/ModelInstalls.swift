@@ -338,7 +338,7 @@ import CassiniNotebook
         let language = language
         followers.append(Task { [weak self] in
             var last: String?
-            for await value in Observations({ language() }) {
+            for await value in ObservedValues({ language() }) {
                 defer { last = value }
                 guard let last, last != value else { continue }
                 guard let self else { return }
@@ -348,7 +348,7 @@ import CassiniNotebook
         guard let job else { return }
         followers.append(Task { [weak self] in
             var downloading = false
-            for await now in Observations({ job.modelDownload != nil }) {
+            for await now in ObservedValues({ job.modelDownload != nil }) {
                 defer { downloading = now }
                 if now, !downloading { self?.downloadsFollowed += 1 }
                 guard downloading, !now else { continue }
