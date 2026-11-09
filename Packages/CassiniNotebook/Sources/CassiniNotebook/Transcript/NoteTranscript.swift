@@ -61,6 +61,13 @@ public struct NoteTurn: Identifiable, Hashable, Sendable {
     public let interjections: [TurnInterjection]
     /// "Is this Luca?" above this paragraph: the speaker's first one, while it is a placeholder.
     public private(set) var suggestion: SpeakerSuggestion?
+    /// Suggestions for speakers who speak in this row's inline chips instead of owning its header.
+    public private(set) var inlineSuggestions: [SpeakerSuggestion]
+    /// Host first, then the inline speakers in reading order; each card names its own actual speaker.
+    public var allSuggestions: [SpeakerSuggestion] {
+        var seen = Set<String>()
+        return ((suggestion.map { [$0] } ?? []) + inlineSuggestions).filter { seen.insert($0.speakerID).inserted }
+    }
     /// The passages the paragraph shows, in order, each with where it starts in the paragraph (for Edit passage).
     public let passages: [PassageRef]
 
@@ -240,14 +247,20 @@ public enum NoteTranscripts {
             return Template(name: name, tint: tints[speaker] ?? .amber, auto: automatic.contains(speaker) && name.isNamed)
         }
         let cards = Dictionary(suggestions.map { ($0.speakerID, $0) }, uniquingKeysWith: { first, _ in first })
-        let placed = NoteTranscript(turns: built.turns.enumerated().map { index, turn in
-            // A card goes above the paragraph where its speaker's latest turn begins.
-            guard let id = turn.speakerID, let card = cards[id], !turn.name.isNamed, ms(turn.start) == card.atMs,
-                  index == 0 || built.turns[index - 1].speakerID != id else { return turn }
-            let label = if case .placeholder(_, let label) = turn.name { label } else { DefaultLabels.placeholder(1) }
-            return turn.with(suggestion: SpeakerSuggestion(
-                speakerID: id, label: label, voiceID: card.voiceID, voiceName: card.name,
-                score: card.score, segmentID: draftSegment, start: turn.start))
+        var placedSpeakers = Set<String>()
+        let placed = NoteTranscript(turns: built.turns.map { turn in
+            // The latest raw speaker run can start inside a rejoined row or one of its chips. Anchor to the
+            // actual word, not the host's row timestamp, while emitting each speaker's card only once.
+            var host: SpeakerSuggestion?, inline: [SpeakerSuggestion] = []
+            for word in turn.words {
+                guard let id = word.speakerID, let card = cards[id], names[id]?.isNamed != true,
+                      ms(word.start) == card.atMs, placedSpeakers.insert(id).inserted else { continue }
+                let label = names[id]?.label ?? DefaultLabels.placeholder(1)
+                let suggestion = SpeakerSuggestion(speakerID: id, label: label, voiceID: card.voiceID, voiceName: card.name,
+                                                   score: card.score, segmentID: draftSegment, start: word.start)
+                if id == turn.speakerID { host = suggestion } else { inline.append(suggestion) }
+            }
+            return turn.with(suggestion: host, inlineSuggestions: inline)
         })
         guard let tentativeFromMs else { return placed }
         let tentativeFrom = Double(tentativeFromMs) / 1000
@@ -304,9 +317,14 @@ public enum NoteTranscripts {
                 }
             }
             let over = row.over.map { template(sourceSpeaker($0), false).name }
+            let inlineSuggestions = row.members.compactMap { member -> SpeakerSuggestion? in
+                guard member.kind == .interjection else { return nil }
+                let speaker = sourceSpeaker(member.speaker)
+                return template(speaker, seen.insert(speaker).inserted).suggestion
+            }
             return NoteTurn(id: "w\(indices.min()!)", speakerID: speaker, name: made.name, tint: made.tint,
                             start: row.startMs / 1000, auto: made.auto, source: words, row: row,
-                            over: over, suggestion: made.suggestion, passages: passages, template: {
+                            over: over, suggestion: made.suggestion, inlineSuggestions: inlineSuggestions, passages: passages, template: {
                 let value = template(sourceSpeaker($0), false)
                 return (value.name, value.tint)
             })
@@ -328,7 +346,7 @@ extension SpeakerName {
 extension NoteTurn {
     init(id: String, speakerID: String?, name: SpeakerName, tint: SpeakerTint, start: TimeInterval, auto: Bool,
          source: [TranscriptWord], row: TurnModel.Row, over: [SpeakerName], suggestion: SpeakerSuggestion?,
-         passages: [PassageRef], template: (String?) -> (SpeakerName, SpeakerTint)) {
+         inlineSuggestions: [SpeakerSuggestion], passages: [PassageRef], template: (String?) -> (SpeakerName, SpeakerTint)) {
         var text = "", offsets: [Int] = [], words: [TurnWord] = [], chips: [TurnInterjection] = []
         for member in row.members {
             guard !member.wordIndices.isEmpty else { continue }
@@ -364,7 +382,7 @@ extension NoteTurn {
         self.auto = auto; self.words = words; self.text = text; self.offsets = offsets
         self.unsettledFrom = nil; self.unsettledWordIndices = []
         self.continuation = row.continuation; self.over = over; self.crosstalk = row.crosstalk
-        self.interjections = chips; self.suggestion = suggestion; self.passages = passages
+        self.interjections = chips; self.suggestion = suggestion; self.inlineSuggestions = inlineSuggestions; self.passages = passages
     }
 
     func with(unsettledWordIndices: Set<Int>) -> NoteTurn {
@@ -374,9 +392,10 @@ extension NoteTurn {
         return copy
     }
 
-    func with(suggestion: SpeakerSuggestion?) -> NoteTurn {
+    func with(suggestion: SpeakerSuggestion?, inlineSuggestions: [SpeakerSuggestion]) -> NoteTurn {
         var copy = self
         copy.suggestion = suggestion
+        copy.inlineSuggestions = inlineSuggestions
         return copy
     }
 }

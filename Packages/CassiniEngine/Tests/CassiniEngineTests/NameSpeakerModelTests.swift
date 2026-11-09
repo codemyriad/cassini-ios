@@ -140,3 +140,32 @@ import CassiniNotebook
         #expect(fake.namingWrites.count == 1, "once the job is gone the name saves")
     }
 }
+
+extension NameSpeakerModelTests {
+    @Test func aChipOnlyDraftSpeakerCanBeNamedAndMergedWhileNamingIsOpen() async throws {
+        let words = [DraftWord(speaker: "a", startMs: 0, endMs: 500, text: "Ready,"),
+                     DraftWord(speaker: "b", startMs: 450, endMs: 650, text: "Yes."),
+                     DraftWord(speaker: "a", startMs: 500, endMs: 1000, text: "now.")]
+        fake.job = Job(noteID: screen.noteID, seq: 1, kind: .transcribe, state: .running, enqueuedAt: Date())
+        fake.runningDraft = DraftState(words: words, tentativeFromMs: .max, namingOpen: true)
+        let shown = try #require(screen.shownDraft)
+        let transcript = NoteTranscripts.draft(shown.words, tentativeFromMs: nil, labels: shown.labels)
+        #expect(transcript.turns.map(\.speakerID) == ["a"], "Speaker b is present only in a chip")
+        #expect(transcript.turns[0].interjections.map(\.speakerID) == ["b"])
+        screen.speakerTapped("b")
+        #expect(screen.sheet == .naming("b", draft: nil))
+        let ben = screen.naming("b")
+        await ben.open(draft: nil) { [actions] in actions.record($0) }
+        let input = try #require(ben.state?.input)
+        #expect(input.draft && input.speakerID == "b" && input.ordinal == 1)
+        #expect(input.mergeTargets.map(\.speakerID) == ["a"])
+        let ada = screen.naming("a")
+        await ada.open(draft: nil) { [actions] in actions.record($0) }
+        #expect(ada.state?.input.mergeTargets.map(\.speakerID) == ["b"])
+        screen.sheet = nil
+        fake.draftNamingOpen = false
+        screen.speakerTapped("b")
+        #expect(screen.sheet == nil)
+        #expect(screen.screen.dialog == .readOnly(.saving))
+    }
+}

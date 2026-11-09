@@ -145,9 +145,13 @@ struct NoteDetailView: View {
 
     /// "Is this Luca?" above the first paragraph of a placeholder speaker a saved voice may be.
     private func suggestionCard(_ turn: NoteTurn, in transcript: NoteTranscript) -> AnyView? {
-        guard let suggestion = turn.suggestion else { return nil }
-        let ordinal = transcript.speakers.firstIndex(of: suggestion.speakerID) ?? 0
-        return AnyView(SuggestionCard(suggestion: suggestion, ordinal: ordinal, model: model))
+        guard readOnly == nil, !turn.allSuggestions.isEmpty else { return nil }
+        return AnyView(VStack(spacing: 12) {
+            ForEach(turn.allSuggestions, id: \.speakerID) { suggestion in
+                let ordinal = transcript.speakers.firstIndex(of: suggestion.speakerID) ?? 0
+                SuggestionCard(suggestion: suggestion, ordinal: ordinal, model: model)
+            }
+        })
     }
 }
 

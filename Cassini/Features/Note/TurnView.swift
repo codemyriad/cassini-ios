@@ -120,14 +120,16 @@ struct TurnView: View, Equatable {
 
     /// The paragraph with its word links (reading), its unsettled words (draft), the active word and the search hits.
     private var attributed: AttributedString {
-        var result = AttributedString(turn.text)
+        var result = style == .reading
+            ? turn.linkedText(activeWord: activeIndex, scheme: Self.scheme)
+            : AttributedString(turn.text)
         let characters = result.characters
         func range(_ offsets: Range<Int>) -> Range<AttributedString.Index>? {
             guard offsets.lowerBound >= 0, offsets.upperBound <= characters.count else { return nil }
             let start = characters.index(characters.startIndex, offsetBy: offsets.lowerBound)
             return start..<characters.index(start, offsetBy: offsets.count)
         }
-        // The chip is inline prose, including its label for VoiceOver and Copy. Its actual words keep their links.
+        // The full chip tint includes its internal spaces; active-word colors are applied after every decoration.
         for chip in turn.interjections {
             if let span = range(chip.textRange) {
                 result[span].backgroundColor = chip.crosstalk ? Color.toneWarn.opacity(0.22) : chip.tint.color.opacity(0.12)
@@ -138,10 +140,7 @@ struct TurnView: View, Equatable {
             }
         }
         switch style {
-        case .reading:
-            for index in turn.words.indices where index != activeIndex {
-                if let word = range(turn.range(ofWord: index)) { result[word].link = URL(string: "\(Self.scheme):\(index)") }
-            }
+        case .reading: break
         case .draft:
             for index in turn.unsettledWordIndices {
                 if let word = range(turn.range(ofWord: index)) { result[word].foregroundColor = Color.faint }

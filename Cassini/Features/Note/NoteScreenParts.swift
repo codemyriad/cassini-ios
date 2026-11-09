@@ -121,9 +121,13 @@ struct DraftSection: View {
             TranscriptList(transcript: transcript, style: .draft, renamable: draft.namingOpen,
                            actions: TranscriptActions(nameSpeaker: { model.speakerTapped($0) }),
                            suggestion: { turn in
-                               guard draft.namingOpen, let suggestion = turn.suggestion else { return nil }
-                               let ordinal = transcript.speakers.firstIndex(of: suggestion.speakerID) ?? 0
-                               return AnyView(SuggestionCard(suggestion: suggestion, ordinal: ordinal, model: model))
+                               guard draft.namingOpen, !turn.allSuggestions.isEmpty else { return nil }
+                               return AnyView(VStack(spacing: 12) {
+                                   ForEach(turn.allSuggestions, id: \.speakerID) { suggestion in
+                                       let ordinal = transcript.speakers.firstIndex(of: suggestion.speakerID) ?? 0
+                                       SuggestionCard(suggestion: suggestion, ordinal: ordinal, model: model)
+                                   }
+                               })
                            })
         }
         .accessibilityIdentifier("draftTranscript")
