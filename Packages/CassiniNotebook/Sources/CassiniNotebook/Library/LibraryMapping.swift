@@ -97,7 +97,7 @@ public struct ProgressBanner: Hashable, Sendable {
         /// "Finishing the previous note…"
         case waiting
         case downloading(ModelPart, percent: Int)
-        case checking(percent: Int)
+        case checking(percent: Int?)
     }
 
     /// The running note, which a tap opens; nil for a download on its own, which opens Settings.
@@ -144,7 +144,8 @@ public struct ProgressBanner: Hashable, Sendable {
     public var spokenPercent: Int? {
         if let percent { return percent }
         switch line {
-        case .downloading(_, let percent), .checking(let percent): return percent
+        case .downloading(_, let percent): return percent
+        case .checking(let percent): return percent
         case .timeLeft, .waiting: return nil
         }
     }
@@ -313,19 +314,22 @@ public enum LibraryMapping {
     /// The banner of a download from Settings or the model download screen: no note, "Downloading models".
     private static func standaloneDownload(_ install: DownloadFact?, queued: Int) -> ProgressBanner? {
         guard let install, install.failure == nil else { return nil }
-        let percent = Int(((install.fraction ?? 0) * 100).rounded(.down))
-        let line = ProgressBanner.Line.downloading(install.part, percent: percent)
+        let percent = Int((min(max(install.fraction ?? 0, 0), 1) * 100).rounded(.down))
+        // The byte fraction describes transfer, not hashing/decompression. Checking has no measured percentage.
+        let line: ProgressBanner.Line = install.checking ? .checking(percent: nil) : .downloading(install.part, percent: percent)
         return ProgressBanner(noteID: nil, title: nil, percent: nil, fraction: fill(line), line: line, queued: queued)
     }
 
     private static func downloadLine(_ progress: DownloadProgress?) -> ProgressBanner.Line {
         guard let progress else { return .downloading(.speech, percent: 0) }
-        return progress.verifying ? .checking(percent: progress.percent) : .downloading(progress.part, percent: progress.percent)
+        return progress.verifying ? .checking(percent: progress.totalBytes > 0 ? progress.percent : nil)
+            : .downloading(progress.part, percent: progress.percent)
     }
 
     private static func fill(_ line: ProgressBanner.Line) -> Double? {
         switch line {
-        case .downloading(_, let percent), .checking(let percent): Double(percent) / 100
+        case .downloading(_, let percent): Double(percent) / 100
+        case .checking(let percent): percent.map { Double($0) / 100 }
         case .timeLeft, .waiting: nil
         }
     }

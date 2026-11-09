@@ -609,3 +609,38 @@ private struct Tracked {
 private extension TimeLeft {
     var isRange: Bool { if case .range = self { true } else { false } }
 }
+
+extension ProgressTrackerTests {
+    @Test func modelDownloadBoundariesPublishWithoutWaitingForTheNextTick() {
+        var t = Tracked()
+        t.send(started(totalMs: 70_000))
+        t.advance(250) // Synthetic time before the first scheduled tick, not a wall-clock wait.
+        let transfer = DownloadProgress(part: .speakers, doneBytes: 100, totalBytes: 100, verifying: false)
+        t.send(.downloading(transfer))
+        #expect(t.progress?.download == transfer)
+        let checking = DownloadProgress(part: .speakers, doneBytes: 0, totalBytes: 0, verifying: true)
+        t.send(.downloading(checking))
+        #expect(t.progress?.download == checking, "The check transition is visible as soon as its event arrives")
+        t.send(.downloading(nil))
+        #expect(t.progress?.download == nil, "Readiness followers see completion without a timer or manual refresh")
+        t.send(.downloading(checking))
+        t.send(.stageChanged(.speakers))
+        #expect(t.progress?.download == nil, "Starting the speaker stage clears the check immediately, before the next tick")
+    }
+
+    @Test func lateDownloadEventsDoNotReviveAStoppedOrCompletedPhase() {
+        let checking = DownloadProgress(part: .speakers, doneBytes: 0, totalBytes: 0, verifying: true)
+        var stopped = Tracked()
+        stopped.send(started())
+        stopped.send(.stopping)
+        stopped.send(.downloading(checking))
+        #expect(stopped.phase == .stopping)
+        var ended = Tracked()
+        ended.send(started())
+        ended.send(.ended(.done))
+        ended.send(.downloading(checking))
+        #expect(ended.progress?.percent == 100)
+        #expect(ended.progress?.download == nil)
+        #expect(!ended.tracker.isTicking)
+    }
+}

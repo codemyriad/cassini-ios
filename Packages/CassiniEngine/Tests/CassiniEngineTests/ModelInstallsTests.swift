@@ -149,6 +149,36 @@ import CassiniNotebook
         #expect(!Notices.library(NoticeFacts(download: installs.download), LibraryFacts()).contains { $0.kind.isDownloadFailure })
     }
 
+    @Test func aJobsSpeakerDownloadClearsTheStandaloneFailureBeforeTheJobEnds() async throws {
+        let analyzer = ScriptedAnalyzer(status: .notDownloaded, gated: true)
+        let job = JobProgress(uptimeMs: { 0 })
+        defer { job.end() }
+        let installs = ModelInstalls(transcriber: FakeTranscriber(.returns([], total: 0)), analyzer: analyzer,
+                                     clock: FakeClock(), job: job) { "en-US" }
+        await installs.refresh()
+        installs.install([.speakers])
+        try await until { analyzer.isWaiting }
+        analyzer.finish(with: .download(.interrupted, requiredFreeBytes: 0), status: .notDownloaded)
+        try await until { installs.installsEnded == 1 }
+        #expect(installs.download?.failure == .interrupted)
+
+        let noteID = UUID()
+        job.begin(noteID, finalizationMs: nil)
+        job.apply(.started(JobStart(totalMs: 10_000, speakers: true, prints: true)))
+        let progress = DownloadProgress(part: .speakers, doneBytes: 30, totalBytes: 100, verifying: false)
+        job.apply(.downloading(progress))
+        try #require(job.modelDownload == progress, "speaker preparation publishes without waiting for a ticker")
+        try await until { installs.downloadsFollowed == 1 }
+        analyzer.finish(with: nil, status: .ready)
+        job.apply(.stageChanged(.speakers))
+        #expect(job.modelDownload == nil, "leaving the download publishes immediately too")
+        try await until { installs.status(of: .speakers) == .ready && installs.download == nil }
+        #expect(job.noteID == noteID, "the refresh must not need the job to end")
+        #expect(installs.status(of: .voices) == .ready)
+        #expect(installs.failures[.speakers] == nil)
+        #expect(!Notices.library(NoticeFacts(download: installs.download), LibraryFacts()).contains { $0.kind.isDownloadFailure })
+    }
+
     @Test func aClosingRefreshCannotRestoreAnObsoleteSpeakerFailure() async throws {
         let analyzer = ScriptedAnalyzer(status: .notDownloaded, gated: true)
         let installs = ModelInstalls(transcriber: FakeTranscriber(.returns([], total: 0)), analyzer: analyzer,

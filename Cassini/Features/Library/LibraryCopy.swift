@@ -53,7 +53,11 @@ enum LibraryCopy {
         case .waiting: ProgressText.headline(.waitingForPrevious)
         case .downloading(let part, let percent): downloading(part, percent)
         case .checking(let percent):
-            String(localized: "Checking files — \(percent)%", table: "Library", comment: "Library banner: downloaded models are checked")
+            if let percent {
+                String(localized: "Checking files — \(percent)%", table: "Library", comment: "Library banner: downloaded models are checked")
+            } else {
+                String(localized: "Checking files", table: "Library", comment: "Library banner: downloaded files are checked without measured progress")
+            }
         }
         guard banner.queued > 0 else { return line }
         let more = String(localized: "\(banner.queued) more in queue", table: "Library", comment: "Library banner: notes waiting")

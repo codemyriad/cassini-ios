@@ -69,11 +69,15 @@ public struct ProgressTracker: Sendable {
                 if !stopping { phase = .downloading(progress) }
             } else {
                 run?.download = progress
+                // Download/check boundaries drive model readiness followers; do not hide them until the next tick.
+                if isTicking { publish(at: nowMs, done: false) }
             }
         default:
             guard var current = run else { return }
+            let previousDownload = current.download
             on(event, &current, at: nowMs)
             run = current
+            if previousDownload != current.download, isTicking { publish(at: nowMs, done: false) }
         }
     }
 

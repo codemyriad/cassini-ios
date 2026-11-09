@@ -69,7 +69,14 @@ public struct NetworkModelFetcher: ModelFetching {
     public func fetch(_ model: ModelDescriptor, into directory: URL,
                       progress: @escaping @Sendable (Int64, Bool) -> Void) async throws {
         guard let decoder else { throw ModelError(.modelInstall, "No Zstandard decoder") }
-        let urls = try await manifest().urls(model, allowed: redirects)
+        let urls: [String: String]
+        do {
+            ModelInstallDiagnostics.begin(model: model.id, stage: "manifest")
+            urls = try await manifest().urls(model, allowed: redirects)
+        } catch {
+            ModelInstallDiagnostics.failure(model: model.id, stage: "manifest", error: error)
+            throw error
+        }
         try await fetcher.fetchNotice(noticeURL, into: directory, redirects: redirects)
         var completed: Int64 = 0
         for (index, artifact) in model.artifacts.enumerated() {
@@ -245,19 +252,31 @@ public final class ModelRepository: Sendable {
     /// keeping the files it checked before); once every file and the notices are there, the staging directory is
     /// written through to storage, renamed into place (never over an existing directory) and its parent written
     /// through. `progress` gets the bytes of the model's download and whether they are being checked. Any failure is
-    /// thrown as a `ModelError` (a full disk becomes SPACE, any other file or network error DOWNLOAD), or as
+    /// thrown as a `ModelError` (a full disk becomes SPACE, other file errors INSTALL, network errors DOWNLOAD), or as
     /// `CancellationError`; the staging directory stays for the next attempt.
     public func installModel(_ model: ModelDescriptor,
                              progress: @escaping @Sendable (Int64, Bool) -> Void) async throws {
-        try prepareRoot()
+        var stage = "prepare-root"
+        do {
+            ModelInstallDiagnostics.begin(model: model.id, stage: stage)
+            try prepareRoot()
+        } catch {
+            ModelInstallDiagnostics.failure(model: model.id, stage: stage, error: error)
+            throw Self.localFailure(error)
+        }
         let final = model.directory(in: root)
         if model.ready(in: root) { return }
         let staging = model.staging(in: root)
         do {
+            stage = "retire"
+            ModelInstallDiagnostics.begin(model: model.id, stage: stage)
             try ModelFiles.retire(final)
-            try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
+            stage = "staging"
+            ModelInstallDiagnostics.begin(model: model.id, stage: stage)
+            try Self.prepareDirectory(staging)
         } catch {
-            throw ModelError(.modelInstall, "\(error)")
+            ModelInstallDiagnostics.failure(model: model.id, stage: stage, error: error)
+            throw Self.localFailure(error)
         }
         do {
             try await fetcher.fetch(model, into: staging, progress: progress)
@@ -269,28 +288,36 @@ public final class ModelRepository: Sendable {
             if ModelInstaller.isCancellation(error) { throw error }
             // iOS reports a full disk as its own error: NOT_ENOUGH_STORAGE, where Android reads it as an I/O error.
             if CheckpointFiles.isOutOfSpace(error) { throw ModelError(.space, "\(error)") }
-            throw ModelError(.modelDownload, "\(error)")
+            if (error as NSError).domain == NSURLErrorDomain { throw ModelError(.modelDownload, "\(error)") }
+            throw Self.localFailure(error)
         }
+        try ModelError.require(!Task.isCancelled, .cancelled)
         guard model.complete(staging) else {
             let error = ModelError(.modelInstall, "\(model.pin) is incomplete")
             ModelInstallDiagnostics.failure(model: model.id, stage: "complete", error: error)
             throw error
         }
-        var stage = "removeLeftovers"
+        stage = "remove-leftovers"
         do {
             try Self.removeLeftovers(of: model, in: staging)
             stage = "staging-directory-sync"
             ModelInstallDiagnostics.begin(model: model.id, stage: stage)
             try ModelFiles.sync(staging)
+            try ModelError.require(!Task.isCancelled, .cancelled)
             stage = "revision-rename"
             ModelInstallDiagnostics.begin(model: model.id, stage: stage)
             try ModelFiles.renameExclusive(staging, final)
-            stage = "parent-directory-sync"
-            ModelInstallDiagnostics.begin(model: model.id, stage: stage)
-            try ModelFiles.sync(final.deletingLastPathComponent())
         } catch {
             ModelInstallDiagnostics.failure(model: model.id, stage: stage, error: error)
-            throw ModelError(.modelInstall, "\(error)")
+            if ModelInstaller.isCancellation(error) { throw error }
+            throw Self.localFailure(error)
+        }
+        // The verified revision is already published. A directory flush failure cannot unpublish it.
+        do {
+            ModelInstallDiagnostics.begin(model: model.id, stage: "parent-directory-sync")
+            try ModelFiles.sync(final.deletingLastPathComponent())
+        } catch {
+            ModelInstallDiagnostics.failure(model: model.id, stage: "parent-directory-sync", error: error)
         }
         verifier.markVerified(model, in: root)
     }
@@ -332,9 +359,27 @@ public final class ModelRepository: Sendable {
         }
     }
 
+    /// Model work may finish after auto-lock. Apply protection even when upgrading an existing staging directory.
+    static func prepareDirectory(_ directory: URL, using files: FileManager = .default) throws {
+        try files.createDirectory(at: directory, withIntermediateDirectories: true)
+        let protection: [FileAttributeKey: Any] = [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication]
+        try files.setAttributes(protection, ofItemAtPath: directory.path)
+        // Existing partials keep their old class when only their directory changes. Migrate those too before a
+        // resumed install can continue under auto-lock; new files inherit the directory's policy.
+        for child in try files.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.isRegularFileKey]) {
+            if try child.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile == true {
+                try files.setAttributes(protection, ofItemAtPath: child.path)
+            }
+        }
+    }
+
+    private static func localFailure(_ error: any Error) -> ModelError {
+        ModelError(CheckpointFiles.isOutOfSpace(error) ? .space : .modelInstall, "\(error)")
+    }
+
     /// Creates the root, excluded from backups: the models download again.
     private func prepareRoot() throws {
-        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try Self.prepareDirectory(root)
         var values = URLResourceValues()
         values.isExcludedFromBackup = true
         var root = root

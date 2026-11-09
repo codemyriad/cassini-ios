@@ -290,6 +290,62 @@ import CassiniNotebook
         #expect(outcome == .failed(part: .speech, error: .notEnoughStorage, requiredFreeBytes: speech.requiredFreeBytes))
     }
 
+    @Test(arguments: [CocoaError(.fileReadNoPermission) as NSError,
+                      CocoaError(.fileWriteUnknown) as NSError,
+                      POSIXError(.EACCES) as NSError])
+    func localFileFailuresAreInstallFailuresRatherThanNetworkFailures(_ error: NSError) async throws {
+        struct FailingFiles: ModelFetching {
+            let error: NSError
+            func fetch(_ model: ModelDescriptor, into directory: URL,
+                       progress: @escaping @Sendable (Int64, Bool) -> Void) async throws { throw error }
+        }
+        let repo = ModelRepository(root: models, consent: settings, fetcher: FailingFiles(error: error))
+        let failure = await #expect(throws: ModelError.self) {
+            try await repo.installModel(ModelCatalog.voiceprint) { _, _ in }
+        }
+        #expect(failure?.failure == .modelInstall)
+        #expect(!ModelCatalog.voiceprint.ready(in: models))
+    }
+
+    @Test func cancellationAfterTheFetchCannotPublishARevision() async throws {
+        struct CancelAtCompletion: ModelFetching {
+            func fetch(_ model: ModelDescriptor, into directory: URL,
+                       progress: @escaping @Sendable (Int64, Bool) -> Void) async throws {
+                sparse(model, in: directory)
+                withUnsafeCurrentTask { $0?.cancel() }
+            }
+        }
+        let repo = ModelRepository(root: models, consent: settings, fetcher: CancelAtCompletion())
+        let result = await Task.detached {
+            await failure { try await repo.installModel(ModelCatalog.voiceprint) { _, _ in } }
+        }.value
+        #expect(result == .cancelled)
+        #expect(!ModelCatalog.voiceprint.ready(in: models))
+        #expect(ModelCatalog.voiceprint.complete(ModelCatalog.voiceprint.staging(in: models)),
+                "Cancellation preserves the checked staging files for a later attempt")
+    }
+
+    @Test func aMetadataTimeoutRemainsADownloadFailure() async throws {
+        struct TimedOut: ModelFetching {
+            func fetch(_ model: ModelDescriptor, into directory: URL,
+                       progress: @escaping @Sendable (Int64, Bool) -> Void) async throws { throw URLError(.timedOut) }
+        }
+        let repo = ModelRepository(root: models, consent: settings, fetcher: TimedOut())
+        let failure = await #expect(throws: ModelError.self) {
+            try await repo.installModel(ModelCatalog.voiceprint) { _, _ in }
+        }
+        #expect(failure?.failure == .modelDownload)
+    }
+
+    @Test func aRootThatCannotBePreparedFailsBeforeAnyDownload() async throws {
+        try Data("occupied".utf8).write(to: models)
+        let failure = await #expect(throws: ModelError.self) {
+            try await repository().installModel(ModelCatalog.voiceprint) { _, _ in }
+        }
+        #expect(failure?.failure == .modelInstall)
+        #expect(log.entries.isEmpty)
+    }
+
     /// iOS only: the models download again, so they stay out of backups.
     @Test func theModelsAreExcludedFromBackups() async throws {
         let repo = repository()
