@@ -20,4 +20,15 @@ import CassiniEngine
             }
         }
     }
+
+    /// The speech language is named only for Apple speech on a system that has it: on iOS 18 the `.appleSpeech`
+    /// identity is the unavailable sentinel, and Settings hides the picker the download screen would point at.
+    @Test func onlyAppleSpeechOnASystemWithItAsksForTheSpeechLanguage() {
+        #expect(PlatformFacts.iOS26.asksForSpeechLanguage(.appleSpeech))
+        #expect(!PlatformFacts.iOS18.asksForSpeechLanguage(.appleSpeech))
+        for facts in [PlatformFacts.iOS26, .iOS18] {
+            #expect(!facts.asksForSpeechLanguage(.parakeet))
+            #expect(!facts.asksForSpeechLanguage(.whistle))
+        }
+    }
 }

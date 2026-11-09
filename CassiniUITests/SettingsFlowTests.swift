@@ -82,7 +82,16 @@ final class SettingsFlowTests: XCTestCase {
         reveal(speech, in: app)
         XCTAssertEqual(speech.label, "Speech recognition, Not available")
         XCTAssertFalse(row(app, startingWith: "Speech recognition").exists, "a Not available row is not a button")
-        XCTAssertTrue(row(app, startingWith: "Telling speakers apart").label.contains("88 MB"))
+        let speakers = row(app, startingWith: "Telling speakers apart")
+        XCTAssertTrue(speakers.label.contains("88 MB"))
+        // D59: the download screen does not point at the Speech language picker Settings hides.
+        speakers.tap()
+        XCTAssertTrue(app.staticTexts["Transcribe on this device"].waitForExistence(within: 5))
+        XCTAssertTrue(app.buttons["Download"].exists)
+        // The line would come with the plan, which lists the speaker models.
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Telling speakers apart"))
+            .firstMatch.waitForExistence(within: 5))
+        XCTAssertTrue(app.staticTexts["speechLanguageLine"].staysAbsent(for: 2))
     }
 
     /// A Parakeet device without Ultra: its row is a button that opens the download screen with the sizes.

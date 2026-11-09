@@ -19,6 +19,13 @@ public struct PlatformFacts: Hashable, Sendable {
     /// iOS 18: neither.
     public static let iOS18 = PlatformFacts(appleSpeech: false, continuedProcessing: false)
 
+    /// Whether Cassini names `recognizer`'s speech language (the Settings picker, its footers and the download
+    /// screen's "change it in Settings › Speech language"): only a recognizer that takes a language, on a system with
+    /// Apple speech. Without it the `.appleSpeech` identity is only the unavailable sentinel, and the picker is hidden.
+    public func asksForSpeechLanguage(_ recognizer: SpeechRecognizer) -> Bool {
+        appleSpeech && recognizer.usesLanguage
+    }
+
     /// Whether work that reports `progressUnits` asks iOS for continued processing (its title, progress and Stop
     /// button); otherwise, and for work without progress, the runner takes the finite background time.
     public func asksForContinuedProcessing(progressUnits: Int64) -> Bool {

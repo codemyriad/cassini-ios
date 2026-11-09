@@ -73,12 +73,13 @@ import CassiniNotebook
         processing.modelDownload = ModelDownloadAdapter(
             settings: settings, processing: processing, transcriber: environment.transcriber,
             analyzer: environment.analyzer, storage: environment.storage, notices: noticeCenter,
-            root: environment.root, models: environment.models, downloadTranscriber: environment.downloadTranscriber)
+            root: environment.root, models: environment.models, platform: environment.platform,
+            downloadTranscriber: environment.downloadTranscriber)
         if let speechModels = environment.speechModels {
             if speechModels.parakeetCapable {
                 processing.parakeetDownload = ModelDownloadAdapter(settings: settings, processing: processing,
                     transcriber: environment.transcriber, analyzer: environment.analyzer, storage: environment.storage,
-                    notices: noticeCenter, root: environment.root, models: environment.models,
+                    notices: noticeCenter, root: environment.root, models: environment.models, platform: environment.platform,
                     downloadTranscriber: environment.downloadTranscriber, speechOnly: true)
             }
             speechModels.onDownload = { [weak router] in router?.push(.parakeetDownload) }
