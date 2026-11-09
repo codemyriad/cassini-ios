@@ -89,4 +89,46 @@ import Testing
         #expect(try #require(rows.first).over == (overlap == 150 ? ["ada"] : []))
         #expect(try #require(rows.last).over == (overlap == 150 ? ["ben"] : []))
     }
+    // overlap.ts budgetsBySpeaker: seven references are insufficient for a speaker median;
+    // the meeting median is 600 ms, not the 250 ms last-resort fallback or Ada's 100 ms.
+    @Test(arguments: [0, 7])
+    func sparseSpeakerFallsBackToNondefaultMeetingMedian(_ referenceCount: Int) throws {
+        var words = (0..<9).map { word("ben", Double($0 * 600), Double(($0 + 1) * 600), "reference\($0)") }
+        words += (0..<referenceCount).map { word("ada", 6000 + Double($0 * 100), 6100 + Double($0 * 100), "short\($0)") }
+        let replyStart = 6000 + Double(referenceCount * 100)
+        words.append(word("ada", replyStart, 15_000, "Done."))
+        let ada = try #require(TurnModel.rows(of: words).last { $0.speaker == "ada" })
+        #expect(ada.endMs == replyStart + 2400) // No references or seven both use 4 * meeting median 600.
+    }
+
+    // With eight references Ada uses her own 400 ms median even though Ben's larger
+    // population makes the meeting median 800 ms. Inflated punctuation candidates do not count.
+    @Test func speakerMedianOverridesMeetingAndExcludesInflatedCandidates() throws {
+        var words = (0..<10).map { word("ben", Double($0 * 800), Double(($0 + 1) * 800), "reference\($0)") }
+        words += (0..<8).map { word("ada", 9000 + Double($0 * 400), 9400 + Double($0 * 400), "own\($0)") }
+        words += (0..<10).map { word("ada", 12_200 + Double($0 * 5000), 17_200 + Double($0 * 5000), "Done.") }
+        let adaRows = TurnModel.rows(of: words).filter { $0.speaker == "ada" }
+        let last = try #require(adaRows.last)
+        #expect(last.endMs == 58_800) // last candidate start 57_200 + 4 * 400
+    }
+
+    // measureSimultaneity orders ties by the viewer's zero-padded canonical string key.
+    // Crossing six digits is lexical, so seg_1000000 sorts before seg_999999. Sparse internal
+    // block ids exercise that boundary without allocating a million unrelated words.
+    @Test func overlapTieUsesCanonicalStringKeysAcrossSixDigitBoundary() {
+        func block(_ id: Int, _ speaker: String, _ start: Double, _ end: Double) -> TurnModel.Block {
+            let item = word(speaker, start, end, speaker)
+            var result = TurnModel.Block(id: id, speaker: speaker, startMs: start, endMs: end,
+                                         text: speaker, words: [.init(index: id, word: item)])
+            result.prepareSpans()
+            return result
+        }
+        let blocks = [block(999_999, "ada", 0, 1000), block(1_000_000, "ben", 100, 1100),
+                      block(1_000_001, "cy", 200, 900)]
+        let runs = TurnModel.turnRuns(blocks)
+        let over = TurnModel.competingSpeakers(runs, nested: [:])
+        // Cy overlaps Ada and Ben equally (700 ms): Ben's lexical key wins this tie.
+        #expect(over[2] == ["ben", "ada"])
+    }
+
 }

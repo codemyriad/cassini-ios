@@ -64,7 +64,13 @@ public enum TurnModel {
     public static func rows(of words: [Word], endsBoundedByAudio: Bool = false) -> [Row] {
         let raw = readableBlocks(words)
         let repaired = endsBoundedByAudio ? raw : repairTiming(raw)
-        let ordered = repaired.enumerated().sorted {
+        // Repair changes effective word ends. Cache audible evidence only after that projection is final.
+        let prepared = repaired.map { raw in
+            var block = raw
+            block.prepareSpans()
+            return block
+        }
+        let ordered = prepared.enumerated().sorted {
             $0.element.startMs == $1.element.startMs ? $0.offset < $1.offset : $0.element.startMs < $1.element.startMs
         }.map(\.element)
         let runs = turnRuns(ordered)
@@ -139,14 +145,17 @@ extension TurnModel {
         var text: String
         var words: [TimedWord]
 
-        var spans: [Interval] {
+        /// Prepared once after grouping and timing repair, before any run or seam analysis.
+        var spans: [Interval] = []
+
+        mutating func prepareSpans() {
             let timed = words.compactMap { item -> Interval? in
                 let word = item.word
                 guard word.startMs.isFinite, word.endMs.isFinite, word.endMs > word.startMs else { return nil }
                 return Interval(start: word.startMs, end: word.endMs)
             }
             // The viewer falls back to the block envelope when no measured positive span exists.
-            return timed.isEmpty ? [Interval(start: startMs, end: endMs)] : mergeIntervals(timed)
+            spans = timed.isEmpty ? [Interval(start: startMs, end: endMs)] : mergeIntervals(timed)
         }
     }
 

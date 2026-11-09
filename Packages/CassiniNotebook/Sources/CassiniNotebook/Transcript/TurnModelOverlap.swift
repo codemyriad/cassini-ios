@@ -28,6 +28,9 @@ extension TurnModel {
     static func duration(_ spans: [Interval]) -> Double { spans.reduce(0) { $0 + $1.end - $1.start } }
 
     static func intersectionDuration(_ left: [Interval], _ right: [Interval]) -> Double {
+        guard let firstLeft = left.first, let lastLeft = left.last,
+              let firstRight = right.first, let lastRight = right.last,
+              lastLeft.end > firstRight.start, lastRight.end > firstLeft.start else { return 0 }
         var leftIndex = 0
         var rightIndex = 0
         var result: Double = 0
@@ -48,7 +51,9 @@ extension TurnModel {
         var attested: Bool
         var lastPosition: Int
 
-        var spans: [Interval] { mergeIntervals(blocks.flatMap(\.spans)) }
+        /// Frozen once all blocks of the run have been collected.
+        var spans: [Interval] = []
+        var collisionKey = ""
         var key: String { speaker ?? "Unknown speaker" }
     }
 
@@ -69,6 +74,11 @@ extension TurnModel {
                 runs.append(Run(speaker: block.speaker, blocks: [block], startMs: bounds?.start ?? block.startMs,
                                 endMs: bounds?.end ?? block.endMs, attested: bounds != nil, lastPosition: position))
             }
+        }
+        for index in runs.indices {
+            runs[index].spans = mergeIntervals(runs[index].blocks.flatMap(\.spans))
+            let id = String(runs[index].blocks[0].id)
+            runs[index].collisionKey = "r_seg_" + String(repeating: "0", count: max(0, 6 - id.count)) + id
         }
         return runs
     }
@@ -122,7 +132,9 @@ extension TurnModel {
             var bestBeforeEnd = -Double.infinity
             var bestSpan: Double = -1
             for (hostIndex, host) in runs.enumerated() {
-                guard hostIndex != runIndex, host.attested, host.key != run.key, run.endMs <= host.endMs,
+                guard hostIndex != runIndex, host.attested, host.key != run.key,
+                      host.blocks.count >= 2, let first = host.spans.first, let last = host.spans.last,
+                      first.start < run.startMs, last.end >= run.endMs, run.endMs <= host.endMs,
                       let seam = seamAround(host, start: run.startMs) else { continue }
                 let startsInside = host.blocks.filter { block in
                     guard let bounds = audibleBounds(block) else { return false }
@@ -153,23 +165,25 @@ extension TurnModel {
         var collisions: [Collision] = []
         let spans = runs.map(\.spans)
         for left in runs.indices {
-            for right in runs.indices where right > left && runs[left].key != runs[right].key {
+            for right in (left + 1)..<runs.count where runs[left].key != runs[right].key {
+                // Nested speech is already represented by a chip, so it cannot add a competing label.
+                if nested[right]?.host == left || nested[left]?.host == right { continue }
                 let overlap = intersectionDuration(spans[left], spans[right])
                 if overlap >= 150 {
                     collisions.append(Collision(left: left, right: right, duration: overlap))
                 }
             }
         }
-        // Viewer stable sort: largest collision, then first block's canonical id.
+        // Viewer stable sort: largest collision, then the zero-padded string block key.
+        // Lexical and numeric ordering differ once indices grow beyond six digits.
         collisions = collisions.enumerated().sorted { a, b in
             if a.element.duration != b.element.duration { return a.element.duration > b.element.duration }
-            let aID = runs[a.element.left].blocks[0].id
-            let bID = runs[b.element.left].blocks[0].id
+            let aID = runs[a.element.left].collisionKey
+            let bID = runs[b.element.left].collisionKey
             return aID == bID ? a.offset < b.offset : aID < bID
         }.map(\.element)
         var result: [Int: [String]] = [:]
         for collision in collisions {
-            if nested[collision.right]?.host == collision.left || nested[collision.left]?.host == collision.right { continue }
             let pairs = [(collision.left, runs[collision.right].key), (collision.right, runs[collision.left].key)]
             for (index, speaker) in pairs where !(result[index] ?? []).contains(speaker) {
                 result[index, default: []].append(speaker)
