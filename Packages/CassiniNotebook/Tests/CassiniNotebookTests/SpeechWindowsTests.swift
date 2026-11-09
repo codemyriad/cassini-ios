@@ -200,11 +200,7 @@ import Testing
 
     /// Steady noise with `quiet` stretches of silence, given in milliseconds.
     private func noisy(_ seconds: Int, _ rate: Int, _ quiet: ClosedRange<Int64>...) -> [Float] {
-        var random = JavaRandom(seed: 7)
-        return (0..<(seconds * rate)).map { i in
-            let ms = Int64(i) * 1000 / Int64(rate)
-            return quiet.contains { $0.contains(ms) } ? 0 : (random.nextFloat() - 0.5) * 0.4
-        }
+        SpeechWindowNoiseFixture.make(seconds: seconds, rate: rate, quiet: quiet)
     }
 
     // ports: SpeechWindowsTest#aSpanOfOrdinaryLengthStaysWhole
