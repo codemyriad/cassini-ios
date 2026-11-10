@@ -40,6 +40,8 @@ public final class TranscriptionCoordinator {
         /// The running job's progress that the Note screen and the Library rows read: it is told when each job
         /// begins, each of its events in order, and when it ends. The system's progress follows it when it is given.
         public var progress: JobProgress?
+        /// Optional producer time, captured before events enter the asynchronous delivery queue.
+        public var eventUptimeMs: (@Sendable () -> Int64)?
 
         public init(jobs: JobStore, notes: NoteStore, runner: any TranscriptionJobRunning,
                     checkpoints: any JobCheckpoints, consent: ModelConsent, notifier: any Notifier,
@@ -48,10 +50,12 @@ public final class TranscriptionCoordinator {
                     backgroundSubtitle: String = "Your audio stays on this device",
                     progress: JobProgress? = nil, recognizer: String? = nil,
                     recognizerChoice: (@MainActor @Sendable () -> String?)? = nil,
-                    consentForRecognizer: (@MainActor @Sendable (String?) -> ModelConsent)? = nil) {
+                    consentForRecognizer: (@MainActor @Sendable (String?) -> ModelConsent)? = nil,
+                    eventUptimeMs: (@Sendable () -> Int64)? = nil) {
             self.jobs = jobs; self.notes = notes; self.runner = runner; self.checkpoints = checkpoints
             self.consent = consent; self.notifier = notifier; self.background = background; self.clock = clock
             self.backgroundTitle = backgroundTitle; self.backgroundSubtitle = backgroundSubtitle
+            self.eventUptimeMs = eventUptimeMs
             self.progress = progress; self.recognizer = recognizer; self.recognizerChoice = recognizerChoice; self.consentForRecognizer = consentForRecognizer
         }
     }

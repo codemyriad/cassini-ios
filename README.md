@@ -247,6 +247,12 @@ the fake transcriber stand for Parakeet Ultra, so the model download screen and 
 current runtime, so those flows are tested on the usual simulators. A normal
 launch starts empty, and Release builds link no fakes.
 
+The iOS UI-test harness also supports `--draft-growing`: its fake waits for
+`cassini://ui-test/append-draft?count=K` before emitting K more synthetic sentences. Each permit advances the
+injected transcription clock past the result-publication interval; tests wait for those actual new words.
+Frozen fake reports advance virtual time too, so pace estimates do not depend on host scheduling. These Debug-only
+controls are iOS harness extras; ordinary launches and production timing are unchanged.
+
 ### Native speech runtime
 
 Every iOS build links sherpa-onnx from the same fork and commit as Android, codemyriad/sherpa-onnx `0c2ee3f` (D16 §1:
