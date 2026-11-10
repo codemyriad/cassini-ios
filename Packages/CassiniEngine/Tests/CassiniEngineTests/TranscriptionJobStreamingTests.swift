@@ -100,10 +100,10 @@ import CassiniNotebook
         let (stopped, engines) = try await harness()
         let transcriber = try #require(stopped.engine as? WindowedTranscriber)
         let stop = StopSignal()
-        transcriber.beforeWindow = { index in if index == 1 { stop.stop(.pause(.user)) } }
+        transcriber.afterWindow = WindowedTranscriber.pause(stop, afterWindows: 1)
         #expect(await stopped.run(stop: stop).outcome == .paused(.user))
         let saved = try #require(stopped.checkpoints.saved.last?.speakers)
-        transcriber.beforeWindow = { _ in }
+        transcriber.afterWindow = { _ in }
         #expect(await stopped.run().outcome == .done)
         // The second run's diarizer goes on from the saved state, with the run's own prefix.
         #expect(engines.opened.count == 2 && engines.opened[1] == saved.diarizer)
@@ -176,11 +176,11 @@ import CassiniNotebook
         let (h, _) = try await harness(engines: FakeSpeakerEngines(failAt: 0, turns: Self.twoSpeakers))
         let transcriber = try #require(h.engine as? WindowedTranscriber)
         let stop = StopSignal()
-        transcriber.beforeWindow = { index in if index == 1 { stop.stop(.pause(.user)) } }
+        transcriber.afterWindow = WindowedTranscriber.pause(stop, afterWindows: 1)
         #expect(await h.run(stop: stop).outcome == .paused(.user))
         let saved = try #require(h.checkpoints.saved.last?.speakers)
         #expect(saved.failed)
-        transcriber.beforeWindow = { _ in }
+        transcriber.afterWindow = { _ in }
         #expect(await h.run().outcome == .done)
         let note = try #require(await h.note())
         #expect(TranscriptionJobTests.OneVoice.expectOneVoice(note) == saved.prefix + "1")
@@ -253,7 +253,7 @@ import CassiniNotebook
         let stop = StopSignal()
         let observed = Mutex<[JobEvent]>([])
         let running = Task { await h.run(stop: stop, observe: { event in observed.withLock { $0.append(event) } }) }
-        while !observed.withLock({ $0.contains(.waitingForPrevious) }) { try await Task.sleep(for: .milliseconds(10)) }
+        try await h.until("the job waits for the budget") { observed.withLock { $0.contains(.waitingForPrevious) } }
         #expect(!observed.withLock { $0.contains { $0.isStarted } }, "nothing loads before the budget is free")
         stop.stop(.pause(.user))
         let (outcome, events) = await running.value

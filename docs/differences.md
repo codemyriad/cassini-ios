@@ -1007,8 +1007,9 @@ each native call where Android checks the thread's interrupt.
 
 iOS bundles the pinned published device/simulator arm64 Needle archives and Whistle weights in a private lazy-loaded
 framework/resource set. The source archives retain minos27.0; the framework is linked for iOS 18.0 with exactly the
-audited SDK26 import closure, backed by native runtime26 parity and the A12 measurement on iPadOS 26; the iOS 18
-runtime evidence is pending. Whistle needs Armv8.1 atomics and Armv8.3 RCpc, so the A10 iPad (7th generation) on
+audited SDK26 import closure, backed by native parity on the iOS 26.0 and 18.2 simulators, the runtime export check
+on 18.2 (every import resolves; 5 of 125 only through the host Mac's libraries) and hosted Whistle tests on 18.2, and the A12 measurement on iPadOS 26 (made with the 26.0-linked framework; owed again
+for this one). No physical iOS 18 device has run it. Whistle needs Armv8.1 atomics and Armv8.3 RCpc, so the A10 iPad (7th generation) on
 iPadOS 18 gets no Whistle (below iOS 26 the app reads the CPU features from `sysctl`; no device has run that read
 yet). Android uses its own pinned arm64 input; neither mobile
 platform claims x86_64 support from an arm64 archive. See [the bundle contract](../Whistle/README.md).

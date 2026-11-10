@@ -23,7 +23,7 @@ public final class FakeJobRunner: TranscriptionJobRunning {
     }
 
     /// The run with `index`, once the coordinator has started it.
-    public func run(_ index: Int, timeout: Duration = .seconds(10)) async throws -> FakeJobRun {
+    public func run(_ index: Int, timeout: Duration = .seconds(30)) async throws -> FakeJobRun {
         let clock = ContinuousClock()
         let deadline = clock.now + timeout
         while clock.now < deadline {

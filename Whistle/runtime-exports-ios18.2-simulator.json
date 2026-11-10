@@ -1,0 +1,115 @@
+{
+  "tool": "scripts/check-whistle-runtime-exports.py",
+  "schema": 1,
+  "runtimeRoot": "/Library/Developer/CoreSimulator/Volumes/iOS_22C150/Library/Developer/CoreSimulator/Profiles/Runtimes/iOS 18.2.simruntime/Contents/Resources/RuntimeRoot",
+  "runtime": {
+    "ProductName": "iPhone OS",
+    "ProductVersion": "18.2",
+    "ProductBuildVersion": "22C150"
+  },
+  "layout": "dylibs",
+  "binary": "DerivedData.noindex/Build/Products/Debug-iphonesimulator/Cassini.app/Frameworks/CassiniWhistleRuntime.framework/CassiniWhistleRuntime",
+  "binarySha256": "7922c9fcfcc668be4998621f1822cf7e394c79d33b225dba4151f6e8bacc8501",
+  "platform": "IOSSIMULATOR",
+  "libraries": {
+    "/usr/lib/libc++.1.dylib": {
+      "images": [
+        "/usr/lib/libc++.1.dylib"
+      ],
+      "exports": 2221,
+      "imports": 69,
+      "missing": 0,
+      "resolvedByHost": 0
+    },
+    "/usr/lib/libSystem.B.dylib": {
+      "images": [
+        "/usr/lib/libSystem.B.dylib",
+        "/usr/lib/system/libcache.dylib",
+        "/usr/lib/system/libcommonCrypto.dylib",
+        "/usr/lib/system/libcompiler_rt.dylib",
+        "/usr/lib/system/libcopyfile.dylib",
+        "/usr/lib/system/libcorecrypto.dylib",
+        "/usr/lib/system/libdispatch.dylib",
+        "/usr/lib/system/libdyld.dylib",
+        "/usr/lib/system/libmacho.dylib",
+        "/usr/lib/system/libremovefile.dylib",
+        "/usr/lib/system/libsystem_asl.dylib",
+        "/usr/lib/system/libsystem_blocks.dylib",
+        "/usr/lib/system/libsystem_c.dylib",
+        "/usr/lib/system/libsystem_collections.dylib",
+        "/usr/lib/system/libsystem_configuration.dylib",
+        "/usr/lib/system/libsystem_containermanager.dylib",
+        "/usr/lib/system/libsystem_coreservices.dylib",
+        "/usr/lib/system/libsystem_darwin.dylib",
+        "/usr/lib/system/libsystem_dnssd.dylib",
+        "/usr/lib/system/libsystem_eligibility.dylib",
+        "/usr/lib/system/libsystem_featureflags.dylib",
+        "/usr/lib/system/libsystem_info.dylib",
+        "/usr/lib/system/libsystem_m.dylib",
+        "/usr/lib/system/libsystem_malloc.dylib",
+        "/usr/lib/system/libsystem_networkextension.dylib",
+        "/usr/lib/system/libsystem_notify.dylib",
+        "/usr/lib/system/libsystem_sandbox.dylib",
+        "/usr/lib/system/libsystem_sanitizers.dylib",
+        "/usr/lib/system/libsystem_sim_kernel.dylib",
+        "/usr/lib/system/libsystem_sim_kernel_host.dylib",
+        "/usr/lib/system/libsystem_sim_platform.dylib",
+        "/usr/lib/system/libsystem_sim_platform_host.dylib",
+        "/usr/lib/system/libsystem_sim_pthread.dylib",
+        "/usr/lib/system/libsystem_sim_pthread_host.dylib",
+        "/usr/lib/system/libsystem_trace.dylib",
+        "/usr/lib/system/libunwind.dylib",
+        "/usr/lib/system/libxpc.dylib",
+        "host:/usr/lib/system/libsystem_kernel.dylib",
+        "host:/usr/lib/system/libsystem_platform.dylib",
+        "host:/usr/lib/system/libsystem_pthread.dylib"
+      ],
+      "exports": 8669,
+      "imports": 51,
+      "missing": 0,
+      "resolvedByHost": 5
+    },
+    "<weak-def-coalesce>": {
+      "images": [
+        "/usr/lib/libSystem.B.dylib",
+        "/usr/lib/libc++.1.dylib"
+      ],
+      "imports": 5,
+      "missing": 0,
+      "resolvedByHost": 0
+    }
+  },
+  "imports": 125,
+  "resolved": 125,
+  "missing": [],
+  "resolvedByHost": [
+    {
+      "symbol": "_getrusage",
+      "library": "/usr/lib/libSystem.B.dylib",
+      "image": "/usr/lib/system/libsystem_kernel.dylib"
+    },
+    {
+      "symbol": "_mmap",
+      "library": "/usr/lib/libSystem.B.dylib",
+      "image": "/usr/lib/system/libsystem_kernel.dylib"
+    },
+    {
+      "symbol": "_munmap",
+      "library": "/usr/lib/libSystem.B.dylib",
+      "image": "/usr/lib/system/libsystem_kernel.dylib"
+    },
+    {
+      "symbol": "_pthread_create",
+      "library": "/usr/lib/libSystem.B.dylib",
+      "image": "/usr/lib/system/libsystem_pthread.dylib"
+    },
+    {
+      "symbol": "_pthread_setspecific",
+      "library": "/usr/lib/libSystem.B.dylib",
+      "image": "/usr/lib/system/libsystem_pthread.dylib"
+    }
+  ],
+  "resolvedByRuntime": 120,
+  "proves": "partial: 5 of 125 imports resolve to the host Mac, not to this runtime",
+  "result": "pass"
+}

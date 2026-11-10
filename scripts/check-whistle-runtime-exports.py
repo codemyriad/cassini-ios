@@ -4,8 +4,8 @@
     scripts/check-whistle-runtime-exports.py <RuntimeRoot> <CassiniWhistleRuntime of a Debug-iphonesimulator build>
 
 RuntimeRoot is a simulator runtime's root, such as
-/Library/Developer/CoreSimulator/Volumes/iOS_22G86/Library/Developer/CoreSimulator/Profiles/Runtimes/
-iOS 18.6.simruntime/Contents/Resources/RuntimeRoot (`xcrun simctl list runtimes -j` gives each one's runtimeRoot).
+/Library/Developer/CoreSimulator/Volumes/iOS_22C150/Library/Developer/CoreSimulator/Profiles/Runtimes/
+iOS 18.2.simruntime/Contents/Resources/RuntimeRoot (`xcrun simctl list runtimes -j` gives each one's runtimeRoot).
 Every import of the framework (`dyld_info -imports`, each with the library it binds to) must be exported by that
 library in the runtime, or by a library it re-exports (libSystem re-exports usr/lib/system/*, libc++ re-exports
 libc++abi). The few imports dyld binds by flat lookup (`<weak-def-coalesce>`: operator new and delete) must be

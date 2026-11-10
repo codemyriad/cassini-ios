@@ -290,6 +290,63 @@ import CassiniNotebook
         #expect(outcome == .failed(part: .speech, error: .notEnoughStorage, requiredFreeBytes: speech.requiredFreeBytes))
     }
 
+    @Test(arguments: [CocoaError(.fileReadNoPermission) as NSError,
+                      CocoaError(.fileWriteUnknown) as NSError,
+                      POSIXError(.EACCES) as NSError])
+    func localFileFailuresAreInstallFailuresRatherThanNetworkFailures(_ error: NSError) async throws {
+        struct FailingFiles: ModelFetching {
+            let error: NSError
+            func fetch(_ model: ModelDescriptor, into directory: URL,
+                       progress: @escaping @Sendable (Int64, Bool) -> Void) async throws { throw error }
+        }
+        let repo = ModelRepository(root: models, consent: settings, fetcher: FailingFiles(error: error))
+        let failure = await #expect(throws: ModelError.self) {
+            try await repo.installModel(ModelCatalog.voiceprint) { _, _ in }
+        }
+        #expect(failure?.failure == .modelInstall)
+        #expect(!ModelCatalog.voiceprint.ready(in: models))
+    }
+
+    @Test func cancellationAfterTheFetchCannotPublishARevision() async throws {
+        struct CancelAtCompletion: ModelFetching {
+            func fetch(_ model: ModelDescriptor, into directory: URL,
+                       progress: @escaping @Sendable (Int64, Bool) -> Void) async throws {
+                sparse(model, in: directory)
+                withUnsafeCurrentTask { $0?.cancel() }
+            }
+        }
+        let repo = ModelRepository(root: models, consent: settings, fetcher: CancelAtCompletion())
+        let result = await Task.detached {
+            await failure { try await repo.installModel(ModelCatalog.voiceprint) { _, _ in } }
+        }.value
+        #expect(result == .cancelled)
+        #expect(!ModelCatalog.voiceprint.ready(in: models))
+        #expect(ModelCatalog.voiceprint.complete(ModelCatalog.voiceprint.staging(in: models)),
+                "Cancellation preserves the checked staging files for a later attempt")
+    }
+
+    @Test func aMetadataTimeoutRemainsADownloadFailure() async throws {
+        struct TimedOut: ModelFetching {
+            func fetch(_ model: ModelDescriptor, into directory: URL,
+                       progress: @escaping @Sendable (Int64, Bool) -> Void) async throws { throw URLError(.timedOut) }
+        }
+        let repo = ModelRepository(root: models, consent: settings, fetcher: TimedOut())
+        let failure = await #expect(throws: ModelError.self) {
+            try await repo.installModel(ModelCatalog.voiceprint) { _, _ in }
+        }
+        #expect(failure?.failure == .modelDownload)
+        #expect(failure?.urlErrorCode == .timedOut)
+    }
+
+    @Test func aRootThatCannotBePreparedFailsBeforeAnyDownload() async throws {
+        try Data("occupied".utf8).write(to: models)
+        let failure = await #expect(throws: ModelError.self) {
+            try await repository().installModel(ModelCatalog.voiceprint) { _, _ in }
+        }
+        #expect(failure?.failure == .modelInstall)
+        #expect(log.entries.isEmpty)
+    }
+
     /// iOS only: the models download again, so they stay out of backups.
     @Test func theModelsAreExcludedFromBackups() async throws {
         let repo = repository()
@@ -304,4 +361,71 @@ private final class FetchLog: Sendable {
     let directories = Mutex<[URL]>([])
     func append(_ item: String) { items.withLock { $0.append(item) } }
     var entries: [String] { items.withLock { $0 } }
+}
+
+extension ModelRepositoryTests {
+    private struct TransportOrLocalFailure: ModelFetching {
+        let error: any Error
+        func fetch(_ model: ModelDescriptor, into directory: URL,
+                   progress: @escaping @Sendable (Int64, Bool) -> Void) async throws { throw error }
+    }
+
+    private func installFailure(_ error: any Error, expected: DownloadError, online: Bool = true) async throws {
+        let repo = ModelRepository(root: models, consent: settings, fetcher: TransportOrLocalFailure(error: error))
+        let store = RepositoryModelStore(models: repo, storage: FakeStorage(), online: { online }, consented: true)
+        let outcome = try await ModelInstaller(store: store).install([.speech]) { _ in }
+        guard case .failed(let part, let mapped, _) = outcome else {
+            Issue.record("Expected a required speech install failure"); return
+        }
+        #expect(part == .speech)
+        #expect(mapped == expected)
+        // The shared owner builds its own RepositoryModelStore; cover the production path, not only downloadError.
+        let owner = PinnedModelInstaller(models: repo, storage: FakeStorage(), online: { online })
+        let shared = try await owner.install([.speech], granted: true)
+        guard case .failed(let sharedPart, let sharedError, _) = shared else {
+            Issue.record("Expected a shared required speech install failure"); return
+        }
+        #expect(sharedPart == .speech)
+        #expect(sharedError == expected)
+        try await waitUntil { owner.status == .idle }
+    }
+
+    @Test func transportFailuresThroughTheRepositoryStayNoConnectionOnValidatedWifi() async throws {
+        let codes: [URLError.Code] = [.timedOut, .cannotFindHost, .dnsLookupFailed, .cannotConnectToHost,
+                                     .notConnectedToInternet, .dataNotAllowed, .internationalRoamingOff]
+        for code in codes {
+            try await installFailure(URLError(code), expected: .noConnection)
+        }
+        // NSError bridging at the URLSession boundary must retain the same typed transport identity.
+        try await installFailure(NSError(domain: NSURLErrorDomain, code: URLError.Code.timedOut.rawValue), expected: .noConnection)
+    }
+
+    @Test func aLostConnectionKeepsItsInterruptedVersusOfflineMeaningThroughTheRepository() async throws {
+        try await installFailure(URLError(.networkConnectionLost), expected: .interrupted)
+        try await installFailure(URLError(.networkConnectionLost), expected: .noConnection, online: false)
+    }
+
+    @Test func localFileFailuresThroughTheRepositoryAreNotMisreportedAsConnectivity() async throws {
+        try await installFailure(CocoaError(.fileReadNoPermission), expected: .install)
+        try await installFailure(CocoaError(.fileWriteNoPermission), expected: .install)
+        try await installFailure(NSError(domain: NSPOSIXErrorDomain, code: Int(EIO)), expected: .install)
+        try await installFailure(CocoaError(.fileWriteOutOfSpace), expected: .notEnoughStorage)
+    }
+
+    @Test func transportCancellationThroughTheRepositoryAndSharedOwnerStaysCancellation() async throws {
+        let errors: [any Error] = [URLError(.cancelled), ModelError(.modelDownload, urlErrorCode: .cancelled)]
+        for error in errors {
+            let repo = ModelRepository(root: models, consent: settings, fetcher: TransportOrLocalFailure(error: error))
+            do {
+                _ = try await repo.install(.speech)
+                Issue.record("Cancelled repository install must not succeed")
+            } catch { #expect(ModelInstaller.isCancellation(error)) }
+            if case .failed? = repo.status[.speech] { Issue.record("Cancellation must not leave a failed model status") }
+            let store = RepositoryModelStore(models: repo, storage: FakeStorage(), online: { true }, consented: true)
+            await #expect(throws: CancellationError.self) { try await ModelInstaller(store: store).install([.speech]) { _ in } }
+            let owner = PinnedModelInstaller(models: repo, storage: FakeStorage(), online: { true })
+            await #expect(throws: CancellationError.self) { try await owner.install([.speech], granted: true) }
+            try await waitUntil { owner.status == .idle }
+        }
+    }
 }

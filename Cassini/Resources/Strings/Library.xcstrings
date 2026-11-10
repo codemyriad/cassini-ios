@@ -523,6 +523,47 @@
         }
       }
     },
+    "Checking files": {
+      "comment": "Library banner: downloaded files are checked without measured progress",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Checking files"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verificando archivos"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vérification des fichiers"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verifica dei file"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verificando arquivos"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A verificar ficheiros"
+          }
+        }
+      }
+    },
     "Checking files — %lld%%": {
       "comment": "Library banner: downloaded models are checked",
       "extractionState": "manual",

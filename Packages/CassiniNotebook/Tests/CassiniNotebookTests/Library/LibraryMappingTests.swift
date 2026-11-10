@@ -292,3 +292,27 @@ struct LibraryMappingTests {
 private extension ProgressBanner.Announcement {
     func with(step: Int?) -> Self { var copy = self; copy.step = step; return copy }
 }
+
+extension LibraryMappingTests {
+    @Test func standaloneVerificationDoesNotReuseTheCompletedTransferPercent() throws {
+        let fact = DownloadFact(part: .speakers, fraction: 1, checking: true, at: Date(timeIntervalSince1970: 0))
+        let banner = try #require(LibraryMapping.progress(ProcessingState(), phase: nil, install: fact))
+        #expect(banner.line == .checking(percent: nil))
+        #expect(banner.stage == .checking)
+        #expect(banner.isPreparing)
+        #expect(banner.noteID == nil && banner.title == nil)
+        #expect(banner.fraction == nil && banner.spokenPercent == nil,
+                "Completed download bytes are not verification/decompression progress")
+    }
+
+    @Test(arguments: [Int64(0), -1])
+    func modelCheckingWithoutAMeasuredTotalHasNoPercentage(_ total: Int64) throws {
+        let id = UUID()
+        let state = ProcessingState(running: RunningJob(noteID: id, title: "Weekly sync"))
+        let progress = DownloadProgress(part: .speakers, doneBytes: 100, totalBytes: total, verifying: true)
+        let banner = try #require(LibraryMapping.progress(state, phase: .downloading(progress)))
+        #expect(banner.line == .checking(percent: nil))
+        #expect(banner.fraction == nil)
+        #expect(banner.spokenPercent == nil)
+    }
+}
