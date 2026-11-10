@@ -48,8 +48,8 @@ final class NoteScreenTests: XCTestCase {
         XCTAssertTrue(third.waitForExistence(within: 5))
         third.tap()
         XCTAssertTrue(wait("label == 'Pause'", play), "a word tap plays")
-        let position = app.descendants(matching: .any)["playbackPosition"]
-        XCTAssertTrue((position.value as? String)?.hasPrefix("00:1") == true, "it plays from the word: \(position.value ?? "")")
+        let seek = app.staticTexts["uiTestState-playbackSeekTarget"]
+        XCTAssertTrue(seek.waitForValue("14.0"), "the player sought to the tapped passage's exact start")
     }
 
     // ports: ScreenBehaviourTest#aDragDuringPlaybackPausesFollowingAndShowsTheChip

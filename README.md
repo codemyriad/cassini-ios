@@ -235,6 +235,9 @@ attachments from the result bundle and saves them, scaled down, under `docs/scre
 `es`, `pt-BR`, `pt-PT`) takes the same set in that language under `docs/screenshots/<locale>/`, which is not committed. `--device` and `--appearance` take a
 subset. `scripts/render-icon.swift` draws the app icon (`swift scripts/render-icon.swift` from the repository root).
 
+UI-test word-tap checks read the last clamped seek target applied by the real audio adapter. Playback keeps advancing,
+while the test-visible target stays fixed until another seek; the assertion has no playback-position time window.
+
 UI-test launches (`--ui-testing`, Debug builds only) use a library and preferences of their own, a clock fixed at
 Thursday 8 October 2026 09:41 UTC, en_US formatting, and fake transcription and speaker analysis. Named seeds fill the
 library: `--seed library|search|reading|speakers|voices|trash|processing|recording|statuses|long`. `--parakeet` makes

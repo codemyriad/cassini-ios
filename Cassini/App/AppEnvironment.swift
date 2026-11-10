@@ -244,7 +244,7 @@ extension AppEnvironment {
             capture: seed != .recording ? AVCaptureAdapter()
                 : heldCapture ? FakeCapture(levels: TestFixtures.speechLevels, heldAt: TestFixtures.heldCaptureStart) : FakeCapture(),
             microphone: seed == .recording ? FakeMicrophonePermission() : AVMicrophonePermission(),
-            liveActivity: ActivityKitAdapter(), playback: AVPlaybackAdapter(), audio: LocalAudioProcessing(),
+            liveActivity: ActivityKitAdapter(), playback: AVPlaybackAdapter(captureSeeks: true), audio: LocalAudioProcessing(),
             // A held capture also holds the free space, so its hint reads the same on every run.
             storage: heldCapture ? FakeStorage() : FileSystemStorageProbe(),
             background: platform.continuedProcessing ? uiTestingBackground : uiTestingFiniteBackground,
