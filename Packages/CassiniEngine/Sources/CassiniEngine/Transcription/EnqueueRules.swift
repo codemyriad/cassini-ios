@@ -100,6 +100,16 @@ public enum EnqueueRules {
         }
     }
 
+    /// Whether Cassini coming to the screen resumes what `hold` keeps, as a Resume from the screen would. Only the
+    /// system hold, and only on a system without continued processing (iOS 18), where it means nothing but that the
+    /// finite background time ran out: there it comes about 30 s after every exit during a transcription. On iOS 26 the
+    /// system hold can also be the person's Stop in the system's progress, so it waits for Resume as before. A user hold
+    /// never yields to this. Android has no such rule (its system hold is the rare `onTimeout`): a proposal, see
+    /// docs/ios18.md.
+    public static func resumesOnActivation(_ hold: QueueHold?, platform: PlatformFacts) -> Bool {
+        hold == .system && !platform.continuedProcessing
+    }
+
     /// The language a job of `kind` is queued with: the chosen speech language for the transcribe kinds; nil (the
     /// job keeps the one it has) for speakers only, which never change the language of the words.
     public static func language(for kind: JobKind, speechLanguage: String) -> String? {

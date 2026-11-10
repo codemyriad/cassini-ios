@@ -55,8 +55,12 @@ on a device, and not checked for the standalone download.
 
 - **Transcription.** When the time ends, the job pauses with its checkpoint kept (at most 30 s of audio is redone),
   the queue is held as paused by the system, and while Cassini is hidden the notification "Transcription paused by
-  iOS" is posted. Resume in the app continues from the checkpoint. On iOS 18 this happens to every transcription that
-  is still running about 30 s after the person leaves the app.
+  iOS" is posted. On iOS 18 this happens to every transcription that is still running about 30 s after the person
+  leaves the app. When Cassini comes back to the screen (or is launched again), the system's pause is resumed from the
+  checkpoint without a tap, and the queue continues (`EnqueueRules.resumesOnActivation`); a pause or Stop of the
+  person's own stays until Resume or Continue. On iOS 26 nothing changes: there the system's pause can be the person's
+  Stop in the system's progress, so it waits for Resume. Android has no such rule (its system pause comes only from the
+  rare `onTimeout`, and waits for Resume); this is a proposal, decision 5 below.
 - **Standalone model download** (Settings, the model download screen). When the time ends it stops and shows "iOS
   stopped the download. Try again to continue where it stopped."; the bytes already downloaded are kept and Try
   again resumes them.
@@ -114,6 +118,11 @@ break (`LibrarySearchEdit`). iOS 26 keeps the binding alone; the same failure wa
   none transcribed again, and an empty queue. With a note open the time did not run out: the note's prepared player
   holds the audio session, and Cassini, which has the `audio` background mode, kept running in the background for over
   10 minutes with its job going on.
+- The proposal that resumes the system's pause on coming back: `EnqueueRules.resumesOnActivation` (`swift test`,
+  both platform facts and both holds), `TranscriptionCoordinatorTests.Activation` (only the system's pause, never the
+  person's, not on the iOS 26 facts, and after a kill) and `ActivationResumeTests` (hosted, from the checkpoint). By hand on the iOS 18.2 simulator the same day: coming back
+  after the expiry the job ran again from 00:25 with no tap, and a launch after a kill while suspended resumed it and
+  finished it with the checkpoint's words.
 - Not yet: the finite background path on a device, the standalone download's stop, and any run on an A12 or A10 on
   iOS 18.
 
@@ -129,7 +138,7 @@ as the coordinator asked and **awaiting Silvio's review**; any of them can still
 | 2 | Install the iOS 18.6 simulator runtime | **Yes**, keeping at least 25 GB free on the build Mac's internal disk afterwards. Apple no longer offers 18.6, so 18.2 was installed instead (below) | Silvio |
 | 3 | One Whistle binary or two | **One**, linked at 18.0, for all OS versions. The iOS 26 simulator parity is rerun on it; the next TestFlight build from main repeats the A12 acceptance | recommendation, awaiting Silvio's review |
 | 4 | A10 iPad (7th generation) | Whistle is gated off by CPU feature (atomics and RCpc). That device records, plays and exports but does not transcribe | recommendation, awaiting Silvio's review |
-| 5 | Background on iOS 18 | Accepted as described above: a transcription pauses about 30 s after leaving the app and needs Resume; the standalone download stops and needs Try again. No `BGProcessingTask`, no background `URLSession` | recommendation, awaiting Silvio's review |
+| 5 | Background on iOS 18 | Accepted as described above: a transcription pauses about 30 s after leaving the app and resumes from its checkpoint by itself when Cassini comes back to the screen (proposal: Android waits for Resume; the commit that adds it can be reverted alone); the standalone download stops and needs Try again. No `BGProcessingTask`, no background `URLSession` | recommendation, awaiting Silvio's review |
 | 6 | Merge gate | The iOS 18 test leg is folded into `drmeyers/test-all`: a smoke run on every `all`, the full iPhone run for PRs that touch views | recommendation, awaiting Silvio's review |
 | 7 | iPad on iOS 18 in the test leg | Only in the full-run tier | recommendation, awaiting Silvio's review |
 | 8 | Physical iOS 18 device | None assumed. Support ships on simulator evidence plus the A12 measurement on iPadOS 26, so there is no D75.2 lab-device run, no memory measurement and no TestFlight acceptance on iOS 18 | follows from decision 1; Silvio to confirm whether a device exists |

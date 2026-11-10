@@ -206,9 +206,15 @@ import CassiniNotebook
         Task { await handler.handle(link) }
     }
 
-    /// Cassini came back to the screen: the notification permission and the speech model may have changed in Settings.
-    func becameActive() {
-        Task { [noticeCenter] in await noticeCenter.refresh() }
+    /// Cassini came back to the screen: the notification permission and the speech model may have changed in Settings,
+    /// and on iOS 18 a transcription paused by the end of the background time resumes from its checkpoint
+    /// (`EnqueueRules.resumesOnActivation`). The returned task ends once both are done.
+    @discardableResult
+    func becameActive() -> Task<Void, Never> {
+        Task { [noticeCenter, processing, platform = environment.platform] in
+            await noticeCenter.refresh()
+            await processing.coordinator?.resumeSystemPause(onActivationOf: platform)
+        }
     }
 
     /// Saves the playback position and keeps the app awake until every pending write has landed.

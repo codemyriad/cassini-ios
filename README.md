@@ -210,8 +210,9 @@ TestFlight still need.
   iOS" is shown. The stepper reads Words, then Speakers & matching.
 - **iOS 18** (a platform constraint; [iOS 18](docs/ios18.md)). No Apple Speech and no continued processing: a
   transcription or a standalone model download that is still running about 30 s after Cassini leaves the screen stops
-  (the job pauses with its checkpoint, the download keeps its bytes) and needs Resume or Try again, where Android
-  keeps both running. Whistle also needs Armv8.1 atomics and Armv8.3 RCpc, so the A10 iPad (7th generation) gets no
+  (the job pauses with its checkpoint, the download keeps its bytes), where Android keeps both running. The paused
+  transcription resumes from its checkpoint when Cassini comes back to the screen (a proposal; Android's system pause
+  waits for Resume); the download needs Try again. Whistle also needs Armv8.1 atomics and Armv8.3 RCpc, so the A10 iPad (7th generation) gets no
   Whistle; with less than 5 GiB it gets no engine at all. The Whistle binary is built for iOS 27 and linked at 18.0
   under the D75.2 exception as extended, which rests on the iOS 18.2 simulator evidence in
   [Whistle/README.md](Whistle/README.md) and two AWS Device Farm runs on 2026-11-10 (iPhone 11 on iOS 18.6.2, iPhone

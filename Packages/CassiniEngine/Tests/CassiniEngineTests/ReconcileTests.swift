@@ -263,6 +263,19 @@ import CassiniNotebook
         #expect(!EnqueueRules.clears(nil, origin: .screen, resume: true))
     }
 
+    /// The proposal of docs/ios18.md: coming to the screen resumes only the system hold, only without continued
+    /// processing.
+    @Test func onlyTheSystemHoldOfASystemWithoutContinuedProcessingResumesOnActivation() {
+        #expect(EnqueueRules.resumesOnActivation(.system, platform: .iOS18))
+        #expect(!EnqueueRules.resumesOnActivation(.system, platform: .iOS26), "iOS 26: it may be the person's Stop")
+        #expect(!EnqueueRules.resumesOnActivation(.user, platform: .iOS18))
+        #expect(!EnqueueRules.resumesOnActivation(.user, platform: .iOS26))
+        #expect(!EnqueueRules.resumesOnActivation(nil, platform: .iOS18))
+        #expect(!EnqueueRules.resumesOnActivation(nil, platform: .iOS26))
+        let appleSpeechOnly = PlatformFacts(appleSpeech: true, continuedProcessing: false)
+        #expect(EnqueueRules.resumesOnActivation(.system, platform: appleSpeechOnly), "the continued-processing fact decides")
+    }
+
     @Test func speakersOnlyJobsNeverTakeTheSpeechLanguage() {
         #expect(EnqueueRules.language(for: .transcribe, speechLanguage: "it-IT") == "it-IT")
         #expect(EnqueueRules.language(for: .transcribeAgain, speechLanguage: "it-IT") == "it-IT")
