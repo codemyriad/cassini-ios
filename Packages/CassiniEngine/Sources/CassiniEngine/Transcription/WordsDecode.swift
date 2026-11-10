@@ -36,6 +36,7 @@ final class WordsDecode: Sendable {
         var checkpoint: CheckpointState
         var savedMs: Int64
         var savedAt: Int64?
+        var savedWhistleSamples: Int = 0
         var words: [DraftWord]
         var volatile: [DraftWord] = []
         /// Transcribed audio as the transcriber reports it; at least `checkpoint.doneMs`.
@@ -78,7 +79,8 @@ final class WordsDecode: Sendable {
         self.noteID = noteID; self.resumeDoneMs = resumeDoneMs; self.limits = limits; self.checkpoints = checkpoints
         self.recognizer = recognizer; self.language = language
         self.stop = stop; self.events = events; self.uptimeMs = uptimeMs
-        state = Mutex(State(checkpoint: resumed, savedMs: base.doneMs, words: base.draftWords, progressMs: base.doneMs,
+        state = Mutex(State(checkpoint: resumed, savedMs: base.doneMs,
+                            savedWhistleSamples: base.whistle?.processedSamples ?? 0, words: base.draftWords, progressMs: base.doneMs,
                             shownMs: base.doneMs))
     }
 
@@ -95,10 +97,6 @@ final class WordsDecode: Sendable {
             guard s.ended == nil else { return }
             if case .preparingModel = event {} else if s.analyzerStartedAt == nil { s.analyzerStartedAt = uptimeMs() }
             switch event {
-            case .detectedLanguage(let reported):
-                guard recognizer == .whistle, let known = TranscriptLanguage.known(reported) else { break }
-                let previous = s.checkpoint.reportedLanguage
-                s.checkpoint.reportedLanguage = previous == nil || previous == known ? known : "mul"
             case .preparingModel(let preparation):
                 let progress: DownloadProgress
                 switch preparation {
@@ -120,6 +118,8 @@ final class WordsDecode: Sendable {
                 emit(&s, force: false)
             case .window(let window):
                 windowDone(window, &s)
+            case .whistleBatch(let batch):
+                whistleDone(batch, &s)
             }
         }
     }
@@ -209,6 +209,32 @@ final class WordsDecode: Sendable {
         emit(&s, force: false)
     }
 
+    private func reportLanguage(_ reported: String, _ s: inout State) {
+        guard let known = TranscriptLanguage.known(reported) else { return }
+        let previous = s.checkpoint.reportedLanguage
+        s.checkpoint.reportedLanguage = previous == nil || previous == known ? known : "mul"
+    }
+
+    private func whistleDone(_ batch: WhistleBatch, _ s: inout State) {
+        guard recognizer == .whistle, accept(total: s.checkpoint.totalMs, &s) else { return }
+        s.finalizedThisRun = true
+        s.checkpoint.whistle = batch.checkpoint
+        s.checkpoint.doneMs = batch.checkpoint.doneMs
+        s.progressMs = max(s.progressMs, s.checkpoint.doneMs)
+        for language in batch.languages { reportLanguage(language, &s) }
+        for segment in batch.segments where !segment.text.isEmpty {
+            s.checkpoint.segments.append(segment)
+            s.words.append(contentsOf: segment.draftWords)
+        }
+        if let request = stop.request { requestStop(request, &s); return }
+        // Count source progress, including silence and open segments whose words aren't final.
+        if batch.checkpoint.processedSamples - s.savedWhistleSamples >= 5 * 16_000 {
+            guard fits(s) else { end(.failed(.long), &s); return }
+            if let failure = save(&s, complete: false) { end(.failed(failure), &s); return }
+        }
+        emit(&s, force: false)
+    }
+
     /// A Parakeet window: its words replace the checkpoint's (a resumed run's include the restored ones), and the run
     /// can go on from its recognition state.
     private func windowDone(_ window: TranscriptWindow, _ s: inout State) {
@@ -246,7 +272,11 @@ final class WordsDecode: Sendable {
         guard !s.stopping else { return }
         s.stopping = true
         s.outbox.append(.stopping)
-        if case .pause = request, s.checkpoint.doneMs > s.savedMs || complete, s.checkpoint.doneMs > 0, fits(s) {
+        let advanced = if let whistle = s.checkpoint.whistle {
+            whistle.processedSamples > s.savedWhistleSamples || s.checkpoint.doneMs > s.savedMs
+        } else { s.checkpoint.doneMs > s.savedMs }
+        let hasProgress = s.checkpoint.doneMs > 0 || s.checkpoint.whistle != nil
+        if case .pause = request, (advanced || complete), hasProgress, fits(s) {
             // A failed save keeps the checkpoint before it.
             _ = save(&s, complete: complete)
         }
@@ -281,6 +311,7 @@ final class WordsDecode: Sendable {
         }
         s.checkpoint = checkpoint
         s.savedMs = checkpoint.doneMs
+        s.savedWhistleSamples = checkpoint.whistle?.processedSamples ?? 0
         s.savedAt = now
         s.outbox.append(.checkpointed(doneMs: checkpoint.doneMs))
         return nil

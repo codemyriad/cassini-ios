@@ -27,6 +27,24 @@ public final class WhistleVAD {
         guard let created else { throw WhistleError.unavailable }
         detector = created
     }
+    public struct State: Codable, Sendable {
+        fileprivate let filter: SpeechInputFilter
+        fileprivate let recurrent: [Float]
+    }
+
+    public var state: State {
+        var values = [Float](repeating: 0, count: Int(CASSINI_VAD_STATE_FLOATS))
+        cassini_vad_save(detector, &values)
+        return State(filter: filter, recurrent: values)
+    }
+
+    public func restore(_ state: State) throws {
+        guard state.filter.valid, state.recurrent.count == Int(CASSINI_VAD_STATE_FLOATS),
+              state.recurrent.allSatisfy(\.isFinite) else { throw WhistleError.invalidInput }
+        cassini_vad_restore(detector, state.recurrent)
+        filter = state.filter
+    }
+
     public func probability(_ frame: [Float]) throws -> Float {
         guard frame.count == 512 else { throw WhistleError.invalidInput }
         let input = filter(frame)

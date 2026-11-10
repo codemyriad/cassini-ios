@@ -10,15 +10,17 @@ public struct TranscriptionRequest: Hashable, Sendable {
     public var startOffset: TimeInterval
     /// Where a resumed Parakeet run goes on from: the checkpoint's window and its words. Nil for a fresh run.
     public var resume: TranscriptResume?
+    /// The Whistle batch whose words are already saved by the job.
+    public var whistleResume: WhistleCheckpoint?
     /// Whether a missing speech model may be downloaded.
     public var allowDownload: Bool
     /// The streaming speakers a Parakeet run gives each window's words to, on its inference thread, before it
     /// reports the window; nil when the run does not tell speakers apart as it goes. Apple Speech ignores it.
     public var speakers: WindowSpeakers?
     public init(url: URL, language: String, startOffset: TimeInterval = 0, resume: TranscriptResume? = nil,
-                allowDownload: Bool, speakers: WindowSpeakers? = nil) {
+                allowDownload: Bool, speakers: WindowSpeakers? = nil, whistleResume: WhistleCheckpoint? = nil) {
         self.url = url; self.language = language; self.startOffset = startOffset; self.resume = resume
-        self.allowDownload = allowDownload; self.speakers = speakers
+        self.allowDownload = allowDownload; self.speakers = speakers; self.whistleResume = whistleResume
     }
 }
 
@@ -48,9 +50,18 @@ public struct TranscriptWindow: Hashable, Sendable {
     }
 }
 
+/// A Whistle batch appends only new segments. The state and its words must be committed together.
+public struct WhistleBatch: Hashable, Sendable {
+    public let checkpoint: WhistleCheckpoint
+    public let segments: [TranscriptSegment]
+    public let languages: [String]
+
+    public init(checkpoint: WhistleCheckpoint, segments: [TranscriptSegment], languages: [String]) {
+        self.checkpoint = checkpoint; self.segments = segments; self.languages = languages
+    }
+}
+
 public enum TranscriptionEvent: Hashable, Sendable {
-    /// Automatically detected language of a finalized Whistle segment; never the requested UI locale.
-    case detectedLanguage(String)
     /// The speech model is being downloaded or checked, retaining verification separately from unknown byte progress.
     case preparingModel(InstallProgress)
     /// Audio up to `done` seconds of `total` is transcribed.
@@ -61,6 +72,7 @@ public enum TranscriptionEvent: Hashable, Sendable {
     case volatile(TranscriptSegment?)
     /// Parakeet decoded a window; it replaces every word before it. Apple Speech never sends it.
     case window(TranscriptWindow)
+    case whistleBatch(WhistleBatch)
 }
 
 public struct TranscriptionResult: Hashable, Sendable {

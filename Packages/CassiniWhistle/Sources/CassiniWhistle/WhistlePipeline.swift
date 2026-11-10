@@ -17,6 +17,29 @@ public struct WhistleResampler {
         coefficients = try JSONDecoder().decode(Filter.self, from: Data(contentsOf: Bundle.module.url(forResource: "fir-48k-16k", withExtension: "json")!)).coefficients
         guard coefficients.count == 97 else { throw WhistleError.invalidInput }
     }
+    public struct State: Codable, Sendable {
+        fileprivate let samples: [Float]
+        fileprivate let base: Int
+        fileprivate let count: Int
+        fileprivate let next: Int
+    }
+    public var state: State { State(samples: samples, base: base, count: count, next: next) }
+
+    public mutating func restore(_ state: State, inputCount: Int, outputCount: Int) throws {
+        if rate == 16000 {
+            guard state.samples.isEmpty, state.base == 0, state.count == 0, state.next == 0,
+                  inputCount == outputCount else { throw WhistleError.invalidInput }
+        } else {
+            guard state.count == inputCount, state.next == outputCount,
+                  state.base == max(0, outputCount * 3 - 48),
+                  state.base <= inputCount, state.samples.count == inputCount - state.base,
+                  state.samples.count <= 97, state.samples.allSatisfy(\.isFinite) else {
+                throw WhistleError.invalidInput
+            }
+        }
+        samples = state.samples; base = state.base; count = state.count; next = state.next
+    }
+
     public mutating func feed(_ input: [Float], final: Bool = false) -> [Float] {
         if rate == 16000 { return input }
         samples.append(contentsOf: input); count += input.count
@@ -49,10 +72,18 @@ public struct WhistleSegment: Codable, Equatable, Sendable {
 }
 /// Exact cassini-live WhistleSpeechGate decisions. Live's one-second handoff chunks are
 /// aggregated into contiguous ranges; no samples are replayed or resynthesised.
-public struct WhistleSpeechGate {
-    private var tail: [Float] = [], pre: [[Float]] = [], votes: [Bool] = []
+public struct WhistleSpeechGate: Codable, Sendable {
+    private var tail: [Float] = [], votes: [Bool] = []
+    private var preCount = 0
     private var active = false, quiet = 0, duration = 0, position = 0, start = 0
     public init() {}
+    public func valid(at total: Int) -> Bool {
+        position >= 0 && position <= total && position.isMultiple(of: 512)
+            && tail.count < 512 && tail.count == total - position && tail.allSatisfy(\.isFinite)
+            && (0...10).contains(preCount) && votes.count <= 3 && (0...19).contains(quiet)
+            && start >= 0 && start <= position && (0...240_128).contains(duration)
+            && (!active || (duration == position - start && preCount == 0 && votes.isEmpty))
+    }
     public var retainedStart: Int { active ? start : max(0, position - 5120) }
     public mutating func feed(_ samples: [Float], probability: ([Float]) throws -> Float) rethrows -> [WhistleSegment] {
         tail.append(contentsOf: samples)
@@ -61,11 +92,11 @@ public struct WhistleSpeechGate {
             let frame = Array(tail[consumed..<consumed + 512]); consumed += 512; position += 512
             let voiced = try probability(frame) >= (active ? 0.35 : 0.5)
             if !active {
-                pre.append(frame); if pre.count > 10 { pre.removeFirst() }
+                preCount = min(preCount + 1, 10)
                 votes.append(voiced); if votes.count > 3 { votes.removeFirst() }
                 guard votes.filter({ $0 }).count >= 2 else { continue }
-                active = true; duration = pre.count * 512; start = position - duration
-                pre.removeAll(keepingCapacity: true); votes.removeAll(keepingCapacity: true)
+                active = true; duration = preCount * 512; start = position - duration
+                preCount = 0; votes.removeAll(keepingCapacity: true)
             } else { duration += 512 }
             quiet = voiced ? 0 : quiet + 1
             let reason: String?

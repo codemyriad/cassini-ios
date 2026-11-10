@@ -27,6 +27,12 @@ void cassini_vad_destroy(CassiniVAD *v) {
  if (v->env) v->api->ReleaseEnv(v->env);
  free(v);
 }
+void cassini_vad_save(const CassiniVAD *v, float *state) {
+ memcpy(state, v->state, sizeof v->state); memcpy(state + 256, v->context, sizeof v->context);
+}
+void cassini_vad_restore(CassiniVAD *v, const float *state) {
+ memcpy(v->state, state, sizeof v->state); memcpy(v->context, state + 256, sizeof v->context);
+}
 void cassini_vad_reset(CassiniVAD *v) { memset(v->state, 0, sizeof v->state); memset(v->context, 0, sizeof v->context); }
 CassiniVAD *cassini_vad_create(const char *model, char *error, size_t capacity) {
  CassiniVAD *v = calloc(1, sizeof *v); if (!v) return NULL;
@@ -69,6 +75,8 @@ int cassini_vad_probability(CassiniVAD *v, const float *frame, float *probabilit
 struct CassiniVAD { int unused; };
 CassiniVAD *cassini_vad_create(const char *model, char *error, size_t capacity) { return NULL; }
 int cassini_vad_probability(CassiniVAD *v, const float *f, float *p, char *e, size_t n) { return 0; }
+void cassini_vad_save(const CassiniVAD *v, float *state) {}
+void cassini_vad_restore(CassiniVAD *v, const float *state) {}
 void cassini_vad_reset(CassiniVAD *v) {}
 void cassini_vad_destroy(CassiniVAD *v) {}
 #endif

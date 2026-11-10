@@ -8,7 +8,7 @@ import Foundation
 ///
 /// The coefficients are exact binary64 literals, with b0 + b1 + b2 == 0 for a true double zero at DC. The arithmetic is
 /// scalar Double in Direct Form I, left to right, so every platform computes the same samples.
-public struct SpeechInputFilter: Hashable, Sendable {
+public struct SpeechInputFilter: Codable, Hashable, Sendable {
     /// The stage's name in the shared goldens (`vadInputStage`).
     public static let stage = "silero-input-hpf-butter2-100hz-v1"
 
@@ -25,6 +25,8 @@ public struct SpeechInputFilter: Hashable, Sendable {
 
     /// Zero state; never primed (zero-state steps of up to ±16000 LSB never made a segment).
     public init() {}
+
+    public var valid: Bool { x1.isFinite && x2.isFinite && y1.isFinite && y2.isFinite }
 
     public mutating func reset() { self = Self() }
 

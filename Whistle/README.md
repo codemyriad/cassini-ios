@@ -173,6 +173,23 @@ recognizer and physical memory, and native load errors/model readiness. No recor
 Distribution acceptance requires a TestFlight-installed build (Beta signer, `get-task-allow=false`) to transcribe
 the controlled English sample; an archive/export or sideloaded success is not that proof.
 
+## Pausing and resuming a recording
+
+Whistle saves finalized words with the exact source frame and its FIR, high-pass, Silero and speech gate state.
+The checkpoint includes bounded raw overlap for an open segment and the gate's pre-roll. Resume seeks to the
+saved frame with codec context, then restores that state before running the next block. The job appends the
+new segments to its saved prefix, so timestamps stay on the recording clock. A paused checkpoint from before
+this format is rebuilt once. A checkpoint with all words complete still goes straight to the speaker step.
+
+The reader uses one-second source blocks. Codec priming rereads 100 ms before each block at standard rates
+(and at most one second at unusual integer rates). Rate conversion uses the same bounded context on both
+sides of a block, with the 48-to-16 kHz FIR kept continuous. A normal pause saves the latest complete batch.
+At most one second of uncommitted source, plus the priming overlap, is reread. If interruption discards a
+Needle result in flight, a retry can redo at most one open segment (15.008 s) plus one second of new audio.
+Periodic checkpoints are saved every five seconds of processed audio, rounded up to the next block, so abrupt
+process loss can redo at most six seconds of source work plus the priming overlap, or less than 22 seconds
+of audio submitted to Needle. These are audio bounds, independent of device decode speed.
+
 ## Validation and cache
 
 `python3 scripts/test-bundle-whistle.py` covers missing/corrupt inputs, the import set and the pinned target;

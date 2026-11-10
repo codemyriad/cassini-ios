@@ -194,16 +194,33 @@ public actor WhistleRuntime {
     /// Actual C API, automatic language detection, no keywords; callers supply already segmented raw 16kHz PCM.
     /// Cancellation discards a late synchronous result. The serial actor cannot overlap model ownership/calls.
     public func transcribe(_ pcm: [Float], acceptance: WhistleCapability, bundle: Bundle = .main) throws -> WhistleResult {
+        let result = try decodePCM(pcm, acceptance: acceptance, bundle: bundle, submitted: nil)
+        try Task.checkCancellation()
+        return result
+    }
+
+    /// An observation point at C entry and at the unpublished result, for interruption tests with the pinned engine.
+    package func transcribe(_ pcm: [Float], acceptance: WhistleCapability, bundle: Bundle,
+                            submitted: @escaping @Sendable () -> Void, resultReady: @Sendable () async -> Void) async throws -> WhistleResult {
+        let result = try decodePCM(pcm, acceptance: acceptance, bundle: bundle, submitted: submitted)
+        await resultReady()
+        try Task.checkCancellation()
+        return result
+    }
+
+    private func decodePCM(_ pcm: [Float], acceptance: WhistleCapability, bundle: Bundle,
+                           submitted: (@Sendable () -> Void)?) throws -> WhistleResult {
         guard acceptance.available else { throw WhistleError.unavailable }
         try Task.checkCancellation()
         try Self.validatePCM(pcm)
         try open(bundle: bundle)
         guard let decode else { throw WhistleError.missingAPI }
-        let result = try WhistlePrivacy.enter(environment: privacyEnvironment()) {
+        return try WhistlePrivacy.enter(environment: privacyEnvironment()) {
             var output = [CChar](repeating: 0, count: 1_048_576)
             let count = pcm.withUnsafeBufferPointer { input in
                 output.withUnsafeMutableBufferPointer {
-                    decode(input.baseAddress, Int32(input.count), nil, nil, 1, $0.baseAddress, Int32($0.count))
+                    submitted?()
+                    return decode(input.baseAddress, Int32(input.count), nil, nil, 1, $0.baseAddress, Int32($0.count))
                 }
             }
             guard count >= 0 else { throw WhistleError.nativeFailure }
@@ -212,8 +229,6 @@ public actor WhistleRuntime {
                 try WhistleResult.parse(Data(bytes: $0.baseAddress!, count: end), samples: pcm.count)
             }
         }
-        try Task.checkCancellation()
-        return result
     }
 
     /// dyld can retain a C++ image with thread-local destructors after dlclose. Never free its borrowed weights
