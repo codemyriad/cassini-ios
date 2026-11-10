@@ -57,7 +57,7 @@ public struct FakeTranscriber: Transcribing {
             events(.progress(done: done, total: total))
             while true { try await Task.sleep(for: .seconds(3600)) }
         case .downloading(let fraction):
-            events(.preparingModel(fraction))
+            events(.preparingModel(.downloading(fraction)))
             while true { try await Task.sleep(for: .seconds(3600)) }
         case .growing(let segments, let interval, let total):
             for segment in segments {

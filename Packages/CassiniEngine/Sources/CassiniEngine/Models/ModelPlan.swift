@@ -93,10 +93,13 @@ public struct ModelPlan: Hashable, Sendable {
 public struct ModelError: Error, Hashable, Sendable, CustomStringConvertible {
     public var failure: JobFailure
     public var message: String
+    /// Preserve transport identity across repository context wrapping; diagnostics are never parsed for error codes.
+    public var urlErrorCode: URLError.Code?
 
-    public init(_ failure: JobFailure, _ message: String? = nil) {
+    public init(_ failure: JobFailure, _ message: String? = nil, urlErrorCode: URLError.Code? = nil) {
         self.failure = failure
         self.message = message ?? failure.code
+        self.urlErrorCode = urlErrorCode
     }
 
     public var description: String { "\(failure.code): \(message)" }
