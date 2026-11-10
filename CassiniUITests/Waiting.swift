@@ -74,7 +74,7 @@ extension XCUIElement {
             defer { last = frame }
             return frame == last
         }
-        guard settled else { XCTFail("The menu item never settled on screen: \(self)", file: file, line: line); return }
+        guard settled else { XCTFail("The menu item never settled on screen", file: file, line: line); return }
         tap()
     }
 }
