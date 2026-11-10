@@ -244,6 +244,7 @@ final class WhistleRecordingAdapterTests: XCTestCase {
 
     private func transcript(in folder: URL, noteID: UUID) async throws -> [Passage] {
         let store = try NoteStore(root: folder)
+        try await store.load()
         let stored = await store.note(noteID)
         return try XCTUnwrap(stored).transcript.map { segment in
             Passage(bounds: .init(text: segment.text, start: segment.start, end: segment.end),
@@ -264,6 +265,7 @@ final class WhistleRecordingAdapterTests: XCTestCase {
     private func runJob(in folder: URL, noteID: UUID, trace: WhistleTranscriber.Trace, stop: StopSignal = StopSignal(),
                         events: @escaping @Sendable (JobEvent) -> Void = { _ in }) async throws -> JobOutcome {
         let store = try NoteStore(root: folder)
+        try await store.load()
         let transcriber = WhistleTranscriber(acceptance: {
             .init(arm64: true, operatingSystemSupported: true, bundleVerified: true, pipelineAccepted: false,
                   deviceAccepted: false, internalExperiment: true)
