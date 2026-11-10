@@ -46,13 +46,18 @@ with the 26.0-linked framework; the next TestFlight build from main repeats the 
 Proven so far, with the 18.0-linked framework (decision 3 in `REPLIES-IOS18.md`: one framework for all OS versions):
 - the link imports exactly the SDK 26 audit, and links only `libc++` and `libSystem`;
 - every simulator import is exported by the installed iOS 26.0 and iOS 27.0 simulator runtimes
-  (`scripts/check-whistle-runtime-exports.py`);
+  (`scripts/check-whistle-runtime-exports.py`); on 26.0, five libsystem_kernel/pthread imports (`_getrusage`, `_mmap`,
+  `_munmap`, `_pthread_create`, `_pthread_setspecific`) resolve through the host Mac's libraries instead, listed under
+  `resolvedByHost` (the tool's `proves` field says `partial` there);
 - the hosted Whistle tests (`WhistleRuntimeTests`, `WhistleRecordingAdapterTests`) load and run it on the iOS 27.0
   and iOS 26.0 simulators;
 - the 13 fixtures above match the frozen Mac results exactly again (104 words, at most 80 ms) on the iOS 26.0
   simulator (23A343), run by the spike's unchanged driver around the simulator framework Cassini embeds;
-- the CPU gate: the archive needs FEAT_LSE and FEAT_LRCPC, the A12 has both, and the A10 is refused
-  (`WhistleCapability.supports(cpu:)`, read live from `hw.optional.arm.*`).
+- the CPU rule: the archive needs FEAT_LSE and FEAT_LRCPC; unit tests show that a CPU reporting either as missing or
+  0 (the A10's values) is refused and the A12's values are accepted (`WhistleCapability.supports(cpu:)`). The app reads
+  them from `hw.optional.arm.*` only below iOS 26 (`supports(cpu:operatingSystemMajor:)`): every iOS 26 device is an
+  A12 or newer, so iOS 26 keeps Whistle whatever the read answers. The live read has only run in the simulator, with
+  the host Mac's features; no A10 or iOS 18 device has run it.
 
 **Pending the iOS 18.6 simulator runtime** (not installed on drmeyers yet). Until all three pass, nothing has shown
 that the framework loads or transcribes on iOS 18:
@@ -60,15 +65,24 @@ that the framework loads or transcribes on iOS 18:
   <Debug-iphonesimulator Cassini.app>/Frameworks/CassiniWhistleRuntime.framework/CassiniWhistleRuntime` and keep its
   JSON as `Whistle/runtime-exports-ios18.6-simulator.json`. *Placeholder: that file does not exist yet.* Imports the
   tool lists under `resolvedByHost` bind to the Mac's own libraries in the simulator, so they say nothing about
-  iOS 18's.
+  iOS 18's: if the 18.6 runtime ships loose dylibs, its `proves` field will say `partial`, and the review of that
+  file must name those symbols as not covered rather than read its `pass` as covering all of them.
 - **Parity.** The 13 fixtures above on an iOS 18.6 simulator, with the 18.0-linked simulator framework. The harness
   that reran them on 26.0 is outside the repository, on drmeyers under
-  `/Volumes/DrMeyers2/cassini-ios18-cache/ios18-e/evidence/parity-harness/` (`run-parity.py --runtime 18.6`).
+  `/Volumes/DrMeyers2/cassini-ios18-cache/ios18-e/evidence/parity-harness/` (`run-parity.py --runtime 18.6`):
+  `build-probe.py` SHA-256 `c1d0de194bcf9fe23302cc997fca003373724e00a1e9a0507ffbef5c6332c785`, `run-parity.py`
+  SHA-256 `f388ecd5e231a26630a512864e6e701f7eca4dfb66248a83a5c807caf0e8878b`. It compiles the spike's unchanged
+  `scripts/whistle-ios26-spike/driver.mm` (SHA-256 `a1b827dfa6c6fc2bdd6b3d692cb3b4231dc616be4be588aeca427a4e64094afd`)
+  from the `whistle-ios26-spike` worktree; check all three hashes before trusting a rerun.
 - **Hosted tests.** `WhistleRuntimeTests` and `WhistleRecordingAdapterTests` on an iOS 18.6 simulator.
 
 Even then, simulator evidence covers only the simulator archive and the simulator's libraries on the Mac's CPU.
-Device loadability on iOS 18 rests on the device archive's import list (the same SDK 26 audit) and on the A12 run on
-iPadOS 26. There is no physical iOS 18 device run, no memory measurement on 18 and no TestFlight acceptance on 18.
+Nothing yet speaks to the device slice on iOS 18. The import list was audited against SDK 26 stubs, and the A12 run
+was on iPadOS 26 with the 26.0-linked framework. The pending 18.6 export check covers only the simulator's libraries
+(and lists what the host Mac supplies apart). Device loadability on iOS 18 needs a physical iOS 18 device or TestFlight
+run. There is no memory measurement on 18 either. That an app can read the `hw.optional.arm.FEAT_*` keys on a device
+is also unverified: on iOS 18 a refused read turns Whistle off (it never lets an A10 through); on iOS 26 the read is
+not consulted. The `WhistleBundle` "CPU features" log line shows the answer in the next TestFlight run on a device.
 
 ## Loading and capability selection
 
@@ -81,8 +95,9 @@ Python runtime or system-library search is involved. The app does not load the n
 
 ## D78 starter model and verified upgrade
 
-Whistle is the immediate bundled default on arm64 devices from iOS 18 whose CPU reports FEAT_LSE and FEAT_LRCPC (A12
-and newer; the A10 iPad 7th generation on iPadOS 18 is refused), with verified assets and the measured 3GB-class
+Whistle is the immediate bundled default on arm64 devices from iOS 18 with FEAT_LSE and FEAT_LRCPC (A12 and newer:
+on iOS 18 the CPU must report both, so the A10 iPad 7th generation on iPadOS 18 is refused; every iOS 26 device has
+them), with verified assets and the measured 3GB-class
 memory floor (at least2GiB reported physical RAM,512MiB available before load,256MiB per window). The physical
 A12/3GB gate on iPadOS 26 and the iOS 26 adapter/DC gates below back this rollout; the iOS 18 evidence is pending (see
 above). The pending capability factory remains
