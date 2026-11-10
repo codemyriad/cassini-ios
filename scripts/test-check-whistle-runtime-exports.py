@@ -135,6 +135,7 @@ class LooseRuntimeTests(unittest.TestCase):
         self.assertEqual(result['libraries']['/usr/lib/libc++.1.dylib']['images'],
                          ['/usr/lib/libc++.1.dylib', '/usr/lib/libc++abi.dylib'])
         self.assertEqual(result['resolvedByHost'], [])
+        self.assertEqual((result['resolvedByRuntime'], result['proves']), (7, 'every import'))
 
     def test_a_symbol_the_runtime_lacks_fails_and_is_named(self):
         result = self.check({'libc++': ['__ZNSt3__16locale4nameEv', '__ZNSt3__122__libcpp_verbose_abortEPKcz'],
@@ -152,6 +153,8 @@ class LooseRuntimeTests(unittest.TestCase):
         self.assertEqual(result['result'], 'pass')
         self.assertEqual(result['resolvedByHost'], [{'symbol': '_pthread_create', 'library': '/usr/lib/libSystem.B.dylib',
                                                      'image': '/usr/lib/system/libsystem_pthread.dylib'}])
+        self.assertEqual(result['resolvedByRuntime'], 1)
+        self.assertEqual(result['proves'], 'partial: 1 of 2 imports resolve to the host Mac, not to this runtime')
         self.assertIn('host:/usr/lib/system/libsystem_pthread.dylib',
                       result['libraries']['/usr/lib/libSystem.B.dylib']['images'])
         self.host = {}
@@ -226,6 +229,9 @@ class ParsingTests(unittest.TestCase):
             '      0x0077  __Znwm  (from <weak-def-coalesce>)\n')
         self.assertEqual(imports, {'libc++': ['__ZTVN10__cxxabiv117__class_type_infoE'], 'libSystem': ['_abort'],
                                    checker.COALESCED: ['__Znwm']})
+        with self.assertRaisesRegex(checker.Refused, 'unexpected dyld_info -imports line: 0x0002  _strlen_weak'):
+            checker.parse_imports('/x/y [arm64]:\n    -imports:\n      0x0001  _abort  (from libSystem)\n'
+                                  '      0x0002  _strlen_weak [weak-import] (from <flat-namespace>)\n')
         linked = checker.parse_linked('/x/CassiniWhistleRuntime [arm64]:\n    -linked_dylibs:\n'
                                       '        attributes       load path\n'
                                       '                         /usr/lib/libc++.1.dylib\n'

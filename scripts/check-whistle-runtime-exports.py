@@ -14,7 +14,9 @@ exported by one of the linked libraries.
 A runtime that ships loose dylibs takes libsystem_kernel, libsystem_platform and libsystem_pthread from the host Mac:
 its libsystem_sim_*_host shims re-export the host's copies, which are not in RuntimeRoot. Those are read from the host
 (`dyld_info -exports`), and every import they provide is listed under "resolvedByHost": on that runtime the simulator
-binds them to the Mac's libraries, so they are no evidence about the iOS version's own libraries. The runtime's libraries are read from its loose dylibs where it ships them (iOS 26.0 and older runtimes),
+binds them to the Mac's libraries, so they are no evidence about the iOS version's own libraries. "resolvedByRuntime"
+counts the imports the runtime itself exports, and "proves" says "partial" whenever any resolve to the host, even when
+"result" is "pass". The runtime's libraries are read from its loose dylibs where it ships them (iOS 26.0 and older runtimes),
 else from its dyld_sim_shared_cache (iOS 27). Prints one JSON object; exits 0 when every import resolves, 1 when one
 does not, 2 on bad input.
 
@@ -286,12 +288,16 @@ def leaf(path):
 
 
 def parse_imports(text):
-    """{library short name: [symbol]} from `dyld_info -imports`."""
+    """{library short name: [symbol]} from `dyld_info -imports`. Every import line must have the plain form; any other
+    (such as `_foo [weak-import] (from libSystem)`) is refused rather than dropped, so no import goes unchecked."""
     imports = {}
     for line in text.splitlines():
-        match = re.match(r'\s*0x[0-9A-Fa-f]+\s+(\S+)\s+\(from ([^)]+)\)', line)
-        if match:
-            imports.setdefault(match.group(2), []).append(match.group(1))
+        if not re.match(r'\s*0x[0-9A-Fa-f]+\s', line):
+            continue
+        match = re.fullmatch(r'\s*0x[0-9A-Fa-f]+\s+(\S+)\s+\(from ([^)]+)\)\s*', line)
+        if not match:
+            raise Refused(f'unexpected dyld_info -imports line: {line.strip()}')
+        imports.setdefault(match.group(2), []).append(match.group(1))
     return imports
 
 
@@ -356,6 +362,9 @@ def check(runtime_root, binary, facts=binary_facts, host_exports=None):
         'binary': str(binary), 'binarySha256': hashlib.sha256(binary.read_bytes()).hexdigest(), 'platform': platform,
         'libraries': libraries, 'imports': total, 'resolved': total - len(missing), 'missing': missing,
         'resolvedByHost': by_host,
+        'resolvedByRuntime': total - len(missing) - len(by_host),
+        'proves': 'every import' if not by_host else
+                  f'partial: {len(by_host)} of {total} imports resolve to the host Mac, not to this runtime',
         'result': 'pass' if not missing and total else 'fail',
     }
 
