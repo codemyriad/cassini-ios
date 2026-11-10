@@ -4,7 +4,7 @@ import Testing
 import CassiniEngineTesting
 
 /// Android #109 ArtifactFetcherCompletionTest, plus iOS AsyncThrowingStream completion/cancellation edges.
-/// Every response is in-memory; suspended EOF tests have an upper-bound limit, never a fixed delay.
+/// Every response is in-memory; held-EOF tests count a pull past the declared length, never race a deadline.
 @Suite struct ArtifactFetcherCompletionTests: Sendable {
     private let bytes = Data("Pinned model bytes for completion tests".utf8)
     private let url = "https://dist.gocassini.com/test-model"
@@ -19,23 +19,10 @@ import CassiniEngineTesting
     @Test(.timeLimit(.minutes(1))) func knownLengthCompletesWithoutWaitingForEOF() async throws {
         let folder = TemporaryFolder()
         defer { folder.remove() }
-        let closed = Counter()
-        let pair = AsyncThrowingStream<Data, any Error>.makeStream()
-        pair.continuation.yield(bytes) // Deliberately never finish until the fetcher closes its response.
-        let transport = CompletionTransport { [bytes] _, _ in
-            HTTPAnswer(status: 200, headers: [:], expectedLength: Int64(bytes.count), body: pair.stream,
-                       close: { _ = closed.next(); pair.continuation.finish() })
-        }
-        let deadline = ContinuousClock.now.advanced(by: .seconds(5))
-        let completed = try await withThrowingTaskGroup(of: Bool.self) { group in
-            defer { group.cancelAll(); pair.continuation.finish() }
-            group.addTask { try await fetch(transport, folder.root); return true }
-            group.addTask { try await Task.sleep(until: deadline, clock: .continuous); return false }
-            return try await group.next() ?? false
-        }
-        #expect(completed, "Pinned body completion must not wait for the EOF released only during cleanup")
-        guard completed else { return }
-        #expect(closed.value == 1)
+        let held = Self.heldEOF(bytes)
+        try await fetch(held.transport, folder.root)
+        #expect(held.pulledPastLength.value == 0, "Pinned body completion must not wait for an EOF after its declared length")
+        #expect(held.closed.value == 1)
         #expect(try Data(contentsOf: folder.root.appendingPathComponent("model.onnx")) == bytes)
         #expect(!exists(partial(folder.root)))
     }
@@ -293,22 +280,11 @@ import CassiniEngineTesting
     func metadataKnownLengthDoesNotWaitForHeldEOF(_ notice: Bool) async throws {
         let folder = TemporaryFolder()
         defer { folder.remove() }
-        let pair = AsyncThrowingStream<Data, any Error>.makeStream()
-        pair.continuation.yield(bytes)
-        let closed = Counter()
-        let transport = CompletionTransport { [bytes] _, _ in
-            HTTPAnswer(status: 200, headers: [:], expectedLength: Int64(bytes.count), body: pair.stream,
-                       close: { _ = closed.next(); pair.continuation.finish() })
-        }
-        let deadline = ContinuousClock.now.advanced(by: .seconds(5))
-        let received = try await withThrowingTaskGroup(of: Data?.self) { group in
-            defer { group.cancelAll(); pair.continuation.finish() }
-            group.addTask { try await metadata(transport, directory: folder.root, notice: notice) }
-            group.addTask { try await Task.sleep(until: deadline, clock: .continuous); return nil }
-            return try await group.next() ?? nil
-        }
-        #expect(received == bytes, "Complete manifest/NOTICE bytes must not depend on a later EOF")
-        #expect(closed.value == 1)
+        let held = Self.heldEOF(bytes)
+        let received = try await metadata(held.transport, directory: folder.root, notice: notice)
+        #expect(held.pulledPastLength.value == 0, "Complete manifest/NOTICE bytes must not depend on a later EOF")
+        #expect(received == bytes)
+        #expect(held.closed.value == 1)
     }
 
     @Test(arguments: [false, true])
@@ -415,6 +391,25 @@ import CassiniEngineTesting
         #expect(result == .cancelled)
         #expect(closed.value == 1)
         #expect(!exists(folder.root.appendingPathComponent("NOTICE.txt")))
+    }
+
+    /// A known-length answer that delivers `data` and has no EOF of its own: transport would end it only at teardown.
+    /// A pull past the declared length before the fetcher closes the answer means the fetcher waits for that EOF. The
+    /// pull is counted and ended at once, so the regression fails the test with a message instead of hanging.
+    /// A pull after close is legitimate (the answer is already released) and is not counted.
+    private static func heldEOF(_ data: Data) -> (transport: CompletionTransport, closed: Counter, pulledPastLength: Counter) {
+        let closed = Counter(), pulledPastLength = Counter()
+        let transport = CompletionTransport { _, _ in
+            let pulls = Counter()
+            let body = AsyncThrowingStream<Data, any Error>(unfolding: {
+                if pulls.next() == 1 { return data }
+                if closed.value == 0 { _ = pulledPastLength.next() }
+                return nil
+            })
+            return HTTPAnswer(status: 200, headers: [:], expectedLength: Int64(data.count), body: body,
+                              close: { _ = closed.next() })
+        }
+        return (transport, closed, pulledPastLength)
     }
 
     private static func answer(_ data: Data, status: Int = 200, headers: [String: String] = [:],
