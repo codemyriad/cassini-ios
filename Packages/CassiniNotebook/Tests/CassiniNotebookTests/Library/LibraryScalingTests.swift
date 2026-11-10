@@ -8,9 +8,11 @@ import Testing
 ///
 /// Linear work costs 4x; the bound allows 2.5x per doubling (6.25x), and a quadratic step costs up to 16x. Grouping
 /// a paragraph used to join all of its words again after each word: a 140-word preview then cost 10.1-10.3x a
-/// 35-word one (rows 11.6-13.9x), against 4.0-5.2x (rows 4.5-5.5x) since (macOS 27, Debug, a loaded machine). The
-/// keystroke measures 3.5-4.5x; a scan of the index per note made it 14.9x. The smaller size is large enough that
-/// what every call pays whatever its size (a 1-word preview costs about 8% of a 35-word one) does not hide the growth.
+/// 35-word one (rows 11.6-13.9x). Copying the block and searching its whole text for a sentence end on every word
+/// still left rows at 4.4-6.0x. Now a preview measures 3.9-4.4x and rows 3.4-4.1x (macOS 27, Debug, load 50-150), so
+/// the bound leaves them about 1.4x. The keystroke measures 3.9x; a scan of the index per note made it 14.9x. The
+/// smaller size is large enough that what every call pays whatever its size (a 1-word preview costs about 8% of a
+/// 35-word one) does not hide the growth.
 @Suite struct LibraryScalingTests {
     static let vocabulary = ["delivery", "Thursday", "price", "supplier", "order", "warehouse", "meeting", "budget"]
     static let bound = 6.25
@@ -87,18 +89,18 @@ import Testing
     static func expectLinear(_ work: String, sizes: (small: String, large: String), repeats: Int,
                              small: () -> Void, large: () -> Void) throws {
         small(); large()
-        var best = (small: Duration.seconds(1_000), large: Duration.seconds(1_000)), used = 0
+        var best = (small: Duration.seconds(1_000), large: Duration.seconds(1_000)), ratios: [String] = []
         var ratio: Double { best.large / best.small * 4 }
         repeat {
-            used += 1
             for _ in 0..<samples {
                 best.small = min(best.small, try measureThreadCPU { for _ in 0..<(4 * repeats) { small() } }.elapsed)
                 best.large = min(best.large, try measureThreadCPU { for _ in 0..<repeats { large() } }.elapsed)
             }
-        } while ratio >= bound && used < rounds
+            ratios.append(String(format: "%.2f", ratio))
+        } while ratio >= bound && ratios.count < rounds
         func ms(_ sample: Duration, runs: Int) -> String { String(format: "%.3f ms", sample / .milliseconds(runs)) }
         let measured = "\(sizes.small) \(ms(best.small, runs: 4 * repeats)), \(sizes.large) \(ms(best.large, runs: repeats)), "
-            + "ratio " + String(format: "%.2f", ratio) + ", \(used) of \(rounds) rounds"
+            + "ratio after each of \(ratios.count) of \(rounds) rounds: " + ratios.joined(separator: ", ")
         print("\(work), calling-thread CPU: \(measured)")
         #expect(ratio < bound, "\(work) of 4x the size costs less than \(bound)x (\(measured))")
     }
