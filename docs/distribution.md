@@ -51,8 +51,8 @@ Sizes of the unsigned archive of the final PR D tree, against the `51bc71b` tree
 | `Cassini.app` zipped (`ditto -c -k`), about the download | 12 686 624 B | 4 190 847 B | +8 495 777 B |
 
 The binary's `__TEXT` is 28.6 MB. App Store Connect's own figures (per device, after thinning and encryption) come only
-with an upload. The models are not in the app: Parakeet Ultra (443 MB) with its speech detector (458 KB), and the
-speaker models (88 MB), download on consent.
+with an upload. Whistle's model and engine are in the app; they came after these measurements and are not in them.
+Parakeet Ultra (443 MB) with its speech detector (458 KB), and the speaker models (88 MB), download on consent.
 
 Never commit archives, exported `.ipa` files, certificates, provisioning profiles or App Store Connect API keys.
 `build/` is ignored for the first two.
@@ -151,5 +151,5 @@ work over SSH.
 - **App Review note:** explain that background audio (`UIBackgroundModes` audio) keeps a recording going with the screen
   locked and lets playback continue on the lock screen, and that `processing` finishes a running transcription. Mention
   that the Whistle speech model and its native engine are in the app, so transcribing with Whistle needs no download.
-  Parakeet Ultra with its speech detector (about 444 MB) and the speaker models (about 88 MB) download from
-  `dist.gocassini.com` only after the user agrees, and are data, not code.
+  On devices with enough memory, Parakeet Ultra with its speech detector (about 444 MB), and the speaker models (about
+  88 MB), download from `dist.gocassini.com` only after the user agrees, and are data, not code.

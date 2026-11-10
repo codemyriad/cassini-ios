@@ -981,8 +981,6 @@ On iOS 26 and later, where neither Whistle nor a downloaded Parakeet Ultra can b
 
 Included in the app
 
-The JFK test recording is public-domain US federal government material, included only in Debug and explicitly enabled local lab builds, never normal Release or internal TestFlight exports.
-
 Whistle weights and Needle engine 3.3.0 — Cactus Compute
 
 Licensed under the Apache License, Version 2.0 (Whistle-Apache-2.0.txt).
@@ -1015,6 +1013,8 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+The JFK test recording is public-domain US federal government material, included only in Debug and explicitly enabled local lab builds, never normal Release or internal TestFlight exports.
 
 
 Downloaded models
