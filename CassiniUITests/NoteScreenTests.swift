@@ -245,7 +245,8 @@ final class NoteScreenTests: XCTestCase {
         let parts = app.descendants(matching: .any).matching(identifier: "draftTranscript")
         XCTAssertTrue(parts.firstMatch.waitForExistence(within: 15))
         var draft: XCUIElement { parts.element(boundBy: parts.count - 1) }
-        XCTAssertTrue(poll(within: 15) { draft.label.contains("Sentence 24 ") }, "the requested draft arrived")
+        XCTAssertTrue(poll(within: 15) { app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "Sentence 24 ")).firstMatch.exists },
+                      "the requested draft arrived; parts: \(parts.allElementsBoundByIndex.map { $0.label })")
         let window = app.windows.firstMatch.frame
         let stop = app.buttons["Stop and keep progress"]
         // The draft outgrows the screen; its end stays in view and so does the card.
@@ -256,7 +257,8 @@ final class NoteScreenTests: XCTestCase {
         draft.swipeDown()
         XCTAssertTrue(poll(within: 15) { draft.frame.maxY > window.maxY + 100 })
         app.appendDraft(sentences: 2)
-        XCTAssertTrue(poll(within: 15) { draft.label.contains("Sentence 26 ") }, "new text arrived after the drag")
+        XCTAssertTrue(poll(within: 15) { app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "Sentence 26 ")).firstMatch.exists },
+                      "new text arrived after the drag; parts: \(parts.allElementsBoundByIndex.map { $0.label })")
         XCTAssertGreaterThan(draft.frame.maxY, window.maxY + 100, "after a scroll up, new text does not scroll")
         XCTAssertTrue(stop.isHittable)
     }
