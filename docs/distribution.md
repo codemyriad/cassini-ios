@@ -155,12 +155,15 @@ work over SSH.
   Whistle (the A10 lacks its CPU features), no Parakeet Ultra (3 GB) and no Apple speech on iPadOS 18. It records,
   plays, searches and exports but cannot transcribe. An app cannot exclude that device by minimum OS, and
   `UIRequiredDeviceCapabilities` has no key that separates the A10 from the A12 in a useful way (not checked further).
-  Whether to say so in the description or the review note is for Silvio to decide.
+  The description and the App Review note say: "Transcription needs an A12 chip or later, so it is not available on
+  the iPad (7th generation)." That follows from the rules above; Whistle on the A12 has been measured on iPadOS 26
+  only, not on iOS 18.
 - **Export compliance:** answered in the build (`ITSAppUsesNonExemptEncryption` false), so no question per upload.
 - **App Review note:** explain that background audio (`UIBackgroundModes` audio) keeps a recording going with the screen
-  locked and lets playback continue on the lock screen, and that `processing` finishes a running transcription (on
-  iOS 26 and later, through continued processing; on iOS 18 a transcription pauses when the short background time
-  ends, see [iOS 18](ios18.md)). Mention that the speech and speaker models (about 531 MB) download only after the
+  locked and lets playback continue on the lock screen, and that `processing` finishes a running transcription on
+  iOS 26 and later, through continued processing. Add: "On iOS 18, which has no continued processing, a transcription
+  that is still running when iOS ends the app's background time pauses, and the user resumes it from the app." (see
+  [iOS 18](ios18.md)). Mention that the speech and speaker models (about 531 MB) download only after the
   user agrees, and are data, not code.
 - **Not yet verified:** no build at 18.0 has been archived, validated or uploaded. The 90208 check (each embedded
   `MinimumOSVersion` against its binary's minos) is covered locally by `scripts/check-embedded-minos.py`, but Apple's

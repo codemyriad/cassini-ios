@@ -95,8 +95,8 @@ as the coordinator asked and **awaiting Silvio's review**; any of them can still
 
 | # | Decision | Answer | Source |
 |---|---|---|---|
-| 1 | Link the iOS 27 Whistle binary at target 18.0 | **Yes**, on this evidence: the import check against the 18.6 runtime, the 13 parity fixtures and the app-hosted Whistle tests on the 18.6 simulator, plus the A12 measurement on iPadOS 26. This extends the D75.2 exception | Silvio |
-| 2 | Install the iOS 18.6 simulator runtime | **Yes**, keeping at least 25 GB free on the build Mac's internal disk afterwards | Silvio |
+| 1 | Link the iOS 27 Whistle binary at target 18.0 | **Yes**, on this evidence: the import check against the iOS 18 simulator runtime, the 13 parity fixtures and the app-hosted Whistle tests on the iOS 18 simulator, plus the A12 measurement on iPadOS 26. This extends the D75.2 exception. The decision named 18.6; the evidence was gathered on 18.2 (below) | Silvio |
+| 2 | Install the iOS 18.6 simulator runtime | **Yes**, keeping at least 25 GB free on the build Mac's internal disk afterwards. Apple no longer offers 18.6, so 18.2 was installed instead (below) | Silvio |
 | 3 | One Whistle binary or two | **One**, linked at 18.0, for all OS versions. The iOS 26 simulator parity is rerun on it; the next TestFlight build from main repeats the A12 acceptance | recommendation, awaiting Silvio's review |
 | 4 | A10 iPad (7th generation) | Whistle is gated off by CPU feature (atomics and RCpc). That device records, plays and exports but does not transcribe | recommendation, awaiting Silvio's review |
 | 5 | Background on iOS 18 | Accepted as described above: a transcription pauses about 30 s after leaving the app and needs Resume; the standalone download stops and needs Try again. No `BGProcessingTask`, no background `URLSession` | recommendation, awaiting Silvio's review |
