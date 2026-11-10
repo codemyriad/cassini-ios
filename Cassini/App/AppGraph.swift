@@ -275,6 +275,9 @@ extension View {
             .environment(graph.imports).environment(graph.trash).environment(graph.trash.undo).environment(graph.exports)
             .environment(graph.settingsPorts)
             .environment(graph.libraryScreen).environment(graph.noteScreens)
+            #if DEBUG
+            .environment(\.marksUITestLayout, graph.environment.launch.marksLaunchFinished)
+            #endif
             .environment(\.clock, graph.environment.clock)
             .environment(\.modelRoot, graph.environment.models)
             .environment(\.locale, graph.environment.locale)

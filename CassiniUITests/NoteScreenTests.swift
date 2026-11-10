@@ -247,6 +247,8 @@ final class NoteScreenTests: XCTestCase {
         var draft: XCUIElement { parts.element(boundBy: parts.count - 1) }
         XCTAssertTrue(poll(within: 15) { app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "Sentence 24 ")).firstMatch.exists },
                       "the requested draft arrived; parts: \(parts.allElementsBoundByIndex.map { $0.label })")
+        let laidOut = app.staticTexts["draftLayoutFinished"]
+        XCTAssertTrue(laidOut.wait(until: NSPredicate(format: "value == %@", "192"), within: 15), "24 sentences finished layout")
         let window = app.windows.firstMatch.frame
         let stop = app.buttons["Stop and keep progress"]
         // The draft outgrows the screen; its end stays in view and so does the card.
@@ -259,6 +261,7 @@ final class NoteScreenTests: XCTestCase {
         app.appendDraft(sentences: 2)
         XCTAssertTrue(poll(within: 15) { app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "Sentence 26 ")).firstMatch.exists },
                       "new text arrived after the drag; parts: \(parts.allElementsBoundByIndex.map { $0.label })")
+        XCTAssertTrue(laidOut.wait(until: NSPredicate(format: "value == %@", "208"), within: 15), "the new sentences finished layout and any scroll")
         XCTAssertGreaterThan(draft.frame.maxY, window.maxY + 100, "after a scroll up, new text does not scroll")
         XCTAssertTrue(stop.isHittable)
     }
