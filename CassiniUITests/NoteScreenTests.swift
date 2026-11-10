@@ -33,7 +33,7 @@ final class NoteScreenTests: XCTestCase {
         let alex = header(app, "Alex")
         XCTAssertEqual(alex.label, "Alex, at 0 seconds")
         XCTAssertTrue(header(app, "Sam").exists)
-        XCTAssertGreaterThanOrEqual(alex.frame.height, 44)
+        XCTAssertGreaterThanOrEqual(alex.frame.height, 44 - 0.001, "a 44 pt target, read through a floating-point transform")
         XCTAssertTrue(app.buttons["speakersButton"].label.contains("2 speakers"))
         alex.tap()
         XCTAssertTrue(app.textFields["speakerNameField"].waitForExistence(within: 5), "the header opens Name a speaker")
