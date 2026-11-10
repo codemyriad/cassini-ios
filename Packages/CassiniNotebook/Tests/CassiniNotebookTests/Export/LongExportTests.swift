@@ -30,11 +30,11 @@ struct LongExportTests {
         let labels = Dictionary(uniqueKeysWithValues: (1...Self.speakers).map { ("\(Self.prefix)\($0)", "Speaker \($0)") })
         let long = ExportTranscript(title: "Conference day", durationMs: hours * Self.hourMs, words: words, labels: labels)
 
-        let ((text, srt, vtt), elapsed) = try measureProcessCPU {
+        let ((text, srt, vtt), elapsed) = try measureThreadCPU {
             (TextExport.write(long, subtitle: "11 Oct 2026", emptyText: "No words"),
              SrtWriter.write(long), VttWriter.write(long))
         }
-        #expect(elapsed < .seconds(30), "export writers used \(elapsed) of process CPU time")
+        #expect(elapsed < .seconds(30), "export writers used \(elapsed) of calling-thread CPU time")
         for export in [text, srt, vtt] { expectExportShape(export) }
         let last = try #require(words.last).text
         #expect(text.trimmingCharacters(in: .whitespacesAndNewlines).hasSuffix(last))
