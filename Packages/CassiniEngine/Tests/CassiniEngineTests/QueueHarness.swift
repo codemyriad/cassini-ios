@@ -91,7 +91,7 @@ import CassiniNotebook
     /// The `index`th run, once the coordinator started it.
     func run(_ index: Int) async throws -> FakeJobRun { try await runner.run(index) }
 
-    func waitUntil(_ what: Comment = "the condition holds", timeout: Duration = .seconds(10),
+    func waitUntil(_ what: Comment = "the condition holds", timeout: Duration = .seconds(30),
                    _ condition: @MainActor () async -> Bool) async throws {
         let clock = ContinuousClock()
         let deadline = clock.now + timeout

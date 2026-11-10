@@ -109,8 +109,8 @@ extension XCUIElement {
         let placeholder = placeholderValue ?? ""
         let length = current == placeholder ? 0 : current.count
         if length > 0 { typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: length + 2)) }
-        // A single character needs no clipboard handoff or paste retries.
-        if text.count == 1 { typeText(text); return }
+        // Short names need no clipboard handoff or paste retries.
+        if (1...10).contains(text.count) { typeText(text); return }
         UIPasteboard.general.string = text
         // The field may cut what is pasted to its limit. The first paste of a runner often does not land.
         for _ in 0..<2 {

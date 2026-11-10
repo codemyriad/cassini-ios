@@ -5,6 +5,8 @@ import CassiniEngine
 @MainActor public final class FakeBackgroundRunner: BackgroundRunner {
     private var active: [BackgroundToken: @MainActor () -> Void] = [:]
     public private(set) var endedCount = 0
+    /// The token finished: an event for tests that must wait for its owner to release background time.
+    public var onEnd: @MainActor (BackgroundToken) -> Void = { _ in }
     /// Every token begun so far.
     public private(set) var begunCount = 0
     /// The title of each token that has not ended.
@@ -37,7 +39,10 @@ import CassiniEngine
         titles[token] = nil
         subtitles[token] = nil
         progresses[token] = nil
-        if active.removeValue(forKey: token) != nil { endedCount += 1 }
+        if active.removeValue(forKey: token) != nil {
+            endedCount += 1
+            onEnd(token)
+        }
     }
 
     /// Takes the background time back, as iOS does: each token's work learns of it and the token ends right after,

@@ -99,7 +99,7 @@ extension XCTestCase {
     @MainActor func closeShareSheet(_ app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
         let shareSheet = app.otherElements["ActivityListView"]
         XCTAssertTrue(shareSheet.waitForExistence(within: 15), "the share sheet opens", file: file, line: line)
-        let close = app.buttons["Close"].firstMatch
+        let close = app.shareSheetCloseButton
         XCTAssertTrue(close.waitForExistence(within: 30), file: file, line: line)
         close.tap()
         XCTAssertTrue(shareSheet.waitForNonExistence(within: 5), file: file, line: line)
