@@ -36,8 +36,8 @@
 #   CASSINI_IPHONE / CASSINI_IPAD  device types to clone (default "iPhone 17", "iPad Pro 13-inch (M5)"; on a
 #                        CASSINI_RUNTIME below 26, "iPhone 16", "iPad Pro 13-inch (M4)")
 #   CASSINI_RUNTIME      the iOS simulator runtime of app, ui, all and changed (default: the newest): a version prefix
-#                        (18, 18.6) picks the newest available runtime it matches, an identifier
-#                        (com.apple.CoreSimulator.SimRuntime.iOS-18-6) that one. The run fails when none matches or a
+#                        (18, 18.2) picks the newest available runtime it matches, an identifier
+#                        (com.apple.CoreSimulator.SimRuntime.iOS-18-2) that one. The run fails when none matches or a
 #                        device type cannot run on it. Its clones (<prefix>-iphone18-N, <prefix>-ipad18-1), logs
 #                        (DerivedData/test-logs-ios18) and timing table (ui-test-durations-ios18.tsv in the cache) are
 #                        its own. It shuts down this worktree's other booted clones before it boots, and all of them
@@ -63,7 +63,7 @@
 #                        posts: no extra arguments, the iPad's tests, the release runtime, the default simulator
 #                        runtime (no CASSINI_RUNTIME), the iOS 18 leg not turned off (CASSINI_IOS18=0) nor moved
 #                        (CASSINI_IOS18_RUNTIME), nothing uncommitted. The description gives the counts, with the
-#                        leg's and its mode when it ran: "passed in 24 min: iPhone 72/72, iPad 8/8; iOS 18.6 smoke:
+#                        leg's and its mode when it ran: "passed in 24 min: iPhone 72/72, iPad 8/8; iOS 18.2 smoke:
 #                        hosted 76/76 (6 skipped), iPhone 16/16".
 #
 # One heavy run at a time per host: every tier but fast and clean takes the host-wide lock before it boots or builds
@@ -89,7 +89,7 @@ root="$(cd "$(dirname "$0")/.." && pwd)"
 common="$(git -C "$root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || echo "$root/.git")"
 cache="${CASSINI_TEST_CACHE:-$(dirname "$common")/.test-cache}"
 derived="$root/DerivedData.noindex"
-# CASSINI_RUNTIME's tag (18, 18.6; an identifier's version) names the second leg's clones, leases, logs and timing
+# CASSINI_RUNTIME's tag (18, 18.2; an identifier's version) names the second leg's clones, leases, logs and timing
 # table, so that leg never reuses or wipes the default one's. Without CASSINI_RUNTIME it is empty and every name is
 # what it always was. Only the tiers that boot clones read it: fast, build and clean ignore it.
 runtime_tag_of() {
@@ -101,7 +101,7 @@ runtime_tag_of() {
 runtime_tag=""
 case "$tier" in app|ui|all|changed|prebuilt) runtime_tag=$(runtime_tag_of "${CASSINI_RUNTIME:-}") ;; esac
 if [ -n "$runtime_tag" ] && ! [[ $runtime_tag =~ ^[0-9]+(\.[0-9]+)*$ ]]; then
-    echo "error: CASSINI_RUNTIME=$CASSINI_RUNTIME is neither a version (18, 18.6) nor an iOS runtime identifier" >&2
+    echo "error: CASSINI_RUNTIME=$CASSINI_RUNTIME is neither a version (18, 18.2) nor an iOS runtime identifier" >&2
     exit 2
 fi
 
@@ -126,7 +126,7 @@ case "$tier" in
 esac
 [ "$ios18_mode" != 0 ] || ios18_mode=off
 if [ "$ios18_mode" != off ] && ! [[ $ios18_tag =~ ^[0-9]+(\.[0-9]+)*$ ]]; then
-    echo "error: CASSINI_IOS18_RUNTIME=$ios18_runtime is neither a version (18, 18.6) nor an iOS runtime identifier" >&2
+    echo "error: CASSINI_IOS18_RUNTIME=$ios18_runtime is neither a version (18, 18.2) nor an iOS runtime identifier" >&2
     exit 2
 fi
 logs="$derived/test-logs${runtime_tag:+-ios$runtime_tag}"
@@ -188,7 +188,7 @@ summary() {
         echo "$tier exit $rc" > "$logs/FAILED"
         echo "FAILED ($tier), logs in $logs (kept in $failed_logs after the next run)"
     fi
-    # A run on another runtime leaves what it ran for the iOS 18 leg's status: "iOS 18.6 hosted 76/76, iPhone 17/17".
+    # A run on another runtime leaves what it ran for the iOS 18 leg's status: "iOS 18.2 hosted 76/76, iPhone 17/17".
     if [ -n "$runtime_tag" ]; then
         if [ -n "$runtime_version" ]; then
             echo "iOS $runtime_version${hosted_counts:+ hosted $hosted_counts}${ui_counts:+, $ui_counts}"
@@ -402,7 +402,7 @@ select_runtime() {
 }
 
 # The UDID of the clone called $1, created from device type $2 when missing. On a CASSINI_RUNTIME only a clone of that
-# runtime counts: one of the same name on another (CASSINI_RUNTIME=18 picked 18.5 before, 18.6 now) is this
+# runtime counts: one of the same name on another (CASSINI_RUNTIME=18 picked 18.0 before, 18.2 now) is this
 # worktree's own and is deleted rather than reused.
 clone_udid() {
     local name="$1" type="$2" udid stale
@@ -457,7 +457,7 @@ for devices in json.load(sys.stdin)["devices"].values():
         if d["name"].startswith(prefix): print(d["udid"], d["state"], d["name"])' "$1"
 }
 # Whether clone $2 is one of worktree prefix $1's: <prefix>-iphone-N, -ipad-N, a CASSINI_RUNTIME's -iphone18-N or
-# -ipad18.6-N, -bench, -shots-iphone or -shots-ipad. A prefix match alone would take in the clones of a worktree whose
+# -ipad18.2-N, -bench, -shots-iphone or -shots-ipad. A prefix match alone would take in the clones of a worktree whose
 # name extends this one's (capture-start-failure and capture-start-failure-test), and shut down, erase or delete them
 # in the middle of that worktree's run. No other worktree's clone has one of these names after this prefix: theirs
 # end in -iphone-N or -ipad18-N after a longer prefix.
@@ -1193,8 +1193,8 @@ ios18_view_changes() {
     changed_files "$base" | grep -E '^Cassini/(Features|Design)/' | head -3 | xargs
 }
 
-# The leg's part of the status, with its mode and $2 (" failed") after it: "iOS 18.6 smoke: hosted 76/76, iPhone 17/17"
-# from the leg-counts "iOS 18.6 hosted 76/76, iPhone 17/17"; "iOS 18 full failed" when the leg left none.
+# The leg's part of the status, with its mode and $2 (" failed") after it: "iOS 18.2 smoke: hosted 76/76, iPhone 17/17"
+# from the leg-counts "iOS 18.2 hosted 76/76, iPhone 17/17"; "iOS 18 full failed" when the leg left none.
 ios18_leg_text() {
     case "$1" in
         "iOS "[0-9]*" "*) printf 'iOS %s %s%s: %s' "$(echo "$1" | cut -d' ' -f2)" "$ios18_mode" "${2:-}" "$(echo "$1" | cut -d' ' -f3-)" ;;

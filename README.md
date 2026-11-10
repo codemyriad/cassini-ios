@@ -222,7 +222,7 @@ environment variables. `scripts/test-remote.sh [tier]` runs the same tier on the
 when that is unset.
 
 `CASSINI_RUNTIME=18 scripts/test.sh app` (or `ui`) runs on the newest installed iOS 18 simulator runtime instead of
-the newest runtime; a version such as `18.6` or a runtime identifier also works. A run fails when no runtime matches,
+the newest runtime; a version such as `18.2` or a runtime identifier also works. A run fails when no runtime matches,
 or when the runtime cannot run the device types: below iOS 26 they default to iPhone 16 and iPad Pro 13-inch (M4).
 That leg keeps its own clones (`ts-<worktree>-iphone18-N`), logs (`DerivedData/test-logs-ios18`) and UI timing table,
 so it neither reuses nor disturbs the default leg, and it posts no commit status. `clean` deletes its clones too.
@@ -238,11 +238,11 @@ that changes views (`Cassini/Features` or `Cassini/Design` since it left origin/
 other branch the smoke run; `CASSINI_IOS18=smoke` or `full` overrides that choice.
 `scripts/test.sh ios18` builds and runs only the leg. The leg is `CASSINI_RUNTIME=18 scripts/test.sh prebuilt`, which
 tests the last build without building, so its clones, logs and timing table are those described above. The commit
-status names what the leg ran and how, for example `passed in 24 min: iPhone 72/72, iPad 8/8; iOS 18.6 smoke: hosted
+status names what the leg ran and how, for example `passed in 24 min: iPhone 72/72, iPad 8/8; iOS 18.2 smoke: hosted
 76/76 (6 skipped), iPhone 16/16`.
 
-Until the iOS 18.6 simulator runtime is installed on the gate's Mac, the leg is off by default
-(`ios18_default=off` in `scripts/test.sh`). An `all` run is then unchanged, and its status says nothing about iOS 18.
+The iOS 18 test runtime is iOS 18.2 (22C150): Apple no longer offers 18.6 for download, and the app's floor is 18.0.
+Until the leg is switched on, it is off by default (`ios18_default=off` in `scripts/test.sh`). An `all` run is then unchanged, and its status says nothing about iOS 18.
 Once the leg is on, a Mac without the runtime fails the run and its status before anything is built; the leg is never
 skipped. `CASSINI_IOS18=0` turns the leg off and posts no status, the same way `CASSINI_UI_IPAD=0` does.
 `CASSINI_IOS18_RUNTIME=26` runs the whole leg on the installed iOS 26.0 runtime, to try it without iOS 18. There
@@ -261,17 +261,25 @@ iOS 18 facts, the smoke list passes on iOS 27, and the full leg (`CASSINI_IOS18=
 Neither has run on a real iOS 18 runtime yet.
 `ScreenshotTests` skip unless `scripts/screenshots.sh` runs them.
 
-To install the runtime, download the iOS 18.6 simulator runtime DMG with the owner's Apple ID and keep it on
-`/Volumes/DrMeyers2/sim-runtimes`. Then, on the Mac:
+To install the runtime, download the iOS 18.2 simulator runtime DMG (22C150) with the owner's Apple ID and keep it on
+`/Volumes/DrMeyers2/sim-runtimes`. Do not `simctl runtime add` that DMG itself: simctl first stages a second 9 GB copy
+of it on the internal disk and then copies the inner image as well, and on this Mac that second copy was refused twice
+("the disk is almost full", with 27 and 30 GB free). Mount the DMG read-only from the external volume and add the image
+inside it instead, which copies once:
 
 ```sh
-xcrun simctl runtime add /Volumes/DrMeyers2/sim-runtimes/<the iOS 18.6 DMG>
-xcrun simctl list runtimes | grep 'iOS 18'   # iOS 18.6 (22G86) is listed
-df -h /                                      # at least 25 GB must stay free on the internal disk
+hdiutil attach -nobrowse -readonly /Volumes/DrMeyers2/sim-runtimes/iOS_18.2_Simulator_Runtime.dmg
+ls /Volumes/<mounted volume>/Restore/                  # one inner .dmg (092-09271-199.dmg for 22C150)
+/usr/bin/lockf -k -t 3600 ~/.cassini-heavy.lock \
+    xcrun simctl runtime add "/Volumes/<mounted volume>/Restore/<inner>.dmg"
+hdiutil detach "/Volumes/<mounted volume>"
+xcrun simctl list runtimes | grep 'iOS 18'           # iOS 18.2 (22C150) is listed
+df -h /System/Volumes/Data                           # check what stays free on the internal disk
 ```
 
-`simctl` copies the image into the system's store on the internal disk, about 9 GB. The DMG stays external as the
-backup. Then change `ios18_default=off` to `ios18_default=smoke` in `scripts/test.sh`. That one line turns the leg on.
+`simctl` copies the inner image, about 8.7 GB, into the system's store on the internal disk, and the first boot of the
+runtime builds its dyld cache, about 3.5 GB more under `/Library/Developer/CoreSimulator/Caches`. The DMG stays
+external as the backup. Then change `ios18_default=off` to `ios18_default=smoke` in `scripts/test.sh`. That one line turns the leg on.
 
 On GitHub, `.github/workflows/ci.yml` runs `scripts/test.sh fast` and `scripts/test.sh build` on a hosted runner
 with Xcode 27.0, for each push to main or a pull request that changes code. The simulator tiers run only locally: the
