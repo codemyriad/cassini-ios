@@ -9,23 +9,23 @@ import CassiniNotebook
     // directory is the pin)
     @Test func parakeetIsTheModelHostsUltraInt8MarkedByItsSourceHash() {
         let parakeet = ModelCatalog.parakeet
-        #expect(parakeet.id == "parakeet-ultra-0.6b-int8")
-        #expect(parakeet.sourceSha256 == "18cb623004dd6c15999b93cb70b14d8a1f6e8f3a2a97ff733f104bfc3494f6a9")
+        #expect(parakeet.id == "parakeet-ultra-0.6b-int8-v2")
+        #expect(parakeet.sourceSha256 == "50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366")
         #expect(parakeet.directory
-                == "models/parakeet-ultra-0.6b-int8/18cb623004dd6c15999b93cb70b14d8a1f6e8f3a2a97ff733f104bfc3494f6a9")
-        #expect(parakeet.pin == "parakeet-ultra-0.6b-int8@18cb623004dd6c15999b93cb70b14d8a1f6e8f3a2a97ff733f104bfc3494f6a9")
+                == "models/parakeet-ultra-0.6b-int8-v2/50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366")
+        #expect(parakeet.pin == "parakeet-ultra-0.6b-int8-v2@50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366")
         #expect(ModelCatalog.parakeetRevision == parakeet.sourceSha256)
         #expect(parakeet.artifacts.map(\.name) == ["encoder.int8.onnx", "decoder.int8.onnx", "joiner.int8.onnx", "tokens.txt"])
-        #expect(parakeet.artifacts.map(\.size) == [652_282_922, 11_845_274, 6_355_277, 93_939])
+        #expect(parakeet.artifacts.map(\.size) == [653_313_528, 11_845_274, 6_355_277, 93_939])
         #expect(parakeet.artifacts.map(\.sha256) == [
-            "299617fefd4664d1c115b691dcb6413cabcdbcc694cdf3cb4464b72c5fc3ae69",
+            "f9a8af14deb2e5237eebb9dfb25126180614feaf835a03f307e4077eab247015",
             "1fab98fe6c12aded87d2da66272cc9e148d0a0044ce3850a12fe56302ec4a922",
             "8a71aaccfdba3d451775507a889afd2257d2e754463fd81095a8c8f290f924c2",
             "d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d",
         ])
-        #expect(parakeet.artifacts.map { $0.download?.size } == [452_306_705, 8_841_708, 3_714_640, 45_831])
+        #expect(parakeet.artifacts.map { $0.download?.size } == [452_843_967, 8_841_708, 3_714_640, 45_831])
         #expect(parakeet.artifacts.map { $0.download?.sha256 } == [
-            "caf7a38f2ad3224c1863564fb6e975a11aa3ae6ad1e7ad0bee5c4f5e018babb4",
+            "44060ee9be2ac23ace05d6ea1271dd4cdbb353ac4d822f36c51ce733142d31a0",
             "69e2e91d01225bc552f8b0113630562fc52622cb2a3c61ef4445ee779f06b295",
             "639fda62a71242a8d7cefb6647f2094eb8ac783925ce91cbd047a0de6988f396",
             "5b3811f0c23fefc86835981f0a23ecfb817999df272ad744c597e5b669ea1b4a",
@@ -33,6 +33,23 @@ import CassiniNotebook
         #expect(ModelCatalog.parakeetModelID == "moondream/parakeet-ultra")
         #expect(ModelCatalog.parakeetDisplayName == "Parakeet Ultra")
         #expect(ModelCatalog.parakeetPrecision == "INT8")
+        #expect(parakeet.downloadBytes == 465_446_146)
+        #expect(parakeet.artifactBytes == 671_608_018)
+    }
+
+    @Test func theOriginalParakeetIdentityIsRetainedOnlyForCleanupAndProvenance() {
+        let legacy = ModelCatalog.legacyParakeet
+        #expect(legacy.id == "parakeet-ultra-0.6b-int8")
+        #expect(legacy.sourceSha256 == "18cb623004dd6c15999b93cb70b14d8a1f6e8f3a2a97ff733f104bfc3494f6a9")
+        #expect(legacy.directory == "models/parakeet-ultra-0.6b-int8/18cb623004dd6c15999b93cb70b14d8a1f6e8f3a2a97ff733f104bfc3494f6a9")
+        #expect(legacy.artifacts.first?.sha256 == "299617fefd4664d1c115b691dcb6413cabcdbcc694cdf3cb4464b72c5fc3ae69")
+        #expect(legacy.artifacts.first?.download?.sha256 == "caf7a38f2ad3224c1863564fb6e975a11aa3ae6ad1e7ad0bee5c4f5e018babb4")
+        #expect(legacy.downloadBytes == 464_908_884)
+        #expect(legacy.artifactBytes == 670_577_412)
+        #expect(Array(legacy.artifacts.dropFirst()) == Array(ModelCatalog.parakeet.artifacts.dropFirst()))
+        #expect(!ModelCatalog.all.contains(legacy))
+        #expect(!ModelCatalog.consented.contains(legacy))
+        #expect(!ModelPlan.of { _ in false }.missing.flatMap(\.models).contains(legacy))
     }
 
     // ports: ModelCatalogTest#theSpeechModelOfThisBuildHasAName (iOS also names its pin, the model string it writes),
@@ -40,6 +57,7 @@ import CassiniNotebook
     @Test func theSpeechModelOfThisBuildHasAName() {
         #expect(ModelCatalog.speechModelNames == [
             ModelCatalog.parakeetProvenanceModel: "Parakeet Ultra, INT8",
+            ModelCatalog.legacyParakeet.pin: "Parakeet Ultra, INT8",
             "moondream/parakeet-ultra INT8": "Parakeet Ultra, INT8",
             "moondream/parakeet-ultra": "Parakeet Ultra",
         ])
@@ -54,10 +72,18 @@ import CassiniNotebook
         #expect(DocumentInfoFacts.modelName(run, speechModels: ModelCatalog.speechModelNames) == "Parakeet Ultra, INT8")
     }
 
+    @Test func documentInfoStillNamesTheOriginalParakeetPin() {
+        let legacy = ModelCatalog.legacyParakeet
+        let run = TranscriptProvenance.parakeetRun(model: legacy.pin, revision: legacy.sourceSha256,
+                                                   segmentation: "speech", inferenceMs: 1, resumedFromMs: 0,
+                                                   device: RunDevice(model: "iPhone17,1", system: "iOS 26.0"))
+        #expect(DocumentInfoFacts.modelName(run, speechModels: ModelCatalog.speechModelNames) == "Parakeet Ultra, INT8")
+    }
+
     /// iOS writes D16 §5's model string; Android still writes `<id> <precision>`.
     @Test func aParakeetTranscriptNamesTheModelByItsPin() {
         #expect(ModelCatalog.parakeetProvenanceModel
-                == "parakeet-ultra-0.6b-int8@18cb623004dd6c15999b93cb70b14d8a1f6e8f3a2a97ff733f104bfc3494f6a9")
+                == "parakeet-ultra-0.6b-int8-v2@50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366")
     }
 
     // ports: ModelCatalogTest#theDetectorAndSpeakerModelsLiveInTheirOwnDirectories

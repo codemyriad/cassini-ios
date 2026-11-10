@@ -9,7 +9,7 @@ import CassiniSherpa
 /// A real Parakeet Ultra transcription job on the simulator, end to end: `TranscriptionJob` over `ParakeetTranscriber`
 /// and CassiniSherpa's recognizer and detector, on FLEURS-it short, compared with the iOS golden. Opt-in and skipped
 /// unless the build links the runtime (every iOS build does) and the environment names the models and the clip;
-/// scripts/sherpa-bench.sh runs it. The models are dist's D16 pins (`parakeet-ultra-0.6b-int8@18cb6230…`, Silero VAD).
+/// scripts/sherpa-bench.sh runs it. The models are dist's D16 pins (`parakeet-ultra-0.6b-int8-v2@50c15b94…`, Silero VAD).
 ///
 /// The golden is iOS's own (`Goldens/fleurs-it-short.ios.json`, arm64 simulator, the dist export on the 0c2ee3f runtime). Android's comes from the x86_64
 /// emulator and the ONNX Runtime int8 kernels differ between the two (iOS runs the arm64 UDOT ones), so words and times
@@ -21,6 +21,7 @@ import CassiniSherpa
 ///                                app's caches)
 ///   CASSINI_PARAKEET_AUDIO       the FLEURS-it short clip
 ///   CASSINI_PARAKEET_GOLDEN      Android's fleurs-it-short.txt golden (optional, reported only)
+///   CASSINI_PARAKEET_IOS_GOLDEN optional exact-word golden path (default FLEURS-it; allows English evaluation)
 ///   CASSINI_PARAKEET_RECORD=1    write the iOS golden instead of comparing with it
 final class ParakeetJobTests: XCTestCase {
     private static let golden = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
@@ -34,6 +35,7 @@ final class ParakeetJobTests: XCTestCase {
         let source = try XCTUnwrap(environment["CASSINI_PARAKEET_MODEL_ROOT"].map { URL(fileURLWithPath: $0) },
                                    "set CASSINI_PARAKEET_MODEL_ROOT")
         let clip = try XCTUnwrap(environment["CASSINI_PARAKEET_AUDIO"].map { URL(fileURLWithPath: $0) })
+        let golden = environment["CASSINI_PARAKEET_IOS_GOLDEN"].flatMap { $0.isEmpty ? nil : URL(fileURLWithPath: $0) } ?? Self.golden
         let models = try cloneModels(from: source)
         XCTAssertTrue(ModelCatalog.parakeet.ready(in: models), "Ultra's revision directory")
         XCTAssertTrue(ModelCatalog.vad.ready(in: models), "the speech detector's revision directory")
@@ -64,7 +66,7 @@ final class ParakeetJobTests: XCTestCase {
         let record = try XCTUnwrap(provenance.provenance(for: saved))
         XCTAssertEqual(record.engine, "Parakeet TDT")
         // D16 §5: the model by its dist pin; D53.2: Parakeet hears the language, so its words are written as "und".
-        XCTAssertEqual(record.model, "parakeet-ultra-0.6b-int8@18cb623004dd6c15999b93cb70b14d8a1f6e8f3a2a97ff733f104bfc3494f6a9")
+        XCTAssertEqual(record.model, "parakeet-ultra-0.6b-int8-v2@50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366")
         XCTAssertEqual(record.model, ModelCatalog.parakeetProvenanceModel)
         XCTAssertEqual(record.language, "und")
         XCTAssertEqual(saved.language, "und")
@@ -74,18 +76,18 @@ final class ParakeetJobTests: XCTestCase {
         let measured = Golden(text: text, words: words.map { .init(text: $0.text, startMs: $0.startMs, endMs: $0.endMs) })
         var report: [String: Any] = ["text": text, "words": words.count, "jobSeconds": seconds,
                                      "inferenceMs": record.inferenceMs]
-        if let android = try environment["CASSINI_PARAKEET_GOLDEN"].map({ try androidParagraph(URL(fileURLWithPath: $0)) }) {
+        if let android = try environment["CASSINI_PARAKEET_GOLDEN"].flatMap({ $0.isEmpty ? nil : $0 }).map({ try androidParagraph(URL(fileURLWithPath: $0)) }) {
             report["android"] = android
             report["differencesFromAndroid"] = differences(text, android)
         }
         if environment["CASSINI_PARAKEET_RECORD"] == "1" {
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-            try FileManager.default.createDirectory(at: Self.golden.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try encoder.encode(measured).write(to: Self.golden)
-            report["recorded"] = Self.golden.path
+            try FileManager.default.createDirectory(at: golden.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try encoder.encode(measured).write(to: golden)
+            report["recorded"] = golden.path
         } else {
-            let expected = try JSONDecoder().decode(Golden.self, from: Data(contentsOf: Self.golden))
+            let expected = try JSONDecoder().decode(Golden.self, from: Data(contentsOf: golden))
             XCTAssertEqual(measured.text, expected.text)
             XCTAssertEqual(measured.words, expected.words)
         }

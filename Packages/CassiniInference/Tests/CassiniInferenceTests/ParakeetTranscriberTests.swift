@@ -167,7 +167,7 @@ import CassiniEngineTesting
         func add(_ event: TranscriptionEvent) { list.withLock { $0.append(event) } }
     }
 
-    /// A verifier that has checked every model already, as after an install in this session.
+    /// Models already present have been checked, as after an install in this session. Missing files cannot be marked.
     private func checked() -> ModelVerifier {
         let verifier = ModelVerifier { _, _, _ in "" }
         for model in ModelCatalog.all { verifier.markVerified(model, in: root) }
@@ -179,9 +179,25 @@ import CassiniEngineTesting
 
     private func transcriber(_ native: Native, online: Bool = false, installs: Installs? = nil,
                              memory: Int64? = nil, verifier: ModelVerifier? = nil) -> ParakeetTranscriber {
-        ParakeetTranscriber(models: .init(root: root, online: { online }, install: installs?.install,
-                                          verifier: verifier ?? checked()),
-                            runtime: native.runtime, availableMemory: { memory })
+        let verification = verifier ?? checked(), root = root
+        let installation: ParakeetTranscriber.Models.Install?
+        if let installs {
+            let fetch = installs.install
+            installation = { parts, progress in
+                let outcome = try await fetch(parts, progress)
+                // A successful fake fetch models the repository's verified publication. Mark after onInstall has
+                // written the files, never pre-authorize missing files or a failed/skipped part.
+                if case .installed(let skipped, let failed) = outcome {
+                    for part in parts where !skipped.contains(part) && failed[part] == nil {
+                        for model in part.models { verification.markVerified(model, in: root) }
+                    }
+                }
+                return outcome
+            }
+        } else { installation = nil }
+        return ParakeetTranscriber(models: .init(root: root, online: { online }, install: installation,
+                                                 verifier: verification),
+                                   runtime: native.runtime, availableMemory: { memory })
     }
 
     private func run(_ transcriber: ParakeetTranscriber, _ url: URL, resume: TranscriptResume? = nil,
@@ -276,7 +292,9 @@ import CassiniEngineTesting
         let url = try audio(seconds: 3)
         let native = Native()
         let installs = Installs()
-        let parakeet = transcriber(native, online: true, installs: installs)
+        let verifier = checked()
+        #expect(!verifier.isChecked(ModelCatalog.parakeet, in: root), "missing files cannot be pre-checked")
+        let parakeet = transcriber(native, online: true, installs: installs, verifier: verifier)
         #expect(await parakeet.assetStatus(locale: Locale(identifier: "it-IT")) == .notDownloaded)
         await #expect(throws: TranscriptionError.needsConsent) { try await run(parakeet, url, allowDownload: false) }
         #expect(installs.list.isEmpty)
@@ -291,6 +309,7 @@ import CassiniEngineTesting
         #expect(words(result) == ["w0", "w1", "w2"])
         #expect(events.preparing >= 2, "unknown download first, then the measured fraction")
         #expect(native.counts.loads == 1)
+        #expect(verifier.isChecked(ModelCatalog.parakeet, in: root), "the completed fake install models verified publication")
 
         // A build that installs nothing itself cannot transcribe without the model.
         try FileManager.default.removeItem(at: root)
@@ -390,11 +409,8 @@ import CassiniEngineTesting
         #expect(installs.list.isEmpty, "the failed run downloads nothing")
         let checks = hashed.withLock { $0 }
 
-        let model = ModelCatalog.parakeet, root = root
-        installs.onInstall = { [self] in
-            try install(model)
-            verifier.markVerified(model, in: root)
-        }
+        let model = ModelCatalog.parakeet
+        installs.onInstall = { [self] in try install(model) }
         let (result, events) = try await run(parakeet, url)
         #expect(installs.list == [[.speech]])
         #expect(events.preparing >= 2, "the download shows as Preparing")

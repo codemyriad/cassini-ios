@@ -226,13 +226,13 @@ import CassiniNotebook
                                           identifySpeakers: true, speakersInstallBytes: 1, recognizer: .parakeet,
                                           catalog: fresh)
         #expect(plan.missing == [.speech, .speakers])
-        let speech: Int64 = 464_908_884, speakers: Int64 = 64_915_668 + 27_138_478
+        let speech: Int64 = 465_446_146, speakers: Int64 = 64_915_668 + 27_138_478
         #expect(plan.downloadBytes == [.speech: speech, .speakers: speakers])
         #expect(plan.totalDownloadBytes == fresh.totalBytes - ModelCatalog.vad.downloadBytes)
         #expect(plan.requiredFreeBytes == fresh.requiredFreeBytes, "the speech detector counts in the free space")
-        #expect(SizeText(bytes: plan.downloadBytes[.speech]!).english() == "443 MB", "D4 and D16")
+        #expect(SizeText(bytes: plan.downloadBytes[.speech]!).english() == "444 MB", "D4 and D16")
         #expect(SizeText(bytes: plan.downloadBytes[.speakers]!).english() == "88 MB")
-        #expect(SizeText(bytes: plan.totalDownloadBytes!).english() == "531 MB")
+        #expect(SizeText(bytes: plan.totalDownloadBytes!).english() == "532 MB")
         #expect(SizeText(bytes: plan.requiredFreeBytes).english() == "1.2 GB")
     }
 
