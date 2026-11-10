@@ -13,8 +13,11 @@
 #   CASSINI_PARAKEET_MODEL_ROOT the model root as scripts/fetch-ci-models.py writes it, read only (default .tools/models,
 #                               then .tools/ci-models)
 #   CASSINI_PARAKEET_MODELS     the Ultra directory, read only (default its revision directory under the model root,
-#                               scripts/fetch-ci-models.py --print-path parakeet-ultra-0.6b-int8)
+#                               scripts/fetch-ci-models.py --print-path parakeet-ultra-0.6b-int8-v2)
 #   CASSINI_PARAKEET_RECORD     1 records CassiniTests/Goldens/fleurs-it-short.ios.json instead of comparing with it
+#   CASSINI_PARAKEET_AUDIO       optional input WAV (default FLEURS-it short)
+#   CASSINI_PARAKEET_GOLDEN      optional Android text comparison; empty disables it
+#   CASSINI_PARAKEET_IOS_GOLDEN  optional exact-word JSON path for recording/comparing English fixtures
 #   CASSINI_BENCH_ONLY          bench, job or dc runs only that test (default all three)
 #   CASSINI_DC_VECTOR           the directory with D26.1's dc-quiet-jfk-v1 WAVs (default ux-draft/dc in
 #                               ~/dev/cassini-coordination; without it the dc test is left out)
@@ -49,10 +52,10 @@ fetch=(/usr/bin/python3 -I scripts/fetch-ci-models.py)
 model_root=${CASSINI_PARAKEET_MODEL_ROOT:-}
 for candidate in "$root/.tools/models" "$root/.tools/ci-models"; do
     [ -n "$model_root" ] && break
-    "${fetch[@]}" --dest "$candidate" --ready parakeet-ultra-0.6b-int8 && model_root=$candidate
+    "${fetch[@]}" --dest "$candidate" --ready parakeet-ultra-0.6b-int8-v2 && model_root=$candidate
 done
 [ -n "$model_root" ] || { echo "error: no models; run scripts/fetch-ci-models.py --dest .tools/models" >&2; exit 1; }
-models=${CASSINI_PARAKEET_MODELS:-$("${fetch[@]}" --dest "$model_root" --print-path parakeet-ultra-0.6b-int8)}
+models=${CASSINI_PARAKEET_MODELS:-$("${fetch[@]}" --dest "$model_root" --print-path parakeet-ultra-0.6b-int8-v2)}
 speakers=${CASSINI_BENCH_SPEAKERS:-}
 if [ -z "$speakers" ] && "${fetch[@]}" --dest "$model_root" --ready nemotron-3-diarization-int8 campplus-voxceleb-16k; then
     speakers=$model_root
@@ -74,9 +77,9 @@ for candidate in "$HOME/dev/cassini-android" "$(dirname "$(dirname "$common")")/
     [ -d "$candidate/fixtures/audio" ] && android=$candidate
 done
 [ -n "$android" ] || { echo "error: set CASSINI_ANDROID to a cassini-android checkout" >&2; exit 1; }
-audio=$android/fixtures/audio/fleurs-it-short.wav
-golden=$android/app/src/androidTest/assets/goldens/fleurs-it-short.txt
-for f in "$models/encoder.int8.onnx" "$audio" "$golden"; do [ -f "$f" ] || { echo "error: missing $f" >&2; exit 1; }; done
+audio=${CASSINI_PARAKEET_AUDIO:-$android/fixtures/audio/fleurs-it-short.wav}
+golden=${CASSINI_PARAKEET_GOLDEN-$android/app/src/androidTest/assets/goldens/fleurs-it-short.txt}
+for f in "$models/encoder.int8.onnx" "$audio" ${golden:+"$golden"}; do [ -f "$f" ] || { echo "error: missing $f" >&2; exit 1; }; done
 
 derived=$root/DerivedData.noindex/sherpa-bench
 out=$root/.tools/bench
@@ -115,6 +118,7 @@ TEST_RUNNER_CASSINI_PARAKEET_MODEL_ROOT="$model_root" \
 TEST_RUNNER_CASSINI_DC_VECTOR="$dc_vector" \
 TEST_RUNNER_CASSINI_PARAKEET_RECORD="${CASSINI_PARAKEET_RECORD:-0}" \
 TEST_RUNNER_CASSINI_PARAKEET_AUDIO="$audio" \
+TEST_RUNNER_CASSINI_PARAKEET_IOS_GOLDEN="${CASSINI_PARAKEET_IOS_GOLDEN:-}" \
 TEST_RUNNER_CASSINI_PARAKEET_GOLDEN="$golden" \
 TEST_RUNNER_CASSINI_BENCH_LONG_SECONDS="${CASSINI_BENCH_LONG_SECONDS:-3600}" \
 TEST_RUNNER_CASSINI_BENCH_SPEAKERS="$speakers" \

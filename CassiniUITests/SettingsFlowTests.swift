@@ -73,7 +73,7 @@ final class SettingsFlowTests: XCTestCase {
         XCTAssertFalse(element(app, startingWith: "Speech language").exists)
         let speech = element(app, startingWith: "Speech recognition")
         reveal(speech, in: app)
-        XCTAssertEqual(speech.label, "Speech recognition, INT8 · 443 MB, Ready")
+        XCTAssertEqual(speech.label, "Speech recognition, INT8 · 444 MB, Ready")
         XCTAssertTrue(row(app, startingWith: "Telling speakers apart").label.contains("88 MB"))
     }
 
@@ -107,11 +107,11 @@ final class SettingsFlowTests: XCTestCase {
         let app = openSettings(["--parakeet", "--models-missing"])
         let speech = row(app, startingWith: "Speech recognition")
         reveal(speech, in: app)
-        XCTAssertEqual(speech.label, "Speech recognition, INT8 · 443 MB, Not downloaded")
+        XCTAssertEqual(speech.label, "Speech recognition, INT8 · 444 MB, Not downloaded")
         speech.tap()
         XCTAssertTrue(app.staticTexts["Transcribe on this device"].waitForExistence(within: 5))
         XCTAssertTrue(app.buttons["Download"].exists)
-        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label == %@", "Speech recognition, 443 MB")).firstMatch
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label == %@", "Speech recognition, 444 MB")).firstMatch
             .exists)
     }
 

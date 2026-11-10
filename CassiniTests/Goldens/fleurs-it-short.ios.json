@@ -1,5 +1,5 @@
 {
-  "text" : "La parte settentrionale, conosciuta come catena della sentinella, vanta le montagne più alte dell'Antartide, il massiccio del Vinson, che raggiunge i 4892 metri con il monte Vinson.",
+  "text" : "La parte settentrionale, conosciuta come Catena della Sentinella, vanta le montagne più alte dell'Antartide, il massiccio del Winson, che raggiunge i 4.892 metri con il monte Vinson.",
   "words" : [
     {
       "endMs" : 1420,
@@ -22,14 +22,14 @@
       "text" : "conosciuta"
     },
     {
-      "endMs" : 3580,
+      "endMs" : 3660,
       "startMs" : 3340,
       "text" : "come"
     },
     {
       "endMs" : 4220,
-      "startMs" : 3580,
-      "text" : "catena"
+      "startMs" : 3660,
+      "text" : "Catena"
     },
     {
       "endMs" : 4460,
@@ -37,13 +37,13 @@
       "text" : "della"
     },
     {
-      "endMs" : 5470,
+      "endMs" : 5580,
       "startMs" : 4460,
-      "text" : "sentinella,"
+      "text" : "Sentinella,"
     },
     {
       "endMs" : 6060,
-      "startMs" : 5500,
+      "startMs" : 5580,
       "text" : "vanta"
     },
     {
@@ -67,38 +67,38 @@
       "text" : "alte"
     },
     {
-      "endMs" : 8220,
+      "endMs" : 8350,
       "startMs" : 7180,
       "text" : "dell'Antartide,"
     },
     {
-      "endMs" : 8540,
+      "endMs" : 8620,
       "startMs" : 8380,
       "text" : "il"
     },
     {
       "endMs" : 9340,
-      "startMs" : 8540,
+      "startMs" : 8620,
       "text" : "massiccio"
     },
     {
-      "endMs" : 9500,
+      "endMs" : 9580,
       "startMs" : 9340,
       "text" : "del"
     },
     {
       "endMs" : 10450,
       "startMs" : 9580,
-      "text" : "Vinson,"
+      "text" : "Winson,"
     },
     {
-      "endMs" : 10620,
+      "endMs" : 10700,
       "startMs" : 10460,
       "text" : "che"
     },
     {
       "endMs" : 11260,
-      "startMs" : 10620,
+      "startMs" : 10700,
       "text" : "raggiunge"
     },
     {
@@ -109,7 +109,7 @@
     {
       "endMs" : 13020,
       "startMs" : 11420,
-      "text" : "4892"
+      "text" : "4.892"
     },
     {
       "endMs" : 13420,
@@ -122,13 +122,13 @@
       "text" : "con"
     },
     {
-      "endMs" : 13660,
+      "endMs" : 13740,
       "startMs" : 13500,
       "text" : "il"
     },
     {
       "endMs" : 14140,
-      "startMs" : 13660,
+      "startMs" : 13740,
       "text" : "monte"
     },
     {

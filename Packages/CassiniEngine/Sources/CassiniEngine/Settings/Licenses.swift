@@ -43,7 +43,7 @@ public struct LicenseTexts: Sendable {
     public static let onnxRuntimeNotices = "ONNXRuntime-ThirdPartyNotices.txt"
     public static let privacy = "Privacy.txt"
     /// The titles of the notices' sections about models.
-    public static let modelSections = ["Speech recognition models", "Downloaded models"]
+    public static let modelSections = ["Speech recognition models", "Included in the app", "Downloaded models"]
     public static let networkHeading = "## Network"
 
     /// The text of a bundled file by name.

@@ -64,12 +64,12 @@ import CassiniNotebook
     }
 
     /// Each row's size is its download: on a Parakeet device the speech row shows Ultra's with the precision, "INT8 ·
-    /// 443 MB" (D16; the speech detector has no row of its own); on a device that keeps Apple Speech iOS manages the
+    /// 444 MB" (D16; the speech detector has no row of its own); on a device that keeps Apple Speech iOS manages the
     /// speech assets. The speakers row is both speaker models; voices come with it.
     @Test func theRowsShowTheirDownloadAndTheSpeechRowTheRecognizers() {
         let speech = ModelCatalog.parakeetBytes
         #expect(ModelRows.size(of: .speech, recognizer: .parakeet, platform: .iOS26) == .precision("INT8", bytes: speech))
-        #expect(SizeText(bytes: speech).english() == "443 MB")
+        #expect(SizeText(bytes: speech).english() == "444 MB")
         #expect(ModelRows.size(of: .speech, recognizer: .appleSpeech, platform: .iOS26) == .managedBySystem)
         for recognizer in [SpeechRecognizer.parakeet, .appleSpeech] {
             #expect(ModelRows.size(of: .speakers, recognizer: recognizer, platform: .iOS26)

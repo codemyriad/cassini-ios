@@ -59,6 +59,25 @@ import CassiniEngineTesting
         }
     }
 
+    @Test func aFreshRetrySessionKeepsItsConfigurationAndDoesNotInvalidateTheOriginal() async throws {
+        StubProtocol.reset { request in
+            #expect(request.value(forHTTPHeaderField: "User-Agent") == "CassiniTalk/0.1.0 (iOS 26.1; build 2)")
+            #expect(request.value(forHTTPHeaderField: "Accept-Encoding") == "identity")
+            return .answer(200, ["Content-Length": "3"], [Data("abc".utf8)])
+        }
+        let original = try await transport.get(URL(string: "https://cassini.invalid/original")!, headers: [:], timeout: 30)
+        defer { original.close() }
+        let fresh = try #require(transport.freshForRetry())
+        let retried = try await fresh.get(URL(string: "https://cassini.invalid/retried")!, headers: [:], timeout: 30)
+        defer { retried.close() }
+        #expect(try await read(retried) == Data("abc".utf8))
+        #expect(try await read(original) == Data("abc".utf8))
+        let next = try await transport.get(URL(string: "https://cassini.invalid/next")!, headers: [:], timeout: 30)
+        defer { next.close() }
+        #expect(try await read(next) == Data("abc".utf8))
+        #expect(StubProtocol.hosts == ["cassini.invalid", "cassini.invalid", "cassini.invalid"])
+    }
+
     /// A model download redirected off the allow-list stops at the redirect with HOST_NOT_ALLOWED, and the foreign host
     /// is never asked.
     @Test func aForcedBadRedirectIsRefusedAsHostNotAllowed() async throws {
