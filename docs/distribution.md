@@ -149,12 +149,20 @@ work over SSH.
   https://cassini.talk/privacy/). The page is published from `Cassini/Resources/Licenses/Privacy.txt`, the text
   Settings shows, so the two say the same. When `Privacy.txt` changes, ask the coordinator to republish the page.
   It goes in App Store Connect under App Information → Privacy Policy URL.
-- **Compatible devices:** the app sets no `UIRequiredDeviceCapabilities`, so the store lists every iPhone and iPad
-  on iOS 18 or later, the iPad (7th generation) included. That iPad gets no speech engine ([iOS 18](ios18.md)): it
-  records, plays and exports but cannot transcribe. Whether to say so in the description is for Silvio to decide.
+- **Compatible devices:** the minimum OS in the store listing comes from the build (`MinimumOSVersion` 18.0). The
+  app sets no `UIRequiredDeviceCapabilities`, so the store lists every iPhone and iPad on iOS 18 or later, the iPhone
+  XR, XS and XS Max and the iPad (7th generation) included. That iPad gets no speech engine ([iOS 18](ios18.md)): no
+  Whistle (the A10 lacks its CPU features), no Parakeet Ultra (3 GB) and no Apple speech on iPadOS 18. It records,
+  plays, searches and exports but cannot transcribe. An app cannot exclude that device by minimum OS, and
+  `UIRequiredDeviceCapabilities` has no key that separates the A10 from the A12 in a useful way (not checked further).
+  Whether to say so in the description or the review note is for Silvio to decide.
 - **Export compliance:** answered in the build (`ITSAppUsesNonExemptEncryption` false), so no question per upload.
 - **App Review note:** explain that background audio (`UIBackgroundModes` audio) keeps a recording going with the screen
   locked and lets playback continue on the lock screen, and that `processing` finishes a running transcription (on
   iOS 26 and later, through continued processing; on iOS 18 a transcription pauses when the short background time
   ends, see [iOS 18](ios18.md)). Mention that the speech and speaker models (about 531 MB) download only after the
   user agrees, and are data, not code.
+- **Not yet verified:** no build at 18.0 has been archived, validated or uploaded. The 90208 check (each embedded
+  `MinimumOSVersion` against its binary's minos) is covered locally by `scripts/check-embedded-minos.py`, but Apple's
+  processing of an 18.0 build has not been seen yet. On iOS 18 only simulator runs exist, on iOS 18.2 (the Whistle
+  tests, [iOS 18](ios18.md)); nothing has run on an iOS 18 device.
