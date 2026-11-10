@@ -27,7 +27,8 @@ public struct HTTPAnswer: Sendable {
 /// back as it is, so `RedirectPolicy` decides every hop (`ArtifactFetcher`). The app's adapter is
 /// `URLSessionTransport` (CassiniInference); tests pass a fake, so no test touches the network.
 public protocol HTTPTransport: Sendable {
-    /// A transport with an independent session and the same request policy, for one explicit metadata retry.
+    /// An independent session with the same request policy. ModelRepository uses it for one metadata retry;
+    /// ArtifactFetcher separately permits one pre-header retry across an artifact's request/redirect chain.
     /// Transports without independent sessions can leave the default nil; callers then preserve the original failure.
     func freshForRetry() -> (any HTTPTransport)?
 
