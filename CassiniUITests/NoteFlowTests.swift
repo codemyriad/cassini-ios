@@ -79,8 +79,6 @@ final class NoteFlowTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["noteTitle"].exists, "the exports leave the note open")
     }
 
-    /// The third passage starts at 14 s: Android's slack of 300 ms before and 3 s after, in the slider's whole seconds.
-
 }
 
 extension XCTestCase {
