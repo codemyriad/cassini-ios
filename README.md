@@ -246,6 +246,12 @@ launch starts empty, and Release builds link no fakes.
 UI-test word-tap checks read the last clamped seek target applied by the real audio adapter. Playback keeps advancing,
 while the test-visible target stays fixed until another seek; the assertion has no playback-position time window.
 
+The iOS UI-test harness also supports `--draft-growing`: its fake waits for
+`cassini://ui-test/append-draft?count=K` before emitting K more synthetic sentences. Each permit advances the
+injected transcription clock past the result-publication interval; tests wait for those actual new words.
+Frozen fake reports advance virtual time too, so pace estimates do not depend on host scheduling. These Debug-only
+controls are iOS harness extras; ordinary launches and production timing are unchanged.
+
 ### Native speech runtime
 
 Every iOS build links sherpa-onnx from the same fork and commit as Android, codemyriad/sherpa-onnx `0c2ee3f` (D16 §1:

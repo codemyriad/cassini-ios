@@ -73,6 +73,17 @@ struct UITestRelaunch {
 }
 
 extension AppGraph {
+    /// Synthetic growth only, in a process explicitly launched for UI testing.
+    func appendUITestDraft(_ url: URL) -> Bool {
+        guard environment.launch.marksLaunchFinished, url.scheme == "cassini", url.host == "ui-test",
+              url.path == "/append-draft", let clock = environment.draftClock,
+              let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems,
+              let value = items.first(where: { $0.name == "count" })?.value,
+              let count = Int(value), (1...120).contains(count) else { return false }
+        clock.grant(count)
+        return true
+    }
+
     /// Stops what the graph does on its own, so a graph replaced by a relaunch inside the app neither records, plays
     /// nor transcribes beside the new one.
     func quietForUITestRelaunch() {
