@@ -1,0 +1,24 @@
+{
+  "head": "a8bd214",
+  "cancellation": {
+    "exit": 1,
+    "actual_decodes": 3,
+    "captured_decodes": 1,
+    "missing_CancellationError": true
+  },
+  "cumulative_time": {
+    "exit": 1,
+    "actual_ms": 80,
+    "expected_ms": 640
+  },
+  "restored": {
+    "tests": 22,
+    "failures": 0,
+    "seconds": 3.102
+  },
+  "selected_observation": {
+    "baseline_seconds": 1.497,
+    "after_seconds": 1.343,
+    "not_pass_condition": true
+  }
+}

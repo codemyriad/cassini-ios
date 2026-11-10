@@ -1,6 +1,6 @@
 # AWS iOS status
 
-Updated: 2026-11-10 17:18 UTC — active; coordinator explicitly requested continued work.
+Updated: 2026-11-10 17:21 UTC — active; coordinator explicitly requested continued work.
 Mac destruction deadline: **2026-11-11 12:09 UTC**. Push continuously; remote handoff branch `test/d88-aws-ios-handoff` contains this status, resume notes, evidence summaries and drivers.
 
 ## Assignment
@@ -23,7 +23,7 @@ AWS iOS owns inventory **3, 6, 7 only**, in order. **8, 9, 10 belong to scw-ios 
 ## Active — inventory 7 (deliver after #91 ready)
 - Branch `test/d88-parakeet-clocks`, worktree `~/agents/cassini-ios-d88-parakeet`, PUSHED `a8bd214`. Independent c74b57c base, no PR yet.
 - **3/3 locked baseline passed** on pristine c74, 6 hogs. Explicit native decode start/release gate now captures count before release; injected nanoTime advances 20 ms per decode and asserts exact cumulative window/result sums. No decodeDelay sleeps. **22/22 ParakeetTranscriberTests passed** (5.417 s).
-- Cancellation-flag and cumulative-time mutations running, with automatic source restoration. Log `/tmp/d88-parakeet-{cancel,time}-mutation.log`; final restored suite `/tmp/d88-parakeet-restored.log`. Final locked after evidence pending; do not run hogs during #91 full gate or other CI.
+- Cancellation-flag mutation failed (3 decodes versus captured 1, missing CancellationError); cumulative-time mutation failed (80 ms versus expected 640 ms). Both restored; suite **22/22 passed** (3.102 s), selected tests 1.343 s versus baseline 1.497 s. Logs `/tmp/d88-parakeet-{cancel,time}-mutation.log`; final restored suite `/tmp/d88-parakeet-restored.log`. Final locked after evidence pending; do not run hogs during #91 full gate or other CI.
 
 ## Next assignment after inventory 6/7 ready
 - Coordinator authorized fresh scan of main after merged D88 PRs, then conversion of remaining engine/package wall-clock tests. Report completed inventory list in STATUS before taking that work. Inventory 8–10 remain scw-ios scope.
