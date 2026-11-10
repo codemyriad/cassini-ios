@@ -175,7 +175,7 @@ public struct ArtifactFetcher: Sendable {
                           _ progress: (Int64, Bool) -> Void) async throws {
         let offset = ModelFiles.length(of: partial)
         let answer = try await connect(url, offset: offset, ifRange: offset > 0 ? Self.entityTag(artifact) : nil,
-                                       redirects)
+                                       redirects, retryArtifact: artifact.name)
         defer { answer.close() }
         do {
             try Self.requireIdentity(answer)
@@ -277,7 +277,8 @@ public struct ArtifactFetcher: Sendable {
     /// Asks for `url` (the bytes from `offset` on, when it is not 0, if the entity tag is still `ifRange`) and follows
     /// the redirects `policy` allows, sending the same request each time. Returns the first answer that is not a
     /// redirect.
-    private func connect(_ url: String, offset: Int64, ifRange: String?, _ policy: RedirectPolicy) async throws
+    private func connect(_ url: String, offset: Int64, ifRange: String?, _ policy: RedirectPolicy,
+                         retryArtifact: String? = nil) async throws
         -> HTTPAnswer {
         guard var target = URL(string: url) else { throw ModelError(.modelDownload, "Bad URL \(url)") }
         var headers = ["Accept-Encoding": Self.identity]
@@ -286,8 +287,29 @@ public struct ArtifactFetcher: Sendable {
             if let ifRange { headers["If-Range"] = ifRange }
         }
         var hop = 0
+        var activeTransport = transport
+        var retried = false
         while true {
-            let answer = try await transport.get(target, headers: headers, timeout: Self.timeout)
+            let answer: HTTPAnswer
+            do {
+                answer = try await activeTransport.get(target, headers: headers, timeout: Self.timeout)
+            } catch {
+                // No HTTPAnswer means no body has reached the artifact writer. Retry only this GET, keeping
+                // the exact resume headers and redirect budget; metadata has its separate bounded policy.
+                if let retryArtifact {
+                    ModelInstallDiagnostics.failure(model: retryArtifact, stage: "artifact.request.before-headers.no-body", error: error)
+                }
+                guard let retryArtifact, !retried, !ModelInstaller.isCancellation(error),
+                      let network = error as? URLError,
+                      network.code == .timedOut || network.code == .networkConnectionLost else { throw error }
+                try Task.checkCancellation()
+                guard let fresh = activeTransport.freshForRetry() else { throw error }
+                try Task.checkCancellation()
+                ModelInstallDiagnostics.begin(model: retryArtifact, stage: "artifact.request.before-headers.retry-1")
+                activeTransport = fresh
+                retried = true
+                continue
+            }
             guard Self.redirectCodes.contains(answer.status) else { return answer }
             let location = answer.header("Location")
             answer.close()
