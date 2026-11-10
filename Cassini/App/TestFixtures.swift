@@ -81,7 +81,7 @@ enum TestFixtures {
     /// progress are that recognizer's, so they resume where the system has no Apple speech; Apple speech's job is a
     /// legacy one, without an identity.
     static func seed(_ seed: AppEnvironment.Seed, into store: NoteStore, now: Date,
-                     recognizer: SpeechRecognizer = .appleSpeech) async throws {
+                     recognizer: SpeechRecognizer) async throws {
         guard try store.root.isEmptyDirectory else { return }
         var main = fixture(now: now)
         var notes: [Note] = []
