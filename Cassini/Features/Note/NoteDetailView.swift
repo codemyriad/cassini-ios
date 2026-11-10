@@ -53,6 +53,12 @@ struct NoteDetailView: View {
             }
         }
         .background(Color.paper)
+        .overlay(alignment: .topLeading) {
+            if let speechModels = processing.speechModels, note != nil {
+                UITestStateMarker(identifier: "noteSuggestionDecision",
+                                  value: speechModels.suggestion.completedWhistle ? "completed" : "no-result")
+            }
+        }
         .navigationBarTitleDisplayMode(.inline)
         .task(id: model.playerKey) { model.updatePlayer() }
         .task(id: job.map { "\($0.state)-\($0.doneMs)" }) { await model.loadSavedDraft() }

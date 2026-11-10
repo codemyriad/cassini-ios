@@ -9,12 +9,16 @@ struct SettingsView: View {
     @Environment(Router.self) private var router
     @Environment(\.scenePhase) private var scenePhase
     @State private var model: SettingsModel?
+    @State private var loaded = false
 
     var body: some View {
         Group {
             if let model { SettingsForm(model: model) } else { Color.paper }
         }
         .paperListBackground()
+        .overlay(alignment: .topLeading) {
+            if loaded { UITestStateMarker(identifier: "settingsLoaded") }
+        }
         .navigationTitle(Text("Settings", tableName: "Settings")).navigationBarTitleDisplayMode(.inline)
         .task {
             let model = self.model ?? SettingsModel(ports: ports)
@@ -27,6 +31,7 @@ struct SettingsView: View {
             }
             self.model = model
             await model.appeared()
+            loaded = true
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active, let model { Task { await model.resumed() } }

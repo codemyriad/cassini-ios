@@ -62,8 +62,13 @@ final class NoteScreenTests: XCTestCase {
         let chip = app.buttons["followPlayback"]
         let transcript = app.descendants(matching: .any)["turn-w0"]
         XCTAssertTrue(transcript.waitForExistence(within: 5))
+        let scroll = app.staticTexts["uiTestState-readingScrollCompleted"]
+        XCTAssertTrue(scroll.waitForExistence(within: 15))
+        let before = scroll.value as? String
         transcript.swipeUp()
-        XCTAssertTrue(chip.staysAbsent(for: 1), "paused: a drag leaves following on")
+        XCTAssertTrue(poll(within: uiWaitFloor) { (scroll.value as? String) != before }, "the drag finished")
+        XCTAssertTrue((scroll.value as? String)?.hasSuffix(":true") == true, "paused: a drag leaves following on")
+        XCTAssertFalse(chip.exists, "paused: no Follow playback chip after the drag finishes")
         let play = app.buttons["playButton"]
         play.tap()
         XCTAssertTrue(play.wait(until: NSPredicate(format: "label == 'Pause' AND value == 'Playing'"), within: 3))
@@ -286,9 +291,11 @@ final class NoteScreenTests: XCTestCase {
         let export = app.collectionViews.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Export transcript")).firstMatch
         XCTAssertEqual(export.label, "Export transcript, Available after transcription")
         XCTAssertTrue(share.exists && share.isEnabled, "the audio can be shared")
-        export.tap()
+        // iOS can open a disabled submenu. Gate on its rendered rows before inspecting their enabled state.
+        export.tapWhenSettled()
         let text = app.collectionViews.buttons["Transcript as text"]
-        XCTAssertTrue(text.staysAbsent(for: 2) || !text.isEnabled, "no transcript to export")
+        XCTAssertTrue(text.waitForExistence(within: 15), "the export submenu finished opening")
+        XCTAssertFalse(text.isEnabled, "no transcript to export")
     }
 
     @MainActor func testDocumentInfoShowsTheNotesFacts() {

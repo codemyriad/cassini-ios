@@ -20,6 +20,8 @@ struct NoteReadingScroll: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var geometry = FollowGeometry()
     @State private var scrollPosition = ScrollPosition()
+    @State private var completedScrolls = 0
+    @Environment(\.uiTesting) private var uiTesting
 
     /// About one line of the transcript's body text.
     private static let lineHeight: CGFloat = 24
@@ -59,6 +61,7 @@ struct NoteReadingScroll: View {
             }
             .onScrollPhaseChange { _, phase in
                 model.scrolled(PlaybackFollow.Scrolling(phase), playing: playback.owns(note.id) && playback.state.isPlaying)
+                if uiTesting, phase == .idle { completedScrolls += 1 }
             }
             // Also on the first value: a search the Library opened scrolls to its first match.
             .task(id: currentMatch) {
@@ -66,6 +69,10 @@ struct NoteReadingScroll: View {
                 await Task.yield()
                 reveal(currentMatch, proxy: proxy)
             }
+        }
+        .overlay(alignment: .topLeading) {
+            UITestStateMarker(identifier: "readingScrollCompleted",
+                              value: "\(completedScrolls):\(model.screen.follow.following)")
         }
     }
 
