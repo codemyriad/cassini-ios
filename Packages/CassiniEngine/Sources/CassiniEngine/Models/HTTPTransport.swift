@@ -27,6 +27,14 @@ public struct HTTPAnswer: Sendable {
 /// back as it is, so `RedirectPolicy` decides every hop (`ArtifactFetcher`). The app's adapter is
 /// `URLSessionTransport` (CassiniInference); tests pass a fake, so no test touches the network.
 public protocol HTTPTransport: Sendable {
+    /// A transport with an independent session and the same request policy, for one explicit metadata retry.
+    /// Transports without independent sessions can leave the default nil; callers then preserve the original failure.
+    func freshForRetry() -> (any HTTPTransport)?
+
     /// Throws when no answer arrives (no connection, a timeout after `timeout` seconds without data).
     func get(_ url: URL, headers: [String: String], timeout: TimeInterval) async throws -> HTTPAnswer
+}
+
+extension HTTPTransport {
+    public func freshForRetry() -> (any HTTPTransport)? { nil }
 }
