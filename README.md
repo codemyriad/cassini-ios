@@ -258,7 +258,9 @@ Parakeet device (`DeviceUnderTest.downloadedSpeech`, `--parakeet`). With Apple s
 and 27 runs launch with the same arguments as before. The statuses seed's paused job carries the recognizer of the
 device it is seeded on, so Resume queues it on the Whistle device too. Every UI test now follows the platform: with the
 iOS 18 facts, the smoke list passes on iOS 27, and the full leg (`CASSINI_IOS18=full`) passes on the iOS 26.0 runtime.
-Neither has run on a real iOS 18 runtime yet.
+On the real iOS 18.2 runtime (10 November 2026) the smoke list passes 16/16 and the hosted tests all pass but one,
+`LibraryScreenTests/testAThousandNotesFilterWithoutDroppingFrames` (about 20 ms against its 16 ms budget, every
+run), which keeps the leg off by default for now. Every UI test run on 18.2: iPhone 95/102, iPad 11/12 (before the 44 pt checks were fixed).
 `ScreenshotTests` skip unless `scripts/screenshots.sh` runs them.
 
 To install the runtime, download the iOS 18.2 simulator runtime DMG (22C150) with the owner's Apple ID and keep it on

@@ -5,8 +5,10 @@ Pro 13-inch (M5)). The counts were taken on 13 October 2026 with `scripts/test.s
 `DerivedData.noindex/test-logs`. `CASSINI_RUNTIME` runs the simulator tiers on another installed runtime (the
 `scripts/test.sh` header), with logs in `DerivedData.noindex/test-logs-ios<version>`. The iOS 18 leg of `all`
 (`CASSINI_IOS18`, [README](../README.md#the-ios-18-leg)) runs the same build on the iOS 18.2 runtime (22C150; Apple no longer offers 18.6). It runs the
-hosted tests and the UI smoke list `scripts/ios18-smoke-tests.txt`, or with `full` every UI test. It stays off until
-that runtime is installed on the gate's Mac, so none of the counts here come from iOS 18 yet. On 10 November 2026
+hosted tests and the UI smoke list `scripts/ios18-smoke-tests.txt`, or with `full` every UI test. It is off by default
+for now, so the counts below do not come from iOS 18. On 10 November 2026 on iOS 18.2 the smoke list passed 16/16 and
+the hosted tests passed except the thousand-note frame budget (about 20 ms against 16 ms); every UI test: iPhone
+95/102, iPad 11/12 (before the 44 pt checks were fixed). Earlier that day
 the leg ran on the iOS 26.0 runtime instead (`CASSINI_IOS18_RUNTIME=26 scripts/test.sh ios18`, with the iOS 18 facts
 given to every UI launch): hosted 95/95 (7 skipped) and the smoke list 16/16, 3.5 minutes after the build. A real device is still
 needed for the checks in the [device checklist](#device-checklist).
