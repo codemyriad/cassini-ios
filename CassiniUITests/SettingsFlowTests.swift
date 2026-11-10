@@ -69,6 +69,31 @@ final class SettingsFlowTests: XCTestCase {
         XCTAssertTrue(row(app, startingWith: "Telling speakers apart").label.contains("88 MB"))
     }
 
+    /// The iOS 18 facts on a device with no recognizer that can run: no Speech language picker and no "Managed by iOS";
+    /// the speech row only says it is not available.
+    @MainActor func testWithoutAppleSpeechOrAnotherRecognizerTheSpeechRowIsNotAvailable() {
+        let app = openSettings(["--ios18-platform"])
+        XCTAssertTrue(app.switches.matching(NSPredicate(format: "label BEGINSWITH %@", "Transcribe after recording"))
+            .firstMatch.waitForExistence(within: 5))
+        XCTAssertFalse(app.descendants(matching: .any)["speechLanguagePicker"].exists)
+        XCTAssertFalse(element(app, startingWith: "Speech language").exists)
+        XCTAssertFalse(element(app, startingWith: "The language of speech is chosen separately").exists)
+        let speech = element(app, startingWith: "Speech recognition")
+        reveal(speech, in: app)
+        XCTAssertEqual(speech.label, "Speech recognition, Not available")
+        XCTAssertFalse(row(app, startingWith: "Speech recognition").exists, "a Not available row is not a button")
+        let speakers = row(app, startingWith: "Telling speakers apart")
+        XCTAssertTrue(speakers.label.contains("88 MB"))
+        // D59: the download screen does not point at the Speech language picker Settings hides.
+        speakers.tap()
+        XCTAssertTrue(app.staticTexts["Transcribe on this device"].waitForExistence(within: 5))
+        XCTAssertTrue(app.buttons["Download"].exists)
+        // The line would come with the plan, which lists the speaker models.
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Telling speakers apart"))
+            .firstMatch.waitForExistence(within: 5))
+        XCTAssertTrue(app.staticTexts["speechLanguageLine"].staysAbsent(for: 2))
+    }
+
     /// A Parakeet device without Ultra: its row is a button that opens the download screen with the sizes.
     @MainActor func testOnAParakeetDeviceAMissingSpeechModelOpensTheDownloadWithItsSize() {
         let app = openSettings(["--parakeet", "--models-missing"])

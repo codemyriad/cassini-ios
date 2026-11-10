@@ -14,14 +14,16 @@ import CassiniNotebook
     private let notices: NoticeCenter
     private let root: URL
     private let models: URL
+    private let platform: PlatformFacts
 
     /// `root` is where the notes are, `models` where the pinned models are installed.
     init(settings: SettingsStore, processing: ProcessingStore, transcriber: any Transcribing,
          analyzer: any SpeakerAnalyzing, storage: any StorageProbe, notices: NoticeCenter, root: URL, models: URL,
-         downloadTranscriber: (any Transcribing)? = nil, speechOnly: Bool = false) {
+         platform: PlatformFacts, downloadTranscriber: (any Transcribing)? = nil, speechOnly: Bool = false) {
         self.settings = settings; self.processing = processing; self.transcriber = transcriber
         self.downloadTranscriber = downloadTranscriber ?? transcriber; self.speechOnly = speechOnly
         self.analyzer = analyzer; self.storage = storage; self.notices = notices; self.root = root; self.models = models
+        self.platform = platform
     }
 
     /// `ModelDownloadPlan.plan` over the speech model of the chosen language and the speaker models' status, for the
@@ -55,12 +57,12 @@ import CassiniNotebook
         guard let noteID else { return speechLanguage() }
         if let context = await processing.coordinator?.modelDownloadContext(for: noteID),
            let speech = try? transcriber.forJob(recognizer: context.recognizer) {
-            return speech.recognizer.usesLanguage ? context.language : nil
+            return platform.asksForSpeechLanguage(speech.recognizer) ? context.language : nil
         }
-        return transcriber.recognizer.usesLanguage ? settings.speechLanguage : nil
+        return platform.asksForSpeechLanguage(transcriber.recognizer) ? settings.speechLanguage : nil
     }
 
-    func speechLanguage() -> String? { downloadTranscriber.recognizer.usesLanguage ? settings.speechLanguage : nil }
+    func speechLanguage() -> String? { platform.asksForSpeechLanguage(downloadTranscriber.recognizer) ? settings.speechLanguage : nil }
 
     func usableBytes() async -> Int64 { storage.availableBytes(at: root) }
 

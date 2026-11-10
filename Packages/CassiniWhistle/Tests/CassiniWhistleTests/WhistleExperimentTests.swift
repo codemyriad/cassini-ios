@@ -6,7 +6,7 @@ import Testing
                             os: Bool = true, ram: UInt64 = 3 << 30, free: UInt64? = 768 << 20,
                             verified: Bool = true) -> WhistleCapability {
         .experiment(internalBuild: internalBuild, optedIn: optedIn, arm64: arm64, osSupported: os,
-                    physicalMemory: ram, availableMemory: free, bundleVerified: verified)
+                    cpuSupported: true, physicalMemory: ram, availableMemory: free, bundleVerified: verified)
     }
     @Test func threeGBArm64IOS26CanOptIntoAnExperimentWithoutAcceptingItsClass() {
         let c = capability()

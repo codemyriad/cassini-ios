@@ -45,6 +45,8 @@ public enum ModelSize: Hashable, Sendable {
     case precision(String, bytes: Int64)
     /// Installed with another part's models.
     case includedWith(ModelPart)
+    /// No speech model can run on this system: the row shows no size, only "Not available".
+    case noModel
 }
 
 /// One On-device models row.
@@ -69,13 +71,14 @@ public enum ModelRows {
 
     /// A row's size, as downloaded. Parakeet's speech row shows Ultra's download with the precision ("INT8 · 443 MB",
     /// D16: the speech detector has no row of its own); Apple's assets are managed by iOS. The speakers row is the
-    /// diarizer and CAM++, which download together; the voices row comes with it.
-    public static func size(of part: ModelPart, recognizer: SpeechRecognizer) -> ModelSize {
+    /// diarizer and CAM++, which download together; the voices row comes with it. Where the system has no Apple
+    /// speech, the Apple identity stands for no recognizer at all, and nothing manages its assets.
+    public static func size(of part: ModelPart, recognizer: SpeechRecognizer, platform: PlatformFacts) -> ModelSize {
         switch part {
         case .speech where recognizer == .parakeet:
             .precision(ModelCatalog.parakeetPrecision, bytes: ModelDownloadPlan.fullDownloadBytes(.speech))
         case .speech where recognizer == .whistle: .included
-        case .speech: .managedBySystem
+        case .speech: platform.appleSpeech ? .managedBySystem : .noModel
         case .speakers: .bytes(ModelDownloadPlan.fullDownloadBytes(.speakers))
         case .voices: .includedWith(.speakers)
         }
