@@ -5,8 +5,8 @@ Destruction deadline: 2026-11-11 12:09 UTC.
 Read STATUS.md and the coordinator's latest messages before resuming. Old local paths in STATUS.md identify artifacts on the first Mac; use the pushed branch refs on the second Mac.
 
 Branches:
-- test/d88-transcript-render: PR #84, ready at 2bedf598a11dc391e996ea594c08d8c300ab6731, CI/full gate green. Do not force-push or merge.
-- test/d88-draft-growth: e5ff89f43d056c3caf1a9b23e9657c1b195e0de4, no implementation changes yet. Independent base main. Original UI baseline 3/3 green, including both draft following and opt-in ScreenshotTests/test03Transcribing.
+- test/d88-transcript-render: PR #84 merged into main c74b57c after exact-head CI/full gate passed. Its own clones are cleaned.
+- test/d88-draft-growth: PR #85, pushed c97404c (and later checkpoints), independent base main c74b57c. Implementation and validation in progress; see STATUS.md. Locked baseline 3/3 green on c74b57c; earlier baseline preserved too.
 - test/d88-aws-ios-handoff: this checkpoint; not a product PR.
 
 Resume inventory PR 3, then remaining 6, 7, 8, 9, 10. Read the coordination brief, inventory, coordinator answers and BUG-CLASSES on the replacement Mac. The new deadline and shared AWS lock rules override the original brief.

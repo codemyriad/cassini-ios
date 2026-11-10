@@ -1,4 +1,4 @@
-import glob, json, os, pathlib, re, subprocess, sys, time
+import fcntl, glob, json, os, pathlib, re, subprocess, sys, time
 root=pathlib.Path.cwd(); label=sys.argv[1]
 out=pathlib.Path.home()/'coordination/evidence/aws-ios-d88-draft'/label
 out.mkdir(parents=True,exist_ok=True)
@@ -14,6 +14,13 @@ plan=glob.glob(str(root/'DerivedData.noindex/Build/Products/*.only-CassiniUITest
 lock=pathlib.Path.home()/'.aws-heavy.lock'
 try: lock.mkdir()
 except FileExistsError: sys.exit('AWS heavy lock busy; no hogs started')
+native=open(pathlib.Path.home()/'.cassini-heavy.lock','a+')
+try: fcntl.flock(native, fcntl.LOCK_EX | fcntl.LOCK_NB)
+except BlockingIOError:
+    native.close(); lock.rmdir(); sys.exit('Another native gate is active; no hogs started')
+commands=subprocess.check_output(['ps','-axo','command='],text=True).splitlines()
+if any(re.match(r'^\S*(?:/swift-test|/swift)\s+(?:test|--)', c) or re.match(r'^(?:/\S*/)?(?:bash|zsh|sh) scripts/test[.]sh fast(?: |$)',c) for c in commands):
+    native.close(); lock.rmdir(); sys.exit('A package gate is active; no hogs started')
 hogs=[]; rows=[]
 try:
     for _ in range(6): hogs.append(subprocess.Popen(['yes'],stdout=subprocess.DEVNULL))
@@ -31,5 +38,6 @@ try:
 finally:
     for p in hogs:p.terminate()
     for p in hogs:p.wait()
+    native.close()
     lock.rmdir()
     subprocess.run(['xcrun','simctl','shutdown',udid],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=60)

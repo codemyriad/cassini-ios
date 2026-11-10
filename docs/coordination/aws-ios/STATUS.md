@@ -1,32 +1,28 @@
-# AWS iOS status — checkpointed, turn ended at coordinator request
+# AWS iOS status
 
-Updated: 2026-11-10 15:17 UTC
+Updated: 2026-11-10 15:36 UTC
+Deadline: this Mac is destroyed after **2026-11-11 12:09 UTC**. Push work continuously; coordinator will move this agent to a replacement Mac.
 
-## Migration deadline
-This Mac is destroyed after **2026-11-11 12:09 UTC**, superseding the brief's November 15 date. Push each branch as work proceeds. The coordinator will move this agent to a second Mac beforehand.
+## Completed
+- Inventory PR 2, #84, merged into main c74b57c. Exact-head CI/full gate were green. Its simulator clones cleaned; original checkout is the main worktree, so it is retained.
+
+## Active — inventory PR 3
+- Worktree `~/agents/cassini-ios-d88-draft`, branch `test/d88-draft-growth`, fast-forwarded to main c74b57c before implementation.
+- New baseline from that main: 3/3 runs passed both draft-following and opt-in ScreenshotTests/test03Transcribing, 6 hogs, one fresh boot, holding BOTH ~/.aws-heavy.lock and the native gate lock. Hogs exited; no run still active. Evidence: `~/coordination/evidence/aws-ios-d88-draft/before-main-locked/`.
+- Implemented pending validation: injected fake pacing clock, permit-driven draft append URL, positive new-sentence checks after dragging, virtual uptime and optional producer timestamps across async queue delivery. Production event timestamps remain unchanged unless explicitly injected.
+- Added package checks for exact permitted growth, cancellation while waiting, exact virtual pace and queued progress samples. Package subset passed; targeted UI/mutation checks, 3 loaded after runs, exact-head CI and full gate remain in progress.
+- Pushed c97404c; draft PR #85: https://github.com/codemyriad/cassini-ios/pull/85 . Five package checks green; targeted UI build green and virtual-time screenshot passed. Draft-following words were not found by the inherited section label; verifying a direct word query now. CI/full gate and 3 loaded after runs remain pending. Source selector adjustment pending its UI result.
+
+## Next
+Continue inventory PRs 6, 7, 8, 9, 10 IN ORDER, independent main-based branches, no waiting for coordinator between ready PRs.
+
+## Shared Mac rules
+- Atomic mkdir ~/.aws-heavy.lock around EVERY hog or full gate, rmdir only our acquired directory after owned processes exit. Retain native test lock too. No hogs during another active gate.
+- Exactly 6 hogs; minimum 3 before + 3 after, 1 fresh boot. No long unattended batches. At most 2 booted simulators.
+- Mark ready only when CI and CASSINI_POST_STATUS=1 scripts/test.sh all are green on exact pushed head. Never force-push after ready; never merge.
 
 ## Remote handoff
-Branch `test/d88-aws-ios-handoff` contains this status, result summaries and the resumable draft evidence driver under `docs/coordination/aws-ios/`. On the second Mac, recover that branch alongside both working branches. PR #84's description also preserves its validation and mutation evidence. Generated projects, model weights, DerivedData and xcresult bundles must be regenerated; they are excluded from source commits.
-
-## Pushed / ready
-- Inventory PR 2: [PR #84](https://github.com/codemyriad/cassini-ios/pull/84), `test/d88-transcript-render`, head 2bedf598a11dc391e996ea594c08d8c300ab6731. Ready for coordinator review; no force pushes.
-- Exact-head CI and full local gate green (706 s); drmeyers/test-all success posted. Hosted 99/7 skipped/0 failures; iPhone UI 102/23 skipped/0 failures; iPad UI 12/0 failures; package/string tiers green.
-- Render evidence: original 10/10 loaded passes; final after 10/10 hosted/package passes, 3 fresh boots. Initial 120-update cap failed 6/10; 1,024 cap passed with actual 231/241-update warm-ups, keeping three consecutive correct render sets. Idle pair 3.494 s vs 12.603 s. Both mutation checks detected unrelated paragraph invalidation. Evidence: `~/coordination/evidence/aws-ios-d88-render/`.
-- Inventory PR 3: empty checkpoint branch `test/d88-draft-growth` pushed, base main e5ff89f; worktree `~/agents/cassini-ios-d88-draft`. No source changes or PR yet. Untouched baseline build passed.
-
-## Stopped / resumable
-- PR 3 baseline completed just before stop inspection: 3/3 runs passed BOTH actual tests (draft-following + opt-in transcribing screenshot), 1 fresh boot, 6 hogs. Loads reached 498/560/569. All six owned yes processes exited automatically; verified no yes processes remain. No test/hog run still active.
-- Evidence: `~/coordination/evidence/aws-ios-d88-draft/before/`; driver `/tmp/d88-draft-loaded.py`; logs `/tmp/d88-draft-loaded-before.log`, `/tmp/d88-draft-baseline-build.log`. Driver now requires the AWS mkdir lock before spawning hogs and releases it after killing/waiting for its own hogs.
-- Next implementation: PR 3 event/clock-driven fake draft growth and pace; remaining inventory PRs 6, 7, 8, 9, 10. Older recording/Parakeet baselines are under `~/coordination/evidence/aws-ios-d88-{recording,parakeet}/before/`.
-- Both worktrees clean. Simulators shut down by completed runs; no foreign clones touched. No merges or edits to others' PRs.
-
-## Mandatory shared-Mac rule — latest coordinator update
-- Acquire `~/.aws-heavy.lock` using atomic `mkdir` around EVERY hog evidence run AND every full local gate. aws-mac uses the same lock. If occupied, wait without starting work; never remove another holder's directory.
-- Release our acquired directory with `rmdir` only after all owned hogs / gate processes exit. Keep the repository's existing test lock as well.
-- Never run hogs while another gate is active, including CI gates; check running gates before starting, even after acquiring the AWS lock.
-- Latest ceiling: at most 10 hogs. Continue using at most 6, 3 before + 3 after, 1 fresh boot; use only the minimum evidence runs needed. No long or unattended hog batches.
-- Do not reuse the legacy unguarded render driver. The draft driver acquires the AWS lock; also check active gates before invoking it. Full gates now require the same outer AWS lock.
-- No new run was started for this policy update.
+`test/d88-aws-ios-handoff` preserves status, evidence summaries and the driver under docs/coordination/aws-ios. Update it at checkpoints. Generated projects, weights, build products and xcresults stay out of commits.
 
 ## Blockers / Questions
-No active blocker. iOS 18.2 is not installed yet (26.0 and 27.0 available); brief says it is arriving. Awaiting coordinator's queued messages; turn ended as requested.
+None. iOS 18.2 was not installed at last check; verify when needed. No messages sent to others or edits to others' PRs.
