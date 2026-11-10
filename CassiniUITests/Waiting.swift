@@ -92,10 +92,10 @@ extension XCUIElement {
 extension XCUIElement {
     /// Replaces this focused field once and waits for the edit. A timeout fails the edit; it never causes another
     /// edit that could overtake an input still arriving. The field may truncate the input to its limit.
-    @MainActor func replaceText(with text: String, file: StaticString = #filePath, line: UInt = #line) {
+    @MainActor func replaceText(with text: String, expecting expected: String? = nil, file: StaticString = #filePath, line: UInt = #line) {
         let current = (value as? String) ?? ""
         // SwiftUI's multiline TextField can expose its prompt as value/label without placeholderValue.
-        let placeholder = placeholderValue ?? label
+        let placeholder = placeholderValue.flatMap { $0.isEmpty ? nil : $0 } ?? label
         // Deleting a displayed prompt is harmless; skipping deletion could keep real text equal to that prompt.
         let length = current.count
         if length > 0 {
@@ -105,17 +105,10 @@ extension XCUIElement {
             }
         }
         if text.isEmpty { return }
-        if text.count <= 10 {
-            typeText(text)
-            XCTAssertTrue(waitForValue(text, within: uiWaitFloor), "The complete replacement edit did not arrive", file: file, line: line)
-            return
-        }
         // One input operation avoids a cross-process clipboard handoff and cannot duplicate a late paste.
         typeText(text)
-        XCTAssertTrue(poll(within: uiWaitFloor) {
-            guard let edited = value as? String, !edited.isEmpty, edited != placeholder else { return false }
-            return text.hasPrefix(edited)
-        }, "The replacement edit did not arrive", file: file, line: line)
+        XCTAssertTrue(waitForValue(expected ?? text, within: uiWaitFloor),
+                      "The replacement edit did not arrive", file: file, line: line)
     }
 }
 
