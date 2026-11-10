@@ -64,6 +64,16 @@ import CassiniNotebook
         #expect(!h.activity.isRunning)
     }
 
+    @Test func thePolicyWaitsOnTheInjectedClockBeforeRefreshingElapsed() async throws {
+        let h = try RecordingHarness(); defer { h.tearDown() }
+        try await h.startRecording()
+        try await h.waitFor("the policy's injected sleep") { h.clock.pendingSleeps > 0 }
+        h.capture.elapsed = 47
+        #expect(try h.active.elapsed == 0, "a registered sleep has not ticked yet")
+        h.clock.advanceToNextSleep()
+        try await h.waitFor("the released policy tick") { (try? h.active.elapsed) == 47 }
+    }
+
     // ports: RecordingControllerTest#titleEditsAreDebouncedAndKept
     @Test func titleEditsAreDebouncedAndKept() async throws {
         let h = try RecordingHarness(); defer { h.tearDown() }

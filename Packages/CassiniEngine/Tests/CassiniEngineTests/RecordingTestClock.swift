@@ -20,6 +20,7 @@ final class RecordingTestClock: AppClock {
 
     init(now: Date) { state = Mutex(State(now: now)) }
     var now: Date { state.withLock { $0.now } }
+    var pendingSleeps: Int { state.withLock { $0.sleeps.count } }
 
     func sleep(for duration: Duration) async throws {
         let id = UUID(), cancelled = Cancellation()
