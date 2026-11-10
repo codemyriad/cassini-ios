@@ -34,13 +34,17 @@ import CassiniWhistle
         let analyzer = SpeakerRefreshAnalyzer(models: SpeakerModels(repository: repository, installer: installer))
         let test = TestGraph(root: root, suite: suite, analyzer: analyzer, speechModels: speech, modelRoot: modelRoot)
         defer { test.tearDown() }
+        let installs = test.graph.processing.models
+        speech.refresh()
         await fulfillment(of: [verificationStarted], timeout: 15)
         XCTAssertEqual(speech.installation, .checking)
-        let installs = test.graph.processing.models
+        await installs.refresh() // Drain startup reads before either install; no refresh follows shared completion.
+        let standaloneEnded = expectation(description: "standalone caller released background time")
+        test.background.onEnd = { _ in standaloneEnded.fulfill() }
         installs.install([.speakers])
-        await observe("standalone failure appeared") {
-            !installs.isInstalling && installs.download?.failure == .interrupted
-        }
+        await fulfillment(of: [standaloneEnded], timeout: 15)
+        XCTAssertFalse(installs.isInstalling)
+        XCTAssertEqual(installs.download?.failure, .interrupted)
         XCTAssertEqual(installs.status(of: .speakers), .failed(.interrupted))
 
         // A different caller now completes the shared models, without ending a job or refreshing the stores itself.
