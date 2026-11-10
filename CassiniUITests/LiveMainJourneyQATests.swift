@@ -85,6 +85,72 @@ final class LiveMainJourneyQATests: XCTestCase {
                       output.appendingPathComponent("journey-result.json"))
     }
 
+    /// Supplemental export of the already-transcribed OWN synthetic fixture; never imports or retranscribes.
+    @MainActor func testExportOwnSyntheticPortable() throws {
+        let env = ProcessInfo.processInfo.environment
+        guard let outputPath = env["CASSINI_QA_OUTPUT"] else { throw XCTSkip("CASSINI_QA_OUTPUT required") }
+        executionTimeAllowance = 300
+        let output = URL(fileURLWithPath: outputPath, isDirectory: true)
+        try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
+        let app = XCUIApplication(bundleIdentifier: "io.codemyriad.cassini")
+        app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launch()
+        defer { capture(app, "portable-export-end", output) }
+        try wait(app, "Live library/note unavailable", 45) {
+            app.buttons["settingsButton"].exists || app.buttons["noteActions"].exists
+        }
+        let container = try ownedContainer()
+        let title = env["CASSINI_QA_ASR_TITLE"] ?? "synthetic-english"
+        let noteTitle = app.staticTexts["noteTitle"]
+        if !noteTitle.exists || noteTitle.label != title {
+            let row = app.buttons.matching(NSPredicate(format: "identifier == %@ AND label BEGINSWITH %@", "noteRow", title + ",")).firstMatch
+            if !row.isHittable, app.buttons["Back to library"].exists {
+                try tap(app, app.buttons["Back to library"])
+            }
+            try wait(app, "Own library unavailable", 20) { app.buttons["importButton"].exists }
+            let library = app.scrollViews.containing(.textField, identifier: "librarySearch").firstMatch
+            let viewport: XCUIElement = library.exists ? library : app
+            try require(viewport.scroll(until: { row.isHittable }), "Exact own synthetic-English row not found")
+            try tap(app, row)
+        }
+        try wait(app, "Wrong note opened; refusing portable export", 30) {
+            noteTitle.exists && noteTitle.label == title && !self.paragraphs(app).isEmpty &&
+                !self.has(app, "draftTranscript") && !self.has(app, "progressHeadline")
+        }
+        capture(app, "portable-own-note", output)
+        try tap(app, app.buttons["noteActions"])
+        // Exact production NoteCopy.exportDocument; no text-export submenu and no model/test hook.
+        try tap(app, app.buttons["Export Cassini document"])
+        try wait(app, "Portable export share sheet unavailable", 120) {
+            app.buttons["Copy"].exists || app.buttons["Save to Files"].exists || app.otherElements["ActivityListView"].exists
+        }
+        capture(app, "portable-share-sheet", output)
+        let exports = container.appendingPathComponent("tmp/Exports") // AppEnvironment.live → ExportStore.folder.
+        let enumerator = FileManager.default.enumerator(at: exports, includingPropertiesForKeys: [.isRegularFileKey])
+        let files = (enumerator?.allObjects as? [URL] ?? []).filter { $0.pathExtension.lowercased() == "opus" }
+        try require(files.count == 1, "Expected one produced portable Opus, found \(files.count)")
+        let bytes = try Data(contentsOf: files[0])
+        try require(bytes.starts(with: Data("OggS".utf8)), "Portable export is not an Ogg stream")
+        let destination = output.appendingPathComponent("owned-opus/actual-portable", isDirectory: true)
+        try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
+        let portable = destination.appendingPathComponent("synthetic-english.opus")
+        try bytes.write(to: portable, options: .atomic)
+        try writeJSON(["noteTitle": title, "source": files[0].path, "destination": portable.path,
+                       "bytes": bytes.count, "copiedWhileShareSheetOpen": true,
+                       "productionAction": "Export Cassini document", "ownedContainerMarkerValidated": true,
+                       "semanticPortableValidation": "pending independent verifier"],
+                      destination.appendingPathComponent("ui-export-evidence.json"))
+        let close = app.shareSheetCloseButton
+        let cancel = app.buttons["Cancel"].firstMatch
+        if close.exists && close.isHittable { try tap(app, close) }
+        else if cancel.exists && cancel.isHittable { try tap(app, cancel) }
+        else { app.swipeDown() }
+        try wait(app, "Portable share sheet did not dismiss", 20) {
+            !app.buttons["Copy"].exists && !app.buttons["Save to Files"].exists && !app.otherElements["ActivityListView"].exists
+        }
+        capture(app, "portable-export-complete", output)
+    }
+
     @MainActor private func chipLabelSeek(_ app: XCUIApplication, _ output: URL) throws {
         let paragraph = paragraphs(app).first { $0.label.contains("(Ben:") && $0.frame.intersects(app.frame) }
         guard let paragraph else { throw Failure(message: "Controlled Ben chip paragraph not visible") }
