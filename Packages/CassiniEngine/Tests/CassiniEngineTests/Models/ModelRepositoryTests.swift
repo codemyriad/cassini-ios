@@ -285,7 +285,7 @@ import CassiniNotebook
         let store = RepositoryModelStore(models: repo, storage: FakeStorage(), online: { true }, consented: true)
         let speech = ModelPlan([ModelPlan.of(root: models).missing[0]])
 
-        let outcome = try await ModelInstaller(store: store).install([.speech]) { _ in } { _ in }
+        let outcome = try await ModelInstaller(store: store).install([.speech]) { _ in }
 
         #expect(outcome == .failed(part: .speech, error: .notEnoughStorage, requiredFreeBytes: speech.requiredFreeBytes))
     }
