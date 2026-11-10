@@ -104,8 +104,10 @@ extension TranscriptionJobTests {
         @Test func aChangedLanguageNoLongerMatches() async throws {
             let h = try await Harness()
             let stop = StopSignal()
-            h.transcriber.beforeSegment = { index in if index == 7 { stop.stop(.pause(.user)) } }
-            _ = await h.run(stop: stop)
+            h.transcriber.afterSegment = ScriptedTranscriber.stops(stop, at: 7)
+            #expect(await h.run(stop: stop).outcome == .paused(.user))
+            #expect(h.checkpoints.saved.last?.doneMs == 40_000)
+            h.transcriber.afterSegment = { _ in }
             #expect(await h.run(language: "en-US").outcome == .failed(.checkpointMismatch))
         }
     }

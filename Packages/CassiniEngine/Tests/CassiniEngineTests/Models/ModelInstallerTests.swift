@@ -29,14 +29,12 @@ import CassiniNotebook
 
     // ports: ModelInstallerTest#offlineSkipsTheBestEffortPartsAtOnce
     @Test func offlineSkipsTheBestEffortPartsAtOnce() async throws {
-        // An install that ran would wait for the read timeout; the skip must not touch the store at all.
+        // An install that ran records an issue; the skip must not touch the store at all.
         let store = FakeStore(ready: speechReady, online: false)
-        store.onInstall = { _, _ in try await Task.sleep(for: .seconds(30)) }
-        let began = ContinuousClock.now
+        store.onInstall = { _, _ in Issue.record("Offline, the best-effort parts must be skipped, not installed") }
         let outcome = try await ModelInstaller(store: store).install([.speakers, .voices]) { _ in }
         #expect(outcome == .installed(skipped: [.speakers, .voices]))
         #expect(store.attempts.isEmpty)
-        #expect(ContinuousClock.now - began < .seconds(1))
     }
 
     // ports: ModelInstallerTest#offlineStillTriesSpeechAndReportsNoConnection
@@ -311,5 +309,21 @@ private final class FakeStore: ModelStore, Sendable {
             state.installed.insert(model)
             state.free -= model.artifactBytes
         }
+    }
+}
+
+extension ModelInstallerTests {
+    @Test func wrappedAndDirectTransportCodesUseTheSameClassification() {
+        let codes: [URLError.Code] = [.timedOut, .cannotFindHost, .dnsLookupFailed, .cannotConnectToHost,
+            .notConnectedToInternet, .dataNotAllowed, .internationalRoamingOff, .networkConnectionLost, .badServerResponse]
+        for online in [true, false] {
+            for code in codes {
+                let wrapped = ModelError(.modelDownload, "diagnostic without a transport code", urlErrorCode: code)
+                #expect(ModelInstaller.downloadError(wrapped, online: { online })
+                    == ModelInstaller.downloadError(URLError(code), online: { online }))
+            }
+        }
+        #expect(ModelInstaller.isCancellation(ModelError(.modelDownload, urlErrorCode: .cancelled)))
+        #expect(!ModelInstaller.isCancellation(ModelError(.modelDownload, urlErrorCode: .networkConnectionLost)))
     }
 }

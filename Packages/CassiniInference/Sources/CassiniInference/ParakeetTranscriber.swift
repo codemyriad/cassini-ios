@@ -13,7 +13,7 @@ import CassiniNotebook
 ///   must be complete (`ModelCatalog.parakeet.ready`), else `MODEL`.
 /// - **Check (D16 §4).** Before the first load in each session, every file of Ultra and of the detector is hashed
 ///   against its pins (`ModelVerifier`), on the inference thread, stopped by the run's cancel flag; the job shows the
-///   Preparing stage (`.preparingModel(nil)`) meanwhile. A file that differs retires its revision: for Ultra the run
+///   Preparing stage (`.preparingModel(.checking)`) meanwhile. A file that differs retires its revision: for Ultra the run
 ///   fails with `VERIFY` ("Model verification failed. Please download it again."), and the next run downloads it
 ///   again like a missing model (with consent; without an installer it fails with `MODEL`); for the detector the run
 ///   goes on cutting at quiet points.
@@ -21,7 +21,7 @@ import CassiniNotebook
 ///   with the first window and released when the run ends, before the speaker step loads its own models.
 /// - **Memory.** `os_proc_available_memory()` is checked before the model loads and before each window
 ///   (`ParakeetMemory`); below the figure the run fails with `MEMORY` rather than be ended by iOS.
-/// - **Events.** `.preparingModel` only while a model downloads; `.window` after each window, with every word so far
+/// - **Events.** `.preparingModel` while a model downloads or is checked; `.window` after each window, with every word so far
 ///   and where to go on from; `.progress` with the decoded audio.
 /// - **Resume.** A run with `TranscriptRequest.resume` reads the file from its start again, keeps the samples of the
 ///   checkpoint's window and goes on from there, so it decodes what an uninterrupted run would (Android keeps the
@@ -140,7 +140,7 @@ public struct ParakeetTranscriber: Transcribing {
         let files = ParakeetFiles(root: models.root)
         guard models.speechReady, files.present() else { throw TranscriptionError.failed(.model) }
         let models = models, runtime = runtime, availableMemory = availableMemory
-        if models.needsCheck { events(.preparingModel(nil)) }
+        if models.needsCheck { events(.preparingModel(.checking)) }
         let cancel = CancelFlag()
         return try await withTaskCancellationHandler {
             try await thread.run {
@@ -164,15 +164,15 @@ public struct ParakeetTranscriber: Transcribing {
         if speechReady {
             // The detector alone, best effort: without it the run cuts at quiet points.
             guard models.install != nil else { return }
-            do { try await install { events(.preparingModel($0.fraction)) } } catch is CancellationError {
+            do { try await install { events(.preparingModel($0)) } } catch is CancellationError {
                 throw CancellationError()
             } catch {}
             return
         }
         guard allowDownload else { throw TranscriptionError.needsConsent }
         guard models.install != nil else { throw TranscriptionError.failed(.model) }
-        events(.preparingModel(nil))
-        try await install { events(.preparingModel($0.fraction)) }
+        events(.preparingModel(.downloading(nil)))
+        try await install { events(.preparingModel($0)) }
     }
 
     /// Installs SPEECH, reporting the fraction done (nil while unknown), then Checking files.
@@ -325,9 +325,4 @@ extension ParakeetTranscriber {
             }
         }
     }
-}
-
-private extension InstallProgress {
-    /// The fraction of a download, nil while unknown and while the files are checked.
-    var fraction: Double? { if case .downloading(let fraction) = self { fraction } else { nil } }
 }

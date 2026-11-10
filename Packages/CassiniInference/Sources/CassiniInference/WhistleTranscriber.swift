@@ -118,7 +118,7 @@ public struct WhistleTranscriber: Transcribing {
         func decode(_ request: TranscriptionRequest, events: @escaping @Sendable (TranscriptionEvent) -> Void) async throws -> TranscriptionResult {
             try Task.checkCancellation()
             try headroom(WhistleCapability.loadHeadroom)
-            events(.preparingModel(nil))
+            events(.preparingModel(.checking))
             let native = try AVAudioFile(forReading: request.url)
             let rate = native.processingFormat.sampleRate == 16000 ? 16000 : 48000
             guard let format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: Double(rate), channels: 1, interleaved: false) else {

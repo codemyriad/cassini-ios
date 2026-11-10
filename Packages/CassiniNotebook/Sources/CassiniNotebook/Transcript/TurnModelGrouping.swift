@@ -12,18 +12,25 @@ extension TurnModel {
             if word.speaker?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == true { word.speaker = nil }
             let item = TimedWord(index: index, word: word)
             if var block = current {
+                // The block is owned here alone, so the word and its text extend its storage rather than a copy of it
+                // (a copy per word is quadratic in the block's words).
+                current = nil
                 let gap = max(0, word.startMs - block.endMs)
                 let duration = max(0, word.endMs - block.startMs)
                 let targetReached = block.words.count >= 96 || block.endMs - block.startMs >= 45_000
-                let boundary = matches(block.text.trimmingCharacters(in: .whitespacesAndNewlines), #"[.!?]["')\]]*$"#) || gap >= 2200
-                if block.speaker != word.speaker || gap > 4200 || duration > 90_000 || block.words.count + 1 > 140 || (targetReached && boundary) {
+                let boundary = targetReached && (gap >= 2200 || endsSentence(block.text))
+                if block.speaker != word.speaker || gap > 4200 || duration > 90_000 || block.words.count + 1 > 140 || boundary {
                     grouped.append(block)
                     current = Block(id: index, speaker: word.speaker, startMs: word.startMs,
                                     endMs: word.endMs, text: word.text, words: [item])
                 } else {
+                    // The text of every word joined, extended by the new word rather than joined again from the
+                    // first word: the same text, without a rejoin per word (quadratic in the block's words). A block
+                    // of one word still holds that word as given, untrimmed.
+                    if block.words.count == 1 { block.text = joinedText([block.text]) }
                     block.words.append(item)
                     block.endMs = word.endMs
-                    block.text = joinedText(block.words.map { $0.word.text })
+                    appendJoined(word.text, to: &block.text)
                     current = block
                 }
             } else {
@@ -56,22 +63,57 @@ extension TurnModel {
 
     static func joinedText(_ parts: [String]) -> String {
         var result = ""
-        for part in parts {
-            let part = part.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !part.isEmpty else { continue }
-            if !result.isEmpty && !matches(part, #"^[,.;:!?)]"#) { result += " " }
-            result += part
-        }
+        for part in parts { appendJoined(part, to: &result) }
         return result
+    }
+
+    /// Extends `joined`, the `joinedText` of some parts, to the `joinedText` of those parts and `part`.
+    static func appendJoined(_ part: String, to joined: inout String) {
+        let part = part.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !part.isEmpty else { return }
+        if !joined.isEmpty && !Pattern.attachesToPrevious.matches(part) { joined += " " }
+        joined += part
+    }
+
+    /// `Pattern.sentenceEnd` on the trimmed `text`, read from its end: past any closing marks, the last code point is
+    /// one of ".!?". The same answer without trimming or searching the whole text, which, once per word, made a
+    /// block's grouping quadratic in its words.
+    static func endsSentence(_ text: String) -> Bool {
+        var tail = text.unicodeScalars.reversed().drop { CharacterSet.whitespacesAndNewlines.contains($0) }
+        tail = tail.drop { "\"')]".unicodeScalars.contains($0) }
+        return tail.first.map { ".!?".unicodeScalars.contains($0) } ?? false
     }
 
     static func textWordCount(_ text: String) -> Int { text.split(whereSeparator: \.isWhitespace).count }
 
-    static func matches(_ text: String, _ pattern: String) -> Bool {
-        text.range(of: pattern, options: .regularExpression) != nil
+    /// A regular expression compiled once. `String.range(of:options: .regularExpression)` took about 2.3 µs a call on
+    /// iOS 18.2 (0.7 µs on iOS 27; Debug builds in the simulator), against 0.6 µs for a compiled one. The expressions
+    /// are the same, but a compiled one matches code point by code point, as portable.ts's JavaScript does, where
+    /// that search on macOS 27 matched whole characters: punctuation followed by a combining mark (",\u{301}") now
+    /// attaches to the previous word, and a word piece made of combining marks and letters (Thai "\u{E49}\u{E33}")
+    /// now counts as word-like. The model gives the patterns anchored at the end trimmed text only: a compiled `$`
+    /// also matches before a final line break, where that search did not.
+    struct Pattern: @unchecked Sendable { // NSRegularExpression is immutable and safe to share between threads.
+        let regex: NSRegularExpression
+
+        init(_ pattern: String) {
+            do { regex = try NSRegularExpression(pattern: pattern) } catch { preconditionFailure("\(pattern): \(error)") }
+        }
+
+        func matches(_ text: String) -> Bool {
+            regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) != nil
+        }
+
+        /// A paragraph may end after this text. The grouping reads it from the text's end with `endsSentence`.
+        static let sentenceEnd = Pattern(#"[.!?]["')\]]*$"#)
+        /// A word that follows the previous one without a space.
+        static let attachesToPrevious = Pattern(#"^[,.;:!?)]"#)
+        static let wordLike = Pattern(#"[\p{L}\p{N}]"#)
+        /// A punctuated word whose end timing may be inflated.
+        static let punctuationTail = Pattern(#"[.?!,;:…。．！？；：，、।॥؛؟][)\]}"'’”»›」』〉》]*$"#)
     }
 
-    static func isWordLike(_ text: String) -> Bool { matches(text, #"[\p{L}\p{N}]"#) }
+    static func isWordLike(_ text: String) -> Bool { Pattern.wordLike.matches(text) }
 
     struct Candidate {
         var indices: [Int]
@@ -87,7 +129,7 @@ extension TurnModel {
             var end = index + 1
             while end < words.count && !isWordLike(words[end].word.text) { end += 1 }
             let text = words[index..<end].map { $0.word.text }.joined().trimmingCharacters(in: .whitespacesAndNewlines)
-            if matches(text, #"[.?!,;:…。．！？；：，、।॥؛؟][)\]}"'’”»›」』〉》]*$"#) {
+            if Pattern.punctuationTail.matches(text) {
                 let timed = (index..<end).filter {
                     let word = words[$0].word
                     return word.startMs.isFinite && word.endMs.isFinite && word.endMs >= word.startMs

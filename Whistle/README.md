@@ -35,54 +35,61 @@ The full original reports/logs are in coordination `evidence/ios/d75-2-2026-11-0
 compatibility results, not physical A12/3GB, production-VAD, thermal or distribution-signing results. That run used
 the spike's 26.0-linked probe framework; the iOS 18 evidence below says what was rerun with the 18.0-linked one.
 
-### iOS 18: what is proven and what is pending
+### iOS 18: what is shown and what is not
 
 Linking for 18.0 changes only the framework's `LC_BUILD_VERSION` (minos 18.0 instead of 26.0), its `LC_UUID`, and
 the plist and manifest minimums. Every section's bytes, the other load commands and the import set are unchanged
 (compared on both slices). Because the runtime identity (`cassini-whistle-sections-v1`) hashes those two commands,
-both slices have new `runtimeIdentity` values, on iOS 26 as on 18. The A12/3GB measurement on iPadOS 26 was made
-with the 26.0-linked framework; the next TestFlight build from main repeats the A12 acceptance with this one.
+both slices have new `runtimeIdentity` values, on iOS 26 as on 18.
 
-Proven so far, with the 18.0-linked framework (decision 3 in `REPLIES-IOS18.md`: one framework for all OS versions):
+Apple no longer offers the iOS 18.6 simulator runtime that decision 1 in `REPLIES-IOS18.md` named, so the coordinator
+made iOS 18.2 (22C150) the iOS 18 test runtime; the app's floor is 18.0. Shown so far, with the 18.0-linked framework
+(decision 3: one framework for all OS versions; simulator slice SHA-256 `7922c9fc…8501`, recorded for the 18.2
+runs and the 26.0 parity run; the earlier 26.0 and 27.0 hosted logs record no hash, and `INDEX.txt` ties them to the
+same build):
 - the link imports exactly the SDK 26 audit, and links only `libc++` and `libSystem`;
-- every simulator import is exported by the installed iOS 26.0 and iOS 27.0 simulator runtimes
-  (`scripts/check-whistle-runtime-exports.py`); on 26.0, five libsystem_kernel/pthread imports (`_getrusage`, `_mmap`,
-  `_munmap`, `_pthread_create`, `_pthread_setspecific`) resolve through the host Mac's libraries instead, listed under
-  `resolvedByHost` (the tool's `proves` field says `partial` there);
-- the hosted Whistle tests (`WhistleRuntimeTests`, `WhistleRecordingAdapterTests`) load and run it on the iOS 27.0
-  and iOS 26.0 simulators;
-- the 13 fixtures above match the frozen Mac results exactly again (104 words, at most 80 ms) on the iOS 26.0
-  simulator (23A343), run by the spike's unchanged driver around the simulator framework Cassini embeds;
+- **imports:** every one of the 125 simulator imports resolves, none missing, on the iOS 18.2, 26.0 and 27.0
+  simulator runtimes (`scripts/check-whistle-runtime-exports.py`; the 18.2 result is
+  `runtime-exports-ios18.2-simulator.json`). 27.0 proves all 125 are exported by the runtime; 18.2 and 26.0 prove 120. On 18.2
+  and 26.0, which ship loose dylibs, 120 resolve to the runtime's own libraries and five libsystem_kernel/pthread
+  imports (`_getrusage`, `_mmap`, `_munmap`, `_pthread_create`, `_pthread_setspecific`) resolve through the host Mac's
+  libraries, listed under `resolvedByHost` (`proves` says `partial`). Those five are **not** shown to exist in iOS
+  18's own libraries by this check; 27.0, a shared-cache runtime, proves all 125;
+- **hosted tests:** `WhistleRuntimeTests` (the bundle loads through the guarded C API) and
+  `WhistleRecordingAdapterTests` (the bundled English recording through the VAD and Needle) pass on an iPhone 16 /
+  iOS 18.2 simulator, as on 27.0 and 26.0, from `scripts/test.sh build` products of this branch. The Whistle DC gate
+  (the shared `dc-quiet-jfk-v1` pair keeping the desktop's six boundaries) passes on 18.2 in a separate run with
+  `CASSINI_WHISTLE_DC` set; with this 18.0-linked framework it was skipped, not run, on 26.0 and 27.0;
+- **parity:** the 13 fixtures above match the frozen Mac results exactly (text, language, 104 words, at most 80 ms)
+  on an iPhone 16 / iOS 18.2 simulator and on the iOS 26.0 simulator (23A343), run by the spike's unchanged driver
+  around the simulator framework Cassini embeds;
 - the CPU rule: the archive needs FEAT_LSE and FEAT_LRCPC; unit tests show that a CPU reporting either as missing or
   0 (the A10's values) is refused and the A12's values are accepted (`WhistleCapability.supports(cpu:)`). The app reads
   them from `hw.optional.arm.*` only below iOS 26 (`supports(cpu:operatingSystemMajor:)`): every iOS 26 device is an
-  A12 or newer, so iOS 26 keeps Whistle whatever the read answers. The live read has only run in the simulator, with
-  the host Mac's features; no A10 or iOS 18 device has run it.
+  A12 or newer, so iOS 26 keeps Whistle whatever the read answers. The live read has run only in simulators (18.2
+  included), which answer with the host Mac's features; no A10 or iOS 18 device has run it.
 
-**Pending the iOS 18.6 simulator runtime** (not installed on drmeyers yet). Until all three pass, nothing has shown
-that the framework loads or transcribes on iOS 18:
-- **Runtime export check.** Run `scripts/check-whistle-runtime-exports.py <iOS 18.6 RuntimeRoot>
-  <Debug-iphonesimulator Cassini.app>/Frameworks/CassiniWhistleRuntime.framework/CassiniWhistleRuntime` and keep its
-  JSON as `Whistle/runtime-exports-ios18.6-simulator.json`. *Placeholder: that file does not exist yet.* Imports the
-  tool lists under `resolvedByHost` bind to the Mac's own libraries in the simulator, so they say nothing about
-  iOS 18's: if the 18.6 runtime ships loose dylibs, its `proves` field will say `partial`, and the review of that
-  file must name those symbols as not covered rather than read its `pass` as covering all of them.
-- **Parity.** The 13 fixtures above on an iOS 18.6 simulator, with the 18.0-linked simulator framework. The harness
-  that reran them on 26.0 is outside the repository, on drmeyers under
-  `/Volumes/DrMeyers2/cassini-ios18-cache/ios18-e/evidence/parity-harness/` (`run-parity.py --runtime 18.6`):
-  `build-probe.py` SHA-256 `c1d0de194bcf9fe23302cc997fca003373724e00a1e9a0507ffbef5c6332c785`, `run-parity.py`
-  SHA-256 `f388ecd5e231a26630a512864e6e701f7eca4dfb66248a83a5c807caf0e8878b`. It compiles the spike's unchanged
-  `scripts/whistle-ios26-spike/driver.mm` (SHA-256 `a1b827dfa6c6fc2bdd6b3d692cb3b4231dc616be4be588aeca427a4e64094afd`)
-  from the `whistle-ios26-spike` worktree; check all three hashes before trusting a rerun.
-- **Hosted tests.** `WhistleRuntimeTests` and `WhistleRecordingAdapterTests` on an iOS 18.6 simulator.
+The parity harness is outside the repository, on drmeyers under
+`/Volumes/DrMeyers2/cassini-ios18-cache/ios18-e/evidence/` (`INDEX.txt` lists every run, `run-ios18.2.sh` the 18.2
+one): `parity-harness/build-probe.py` SHA-256 `c1d0de194bcf9fe23302cc997fca003373724e00a1e9a0507ffbef5c6332c785`,
+`parity-harness/run-parity.py` SHA-256 `f2badbc02f67be71b1a5efe10075179ca34fd0f4e0ecad479b2af35c8bc2bceb` (the 26.0
+run's version, `f388ecd5…878b`, plus a device-type parameter, kept as `run-parity-v1-ios26.0.py`). It compiles the
+spike's unchanged `scripts/whistle-ios26-spike/driver.mm` (SHA-256
+`a1b827dfa6c6fc2bdd6b3d692cb3b4231dc616be4be588aeca427a4e64094afd`) from the `whistle-ios26-spike` worktree; check
+the hashes before trusting a rerun.
 
-Even then, simulator evidence covers only the simulator archive and the simulator's libraries on the Mac's CPU.
-Nothing yet speaks to the device slice on iOS 18. The import list was audited against SDK 26 stubs, and the A12 run
-was on iPadOS 26 with the 26.0-linked framework. The pending 18.6 export check covers only the simulator's libraries
-(and lists what the host Mac supplies apart). Device loadability on iOS 18 needs a physical iOS 18 device or TestFlight
-run. There is no memory measurement on 18 either. That an app can read the `hw.optional.arm.FEAT_*` keys on a device
-is also unverified: on iOS 18 a refused read turns Whistle off (it never lets an A10 through); on iOS 26 the read is
-not consulted. The `WhistleBundle` "CPU features" log line shows the answer in the next TestFlight run on a device.
+**Not shown.** All of the above is simulator evidence: the arm64 simulator slice, running on the Mac's CPU against
+the simulator runtime's libraries (and the host Mac's for the five imports above). It says nothing about:
+- the device slice on iOS 18: there is no physical iOS 18 device, so no device load, D75.2 lab-device run, memory
+  measurement or TestFlight acceptance on 18. The device import list was audited against SDK 26 stubs only;
+- A12 instruction support on iOS 18: the simulator executes on the Mac's CPU, which has every feature the archive
+  uses, so it cannot show that an A12 under iOS 18 runs the code or that the CPU gate refuses an A10;
+- whether an app can read the `hw.optional.arm.FEAT_*` keys on a device: on iOS 18 a refused read turns Whistle off
+  (it never lets an A10 through); on iOS 26 the read is not consulted. The `WhistleBundle` "CPU features" log line
+  shows the answer in the first device run;
+- the A12 measurement on iPadOS 26 named in decision 1: it exists for the **26.0-linked** framework (the A12/3GB
+  iPad, about 91 MiB footprint). For this 18.0-linked framework it is **still owed**: the next TestFlight build from
+  main after this change merges repeats the A12 acceptance.
 
 ## Loading and capability selection
 
@@ -99,8 +106,8 @@ Whistle is the immediate bundled default on arm64 devices from iOS 18 with FEAT_
 on iOS 18 the CPU must report both, so the A10 iPad 7th generation on iPadOS 18 is refused; every iOS 26 device has
 them), with verified assets and the measured 3GB-class
 memory floor (at least2GiB reported physical RAM,512MiB available before load,256MiB per window). The physical
-A12/3GB gate on iPadOS 26 and the iOS 26 adapter/DC gates below back this rollout; the iOS 18 evidence is pending (see
-above). The pending capability factory remains
+A12/3GB gate on iPadOS 26 and the iOS 26 adapter/DC gates below back this rollout; on iOS 18 only simulator evidence
+exists (see above). The pending capability factory remains
 unavailable; the D78 bundled factory is separate from the earlier explicit internal experiment.
 
 `SpeechModelPolicy` uses Whistle until Parakeet is installed and hash-verified, then defaults new jobs to Parakeet
