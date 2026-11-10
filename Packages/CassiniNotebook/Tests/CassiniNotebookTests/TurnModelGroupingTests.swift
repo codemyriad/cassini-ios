@@ -43,6 +43,21 @@ import Testing
         #expect(!TurnModel.Pattern.punctuationTail.matches("a.\u{301}"))
     }
 
+    /// The grouping reads a sentence's end from the text's end; it answers as the pattern does on the trimmed text.
+    @Test func aSentenceEndReadFromTheEndAgreesWithThePattern() {
+        func agrees(_ text: String) {
+            let pattern = TurnModel.Pattern.sentenceEnd.matches(text.trimmingCharacters(in: .whitespacesAndNewlines))
+            #expect(TurnModel.endsSentence(text) == pattern, "\(text.debugDescription)")
+        }
+        Self.corpus.forEach(agrees)
+        let pieces = [".", "!", "?", "\"", "'", ")", "]", "a", "e\u{301}", "\u{301}", "\u{200D}", " ", "\n", "\r\n", "\t",
+                      "\u{85}", "\u{2028}", "\u{2029}", "\u{0B}", "\u{0C}", "\u{A0}", "\u{3000}", "。", "…", "(", "»", "1"]
+        var generator = Generator(seed: 0xE5D)
+        for _ in 0..<5_000 {
+            agrees((0..<generator.next(7)).map { _ in pieces[generator.next(pieces.count)] }.joined())
+        }
+    }
+
     @Test func joiningTrimsSkipsEmptyPartsAndAttachesPunctuation() {
         #expect(TurnModel.joinedText(["  Hello", ",", "", " ", "world ", ".", "(aside)", ")", "ok"]) == "Hello, world. (aside)) ok")
         var joined = TurnModel.joinedText(["Hello"])

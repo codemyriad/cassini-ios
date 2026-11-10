@@ -12,11 +12,14 @@ extension TurnModel {
             if word.speaker?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == true { word.speaker = nil }
             let item = TimedWord(index: index, word: word)
             if var block = current {
+                // The block is owned here alone, so the word and its text extend its storage rather than a copy of it
+                // (a copy per word is quadratic in the block's words).
+                current = nil
                 let gap = max(0, word.startMs - block.endMs)
                 let duration = max(0, word.endMs - block.startMs)
                 let targetReached = block.words.count >= 96 || block.endMs - block.startMs >= 45_000
-                let boundary = Pattern.sentenceEnd.matches(block.text.trimmingCharacters(in: .whitespacesAndNewlines)) || gap >= 2200
-                if block.speaker != word.speaker || gap > 4200 || duration > 90_000 || block.words.count + 1 > 140 || (targetReached && boundary) {
+                let boundary = targetReached && (gap >= 2200 || endsSentence(block.text))
+                if block.speaker != word.speaker || gap > 4200 || duration > 90_000 || block.words.count + 1 > 140 || boundary {
                     grouped.append(block)
                     current = Block(id: index, speaker: word.speaker, startMs: word.startMs,
                                     endMs: word.endMs, text: word.text, words: [item])
@@ -72,6 +75,15 @@ extension TurnModel {
         joined += part
     }
 
+    /// `Pattern.sentenceEnd` on the trimmed `text`, read from its end: past any closing marks, the last code point is
+    /// one of ".!?". The same answer without trimming or searching the whole text, which, once per word, made a
+    /// block's grouping quadratic in its words.
+    static func endsSentence(_ text: String) -> Bool {
+        var tail = text.unicodeScalars.reversed().drop { CharacterSet.whitespacesAndNewlines.contains($0) }
+        tail = tail.drop { "\"')]".unicodeScalars.contains($0) }
+        return tail.first.map { ".!?".unicodeScalars.contains($0) } ?? false
+    }
+
     static func textWordCount(_ text: String) -> Int { text.split(whereSeparator: \.isWhitespace).count }
 
     /// A regular expression compiled once. `String.range(of:options: .regularExpression)` took about 2.3 µs a call on
@@ -92,7 +104,7 @@ extension TurnModel {
             regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) != nil
         }
 
-        /// A paragraph may end after this text.
+        /// A paragraph may end after this text. The grouping reads it from the text's end with `endsSentence`.
         static let sentenceEnd = Pattern(#"[.!?]["')\]]*$"#)
         /// A word that follows the previous one without a space.
         static let attachesToPrevious = Pattern(#"^[,.;:!?)]"#)
