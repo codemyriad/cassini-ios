@@ -92,10 +92,10 @@ extension XCUIElement {
 extension XCUIElement {
     /// Replaces this focused field once and waits for the edit. A timeout fails the edit; it never causes another
     /// edit that could overtake an input still arriving. The field may truncate the input to its limit.
-    @MainActor func replaceText(with text: String, expecting expected: String? = nil, file: StaticString = #filePath, line: UInt = #line) {
+    @MainActor func replaceText(with text: String, expecting expected: String? = nil, emptyValue: String? = nil, file: StaticString = #filePath, line: UInt = #line) {
         let current = (value as? String) ?? ""
         // SwiftUI's multiline TextField can expose its prompt as value/label without placeholderValue.
-        let placeholder = placeholderValue.flatMap { $0.isEmpty ? nil : $0 } ?? label
+        let placeholder = emptyValue ?? placeholderValue.flatMap { $0.isEmpty ? nil : $0 } ?? label
         // Deleting a displayed prompt is harmless; skipping deletion could keep real text equal to that prompt.
         let length = current.count
         if length > 0 {
