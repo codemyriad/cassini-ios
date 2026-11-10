@@ -10,7 +10,7 @@ Validation:
 - Revised recording suites **47/47 passed**, including after restoring all mutations (1.527 s).
 - New mutation checks: removing debounce fails the full-50ms registration requirement; removing cancellation fails the cancelled-sleep identity requirement; retaining self before the loop fails the controller deallocation requirement. All restored. Earlier duplicate-title mutation also detected 2 writes versus1.
 - Main baseline **3/3** loaded passes retained. Current revised head **3/3** loaded passes (4.152/3.291/3.305 s), exactly6 hogs, AWS mkdir/native locks, no overlapping gate. All hogs exited before full gate.
-- Current-head CI and full status-posting gate **pending**. Gate runs with one iPhone worker/default iPad under AWS/native locks; remains draft until both pass on exact head. Prior 573a66c full gate763s is historical and does not establish current readiness.
+- Current-head CI **PASSED** (run42871363925); full status-posting gate **pending**. Gate runs with one iPhone worker/default iPad under AWS/native locks; remains draft until both pass on exact head. Prior 573a66c full gate763s is historical and does not establish current readiness.
 
 ## Checked bug classes
 Reference: [cassini-ux review/BUG-CLASSES.md](https://github.com/codemyriad/cassini-ux/blob/1e8a722060c3f014c67fa4eff13c454307cc31ea/review/BUG-CLASSES.md) (D87).
