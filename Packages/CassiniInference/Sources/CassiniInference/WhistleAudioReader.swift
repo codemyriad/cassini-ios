@@ -14,7 +14,7 @@ final class WhistleAudioReader {
     private(set) var position: Int64
 
     init(url: URL, position: Int64) throws {
-        file = try AVAudioFile(forReading: url)
+        file = try AVAudioFile(forReading: url, commonFormat: .pcmFormatFloat32, interleaved: false)
         let hz = file.processingFormat.sampleRate
         guard hz.isFinite, (1...1_000_000).contains(hz), hz.rounded() == hz else {
             throw TranscriptionError.failed(.audio)
@@ -57,8 +57,7 @@ final class WhistleAudioReader {
         guard let input = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: frames) else {
             throw TranscriptionError.failed(.audio)
         }
-        try file.read(into: input, frameCount: frames)
-        guard input.frameLength == frames else { throw TranscriptionError.failed(.open) }
+        try fill(input, frames: frames)
         let output = try mono(input)
         let first = inputFrames(through: position - startWithContext)
         let last = first + inputFrames(through: end) - inputFrames(through: position)
@@ -67,6 +66,25 @@ final class WhistleAudioReader {
         }
         position = end
         return Array(UnsafeBufferPointer(start: channel + first, count: last - first))
+    }
+
+    private func fill(_ input: AVAudioPCMBuffer, frames: AVAudioFrameCount) throws {
+        try file.read(into: input, frameCount: frames)
+        guard input.frameLength < frames else { return }
+        guard input.frameLength > 0, let destination = input.floatChannelData,
+              let rest = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: frames - input.frameLength),
+              let source = rest.floatChannelData else { throw TranscriptionError.failed(.open) }
+        // AVAudioFile can return a partial read before EOF (e.g. a packet boundary on the simulator).
+        while input.frameLength < frames {
+            let offset = input.frameLength
+            try file.read(into: rest, frameCount: frames - offset)
+            guard rest.frameLength > 0 else { throw TranscriptionError.failed(.open) }
+            input.frameLength = offset + rest.frameLength
+            for channel in 0..<Int(input.format.channelCount) {
+                destination[channel].advanced(by: Int(offset))
+                    .update(from: source[channel], count: Int(rest.frameLength))
+            }
+        }
     }
 
     private func mono(_ input: AVAudioPCMBuffer) throws -> AVAudioPCMBuffer {
