@@ -326,6 +326,10 @@ transcription lifecycle.
 
 ## License
 
+Copyright © 2026 Codemyriad and contributors.
+
+Maintainer: Codemyriad <cassini@codemyriad.io>.
+
 Cassini for iOS is free software under the [GPLv3](LICENSE). `Cassini/Resources/Licenses/ThirdPartyNotices.txt` lists
 the licences of the dependencies and the models, including every library of the native runtime's lock
 (`scripts/native-dependencies.json`, checked by `LicenseAssetsTests`); `ONNXRuntime-ThirdPartyNotices.txt` next to it is
