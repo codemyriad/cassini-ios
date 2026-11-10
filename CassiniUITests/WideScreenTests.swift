@@ -84,7 +84,7 @@ final class WideScreenTests: XCTestCase {
         app.buttons["Transcribe"].tap()
         let title = app.staticTexts["Transcribe on this device"]
         XCTAssertTrue(title.waitForExistence(within: 5))
-        let speech = app.staticTexts[DeviceUnderTest.appleSpeech ? "Speech recognition" : "Speech recognition, 443 MB"]
+        let speech = app.staticTexts[DeviceUnderTest.appleSpeech ? "Speech recognition" : "Speech recognition, 444 MB"]
         assertCentred([title, speech, app.buttons["Download and transcribe"]], in: detailColumn(app))
     }
 

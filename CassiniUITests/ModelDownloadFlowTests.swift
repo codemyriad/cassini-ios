@@ -46,8 +46,8 @@ final class ModelDownloadFlowTests: XCTestCase {
             XCTAssertTrue(!name.isEmpty && !name.contains("-") && !name.contains("_"),
                           "the language's name, as Settings shows it, not its code: \(name)")
         } else {
-            XCTAssertEqual(part(app, "Speech recognition").label, "Speech recognition, 443 MB")
-            XCTAssertTrue(text(app, containing: "one-time download of about 531\u{00A0}MB.").exists)
+            XCTAssertEqual(part(app, "Speech recognition").label, "Speech recognition, 444 MB")
+            XCTAssertTrue(text(app, containing: "one-time download of about 532\u{00A0}MB.").exists)
             XCTAssertFalse(language.exists, "Parakeet hears the language")
         }
 
