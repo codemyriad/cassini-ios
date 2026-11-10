@@ -1,0 +1,36 @@
+{
+  "head": "3edd1a785c60725c79b40690a1a284d9d21b3543",
+  "fresh_clones": true,
+  "cases": [
+    {
+      "name": "testIPadModelDownloadIsCappedAndCentred",
+      "seconds": 16.441,
+      "passed": true
+    },
+    {
+      "name": "testIPadNoteContentIsCappedAndCentred",
+      "seconds": 2.661,
+      "passed": true
+    },
+    {
+      "name": "testIPadRecordingIsCappedAndCentred",
+      "seconds": 3.769,
+      "passed": true
+    },
+    {
+      "name": "testIPadRenameStaysInItsBandInLandscape",
+      "seconds": 5.711,
+      "passed": true
+    },
+    {
+      "name": "testIPadSavedVoicesAreCappedAndCentred",
+      "seconds": 4.914,
+      "passed": true
+    },
+    {
+      "name": "testIPadSettingsAndRecentlyDeletedAreCappedAndCentred",
+      "seconds": 4.251,
+      "passed": true
+    }
+  ]
+}

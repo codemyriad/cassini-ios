@@ -1,28 +1,32 @@
-# AWS iOS status
+# AWS iOS status — checkpoint at coordinator's 60-minute turn boundary
 
-Updated: 2026-11-10 15:55 UTC
-Deadline: this Mac is destroyed after **2026-11-11 12:09 UTC**. Push work continuously; coordinator will move this agent to a replacement Mac.
+Updated: 2026-11-10 16:26 UTC
+Deadline: this Mac is destroyed after **2026-11-11 12:09 UTC**; push continuously. Coordinator will move the agent to a second Mac.
 
 ## Completed
-- Inventory PR 2, #84, merged into main c74b57c. Exact-head CI/full gate were green. Its simulator clones cleaned; original checkout is the main worktree, so it is retained.
+- Inventory PR 2: #84 merged into main c74b57c. Exact-head CI/full gate were green. Its own simulator clones cleaned; original checkout retained as the main worktree (now on main).
 
-## Active — inventory PR 3
-- Draft [PR #85](https://github.com/codemyriad/cassini-ios/pull/85), pushed head 3edd1a7, branch `test/d88-draft-growth`, worktree `~/agents/cassini-ios-d88-draft`, independent main base c74b57c.
-- Locked current-main baseline: 3/3 passes for BOTH draft-following and opt-in transcribing screenshot, 6 hogs/1 fresh boot, holding AWS + native gate locks. Evidence `~/coordination/evidence/aws-ios-d88-draft/before-main-locked/`.
-- Implemented injected fake clocks, permit-driven draft append URL, producer timestamps across async delivery, actual new-word checks, and Debug-only real layout/scroll completion marker. Five package tests green; normal targeted UI pair passed.
-- Mutations detected: dropped producer timestamps => screenshot time left stays Calculating; forced-follow after drag => final frame 816 failed required >974. The first scroll mutation exposed an early assertion race; layout/end-geometry marker strengthened it. Mutations restored; worktree clean.
-- Clean head targeted pair passed again; exact-head CI green on 3edd1a7. Loaded after runs finished 3/3 green for BOTH tests, 6 hogs/1 fresh boot with both locks held. All hogs exited. Full gate now running under the AWS lock on clean pushed 3edd1a785c60725c79b40690a1a284d9d21b3543; CI green. Keep draft until full gate success. Log /tmp/d88-draft-full-gate.log.
+## Active — inventory PR 3 / draft PR #85
+- Branch `test/d88-draft-growth`, worktree `~/agents/cassini-ios-d88-draft`, pushed clean head **3edd1a785c60725c79b40690a1a284d9d21b3543**, independent base c74b57c. https://github.com/codemyriad/cassini-ios/pull/85
+- Implemented permit-driven synthetic draft append URL, injected fake pacing/uptime, optional producer timestamps across async event delivery, positive new-word checks, and Debug-only layout/scroll completion marker. Production timing keeps its prior path unless explicitly injected.
+- Five package tests green. Before/after evidence: 3/3 runs of BOTH draft-following and opt-in ScreenshotTests/test03Transcribing passed on each side, 6 hogs/1 fresh boot; AWS and native locks held. All hogs exited. JSON summaries under `~/coordination/evidence/aws-ios-d88-draft/{before,after}-main-locked/` and remote handoff branch.
+- Mutations detected: dropping producer timestamps leaves time left Calculating; forced follow after dragging causes final frame 816 to fail required >974. Early negative check was strengthened with real layout/end-geometry acknowledgement. Both mutations restored.
+- Exact-head CI GREEN on 3edd1a7. First full gate FAILED after iPad WideScreen runner timeout/restart (1045 s); package tier, hosted 99/7 skipped/0 failures and all iPhone UI passed. Ended only the already-failed owned iPad shard. Failure status posted; PR stays DRAFT.
+- Cleaned/recreated only this worktree's clones. Entire isolated WideScreen class then PASSED without source changes; Recording ~3.8 s, Rename ~5.7 s, Saved Voices ~4.9 s, Settings/Trash ~4.3 s. Log `/tmp/d88-draft-wide-isolated.log`.
+- **Full-gate retry STILL RUNNING** on unchanged pushed 3edd1a7, under `~/.aws-heavy.lock` plus native test lock. Command: `CASSINI_UI_WORKERS=1 CASSINI_KEEP_SIMS=0 CASSINI_POST_STATUS=1 scripts/test.sh all`. Log `/tmp/d88-draft-full-gate-retry.log`; tool session **12011**; main test.sh PID **96448**, wrapper PID 96439. It acquired the AWS lock and will release it automatically on exit. Do NOT remove that directory while this gate runs.
+- Retry hosted suite passed 99/7 skipped/0 failures; package tier green; UI just started at last check (3 iPhone, 2 iPad passes). Inspect completion/status before doing more heavy work. If green and exact-head CI remains green, update PR body evidence and mark #85 ready. Never force-push after ready.
 
-## Next
-Continue inventory PRs 6, 7, 8, 9, 10 IN ORDER, independent main-based branches, no waiting for coordinator between ready PRs.
+## Prepared — inventory PR 6 (deliver after #85 ready)
+- Branch `test/d88-recording-timers`, worktree `~/agents/cassini-ios-d88-recording`, pushed **2365f54** (WIP, NOT COMPILED/TESTED YET), independent base main c74b57c. No PR opened yet.
+- Original baseline build passed 45 recording tests; short locked baseline 3/3 passed with 6 hogs, no overlapping gate, all hogs exited. Evidence `~/coordination/evidence/aws-ios-d88-recording/before-locked/`.
+- WIP routes policy/title sleeps through parts.clock; settle awaits pending title work; harness advances a manual RecordingTestClock and cancels owned tasks on teardown. Replaces the fixed post-title sleep with event/task completion.
+- Hosted TestGraph needs recording-specific real sleeps because its immediate FakeClock would spin an injected policy loop. Added optional AppEnvironment.recordingClock and a hosted RecordingClock forwarding FakeClock dates while retaining real sleeps; ordinary app defaults unchanged.
+- Next: compile/run recording package subset, verify hosted composition, second-title-write mutation, 3 locked after runs, push fixes, open draft, CI + full gate green on exact head, then ready. Continue inventory 7, 8, 9, 10 IN ORDER. Do not wait for coordinator between ready PRs.
 
-## Shared Mac rules
-- Atomic mkdir ~/.aws-heavy.lock around EVERY hog or full gate, rmdir only our acquired directory after owned processes exit. Retain native test lock too. No hogs during another active gate.
-- Exactly 6 hogs; minimum 3 before + 3 after, 1 fresh boot. No long unattended batches. At most 2 booted simulators.
-- Mark ready only when CI and CASSINI_POST_STATUS=1 scripts/test.sh all are green on exact pushed head. Never force-push after ready; never merge.
+## Shared Mac / migration rules
+- Atomic mkdir `~/.aws-heavy.lock` around EVERY hog/full gate, rmdir ONLY our acquired directory after owned processes exit. Retain native gate lock. No hogs during another active gate; check non-locking package gates too.
+- Exactly 6 hogs, minimum 3 before + 3 after, one fresh boot for simulator evidence. At most 2 booted simulators. No current owned hogs. No foreign jobs/clones touched.
+- Remote handoff branch `test/d88-aws-ios-handoff`, files `docs/coordination/aws-ios/`: status, evidence summaries, resumable draft driver. Keep this checkpoint current. Build outputs, models and xcresults excluded; regenerate on second Mac.
 
-## Remote handoff
-`test/d88-aws-ios-handoff` preserves status, evidence summaries and the driver under docs/coordination/aws-ios. Update it at checkpoints. Generated projects, weights, build products and xcresults stay out of commits.
-
-## Blockers / Questions
-None. iOS 18.2 was not installed at last check; verify when needed. No messages sent to others or edits to others' PRs.
+## Questions
+None pending. Full retry is running; turn ended only to let coordinator's queued inputs land. iOS 18.2 was not installed at last check; verify when needed.
