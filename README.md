@@ -242,7 +242,8 @@ status names what the leg ran and how, for example `passed in 24 min: iPhone 72/
 76/76 (6 skipped), iPhone 16/16`.
 
 The iOS 18 test runtime is iOS 18.2 (22C150): Apple no longer offers 18.6 for download, and the app's floor is 18.0.
-Until the leg is switched on, it is off by default (`ios18_default=off` in `scripts/test.sh`). An `all` run is then unchanged, and its status says nothing about iOS 18.
+Until the leg is switched on, it is off by default (`ios18_default=off` in `scripts/test.sh`). An `all` run is then
+unchanged, and its status says nothing about iOS 18.
 Once the leg is on, a Mac without the runtime fails the run and its status before anything is built; the leg is never
 skipped. `CASSINI_IOS18=0` turns the leg off and posts no status, the same way `CASSINI_UI_IPAD=0` does.
 `CASSINI_IOS18_RUNTIME=26` runs the whole leg on the installed iOS 26.0 runtime, to try it without iOS 18. There
@@ -258,9 +259,12 @@ Parakeet device (`DeviceUnderTest.downloadedSpeech`, `--parakeet`). With Apple s
 and 27 runs launch with the same arguments as before. The statuses seed's paused job carries the recognizer of the
 device it is seeded on, so Resume queues it on the Whistle device too. Every UI test now follows the platform: with the
 iOS 18 facts, the smoke list passes on iOS 27, and the full leg (`CASSINI_IOS18=full`) passes on the iOS 26.0 runtime.
-On the real iOS 18.2 runtime (10 November 2026) the smoke list passes 16/16 and the hosted tests all pass but one,
-`LibraryScreenTests/testAThousandNotesFilterWithoutDroppingFrames` (about 20 ms against its 16 ms budget, every
-run), which keeps the leg off by default for now. Every UI test run on 18.2: iPhone 95/102, iPad 11/12 (before the 44 pt checks were fixed).
+On the real iOS 18.2 runtime (10 November 2026) the smoke list passed 16/16. Two hosted tests failed:
+`LibraryScreenTests/testAThousandNotesFilterWithoutDroppingFrames` (about 20 ms against its 16 ms budget, every run)
+and `SpeechCompositionTests/testSpeechAndTheSpeakerModelsShareOneInstaller`, which crashed the test host: on iOS 18
+`Task(executorPreference: nil)` crashes, so every pinned-model download crashed the app. `PinnedModelInstaller` now
+starts a plain `Task` when it has no executor; that fix has not run on 18.2 yet. Every UI test on 18.2: iPhone
+95/102, iPad 11/12 (before the 44 pt checks were fixed). The leg stays off by default for now.
 `ScreenshotTests` skip unless `scripts/screenshots.sh` runs them.
 
 To install the runtime, download the iOS 18.2 simulator runtime DMG (22C150) with the owner's Apple ID and keep it on
@@ -281,7 +285,8 @@ df -h /System/Volumes/Data                           # check what stays free on 
 
 `simctl` copies the inner image, about 8.7 GB, into the system's store on the internal disk, and the first boot of the
 runtime builds its dyld cache, about 3.5 GB more under `/Library/Developer/CoreSimulator/Caches`. The DMG stays
-external as the backup. Then change `ios18_default=off` to `ios18_default=smoke` in `scripts/test.sh`. That one line turns the leg on.
+external as the backup. Then change `ios18_default=off` to `ios18_default=smoke` in `scripts/test.sh`. That one
+line turns the leg on.
 
 On GitHub, `.github/workflows/ci.yml` runs `scripts/test.sh fast` and `scripts/test.sh build` on a hosted runner
 with Xcode 27.0, for each push to main or a pull request that changes code. The simulator tiers run only locally: the
