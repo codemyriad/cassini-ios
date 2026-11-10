@@ -1,0 +1,20 @@
+{
+  "head": "71274c47e98a3c450ead6ec4741021aaaa3822fc",
+  "no_debounce": {
+    "exit": 1,
+    "failure": "50ms sleep count0 versus1"
+  },
+  "no_cancel": {
+    "exit": 1,
+    "failure": "first sleep not in cancelled IDs"
+  },
+  "retained_policy": {
+    "exit": 1,
+    "failure": "sleeping policy retained controller after one tick"
+  },
+  "restored": {
+    "tests": 47,
+    "failures": 0,
+    "seconds": 1.527
+  }
+}

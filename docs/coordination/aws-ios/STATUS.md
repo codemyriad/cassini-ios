@@ -1,6 +1,12 @@
-# CURRENT UPDATE — 2026-11-10 18:03 UTC
+# CURRENT UPDATE — 2026-11-10 18:05 UTC
 
-**#91 BACK TO DRAFT per agy fix-first review.** Previous exact-head ready evidence below is historical, not current readiness. Fixing title debounce/cancellation proof and controller retention by the policy loop. Revised suites47/47 passed; strengthening deallocation check to run one policy iteration first, then mutation checks, final loaded evidence and exact-head CI/full gate. No owned hogs/gate running. #92 remains ready/in review, untouched.
+**#91 BACK TO DRAFT per agy fix-first review.** New clean PUSHED head **71274c47e98a3c450ead6ec4741021aaaa3822fc**. Previous 573a66c ready evidence below is historical, not current readiness.
+- Title test registers50ms sleep; verifies no write at10/20/30ms, replaces/cancels that exact sleep, crosses old deadline with no write through70ms, releases only replacement at80ms, asserts one final title write.
+- Policy captures clock/interval across suspension and rechecks weak self per iteration. Deinit cancels policy/title/event tasks. New deallocation test runs one tick, waits for next sleep, drops owner and requires controller release/policy completion.
+- Revised suites47/47 passed (restored1.527s). Mutations detected: bypass debounce, remove sleep cancellation, retain self across loop. All restored.
+- Final current-head locked loaded evidence **3/3 passed**, 6 hogs, both locks/no overlap, 4.152/3.291/3.305s. Hogs exited.
+- Current-head CI pending. Full gate **RUNNING**, tool session **9075**, `/tmp/d88-recording-agy-full-gate.log`, one iPhone worker/default iPad/status posting. Wrapper owns AWS lock and releases on exit. Do not remove while running. Remain draft until exact-head CI + full gate green.
+- #92 remains ready/in review, untouched. After #91 ready, refresh the audit for any newer main merges; assigned inventory3/6/7 otherwise done. No work on scw-ios8/9/10.
 
 # AWS iOS status
 

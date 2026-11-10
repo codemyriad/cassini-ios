@@ -1,21 +1,22 @@
-Recording policy ticks and title debounce now use the injected AppClock. The recording harness advances to registered sleep deadlines while waiting for actual controller events; the debounce check awaits the pending title task instead of sleeping for twice the debounce interval. Controller settle includes pending title work, and fixture teardown cancels its owned timer/event tasks.
+Recording policy ticks and title debounce now use the injected AppClock. The harness advances exact virtual deadlines and controller settle awaits pending title work instead of waiting a fixed interval. Hosted recording composition retains real sleep cadence while keeping shared fake dates/search debounce unchanged.
 
-App composition permits a recording-specific clock. Hosted TestGraph forwards its fake dates while keeping the prior real sleep cadence, preventing its immediate-return search clock from spinning the policy loop. Ordinary app defaults are unchanged.
+The title test registers the first 50 ms debounce sleep, advances three 10 ms policy ticks and verifies no persisted title/write. A newer edit must cancel that exact registered sleep. Four more ticks cross the cancelled sleep's old deadline while staying below the replacement deadline; only the final tick releases the replacement write, and only the last title is persisted once.
 
-Inventory PR 6 (E7/E8), per ~/coordination/IOS-D88-INVENTORY.md and coordinator answers. Independent base main c74b57c.
+The policy task captures its clock and interval across suspension, re-acquiring weak self only inside each loop iteration. Controller deinit cancels its policy/title/event tasks. A deallocation test starts recording, executes one policy tick, waits for the next registered sleep, drops the owner and requires immediate controller release plus policy completion/cancelled sleep cleanup. These address both agy fix-first findings.
+
+Inventory PR6 (E7/E8), independent base main c74b57c. Current pushed head `71274c47e98a3c450ead6ec4741021aaaa3822fc`.
 
 Validation:
-- Current pushed head `573a66c21a5f55b91ba37cc59b9950e0392210dc`: **46/46** recording package tests passed, including the new check that a policy tick registers on the injected clock before refreshing elapsed.
-- Main baseline: **3/3** loaded runs passed (45 tests each). Final head: **3/3** loaded runs passed (46 tests each), 4.717/3.334/3.315 s. Exactly 6 hogs, AWS mkdir and native locks held, no overlapping gate. Earlier partial after batch is retained separately and not counted for this head.
-- Hosted RecordingTests + LibraryScreenTests: **11/11** passed on the preceding head with identical production changes.
-- Mutation: inserting an extra stale-title write before the correct debounced title fails with titleWrites **2 versus 1**; restored.
-- CI **passed** on exact head (run 42860564858). Full local status-posting gate **PASSED in 763 s** on the same clean pushed head under AWS/native locks: hosted 99/7 skipped/0 failures, iPhone UI 102/23 skipped/0 failures, iPad UI 12/0 failures, packages and catalogs green. `drmeyers/test-all` success confirmed. All owned simulators shut down and the AWS lock released.
+- Revised recording suites **47/47 passed**, including after restoring all mutations (1.527 s).
+- New mutation checks: removing debounce fails the full-50ms registration requirement; removing cancellation fails the cancelled-sleep identity requirement; retaining self before the loop fails the controller deallocation requirement. All restored. Earlier duplicate-title mutation also detected 2 writes versus1.
+- Main baseline **3/3** loaded passes retained. Current revised head **3/3** loaded passes (4.152/3.291/3.305 s), exactly6 hogs, AWS mkdir/native locks, no overlapping gate. All hogs exited before full gate.
+- Current-head CI and full status-posting gate **pending**. Gate runs with one iPhone worker/default iPad under AWS/native locks; remains draft until both pass on exact head. Prior 573a66c full gate763s is historical and does not establish current readiness.
 
 ## Checked bug classes
 Reference: [cassini-ux review/BUG-CLASSES.md](https://github.com/codemyriad/cassini-ux/blob/1e8a722060c3f014c67fa4eff13c454307cc31ea/review/BUG-CLASSES.md) (D87).
-- 1–3: checked; no model/row rebuilding or cache changes. Manual scheduling lives in test support; recording composition preserves the hosted search clock's immediate debounce (LibraryScreenTests green).
-- 4–13: not applicable; no word ordering, identity/index mapping, chips, search indexing, previews, format/provenance or localized UI text changes.
-- 14–16: checked where applicable; cancellation ends a sleeping policy/title task, and fixture teardown cancels owned waiters. Existing recording tests cover storage stops, interrupted capture, final titles, compression failures and handoff. No data format or protection changes.
-- 17: checked; title persistence is gated on task completion; policy tests drive virtual deadlines and assert real state changes. Poll timeouts are hang bounds only, with no wall-clock pass conditions.
-- 18: checked; independent branch from main, no draft/failing dependency.
-- 19: checked; CI and `CASSINI_POST_STATUS=1 scripts/test.sh all` both green on exact head `573a66c21a5f55b91ba37cc59b9950e0392210dc`.
+- 1–3: checked; no model/row rebuilding or cache changes. Manual scheduling is test support. The policy's strong controller reference ends before each sleep; explicit after-one-tick deallocation coverage. Hosted graph keeps the search clock's immediate debounce.
+- 4–13: not applicable; no word ordering/index identity, chips, search indexing, previews, format/provenance or localized UI text changes.
+- 14–16: checked where applicable; new edits cancel the actual registered title sleep, controller teardown cancels timer/event tasks, and sleeping policy cannot retain its owner. Existing recording tests cover storage stops, interruptions, final titles, compression failures and handoff. No data format/protection changes.
+- 17: checked; title no-write checks advance exact virtual ticks gated on actual policy progress, then await the final task. Cancellation identity and deallocation are explicit assertions; timeouts only bound hangs. Mutations prove the assertions detect the protected bugs.
+- 18: checked; independent branch from main, no draft/failing dependency; normal additional commit after review, no force push.
+- 19: pending exact-head CI and full `CASSINI_POST_STATUS=1 scripts/test.sh all` on 71274c4; remains draft.
