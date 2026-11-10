@@ -232,21 +232,38 @@ so it neither reuses nor disturbs the default leg, and it posts no commit status
 `CASSINI_IOS18=smoke` adds an iOS 18 leg to `scripts/test.sh all`. It starts once the default runtime's tiers pass.
 The worktree's clones are shut down first, and the same build then runs on the iOS 18 runtime: the hosted tests,
 which load Whistle and ONNX Runtime for real, then the UI tests in `scripts/ios18-smoke-tests.txt` on one iPhone 16.
-The list plans about six minutes by `scripts/ui-test-durations.tsv`. `CASSINI_IOS18=full` runs every UI test and the
-`testIPad*` tests on an iPad Pro 13-inch (M4) instead, for pull requests that change views.
+The list plans about five and a half minutes (332 s) by `scripts/ui-test-durations.tsv`. `CASSINI_IOS18=full` runs
+every UI test and the `testIPad*` tests on an iPad Pro 13-inch (M4) instead. Once the leg is on by default, a branch
+that changes views (`Cassini/Features` or `Cassini/Design` since it left origin/main) gets the full leg, and every
+other branch the smoke run; `CASSINI_IOS18=smoke` or `full` overrides that choice.
 `scripts/test.sh ios18` builds and runs only the leg. The leg is `CASSINI_RUNTIME=18 scripts/test.sh prebuilt`, which
 tests the last build without building, so its clones, logs and timing table are those described above. The commit
-status names what the leg ran, for example `passed in 24 min: iPhone 72/72, iPad 8/8; iOS 18.6 hosted 76/76 (6
-skipped), iPhone 17/17`.
+status names what the leg ran and how, for example `passed in 24 min: iPhone 72/72, iPad 8/8; iOS 18.6 smoke: hosted
+76/76 (6 skipped), iPhone 16/16`.
 
 Until the iOS 18.6 simulator runtime is installed on the gate's Mac, the leg is off by default
 (`ios18_default=off` in `scripts/test.sh`). An `all` run is then unchanged, and its status says nothing about iOS 18.
 Once the leg is on, a Mac without the runtime fails the run and its status before anything is built; the leg is never
 skipped. `CASSINI_IOS18=0` turns the leg off and posts no status, the same way `CASSINI_UI_IPAD=0` does.
-`CASSINI_IOS18_RUNTIME=26` runs the whole leg on the installed iOS 26.0 runtime, to try it without iOS 18. In tests,
+`CASSINI_IOS18_RUNTIME=26` runs the whole leg on the installed iOS 26.0 runtime, to try it without iOS 18. There
+every UI test is given the iOS 18 facts (below), so the iOS 18 side of each test runs, and the run posts no status.
+In tests,
 `DeviceUnderTest` (in `CassiniUITests`) reads which platform the device has, so the same test checks the iOS 18 screens
 on 18 and the iOS 26 screens on 26 and 27. With `TEST_RUNNER_CASSINI_IOS18_FACTS=1`, every launch gets
 `--ios18-platform` and those expectations follow, which runs the iOS 18 side on the current simulators.
+
+The smoke list passes that way on iOS 27 and, as the leg, on iOS 26.0. Sixteen other UI tests still expect the Apple
+speech device at the UI-test defaults and fail with the iOS 18 facts, so `full` cannot pass on iOS 18 until they follow
+`DeviceUnderTest` too: `CassiniUITests` `testMovingARunningNoteAsksFirst`, `testTheProcessingSeedShowsAJobInProgress`
+and `testTranscribeWithTheModelInstalledStartsWithoutAskingAndWritesTheTranscript`; `LibraryUITests`
+`testEveryRowStatusShowsWithItsText`, `testResumeAndTryAgainQueueTheNote`,
+`testTheActionsMenuAsksBeforeStartingOverOrReplacingTheVersions` and `testTheControlsLeadWhereTheySay`;
+`NoteFlowTests/testTranscribeReadSeekVersionsAndExports`; `NoteScreenTests` `testAPlainNoteShowsItsBannerAndSubtitle`,
+`testAPlainNotesMenuHasNoDocumentInfoAndCannotExportText`, `testAQueuedNoteCanStillBeRenamed`,
+`testAQueuedNoteKeepsItsTranscriptButCannotBeRenamed`, `testCancelInTheCardsDownloadStopsTheJob`,
+`testTheDraftFollowsItsEndBelowTheFixedCard` and `testTheQueuedCardCountsTheNotesAheadOfIt`; and the iPad's
+`WideScreenTests/testIPadModelDownloadIsCappedAndCentred`. `ScreenshotTests` skip unless `scripts/screenshots.sh`
+runs them.
 
 To install the runtime, download the iOS 18.6 simulator runtime DMG with the owner's Apple ID and keep it on
 `/Volumes/DrMeyers2/sim-runtimes`. Then, on the Mac:
