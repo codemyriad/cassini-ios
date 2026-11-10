@@ -109,11 +109,13 @@ extension XCUIElement {
             }
         }
         if text.isEmpty { return }
-        if text.count <= 10 { typeText(text) }
-        else {
-            UIPasteboard.general.string = text
-            typeKey("v", modifierFlags: .command)
+        if text.count <= 10 {
+            typeText(text)
+            XCTAssertTrue(waitForValue(text, within: uiWaitFloor), "The complete replacement edit did not arrive", file: file, line: line)
+            return
         }
+        UIPasteboard.general.string = text
+        typeKey("v", modifierFlags: .command)
         XCTAssertTrue(poll(within: uiWaitFloor) {
             guard let edited = value as? String, !edited.isEmpty, edited != placeholder else { return false }
             return text.hasPrefix(edited)
