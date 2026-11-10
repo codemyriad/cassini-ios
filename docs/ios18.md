@@ -5,8 +5,8 @@ iOS 26. Below iOS 26 two system features are missing, and the app does without t
 18 is read from the code and its unit tests, except what has run on iOS 18 (below): the full iOS 18 test leg on the
 iOS 18.2 simulator, the iOS 18 test runtime since Apple no longer offers 18.6 (hosted 98/98, iPhone 102/102, iPad
 12/12 on 10 November 2026), and two AWS Device Farm runs on 2026-11-10 (iPhone 11 on iOS 18.6.2, iPhone 15 on iOS
-18.0), which ran only hosted Whistle and platform tests in a Debug build. Each statement below that none of these runs covers says
-"not yet verified on iOS 18.2".
+18.0), which ran only hosted Whistle and platform tests in a Debug build. Each statement below that none of these runs
+covers says "not yet verified on iOS 18.2".
 
 ## What the system decides
 

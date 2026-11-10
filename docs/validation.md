@@ -154,8 +154,8 @@ the kill-and-resume items.
 ### iOS 18 device
 
 None of this has run (decision 8 in [iOS 18](ios18.md)). The two AWS Device Farm runs on 2026-11-10 (iPhone 11 on iOS
-18.6.2, iPhone 15 on iOS 18.0) ran only hosted Whistle and platform tests in a Debug build; they read the CPU features as 1
-([Whistle/README.md](../Whistle/README.md)). On an iPhone XR or XS, or any device kept on iOS 18:
+18.6.2, iPhone 15 on iOS 18.0) ran only hosted Whistle and platform tests in a Debug build; they read the CPU features
+as 1 ([Whistle/README.md](../Whistle/README.md)). On an iPhone XR or XS, or any device kept on iOS 18:
 
 - Install a TestFlight build. Whistle transcribes the controlled English sample (the Whistle README's distribution
   acceptance), and the `WhistleBundle` log shows the CPU features read as atomics and rcpc true.
