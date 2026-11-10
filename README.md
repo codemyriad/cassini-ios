@@ -7,9 +7,9 @@ This is the iOS port of [Cassini for Android](https://github.com/codemyriad/cass
 `rebuild`). It ports Android's behaviour and keeps Android's tests: each ported test is marked `// ports:
 <AndroidTest>#<name>`. Where the two apps disagree, Android's behaviour wins, unless the difference is an iOS-only
 extra or a platform constraint. [Differences from Android](#differences-from-android) lists what remains different and
-why. The app is native SwiftUI for iOS 18 or later. On iOS 26 and later it uses Apple's speech model and continued
-background processing; below iOS 26 it does without both ([iOS 18](docs/ios18.md)). Nothing has run on iOS 18 yet:
-support there is not yet verified on iOS 18.6.
+why. The app is native SwiftUI for iOS 18 or later. On iOS 26 and later it can fall back to Apple's speech model and
+uses continued background processing; below iOS 26 it does without both ([iOS 18](docs/ios18.md)). Nothing has run
+on iOS 18 yet: support there is not yet verified on iOS 18.6.
 
 ## Screenshots
 
@@ -83,16 +83,16 @@ records their exact revisions.
 - **Import** any audio format that iOS reads, plus Ogg Opus and Cassini `.opus` documents, from Files (several files
   at once) or with "Open in Cassini" from another app. A file that is already in the library is not added twice. A
   Cassini document's verified transcripts are imported with it.
-- **Transcribe on the device** with the bundled Whistle model at once, or with Parakeet Ultra after a one-time
-  download of about 531 MB (Ultra, its speech detector and the speaker models, from Cassini's model host) on devices
-  with at least 5 GiB of memory. On iOS 26 or later, a device that can run neither uses Apple's `SpeechAnalyzer` after
-  a model download for the speech language you choose; iOS 18 has no Apple speech, so such a device cannot transcribe
-  there ([iOS 18](docs/ios18.md)). The queue is durable: jobs run one at a time and survive a relaunch. Progress is saved every 30 seconds
-  of audio, so "Stop and keep progress", iOS taking the background time back, or a crash all resume from the last
-  checkpoint. The progress card shows the stages, the percent, the time left, a battery projection and the draft so
-  far. On iOS 26 or later transcription continues in the background with a system progress indicator; on iOS 18 it
-  pauses when iOS ends the short background time (not yet verified on iOS 18.6). A notification says when a note is
-  done or iOS paused it.
+- **Transcribe on the device** with the bundled Whistle model at once, or with Parakeet Ultra after a one-time download
+  of about 531 MB (Ultra, its speech detector and the speaker models, from Cassini's model host) on devices with at
+  least 5 GiB of memory. On iOS 26 or later, where neither Whistle nor a verified Parakeet can run, Cassini uses Apple's
+  `SpeechAnalyzer` after a model download for the speech language you choose; iOS 18 has no Apple speech, so a device
+  that can run neither engine cannot transcribe there ([iOS 18](docs/ios18.md)). The queue is durable: jobs run one at a
+  time and survive a relaunch. Progress is saved every 30 seconds of audio, so "Stop and keep progress", iOS taking the
+  background time back, or a crash all resume from the last checkpoint. The progress card shows the stages, the percent,
+  the time left, a battery projection and the draft so far. On iOS 26 or later transcription continues in the background
+  with a system progress indicator; on iOS 18 it pauses when iOS ends the short background time (not yet verified on iOS
+  18.6). A notification says when a note is done or iOS paused it.
 - **Speakers.** As Android does, streaming Sortformer tells the speakers apart window by window while the words are
   decoded, and CAM++ makes a voiceprint for each speaker. The draft shows the speakers as they appear: you can name or
   merge them before the job is done, and a saved voice is suggested in the draft ("Is this Luca?"). Afterwards you
@@ -148,8 +148,9 @@ TestFlight still need.
   from `Privacy.txt` ([distribution](docs/distribution.md#app-store-connect-answers)).
 - A real device is still needed to validate recognition, model downloads, long background capture and transcription,
   Bluetooth routes, the Live Activity and thermal behaviour. [Validation](docs/validation.md) has the checklist.
-- iOS 18 support is built from the code and unit tests only: no iOS 18 simulator or device has run the app, and no
-  iOS 18 device is available. [iOS 18](docs/ios18.md) lists what is shown and what is pending.
+- iOS 18 support rests on the code, unit tests and runs with the iOS 18 facts on the iOS 26 and 27 simulators:
+  nothing has run on an iOS 18 system, neither the iOS 18.6 simulator nor a device, and no iOS 18 device is known.
+  [iOS 18](docs/ios18.md) lists what is shown and what is pending.
 
 ## Differences from Android
 
@@ -207,7 +208,8 @@ TestFlight still need.
   stops (the job pauses with its checkpoint, the download keeps its bytes) and needs Resume or Try again, where
   Android keeps both running. Whistle also needs Armv8.1 atomics and Armv8.3 RCpc, so the A10 iPad (7th generation)
   gets no Whistle; with less than 5 GiB it gets no engine at all. The Whistle binary is built for iOS 27 and linked
-  at 18.0 under the extended D75.2 exception. Not yet verified on iOS 18.6.
+  at 18.0 under the D75.2 exception as extended, which rests on iOS 18.6 simulator evidence still pending. Not yet
+  verified on iOS 18.6.
 - **iOS extras.** Stars, bookmarks, playback speed, lock-screen controls, passage editing, JSON export, the Speakers
   list, the "Recently Deleted" name, "Forget all voice data", and Settings sections for transcription, speakers and
   your library.
@@ -270,8 +272,9 @@ xcframework), which `Package.swift` links as two binary targets by URL and check
 CassiniNotebook/Transcription, and `ParakeetTranscriber` (CassiniInference) drives them over CassiniSherpa's
 `ParakeetDecoder` and `SileroDetector`. The app uses Ultra when the device passes `SpeechCapability`, installed or not:
 a job, or the model download screen's Download, fetches Ultra and its speech detector with consent through the installer
-the speaker models share (`PinnedModels`). Apple's recognizer stays as the fallback, on iOS 26 or later, for devices
-that can run neither Whistle nor Ultra (`AppleSpeechWindows`); iOS 18 has no Apple recognizer. Speakers run on the same runtime: `CassiniSherpa` wraps Android's streaming Sortformer diarizer
+the speaker models share (`PinnedModels`). Apple's recognizer stays as the fallback, on iOS 26 or later, where
+neither Whistle nor a verified Ultra can run (`AppleSpeechWindows`); iOS 18 has no Apple recognizer. Speakers run on
+the same runtime: `CassiniSherpa` wraps Android's streaming Sortformer diarizer
 (`SortformerStream`, with save and restore of its state) and CAM++ extractor (`VoiceprintExtractor`); the streaming
 rules (`TurnHistory`, `SpeakerBudget`, `Diarization`, the voice-clip cache, `DraftNames` and draft stats) are in
 CassiniNotebook, and the job (`WindowSpeakers`, `LiveMatching`, `DraftNamesStore`) in CassiniEngine. Without the native

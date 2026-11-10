@@ -1,7 +1,7 @@
 import Foundation
 
-/// The reading rules of the Apple Speech fallback (iOS 26 and later, on devices that can run neither Whistle nor
-/// Parakeet Ultra; iOS 18 has no Apple Speech). Apple's analyzer finds
+/// The reading rules of the Apple Speech fallback (iOS 26 and later, where neither Whistle nor a verified
+/// Parakeet Ultra can run; iOS 18 has no Apple Speech). Apple's analyzer finds
 /// its own speech segments, so this path reads the file in fixed blocks from the resume point instead of using
 /// `SpeechWindows`' windows. iOS only: Android has no fallback recognizer.
 public enum AppleSpeechWindows {
