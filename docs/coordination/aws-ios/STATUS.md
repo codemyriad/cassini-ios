@@ -1,6 +1,6 @@
 # AWS iOS status
 
-Updated: 2026-11-10 15:52 UTC
+Updated: 2026-11-10 15:55 UTC
 Deadline: this Mac is destroyed after **2026-11-11 12:09 UTC**. Push work continuously; coordinator will move this agent to a replacement Mac.
 
 ## Completed
@@ -11,7 +11,7 @@ Deadline: this Mac is destroyed after **2026-11-11 12:09 UTC**. Push work contin
 - Locked current-main baseline: 3/3 passes for BOTH draft-following and opt-in transcribing screenshot, 6 hogs/1 fresh boot, holding AWS + native gate locks. Evidence `~/coordination/evidence/aws-ios-d88-draft/before-main-locked/`.
 - Implemented injected fake clocks, permit-driven draft append URL, producer timestamps across async delivery, actual new-word checks, and Debug-only real layout/scroll completion marker. Five package tests green; normal targeted UI pair passed.
 - Mutations detected: dropped producer timestamps => screenshot time left stays Calculating; forced-follow after drag => final frame 816 failed required >974. The first scroll mutation exposed an early assertion race; layout/end-geometry marker strengthened it. Mutations restored; worktree clean.
-- Clean head targeted pair passed again; exact-head CI green on 3edd1a7. Collecting 3 loaded after runs now, exactly 6 hogs and both AWS/native locks held; one fresh boot. Full gate still pending, keep draft.
+- Clean head targeted pair passed again; exact-head CI green on 3edd1a7. Loaded after runs finished 3/3 green for BOTH tests, 6 hogs/1 fresh boot with both locks held. All hogs exited. Full gate now running under the AWS lock on clean pushed 3edd1a785c60725c79b40690a1a284d9d21b3543; CI green. Keep draft until full gate success. Log /tmp/d88-draft-full-gate.log.
 
 ## Next
 Continue inventory PRs 6, 7, 8, 9, 10 IN ORDER, independent main-based branches, no waiting for coordinator between ready PRs.
