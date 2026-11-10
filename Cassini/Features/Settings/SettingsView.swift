@@ -10,6 +10,7 @@ struct SettingsView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var model: SettingsModel?
     @State private var loaded = false
+    @State private var pendingLoads = 0
 
     var body: some View {
         Group {
@@ -21,6 +22,8 @@ struct SettingsView: View {
         }
         .navigationTitle(Text("Settings", tableName: "Settings")).navigationBarTitleDisplayMode(.inline)
         .task {
+            loaded = false
+            pendingLoads += 1
             let model = self.model ?? SettingsModel(ports: ports)
             model.onEffect = { [router] effect in
                 switch effect {
@@ -31,10 +34,19 @@ struct SettingsView: View {
             }
             self.model = model
             await model.appeared()
-            loaded = true
+            pendingLoads -= 1
+            loaded = pendingLoads == 0
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active, let model { Task { await model.resumed() } }
+            if phase == .active, let model {
+                loaded = false
+                pendingLoads += 1
+                Task {
+                    await model.resumed()
+                    pendingLoads -= 1
+                    loaded = pendingLoads == 0
+                }
+            }
         }
     }
 }

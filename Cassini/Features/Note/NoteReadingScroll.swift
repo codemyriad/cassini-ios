@@ -21,6 +21,7 @@ struct NoteReadingScroll: View {
     @State private var geometry = FollowGeometry()
     @State private var scrollPosition = ScrollPosition()
     @State private var completedScrolls = 0
+    @State private var userScrollInFlight = false
     @Environment(\.uiTesting) private var uiTesting
 
     /// About one line of the transcript's body text.
@@ -61,7 +62,13 @@ struct NoteReadingScroll: View {
             }
             .onScrollPhaseChange { _, phase in
                 model.scrolled(PlaybackFollow.Scrolling(phase), playing: playback.owns(note.id) && playback.state.isPlaying)
-                if uiTesting, phase == .idle { completedScrolls += 1 }
+                if uiTesting {
+                    if phase == .interacting { userScrollInFlight = true }
+                    if phase == .idle, userScrollInFlight {
+                        completedScrolls += 1
+                        userScrollInFlight = false
+                    }
+                }
             }
             // Also on the first value: a search the Library opened scrolls to its first match.
             .task(id: currentMatch) {
