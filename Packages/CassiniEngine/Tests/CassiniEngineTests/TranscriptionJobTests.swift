@@ -79,8 +79,7 @@ import CassiniNotebook
     @Test func aStopBeforeTheFirstResultLeavesNoCheckpoint() async throws {
         let h = try await Harness()
         let stop = StopSignal()
-        h.transcriber.beforeSegment = { index in if index == 0 { stop.stop(.pause(.user)) } }
-        h.transcriber.firstSegmentDelay = .milliseconds(300)
+        h.transcriber.beforeSegment = ScriptedTranscriber.stops(stop, at: 0)
         let (outcome, events) = await h.run(stop: stop)
         #expect(outcome == .paused(.user))
         #expect(h.transcriber.starts == [0])
@@ -119,17 +118,17 @@ import CassiniNotebook
 
         let stopped = try await Harness()
         let stop = StopSignal()
-        stopped.transcriber.beforeSegment = { index in if index == 7 { stop.stop(.pause(.user)) } }
+        stopped.transcriber.afterSegment = ScriptedTranscriber.stops(stop, at: 7)
         let (outcome, events) = await stopped.run(stop: stop)
         #expect(outcome == .paused(.user))
         #expect(events.contains(.stopping))
-        // The stop is honoured at the result it arrived in: 35–40 s is kept.
+        // The stop came once the result at 35–40 s was in: it is kept.
         let checkpoint = try #require(stopped.checkpoints.saved.last)
         #expect(checkpoint.doneMs == 40_000)
         #expect(checkpoint.wordsComplete == false)
         #expect(await stopped.note()?.transcript.isEmpty == true)
 
-        stopped.transcriber.beforeSegment = { _ in }
+        stopped.transcriber.afterSegment = { _ in }
         let (resumedOutcome, resumedEvents) = await stopped.run()
         #expect(resumedOutcome == .done)
         // The tracker starts the resumed draft from the checkpoint's words and elapsed time.
@@ -157,11 +156,11 @@ import CassiniNotebook
     @Test func aJobWithoutALanguageResumesInTheCheckpointsLanguage() async throws {
         let h = try await Harness()
         let stop = StopSignal()
-        h.transcriber.beforeSegment = { index in if index == 7 { stop.stop(.pause(.user)) } }
+        h.transcriber.afterSegment = ScriptedTranscriber.stops(stop, at: 7)
         #expect(await h.run(language: "fr-FR", stop: stop).outcome == .paused(.user))
         #expect(h.checkpoints.saved.last?.model == CheckpointState.appleModel(language: "fr-FR"))
 
-        h.transcriber.beforeSegment = { _ in }
+        h.transcriber.afterSegment = { _ in }
         #expect(await h.run(language: "").outcome == .done)
         #expect(h.transcriber.starts == [0, 39], "it went on from the checkpoint")
         let note = try #require(await h.note())
@@ -173,7 +172,7 @@ import CassiniNotebook
     @Test func aCancelEndsCancelledAndLeavesTheEarlierCheckpointToTheCoordinator() async throws {
         let h = try await Harness()
         let stop = StopSignal()
-        h.transcriber.beforeSegment = { index in if index == 9 { stop.stop(.cancel) } }
+        h.transcriber.afterSegment = ScriptedTranscriber.stops(stop, .cancel, at: 9)
         #expect(await h.run(stop: stop).outcome == .cancelled)
         #expect(h.checkpoints.saved.map(\.doneMs) == [30_000])
         #expect(try h.files.load(h.noteID)?.doneMs == 30_000)
@@ -255,13 +254,13 @@ import CassiniNotebook
     @Test func identifySpeakersKeepsAPausedTranscription() async throws {
         let h = try await Harness()
         let stop = StopSignal()
-        h.transcriber.beforeSegment = { index in if index == 7 { stop.stop(.pause(.user)) } }
+        h.transcriber.afterSegment = ScriptedTranscriber.stops(stop, at: 7)
         #expect(await h.run(stop: stop).outcome == .paused(.user))
         _ = try await h.notes.mutate(h.noteID) { $0.transcript = [TranscriptSegment(text: "Older", start: 0, end: 1)] }
         #expect(await h.run(kind: .speakersOnly).outcome == .done)
         #expect(try h.files.load(h.noteID)?.doneMs == 40_000, "the paused transcription keeps its checkpoint")
 
-        h.transcriber.beforeSegment = { _ in }
+        h.transcriber.afterSegment = { _ in }
         #expect(await h.run().outcome == .done)
         #expect(h.transcriber.starts == [0, 39])
     }
