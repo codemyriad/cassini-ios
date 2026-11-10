@@ -139,6 +139,11 @@ extension XCUIElement {
 }
 
 extension XCUIApplication {
+    /// Releases exactly this many synthetic draft results; callers wait for the resulting words.
+    @MainActor func appendDraft(sentences: Int) {
+        XCUIDevice.shared.system.open(URL(string: "cassini://ui-test/append-draft?count=\(sentences)")!)
+    }
+
     /// Launches and waits until the app's launch work is done: the seed written, the library read and any fixture note
     /// opened. A step taken before that, on a busy machine, could find an empty screen.
     ///

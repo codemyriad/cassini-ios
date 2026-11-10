@@ -54,9 +54,10 @@ import CassiniNotebook
         phase = tracker.phase
     }
 
-    public func apply(_ event: JobEvent) {
+    /// `receivedAt` preserves a producer's injected time across asynchronous queue delivery.
+    public func apply(_ event: JobEvent, receivedAt: Int64? = nil) {
         guard noteID != nil else { return }
-        let now = uptimeMs()
+        let now = receivedAt ?? uptimeMs()
         switch event {
         case .stageChanged(.matching, _, _), .stageChanged(.saving, _, _):
             if finalizingSince == nil { finalizingSince = now }
