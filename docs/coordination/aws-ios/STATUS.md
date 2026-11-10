@@ -1,3 +1,7 @@
+# CURRENT UPDATE — 2026-11-10 18:03 UTC
+
+**#91 BACK TO DRAFT per agy fix-first review.** Previous exact-head ready evidence below is historical, not current readiness. Fixing title debounce/cancellation proof and controller retention by the policy loop. Revised suites47/47 passed; strengthening deallocation check to run one policy iteration first, then mutation checks, final loaded evidence and exact-head CI/full gate. No owned hogs/gate running. #92 remains ready/in review, untouched.
+
 # AWS iOS status
 
 Updated: 2026-11-10 17:44 UTC.
