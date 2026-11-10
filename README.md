@@ -246,6 +246,9 @@ the fake transcriber stand for Parakeet Ultra, so the model download screen and 
 current runtime, so those flows are tested on the usual simulators. A normal
 launch starts empty, and Release builds link no fakes.
 
+UI-test word-tap checks read the last clamped seek target applied by the real audio adapter. Playback keeps advancing,
+while the test-visible target stays fixed until another seek; the assertion has no playback-position time window.
+
 The iOS UI-test harness also supports `--draft-growing`: its fake waits for
 `cassini://ui-test/append-draft?count=K` before emitting K more synthetic sentences. Each permit advances the
 injected transcription clock past the result-publication interval; tests wait for those actual new words.
