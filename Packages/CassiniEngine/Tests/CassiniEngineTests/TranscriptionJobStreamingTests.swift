@@ -253,7 +253,7 @@ import CassiniNotebook
         let stop = StopSignal()
         let observed = Mutex<[JobEvent]>([])
         let running = Task { await h.run(stop: stop, observe: { event in observed.withLock { $0.append(event) } }) }
-        while !observed.withLock({ $0.contains(.waitingForPrevious) }) { try await Task.sleep(for: .milliseconds(10)) }
+        try await h.until("the job waits for the budget") { observed.withLock { $0.contains(.waitingForPrevious) } }
         #expect(!observed.withLock { $0.contains { $0.isStarted } }, "nothing loads before the budget is free")
         stop.stop(.pause(.user))
         let (outcome, events) = await running.value

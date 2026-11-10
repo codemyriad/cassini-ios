@@ -270,9 +270,9 @@ import CassiniNotebook
         let h = try await Harness(analyzer: analyzer)
         let stop = StopSignal()
         let running = Task { await h.run(stop: stop) }
-        while analyzer.analyzeCount == 0 { try await Task.sleep(for: .milliseconds(10)) }
+        try await h.until("the speaker step runs") { analyzer.analyzeCount == 1 }
         stop.stop(.pause(.user))
-        try await Task.sleep(for: .milliseconds(100))
+        try await h.until("the stop cancels the analysis") { analyzer.cancelledWhileWaiting == 1 }
         analyzer.resume()
         #expect(await running.value.outcome == .paused(.user))
         let versions = await h.note()?.versions?.count
