@@ -276,8 +276,8 @@ final class LiveMainJourneyQATests: XCTestCase {
         try bytes.write(to: output.appendingPathComponent(name + "." + ext), options: .atomic)
         try writeJSON(["source": files[0].path, "bytes": bytes.count, "format": format, "copiedWhileShareSheetOpen": true],
                       output.appendingPathComponent(name + "-" + ext + "-export-evidence.json"))
-        let close = app.buttons["Close"]
-        let cancel = app.buttons["Cancel"]
+        let close = app.shareSheetCloseButton
+        let cancel = app.buttons["Cancel"].firstMatch
         if close.exists && close.isHittable { try tap(app, close) }
         else if cancel.exists && cancel.isHittable { try tap(app, cancel) }
         else { app.swipeDown() }
