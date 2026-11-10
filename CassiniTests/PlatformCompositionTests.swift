@@ -30,9 +30,21 @@ import CassiniWhistle
         } else {
             XCTAssertEqual(LivePlatform.facts, .iOS18)
         }
-        XCTAssertTrue(LivePlatform.whistleCPUSupported)
         XCTAssertEqual(LivePlatform.whistleOperatingSystemSupported,
                        ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= WhistleCapability.minimumOperatingSystemMajor)
+    }
+
+    /// The CPU features come from the system's `sysctl` keys. The simulator answers with the host Mac's, and every
+    /// Apple silicon Mac has the atomics and RCpc Whistle needs, so the hosted and UI tests keep Whistle.
+    func testTheCPUFeaturesAreTheSystems() throws {
+        let lse = try XCTUnwrap(LivePlatform.sysctlBytes(WhistleCPUFeatures.atomicsKey), "the key exists here")
+        XCTAssertEqual(lse.count, 4)
+        XCTAssertNil(LivePlatform.sysctlBytes("hw.optional.arm.FEAT_CASSINI_NONE"), "an unknown key is no answer")
+        XCTAssertEqual(LivePlatform.cpuFeatures, WhistleCPUFeatures(reading: LivePlatform.sysctlBytes))
+        #if targetEnvironment(simulator) && arch(arm64)
+        XCTAssertTrue(LivePlatform.cpuFeatures.atomics && LivePlatform.cpuFeatures.rcpc)
+        XCTAssertTrue(LivePlatform.whistleCPUSupported)
+        #endif
     }
 
     /// Apple's adapter is built exactly where the facts say the system has Apple speech, and the system has it.

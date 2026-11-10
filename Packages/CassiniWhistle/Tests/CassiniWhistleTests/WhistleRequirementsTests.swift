@@ -25,6 +25,27 @@ import Testing
         }
     }
 
+    /// The live reader's raw answers: a key present as 1 or 0, a missing (or unreadable) key, and a value of another
+    /// size. Only a 4-byte nonzero value is a present feature.
+    @Test func theSystemsRawAnswersMapToFeatures() {
+        let one: [UInt8] = [1, 0, 0, 0], zero: [UInt8] = [0, 0, 0, 0]
+        func features(_ values: [String: [UInt8]]) -> WhistleCPUFeatures { WhistleCPUFeatures(reading: { values[$0] }) }
+        let lse = WhistleCPUFeatures.atomicsKey, rcpc = WhistleCPUFeatures.rcpcKey, dot = WhistleCPUFeatures.dotProductKey
+        #expect(lse == "hw.optional.arm.FEAT_LSE" && rcpc == "hw.optional.arm.FEAT_LRCPC" && dot == "hw.optional.arm.FEAT_DotProd")
+        #expect(features([lse: one, rcpc: one, dot: zero]) == a12)
+        #expect(features([lse: one, rcpc: one, dot: one]) == a13)
+        #expect(features([lse: one, rcpc: zero, dot: zero]) == a11)
+        #expect(features([lse: zero, rcpc: zero, dot: zero]) == a10)
+        #expect(features([:]) == a10, "a system without the keys reports nothing, so Whistle is refused")
+        #expect(features([lse: one]) == a11, "a missing key is an absent feature")
+        for size in [[UInt8](), [1], [1, 0], [1, 0, 0, 0, 0, 0, 0, 0]] {
+            #expect(!features([lse: size, rcpc: size, dot: size]).atomics, "\(size.count) bytes is no 4-byte int")
+        }
+        #expect(features([lse: [0, 0, 0, 1], rcpc: [0, 1, 0, 0], dot: zero]) == a12, "any nonzero int is present")
+        #expect(WhistleCapability.supports(cpu: features([lse: one, rcpc: one, dot: zero])))
+        #expect(!WhistleCapability.supports(cpu: features([lse: one, dot: one])))
+    }
+
     @Test func anUnsupportedCPUMakesTheBundledAndTheExperimentalWhistleUnavailable() {
         for supported in [false, true] {
             let bundled = WhistleCapability.bundled(arm64: true, osSupported: true, cpuSupported: supported,

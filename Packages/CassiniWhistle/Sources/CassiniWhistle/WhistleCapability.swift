@@ -84,6 +84,23 @@ public struct WhistleCPUFeatures: Hashable, Sendable {
     public init(atomics: Bool, rcpc: Bool, dotProduct: Bool) {
         self.atomics = atomics; self.rcpc = rcpc; self.dotProduct = dotProduct
     }
+
+    /// The `sysctl` keys of the three features (xnu `bsd/kern/kern_mib.c`, under `hw.optional.arm`).
+    public static let atomicsKey = "hw.optional.arm.FEAT_LSE"
+    public static let rcpcKey = "hw.optional.arm.FEAT_LRCPC"
+    public static let dotProductKey = "hw.optional.arm.FEAT_DotProd"
+
+    /// The features as the system reports them, from `read(key)`: the raw bytes `sysctlbyname` wrote for that key, or
+    /// nil when the call failed (no such key, or not readable). xnu publishes each key as a 4-byte int, 1 when the CPU
+    /// has the feature; a feature counts as present only for a 4-byte nonzero value. A missing key, a failed read or
+    /// any other size counts as absent, so an unexpected answer refuses Whistle rather than crash on first use.
+    public init(reading read: (String) -> [UInt8]?) {
+        func present(_ key: String) -> Bool {
+            guard let bytes = read(key), bytes.count == MemoryLayout<Int32>.size else { return false }
+            return bytes.contains { $0 != 0 }
+        }
+        self.init(atomics: present(Self.atomicsKey), rcpc: present(Self.rcpcKey), dotProduct: present(Self.dotProductKey))
+    }
 }
 
 /// Candidate selection without loading native code or promising that missing/downloadable assets are installed.
