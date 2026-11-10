@@ -215,6 +215,38 @@ import CassiniEngineTesting
         #expect(try Data(contentsOf: directory.appendingPathComponent("NOTICE.txt")) == notice)
     }
 
+    @Test func aMetadataTimeoutWithoutAnIndependentSessionKeepsTheOriginalFailure() async throws {
+        let folder = TemporaryFolder()
+        defer { folder.remove() }
+        let original = MetadataRetryTransport(server: host(), failurePath: "/manifest.json")
+        let directory = folder.newFolder("staging")
+        await expectNetworkError(.timedOut) { try await retryFetcher(original).fetch(model, into: directory) { _, _ in } }
+        #expect(original.freshCalls.value == 1)
+        #expect(original.paths == ["/manifest.json"])
+        #expect(try FileManager.default.contentsOfDirectory(atPath: directory.path).isEmpty)
+    }
+
+    @Test func aRetryRevalidatesTheManifestBeforeFetchingAnyArtifact() async throws {
+        let folder = TemporaryFolder()
+        defer { folder.remove() }
+        let forbiddenThird = MetadataRetryTransport(server: host())
+        let fresh = MetadataRetryTransport(
+            server: host(manifest: manifest(sourceSha256: String(repeating: "0", count: 64))), fresh: forbiddenThird)
+        // The original manifest was valid; a lost NOTICE response cannot authorize the new session's changed pins.
+        let original = MetadataRetryTransport(server: host(), failurePath: "/NOTICE.txt",
+                                             failureCode: .networkConnectionLost, fresh: fresh)
+        let directory = folder.newFolder("staging")
+        #expect(await failure {
+            try await retryFetcher(original).fetch(model, into: directory) { _, _ in }
+        } == .download(.pinUnavailable))
+        #expect(original.paths == ["/manifest.json", "/NOTICE.txt"])
+        #expect(original.freshCalls.value == 1)
+        #expect(fresh.paths == ["/manifest.json"])
+        #expect(fresh.freshCalls.value == 0)
+        #expect(forbiddenThird.paths.isEmpty)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: directory.path).isEmpty)
+    }
+
     @Test func aSecondMetadataTimeoutEndsTheInstallWithoutAThirdSession() async throws {
         let folder = TemporaryFolder()
         defer { folder.remove() }
