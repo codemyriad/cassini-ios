@@ -82,9 +82,11 @@ jobs:
       - name: String catalogs and package tests
         working-directory: cassini-ios
         run: scripts/test.sh fast
-      - name: Whistle pinned-input and SDK closure regressions
+      - name: Whistle pinned-input, SDK closure and runtime-export regressions
         working-directory: cassini-ios
-        run: python3 scripts/test-bundle-whistle.py
+        run: |
+          python3 scripts/test-bundle-whistle.py
+          python3 scripts/test-check-whistle-runtime-exports.py
       - name: Build for testing
         working-directory: cassini-ios
         run: scripts/test.sh build
