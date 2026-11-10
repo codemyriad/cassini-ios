@@ -83,6 +83,15 @@ class EmbeddedMinimumTests(unittest.TestCase):
                 self.assertTrue(problems[0].startswith(relative + ': minimum iOS '), problems)
                 self.assertIn("above the app's 18.0", problems[0])
 
+    def test_the_whistle_exception_covers_only_its_executable_and_plist(self):
+        for relative in [WHISTLE + '/Other.dylib', WHISTLE + '/Frameworks/Inner.framework/Inner',
+                         WHISTLE + '/Resources/Info.plist']:
+            with self.subTest(relative=relative):
+                content = (plistlib.dumps({'MinimumOSVersion': '26.0'}) if relative.endswith('.plist')
+                           else macho('26.0'))
+                _, problems = self.check({relative: content})
+                self.assertEqual(problems, [relative + ": minimum iOS 26.0 is above the app's 18.0"])
+
     def test_whistle_may_not_exceed_its_exception(self):
         _, problems = self.check({WHISTLE + '/CassiniWhistleRuntime': macho('27.0')})
         self.assertEqual(problems, [WHISTLE + '/CassiniWhistleRuntime: minimum iOS 27.0 is above its exception, 26.0'])
