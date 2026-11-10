@@ -19,7 +19,7 @@ final class ModelDownloadFlowTests: XCTestCase {
         // under the capture bar.
         XCTAssertTrue(app.otherElements["banner.DL_RECORD_NOW"].waitForExistence(within: 5))
         let row = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Thoughts from the morning walk")).firstMatch
-        app.swipeUp()
+        XCTAssertTrue(app.scroll { row.exists && row.isHittable }, "the note is visible before tapping")
         row.tap()
         XCTAssertTrue(app.buttons["Transcribe"].waitForExistence(within: 5))
         app.buttons["Transcribe"].tap()

@@ -235,6 +235,10 @@ attachments from the result bundle and saves them, scaled down, under `docs/scre
 `es`, `pt-BR`, `pt-PT`) takes the same set in that language under `docs/screenshots/<locale>/`, which is not committed. `--device` and `--appearance` take a
 subset. `scripts/render-icon.swift` draws the app icon (`swift scripts/render-icon.swift` from the repository root).
 
+UI helper deadlines only bound hangs: menu taps require settled snapshots, Library navigation waits for loaded data
+and UIKit presentation in an active scene before one tap, and text replacement waits for a cleared field and one edit.
+A late destination or paste never triggers another input solely because a short deadline expired.
+
 UI-test launches (`--ui-testing`, Debug builds only) use a library and preferences of their own, a clock fixed at
 Thursday 8 October 2026 09:41 UTC, en_US formatting, and fake transcription and speaker analysis. Named seeds fill the
 library: `--seed library|search|reading|speakers|voices|trash|processing|recording|statuses|long`. `--parakeet` makes

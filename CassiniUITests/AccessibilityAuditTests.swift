@@ -14,8 +14,7 @@ import XCTest
 // ports: ScreenAccessibilityTest#settings
 // ports: AppAccessibilityTest#theLibraryAndSettingsHaveNoFindings
 // Its waits allow 20 s: upper bounds for the iPad clone on a busy machine, where a screen can take that long to open.
-// The taps that open a screen are tried again when it does not open (`tap(until:)`): the first after a launch can
-// be dropped there.
+// Library actions wait for its interactive marker, then tap once and await the destination.
 final class AccessibilityAuditTests: XCTestCase {
     private static let fixture = "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA"
     /// The largest Dynamic Type size (AX5).
@@ -46,7 +45,7 @@ final class AccessibilityAuditTests: XCTestCase {
         let app = launch(["--seed", "recording"] + extra)
         XCTAssertTrue(app.buttons["recordButton"].waitForExistence(within: 15))
         let pause = app.buttons["pauseResumeRecording"]
-        app.buttons["recordButton"].tap(until: { pause.exists })
+        app.buttons["recordButton"].tapWhenInteractive(in: app, until: { pause.exists })
         XCTAssertTrue(pause.waitForEnabled(within: 8))
         return app
     }
@@ -54,7 +53,7 @@ final class AccessibilityAuditTests: XCTestCase {
     @MainActor private func settings(_ extra: [String] = []) -> XCUIApplication {
         let app = library(extra)
         let language = app.buttons["appLanguageRow"]
-        XCTAssertTrue(app.buttons["settingsButton"].tap(until: { language.exists }), "Settings did not open")
+        XCTAssertTrue(app.buttons["settingsButton"].tapWhenInteractive(in: app, until: { language.exists }), "Settings did not open")
         return app
     }
 
@@ -62,7 +61,7 @@ final class AccessibilityAuditTests: XCTestCase {
         let app = launch(["--seed", "trash"] + extra)
         XCTAssertTrue(app.buttons["recentlyDeletedButton"].waitForExistence(within: 15))
         let draft = app.staticTexts["Old interview draft"]
-        XCTAssertTrue(app.buttons["recentlyDeletedButton"].tap(until: { draft.exists }),
+        XCTAssertTrue(app.buttons["recentlyDeletedButton"].tapWhenInteractive(in: app, until: { draft.exists }),
                       "Recently Deleted did not open")
         return app
     }
@@ -71,7 +70,7 @@ final class AccessibilityAuditTests: XCTestCase {
         let app = launch(["--seed", "voices"] + extra)
         XCTAssertTrue(app.buttons["settingsButton"].waitForExistence(within: 15))
         let language = app.buttons["appLanguageRow"], row = app.buttons["savedVoicesRow"]
-        XCTAssertTrue(app.buttons["settingsButton"].tap(until: { language.exists }), "Settings did not open")
+        XCTAssertTrue(app.buttons["settingsButton"].tapWhenInteractive(in: app, until: { language.exists }), "Settings did not open")
         // At the largest text size the row is about six swipes down, more when a loaded host makes each fling shorter:
         // six once stopped a row short of it.
         XCTAssertTrue(app.scroll(attempts: 12) { row.exists && row.isHittable }, "Saved voices is not on the screen")
@@ -207,7 +206,7 @@ enum AuditFilter {
         // The status bar and the keyboard belong to the system.
         if [.statusBar, .key, .keyboard].contains(element.elementType) { return true }
         // The UI-test launch marker, an invisible 1 pt text that only DEBUG builds draw.
-        if element.identifier == "launchFinished" { return true }
+        if element.identifier == "launchFinished" || element.identifier == "uiTestState-libraryInteractive" { return true }
         // A Library row's title and preview stop at two lines by design (Android maxLines = 2); in the iPad's sidebar a
         // long title reaches them.
         if issue.auditType == .textClipped, ["rowPreview", "rowTitle"].contains(element.identifier) { return true }
