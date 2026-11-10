@@ -121,8 +121,11 @@ work over SSH.
    period-separated integers, at most 18 characters (errors 90058/90059); `scripts/build-sherpa-xcframework.sh`
    writes `1.13.7`. It does not check that each bundle's `MinimumOSVersion` matches its binary (`otool -l`,
    `LC_BUILD_VERSION` minos); Apple's processing does, after the upload (90208, seen with `xcrun altool
-   --build-status --delivery-id <id>`). The app embeds no frameworks: the runtime's xcframeworks are static, and a
-   build step drops the stubs Xcode embeds for them.
+   --build-status --delivery-id <id>`). The app embeds one framework, the private `CassiniWhistleRuntime.framework`:
+   `scripts/bundle-whistle.py` links its binary for `Whistle/pins.json` `deploymentTarget` (18.0, the app's target)
+   and writes the same value as its `MinimumOSVersion`, and `scripts/check-embedded-minos.py` (run by
+   `scripts/test.sh` after every build for testing) fails if any embedded binary or plist needs a newer iOS than the
+   app. The sherpa runtime's xcframeworks are static, and a build step drops the stubs Xcode embeds for them.
 2. The archive validates with no ITMS-91053 (missing required-reason API) warning. After a change of the native
    runtime, check the app binary's imports again (`nm -u`) against `Cassini/Resources/PrivacyInfo.xcprivacy`. Last
    checked on the archive above: of Apple's required-reason symbols the binary imports only `stat` and `fstat`, which
