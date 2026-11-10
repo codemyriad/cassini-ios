@@ -189,19 +189,23 @@ final class WhistleRecordingAdapterTests: XCTestCase {
             let earliest = checkpoint.sourceFrame - priming
             XCTAssertEqual(remaining.reads.first?.lowerBound, earliest)
             XCTAssertTrue(remaining.reads.allSatisfy { $0.lowerBound >= earliest })
-            let replayedSource = remaining.reads.reduce(0) { count, read in
+            let replayedSource = remaining.reads.reduce(Int64(0)) { count, read in
                 count + max(0, min(read.upperBound, interruption.readThrough) - read.lowerBound)
             }
             let redoFrames = interruption.readThrough - checkpoint.sourceFrame
             XCTAssertGreaterThan(redoFrames, 0)
             XCTAssertLessThanOrEqual(redoFrames, sourceLimit)
             XCTAssertGreaterThan(replayedSource, 0)
-            XCTAssertLessThanOrEqual(replayedSource, Int(sourceLimit + (sourceLimit / 48_000 + 1) * priming))
+            let primedReads = sourceLimit / 48_000 + 1
+            let frameLimit = sourceLimit + primedReads * priming
+            XCTAssertLessThanOrEqual(replayedSource, frameLimit)
             let replayedNative = remaining.submissions.filter { attempted.submissions.contains($0) }
             XCTAssertTrue(replayedNative.contains(interruption.native))
             XCTAssertTrue(remaining.submissions.allSatisfy { $0.upperBound > checkpoint.doneSamples })
-            XCTAssertLessThanOrEqual(replayedNative.reduce(0) { $0 + $1.count },
-                                     graceful ? 240_128 + 16_000 : 22 * 16_000 - 1)
+            let submittedSamples = replayedNative.reduce(0) { $0 + $1.count }
+            let sampleLimit = graceful ? 240_128 + 16_000 : 22 * 16_000 - 1
+            XCTAssertLessThanOrEqual(submittedSamples, sampleLimit)
+            print("WHISTLE_REDO graceful=\(graceful) sourceFrames=\(replayedSource)/\(frameLimit) nativeSamples=\(submittedSamples)/\(sampleLimit)")
             XCTAssertEqual(Array(wholeSubmissions.suffix(remaining.submissions.count)), remaining.submissions,
                            "native ranges include exactly the suffix of the uninterrupted run")
         }
