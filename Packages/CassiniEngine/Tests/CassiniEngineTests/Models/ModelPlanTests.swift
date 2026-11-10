@@ -13,23 +13,23 @@ import CassiniNotebook
     /// What one file needs while it installs: its download and its decompressed copy.
     private func peak(_ artifact: Artifact) -> Int64 { (artifact.download?.size ?? 0) + artifact.size }
 
-    // ports: ModelPlanTest#aFreshInstallNeedsAbout1231MiBAndShows528
-    @Test func aFreshInstallNeedsAbout1231MiBAndShows528() {
+    // ports: ModelPlanTest#aFreshInstallNeedsAbout1232MiBAndShows528
+    @Test func aFreshInstallNeedsAbout1232MiBAndShows528() {
         let plan = ModelPlan.of { _ in false }
         #expect(plan.parts == [.speech, .speakers, .voices])
         #expect(plan.missing.map(\.mebibytes) == [440, 62, 26])
         #expect(plan.totalMebibytes == 528)
         // The rounded parts add up on screen; the rounded sum of the bytes would say 530.
         #expect(ModelCatalog.mebibytes(plan.totalBytes) == 530)
-        #expect(plan.totalBytes == 557_432_379)
+        #expect(plan.totalBytes == 557_969_641)
         let speech = ModelCatalog.parakeetArtifacts.reduce(0) { $0 + installed($1) } + installed(ModelCatalog.sileroVad)
         let speakers = installed(ModelCatalog.diarizationModel)
         let voices = installed(ModelCatalog.voiceprintModel)
         // Every installed file, plus the one download being decompressed at a time: at most the speech encoder's.
         let encoder = ModelCatalog.parakeetArtifacts.first { $0.name == "encoder.int8.onnx" }?.download?.size ?? 0
         #expect(plan.requiredFreeBytes == speech + speakers + voices + encoder + ArtifactFetcher.slackBytes)
-        #expect(plan.requiredFreeBytes == 1_290_646_807)
-        #expect((Double(plan.requiredFreeBytes) / mib).rounded() == 1231)
+        #expect(plan.requiredFreeBytes == 1_292_214_675)
+        #expect((Double(plan.requiredFreeBytes) / mib).rounded() == 1232)
         #expect(plan.requiredFreeMebibytes == 1230)
     }
 

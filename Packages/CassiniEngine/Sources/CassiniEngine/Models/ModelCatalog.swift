@@ -157,12 +157,12 @@ public enum ModelCatalog {
                                                         "\(distBase)/models/files/\(compressedSha256)/\(name).zst"))
     }
 
-    /// Parakeet Ultra INT8 on the model host (`parakeet-ultra-0.6b-int8`): the codemyriad sherpa-onnx
+    /// Parakeet Ultra INT8 on the model host (`parakeet-ultra-0.6b-int8-v2`): the #4179 encoder with the codemyriad sherpa-onnx
     /// `nemo_transducer` export of moondream/parakeet-ultra, a post-train of NVIDIA Parakeet TDT 0.6B v3, used exactly
     /// as downloaded (D16 §2). It needs the codemyriad sherpa-onnx fork. Its revision, which provenance and checkpoints
     /// name, is the source SHA-256.
-    public static let parakeetDistID = "parakeet-ultra-0.6b-int8"
-    public static let parakeetRevision = "18cb623004dd6c15999b93cb70b14d8a1f6e8f3a2a97ff733f104bfc3494f6a9"
+    public static let parakeetDistID = "parakeet-ultra-0.6b-int8-v2"
+    public static let parakeetRevision = "50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366"
     public static let parakeetPrecision = "INT8"
 
     /// The model id of Android's provenance (`<id> <precision>`) and the name the app shows for it.
@@ -170,8 +170,12 @@ public enum ModelCatalog {
     public static let parakeetDisplayName = "Parakeet Ultra"
 
     public static let parakeetArtifacts: [Artifact] = [
-        dist("encoder.int8.onnx", 652_282_922, "299617fefd4664d1c115b691dcb6413cabcdbcc694cdf3cb4464b72c5fc3ae69",
-             452_306_705, "caf7a38f2ad3224c1863564fb6e975a11aa3ae6ad1e7ad0bee5c4f5e018babb4"),
+        dist("encoder.int8.onnx", 653_313_528, "f9a8af14deb2e5237eebb9dfb25126180614feaf835a03f307e4077eab247015",
+             452_843_967, "44060ee9be2ac23ace05d6ea1271dd4cdbb353ac4d822f36c51ce733142d31a0"),
+    ] + parakeetSharedArtifacts
+
+    /// These three objects are identical in the original and v2 dist revisions.
+    private static let parakeetSharedArtifacts: [Artifact] = [
         dist("decoder.int8.onnx", 11_845_274, "1fab98fe6c12aded87d2da66272cc9e148d0a0044ce3850a12fe56302ec4a922",
              8_841_708, "69e2e91d01225bc552f8b0113630562fc52622cb2a3c61ef4445ee779f06b295"),
         dist("joiner.int8.onnx", 6_355_277, "8a71aaccfdba3d451775507a889afd2257d2e754463fd81095a8c8f290f924c2",
@@ -182,14 +186,24 @@ public enum ModelCatalog {
 
     public static let parakeet = ModelDescriptor(parakeetDistID, parakeetRevision, parakeetArtifacts)
 
+    /// D86 keeps the old identity for verified-install cleanup and reading provenance, never as a new download.
+    /// Deliberately excluded from `all`, `consented` and each ModelPart's installation plan.
+    public static let legacyParakeet = ModelDescriptor("parakeet-ultra-0.6b-int8",
+        "18cb623004dd6c15999b93cb70b14d8a1f6e8f3a2a97ff733f104bfc3494f6a9", [
+            dist("encoder.int8.onnx", 652_282_922, "299617fefd4664d1c115b691dcb6413cabcdbcc694cdf3cb4464b72c5fc3ae69",
+                 452_306_705, "caf7a38f2ad3224c1863564fb6e975a11aa3ae6ad1e7ad0bee5c4f5e018babb4"),
+        ] + parakeetSharedArtifacts)
+
     /// What a Parakeet transcript's provenance names as its model: `<id>@<source_sha256>` (D16 §5).
     public static var parakeetProvenanceModel: String { parakeet.pin }
 
     /// The name Document info shows for the speech model of this build, by the model string of a transcript's
     /// provenance: the pin iOS writes (D16 §5), and Android's `<id> <precision>` and `<id>`, named as Android's
-    /// `NoteMapping.modelName` names them ("Parakeet Ultra, INT8"). Earlier models have no entry (D51).
+    /// `NoteMapping.modelName` names them ("Parakeet Ultra, INT8"). The original dist pin keeps its display name;
+    /// other earlier models have no entry (D51).
     public static let speechModelNames: [String: String] = [
         parakeet.pin: "\(parakeetDisplayName), \(parakeetPrecision)",
+        legacyParakeet.pin: "\(parakeetDisplayName), \(parakeetPrecision)",
         "\(parakeetModelID) \(parakeetPrecision)": "\(parakeetDisplayName), \(parakeetPrecision)",
         parakeetModelID: parakeetDisplayName,
     ]

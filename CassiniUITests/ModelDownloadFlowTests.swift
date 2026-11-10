@@ -61,10 +61,10 @@ final class ModelDownloadFlowTests: XCTestCase {
     @MainActor func testAParakeetDeviceShowsEachPartsDownloadAndTheTotal() {
         let app = launchWithoutModels(parakeet: true)
         transcribeTheWalk(app)
-        XCTAssertEqual(part(app, "Speech recognition").label, "Speech recognition, 443 MB")
+        XCTAssertEqual(part(app, "Speech recognition").label, "Speech recognition, 444 MB")
         XCTAssertEqual(part(app, "Telling speakers apart").label, "Telling speakers apart, 88 MB")
         // The figure keeps its unit on its line: a no-break space.
-        XCTAssertTrue(text(app, containing: "Cassini needs a one-time download of about 531\u{00A0}MB.").exists)
+        XCTAssertTrue(text(app, containing: "Cassini needs a one-time download of about 532\u{00A0}MB.").exists)
         XCTAssertTrue(text(app, containing: "Needs about 1.2 GB free while installing.").exists)
         XCTAssertFalse(app.staticTexts["speechLanguageLine"].exists, "Parakeet hears the language")
         XCTAssertTrue(app.buttons["Download and transcribe"].exists)
