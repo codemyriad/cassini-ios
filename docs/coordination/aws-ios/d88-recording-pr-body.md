@@ -9,7 +9,7 @@ Validation:
 - Main baseline: **3/3** loaded runs passed (45 tests each). Final head: **3/3** loaded runs passed (46 tests each), 4.717/3.334/3.315 s. Exactly 6 hogs, AWS mkdir and native locks held, no overlapping gate. Earlier partial after batch is retained separately and not counted for this head.
 - Hosted RecordingTests + LibraryScreenTests: **11/11** passed on the preceding head with identical production changes.
 - Mutation: inserting an extra stale-title write before the correct debounced title fails with titleWrites **2 versus 1**; restored.
-- CI **passed** on exact head (run 42860564858). Full local status-posting gate is running under the AWS/native locks, one iPhone worker and default iPad coverage. Remains draft until it passes.
+- CI **passed** on exact head (run 42860564858). Full local status-posting gate **PASSED in 763 s** on the same clean pushed head under AWS/native locks: hosted 99/7 skipped/0 failures, iPhone UI 102/23 skipped/0 failures, iPad UI 12/0 failures, packages and catalogs green. `drmeyers/test-all` success confirmed. All owned simulators shut down and the AWS lock released.
 
 ## Checked bug classes
 Reference: [cassini-ux review/BUG-CLASSES.md](https://github.com/codemyriad/cassini-ux/blob/1e8a722060c3f014c67fa4eff13c454307cc31ea/review/BUG-CLASSES.md) (D87).
@@ -18,4 +18,4 @@ Reference: [cassini-ux review/BUG-CLASSES.md](https://github.com/codemyriad/cass
 - 14–16: checked where applicable; cancellation ends a sleeping policy/title task, and fixture teardown cancels owned waiters. Existing recording tests cover storage stops, interrupted capture, final titles, compression failures and handoff. No data format or protection changes.
 - 17: checked; title persistence is gated on task completion; policy tests drive virtual deadlines and assert real state changes. Poll timeouts are hang bounds only, with no wall-clock pass conditions.
 - 18: checked; independent branch from main, no draft/failing dependency.
-- 19: pending; keep draft until CI and CASSINI_POST_STATUS=1 scripts/test.sh all are green on the exact pushed head.
+- 19: checked; CI and `CASSINI_POST_STATUS=1 scripts/test.sh all` both green on exact head `573a66c21a5f55b91ba37cc59b9950e0392210dc`.
