@@ -280,6 +280,143 @@ import CassiniEngineTesting
         #expect(try Data(contentsOf: source) == compressed)
     }
 
+    private func metadata(_ transport: any HTTPTransport, directory: URL, notice: Bool) async throws -> Data {
+        let fetcher = ArtifactFetcher(transport: transport, storage: FakeStorage())
+        if notice {
+            try await fetcher.fetchNotice(url, into: directory)
+            return try Data(contentsOf: directory.appendingPathComponent("NOTICE.txt"))
+        }
+        return try await fetcher.read(url, limit: Int64(bytes.count * 2))
+    }
+
+    @Test(.timeLimit(.minutes(1)), arguments: [false, true])
+    func metadataKnownLengthDoesNotWaitForHeldEOF(_ notice: Bool) async throws {
+        let folder = TemporaryFolder()
+        defer { folder.remove() }
+        let pair = AsyncThrowingStream<Data, any Error>.makeStream()
+        pair.continuation.yield(bytes)
+        let closed = Counter()
+        let transport = CompletionTransport { [bytes] _, _ in
+            HTTPAnswer(status: 200, headers: [:], expectedLength: Int64(bytes.count), body: pair.stream,
+                       close: { _ = closed.next(); pair.continuation.finish() })
+        }
+        let deadline = ContinuousClock.now.advanced(by: .seconds(5))
+        let received = try await withThrowingTaskGroup(of: Data?.self) { group in
+            defer { group.cancelAll(); pair.continuation.finish() }
+            group.addTask { try await metadata(transport, directory: folder.root, notice: notice) }
+            group.addTask { try await Task.sleep(until: deadline, clock: .continuous); return nil }
+            return try await group.next() ?? nil
+        }
+        #expect(received == bytes, "Complete manifest/NOTICE bytes must not depend on a later EOF")
+        #expect(closed.value == 1)
+    }
+
+    @Test(arguments: [false, true])
+    func zeroLengthMetadataSkipsItsBodyAndStillCloses(_ notice: Bool) async throws {
+        let folder = TemporaryFolder()
+        defer { folder.remove() }
+        let reads = Counter(), closed = Counter()
+        let body = AsyncThrowingStream<Data, any Error>(unfolding: {
+            _ = reads.next()
+            throw URLError(.timedOut)
+        })
+        let transport = CompletionTransport { _, _ in
+            HTTPAnswer(status: 200, headers: [:], expectedLength: 0, body: body, close: { _ = closed.next() })
+        }
+        if notice {
+            #expect(await failure { _ = try await metadata(transport, directory: folder.root, notice: true) } == .modelVerify)
+            #expect(!exists(folder.root.appendingPathComponent("NOTICE.txt")), "An empty notice remains invalid")
+        } else {
+            #expect(try await metadata(transport, directory: folder.root, notice: false).isEmpty)
+        }
+        #expect(reads.value == 0)
+        #expect(closed.value == 1)
+    }
+
+    @Test(arguments: [false, true])
+    func metadataCannotOverdeliverItsDeclaredLength(_ notice: Bool) async throws {
+        let folder = TemporaryFolder()
+        defer { folder.remove() }
+        let closed = Counter()
+        let transport = CompletionTransport { [bytes] _, _ in
+            var answer = Self.answer(bytes, length: Int64(bytes.count - 1))
+            answer.close = { _ = closed.next() }
+            return answer
+        }
+        #expect(await failure { _ = try await metadata(transport, directory: folder.root, notice: notice) } == .modelVerify)
+        #expect(closed.value == 1)
+        #expect(!exists(folder.root.appendingPathComponent("NOTICE.txt")))
+    }
+
+    @Test(arguments: [false, true])
+    func negativeMetadataLengthIsRefusedBeforeBodyConsumption(_ notice: Bool) async throws {
+        let folder = TemporaryFolder()
+        defer { folder.remove() }
+        let reads = Counter(), closed = Counter()
+        let body = AsyncThrowingStream<Data, any Error>(unfolding: {
+            _ = reads.next()
+            throw URLError(.timedOut)
+        })
+        let transport = CompletionTransport { _, _ in
+            HTTPAnswer(status: 200, headers: [:], expectedLength: -1, body: body, close: { _ = closed.next() })
+        }
+        #expect(await failure { _ = try await metadata(transport, directory: folder.root, notice: notice) } == .modelVerify)
+        #expect(reads.value == 0)
+        #expect(closed.value == 1)
+    }
+
+    @Test(arguments: [false, true])
+    func shortDeclaredMetadataFailsButLengthlessMetadataUsesEOF(_ notice: Bool) async throws {
+        let folder = TemporaryFolder()
+        defer { folder.remove() }
+        let prefix = Data(bytes.prefix(7))
+        let short = CompletionTransport { [bytes] _, _ in Self.answer(prefix, length: Int64(bytes.count)) }
+        #expect(await failure { _ = try await metadata(short, directory: folder.root, notice: notice) } == .modelDownload)
+        #expect(!exists(folder.root.appendingPathComponent("NOTICE.txt")))
+        let lengthless = CompletionTransport { _, _ in Self.answer(prefix, length: nil) }
+        #expect(try await metadata(lengthless, directory: folder.root, notice: notice) == prefix)
+    }
+
+    @Test(arguments: [false, true])
+    func cancellationCannotReturnEvenZeroLengthMetadata(_ notice: Bool) async throws {
+        let folder = TemporaryFolder()
+        defer { folder.remove() }
+        let closed = Counter()
+        let transport = CompletionTransport { _, _ in
+            var answer = Self.answer(Data(), length: 0)
+            answer.close = { _ = closed.next() }
+            return answer
+        }
+        let result = await Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            return await failure { _ = try await metadata(transport, directory: folder.root, notice: notice) }
+        }.value
+        #expect(result == .cancelled)
+        #expect(closed.value == 1)
+        #expect(!exists(folder.root.appendingPathComponent("NOTICE.txt")))
+    }
+
+    @Test(arguments: [false, true])
+    func metadataCancellationAtTheFinalChunkCannotPublish(_ notice: Bool) async throws {
+        let folder = TemporaryFolder()
+        defer { folder.remove() }
+        let closed = Counter()
+        let body = AsyncThrowingStream<Data, any Error>(unfolding: { [bytes] in
+            withUnsafeCurrentTask { $0?.cancel() }
+            return bytes
+        })
+        let transport = CompletionTransport { [bytes] _, _ in
+            HTTPAnswer(status: 200, headers: [:], expectedLength: Int64(bytes.count), body: body,
+                       close: { _ = closed.next() })
+        }
+        let result = await Task {
+            await failure { _ = try await metadata(transport, directory: folder.root, notice: notice) }
+        }.value
+        #expect(result == .cancelled)
+        #expect(closed.value == 1)
+        #expect(!exists(folder.root.appendingPathComponent("NOTICE.txt")))
+    }
+
     private static func answer(_ data: Data, status: Int = 200, headers: [String: String] = [:],
                                length: Int64?, error: (any Error)? = nil) -> HTTPAnswer {
         HTTPAnswer(status: status, headers: headers, expectedLength: length, body: AsyncThrowingStream { continuation in

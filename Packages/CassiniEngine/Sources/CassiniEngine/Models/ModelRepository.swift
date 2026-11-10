@@ -226,7 +226,7 @@ public final class ModelRepository: Sendable {
             }
         } catch {
             update { state in
-                if let failure = error as? ModelError, failure.failure != .cancelled {
+                if let failure = error as? ModelError, !ModelInstaller.isCancellation(failure) {
                     state.inFlight[part] = .failed(failure.failure, detail: failure.message)
                 } else if error is ModelError || ModelInstaller.isCancellation(error) {
                     state.inFlight[part] = nil
@@ -288,7 +288,10 @@ public final class ModelRepository: Sendable {
             if ModelInstaller.isCancellation(error) { throw error }
             // iOS reports a full disk as its own error: NOT_ENOUGH_STORAGE, where Android reads it as an I/O error.
             if CheckpointFiles.isOutOfSpace(error) { throw ModelError(.space, "\(error)") }
-            if (error as NSError).domain == NSURLErrorDomain { throw ModelError(.modelDownload, "\(error)") }
+            if (error as NSError).domain == NSURLErrorDomain {
+                let code = (error as? URLError)?.code ?? URLError.Code(rawValue: (error as NSError).code)
+                throw ModelError(.modelDownload, "\(error)", urlErrorCode: code)
+            }
             throw Self.localFailure(error)
         }
         try ModelError.require(!Task.isCancelled, .cancelled)

@@ -611,6 +611,32 @@ private extension TimeLeft {
 }
 
 extension ProgressTrackerTests {
+    @Test func latePreparationEventsCannotReviveAJobThatEndedBeforeInference() {
+        let checking = DownloadProgress(part: .speech, doneBytes: 0, totalBytes: 0, verifying: true)
+        let outcomes: [JobOutcome] = [.done, .failed(.model), .paused(.user)]
+        for outcome in outcomes {
+            var t = Tracked()
+            t.send(.downloading(checking))
+            t.send(.ended(outcome))
+            let endedPhase = t.phase
+            t.send(.waitingForPrevious)
+            #expect(t.phase == endedPhase)
+            t.send(.downloading(nil))
+            #expect(t.phase == endedPhase)
+            t.send(.downloading(checking))
+            #expect(t.phase == endedPhase)
+            #expect(t.tracker.outcome == outcome)
+            #expect(!t.tracker.isTicking)
+        }
+        var stopped = Tracked()
+        stopped.send(.waitingForPrevious)
+        stopped.send(.stopping)
+        stopped.send(.waitingForPrevious)
+        stopped.send(.downloading(checking))
+        #expect(stopped.phase == .stopping)
+        #expect(!stopped.tracker.isTicking)
+    }
+
     @Test func modelDownloadBoundariesPublishWithoutWaitingForTheNextTick() {
         var t = Tracked()
         t.send(started(totalMs: 70_000))

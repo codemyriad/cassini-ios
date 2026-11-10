@@ -214,12 +214,17 @@ public struct ArtifactFetcher: Sendable {
         defer { answer.close() }
         guard answer.status == 200 else { throw ModelError(.modelDownload, "HTTP \(answer.status)") }
         try Self.requireIdentity(answer)
-        try ModelError.require((answer.expectedLength ?? 0) <= limit, .modelVerify)
+        let cap = answer.expectedLength ?? limit
+        try ModelError.require(cap >= 0 && cap <= limit, .modelVerify)
         var body = Data()
-        for try await block in answer.body {
-            try ModelError.require(!Task.isCancelled, .cancelled)
-            try ModelError.require(Int64(body.count + block.count) <= limit, .modelVerify)
-            body.append(block)
+        if answer.expectedLength != 0 {
+            for try await block in answer.body {
+                try ModelError.require(!Task.isCancelled, .cancelled)
+                try ModelError.require(Int64(block.count) <= cap - Int64(body.count), .modelVerify)
+                body.append(block)
+                // Complete the declared metadata body without waiting for transport EOF/teardown.
+                if answer.expectedLength != nil && Int64(body.count) == cap { break }
+            }
         }
         try ModelError.require(!Task.isCancelled, .cancelled)
         if let announced = answer.expectedLength, Int64(body.count) < announced {

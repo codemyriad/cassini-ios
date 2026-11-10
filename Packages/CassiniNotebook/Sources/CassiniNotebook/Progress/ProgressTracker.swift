@@ -63,10 +63,10 @@ public struct ProgressTracker: Sendable {
             outcome = ended
             if ended == .done { publish(at: nowMs, done: true) }
         case .waitingForPrevious:
-            if run == nil, !stopping { phase = .waitingForPrevious }
+            if run == nil, !stopping, outcome == nil { phase = .waitingForPrevious }
         case .downloading(let progress):
             if run == nil {
-                if !stopping { phase = .downloading(progress) }
+                if !stopping, outcome == nil { phase = .downloading(progress) }
             } else {
                 run?.download = progress
                 // Download/check boundaries drive model readiness followers; do not hide them until the next tick.
