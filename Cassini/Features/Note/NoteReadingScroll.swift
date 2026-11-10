@@ -63,7 +63,8 @@ struct NoteReadingScroll: View {
             .onScrollPhaseChange { _, phase in
                 model.scrolled(PlaybackFollow.Scrolling(phase), playing: playback.owns(note.id) && playback.state.isPlaying)
                 if uiTesting {
-                    if phase == .interacting { userScrollInFlight = true }
+                    // A gesture that reaches a boundary can track without entering .interacting.
+                    if phase == .tracking || phase == .interacting { userScrollInFlight = true }
                     if phase == .idle, userScrollInFlight {
                         completedScrolls += 1
                         userScrollInFlight = false
