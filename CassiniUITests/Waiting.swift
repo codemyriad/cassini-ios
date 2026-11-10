@@ -152,6 +152,7 @@ extension XCUIApplication {
     /// launch resets the test data, the launch happens inside the app (`Launches.relaunchInApp`): about a second
     /// instead of five. `fresh` asks for a new process.
     @MainActor func launchAndWait(fresh: Bool = false, file: StaticString = #filePath, line: UInt = #line) {
+        if DeviceUnderTest.iOS18Facts, !launchArguments.contains("--ios18-platform") { launchArguments.append("--ios18-platform") }
         if !fresh, Launches.relaunchInApp(launchArguments) { return }
         launch()
         Launches.launched(launchArguments)

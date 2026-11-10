@@ -1,7 +1,7 @@
 import XCTest
 
-/// Settings and "Source code and notices" over the UI-test models: Apple's speech model installed, the speaker models
-/// not downloaded, notifications denied.
+/// Settings and "Source code and notices" over the UI-test models: Apple's speech model installed where the system has
+/// Apple speech (`DeviceUnderTest`), the speaker models not downloaded, notifications denied.
 final class SettingsFlowTests: XCTestCase {
     @MainActor private func openSettings(_ arguments: [String] = []) -> XCUIApplication {
         let app = XCUIApplication()
@@ -29,6 +29,8 @@ final class SettingsFlowTests: XCTestCase {
     }
 
     // ports: SettingsViewModelTest#showsTheModelRowsTheCountsTheVersionAndTheNotificationsBanner (on the screen)
+    /// Where the system has no Apple speech (iOS 18) the default device has no recognizer: no picker, and the speech
+    /// row says it is not available.
     @MainActor func testSettingsShowsTheModelRowsTheBannerTheCountsAndTheBundleVersion() {
         let app = openSettings()
         // In the iPad split view the list fills in after the navigation bar.
@@ -36,13 +38,17 @@ final class SettingsFlowTests: XCTestCase {
             .waitForExistence(within: 5))
         XCTAssertTrue(app.staticTexts["Notifications are off"].waitForExistence(within: 5))
         XCTAssertTrue(app.buttons["Turn on"].exists)
-        XCTAssertTrue(app.descendants(matching: .any)["speechLanguagePicker"].exists,
-                      "Apple Speech takes a language: Transcription offers the picker")
+        XCTAssertEqual(app.descendants(matching: .any)["speechLanguagePicker"].exists, DeviceUnderTest.appleSpeech,
+                       "Apple Speech takes a language: Transcription offers the picker, and only then")
         let speech = element(app, startingWith: "Speech recognition")
         reveal(speech, in: app)
-        XCTAssertTrue(speech.label.contains("Ready"), speech.label)
-        XCTAssertTrue(speech.label.contains("Managed by iOS"), speech.label)
-        XCTAssertFalse(row(app, startingWith: "Speech recognition").exists, "a Ready row is not a button")
+        if DeviceUnderTest.appleSpeech {
+            XCTAssertTrue(speech.label.contains("Ready"), speech.label)
+            XCTAssertTrue(speech.label.contains("Managed by iOS"), speech.label)
+        } else {
+            XCTAssertEqual(speech.label, "Speech recognition, Not available")
+        }
+        XCTAssertFalse(row(app, startingWith: "Speech recognition").exists, "a Ready or Not available row is not a button")
         XCTAssertTrue(row(app, startingWith: "Telling speakers apart").label.contains("Not downloaded"))
         XCTAssertTrue(row(app, startingWith: "Telling speakers apart").label.contains("88 MB"))
         let voices = row(app, startingWith: "Saved voices")
