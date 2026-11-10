@@ -75,9 +75,12 @@ extension TurnModel {
     static func textWordCount(_ text: String) -> Int { text.split(whereSeparator: \.isWhitespace).count }
 
     /// A regular expression compiled once. `String.range(of:options: .regularExpression)` took about 2.3 µs a call on
-    /// iOS 18.2 (0.7 µs on iOS 27; Debug builds in the simulator), against 0.6 µs for a compiled one; the matching
-    /// itself is the same ICU expression with no options. The model gives the patterns anchored at the end
-    /// trimmed text only: a compiled `$` also matches before a final line break, where that search did not.
+    /// iOS 18.2 (0.7 µs on iOS 27; Debug builds in the simulator), against 0.6 µs for a compiled one. The expressions
+    /// are the same, but a compiled one matches code point by code point, as portable.ts's JavaScript does, where
+    /// that search on macOS 27 matched whole characters: punctuation followed by a combining mark (",\u{301}") now
+    /// attaches to the previous word, and a word piece made of combining marks and letters (Thai "\u{E49}\u{E33}")
+    /// now counts as word-like. The model gives the patterns anchored at the end trimmed text only: a compiled `$`
+    /// also matches before a final line break, where that search did not.
     struct Pattern: @unchecked Sendable { // NSRegularExpression is immutable and safe to share between threads.
         let regex: NSRegularExpression
 
