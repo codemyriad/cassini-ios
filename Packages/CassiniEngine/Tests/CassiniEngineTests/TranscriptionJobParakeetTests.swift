@@ -97,8 +97,11 @@ import CassiniNotebook
     @Test func aStopBeforeTheFirstWindowIsDoneLeavesNoCheckpoint() async throws {
         let (h, transcriber) = try await harness()
         let stop = StopSignal()
-        transcriber.beforeBlock = { index in if index == 3 { stop.stop(.pause(.user)) } }
-        transcriber.blockDelay = .milliseconds(20)
+        transcriber.beforeBlock = { index in
+            guard index == 3 else { return }
+            stop.stop(.pause(.user))
+            try await holdUntilTheJobCancels()
+        }
         #expect(await h.run(stop: stop).outcome == .paused(.user))
         #expect(h.checkpoints.saved.isEmpty)
         #expect(!h.files.exists(h.noteID))
@@ -228,12 +231,11 @@ final class WindowedTranscriber: Transcribing, @unchecked Sendable {
         { windows in
             guard windows == count else { return }
             stop.stop(.pause(.user))
-            // An upper bound: the job cancels the decode once its stop watch sees the stop.
-            try await Task.sleep(for: .seconds(30))
+            try await holdUntilTheJobCancels()
         }
     }
-    var beforeBlock: @Sendable (Int) -> Void = { _ in }
-    var blockDelay: Duration?
+    /// Awaited before each 1 s block is read, with its index; the decode waits for it.
+    var beforeBlock: @Sendable (Int) async throws -> Void = { _ in }
     /// Thrown in place of the window at this index.
     var failure: (window: Int, error: any Error)?
     /// What the words start with: `w` hears "w0", "w1", …
@@ -282,9 +284,8 @@ final class WindowedTranscriber: Transcribing, @unchecked Sendable {
         var block = 0
         let silence = [Float](repeating: 0, count: Limits.asrRate)
         while position < totalSamples {
-            beforeBlock(block)
+            try await beforeBlock(block)
             block += 1
-            if let blockDelay { try await Task.sleep(for: blockDelay) }
             let count = min(Limits.asrRate, totalSamples - position)
             try transcript.accept(silence, count: count)
             position += count

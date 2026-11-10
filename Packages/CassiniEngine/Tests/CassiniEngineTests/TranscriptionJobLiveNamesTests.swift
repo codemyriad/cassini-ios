@@ -158,11 +158,10 @@ import CassiniNotebook
         let (h, transcriber) = try await harness(voices: [])
         let speakers = Speakers()
         let stop = StopSignal()
-        transcriber.beforeWindow = { [drafts = h.drafts, noteID = h.noteID] index in
-            if index == 1 {
-                drafts.mutateIfOpen(noteID) { $0.rename(speakers.a, "Chiara") }
-                stop.stop(.pause(.user))
-            }
+        let pause = WindowedTranscriber.pause(stop, afterWindows: 1)
+        transcriber.afterWindow = { [drafts = h.drafts, noteID = h.noteID] windows in
+            if windows == 1 { drafts.mutateIfOpen(noteID) { $0.rename(speakers.a, "Chiara") } }
+            try await pause(windows)
         }
         #expect(await h.run(stop: stop, observe: speakers.observe).outcome == .paused(.user))
         #expect(h.drafts.isOpen(h.noteID))
@@ -171,7 +170,7 @@ import CassiniNotebook
         let reread = DraftNamesStore(notes: h.notes)
         #expect(reread.current(h.noteID).labels == [speakers.a: "Chiara"])
 
-        transcriber.beforeWindow = { _ in }
+        transcriber.afterWindow = { _ in }
         #expect(await h.run().outcome == .done)
         #expect(h.host.analyses.single?.names?.labels == [speakers.a: "Chiara"])
     }
