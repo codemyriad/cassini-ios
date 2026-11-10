@@ -30,7 +30,9 @@ final class SettingsFlowTests: XCTestCase {
 
     // ports: SettingsViewModelTest#showsTheModelRowsTheCountsTheVersionAndTheNotificationsBanner (on the screen)
     /// Where the system has no Apple speech (iOS 18) the default device has no recognizer: no picker, and the speech
-    /// row says it is not available.
+    /// row says it is not available. That repeats, on purpose, the row of
+    /// `testWithoutAppleSpeechOrAnotherRecognizerTheSpeechRowIsNotAvailable`; the rest of the screen is this test's own. The Whistle and Parakeet rows of iOS 18 are checked by ParakeetSuggestionTests and
+    /// `testOnAParakeetDeviceTheSpeechRowShowsItsDownload`.
     @MainActor func testSettingsShowsTheModelRowsTheBannerTheCountsAndTheBundleVersion() {
         let app = openSettings()
         // In the iPad split view the list fills in after the navigation bar.
