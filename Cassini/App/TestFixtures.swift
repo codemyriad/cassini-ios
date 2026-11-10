@@ -77,8 +77,11 @@ enum TestFixtures {
 
     private static let waveform = (0..<96).map { Float(0.15 + abs(sin(Double($0) * 0.73)) * 0.55) }
 
-    /// Writes the notes of `seed` into an empty library.
-    static func seed(_ seed: AppEnvironment.Seed, into store: NoteStore, now: Date) async throws {
+    /// Writes the notes of `seed` into an empty library. `recognizer` is the device's: a seeded job and its saved
+    /// progress are that recognizer's, so they resume where the system has no Apple speech; Apple speech's job is a
+    /// legacy one, without an identity.
+    static func seed(_ seed: AppEnvironment.Seed, into store: NoteStore, now: Date,
+                     recognizer: SpeechRecognizer = .appleSpeech) async throws {
         guard try store.root.isEmptyDirectory else { return }
         var main = fixture(now: now)
         var notes: [Note] = []
@@ -126,7 +129,7 @@ enum TestFixtures {
             let url = store.audioURL(for: note)
             if note.id == fixtureID { try writeSilence(to: url) } else { try FileManager.default.copyItem(at: audio, to: url) }
         }
-        if seed == .statuses { try await seedStatusJobs(into: store, now: now) }
+        if seed == .statuses { try await seedStatusJobs(into: store, now: now, recognizer: recognizer) }
     }
 
     /// What a seed needs once the app is ready: consent and a running job for `processing`, whose speaker step is
@@ -175,14 +178,15 @@ enum TestFixtures {
     }
 
     /// The paused job (with the saved progress it resumes from) and the failed one of the statuses seed.
-    private static func seedStatusJobs(into store: NoteStore, now: Date) async throws {
+    private static func seedStatusJobs(into store: NoteStore, now: Date, recognizer: SpeechRecognizer) async throws {
         let audio = store.directory(for: pausedID).appendingPathComponent("audio.wav")
         try CheckpointFiles(notes: store).save(CheckpointState(
-            source: "audio.wav", signature: CheckpointState.signature(of: audio), model: CheckpointState.appleModel(language: "en-US"), segments: [],
+            source: "audio.wav", signature: CheckpointState.signature(of: audio), model: recognizer.checkpointModel(language: "en-US"), segments: [],
             doneMs: pausedDoneMs, totalMs: Int64(fixtureDuration * 1000), elapsedMs: 1_000), for: pausedID)
         try JobRepository(root: store.root).save([
             Job(noteID: pausedID, seq: 1, kind: .transcribe, state: .paused, pauseReason: .user, doneMs: pausedDoneMs,
-                totalMs: Int64(fixtureDuration * 1000), language: "en-US", enqueuedAt: now),
+                totalMs: Int64(fixtureDuration * 1000), language: "en-US", enqueuedAt: now,
+                recognizer: recognizer == .appleSpeech ? nil : recognizer.rawValue),
             Job(noteID: failedID, seq: 2, kind: .transcribe, state: .failed, failure: .audio, language: "en-US", enqueuedAt: now),
         ])
     }

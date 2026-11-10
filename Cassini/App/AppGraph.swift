@@ -230,7 +230,8 @@ import CassiniNotebook
         #if DEBUG
         if let seed = environment.launch.seed, let store = library.noteStore {
             startup.register(.load) { [environment] in
-                try await TestFixtures.seed(seed, into: store, now: environment.clock.now)
+                try await TestFixtures.seed(seed, into: store, now: environment.clock.now,
+                                            recognizer: environment.transcriber.recognizer)
             }
         }
         #endif
