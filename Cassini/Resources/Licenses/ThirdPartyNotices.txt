@@ -984,7 +984,7 @@ Downloaded models
 Cassini downloads its models only from dist.gocassini.com, Cassini's model host, and only after you agree. They are not in the app.
 - NVIDIA Nemotron-3-Diarization (nemotron-3-diarization-int8) tells speakers apart. OpenMDW License Agreement 1.1.
 - 3D-Speaker CAM++ (campplus-voxceleb-16k) computes the voiceprints that recognise saved voices. Apache License 2.0.
-- On devices that run it, Parakeet Ultra 0.6B INT8 (parakeet-ultra-0.6b-int8) recognises speech, and Silero VAD (silero-vad) finds where speech is. CC BY 4.0 and MIT.
+- On devices that run it, Parakeet Ultra 0.6B INT8 (parakeet-ultra-0.6b-int8-v2) recognises speech, and Silero VAD (silero-vad) finds where speech is. CC BY 4.0 and MIT.
 
 Each model is installed with the model host's notices, https://dist.gocassini.com/NOTICE.txt, which name each model's source, licence and changes and carry the licence texts they ask to keep. Once a model is installed they follow this section.
 
