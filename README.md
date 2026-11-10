@@ -219,6 +219,12 @@ measured time, averaged with the time stored before. Arguments after the tier go
 environment variables. `scripts/test-remote.sh [tier]` runs the same tier on the Mac named by `CASSINI_MAC`, or here
 when that is unset.
 
+`CASSINI_RUNTIME=18 scripts/test.sh app` (or `ui`) runs on the newest installed iOS 18 simulator runtime instead of
+the newest runtime; a version such as `18.6` or a runtime identifier also works. A run fails when no runtime matches,
+or when the runtime cannot run the device types: below iOS 26 they default to iPhone 16 and iPad Pro 13-inch (M4).
+That leg keeps its own clones (`ts-<worktree>-iphone18-N`), logs (`DerivedData/test-logs-ios18`) and UI timing table,
+so it neither reuses nor disturbs the default leg, and it posts no commit status. `clean` deletes its clones too.
+
 On GitHub, `.github/workflows/ci.yml` runs `scripts/test.sh fast` and `scripts/test.sh build` on a hosted runner
 with Xcode 27.0, for each push to main or a pull request that changes code. The simulator tiers run only locally: the
 `drmeyers/test-all` status that `CASSINI_POST_STATUS=1 scripts/test.sh all` posts is what a merge looks for.

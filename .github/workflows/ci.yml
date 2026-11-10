@@ -26,6 +26,7 @@ on:
       - 'scripts/test-events.py'
       - 'scripts/test-test-events.py'
       - 'scripts/test-swift-test-product.py'
+      - 'scripts/test-test-runtime.py'
       - 'scripts/check-strings.sh'
       - 'scripts/*whistle*.py'
       - '.github/workflows/ci.yml'
@@ -76,6 +77,7 @@ jobs:
         run: |
           python3 scripts/test-test-events.py
           python3 scripts/test-swift-test-product.py
+          python3 scripts/test-test-runtime.py
       - name: String catalogs and package tests
         working-directory: cassini-ios
         run: scripts/test.sh fast
