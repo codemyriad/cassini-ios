@@ -5,12 +5,13 @@ Pro 13-inch (M5)). The counts were taken on 13 October 2026 with `scripts/test.s
 `DerivedData.noindex/test-logs`. A real device is still needed for the checks in the
 [device checklist](#device-checklist).
 
-The deployment target is iOS 18.0, but no check has run on an iOS 18 system yet: the iOS 18.6 simulator runtime is
-not installed on the build Mac and no iOS 18 device is known. The iOS 18 rules are covered by `swift test` (both
-values of each `PlatformFacts` fact and the Whistle CPU rule), by app-hosted tests that pass the iOS 18 facts
-(`PlatformCompositionTests`), and by `--ios18-platform` UI test launches, which apply them on the iOS 27 simulators
-(`SettingsFlowTests`, `SpeechUnavailableTests`, `ParakeetSuggestionTests`). They do not exercise iOS 18's own
-system, chrome or libraries. [iOS 18](ios18.md) lists what is pending.
+The deployment target is iOS 18.0. Only Whistle's checks have run on an iOS 18 system so far: on the iOS 18.2
+simulator (the iOS 18 test runtime; Apple no longer offers 18.6) its imports resolve, its hosted tests pass and the 13
+parity fixtures match ([Whistle/README.md](../Whistle/README.md)). No iOS 18 device is known. The iOS 18 rules are
+covered by `swift test` (both values of each `PlatformFacts` fact and the Whistle CPU rule), by app-hosted tests that
+pass the iOS 18 facts (`PlatformCompositionTests`), and by `--ios18-platform` UI test launches, which apply them on the
+iOS 27 simulators (`SettingsFlowTests`, `SpeechUnavailableTests`, `ParakeetSuggestionTests`). They do not exercise
+iOS 18's own system, chrome or libraries. [iOS 18](ios18.md) lists what is pending.
 
 ## Automated checks
 

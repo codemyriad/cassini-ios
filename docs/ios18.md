@@ -2,9 +2,10 @@
 
 The app's deployment target is iOS 18.0 (`project.yml`). On iOS 26 and later it behaves as it did when the target was
 iOS 26. Below iOS 26 two system features are missing, and the app does without them. Everything on this page about
-iOS 18 is read from the code and its unit tests. **Nothing has run yet on an iOS 18 system: not on the iOS 18.6
-simulator (the runtime is not installed on the build Mac yet), and not on a device.** Each statement below that
-depends on that says "not yet verified on iOS 18.6".
+iOS 18 is read from the code and its unit tests, except Whistle's evidence on the iOS 18.2 simulator (below). **Apart
+from that, nothing has run yet on an iOS 18 system: not on the iOS 18.2 simulator, the iOS 18 test runtime since
+Apple no longer offers 18.6, and not on a device.** Each statement below that depends on that says "not yet verified
+on iOS 18.2".
 
 ## What the system decides
 
@@ -46,7 +47,7 @@ than allowed to crash on first use. The `WhistleBundle` "CPU features" log line 
 ## Background on iOS 18
 
 Without continued processing, work that leaves the screen gets only the finite background time iOS allows (about
-30 s, not guaranteed). Not yet verified on iOS 18.6.
+30 s, not guaranteed). Not yet verified on iOS 18.2.
 
 - **Transcription.** When the time ends, the job pauses with its checkpoint kept (at most 30 s of audio is redone),
   the queue is held as paused by the system, and while Cassini is hidden the notification "Transcription paused by
@@ -64,11 +65,11 @@ Android keeps both running in a foreground service, so this is a platform differ
 
 The pinned Needle archives declare minos 27.0 and are used unchanged. D75.2 allowed linking them at target 26.0;
 Silvio's decision of 2026-11-10 (D85, decision 1 below) extends that exception to 18.0. There is one framework for
-every OS version, linked at 18.0 (decision 3). [Whistle/README.md](../Whistle/README.md) has the contract, what has
-been shown with the 18.0-linked framework on the iOS 26.0 and 27.0 simulators, and the evidence still pending on the
-iOS 18.6 simulator: the runtime export check, the 13 parity fixtures and the hosted Whistle tests. Until those pass,
-nothing has shown that the framework loads or transcribes on iOS 18. No iOS 18 device is known (decision 8), so there is
-also no device run, no memory measurement and no TestFlight acceptance on iOS 18.
+every OS version, linked at 18.0 (decision 3). [Whistle/README.md](../Whistle/README.md) has the contract and what has
+been shown with the 18.0-linked framework on the iOS 18.2, 26.0 and 27.0 simulators. On iOS 18.2 every simulator
+import resolves (five only through the host Mac's libraries), the hosted Whistle tests pass and the 13 parity fixtures
+match: the framework loads and transcribes on the iOS 18.2 simulator. No iOS 18 device is known (decision 8), so there
+is no device run, no memory measurement and no TestFlight acceptance on iOS 18.
 
 ## How it is tested today
 
@@ -82,7 +83,8 @@ also no device run, no memory measurement and no TestFlight acceptance on iOS 18
   iOS 18's own system chrome or APIs.
 - `scripts/test.sh build` runs `scripts/check-embedded-minos.py`: no embedded binary or plist may need a newer iOS
   than the app.
-- Not yet: any run on the iOS 18.6 simulator runtime, and the pre-iOS 26 system chrome (the back button's text,
+- Not yet: a run of the other app-hosted and UI tests on the iOS 18.2 simulator runtime (only the Whistle tests have
+  run there), and the pre-iOS 26 system chrome (the back button's text,
   navigation bar material, scroll following), which only such a run can show.
 
 ## Decisions recorded
@@ -101,5 +103,9 @@ as the coordinator asked and **awaiting Silvio's review**; any of them can still
 | 6 | Merge gate | The iOS 18 test leg is folded into `drmeyers/test-all`: a smoke run on every `all`, the full iPhone run for PRs that touch views | recommendation, awaiting Silvio's review |
 | 7 | iPad on iOS 18 in the test leg | Only in the full-run tier | recommendation, awaiting Silvio's review |
 | 8 | Physical iOS 18 device | None assumed. Support ships on simulator evidence plus the A12 measurement on iPadOS 26, so there is no D75.2 lab-device run, no memory measurement and no TestFlight acceptance on iOS 18 | follows from decision 1; Silvio to confirm whether a device exists |
+
+Apple no longer offers the iOS 18.6 simulator runtime that decisions 1 and 2 name; the coordinator made iOS 18.2
+(22C150) the iOS 18 test runtime, and decision 1's evidence was gathered there
+([Whistle/README.md](../Whistle/README.md)).
 
 Decisions 6 and 7 describe a test leg that is not on this branch.

@@ -672,7 +672,7 @@ stricter or looser than the spec.
   never called. A transcription still running when that time ends (about 30 s after Cassini leaves the screen) pauses
   as below and needs Resume; the standalone download stops with "iOS stopped the download. Try again to continue
   where it stopped." and keeps its bytes. Android keeps both running in its foreground service. This is a platform
-  constraint (decision 5 in [iOS 18](ios18.md), awaiting Silvio's review). Not yet verified on iOS 18.6.
+  constraint (decision 5 in [iOS 18](ios18.md), awaiting Silvio's review). Not yet verified on iOS 18.2.
 - **When iOS takes the time back.** Expiry and the system's Stop do what Android's `onTimeout` does. The job's stop is
   signalled before iOS's expiration handler returns, the queue is held (`system`), and the job shows as paused by the
   system. While Cassini is hidden, the notification "Transcription paused by iOS · iOS needed the time back. Open

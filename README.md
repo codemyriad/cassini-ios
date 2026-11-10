@@ -8,8 +8,8 @@ This is the iOS port of [Cassini for Android](https://github.com/codemyriad/cass
 <AndroidTest>#<name>`. Where the two apps disagree, Android's behaviour wins, unless the difference is an iOS-only
 extra or a platform constraint. [Differences from Android](#differences-from-android) lists what remains different and
 why. The app is native SwiftUI for iOS 18 or later. On iOS 26 and later it can fall back to Apple's speech model and
-uses continued background processing; below iOS 26 it does without both ([iOS 18](docs/ios18.md)). Nothing has run
-on iOS 18 yet: support there is not yet verified on iOS 18.6.
+uses continued background processing; below iOS 26 it does without both ([iOS 18](docs/ios18.md)). On iOS 18 only
+Whistle has run so far, on the iOS 18.2 simulator; the rest of iOS 18 support is not yet verified on iOS 18.2.
 
 ## Screenshots
 
@@ -92,7 +92,7 @@ records their exact revisions.
   background time back, or a crash all resume from the last checkpoint. The progress card shows the stages, the percent,
   the time left, a battery projection and the draft so far. On iOS 26 or later transcription continues in the background
   with a system progress indicator; on iOS 18 it pauses when iOS ends the short background time (not yet verified on iOS
-  18.6). A notification says when a note is done or iOS paused it.
+  18.2). A notification says when a note is done or iOS paused it.
 - **Speakers.** As Android does, streaming Sortformer tells the speakers apart window by window while the words are
   decoded, and CAM++ makes a voiceprint for each speaker. The draft shows the speakers as they appear: you can name or
   merge them before the job is done, and a saved voice is suggested in the draft ("Is this Luca?"). Afterwards you
@@ -148,8 +148,9 @@ TestFlight still need.
   from `Privacy.txt` ([distribution](docs/distribution.md#app-store-connect-answers)).
 - A real device is still needed to validate recognition, model downloads, long background capture and transcription,
   Bluetooth routes, the Live Activity and thermal behaviour. [Validation](docs/validation.md) has the checklist.
-- iOS 18 support rests on the code, unit tests and runs with the iOS 18 facts on the iOS 26 and 27 simulators:
-  nothing has run on an iOS 18 system, neither the iOS 18.6 simulator nor a device, and no iOS 18 device is known.
+- iOS 18 support rests on the code, unit tests and runs with the iOS 18 facts on the iOS 26 and 27 simulators. On an
+  iOS 18 system only Whistle has run: its imports, hosted tests and parity fixtures on the iOS 18.2 simulator (the
+  iOS 18 test runtime; Apple no longer offers 18.6). Nothing else has run there, and no iOS 18 device is known.
   [iOS 18](docs/ios18.md) lists what is shown and what is pending.
 
 ## Differences from Android
@@ -208,8 +209,8 @@ TestFlight still need.
   stops (the job pauses with its checkpoint, the download keeps its bytes) and needs Resume or Try again, where
   Android keeps both running. Whistle also needs Armv8.1 atomics and Armv8.3 RCpc, so the A10 iPad (7th generation)
   gets no Whistle; with less than 5 GiB it gets no engine at all. The Whistle binary is built for iOS 27 and linked
-  at 18.0 under the D75.2 exception as extended, which rests on iOS 18.6 simulator evidence still pending. Not yet
-  verified on iOS 18.6.
+  at 18.0 under the D75.2 exception as extended, which rests on the iOS 18.2 simulator evidence in
+  [Whistle/README.md](Whistle/README.md); no iOS 18 device has run it. The rest is not yet verified on iOS 18.2.
 - **iOS extras.** Stars, bookmarks, playback speed, lock-screen controls, passage editing, JSON export, the Speakers
   list, the "Recently Deleted" name, "Forget all voice data", and Settings sections for transcription, speakers and
   your library.
