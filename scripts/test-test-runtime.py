@@ -402,18 +402,40 @@ class FullRunTests(unittest.TestCase):
         self.assertFalse([c for c in h.calls() if "simctl | shutdown" in c])
         self.assertEqual(h.state()["devices"][R27][0]["state"], "Booted")
 
+    # lock-ready as test.sh calls it, answering at once from a non-blocking flock instead of waiting out its deadline
+    # (at least 5 s): 124, its "not within the wait" status, while another process holds the lock. Any other command
+    # (the hold helper) is the real test-events.py.
+    LOCK_READY_NOW = r'''#!/usr/bin/python3 -I
+import errno, fcntl, os, sys
+here = os.path.dirname(os.path.abspath(__file__))
+if sys.argv[1:2] != ["lock-ready"]:
+    os.execv(sys.executable, [sys.executable, "-I", os.path.join(here, "test-events-real.py")] + sys.argv[1:])
+with open(os.path.join(os.environ["STUB"], "calls"), "a") as f:
+    f.write("lock-ready | %s | %s\n" % (sys.argv[3], sys.argv[5]))
+fd = os.open(sys.argv[3], os.O_RDWR | os.O_CREAT, 0o644)
+try:
+    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+except OSError as error:
+    sys.exit(124 if error.errno in (errno.EWOULDBLOCK, errno.EAGAIN) else 1)
+sys.exit("the lock was free: this test must hold it")
+'''
+
     def test_a_run_that_does_not_get_the_host_lock_leaves_the_clones_alone(self):
         import fcntl
         h = Harness(self, devices={R27: [dev("ts-wt-iphone-1", udid(1), "Booted")]})
+        scripts = h.root / "scripts"
+        (scripts / "test-events.py").rename(scripts / "test-events-real.py")
+        (scripts / "test-events.py").write_text(self.LOCK_READY_NOW)
         lock = h.home / "heavy.lock"
         with open(lock, "w") as held:
             fcntl.flock(held, fcntl.LOCK_EX)
-            # The shortest wait test-events.py allows (5 s) runs out while this test holds the lock.
             result = h.run("app", CASSINI_RUNTIME="26", CASSINI_HEAVY_LOCK_HELD="", CASSINI_HEAVY_LOCK=str(lock),
                            CASSINI_LOCK_MINUTES="0")
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn("host busy: could not take", result.stderr)
-        self.assertFalse([c for c in h.calls() if c.startswith("xcodebuild") or "simctl | shutdown" in c])
+        self.assertIn(f"host busy: could not take {lock} within 0 min", result.stderr)
+        # One immediate try of the lock with the wait it was given, then no build and no clone shutdown.
+        calls = [c for c in h.calls() if c.startswith(("lock-ready", "xcodebuild")) or "simctl | shutdown" in c]
+        self.assertEqual(calls, ["lock-ready | <TMP>/home/heavy.lock | 0"])
         self.assertEqual(h.state()["devices"][R27][0]["state"], "Booted")
 
     def test_a_cassini_runtime_run_still_shuts_its_clones_down_at_the_end(self):
@@ -457,8 +479,10 @@ class FullRunTests(unittest.TestCase):
                 result = h.shell(functions, stubs + f'runtime_tag={tag!r}; auto_workers 0')
                 self.assertEqual(result.stdout.strip(), expected, result.stderr)
         # Two booted iPhones of the leg give the room the UI clones need, with nothing else free; without them, the
-        # wait would start (and here fail at once: there is no resource-event helper under this root).
-        stubs = 'free_mb() { echo 0; }\ncpu_idle() { echo 100; }\nadmit_minutes=1; root=/nonexistent\n'
+        # wait would start (and here fail at once: there is no resource-event helper under this root). The clock
+        # stands still, so the admission deadline never decides which.
+        stubs = 'free_mb() { echo 0; }\ncpu_idle() { echo 100; }\nadmit_minutes=1; root=/nonexistent\n' \
+                'date() { echo 2000000000; }\n'
         result = h.shell(functions, stubs + 'runtime_tag=26; wait_for_room')
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertNotIn("waiting for room", result.stdout)
@@ -548,13 +572,16 @@ class OwnershipTests(unittest.TestCase):
         runtime_leases = h.cache / "sim-leases/runtime"
         runtime_leases.mkdir(parents=True)
         (runtime_leases / udid(1)).touch()
-        # Both last had an app installed an hour ago; only the first has a fresh lease.
+        # Both last had an app installed an hour ago; only the first has a lease from half a minute ago, on a clock
+        # that stands still at now.
+        now = 2000000000
+        os.utime(runtime_leases / udid(1), (now - 30, now - 30))
         for n in (1, 2):
             apps = h.home / f"Library/Developer/CoreSimulator/Devices/{udid(n)}/data/Containers/Bundle/Application"
             apps.mkdir(parents=True)
-            os.utime(apps, (0, os.path.getmtime(apps) - 3600))
+            os.utime(apps, (now - 3600, now - 3600))
         result = h.shell(["clones", "clone_of", "idle_seconds", "reap_idle_clones"],
-                         'idle_minutes=15; reap_idle_clones')
+                         f'date() {{ echo {now}; }}\nidle_minutes=15; reap_idle_clones')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("ts-wt-b-iphone18-1 was used 0 min ago; leaving it booted", result.stdout)
         self.assertIn("shutting down ts-wt-b-iphone18-2, idle for 60 min", result.stdout)
