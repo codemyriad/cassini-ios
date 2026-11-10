@@ -48,8 +48,8 @@ without a speech-model download. On supported devices, a calm, dismissible sugge
 Parakeet Ultra with its actual pinned download size. Once Parakeet is installed and hash-verified, new jobs use it
 automatically; Whistle remains selectable. Devices below Parakeet's capability/memory/disk requirements never see
 the suggestion. Existing queued and paused jobs keep their recognizer. See [Whistle/README.md](Whistle/README.md)
-for the documented minos27 archive exception (linked for iOS 18.0), the iOS 26 parity, the A12/3GB measurements
-and the iOS 18 evidence still pending. Internal TestFlight builds
+for the documented minos27 archive exception (linked for iOS 18.0), the iOS 26 and iOS 18.2 simulator parity, the
+A12/3GB measurements (made with the 26.0-linked framework; owed again for the 18.0-linked one), and what the iOS 18 evidence does not show (no physical iOS 18 device has run Whistle). Internal TestFlight builds
 retain private memory diagnostics and must export with testFlightInternalTestingOnly=true.
 
 ## Run
