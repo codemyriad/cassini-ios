@@ -5,20 +5,25 @@ import CassiniWhistle
 /// The one place the app asks the running system what it offers. The rules take the answers as values
 /// (`PlatformFacts`, `WhistleCapability`), so `swift test` covers both sides of each.
 ///
-/// The deployment target is iOS 26.0, so every iOS 26 feature is there and every device is an A12 or newer. A lower
-/// target replaces the constants below with `#available` checks and the CPU's reported features.
+/// Apple speech and continued processing are iOS 26 APIs; `facts` says the system has them exactly where
+/// `#available(iOS 26.0, *)` does, and the adapters that use them check both (`AppEnvironment.appleSpeechCandidate`,
+/// `UIKitBackgroundRunner`), so a fact never promises an API the system lacks.
 enum LivePlatform {
-    /// Apple speech and continued processing, both iOS 26.
-    static let facts = PlatformFacts.iOS26
+    /// The iOS 26 facts on iOS 26 and later, the iOS 18 facts below.
+    static let facts: PlatformFacts = {
+        if #available(iOS 26.0, *) { return .iOS26 }
+        return .iOS18
+    }()
 
     static var operatingSystemMajor: Int { ProcessInfo.processInfo.operatingSystemVersion.majorVersion }
 
-    /// Whether this iOS is one the bundled Whistle framework is linked for.
+    /// Whether this iOS is one the bundled Whistle framework is linked for (iOS 26 until Whistle is linked for 18).
     static var whistleOperatingSystemSupported: Bool {
         WhistleCapability.supports(operatingSystemMajor: operatingSystemMajor)
     }
 
-    /// Every device iOS 26 runs on is an A12 or newer, which has the atomics and RCpc loads Whistle executes
-    /// (`WhistleCapability.supports(cpu:)`).
+    /// Whistle is offered only from its OS floor, iOS 26, and every device iOS 26 runs on is an A12 or newer, which
+    /// has the atomics and RCpc loads Whistle executes (`WhistleCapability.supports(cpu:)`). Linking Whistle for an
+    /// older iOS replaces this with the CPU's reported features.
     static let whistleCPUSupported = true
 }

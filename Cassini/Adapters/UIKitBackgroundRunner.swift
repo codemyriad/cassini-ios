@@ -15,7 +15,9 @@ import CassiniEngine
 /// terminates an app whose finite task is still running after its expiration handler, and documents no time after it.
 /// What the work starts from its handler (the paused job's write) is best-effort; the queue's stored `system` hold lets
 /// the launch repair finish it when Cassini is killed while suspended. Where the system has no continued processing
-/// (`PlatformFacts.continuedProcessing`), every request takes the finite time and nothing touches `BGTaskScheduler`.
+/// (`PlatformFacts.continuedProcessing`, iOS 26), every request takes the finite time and nothing touches
+/// `BGTaskScheduler`: only `submit` makes a continued entry, and it runs only where both the facts and
+/// `#available(iOS 26.0, *)` allow it. Below iOS 26 a registration after launch would throw.
 @MainActor final class UIKitBackgroundRunner: BackgroundRunner {
     /// Match `BGTaskSchedulerPermittedIdentifiers` (`io.codemyriad.cassini.transcription.*`). A request takes the first
     /// one that no held continued task has: the queue's drain, which asks first, usually gets the first.
@@ -35,14 +37,15 @@ import CassiniEngine
         }
     }
 
-    /// A continued-processing request, and its task once iOS has started it.
+    /// A continued-processing request, and its task once iOS has started it. Made only on iOS 26 (`submit`).
     private final class Continued {
         let identifier: String
         let progress: Progress
         let onExpire: Expiry
         let subtitle: String
         var title: String
-        var task: BGContinuedProcessingTask?
+        /// The `BGContinuedProcessingTask` (iOS 26) iOS started for it.
+        var task: BGTask?
         init(identifier: String, title: String, subtitle: String, progress: Progress, onExpire: @escaping Expiry) {
             self.identifier = identifier; self.title = title; self.subtitle = subtitle; self.progress = progress
             self.onExpire = onExpire
@@ -50,15 +53,28 @@ import CassiniEngine
     }
 
     private var held: [BackgroundToken: Held] = [:]
-    private var registered: Set<String> = []
+    /// The identifiers whose launch handler this runner registered with `BGTaskScheduler`.
+    private(set) var registered: Set<String> = []
     private let platform: PlatformFacts
 
     init(platform: PlatformFacts) { self.platform = platform }
 
+    /// What a token holds, for the tests.
+    enum Hold { case finite, continued }
+
+    /// What `token` holds; nil once it ended, or when iOS gave no time.
+    func hold(of token: BackgroundToken) -> Hold? {
+        switch held[token] {
+        case .finite: .finite
+        case .continued: .continued
+        case nil: nil
+        }
+    }
+
     func begin(title: String, subtitle: String, progress: Progress,
                onExpire: @escaping @MainActor () -> Void) -> BackgroundToken {
         let token = BackgroundToken()
-        if platform.asksForContinuedProcessing(progressUnits: progress.totalUnitCount),
+        if platform.asksForContinuedProcessing(progressUnits: progress.totalUnitCount), #available(iOS 26.0, *),
            let continued = submit(title: title, subtitle: subtitle, progress: progress, onExpire: onExpire) {
             held[token] = .continued(continued)
             return token
@@ -72,9 +88,9 @@ import CassiniEngine
     }
 
     func update(_ token: BackgroundToken, title: String) {
-        guard case .continued(let continued) = held[token] else { return }
+        guard case .continued(let continued) = held[token], #available(iOS 26.0, *) else { return }
         continued.title = title
-        continued.task?.updateTitle(title, subtitle: continued.subtitle)
+        (continued.task as? BGContinuedProcessingTask)?.updateTitle(title, subtitle: continued.subtitle)
     }
 
     func end(_ token: BackgroundToken) {
@@ -97,6 +113,7 @@ import CassiniEngine
 
     /// Asks iOS to run the work as continued processing, under an identifier no held continued task has; nil when it
     /// refuses or every identifier is held.
+    @available(iOS 26.0, *)
     private func submit(title: String, subtitle: String, progress: Progress, onExpire: @escaping Expiry) -> Continued? {
         let taken = Set(held.values.compactMap { entry -> String? in
             if case .continued(let continued) = entry { continued.identifier } else { nil }
@@ -111,6 +128,7 @@ import CassiniEngine
     }
 
     /// Registers the launch handler of `identifier` once; continued-processing handlers may be registered after launch.
+    @available(iOS 26.0, *)
     private func register(_ identifier: String) -> Bool {
         if registered.contains(identifier) { return true }
         let done = BGTaskScheduler.shared.register(forTaskWithIdentifier: identifier, using: .main) { [weak self] task in
@@ -121,6 +139,7 @@ import CassiniEngine
     }
 
     /// iOS started the continued-processing task asked for last under the task's identifier.
+    @available(iOS 26.0, *)
     private func started(_ task: BGTask) {
         let pending = held.first { _, entry in
             if case .continued(let continued) = entry {

@@ -66,7 +66,7 @@ struct LibraryView: View {
                     .accessibilityLabel(Text(verbatim: ProductName.full))
                     .accessibilityAddTraits(.isHeader).accessibilityShowsLargeContentViewer()
                     .accessibilityIdentifier("wordmark")
-            }.sharedBackgroundVisibility(.hidden)
+            }.sharedBackgroundHidden()
             ToolbarItemGroup(placement: .topBarTrailing) {
                 Button(TrashCopy.title, systemImage: "trash") { router.show(.trash) }
                     .accessibilityIdentifier("recentlyDeletedButton")
@@ -195,4 +195,11 @@ struct LibraryView: View {
 private extension LibraryDialog {
     var startOver: Bool { if case .startOver = self { true } else { false } }
     var transcribeFresh: Bool { if case .transcribeFresh = self { true } else { false } }
+}
+
+private extension ToolbarContent {
+    /// Keeps the item out of iOS 26's shared glass background; earlier systems draw no background behind bar items.
+    @ToolbarContentBuilder func sharedBackgroundHidden() -> some ToolbarContent {
+        if #available(iOS 26.0, *) { sharedBackgroundVisibility(.hidden) } else { self }
+    }
 }
