@@ -135,7 +135,8 @@ The app now verifies the complete weights/VAD hashes and provenance metadata, an
 file at its fixed path inside the running app's bundle. Another bundle and symlinks escaping that path are refused.
 It then sets the privacy environment before `dlopen`; iOS authenticates the signed executable code when loading it.
 Apple's encryption is opaque to Cassini. There is no receipt/DEBUG bypass, code decryption, load-command rewriting
-or warning suppression. The minos27 exception and all source-archive/model pins remain unchanged.
+or warning suppression. The minos27 exception (since extended from the 26.0 link to 18.0) and all
+source-archive/model pins remain unchanged.
 
 This separates pre-Apple input provenance from installed executable authentication. Apple documents
 [TestFlight/App Store re-signing and custom tamper-check limitations](https://developer.apple.com/documentation/technotes/tn3161-inside-code-signing-certificates)

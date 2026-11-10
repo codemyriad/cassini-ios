@@ -23,7 +23,13 @@ that were not ported, with the reason for each.
   on the host with fakes. Decodes run on one dedicated thread at `.userInitiated` (`InferenceThread`); the recognizer
   is made with the first window and released when the words step ends, before the speaker step loads its models.
   Differences:
-  - **Apple Speech fallback (decision D2, iOS only).** A device that cannot hold Ultra keeps Apple's `SpeechAnalyzer` /
+  - **Apple Speech fallback (decision D2, iOS 26 and later only).** `SpeechAnalyzer` exists only from iOS 26. On
+    iOS 18 the Apple slot holds `UnavailableSpeechTranscriber`, which refuses every job, Settings shows no speech
+    language, and a device where Whistle cannot run is offered the Parakeet download if it can hold Ultra, as on
+    Android, else it cannot transcribe (`SpeechModelPolicy.recognizer(preference:platform:)`,
+    [iOS 18](ios18.md)). Wherever this page says "Apple Speech devices" or "devices that keep Apple Speech", it means
+    devices on iOS 26 or later. Since D78, Whistle comes first and Apple Speech is the fallback only where neither
+    Whistle nor a verified Parakeet can run. On iOS 26 such a device keeps Apple's `SpeechAnalyzer` /
     `SpeechTranscriber` (`AppleSpeechTranscriber`), with the speech language setting and its failure codes; so would a
     build without the native runtime, which every iOS build now links. `AppEnvironment` asks the pure
     `SpeechCapability.choose(linked:capable:)` once at launch, whether or not Ultra is installed: a job downloads it
@@ -202,8 +208,9 @@ that were not ported, with the reason for each.
   - **A full disk** during a download is `NOT_ENOUGH_STORAGE`, as iOS reports it as its own error. Android reads it
     as an I/O error (`INTERRUPTED`). Both check the free space before the first byte.
   - **Stopped by the system.** The installer has no `startDownload`/`stopDownloads()`: the standalone download is
-    `ModelInstalls`, one more caller of the installer, and the end of its `BGContinuedProcessingTask` (Android's
-    foreground-service time-out) stops its own wait and shows "Download stopped" there. The ported
+    `ModelInstalls`, one more caller of the installer, and the end of its `BGContinuedProcessingTask` (iOS 26; on
+    iOS 18 the end of its finite background time; Android's foreground-service time-out) stops its own wait and shows
+    "Download stopped" there. The ported
     `ModelInstallOwnerTest` cases start that caller with `install`.
   - **Compressed downloads.** Every model file is seekable Zstandard, which Apple's Compression framework does not read.
     `ArtifactFetcher.fetchCompressed` takes a `Decompressing` port, which the app fills with `ZstdDecompressor`
@@ -660,6 +667,12 @@ stricter or looser than the spec.
   the next part starts. When iOS takes that time back, or the person presses Stop, the standalone download stops as
   its Cancel does and the part shows "Download stopped" (STOPPED_BY_SYSTEM), as Android's `stopDownloads()` shows it,
   until its next install.
+- **Background time on iOS 18.** iOS 18 has no continued processing (`PlatformFacts.continuedProcessing`), so the
+  drain and the standalone download always take the finite time of `beginBackgroundTask`, and `BGTaskScheduler` is
+  never called. A transcription still running when that time ends (about 30 s after Cassini leaves the screen) pauses
+  as below and needs Resume; the standalone download stops with "iOS stopped the download. Try again to continue
+  where it stopped." and keeps its bytes. Android keeps both running in its foreground service. This is a platform
+  constraint (decision 5 in [iOS 18](ios18.md), awaiting Silvio's review). Not yet verified on iOS 18.6.
 - **When iOS takes the time back.** Expiry and the system's Stop do what Android's `onTimeout` does. The job's stop is
   signalled before iOS's expiration handler returns, the queue is held (`system`), and the job shows as paused by the
   system. While Cassini is hidden, the notification "Transcription paused by iOS · iOS needed the time back. Open

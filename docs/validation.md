@@ -5,6 +5,13 @@ Pro 13-inch (M5)). The counts were taken on 13 October 2026 with `scripts/test.s
 `DerivedData.noindex/test-logs`. A real device is still needed for the checks in the
 [device checklist](#device-checklist).
 
+The deployment target is iOS 18.0, but no check has run on an iOS 18 system yet: the iOS 18.6 simulator runtime is
+not installed on the build Mac and there is no iOS 18 device. The iOS 18 rules are covered by `swift test` (both
+values of each `PlatformFacts` fact and the Whistle CPU rule) and by `--ios18-platform` launches, which apply them
+on the iOS 27 simulators (`PlatformCompositionTests`, `SettingsFlowTests`, `SpeechUnavailableTests`,
+`ParakeetSuggestionTests`). They do not exercise iOS 18's own system, chrome or libraries. [iOS 18](ios18.md) lists
+what is pending.
+
 ## Automated checks
 
 `scripts/test.sh` runs the tiers. The modules are targets of the one root `Package.swift`, so every `swift test`
@@ -108,7 +115,8 @@ xcodebuild -project Cassini.xcodeproj -scheme Cassini -configuration Release \
 
 The simulator has no microphone, no Apple speech models of its own, no Live Activities on a Lock Screen, and no
 background limits like a device's. Run these checks on a physical iPhone (and an iPad for the split view) with iOS 26
-or later, with Live Activities and notifications allowed. Android's `device-kill-resume.sh` covers the same ground as
+or later, with Live Activities and notifications allowed, and, when an iOS 18 device is available, again on it (none
+is yet; see [iOS 18 device](#ios-18-device)). Android's `device-kill-resume.sh` covers the same ground as
 the kill-and-resume items.
 
 ### Live Activity
@@ -131,7 +139,7 @@ the kill-and-resume items.
 - Receive a phone call while recording. The recording pauses with "Paused — another app is using audio" and stays
   paused after the call until you resume it.
 
-### Background transcription (`BGContinuedProcessingTask`)
+### Background transcription (`BGContinuedProcessingTask`, iOS 26 and later)
 
 - Queue three notes from the screen, then leave Cassini. The system shows "Transcribing “title”" with progress and
   Stop, and the title changes for each next note. All three finish in the background.
@@ -139,6 +147,21 @@ the kill-and-resume items.
   paused by iOS" offers Resume. Resume continues from the checkpoint, not from the start.
 - Start a transcription while Cassini is already in the background (an import from another app). It gets only the
   short background time, and when that ends the job pauses with its progress kept.
+
+### iOS 18 device
+
+None of this has run: there is no iOS 18 device (decision 8 in [iOS 18](ios18.md)). On an iPhone XR or XS, or any
+device kept on iOS 18:
+
+- Install a TestFlight build. Whistle transcribes the controlled English sample (the Whistle README's distribution
+  acceptance), and the `WhistleBundle` log shows the CPU features read as atomics and rcpc true.
+- Settings shows no speech language row and no "Managed by iOS".
+- Queue a note longer than a few minutes from the screen, then leave Cassini. No system progress indicator appears;
+  after about 30 s the job pauses, "Transcription paused by iOS" is posted, and Resume continues from the checkpoint.
+- On a device with at least 5 GiB, start the Parakeet download from Settings and leave Cassini. It stops with "iOS
+  stopped the download. Try again to continue where it stopped."; Try again continues from the bytes kept.
+- On an iPad (7th generation) on iPadOS 18, if one is available: Whistle is unavailable, Transcribe is disabled, and
+  recording, playback and export work.
 
 ### Kill and resume
 

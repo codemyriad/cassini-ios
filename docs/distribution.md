@@ -40,7 +40,8 @@ keeps no entitlements either. Every build links the native speech runtime, the s
 Builds with `CASSINI_SHERPA_LOCAL=1` link a local build of it instead and are for development, not for upload.
 
 It was last checked with Xcode 27 on the final PR D tree (2026-11-02): app and extension present, both with
-their privacy manifests, version 0.1.0 build 2, minimum iOS 26, `ITSAppUsesNonExemptEncryption` false, arm64 only.
+their privacy manifests, version 0.1.0 build 2, minimum iOS 26 (the target then; it is now iOS 18.0, and no archive
+has been checked at 18.0 yet), `ITSAppUsesNonExemptEncryption` false, arm64 only.
 Sizes of the unsigned archive of the final PR D tree, against the `51bc71b` tree built without the two binary targets
 (the share includes the runtime's licence texts, 0.3 MiB of them ONNX Runtime's own notices):
 
@@ -150,5 +151,7 @@ work over SSH.
   It goes in App Store Connect under App Information → Privacy Policy URL.
 - **Export compliance:** answered in the build (`ITSAppUsesNonExemptEncryption` false), so no question per upload.
 - **App Review note:** explain that background audio (`UIBackgroundModes` audio) keeps a recording going with the screen
-  locked and lets playback continue on the lock screen, and that `processing` finishes a running transcription. Mention
-  that the speech and speaker models (about 531 MB) download only after the user agrees, and are data, not code.
+  locked and lets playback continue on the lock screen, and that `processing` finishes a running transcription (on
+  iOS 26 and later, through continued processing; on iOS 18 a transcription pauses when the short background time
+  ends, see [iOS 18](ios18.md)). Mention that the speech and speaker models (about 531 MB) download only after the
+  user agrees, and are data, not code.

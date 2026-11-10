@@ -37,7 +37,7 @@ build for the UI-test launches, and is empty in Release, where every source is c
 | `CassiniEngine` | The stateful parts, which work through ports: `NoteStore` and `JobStore` (actors), `LibraryStore`, `VoicesStore`, `SettingsStore`, the `TranscriptionCoordinator` and the `TranscriptionJob`, `RecordingController`, `PlaybackController`, `TrashService`, `NoticeCenter`, `ModelInstalls`, `ImportService` and `ExportService`, the screen models (`LibraryScreenModel`, `NoteScreenModel`, `NameSpeakerModel`, `RecordingScreenModel`, `SettingsModel`,
 `ModelDownloadModel`, `LicensesModel`), navigation (`Route`, `ScreenStack`, `DeepLinks`) and `Startup`. |
 | `CassiniEngineTesting` | Fakes of every port (`FakeTranscriber`, `FakeAnalyzer`, `FakeCapture`, `FakeClock`, …). Each source is under `#if DEBUG`, so a Release build links an empty module. |
-| `CassiniInference` | The adapters to the recognition engines: `ParakeetTranscriber` (Parakeet Ultra over the `SpeechDecoding`/`SpeechDetecting` ports, on its own inference thread), `AppleSpeechTranscriber` (`SpeechAnalyzer`, the fallback on devices that cannot hold Ultra) and `SpeakerAnalyzer` (Android's streaming Sortformer and CAM++ over the native runtime, from the pinned catalog through `PinnedModelInstaller`), with `ZstdDecompressor` for the diarizer's seekable Zstandard download. |
+| `CassiniInference` | The adapters to the recognition engines: `ParakeetTranscriber` (Parakeet Ultra over the `SpeechDecoding`/`SpeechDetecting` ports, on its own inference thread), `AppleSpeechTranscriber` (`SpeechAnalyzer`, iOS 26 and later only: the fallback on devices that can run neither Whistle nor Ultra), `UnavailableSpeechTranscriber` (its stand-in below iOS 26, which refuses every job) and `SpeakerAnalyzer` (Android's streaming Sortformer and CAM++ over the native runtime, from the pinned catalog through `PinnedModelInstaller`), with `ZstdDecompressor` for the diarizer's seekable Zstandard download. |
 | `CassiniSherpa` | The only importer of the sherpa-onnx C API (`SherpaOnnxC`, iOS only: the release `v1.13.7-cassini-mobile.1`, or the local build with `CASSINI_SHERPA_LOCAL=1`): `ParakeetDecoder` and `SileroDetector`, which conform to CassiniEngine's ports, and `SherpaRuntime.speech`, the factory the app passes to `ParakeetTranscriber`. Without the runtime its objects throw `notLinked`. |
 | `CassiniAudio` | Audio work that needs AVFoundation or libopus: inspection, CAF repair and Opus encode and decode (through `COpusBridge`). |
 | `Cassini` (app) | `AppEnvironment`, `AppGraph` (which binds each screen model's `Ports` to the stores, e.g. `NoteScreens`), the `Router`, the adapters (`AVCaptureAdapter`, `AVPlaybackAdapter`, `ActivityKitAdapter`, `UNNotifier`, `UIKitBackgroundRunner`, …), the thin app stores (`ProcessingStore`, `RecordingStore`, `PlaybackStore`, `ImportStore`, `ExportStore`, `NoticesStore`), the views and the string catalogs. |
@@ -140,10 +140,11 @@ Preferences are in `UserDefaults`, under Android's key names (`SettingsKeys`).
    Without consent, the model download screen opens. With consent, the job is written to `jobs.json` as `queued`, in
    `seq` order.
 2. **Drain.** The coordinator claims the next queued job unless the queue is held. Before the first claim it asks for
-   background time: `BGContinuedProcessingTask` when Cassini is on screen, else `beginBackgroundTask`. The job runs
+   background time: `BGContinuedProcessingTask` when Cassini is on screen on iOS 26 or later, else (and always on
+   iOS 18, `PlatformFacts.continuedProcessing`) `beginBackgroundTask`. The job runs
    only once that time is held.
 3. **Run.** `TranscriptionJob` reads any checkpoint (`NoteWorkFolders`), checks it against the audio's `length:mtime`
-   signature and the language, and resumes 1 s before `doneMs`. It feeds Apple's analyzer, writes a checkpoint every
+   signature and the language, and resumes from it. It feeds the recognizer, writes a checkpoint every
    30 s of finalized audio (at most every 10 s of running time), then saves the words to `note.json`. The speaker
    step depends on the recognizer: a Parakeet run tells each window's speakers apart as it decodes
    (`WindowSpeakers`: streaming Sortformer, then CAM++ prints of the voice clips after the words), with the draft's
