@@ -99,8 +99,16 @@ final class WordsDecode: Sendable {
                 guard recognizer == .whistle, let known = TranscriptLanguage.known(reported) else { break }
                 let previous = s.checkpoint.reportedLanguage
                 s.checkpoint.reportedLanguage = previous == nil || previous == known ? known : "mul"
-            case .preparingModel(let fraction):
-                s.outbox.append(.downloading(fraction.map(TranscriptionJob.fractionProgress(.speech))))
+            case .preparingModel(let preparation):
+                let progress: DownloadProgress
+                switch preparation {
+                case .checking:
+                    progress = DownloadProgress(part: .speech, doneBytes: 0, totalBytes: 0, verifying: true)
+                case .downloading(let fraction):
+                    progress = fraction.map(TranscriptionJob.fractionProgress(.speech))
+                        ?? DownloadProgress(part: .speech, doneBytes: 0, totalBytes: 0, verifying: false)
+                }
+                s.outbox.append(.downloading(progress))
             case .progress(let done, let total):
                 guard accept(total: CheckpointState.ms(total), &s) else { return }
                 s.progressMs = max(s.progressMs, CheckpointState.ms(done))
