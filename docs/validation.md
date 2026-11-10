@@ -2,8 +2,9 @@
 
 The automated checks below run on an Apple Silicon Mac with Xcode 27 and the iOS 27 simulators (iPhone 17 and iPad
 Pro 13-inch (M5)). The counts were taken on 13 October 2026 with `scripts/test.sh all`, from the logs in
-`DerivedData.noindex/test-logs`. A real device is still needed for the checks in the
-[device checklist](#device-checklist).
+`DerivedData.noindex/test-logs`. `CASSINI_RUNTIME` runs the simulator tiers on another installed runtime (the
+`scripts/test.sh` header), with logs in `DerivedData.noindex/test-logs-ios<version>`. A real device is still needed
+for the checks in the [device checklist](#device-checklist).
 
 ## Automated checks
 
