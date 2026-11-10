@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 import Synchronization
 import Testing
 import CassiniEngine
@@ -52,11 +53,14 @@ import CassiniEngineTesting
         #expect(StubProtocol.encodings == ["identity"], "Content-Length counts the bytes of the file")
     }
 
-    @Test func noAnswerThrowsTheURLError() async {
-        StubProtocol.reset { _ in .fail(URLError(.notConnectedToInternet)) }
-        await #expect(throws: URLError.self) {
+    @Test(arguments: [URLError.Code.notConnectedToInternet, .timedOut, .networkConnectionLost])
+    func noAnswerPreservesTheURLErrorCode(_ code: URLError.Code) async {
+        StubProtocol.reset { _ in .fail(URLError(code)) }
+        do {
             _ = try await transport.get(URL(string: "https://dist.gocassini.com/model")!, headers: [:], timeout: 30)
-        }
+            Issue.record("Expected the original transport failure")
+        } catch let error as URLError { #expect(error.code == code) }
+        catch { Issue.record("Expected URLError, got \(error)") }
     }
 
     @Test func aFreshRetrySessionKeepsItsConfigurationAndDoesNotInvalidateTheOriginal() async throws {
@@ -99,13 +103,97 @@ import CassiniEngineTesting
     }
 
     /// The error comes from `get` when URL loading ends the task before it hands over the head, else from the body.
-    @Test func aTransferThatBreaksOffThrows() async throws {
-        StubProtocol.reset { _ in .answer(200, ["Content-Length": "100"], [Data("abc".utf8)], then: URLError(.networkConnectionLost)) }
-        await #expect(throws: URLError.self) {
+    @Test(arguments: [URLError.Code.timedOut, .networkConnectionLost])
+    func aTransferThatBreaksOffPreservesItsURLErrorCode(_ code: URLError.Code) async throws {
+        StubProtocol.reset { _ in .answer(200, ["Content-Length": "100"], [Data("abc".utf8)], then: URLError(code)) }
+        do {
             let answer = try await transport.get(URL(string: "https://dist.gocassini.com/model")!, headers: [:], timeout: 30)
+            defer { answer.close() }
             _ = try await read(answer)
-        }
+            Issue.record("Expected the original transport failure")
+        } catch let error as URLError { #expect(error.code == code) }
+        catch { Issue.record("Expected URLError, got \(error)") }
     }
+
+    @Test(.timeLimit(.minutes(1))) func cancellingBeforeHeadersStopsTheProtocolAndReturnsCancellation() async throws {
+        let gate = HeldRequestGate()
+        let transport = heldTransport(gate)
+        let operation = Task { try await transport.get(URL(string: "https://cassini.invalid/pre-head")!, headers: [:], timeout: 30) }
+        defer { operation.cancel(); gate.failForCleanup() }
+        await gate.waitUntilStarted()
+        operation.cancel()
+        do {
+            let answer = try await operation.value
+            answer.close()
+            Issue.record("Cancelled pre-header request returned an answer")
+        } catch let error as URLError { #expect(error.code == .cancelled) }
+        catch { Issue.record("Expected URLSession cancellation, got \(error)") }
+        await gate.waitUntilStopped()
+        #expect(gate.starts == 1 && gate.stops == 1)
+    }
+
+    @Test(.timeLimit(.minutes(1))) func closingAnAnswerStopsItsHeldBodyWithoutInvalidatingTheSession() async throws {
+        let gate = HeldRequestGate()
+        let transport = heldTransport(gate)
+        let operation = Task { try await transport.get(URL(string: "https://cassini.invalid/held")!, headers: [:], timeout: 30) }
+        defer { operation.cancel(); gate.failForCleanup() }
+        await gate.waitUntilStarted()
+        gate.sendHeadersAndPrefix(Data("abc".utf8), total: 100)
+        let answer = try await operation.value
+        answer.close()
+        await gate.waitUntilStopped()
+        #expect(gate.starts == 1 && gate.stops == 1)
+        // A second independently gated request must still run on this same session.
+        let nextGate = HeldRequestGate()
+        HeldProtocol.use(nextGate)
+        let nextOperation = Task { try await transport.get(URL(string: "https://cassini.invalid/next")!, headers: [:], timeout: 30) }
+        defer { nextOperation.cancel(); nextGate.failForCleanup() }
+        await nextGate.waitUntilStarted()
+        nextGate.sendHeadersAndPrefix(Data("ok".utf8), total: 2)
+        nextGate.finish()
+        let next = try await nextOperation.value
+        defer { next.close() }
+        #expect(try await read(next) == Data("ok".utf8))
+    }
+
+    @Test(.timeLimit(.minutes(1))) func cancellingAfterTheArtifactPrefixKeepsItAndDoesNotRetryOrPublish() async throws {
+        let gate = HeldRequestGate()
+        let transport = heldTransport(gate)
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("transport-cancel-\(UUID())")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let bytes = Data("Pinned complete model".utf8), prefix = Data("Pinned".utf8)
+        let hash = SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
+        let artifact = Artifact("model.onnx", Int64(bytes.count), hash)
+        let consumed = AsyncStream<Void>.makeStream()
+        let operation = Task {
+            try await ArtifactFetcher(transport: transport, storage: FakeStorage())
+                .fetch("https://cassini.invalid/model", artifact, into: directory) { count, checking in
+                    if !checking && count == Int64(prefix.count) {
+                        consumed.continuation.yield(()); consumed.continuation.finish()
+                    }
+                }
+        }
+        defer { operation.cancel(); gate.failForCleanup(); consumed.continuation.finish() }
+        await gate.waitUntilStarted()
+        gate.sendHeadersAndPrefix(prefix, total: bytes.count)
+        for await _ in consumed.stream { break } // Bytes have reached the file writer before cancellation.
+        operation.cancel()
+        do { try await operation.value; Issue.record("Cancelled artifact request published") }
+        catch { #expect(ModelInstaller.isCancellation(error)) }
+        await gate.waitUntilStopped()
+        #expect(gate.starts == 1 && gate.stops == 1, "Body cancellation must not renew the session")
+        #expect(!FileManager.default.fileExists(atPath: directory.appendingPathComponent("model.onnx").path))
+        #expect(try Data(contentsOf: directory.appendingPathComponent("\(hash).part")) == prefix)
+    }
+
+    private func heldTransport(_ gate: HeldRequestGate) -> URLSessionTransport {
+        HeldProtocol.use(gate)
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [HeldProtocol.self]
+        return URLSessionTransport(userAgent: "Cassini cancellation event tests", configuration: configuration)
+    }
+
 }
 
 /// Answers every request of the session with `handler`, recording each request.
@@ -157,4 +245,61 @@ final class StubProtocol: URLProtocol, @unchecked Sendable {
     }
 
     override func stopLoading() {}
+}
+
+
+/// A held URL loading operation. No worker is blocked: the test explicitly delivers each callback.
+/// Suite serialization protects the next-request selector; each protocol instance retains its own gate.
+private final class HeldProtocol: URLProtocol, @unchecked Sendable {
+    private static let next = Mutex<HeldRequestGate?>(nil)
+    private let active = Mutex<HeldRequestGate?>(nil)
+    static func use(_ gate: HeldRequestGate) { next.withLock { $0 = gate } }
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        guard let gate = Self.next.withLock({ $0 }) else {
+            client?.urlProtocol(self, didFailWithError: URLError(.unsupportedURL)); return
+        }
+        active.withLock { $0 = gate }
+        gate.started(self)
+    }
+    override func stopLoading() { active.withLock { $0 }?.stopped() }
+}
+
+private final class HeldRequestGate: Sendable {
+    private struct State { var loader: HeldProtocol?; var starts = 0; var stops = 0 }
+    private let state = Mutex(State())
+    private let entered = AsyncStream<Void>.makeStream()
+    private let ended = AsyncStream<Void>.makeStream()
+    var starts: Int { state.withLock { $0.starts } }
+    var stops: Int { state.withLock { $0.stops } }
+    func started(_ loader: HeldProtocol) {
+        state.withLock { $0.loader = loader; $0.starts += 1 }
+        entered.continuation.yield(()); entered.continuation.finish()
+    }
+    func stopped() {
+        state.withLock { $0.loader = nil; $0.stops += 1 }
+        ended.continuation.yield(()); ended.continuation.finish()
+    }
+    func waitUntilStarted() async { for await _ in entered.stream { break } }
+    func waitUntilStopped() async { for await _ in ended.stream { break } }
+    func sendHeadersAndPrefix(_ prefix: Data, total: Int) {
+        guard let loader = state.withLock({ $0.loader }) else { Issue.record("Held request not active"); return }
+        let response = HTTPURLResponse(url: loader.request.url!, statusCode: 200, httpVersion: "HTTP/1.1",
+                                       headerFields: ["Content-Length": String(total)])!
+        loader.client?.urlProtocol(loader, didReceive: response, cacheStoragePolicy: .notAllowed)
+        loader.client?.urlProtocol(loader, didLoad: prefix)
+    }
+    func finish() {
+        let loader = state.withLock { value -> HeldProtocol? in
+            let loader = value.loader; value.loader = nil; return loader
+        }
+        if let loader { loader.client?.urlProtocolDidFinishLoading(loader) }
+    }
+    func failForCleanup() {
+        let loader = state.withLock { value -> HeldProtocol? in
+            let loader = value.loader; value.loader = nil; return loader
+        }
+        if let loader { loader.client?.urlProtocol(loader, didFailWithError: URLError(.cancelled)) }
+    }
 }
