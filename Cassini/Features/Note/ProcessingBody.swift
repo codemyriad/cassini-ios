@@ -36,8 +36,12 @@ struct ProcessingBody<Top: View, Banners: View>: View {
                     }
                     .padding(.horizontal, Spacing.gutter).padding(.top, pinned ? 0 : Spacing.gutter)
                     .padding(.bottom, Spacing.gutter)
-                    // The end of the list, for the scroll below iOS 26; an overlay, so the layout does not change.
-                    .overlay(alignment: .bottom) { Color.clear.frame(height: 1).id(Self.end).accessibilityHidden(true) }
+                    // The end of the list, for the scroll below iOS 26 only; an overlay, so the layout does not change.
+                    .overlay(alignment: .bottom) {
+                        if #available(iOS 26.0, *) {} else {
+                            Color.clear.frame(height: 1).id(Self.end).accessibilityHidden(true)
+                        }
+                    }
                     .readableWidth()
                 }
                 .scrollPosition($position)
