@@ -51,8 +51,8 @@ public struct TranscriptWindow: Hashable, Sendable {
 public enum TranscriptionEvent: Hashable, Sendable {
     /// Automatically detected language of a finalized Whistle segment; never the requested UI locale.
     case detectedLanguage(String)
-    /// The speech model is being prepared or downloaded; the fraction is nil while unknown.
-    case preparingModel(Double?)
+    /// The speech model is being downloaded or checked, retaining verification separately from unknown byte progress.
+    case preparingModel(InstallProgress)
     /// Audio up to `done` seconds of `total` is transcribed.
     case progress(done: TimeInterval, total: TimeInterval)
     /// A result that will not change any more.
