@@ -28,8 +28,11 @@ on:
       - 'scripts/test-test-events.py'
       - 'scripts/test-swift-test-product.py'
       - 'scripts/*embedded-minos.py'
+      - 'scripts/test-test-runtime.py'
       - 'scripts/check-strings.sh'
       - 'scripts/*whistle*.py'
+      - 'scripts/run-in-gui.py'
+      - 'scripts/test-run-in-gui.py'
       - '.github/workflows/ci.yml'
   push:
     branches: [main]
@@ -79,6 +82,7 @@ jobs:
           python3 scripts/test-test-events.py
           python3 scripts/test-swift-test-product.py
           python3 scripts/test-check-embedded-minos.py
+          python3 scripts/test-test-runtime.py
       - name: String catalogs and package tests
         working-directory: cassini-ios
         run: scripts/test.sh fast
@@ -87,6 +91,9 @@ jobs:
         run: |
           python3 scripts/test-bundle-whistle.py
           python3 scripts/test-check-whistle-runtime-exports.py
+      - name: GUI runner event and lifecycle regressions
+        working-directory: cassini-ios
+        run: python3 scripts/test-run-in-gui.py
       - name: Build for testing
         working-directory: cassini-ios
         run: scripts/test.sh build

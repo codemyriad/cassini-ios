@@ -175,7 +175,7 @@ TestFlight still need.
   Apple's models are per language. The pinned model catalog, plan, redirect policy, fetcher and installer are ported
   with Android's tests, behind an `HTTPTransport` port over a data-task `URLSession` that never follows a redirect
   itself, and one shared installer downloads Ultra, its speech detector and the speaker models with consent. Sizes
-  follow the shared rule of the format vectors ("443 MB"), where Android still rounds to tens.
+  follow the shared rule of the format vectors ("444 MB"), where Android still rounds to tens.
 - **Storage model.** A note is a `note.json` beside its audio. The portable Cassini document is sealed only at export,
   with the run's provenance under Android's keys. Each variant carries the language of the run that made its words
   (D53.2): `und` for Parakeet, as Android writes, the locale that ran for Apple Speech, never the Settings language.
@@ -239,6 +239,12 @@ measured time, averaged with the time stored before. Arguments after the tier go
 -only-testing:CassiniUITests/NoteScreenTests` runs one class, still sharded. The header of `scripts/test.sh` lists its
 environment variables. `scripts/test-remote.sh [tier]` runs the same tier on the Mac named by `CASSINI_MAC`, or here
 when that is unset.
+
+`CASSINI_RUNTIME=18 scripts/test.sh app` (or `ui`) runs on the newest installed iOS 18 simulator runtime instead of
+the newest runtime; a version such as `18.6` or a runtime identifier also works. A run fails when no runtime matches,
+or when the runtime cannot run the device types: below iOS 26 they default to iPhone 16 and iPad Pro 13-inch (M4).
+That leg keeps its own clones (`ts-<worktree>-iphone18-N`), logs (`DerivedData/test-logs-ios18`) and UI timing table,
+so it neither reuses nor disturbs the default leg, and it posts no commit status. `clean` deletes its clones too.
 
 On GitHub, `.github/workflows/ci.yml` runs `scripts/test.sh fast` and `scripts/test.sh build` on a hosted runner
 with Xcode 27.0, for each push to main or a pull request that changes code. The simulator tiers run only locally: the
@@ -308,10 +314,17 @@ decompression; the files and the host's `NOTICE.txt` are collected in
 On iOS, the model root, staging directories and resumed staging files use `completeUntilFirstUserAuthentication`
 so verification can finish after auto-lock. A response with a validated length finishes at its pinned whole-file or
 range boundary without waiting for connection teardown; size and SHA-256 checks still precede publication.
+As an iOS URLSession recovery measure, a timeout or lost connection while reading the manifest or NOTICE gets one
+retry with a separate session. It checks both metadata objects again and uses that session for the remaining model
+requests. Artifact transfers keep their existing resume rules; cancellation, pin, HTTP and local storage failures
+do not trigger this metadata retry.
 About › Model notices shows that `NOTICE.txt` from an installed revision. Every request to the host, each redirect hop included, sends `User-Agent: CassiniTalk/<CFBundleShortVersionString> (iOS <version>; build <CFBundleVersion>)` (D54, `ModelUserAgent`), built once by the app and set by `URLSessionTransport`. Before the first load in each session every
 installed file is hashed again (`ModelVerifier`, D16 §4); a file that differs retires the revision, the job fails
 with "Model verification failed", and the next job downloads it again. Provenance names Ultra
-`parakeet-ultra-0.6b-int8@<source_sha256>` (D16 §5). These pins need the codemyriad sherpa-onnx fork at `0c2ee3f`
+`parakeet-ultra-0.6b-int8-v2@<source_sha256>` (D16 §5, D86). The default is the improved #4179 INT8 encoder
+(`50c15b94…`): 465,446,146 compressed bytes and 671,608,018 installed bytes. The previous ID remains readable in
+provenance and stays on disk until v2 is installed and verified; only then is its install removed. The model cache key
+is derived from all pins and artifact hashes in `scripts/ci-models.json`, so v2 gets a distinct cache. These pins need the codemyriad sherpa-onnx fork at `0c2ee3f`
 (D16 §1): an older runtime cannot load the v2 diarizer or the dist Ultra export.
 
 `Package.swift` links the release's two xcframeworks into `CassiniSherpa`, the only module that imports `SherpaOnnxC`;
@@ -338,6 +351,10 @@ its URL, version and SwiftPM checksum in `scripts/native-dependencies.json` and 
 transcription lifecycle.
 
 ## License
+
+Copyright © 2026 Codemyriad and contributors.
+
+Maintainer: Codemyriad <cassini@codemyriad.io>.
 
 Cassini for iOS is free software under the [GPLv3](LICENSE). `Cassini/Resources/Licenses/ThirdPartyNotices.txt` lists
 the licences of the dependencies and the models, including every library of the native runtime's lock

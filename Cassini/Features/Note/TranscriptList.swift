@@ -43,11 +43,11 @@ struct TranscriptList: View {
         LazyVStack(alignment: .leading, spacing: 14) {
             ForEach(transcript.turns) { turn in
                 if let card = suggestion(turn) { card }
-                TurnView(turn: turn,
-                         activeIndex: activeWord?.turnID == turn.id ? activeWord?.index : nil,
-                         matches: hits.ranges[turn.id] ?? [],
-                         currentMatch: hits.current?.turnID == turn.id ? hits.current?.range : nil,
-                         style: style, renamable: renamable, actions: actions, geometry: geometry)
+                TurnView(input: TurnRenderInput(turn: turn, activeWord: activeWord,
+                                               matches: hits.ranges[turn.id] ?? [],
+                                               currentMatch: hits.current?.turnID == turn.id ? hits.current?.range : nil,
+                                               style: style, renamable: renamable),
+                         actions: actions, geometry: geometry)
                     .id(turn.id)
             }
         }

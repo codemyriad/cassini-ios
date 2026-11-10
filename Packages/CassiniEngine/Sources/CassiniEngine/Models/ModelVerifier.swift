@@ -21,7 +21,12 @@ public final class ModelVerifier: Sendable {
     /// The process's verifier: a session is the life of the process.
     public static let shared = ModelVerifier()
 
-    private let checked = Mutex<Set<String>>([])
+    private struct CheckedModel: Hashable, Sendable {
+        let root: String
+        let model: ModelDescriptor
+    }
+
+    private let checked = Mutex<Set<CheckedModel>>([])
     private let digest: Digest
 
     public init(digest: @escaping Digest = { file, cancelled, onBytes in
@@ -30,8 +35,8 @@ public final class ModelVerifier: Sendable {
         self.digest = digest
     }
 
-    private static func key(_ model: ModelDescriptor, _ root: URL) -> String {
-        "\(root.standardizedFileURL.path)|\(model.pin)"
+    private static func key(_ model: ModelDescriptor, _ root: URL) -> CheckedModel {
+        CheckedModel(root: root.standardizedFileURL.path, model: model)
     }
 
     /// Whether `model` under `root` was checked, or installed, in this session.
@@ -41,7 +46,9 @@ public final class ModelVerifier: Sendable {
 
     /// Records that every file of `model` under `root` was just checked, as an install does.
     public func markVerified(_ model: ModelDescriptor, in root: URL) {
+        guard model.ready(in: root) else { return }
         _ = checked.withLock { $0.insert(Self.key(model, root)) }
+        retireReplacedParakeet(afterVerifying: model, in: root)
     }
 
     /// Forgets the checks, as a new session would.
@@ -54,7 +61,12 @@ public final class ModelVerifier: Sendable {
     public func verify(_ model: ModelDescriptor, in root: URL, onBytes: (Int64) -> Void = { _ in },
                        cancelled: () -> Bool = { false }) throws -> Bool {
         guard model.ready(in: root) else { return false }
-        if isChecked(model, in: root) { return true }
+        if cancelled() { throw CancellationError() }
+        if isChecked(model, in: root) {
+            // A failed best-effort retirement is tried again without hashing the new files again.
+            retireReplacedParakeet(afterVerifying: model, in: root)
+            return true
+        }
         let directory = model.directory(in: root)
         var done: Int64 = 0
         for artifact in model.artifacts {
@@ -77,8 +89,23 @@ public final class ModelVerifier: Sendable {
             }
             done += artifact.size
         }
+        if cancelled() { throw CancellationError() }
         markVerified(model, in: root)
         return true
+    }
+
+    /// D86: keep the old install until this exact replacement has passed its checks. Both a successful first load
+    /// and a just-published download come through here. Retiring the old id is best effort: it cannot invalidate the
+    /// verified replacement, and a later cached check retries it. Readiness or startup pruning alone never retires it.
+    private func retireReplacedParakeet(afterVerifying model: ModelDescriptor, in root: URL) {
+        guard model == ModelCatalog.parakeet, model.ready(in: root) else { return }
+        let old = ModelCatalog.legacyParakeet.directory(in: root).deletingLastPathComponent()
+        do {
+            try ModelFiles.retire(old)
+        } catch {
+            ModelInstallDiagnostics.failure(model: ModelCatalog.legacyParakeet.id,
+                                            stage: "retire-replaced-model", error: error)
+        }
     }
 
     private static func log(_ message: String) {

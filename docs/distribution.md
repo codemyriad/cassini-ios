@@ -52,8 +52,8 @@ Sizes of the unsigned archive of the final PR D tree, against the `51bc71b` tree
 | `Cassini.app` zipped (`ditto -c -k`), about the download | 12 686 624 B | 4 190 847 B | +8 495 777 B |
 
 The binary's `__TEXT` is 28.6 MB. App Store Connect's own figures (per device, after thinning and encryption) come only
-with an upload. The models are not in the app: Parakeet Ultra (443 MB) with its speech detector (458 KB), and the
-speaker models (88 MB), download on consent.
+with an upload. Whistle's model and engine are in the app; they came after these measurements and are not in them.
+Parakeet Ultra (443 MB) with its speech detector (458 KB), and the speaker models (88 MB), download on consent.
 
 Never commit archives, exported `.ipa` files, certificates, provisioning profiles or App Store Connect API keys.
 `build/` is ignored for the first two.
@@ -113,8 +113,22 @@ Store profile for `io.codemyriad.cassini` already grants it.
 
 The archive is signed with a development identity from the login keychain, so over SSH it fails at CodeSign with
 `errSecInternalComponent` (the SSH session cannot use the keychain). Run the `xcodebuild archive` in the GUI login
-session instead (on drmeyers, `~/bin/guirun xcodebuild archive …`). The export and the upload sign in the cloud and
-work over SSH.
+session instead. On drmeyers, with the existing `gui` tmux session:
+
+```sh
+python3 scripts/run-in-gui.py lockf -k -t 3600 ~/.cassini-heavy.lock xcodebuild archive …
+```
+
+The runner preserves the caller's working directory and PATH and streams the command's combined output. It waits
+on filesystem events for output and completion, then returns the command's exit status without a drain delay.
+`GUIRUN_TIMEOUT` is an upper bound (default 86400 seconds); on timeout the GUI command continues and the error
+reports its retained log. Interrupting the local watcher or closing its output pipe also preserves the GUI command
+and reports its pane and log. If the GUI process exits without a completion status, the runner reports that failure
+instead of waiting for the deadline. If the GUI session is absent, start `~/bin/gui-tmux.command` in the Mac's logged-in
+Terminal, then retry. The shared `~/bin/guirun` tool is unchanged. `python3 scripts/test-run-in-gui.py` checks the
+runner with a fake tmux launcher and real filesystem events, without a GUI or simulator.
+
+The export and the upload sign in the cloud and work over SSH.
 
 ### Before an upload
 
@@ -146,9 +160,11 @@ work over SSH.
   empty, `NSPrivacyTracking` false) and `Privacy.txt`: recordings, transcripts and voiceprints stay on the device, and
   the only network use is downloading pinned models.
 - **Privacy policy URL:** https://cassini.talk/privacy/ios/ (the overview for every app is
-  https://cassini.talk/privacy/). The page is published from `Cassini/Resources/Licenses/Privacy.txt`, the text
-  Settings shows, so the two say the same. When `Privacy.txt` changes, ask the coordinator to republish the page.
-  It goes in App Store Connect under App Information → Privacy Policy URL.
+  https://cassini.talk/privacy/). That page is the legal text, which the coordinator keeps outside this repository.
+  The technical page, https://cassini.talk/privacy/ios/technical/, is published from
+  `Cassini/Resources/Licenses/Privacy.txt`, the text Settings shows, so those two say the same. When `Privacy.txt`
+  changes, ask the coordinator to republish the technical page and to check the legal page against it.
+  The legal page's URL goes in App Store Connect under App Information → Privacy Policy URL.
 - **Compatible devices:** the minimum OS in the store listing comes from the build (`MinimumOSVersion` 18.0). The
   app sets no `UIRequiredDeviceCapabilities`, so the store lists every iPhone and iPad on iOS 18 or later, the iPhone
   XR, XS and XS Max and the iPad (7th generation) included. That iPad gets no speech engine ([iOS 18](ios18.md)): no
@@ -163,9 +179,13 @@ work over SSH.
   locked and lets playback continue on the lock screen, and that `processing` finishes a running transcription on
   iOS 26 and later, through continued processing. Add: "On iOS 18, which has no continued processing, a transcription
   that is still running when iOS ends the app's background time pauses, and the user resumes it from the app." (see
-  [iOS 18](ios18.md)). Add the A12 sentence from **Compatible devices** above. Mention that the speech and speaker
-  models (about 531 MB) download only after the user agrees, and are data, not code.
-- **Not yet verified:** no build at 18.0 has been archived, validated or uploaded. The 90208 check (each embedded
-  `MinimumOSVersion` against its binary's minos) is covered locally by `scripts/check-embedded-minos.py`, but Apple's
-  processing of an 18.0 build has not been seen yet. On iOS 18 only simulator runs exist, on iOS 18.2 (the Whistle
-  tests, [iOS 18](ios18.md)); nothing has run on an iOS 18 device.
+  [iOS 18](ios18.md)). Add the A12 sentence from **Compatible devices** above. Mention that the Whistle speech model
+  and its native engine are in the app, so transcribing with Whistle needs no download. On devices with enough memory,
+  Parakeet Ultra with its speech detector (about 444 MB), and the speaker models (about 88 MB), download from
+  `dist.gocassini.com` only after the user agrees, and are data, not code.
+- **Not yet verified:** no build at 18.0 has been archived, validated or uploaded to App Store Connect. The 90208
+  check (each embedded `MinimumOSVersion` against its binary's minos) is covered locally by
+  `scripts/check-embedded-minos.py`, but Apple's processing of an 18.0 build has not been seen yet. On iOS 18 the
+  full test leg passed on the iOS 18.2 simulator ([iOS 18](ios18.md)), and two AWS Device Farm runs on 2026-11-10
+  (iPhone 11 on iOS 18.6.2, iPhone 15 on iOS 18.0) ran the Whistle tests in a Debug build with development signing.
+  No A12 or A10 device on iOS 18 and no Release build has run the app.
