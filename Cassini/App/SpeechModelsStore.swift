@@ -29,6 +29,7 @@ import CassiniWhistle
     nonisolated private let installed: @Sendable () -> Bool
     nonisolated private let verified: @Sendable () -> Bool
     @ObservationIgnored private let verify: @Sendable () throws -> Bool
+    @ObservationIgnored private let verifyBundle: @Sendable () async -> Bool
     @ObservationIgnored private var verificationTask: Task<Void, Never>?
     @ObservationIgnored var onChange: @MainActor () -> Void = {}
     @ObservationIgnored var onDownload: @MainActor () -> Void = {}
@@ -42,7 +43,9 @@ import CassiniWhistle
          parakeetLinked: Bool, platform: PlatformFacts, physicalMemory: UInt64 = ProcessInfo.processInfo.physicalMemory,
          availableMemory: @escaping @Sendable () -> Int64? = { let n = os_proc_available_memory(); return n > 0 ? Int64(n) : nil },
          installed: (@Sendable () -> Bool)? = nil, verified: (@Sendable () -> Bool)? = nil,
-         verify: (@Sendable () throws -> Bool)? = nil) {
+         verify: (@Sendable () throws -> Bool)? = nil,
+         verifyBundle: @escaping @Sendable () async -> Bool = { await WhistleRuntime.verifyBundle() }) {
+        self.verifyBundle = verifyBundle
         self.root = root; self.defaults = defaults; self.storage = storage; self.whistle = Mutex(whistle)
         self.physicalMemory = physicalMemory; self.availableMemory = availableMemory; self.platform = platform
         parakeetCapable = parakeetLinked && SpeechCapability.parakeetCapable(physicalMemory: physicalMemory)
@@ -60,7 +63,7 @@ import CassiniWhistle
 
     nonisolated var whistleCapability: WhistleCapability { whistle.withLock { $0 } }
     func verifyBundledSpeech() async {
-        let verified = await WhistleRuntime.verifyBundle()
+        let verified = await verifyBundle()
         whistle.withLock { $0.bundleVerified = verified }
         let recognizer = selectedRecognizer().rawValue
         Logger(subsystem: "io.codemyriad.cassini", category: "WhistleBundle")
@@ -143,7 +146,16 @@ import CassiniWhistle
         }
     }
 
-    /// A size-matching directory is only a candidate. Keep Whistle usable while this check runs.
+    /// Resolve installed-model verification before releasing cold-start queue/recording/import admission.
+    /// The verifier still runs on its utility worker; awaiting this task does not block the main actor.
+    func verifyInstalledSpeech() async {
+        refresh()
+        if preference == .whistle && whistleCapability.available { return }
+        await verificationTask?.value
+    }
+
+    /// A size-matching directory is only a candidate. An explicit Whistle choice remains usable while this check
+    /// runs; automatic/Parakeet cold-start admission awaits it through verifyInstalledSpeech().
     func refresh() {
         guard verificationTask == nil else { return }
         guard parakeetCapable, installed() else { publish(.missing); return }
