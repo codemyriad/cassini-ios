@@ -88,14 +88,14 @@ import CassiniNotebook
         await task.value
     }
 
-    func waitFor(_ what: String = "condition", timeout: Duration = .seconds(30), _ condition: @MainActor () async -> Bool) async throws {
+    func waitFor(_ what: String = "condition", timeout: Duration = .seconds(30), advancingClock: Bool = true, _ condition: @MainActor () async -> Bool) async throws {
         let deadline = ContinuousClock.now + timeout
         while !(await condition()) {
             guard ContinuousClock.now < deadline else {
                 Issue.record("Timed out waiting for \(what)")
                 throw CancellationError()
             }
-            clock.advanceToNextSleep()
+            if advancingClock { clock.advanceToNextSleep() }
             try await Task.sleep(for: .milliseconds(5))
         }
     }

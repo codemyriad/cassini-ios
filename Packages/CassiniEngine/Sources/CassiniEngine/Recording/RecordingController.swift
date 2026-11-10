@@ -113,6 +113,12 @@ public final class RecordingController {
         }
     }
 
+    deinit {
+        policy?.cancel()
+        titleWrite?.cancel()
+        events?.cancel()
+    }
+
     // MARK: Actions
 
     /// Starts a recording. False when one is already in progress.
@@ -208,7 +214,7 @@ public final class RecordingController {
             let activity = activityState(active)
             self.activity = activity
             parts.liveActivity?.start(noteID: note.id, activity)
-            policy = Task { [weak self] in await self?.runPolicy() }
+            startPolicy()
         } catch {
             if let created { try? await parts.notes.discard(created) }
             captureURL = nil

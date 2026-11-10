@@ -7,14 +7,20 @@ import CassiniNotebook
 ///
 /// Touches: `titleWrite`, and reads `captureURL`; the state only through `setState`, `addLevel` and `publishActivity`.
 extension RecordingController {
-    func runPolicy() async {
-        while !Task.isCancelled {
-            do { try await parts.clock.sleep(for: parts.timing.tick) } catch { return }
-            guard !Task.isCancelled else { return }
-            if tick() {
-                // A new operation: the end cancels this loop.
-                serialized { await self.end(.space, title: nil) }
-                return
+    func startPolicy() {
+        // Capture only the scheduler across suspension. Unwrapping a weak controller before an
+        // unbounded async method would keep it alive for the lifetime of the policy loop.
+        let clock = parts.clock, interval = parts.timing.tick
+        policy = Task { [weak self] in
+            while !Task.isCancelled {
+                do { try await clock.sleep(for: interval) } catch { return }
+                guard !Task.isCancelled, let self else { return }
+                if tick() {
+                    // A new operation: the end cancels this loop.
+                    serialized { await self.end(.space, title: nil) }
+                    return
+                }
+                // The strong reference ends with this iteration, before the next sleep.
             }
         }
     }
