@@ -172,7 +172,12 @@ import CassiniNotebook
         }
         speechUnavailability = unavailability
         stored = [.speech: speech, .speakers: speakers, .voices: speakers]
-        if speakers == .ready { failures[.speakers] = nil }
+        if speakers == .ready {
+            failures[.speakers] = nil
+            // The models may have arrived through another caller; the closing refresh must not restore an old notice.
+            installFailures.removeAll { $0.part == .speakers }
+            if download?.part == .speakers, download?.failure != nil { download = nil }
+        }
     }
 
     /// Installs `parts` now, in `ModelPart` order. While a standalone install runs, the parts it does not cover are
@@ -222,6 +227,8 @@ import CassiniNotebook
     private func stopBySystem(_ number: Int) {
         guard installNumber == number, let installing else { return }
         let part = inFlight ?? queued.first
+        ModelInstallDiagnostics.failure(model: part?.rawValue ?? "models", stage: "background-expiration",
+                                        error: ModelError(.modelDownload))
         installNumber += 1
         self.installing = nil
         inFlight = nil

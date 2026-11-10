@@ -119,7 +119,7 @@ import CassiniEngineTesting
         let speechModels = SpeechModelsStore(root: modelRoot, defaults: defaults, storage: storage,
             whistle: whistleCapability, parakeetLinked: SherpaRuntime.isLinked, platform: platform)
         let models = PinnedModels(root: modelRoot, defaults: defaults, storage: storage,
-            onInstallChange: { status in Task { @MainActor in speechModels.installerChanged(status) } })
+            onInstallChange: { status in Task { @MainActor in AppEnvironment.modelInstallerChanged(status, speechModels: speechModels) } })
         let legacy = speechTranscriber(models: models, defaults: defaults, platform: platform)
         let apple = appleSpeechCandidate(platform: platform)
         let whistle = WhistleTranscriber(acceptance: whistleCapability, memoryReport: InternalWhistle.writeReport,
@@ -143,6 +143,13 @@ import CassiniEngineTesting
             value.launch.restoresNavigation = false
         }
         return value
+    }
+
+    /// A shared install may finish while speech verification is still running. Notify the graph's model readiness
+    /// callback directly on idle instead of relying on SpeechModelsStore.refresh() publishing a new speech state.
+    static func modelInstallerChanged(_ status: PinnedModelInstaller.Status, speechModels: SpeechModelsStore) {
+        speechModels.installerChanged(status)
+        if case .idle = status { speechModels.onChange() }
     }
 
     /// The environment the process arguments ask for.

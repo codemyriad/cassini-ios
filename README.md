@@ -283,6 +283,9 @@ Zstandard object, resumed with Range and If-Range (the entity tag is the quoted 
 from zero whatever its tag, and a `206` without that tag or a `416` deletes the part) and checked before and after
 decompression; the files and the host's `NOTICE.txt` are collected in
 `CassiniModels/models/<id>/.<source_sha256>.staging/` and renamed into `CassiniModels/models/<id>/<source_sha256>/`.
+On iOS, the model root, staging directories and resumed staging files use `completeUntilFirstUserAuthentication`
+so verification can finish after auto-lock. A response with a validated length finishes at its pinned whole-file or
+range boundary without waiting for connection teardown; size and SHA-256 checks still precede publication.
 About › Model notices shows that `NOTICE.txt` from an installed revision. Every request to the host, each redirect hop included, sends `User-Agent: CassiniTalk/<CFBundleShortVersionString> (iOS <version>; build <CFBundleVersion>)` (D54, `ModelUserAgent`), built once by the app and set by `URLSessionTransport`. Before the first load in each session every
 installed file is hashed again (`ModelVerifier`, D16 §4); a file that differs retires the revision, the job fails
 with "Model verification failed", and the next job downloads it again. Provenance names Ultra

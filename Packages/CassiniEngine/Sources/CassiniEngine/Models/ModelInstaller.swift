@@ -132,7 +132,7 @@ public struct ModelInstaller: Sendable {
     /// Whether `error` (or the task) is a cancellation rather than a failure.
     public static func isCancellation(_ error: any Error) -> Bool {
         if error is CancellationError || Task.isCancelled { return true }
-        if let error = error as? ModelError { return error.failure == .cancelled }
+        if let error = error as? ModelError { return error.failure == .cancelled || error.urlErrorCode == .cancelled }
         if let error = error as? URLError { return error.code == .cancelled }
         return false
     }
@@ -151,19 +151,12 @@ public struct ModelInstaller: Sendable {
             case .modelVerify: return .fileCheckFailed
             case .modelDownload:
                 if failure.message.hasSuffix(RedirectPolicy.refusedSuffix) { return .hostNotAllowed }
+                if let code = failure.urlErrorCode { return transportError(code, online: online) }
                 return online() ? .interrupted : .noConnection
             default: return .install
             }
         }
-        if let failure = failure as? URLError {
-            switch failure.code {
-            case .timedOut, .cannotFindHost, .dnsLookupFailed, .cannotConnectToHost, .notConnectedToInternet,
-                 .dataNotAllowed, .internationalRoamingOff:
-                return .noConnection
-            default:
-                return online() ? .interrupted : .noConnection
-            }
-        }
+        if let failure = failure as? URLError { return transportError(failure.code, online: online) }
         if CheckpointFiles.isOutOfSpace(failure) { return .notEnoughStorage }
         let error = failure as NSError
         if error.domain == NSPOSIXErrorDomain || (error.domain == NSCocoaErrorDomain && error.code >= 256 && error.code < 1024) {
@@ -172,4 +165,16 @@ public struct ModelInstaller: Sendable {
         }
         return .install
     }
+
+    /// The same transport failure has the same user-facing meaning before and after repository wrapping.
+    private static func transportError(_ code: URLError.Code, online: () -> Bool) -> DownloadError {
+        switch code {
+        case .timedOut, .cannotFindHost, .dnsLookupFailed, .cannotConnectToHost, .notConnectedToInternet,
+             .dataNotAllowed, .internationalRoamingOff:
+            return .noConnection
+        default:
+            return online() ? .interrupted : .noConnection
+        }
+    }
+
 }
