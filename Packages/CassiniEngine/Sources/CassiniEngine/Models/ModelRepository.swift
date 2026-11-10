@@ -108,7 +108,8 @@ public struct NetworkModelFetcher: ModelFetching {
         }
     }
 
-    /// The only retryable scope: no artifact bytes have been requested yet.
+    /// The model's metadata-retry scope: no artifact bytes have been requested yet.
+    /// ArtifactFetcher separately bounds recovery of an artifact GET that fails before response headers arrive.
     private func metadata(_ model: ModelDescriptor, into directory: URL,
                           using fetcher: ArtifactFetcher) async throws -> [String: String] {
         let urls: [String: String]

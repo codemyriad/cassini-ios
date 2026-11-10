@@ -54,15 +54,67 @@ import CassiniEngineTesting
         #expect(!exists(partial))
     }
 
-    @Test func aSecondPreHeaderFailureCannotCreateAThirdSession() async {
+    @Test(arguments: [URLError.Code.timedOut, .networkConnectionLost])
+    func aSecondPreHeaderFailureCannotCreateAThirdSession(_ code: URLError.Code) async {
         let folder = TemporaryFolder(); defer { folder.remove() }
         let third = RequestRetryTransport { _, _ in Self.answer() }
-        let fresh = RequestRetryTransport(fresh: third) { _, _ in throw URLError(.timedOut) }
+        let fresh = RequestRetryTransport(fresh: third) { _, _ in throw URLError(code) }
         let original = RequestRetryTransport(fresh: fresh) { _, _ in throw URLError(.timedOut) }
-        await expectNetwork(.timedOut) { try await fetch(original, folder.root) }
+        await expectNetwork(code) { try await fetch(original, folder.root) }
         #expect(original.freshCalls == 1)
         #expect(fresh.requests.count == 1 && fresh.freshCalls == 0)
         #expect(third.requests.isEmpty)
+    }
+
+    @Test(arguments: [503, 416, 206])
+    func anOriginalHTTPErrorDoesNotCreateAFreshSession(_ status: Int) async {
+        let folder = TemporaryFolder(); defer { folder.remove() }
+        let fresh = RequestRetryTransport { _, _ in Self.answer() }
+        let original = RequestRetryTransport(fresh: fresh) { _, _ in Self.answer(status: status) }
+        #expect(await failure { try await fetch(original, folder.root) } == .modelDownload)
+        #expect(original.requests.count == 1 && original.freshCalls == 0)
+        #expect(fresh.requests.isEmpty)
+    }
+
+    @Test func anOriginalDigestFailureDoesNotCreateAFreshSession() async {
+        let folder = TemporaryFolder(); defer { folder.remove() }
+        let wrong = Data(repeating: 120, count: bytes.count)
+        let bytes = bytes
+        let fresh = RequestRetryTransport { _, _ in Self.answer(bytes) }
+        let original = RequestRetryTransport(fresh: fresh) { _, _ in Self.answer(wrong) }
+        #expect(await failure { try await fetch(original, folder.root) } == .modelVerify)
+        #expect(original.requests.count == 1 && original.freshCalls == 0)
+        #expect(fresh.requests.isEmpty)
+        #expect(!exists(folder.file("model.onnx")))
+    }
+
+    @Test func insufficientStorageDoesNotCreateAFreshSessionOrRequest() async {
+        let folder = TemporaryFolder(); defer { folder.remove() }
+        let bytes = bytes
+        let fresh = RequestRetryTransport { _, _ in Self.answer(bytes) }
+        let original = RequestRetryTransport(fresh: fresh) { _, _ in Self.answer(bytes) }
+        #expect(await failure {
+            try await ArtifactFetcher(transport: original, storage: FakeStorage(availableBytes: 0))
+                .fetch(url, artifact(), into: folder.root, redirects: policy) { _, _ in }
+        } == .space)
+        #expect(original.requests.isEmpty && original.freshCalls == 0)
+        #expect(fresh.requests.isEmpty)
+    }
+
+    @Test func aLocalOutputFailureAfterHeadersDoesNotRetryTheRequest() async {
+        let folder = TemporaryFolder(); defer { folder.remove() }
+        let partial = folder.file("\(artifact().sha256).part")
+        let bytes = bytes
+        let fresh = RequestRetryTransport { _, _ in Self.answer(bytes) }
+        let original = RequestRetryTransport(fresh: fresh) { _, _ in
+            // The preflight has completed. Make the output path unwritable before the real writer opens it.
+            try FileManager.default.createDirectory(at: partial, withIntermediateDirectories: true)
+            return Self.answer(bytes)
+        }
+        #expect(await failure { try await fetch(original, folder.root) } == .modelInstall)
+        #expect(original.requests.count == 1 && original.freshCalls == 0)
+        #expect(fresh.requests.isEmpty)
+        #expect(!exists(folder.file("model.onnx")))
     }
 
     @Test func cancellationFollowedByALateTimeoutDoesNotCreateAFreshSession() async {
