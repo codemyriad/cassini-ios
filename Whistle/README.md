@@ -99,7 +99,7 @@ sides of a block, with the 48-to-16 kHz FIR kept continuous. A normal pause save
 At most one second of uncommitted source, plus the priming overlap, is reread. If interruption discards a
 Needle result in flight, a retry can redo at most one open segment (15.008 s) plus one second of new audio.
 Periodic checkpoints are saved every five seconds of processed audio, rounded up to the next block, so abrupt
-process loss can redo less than six seconds of source work plus the priming overlap, or less than 22 seconds
+process loss can redo at most six seconds of source work plus the priming overlap, or less than 22 seconds
 of audio submitted to Needle. These are audio bounds, independent of device decode speed.
 
 ## Validation and cache

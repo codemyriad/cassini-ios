@@ -66,12 +66,16 @@ final class WhistleRecordingAdapterTests: XCTestCase {
         for pause in pauses {
             let batches = Mutex<[WhistleBatch]>([])
             let request = TranscriptionRequest(url: url, language: "", allowDownload: false, whistleResume: resume)
-            do {
-                _ = try await transcriber().transcribe(request) {
+            let adapter = transcriber()
+            let attempt = Task {
+                try await adapter.transcribe(request) {
                     guard case .whistleBatch(let batch) = $0 else { return }
                     batches.withLock { $0.append(batch) }
                     if batch.checkpoint.sourceFrame == pause { withUnsafeCurrentTask { $0?.cancel() } }
                 }
+            }
+            do {
+                _ = try await attempt.value
                 XCTFail("The checkpoint event must interrupt this session")
             } catch is CancellationError {}
             let observed = batches.withLock { $0 }
