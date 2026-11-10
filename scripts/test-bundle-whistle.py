@@ -3,6 +3,7 @@
 import importlib.util
 import hashlib
 import io
+import json
 import struct
 from whistle_binary_identity import identity
 from pathlib import Path
@@ -10,6 +11,7 @@ import tempfile
 import unittest
 from unittest import mock
 
+ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location("bundle", Path(__file__).with_name("bundle-whistle.py"))
 bundle = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(bundle)
@@ -42,15 +44,48 @@ class IntegrityTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 bundle.verify(path, {"bytes": 3, "sha256": hashlib.sha256(b"yes").hexdigest()})
 
-    def test_new_import_requires_sdk26_evidence(self):
-        with self.assertRaises(ValueError):
-            bundle.check_imports("ios-arm64", ["_made_up_ios27_symbol"])
-        bundle.check_imports("ios-arm64", ["_memcpy", "_memset"])
+    def audited(self, kind):
+        return list(json.loads((ROOT / "Whistle/sdk26-imports.json").read_text())["targets"][kind])
+
+    def test_the_link_must_import_exactly_the_sdk26_audit(self):
+        for kind in ["ios-arm64", "ios-sim-arm64"]:
+            with self.subTest(kind=kind):
+                audited = self.audited(kind)
+                bundle.check_imports(kind, audited)
+                with self.assertRaisesRegex(ValueError, "without SDK26 evidence"):
+                    bundle.check_imports(kind, audited + ["_made_up_ios27_symbol"])
+                with self.assertRaisesRegex(ValueError, "no longer imported: \\['_memcpy'\\]"):
+                    bundle.check_imports(kind, [symbol for symbol in audited if symbol != "_memcpy"])
 
     def test_archive_pin_change_invalidates_old_sdk26_evidence(self):
         with mock.patch.dict(bundle.PINS["artifacts"]["ios-arm64/libneedle.a"], {"sha256": "0" * 64}):
-            with self.assertRaises(ValueError):
-                bundle.check_imports("ios-arm64", ["_memcpy"])
+            with self.assertRaisesRegex(ValueError, "changed without fresh SDK26 evidence"):
+                bundle.check_imports("ios-arm64", self.audited("ios-arm64"))
+
+
+class DeploymentTargetTests(unittest.TestCase):
+    def test_every_target_value_is_the_pin(self):
+        pins = json.loads((ROOT / "Whistle/pins.json").read_text())
+        self.assertEqual(bundle.DEPLOYMENT_TARGET, pins["deploymentTarget"])
+        self.assertEqual(bundle.SOURCE_ARCHIVE_MINIMUM_OS, pins["sourceArchiveMinimumOS"])
+        source = Path(bundle.__file__).read_text()
+        # No second literal: the triple, the minos check, the plist and the manifest all read the pin.
+        for literal in ['"18.0"', '"26.0"', '"27.0"', "ios18", "ios26"]:
+            self.assertNotIn(literal, source)
+
+    def test_the_linked_build_version_must_be_the_slice_platform_at_the_pin(self):
+        def show(platform, minos):
+            return f"Load command 9\n      cmd LC_BUILD_VERSION\n platform {platform}\n    minos {minos}\n      sdk 27.0\n"
+        target = bundle.DEPLOYMENT_TARGET
+        bundle.check_build_version("ios-arm64", show("IOS", target))
+        bundle.check_build_version("ios-sim-arm64", show("IOSSIMULATOR", target))
+        for kind, build in [("ios-arm64", show("IOSSIMULATOR", target)), ("ios-sim-arm64", show("IOS", target)),
+                            ("ios-arm64", show("IOS", target + ".1")), ("ios-arm64", show("IOS", "26.0")),
+                            ("ios-arm64", show("IOS", "1" + target)), ("ios-arm64", show("IOS", "27.0")),
+                            ("ios-arm64", show("IOS", target) + show("IOS", target)), ("ios-arm64", "")]:
+            with self.subTest(kind=kind, build=build):
+                with self.assertRaises(ValueError):
+                    bundle.check_build_version(kind, build)
 
 
 class SectionIdentityTests(unittest.TestCase):

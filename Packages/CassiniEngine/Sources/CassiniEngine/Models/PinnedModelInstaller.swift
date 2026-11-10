@@ -142,7 +142,10 @@ public final class PinnedModelInstaller: Sendable {
             if fields.current == nil {
                 fields.installs += 1
                 let number = fields.installs
-                let task = Task(executorPreference: executor) { try await self.run(number, parts, granted: granted) }
+                // Only a real executor goes to `Task(executorPreference:)`: on iOS 18 a nil preference crashes the
+                // concurrency runtime (SIGSEGV in swift_task_create_commonImpl, seen on 18.2), while iOS 26 accepts it.
+                let operation: @Sendable () async throws -> InstallOutcome = { try await self.run(number, parts, granted: granted) }
+                let task = if let executor { Task(executorPreference: executor, operation: operation) } else { Task(operation: operation) }
                 fields.current = Install(number: number, parts: parts, task: task)
                 started = (task, number)
             }

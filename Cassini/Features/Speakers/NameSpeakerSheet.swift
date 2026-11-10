@@ -78,14 +78,18 @@ struct NameSpeakerSheet: View {
         Form {
             Section { header(ui) }
             Section {
-                TextField(SpeakersCopy.nameField, text: $nameField)
+                TextField(SpeakersCopy.nameField, text: $nameField.handingEdits { text in
+                    nameTyped(text)
+                    // A name cut to its limit goes back once the field's own edit is done, as in the Rename sheet.
+                    if let name = state?.name, name != text {
+                        DispatchQueue.main.async { if nameField == text { nameField = name } }
+                    }
+                })
                     .onAppear { nameField = ui.name }
                     .onChange(of: nameField) { _, text in
-                        send(.nameChanged(text))
-                        nameChanged(state?.name ?? text)
+                        nameTyped(text)
                         if let name = state?.name, name != text { nameField = name }
                     }
-                    .onChange(of: ui.name) { _, name in if name != nameField { nameField = name } }
                     .textInputAutocapitalization(.words)
                     .autocorrectionDisabled()
                     .submitLabel(.done)
@@ -180,7 +184,23 @@ struct NameSpeakerSheet: View {
 
     // MARK: - Events
 
-    private func send(_ event: NamingEvent) { model.send(event, sheet: handle) }
+    /// Sends `event`; a name the model chose (a picked voice) goes into the field. The field's own typing is not
+    /// written back here (only a name cut to its limit is, above): a name the view rendered one keystroke earlier would
+    /// overwrite text typed since.
+    private func send(_ event: NamingEvent) {
+        model.send(event, sheet: handle)
+        if case .nameChanged = event { return }
+        if let name = state?.name, name != nameField { nameField = name }
+    }
+
+    /// The model takes the name being typed, and the Note screen keeps it. Below iOS 26 this also runs from the field's
+    /// binding (`handingEdits`): SwiftUI can skip the `onChange` of a fast typist's last keystroke there, and Save
+    /// would store the name without it (iOS 18.2: "Anna Ricci" shown, "Anna Ric" saved). The same text taken twice
+    /// changes nothing.
+    private func nameTyped(_ text: String) {
+        send(.nameChanged(text))
+        nameChanged(state?.name ?? text)
+    }
 
     private func handle(_ action: NameSpeakerModel.SheetAction) {
         switch action {

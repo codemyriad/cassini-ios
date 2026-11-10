@@ -91,6 +91,21 @@ import CassiniNotebook
         #expect(actions.all.last == .close)
     }
 
+    /// Below iOS 26 the sheet reports each keystroke from the field's binding and again from its `onChange`: the second
+    /// report of the same name keeps the answered question and the picked voice.
+    @Test func aNameReportedTwiceIsTheSameAsOnce() async throws {
+        let model = await open()
+        send(model, .nameChanged("Anna Ricci"), .samePerson)
+        let answered = try #require(model.state)
+        #expect(answered.boundVoiceID == anna.id)
+        send(model, .nameChanged("Anna Ricci"))
+        #expect(model.state == answered)
+        send(model, .nameChanged(String(repeating: "a", count: 90)))
+        let cut = try #require(model.state)
+        send(model, .nameChanged(String(repeating: "a", count: 90)))
+        #expect(model.state == cut)
+    }
+
     @Test func theSheetClosesOnlyOnceTheWritesLandAndTakesNoEventMeanwhile() async throws {
         let model = await open()
         fake.holdsNaming = true

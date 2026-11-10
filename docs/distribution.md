@@ -40,7 +40,8 @@ keeps no entitlements either. Every build links the native speech runtime, the s
 Builds with `CASSINI_SHERPA_LOCAL=1` link a local build of it instead and are for development, not for upload.
 
 It was last checked with Xcode 27 on the final PR D tree (2026-11-02): app and extension present, both with
-their privacy manifests, version 0.1.0 build 2, minimum iOS 26, `ITSAppUsesNonExemptEncryption` false, arm64 only.
+their privacy manifests, version 0.1.0 build 2, minimum iOS 26 (the target then; it is now iOS 18.0, and no archive
+has been checked at 18.0 yet), `ITSAppUsesNonExemptEncryption` false, arm64 only.
 Sizes of the unsigned archive of the final PR D tree, against the `51bc71b` tree built without the two binary targets
 (the share includes the runtime's licence texts, 0.3 MiB of them ONNX Runtime's own notices):
 
@@ -135,8 +136,11 @@ The export and the upload sign in the cloud and work over SSH.
    period-separated integers, at most 18 characters (errors 90058/90059); `scripts/build-sherpa-xcframework.sh`
    writes `1.13.7`. It does not check that each bundle's `MinimumOSVersion` matches its binary (`otool -l`,
    `LC_BUILD_VERSION` minos); Apple's processing does, after the upload (90208, seen with `xcrun altool
-   --build-status --delivery-id <id>`). The app embeds no frameworks: the runtime's xcframeworks are static, and a
-   build step drops the stubs Xcode embeds for them.
+   --build-status --delivery-id <id>`). The app embeds one framework, the private `CassiniWhistleRuntime.framework`:
+   `scripts/bundle-whistle.py` links its binary for `Whistle/pins.json` `deploymentTarget` (18.0, the app's target)
+   and writes the same value as its `MinimumOSVersion`, and `scripts/check-embedded-minos.py` (run by
+   `scripts/test.sh` after every build for testing) fails if any embedded binary or plist needs a newer iOS than the
+   app. The sherpa runtime's xcframeworks are static, and a build step drops the stubs Xcode embeds for them.
 2. The archive validates with no ITMS-91053 (missing required-reason API) warning. After a change of the native
    runtime, check the app binary's imports again (`nm -u`) against `Cassini/Resources/PrivacyInfo.xcprivacy`. Last
    checked on the archive above: of Apple's required-reason symbols the binary imports only `stat` and `fstat`, which
@@ -161,9 +165,27 @@ The export and the upload sign in the cloud and work over SSH.
   `Cassini/Resources/Licenses/Privacy.txt`, the text Settings shows, so those two say the same. When `Privacy.txt`
   changes, ask the coordinator to republish the technical page and to check the legal page against it.
   The legal page's URL goes in App Store Connect under App Information → Privacy Policy URL.
+- **Compatible devices:** the minimum OS in the store listing comes from the build (`MinimumOSVersion` 18.0). The
+  app sets no `UIRequiredDeviceCapabilities`, so the store lists every iPhone and iPad on iOS 18 or later, the iPhone
+  XR, XS and XS Max and the iPad (7th generation) included. That iPad gets no speech engine ([iOS 18](ios18.md)): no
+  Whistle (the A10 lacks its CPU features), no Parakeet Ultra (3 GB) and no Apple speech on iPadOS 18. It records,
+  plays, searches and exports but cannot transcribe. An app cannot exclude that device by minimum OS, and
+  `UIRequiredDeviceCapabilities` has no key that separates the A10 from the A12 in a useful way (not checked further).
+  Put in the description and in the App Review note: "Transcription needs an A12 chip or later, so it is not available
+  on the iPad (7th generation)." That follows from the rules above; Whistle on the A12 has been measured on iPadOS 26
+  only, not on iOS 18.
 - **Export compliance:** answered in the build (`ITSAppUsesNonExemptEncryption` false), so no question per upload.
 - **App Review note:** explain that background audio (`UIBackgroundModes` audio) keeps a recording going with the screen
-  locked and lets playback continue on the lock screen, and that `processing` finishes a running transcription. Mention
-  that the Whistle speech model and its native engine are in the app, so transcribing with Whistle needs no download.
-  On devices with enough memory, Parakeet Ultra with its speech detector (about 444 MB), and the speaker models (about
-  88 MB), download from `dist.gocassini.com` only after the user agrees, and are data, not code.
+  locked and lets playback continue on the lock screen, and that `processing` finishes a running transcription on
+  iOS 26 and later, through continued processing. Add: "On iOS 18, which has no continued processing, a transcription
+  that is still running when iOS ends the app's background time pauses, and the user resumes it from the app." (see
+  [iOS 18](ios18.md)). Add the A12 sentence from **Compatible devices** above. Mention that the Whistle speech model
+  and its native engine are in the app, so transcribing with Whistle needs no download. On devices with enough memory,
+  Parakeet Ultra with its speech detector (about 444 MB), and the speaker models (about 88 MB), download from
+  `dist.gocassini.com` only after the user agrees, and are data, not code.
+- **Not yet verified:** no build at 18.0 has been archived, validated or uploaded to App Store Connect. The 90208
+  check (each embedded `MinimumOSVersion` against its binary's minos) is covered locally by
+  `scripts/check-embedded-minos.py`, but Apple's processing of an 18.0 build has not been seen yet. On iOS 18 the full
+  test leg passed on the iOS 18.2 simulator ([iOS 18](ios18.md)), and two AWS Device Farm runs on 2026-11-10 (iPhone
+  11 on iOS 18.6.2, iPhone 15 on iOS 18.0) ran hosted Whistle and platform tests in a Debug build with development
+  signing. No A12 or A10 device on iOS 18 and no Release build has run the app.

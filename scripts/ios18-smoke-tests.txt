@@ -1,0 +1,30 @@
+# The UI tests the iOS 18 leg's smoke run (CASSINI_IOS18=smoke, scripts/test.sh) runs on the iOS 18 runtime, on one
+# iPhone, after the hosted tests. One Class/method per line; "#" starts a comment. They cover what differs on iOS 18:
+# the engine the app chooses and the Settings rows and download screen that follow it, the walk from recording to
+# restore, the Library's toolbar and empty state, opening a note and going back, and the Library, Note and Recording
+# screens under the accessibility audit and at the largest text size. The full leg (CASSINI_IOS18=full) runs every UI
+# test. scripts/test-test-runtime.py checks that each line names a UI test and the list's planned time.
+
+# Engine choice, Settings rows and the download screen
+SettingsFlowTests/testSettingsShowsTheModelRowsTheBannerTheCountsAndTheBundleVersion
+SettingsFlowTests/testOnAParakeetDeviceTheSpeechRowShowsItsDownload
+ParakeetSuggestionTests/testWithoutAppleSpeechAThreeGigabyteDeviceStillUsesWhistle
+ParakeetSuggestionTests/testSettingsSuggestionOpensTheSpeechOnlyConsentPlan
+SpeechUnavailableTests/testWithoutAppleSpeechOrAnotherRecognizerBothActionsAreDisabled
+ModelDownloadFlowTests/testTranscribeOpensTheConsentItsSourcesOpenLicensesAndNotNowGoesBack
+ModelDownloadFlowTests/testDownloadAndTranscribeTranscribesTheNote
+
+# Record, transcribe, read, name, export, trash and restore
+AcceptanceWalkTests/testRecordTranscribeReadNameExportTrashAndRestore
+
+# The Library's toolbar, wordmark and empty state; a note opened and left
+CassiniUITests/testEmptyLibraryAndSettings
+CassiniUITests/testOpenFixtureOpensTheNamedNote
+NoteScreenTests/testTheBackButtonSaysBackToLibrary
+RecordingSelectionTests/testBackToLibraryThenAnotherRecordingOpensTheRequestedNote
+
+# The accessibility audits and the largest text size
+AccessibilityAuditTests/testTheLibraryPassesTheAudit
+AccessibilityAuditTests/testTheNoteScreenPassesTheAudit
+AccessibilityAuditTests/testTheRecordingScreenPassesTheAudit
+AccessibilityAuditTests/testNoTextIsClippedAtTheLargestTextSize

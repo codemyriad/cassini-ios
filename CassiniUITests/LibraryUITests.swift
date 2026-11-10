@@ -54,7 +54,7 @@ final class LibraryUITests: XCTestCase {
 
     /// Every row status of the table shows, with its text, in a fixture (Recording is in the recording test below).
     @MainActor func testEveryRowStatusShowsWithItsText() {
-        let app = launch(["--seed", "statuses"])
+        let app = launch(["--seed", "statuses"] + DeviceUnderTest.workingSpeech)
         let rows: [(String, String)] = [
             ("Weekly planning call", ", transcribing"),
             ("Interview with the printer", ", queued"),
@@ -87,11 +87,12 @@ final class LibraryUITests: XCTestCase {
 
     /// Resume and Try again are inline buttons that queue the note again (the running job is frozen, so it waits).
     @MainActor func testResumeAndTryAgainQueueTheNote() {
-        let app = launch(["--seed", "statuses"])
+        let app = launch(["--seed", "statuses"] + DeviceUnderTest.workingSpeech)
         let resume = app.buttons["Resume transcribing Paused standup"]
         list(app).scroll(attempts: 4) { resume.exists && resume.isHittable }
         XCTAssertTrue(resume.waitForExistence(within: 10))
-        XCTAssertGreaterThanOrEqual(resume.frame.height, 44, "a 44 pt target")
+        // The frame comes back through a floating-point transform: once on iOS 18.2 a 44 pt row read 43.99999999999997.
+        XCTAssertGreaterThanOrEqual(resume.frame.height, 44 - 0.001, "a 44 pt target")
         resume.tap()
         XCTAssertTrue(waitFor(row(app, "Paused standup"), label: ", queued"), row(app, "Paused standup").label)
         let tryAgain = app.buttons["Try transcribing Hallway conversation again"]
@@ -103,7 +104,7 @@ final class LibraryUITests: XCTestCase {
     // ports: LibraryBehaviourTest#theControlsSendTheirEvents
     // ports: LibraryViewModelTest#theProgressBannerOpensTheRunningNoteOrSettings
     @MainActor func testTheControlsLeadWhereTheySay() {
-        let app = launch(["--seed", "statuses"])
+        let app = launch(["--seed", "statuses"] + DeviceUnderTest.workingSpeech)
         let banner = app.buttons["progressBanner"]
         XCTAssertTrue(banner.waitForExistence(within: 15))
         XCTAssertTrue(waitFor(banner, label: "Transcribing Weekly planning call"), banner.label)
@@ -268,7 +269,7 @@ final class LibraryUITests: XCTestCase {
     /// The long-press menu: Start over and a Transcribe again that replaces the versions ask first.
     // ports: LibraryBehaviourTest#theConfirmationsOfTheSheetRows
     @MainActor func testTheActionsMenuAsksBeforeStartingOverOrReplacingTheVersions() {
-        let app = launch(["--seed", "statuses"])
+        let app = launch(["--seed", "statuses"] + DeviceUnderTest.workingSpeech)
         let paused = scrolledRow(app, "Paused standup")
         XCTAssertTrue(paused.waitForExistence(within: 10))
         paused.press(forDuration: 1)

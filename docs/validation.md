@@ -3,8 +3,23 @@
 The automated checks below run on an Apple Silicon Mac with Xcode 27 and the iOS 27 simulators (iPhone 17 and iPad
 Pro 13-inch (M5)). The counts were taken on 13 October 2026 with `scripts/test.sh all`, from the logs in
 `DerivedData.noindex/test-logs`. `CASSINI_RUNTIME` runs the simulator tiers on another installed runtime (the
-`scripts/test.sh` header), with logs in `DerivedData.noindex/test-logs-ios<version>`. A real device is still needed
-for the checks in the [device checklist](#device-checklist).
+`scripts/test.sh` header), with logs in `DerivedData.noindex/test-logs-ios<version>`. The iOS 18 leg of `all`
+(`CASSINI_IOS18`, [README](../README.md#the-ios-18-leg)) runs the same build on the iOS 18.2 runtime (22C150; Apple
+no longer offers 18.6). It runs the hosted tests and the UI smoke list `scripts/ios18-smoke-tests.txt`, or with `full`
+every UI test. It is off by default for now, so the counts below do not come from iOS 18. On 10 November 2026 (at
+bc7bb8e) the full leg passed on iOS 18.2: hosted 98/98 (7 skipped), iPhone 102/102, iPad 12/12. Earlier that day the
+leg ran on the iOS 26.0 runtime instead (`CASSINI_IOS18_RUNTIME=26 scripts/test.sh ios18`, with the iOS 18 facts given
+to every UI launch): hosted 95/95 (7 skipped) and the smoke list 16/16, 3.5 minutes after the build. A real device is
+still needed for the checks in the [device checklist](#device-checklist).
+
+The deployment target is iOS 18.0. On the iOS 18.2 simulator (the iOS 18 test runtime; Apple no longer offers 18.6)
+Whistle's imports resolve and its 13 parity fixtures match ([Whistle/README.md](../Whistle/README.md)), besides the
+full leg above. Two AWS Device Farm runs on 10 November 2026 (iPhone 11 on iOS 18.6.2, iPhone 15 on iOS 18.0) ran
+hosted Whistle and platform tests on devices in a Debug build. The iOS 18 rules are covered by `swift test` (both
+values of each `PlatformFacts` fact and the Whistle CPU rule), by app-hosted tests that pass the iOS 18 facts
+(`PlatformCompositionTests`), and by `--ios18-platform` UI test launches, which apply them on the iOS 27 simulators
+(`SettingsFlowTests`, `SpeechUnavailableTests`, `ParakeetSuggestionTests`). Those launches do not exercise iOS 18's
+own system, chrome or libraries; the leg on iOS 18.2 does. [iOS 18](ios18.md) lists what is pending.
 
 ## Automated checks
 
@@ -16,7 +31,8 @@ command below runs from the repository root, not from a folder under `Packages/`
 | `fast` | `scripts/check-strings.sh`, then `swift test` over the packages | 1,567 tests: 1,558 Swift Testing tests in 198 suites and 9 XCTest cases; the real-model test is skipped unless enabled |
 | `app` | The hosted unit tests (`CassiniTests`) in the app on a simulator | 82, of which the 6 real-model ones skip unless `scripts/sherpa-bench.sh` or `scripts/speaker-smoke.sh` names their models |
 | `ui` | The UI tests (`CassiniUITests`) on up to three iPhone clones, and the `testIPad*` tests on an iPad clone | 91 test methods: 72 run on the iPhones, the 8 `testIPad*` tests on the iPad, and the 11 `ScreenshotTests` skip |
-| `all` | All three; the package tests run beside the build | |
+| `all` | All three; the package tests run beside the build. Then the iOS 18 leg, when it is on | |
+| `ios18` | Build, then only the iOS 18 leg: the hosted tests and the UI smoke list (`CASSINI_IOS18=full`: every UI test and the iPad's) on the iOS 18 runtime | full leg on iOS 18.2 at bc7bb8e: hosted 98/98 (7 skipped), iPhone 102/102, iPad 12/12; on iOS 26.0 with the iOS 18 facts: hosted 95/95 (7 skipped), UI 16/16 |
 
 ### `fast`: the string catalogs and the package tests
 
@@ -109,7 +125,8 @@ xcodebuild -project Cassini.xcodeproj -scheme Cassini -configuration Release \
 
 The simulator has no microphone, no Apple speech models of its own, no Live Activities on a Lock Screen, and no
 background limits like a device's. Run these checks on a physical iPhone (and an iPad for the split view) with iOS 26
-or later, with Live Activities and notifications allowed. Android's `device-kill-resume.sh` covers the same ground as
+or later, with Live Activities and notifications allowed, and again on a device kept on iOS 18 (see
+[iOS 18 device](#ios-18-device)). Android's `device-kill-resume.sh` covers the same ground as
 the kill-and-resume items.
 
 ### Live Activity
@@ -132,7 +149,7 @@ the kill-and-resume items.
 - Receive a phone call while recording. The recording pauses with "Paused — another app is using audio" and stays
   paused after the call until you resume it.
 
-### Background transcription (`BGContinuedProcessingTask`)
+### Background transcription (`BGContinuedProcessingTask`, iOS 26 and later)
 
 - Queue three notes from the screen, then leave Cassini. The system shows "Transcribing “title”" with progress and
   Stop, and the title changes for each next note. All three finish in the background.
@@ -140,6 +157,22 @@ the kill-and-resume items.
   paused by iOS" offers Resume. Resume continues from the checkpoint, not from the start.
 - Start a transcription while Cassini is already in the background (an import from another app). It gets only the
   short background time, and when that ends the job pauses with its progress kept.
+
+### iOS 18 device
+
+None of this has run (decision 8 in [iOS 18](ios18.md)). The two AWS Device Farm runs on 2026-11-10 (iPhone 11 on iOS
+18.6.2, iPhone 15 on iOS 18.0) ran only hosted Whistle and platform tests in a Debug build; they read the CPU features
+as 1 ([Whistle/README.md](../Whistle/README.md)). On an iPhone XR or XS, or any device kept on iOS 18:
+
+- Install a TestFlight build. Whistle transcribes the controlled English sample (the Whistle README's distribution
+  acceptance), and the `WhistleBundle` log shows the CPU features read as atomics and rcpc true.
+- Settings shows no speech language row and no "Managed by iOS".
+- Queue a note longer than a few minutes from the screen, then leave Cassini. No system progress indicator appears;
+  after about 30 s the job pauses, "Transcription paused by iOS" is posted, and Resume continues from the checkpoint.
+- On a device with at least 5 GiB, start the Parakeet download from Settings and leave Cassini. It stops with "iOS
+  stopped the download. Try again to continue where it stopped."; Try again continues from the bytes kept.
+- On an iPad (7th generation) on iPadOS 18, if one is available: Whistle is unavailable, Transcribe is disabled, and
+  recording, playback and export work.
 
 ### Kill and resume
 

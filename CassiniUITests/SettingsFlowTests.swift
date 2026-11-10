@@ -1,7 +1,7 @@
 import XCTest
 
-/// Settings and "Source code and notices" over the UI-test models: Apple's speech model installed, the speaker models
-/// not downloaded, notifications denied.
+/// Settings and "Source code and notices" over the UI-test models: Apple's speech model installed where the system has
+/// Apple speech (`DeviceUnderTest`), the speaker models not downloaded, notifications denied.
 final class SettingsFlowTests: XCTestCase {
     @MainActor private func openSettings(_ arguments: [String] = []) -> XCUIApplication {
         let app = XCUIApplication()
@@ -13,9 +13,12 @@ final class SettingsFlowTests: XCTestCase {
         return app
     }
 
-    /// Scrolls the screen up until `element` is on it.
+    /// Scrolls the screen up until the whole of `element` is on it. Hittable is not enough: an element cut by the bottom
+    /// edge is hittable, and its tap point can fall in the home indicator's strip, where the tap does nothing. On an
+    /// iPhone 16 (iOS 18.2) "Source code and notices" stopped at y 827.7–865.7 of 852 and the tap at y 846.7 did not
+    /// open the notices.
     @MainActor private func reveal(_ element: XCUIElement, in app: XCUIApplication) {
-        app.scroll { element.exists && element.isHittable }
+        app.scroll { element.exists && element.isHittable && app.frame.contains(element.frame) }
         XCTAssertTrue(element.waitForExistence(within: 2), "\(element) is not on the screen")
     }
 
@@ -29,6 +32,10 @@ final class SettingsFlowTests: XCTestCase {
     }
 
     // ports: SettingsViewModelTest#showsTheModelRowsTheCountsTheVersionAndTheNotificationsBanner (on the screen)
+    /// Where the system has no Apple speech (iOS 18) the default device has no recognizer: no picker, and the speech
+    /// row says it is not available. That repeats, on purpose, the row of
+    /// `testWithoutAppleSpeechOrAnotherRecognizerTheSpeechRowIsNotAvailable`; the rest of the screen is this test's own. The Whistle and Parakeet rows of iOS 18 are checked by ParakeetSuggestionTests and
+    /// `testOnAParakeetDeviceTheSpeechRowShowsItsDownload`.
     @MainActor func testSettingsShowsTheModelRowsTheBannerTheCountsAndTheBundleVersion() {
         let app = openSettings()
         // In the iPad split view the list fills in after the navigation bar.
@@ -36,13 +43,17 @@ final class SettingsFlowTests: XCTestCase {
             .waitForExistence(within: 5))
         XCTAssertTrue(app.staticTexts["Notifications are off"].waitForExistence(within: 5))
         XCTAssertTrue(app.buttons["Turn on"].exists)
-        XCTAssertTrue(app.descendants(matching: .any)["speechLanguagePicker"].exists,
-                      "Apple Speech takes a language: Transcription offers the picker")
+        XCTAssertEqual(app.descendants(matching: .any)["speechLanguagePicker"].exists, DeviceUnderTest.appleSpeech,
+                       "Apple Speech takes a language: Transcription offers the picker, and only then")
         let speech = element(app, startingWith: "Speech recognition")
         reveal(speech, in: app)
-        XCTAssertTrue(speech.label.contains("Ready"), speech.label)
-        XCTAssertTrue(speech.label.contains("Managed by iOS"), speech.label)
-        XCTAssertFalse(row(app, startingWith: "Speech recognition").exists, "a Ready row is not a button")
+        if DeviceUnderTest.appleSpeech {
+            XCTAssertTrue(speech.label.contains("Ready"), speech.label)
+            XCTAssertTrue(speech.label.contains("Managed by iOS"), speech.label)
+        } else {
+            XCTAssertEqual(speech.label, "Speech recognition, Not available")
+        }
+        XCTAssertFalse(row(app, startingWith: "Speech recognition").exists, "a Ready or Not available row is not a button")
         XCTAssertTrue(row(app, startingWith: "Telling speakers apart").label.contains("Not downloaded"))
         XCTAssertTrue(row(app, startingWith: "Telling speakers apart").label.contains("88 MB"))
         let voices = row(app, startingWith: "Saved voices")

@@ -9,6 +9,8 @@ public actor WhistleRuntime {
     public static let shared = WhistleRuntime()
     public static let engineRevision = "93e88ede867e4311c39151285e74df513e4b835b"
     public static let modelSHA256 = "b6e02f048568ac5d01a2042556c658061e699acbc0aa2a1439f52f3d461dffeb"
+    /// The minimum of the unmodified published archives (`Whistle/pins.json` "sourceArchiveMinimumOS").
+    static let sourceArchiveMinimumOS = "27.0"
     private static let logger = Logger(subsystem: "io.codemyriad.cassini", category: "WhistleBundle")
     private typealias Load = @convention(c) (UnsafePointer<UInt8>?, UInt64) -> Int32
     private typealias Models = @convention(c) () -> Int32
@@ -26,6 +28,11 @@ public actor WhistleRuntime {
         var target: String
         var minimumOS: String
         var sourceArchiveMinimumOS: String
+
+        /// Built for the deployment target the OS floor implies, from the pinned archives.
+        var pinsDeployment: Bool {
+            minimumOS == WhistleCapability.deploymentTarget && sourceArchiveMinimumOS == WhistleRuntime.sourceArchiveMinimumOS
+        }
     }
 
     private static let bundleVerification = WhistleBundleVerification { url in
@@ -60,7 +67,7 @@ public actor WhistleRuntime {
             stage = "manifestPins"
             guard manifest.engineRevision == engineRevision, manifest.modelSha256 == modelSHA256,
                   manifest.target == target,
-                  manifest.minimumOS == "26.0", manifest.sourceArchiveMinimumOS == "27.0" else { throw WhistleError.integrity }
+                  manifest.pinsDeployment else { throw WhistleError.integrity }
             func hash(_ data: Data) -> String { SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined() }
             stage = "weightsRead"
             let weights = try Data(contentsOf: root.appendingPathComponent("whistle.cact"), options: .mappedIfSafe)
@@ -114,7 +121,7 @@ public actor WhistleRuntime {
         let root = resources.appendingPathComponent("Whistle", isDirectory: true)
         let manifest = try JSONDecoder().decode(Manifest.self, from: Data(contentsOf: root.appendingPathComponent("manifest.json")))
         guard manifest.engineRevision == Self.engineRevision, manifest.modelSha256 == Self.modelSHA256,
-              manifest.target == target, manifest.minimumOS == "26.0", manifest.sourceArchiveMinimumOS == "27.0" else {
+              manifest.target == target, manifest.pinsDeployment else {
             throw WhistleError.integrity
         }
         let weights = try Data(contentsOf: root.appendingPathComponent("whistle.cact"), options: .mappedIfSafe)

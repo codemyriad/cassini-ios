@@ -123,6 +123,53 @@ extension TranscriptionCoordinatorTests {
             await first.coordinator.awaitIdle()
         }
 
+        /// iOS 18 has no continued processing, so every transcription still running when the finite background time
+        /// ends goes through this: paused by the system with its checkpoint, the queue held, then a later launch over
+        /// the same files keeps that one job paused by the system until a Resume from the screen runs it from its
+        /// checkpoint to the end. Nothing in between starts it again or makes a second job.
+        @Test func aJobIOSPausedInTheBackgroundStaysOneJobAcrossALaunchAndAResumeFinishesItFromItsCheckpoint() async throws {
+            let first = try QueueHarness(); defer { first.tearDown() }
+            try await first.start()
+            let a = try await first.note("A")
+            await first.coordinator.transcribe(a)
+            let run = try await first.run(0)
+            run.pauseOnStop = false
+            first.checkpoints.save(a, .saved(doneMs: 28_000, totalMs: 60_000, words: 40))
+
+            first.coordinator.setVisible(false)
+            first.background.expireAll()
+            #expect(run.stopRequest == .pause(.system))
+            run.finish(.paused(.system))
+            await first.coordinator.awaitIdle()
+            let paused = try #require(await first.job(a))
+            #expect(paused.state == .paused && paused.pauseReason == .system)
+            #expect(paused.doneMs == 28_000)
+            #expect(first.settings.queueHold == .system)
+
+            // The next launch: the job was already written as paused, so the repair leaves it as it is.
+            let second = try first.reopened()
+            let report = try await second.start(visible: true)
+            #expect(report.isEmpty, "nothing to repair: \(report)")
+            #expect(await second.jobs.all().map(\.noteID) == [a], "one job")
+            let relaunched = try #require(await second.job(a))
+            #expect(relaunched.state == .paused && relaunched.pauseReason == .system)
+            #expect(relaunched.doneMs == 28_000 && relaunched.attempts == 0)
+            #expect(second.settings.queueHold == .system)
+            try await second.settle()
+            #expect(second.runner.runs.isEmpty, "coming to the screen does not start it")
+
+            #expect(await second.coordinator.transcribe(a, origin: .screen) == .queued(changed: true))
+            #expect(second.settings.queueHold == nil)
+            let resumed = try await second.run(0)
+            #expect(resumed.noteID == a)
+            #expect(resumed.job.doneMs == 28_000, "the run is given its checkpoint's numbers, not zero")
+            #expect(await second.jobs.all().count == 1, "Resume moved the job, it did not add one")
+            resumed.finish(.done)
+            await second.coordinator.awaitIdle()
+            #expect(await second.jobs.all().isEmpty)
+            #expect(second.runner.runs.count == 1)
+        }
+
         @Test func afterIOSTookTheTimeBackTheNextDrainAsksForNewTime() async throws {
             let h = try QueueHarness(); defer { h.tearDown() }
             try await h.start()

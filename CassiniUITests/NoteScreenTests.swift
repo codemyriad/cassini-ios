@@ -33,7 +33,7 @@ final class NoteScreenTests: XCTestCase {
         let alex = header(app, "Alex")
         XCTAssertEqual(alex.label, "Alex, at 0 seconds")
         XCTAssertTrue(header(app, "Sam").exists)
-        XCTAssertGreaterThanOrEqual(alex.frame.height, 44)
+        XCTAssertGreaterThanOrEqual(alex.frame.height, 44 - 0.001, "a 44 pt target, read through a floating-point transform")
         XCTAssertTrue(app.buttons["speakersButton"].label.contains("2 speakers"))
         alex.tap()
         XCTAssertTrue(app.textFields["speakerNameField"].waitForExistence(within: 5), "the header opens Name a speaker")
@@ -113,7 +113,7 @@ final class NoteScreenTests: XCTestCase {
     // ports: NoteViewModelTest#aJobRowMakesTheSealedTranscriptReadOnly
     /// The processing seed runs a job that never ends, so Transcribe again queues the fixture behind it.
     @MainActor func testAQueuedNoteKeepsItsTranscriptButCannotBeRenamed() {
-        let app = open(seed: "processing")
+        let app = open(seed: "processing", DeviceUnderTest.workingSpeech)
         app.buttons["Share and more"].tap()
         app.buttons["transcribeAgain"].tapWhenSettled()
         XCTAssertTrue(app.staticTexts["Queued"].waitForExistence(within: 10))
@@ -134,7 +134,7 @@ final class NoteScreenTests: XCTestCase {
     /// The Queued card counts the queued notes before this one; the running job is not counted.
     @MainActor func testTheQueuedCardCountsTheNotesAheadOfIt() {
         let app = XCUIApplication()
-        app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed", "processing"]
+        app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed", "processing"] + DeviceUnderTest.workingSpeech
         app.launchAndWait()
         // The seed's job runs first, so the notes queued below wait behind it.
         let banner = app.buttons["progressBanner"]
@@ -211,7 +211,7 @@ final class NoteScreenTests: XCTestCase {
     // ports: NoteOverlaysBehaviourTest#renameConfirmsTheNewTitle
     /// The title can be renamed while the transcript is read-only.
     @MainActor func testAQueuedNoteCanStillBeRenamed() {
-        let app = open(seed: "processing")
+        let app = open(seed: "processing", DeviceUnderTest.workingSpeech)
         app.buttons["Share and more"].tap()
         app.buttons["transcribeAgain"].tapWhenSettled()
         XCTAssertTrue(app.staticTexts["Queued"].waitForExistence(within: 10))
@@ -227,10 +227,11 @@ final class NoteScreenTests: XCTestCase {
 
     // ports: ModelDownloadFlowTest (Cancel in the processing card's download banner)
     /// The job's model download shows its part in the card, and Cancel stops the job: the note is audio only again.
+    /// Without Apple speech the downloaded speech model is Parakeet's (`DeviceUnderTest.downloadedSpeech`).
     @MainActor func testCancelInTheCardsDownloadStopsTheJob() {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed", "processing", "--model-downloading",
-                               "--open-fixture", "CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC"]
+                               "--open-fixture", "CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC"] + DeviceUnderTest.downloadedSpeech
         app.launchAndWait()
         let banner = app.descendants(matching: .any)["banner.DL_DOWNLOADING"]
         XCTAssertTrue(banner.waitForExistence(within: 15))
@@ -246,7 +247,7 @@ final class NoteScreenTests: XCTestCase {
     @MainActor func testTheDraftFollowsItsEndBelowTheFixedCard() {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed", "processing", "--draft-growing",
-                               "--open-fixture", "CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC"]
+                               "--open-fixture", "CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC"] + DeviceUnderTest.workingSpeech
         app.launchAndWait()
         app.appendDraft(sentences: 24)
         // The draft's header, its tag and its paragraphs all carry the section's identifier; the last one ends it.
@@ -292,7 +293,7 @@ final class NoteScreenTests: XCTestCase {
     @MainActor func testAPlainNotesMenuHasNoDocumentInfoAndCannotExportText() {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed-test-data", "--open-fixture",
-                               "BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB"]
+                               "BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB"] + DeviceUnderTest.workingSpeech
         app.launchAndWait()
         XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 15))
         app.buttons["Share and more"].tap()
@@ -323,7 +324,7 @@ final class NoteScreenTests: XCTestCase {
     @MainActor func testAPlainNoteShowsItsBannerAndSubtitle() {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed-test-data", "--open-fixture",
-                               "BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB"]
+                               "BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB"] + DeviceUnderTest.workingSpeech
         app.launchAndWait()
         XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 15))
         XCTAssertTrue(app.staticTexts["Plain audio"].exists)

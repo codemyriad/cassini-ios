@@ -17,6 +17,8 @@ import XCTest
 // Library actions wait for its interactive marker, then tap once and await the destination.
 final class AccessibilityAuditTests: XCTestCase {
     private static let fixture = "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA"
+    /// The screens built as a SwiftUI List (`audit`'s `listRows`).
+    private static let listScreens: Set<String> = ["settings", "savedVoices"]
     /// The largest Dynamic Type size (AX5).
     private static let largestText = ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
 
@@ -81,7 +83,9 @@ final class AccessibilityAuditTests: XCTestCase {
 
     /// The audit, failing on every issue but those the system owns (`AuditFilter`), each with the element it is about.
     /// `transcript` is for a screen that draws a transcript, whose active word may yield one unattributed text issue
-    /// (`AuditFilter.isActiveWord`). On a failure the screen is attached as "audit-<screen>".
+    /// (`AuditFilter.isActiveWord`). `listRows` is for a screen built as a SwiftUI List (Settings, Saved voices), whose
+    /// rows below iOS 26 yield unattributed clipping predictions (`AuditFilter.isListRowPrediction`). On a failure the
+    /// screen is attached as "audit-<screen>".
     ///
     /// The element detection runs in an audit of its own, before the other checks. The clipping check renders the
     /// screen again at other text sizes, and an element detection in the same audit can read the pixels while the app
@@ -92,10 +96,12 @@ final class AccessibilityAuditTests: XCTestCase {
     /// busy machine (the full run's iPad beside three iPhones) slows the redraw the same way, now and then.
     @MainActor private func audit(_ app: XCUIApplication, screen: String,
                                   _ types: XCUIAccessibilityAuditType = .all.subtracting([.contrast, .dynamicType]),
-                                  transcript: Bool = false,
+                                  transcript: Bool = false, listRows: Bool = false,
                                   file: StaticString = #filePath, line: UInt = #line) {
         var issues: [String] = []
         var titleClipped = false
+        // Unattributed clipping issues let through so far, the title's included (`AuditFilter.listRowLimit`).
+        var unattributedClips = 0
         // An iPad window has a resize handle in its corner (`AuditFilter.isWindowControl`).
         let window = UIDevice.current.userInterfaceIdiom == .pad
         let detection = types.intersection(.elementDetection)
@@ -105,6 +111,11 @@ final class AccessibilityAuditTests: XCTestCase {
                 try app.performAccessibilityAudit(for: pass) { issue in
                     if AuditFilter.isNavigationTitle(issue, in: app, alreadySeen: titleClipped) {
                         titleClipped = true
+                        unattributedClips += 1
+                    } else if listRows, AuditFilter.isListRowPrediction(issue),
+                              unattributedClips < AuditFilter.listRowLimit {
+                        // Passes: see `isListRowPrediction`; the next one fails.
+                        unattributedClips += 1
                     } else if transcript, AuditFilter.isActiveWord(issue) {
                         // Passes: see `isActiveWord`.
                     } else if window, AuditFilter.isWindowControl(issue) {
@@ -128,9 +139,9 @@ final class AccessibilityAuditTests: XCTestCase {
     @MainActor func testTheLibraryPassesTheAudit() { audit(library(), screen: "library") }
     @MainActor func testTheNoteScreenPassesTheAudit() { audit(note(), screen: "note", transcript: true) }
     @MainActor func testTheRecordingScreenPassesTheAudit() { audit(recording(), screen: "recording") }
-    @MainActor func testSettingsPassesTheAudit() { audit(settings(), screen: "settings") }
+    @MainActor func testSettingsPassesTheAudit() { audit(settings(), screen: "settings", listRows: true) }
     @MainActor func testRecentlyDeletedPassesTheAudit() { audit(trash(), screen: "trash") }
-    @MainActor func testSavedVoicesPassesTheAudit() { audit(savedVoices(), screen: "savedVoices") }
+    @MainActor func testSavedVoicesPassesTheAudit() { audit(savedVoices(), screen: "savedVoices", listRows: true) }
 
     // MARK: iPad
 
@@ -145,7 +156,9 @@ final class AccessibilityAuditTests: XCTestCase {
             ("trash", trash), ("savedVoices", savedVoices)]
         for (name, open) in screens {
             let app = open([])
-            XCTContext.runActivity(named: name) { _ in audit(app, screen: "ipad-\(name)", transcript: name == "note") }
+            XCTContext.runActivity(named: name) { _ in
+                audit(app, screen: "ipad-\(name)", transcript: name == "note", listRows: Self.listScreens.contains(name))
+            }
             if name == "recording" { app.terminate() }
         }
     }
@@ -182,7 +195,7 @@ final class AccessibilityAuditTests: XCTestCase {
             if name == "library" {
                 XCTAssertNotEqual(app.buttons["settingsButton"].label, "Settings", "the app is not in \(language)")
             }
-            audit(app, screen: "\(language)-\(name)", .textClipped)
+            audit(app, screen: "\(language)-\(name)", .textClipped, listRows: Self.listScreens.contains(name))
             if name == "recording" { app.terminate() }
         }
     }
@@ -228,6 +241,31 @@ enum AuditFilter {
     /// contrast check's does. An issue that names an element still fails.
     @MainActor static func isActiveWord(_ issue: XCUIAccessibilityAuditIssue) -> Bool {
         issue.element == nil && issue.auditType == .elementDetection
+    }
+
+    /// Below iOS 26 only: "Text of this element may be clipped at larger Dynamic Type sizes" with no element, on a screen
+    /// built as a SwiftUI List. The function does not check the text size: only the callers keep it to sizes below the
+    /// largest (the default-size and long-language audits pass `listRows`; the largest-size audit does not). iOS 18.2's
+    /// audit predicts it for the List's rows though no text is cut: on screen every text is whole in English, French
+    /// and Brazilian Portuguese, and after a live change of the simulator's text size to AX5 the rows grow and wrap every
+    /// text (Settings' App language row 44 -> 209 pt, Saved voices' Alex Moreau 20 -> 125 pt). Evidence for the element:
+    /// on Saved voices, removing the people rows removes both issues, removing each row's trailing menu leaves one, and
+    /// removing the privacy line, the footer or the Forget section leaves both; hiding the navigation bar or the back
+    /// button leaves them. Settings was attributed by analogy (same List rows, same two issues, unchanged by the
+    /// navigation-bar experiments); its parts were not removed one by one. With the app's own bar each screen reports at
+    /// most two (`listRowLimit`), so a third fails. The largest-size test (`testNoTextIsClippedAtTheLargestTextSize`)
+    /// does not use this pass, but it is no full backstop: at AX5 Saved voices still reports one unattributed issue,
+    /// unexplained, which `isNavigationTitle` lets through though the title is not cut (125 pt in a 393 pt bar). iOS 26
+    /// and 27 report no such issue. Evidence: cassini-ios18-cache/ios18-g/evidence-18.2-full2 (the failing run) and
+    /// evidence-audits-diag{1,2,4} (the experiments). An issue that names an element still fails.
+    /// The most unattributed clipping issues one audit of a List screen lets through, the navigation title's included:
+    /// Settings and Saved voices each reported two with the app's own bar (evidence-audits-diag1, diag2).
+    static let listRowLimit = 2
+
+    @MainActor static func isListRowPrediction(_ issue: XCUIAccessibilityAuditIssue) -> Bool {
+        ProcessInfo.processInfo.operatingSystemVersion.majorVersion < 26
+            && issue.element == nil && issue.auditType == .textClipped
+            && issue.detailedDescription == "Text of this element may be clipped at larger Dynamic Type sizes."
     }
 
     /// A hit region too small with no element, on an iPad: the window's resize handle in its corner, which iPadOS

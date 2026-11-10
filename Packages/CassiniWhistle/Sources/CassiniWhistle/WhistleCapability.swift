@@ -1,5 +1,7 @@
-/// Compatibility and reviewed pipeline/device evidence are independent. D78 uses the iOS26 parity and
-/// physical A12/3GB evidence; transient load/window headroom is checked by the recording adapter.
+/// Compatibility and reviewed pipeline/device evidence are independent. D78 uses the iOS 26 simulator parity and the
+/// physical A12/3GB evidence on iPadOS 26; transient load/window headroom is checked by the recording adapter. The
+/// framework is linked for iOS 18.0 (Silvio's decision of 2026-11-10). On iOS 18 it has simulator evidence and two
+/// device runs (A13, A16), but no A12 or A10 device run (Whistle/README.md).
 public struct WhistleCapability: Hashable, Sendable {
     public var arm64: Bool
     public var operatingSystemSupported: Bool
@@ -34,7 +36,7 @@ public struct WhistleCapability: Hashable, Sendable {
                      bundleVerified: bundleVerified,
                      pipelineAccepted: false, deviceAccepted: false, internalExperiment: admitted)
     }
-    /// D78 rollout after iOS26 DC/adapter parity and the default-limit A12/3GB physical memory gate.
+    /// D78 rollout after the iOS 26 DC/adapter parity and the default-limit A12/3GB physical memory gate on iPadOS 26.
     /// The minimum reported physical memory admits the measured 3GB class; runtime preflights recheck headroom.
     public static func bundled(arm64: Bool, osSupported: Bool, cpuSupported: Bool, bundleVerified: Bool,
                                physicalMemory: UInt64) -> Self {
@@ -42,10 +44,14 @@ public struct WhistleCapability: Hashable, Sendable {
               pipelineAccepted: true, deviceAccepted: physicalMemory >= 2 << 30)
     }
 
-    /// The oldest iOS major version the bundled framework is linked for and checked on (`scripts/bundle-whistle.py`
-    /// links it at 26.0, and `WhistleRuntime` accepts only that manifest). The live app and the internal lab both ask
-    /// `supports(operatingSystemMajor:)`.
-    public static let minimumOperatingSystemMajor = 26
+    /// The oldest iOS major version the bundled framework is linked for: `Whistle/pins.json` "deploymentTarget", which
+    /// `scripts/bundle-whistle.py` links, asserts and writes into the manifest, is `deploymentTarget` (a package test
+    /// ties the two), and `WhistleRuntime` accepts only a manifest with that minimum. The live app and the internal lab
+    /// both ask `supports(operatingSystemMajor:)`.
+    public static let minimumOperatingSystemMajor = 18
+
+    /// The framework's deployment target as the bundle manifest states it ("18.0").
+    public static var deploymentTarget: String { "\(minimumOperatingSystemMajor).0" }
 
     public static func supports(operatingSystemMajor major: Int) -> Bool { major >= minimumOperatingSystemMajor }
 
@@ -55,11 +61,24 @@ public struct WhistleCapability: Hashable, Sendable {
     /// run time, and the A12, which has none, runs the fallback kernels (measured on the A12/3 GB iPad).
     public static func supports(cpu: WhistleCPUFeatures) -> Bool { cpu.atomics && cpu.rcpc }
 
+    /// The oldest iOS major version every device of which has the CPU features (`supports(cpu:)`): iOS 26 and iPadOS 26
+    /// run only on the A12 and later. Below it, iPadOS 18 still runs on the A10 iPad (7th generation); no A11 device runs
+    /// iOS 18 or later.
+    public static let everyDeviceHasTheCPUFeaturesFromMajor = 26
+
+    /// The CPU answer the live app and the internal lab use. From iOS 26 the device is known to have the features, so
+    /// the read features are not consulted and Whistle stays as before even if the system answered no `sysctl` key.
+    /// Below it the read features decide; a key the system does not answer counts as absent, so an unexpected answer
+    /// refuses Whistle on iOS 18 rather than crash on first use.
+    public static func supports(cpu: WhistleCPUFeatures, operatingSystemMajor major: Int) -> Bool {
+        major >= everyDeviceHasTheCPUFeaturesFromMajor || supports(cpu: cpu)
+    }
+
     public static let loadHeadroom: UInt64 = 512 << 20
     public static let windowHeadroom: UInt64 = 256 << 20
 
     /// An explicitly unaccepted bundle stays unavailable. D78 uses the separate bundled factory after the
-    /// iOS26 pipeline and physical3GB measurement; a pending input never grants support.
+    /// iOS 26 pipeline and physical 3GB measurement; a pending input never grants support.
     public static func pending(bundleVerified: Bool) -> Self {
         #if arch(arm64) && os(iOS)
         let supported = true
@@ -83,6 +102,23 @@ public struct WhistleCPUFeatures: Hashable, Sendable {
 
     public init(atomics: Bool, rcpc: Bool, dotProduct: Bool) {
         self.atomics = atomics; self.rcpc = rcpc; self.dotProduct = dotProduct
+    }
+
+    /// The `sysctl` keys of the three features (xnu `bsd/kern/kern_mib.c`, under `hw.optional.arm`).
+    public static let atomicsKey = "hw.optional.arm.FEAT_LSE"
+    public static let rcpcKey = "hw.optional.arm.FEAT_LRCPC"
+    public static let dotProductKey = "hw.optional.arm.FEAT_DotProd"
+
+    /// The features as the system reports them, from `read(key)`: the raw bytes `sysctlbyname` wrote for that key, or
+    /// nil when the call failed (no such key, or not readable). xnu publishes each key as a 4-byte int, 1 when the CPU
+    /// has the feature; a feature counts as present only for a 4-byte nonzero value. A missing key, a failed read or
+    /// any other size counts as absent, so an unexpected answer refuses Whistle rather than crash on first use.
+    public init(reading read: (String) -> [UInt8]?) {
+        func present(_ key: String) -> Bool {
+            guard let bytes = read(key), bytes.count == MemoryLayout<Int32>.size else { return false }
+            return bytes.contains { $0 != 0 }
+        }
+        self.init(atomics: present(Self.atomicsKey), rcpc: present(Self.rcpcKey), dotProduct: present(Self.dotProductKey))
     }
 }
 
