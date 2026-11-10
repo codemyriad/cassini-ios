@@ -396,6 +396,7 @@ import CassiniEngineTesting
     /// A known-length answer that delivers `data` and has no EOF of its own: transport would end it only at teardown.
     /// A pull past the declared length before the fetcher closes the answer means the fetcher waits for that EOF. The
     /// pull is counted and ended at once, so the regression fails the test with a message instead of hanging.
+    /// A pull after close is legitimate (the answer is already released) and is not counted.
     private static func heldEOF(_ data: Data) -> (transport: CompletionTransport, closed: Counter, pulledPastLength: Counter) {
         let closed = Counter(), pulledPastLength = Counter()
         let transport = CompletionTransport { _, _ in

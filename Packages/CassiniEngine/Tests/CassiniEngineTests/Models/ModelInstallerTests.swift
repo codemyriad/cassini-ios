@@ -29,7 +29,7 @@ import CassiniNotebook
 
     // ports: ModelInstallerTest#offlineSkipsTheBestEffortPartsAtOnce
     @Test func offlineSkipsTheBestEffortPartsAtOnce() async throws {
-        // An install that ran would wait for the read timeout; the skip must not touch the store at all.
+        // An install that ran records an issue; the skip must not touch the store at all.
         let store = FakeStore(ready: speechReady, online: false)
         store.onInstall = { _, _ in Issue.record("Offline, the best-effort parts must be skipped, not installed") }
         let outcome = try await ModelInstaller(store: store).install([.speakers, .voices]) { _ in }
