@@ -46,7 +46,7 @@ import CassiniNotebook
         #expect(record.backend == "sherpa-onnx")
         #expect(record.engine == "Parakeet TDT")
         // D16 §5: the model host's pin (Android still writes "moondream/parakeet-ultra INT8").
-        #expect(record.model == "parakeet-ultra-0.6b-int8@18cb623004dd6c15999b93cb70b14d8a1f6e8f3a2a97ff733f104bfc3494f6a9")
+        #expect(record.model == "parakeet-ultra-0.6b-int8-v2@50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366")
         #expect(record.version == "sherpa-onnx 1.13.7; model revision \(ModelCatalog.parakeetRevision)")
         #expect(record.source == "recording")
         #expect(record.language == "und", "Parakeet does not say which language it heard (D53.2)")

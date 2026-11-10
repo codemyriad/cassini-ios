@@ -85,7 +85,7 @@ xcrun simctl bootstatus "$udid" -b > /dev/null
 # The end-to-end job needs Parakeet Ultra and its detector beside the speaker models (CASSINI_SPEAKER_JOB=0 skips it).
 model_root=$models
 only=(-only-testing:CassiniTests/SpeakerSmokeTests)
-if [ "${CASSINI_SPEAKER_JOB:-1}" != 0 ] && "${fetch[@]}" --dest "$model_root" --ready parakeet-ultra-0.6b-int8 silero-vad; then
+if [ "${CASSINI_SPEAKER_JOB:-1}" != 0 ] && "${fetch[@]}" --dest "$model_root" --ready parakeet-ultra-0.6b-int8-v2 silero-vad; then
     only+=(-only-testing:CassiniTests/SpeakerJobTests)
 fi
 echo "==> ${only[*]#-only-testing:} on $name ($udid)"
