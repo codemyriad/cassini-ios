@@ -1,6 +1,6 @@
 # AWS iOS status — checkpoint at coordinator's 60-minute turn boundary
 
-Updated: 2026-11-10 16:26 UTC
+Updated: 2026-11-10 16:28 UTC
 Deadline: this Mac is destroyed after **2026-11-11 12:09 UTC**; push continuously. Coordinator will move the agent to a second Mac.
 
 ## Completed
@@ -21,7 +21,10 @@ Deadline: this Mac is destroyed after **2026-11-11 12:09 UTC**; push continuousl
 - Original baseline build passed 45 recording tests; short locked baseline 3/3 passed with 6 hogs, no overlapping gate, all hogs exited. Evidence `~/coordination/evidence/aws-ios-d88-recording/before-locked/`.
 - WIP routes policy/title sleeps through parts.clock; settle awaits pending title work; harness advances a manual RecordingTestClock and cancels owned tasks on teardown. Replaces the fixed post-title sleep with event/task completion.
 - Hosted TestGraph needs recording-specific real sleeps because its immediate FakeClock would spin an injected policy loop. Added optional AppEnvironment.recordingClock and a hosted RecordingClock forwarding FakeClock dates while retaining real sleeps; ordinary app defaults unchanged.
-- Next: compile/run recording package subset, verify hosted composition, second-title-write mutation, 3 locked after runs, push fixes, open draft, CI + full gate green on exact head, then ready. Continue inventory 7, 8, 9, 10 IN ORDER. Do not wait for coordinator between ready PRs.
+- Next: compile/run recording package subset, verify hosted composition, second-title-write mutation, 3 locked after runs, push fixes, open draft, CI + full gate green on exact head, then ready. Continue inventory PR 7 after PRs 3 and 6. AWS iOS owns only inventory PRs 3, 6, 7; PRs 8, 9, 10 are assigned to scw-ios on the Scaleway Mac and MUST NOT be started here. Do not wait for coordinator between ready PRs.
+
+## Latest assignment split
+AWS iOS owns inventory PRs **3, 6, 7 only**, in that order. PRs **8, 9, 10 belong to scw-ios on the Scaleway Mac**. No branches or implementation work for 8–10 have been started here; do not start them.
 
 ## Shared Mac / migration rules
 - Atomic mkdir `~/.aws-heavy.lock` around EVERY hog/full gate, rmdir ONLY our acquired directory after owned processes exit. Retain native gate lock. No hogs during another active gate; check non-locking package gates too.

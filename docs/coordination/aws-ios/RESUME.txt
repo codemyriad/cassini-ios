@@ -9,7 +9,7 @@ Branches:
 - test/d88-draft-growth: PR #85, pushed c97404c (and later checkpoints), independent base main c74b57c. Implementation and validation in progress; see STATUS.md. Locked baseline 3/3 green on c74b57c; earlier baseline preserved too.
 - test/d88-aws-ios-handoff: this checkpoint; not a product PR.
 
-Resume inventory PR 3, then remaining 6, 7, 8, 9, 10. Read the coordination brief, inventory, coordinator answers and BUG-CLASSES on the replacement Mac. The new deadline and shared AWS lock rules override the original brief.
+Resume inventory PR 3, then 6 and 7 ONLY. PRs 8, 9, 10 belong to scw-ios on the Scaleway Mac; do not start those. Read the coordination brief, inventory, coordinator answers and BUG-CLASSES on the replacement Mac. The new deadline and shared AWS lock rules override the original brief.
 
 Evidence summaries are JSON measurements, not build products. render/after is the failed first conversion batch with a 120-update warm-up cap. render/after-1024 is the final green 10-run batch. Earlier recording baselines cover RecordingControllerTests and RecordingScreenModelTests; Parakeet baselines cover aCancelStopsBeforeTheNextNativeCall and theInferenceTimeIsEachWindowsDecode. These predate the revised evidence standard.
 
@@ -20,3 +20,5 @@ The saved draft-loaded.py driver requires the AWS mkdir lock, uses 6 hogs and 3 
 Generated Xcode projects, weights, DerivedData and xcresult bundles are intentionally excluded from Git. Regenerate/download them on the replacement Mac. PR #84's body preserves its full validation, mutation evidence and D87 bug-class review. Local raw logs are disposable; useful results and the driver are preserved here.
 
 Latest checkpoint: PR #85 full-gate retry is active (session 12011, test.sh PID 96448); inspect STATUS.md and the live log before any new heavy work. Recording PR 6 WIP is pushed at 2365f54 and awaits first compilation. No hogs running. This turn ended at the coordinator's explicit checkpoint request.
+
+Coordinator assignment update: AWS iOS owns inventory 3, 6, 7 only. scw-ios owns 8, 9, 10; no work on those was started here. This supersedes the original brief.
