@@ -19,7 +19,7 @@ extension TranscriptionJobTests {
         progress.begin(h.noteID, finalizationMs: nil)
         defer { progress.end() }
         let run = Task {
-            let result = await h.run(observe: { output.yield(.event($0)) })
+            let result = await h.run(language: "en-US", observe: { output.yield(.event($0)) })
             output.finish()
             return result
         }
@@ -97,7 +97,7 @@ private struct CheckingTranscriber: Transcribing {
         events(.preparingModel(.checking))
         reachedCheck()
         await gate.wait()
-        return try await FakeTranscriber(.returns([TranscriptSegment(text: "Hello everyone.", start: 0, end: 1)], total: 10),
+        return try await FakeTranscriber(.returns([TranscriptSegment(text: "Hello everyone.", start: 0, end: 10)], total: 10),
                                         recognizer: .parakeet).transcribe(request, events: events)
     }
 }
