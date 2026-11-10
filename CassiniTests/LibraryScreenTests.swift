@@ -91,7 +91,10 @@ import CassiniEngineTesting
                 XCTAssertNotNil(content.results)
             }
         }
-        XCTAssertLessThan(slowestIndex + slowestContent, .milliseconds(16), "the main actor's part of the slowest keystroke")
+        // Printed when it passes too, so the logs show how much of the frame is left.
+        let measured = "indexing \(slowestIndex), content \(slowestContent)"
+        print("the main actor's part of the slowest keystroke: \(measured)")
+        XCTAssertLessThan(slowestIndex + slowestContent, .milliseconds(16), "the main actor's part of the slowest keystroke (\(measured))")
         XCTAssertLessThan(slowestSearch, .milliseconds(400), "the debounce and the search off the main actor")
     }
 }
