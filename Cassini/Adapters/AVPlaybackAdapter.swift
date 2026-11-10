@@ -1,3 +1,4 @@
+import Observation
 import AVFoundation
 import MediaPlayer
 import CassiniAudio
@@ -24,6 +25,8 @@ import CassiniNotebook
     private var holdsSession = false
     /// The player reached the end of the file by itself.
     private var finished = false
+    /// Only UI-test composition creates a probe; the actual player keeps its normal advancing clock.
+    let seekProbe: PlaybackSeekProbe?
 
     var rate: Float = 1 { didSet { player?.rate = rate; updateNowPlaying() } }
     var position: TimeInterval {
@@ -33,7 +36,8 @@ import CassiniNotebook
     var duration: TimeInterval { player?.duration ?? 0 }
     var isPlaying: Bool { player?.isPlaying ?? false }
 
-    init() {
+    init(captureSeeks: Bool = false) {
+        seekProbe = captureSeeks ? PlaybackSeekProbe() : nil
         (events, continuation) = AsyncStream.makeStream(of: PlaybackEvent.self)
         let continuation = continuation
         let skip = NSNumber(value: PlaybackSkip.interval)
@@ -105,7 +109,9 @@ import CassiniNotebook
     func seek(_ position: TimeInterval) {
         guard let player else { return }
         finished = false
-        player.currentTime = max(0, min(position, player.duration))
+        let target = max(0, min(position, player.duration))
+        player.currentTime = target
+        seekProbe?.target = target
         updateNowPlaying()
     }
 
@@ -118,6 +124,7 @@ import CassiniNotebook
     /// Stops and drops the open player, keeping the audio session and the Now Playing entry.
     private func closePlayer() {
         player?.stop(); player = nil
+        seekProbe?.target = nil
         finished = false
     }
 
@@ -153,4 +160,9 @@ import CassiniNotebook
             Task { @MainActor in self.onFinish?() }
         }
     }
+}
+
+/// The last clamped target handed to AVAudioPlayer, independent of how far playback has advanced since that seek.
+@MainActor @Observable final class PlaybackSeekProbe {
+    var target: TimeInterval?
 }

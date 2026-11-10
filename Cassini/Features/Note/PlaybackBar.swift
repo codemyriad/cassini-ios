@@ -42,6 +42,15 @@ struct PlaybackBar: View {
         .accessibilityElement(children: .contain)
         .accessibilityLabel(Text("Playback", tableName: "Playback"))
         .accessibilityIdentifier("playbackBar")
+        #if DEBUG
+        .overlay(alignment: .topLeading) {
+            if let target = playback.seekProbe?.target {
+                Text(verbatim: " ").font(.system(size: 1)).opacity(0.01).allowsHitTesting(false)
+                    .accessibilityIdentifier("uiTestState-playbackSeekTarget")
+                    .accessibilityValue(Text(verbatim: String(target)))
+            }
+        }
+        #endif
     }
 
     private var slider: some View {

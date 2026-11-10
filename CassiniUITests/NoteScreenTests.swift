@@ -48,22 +48,30 @@ final class NoteScreenTests: XCTestCase {
         XCTAssertTrue(third.waitForExistence(within: 5))
         third.tap()
         XCTAssertTrue(wait("label == 'Pause'", play), "a word tap plays")
-        let position = app.descendants(matching: .any)["playbackPosition"]
-        XCTAssertTrue((position.value as? String)?.hasPrefix("00:1") == true, "it plays from the word: \(position.value ?? "")")
+        let seek = app.staticTexts["uiTestState-playbackSeekTarget"]
+        XCTAssertTrue(seek.waitForValue("14.0"), "the player sought to the tapped passage's exact start")
     }
 
     // ports: ScreenBehaviourTest#aDragDuringPlaybackPausesFollowingAndShowsTheChip
     // ports: ScreenBehaviourTest#aDragWithPlaybackPausedLeavesFollowingOn
     @MainActor func testADragDuringPlaybackShowsFollowPlaybackAndTheChipResumesIt() {
-        // On an iPad the fixture's three paragraphs scroll only at the largest text size; a drag on a transcript that
-        // fits is a tap.
-        let largest = ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
-        let app = open(UIDevice.current.userInterfaceIdiom == .pad ? largest : [])
+        // This test needs an actual scroll gesture: at the default phone size the short fixture can fit after
+        // fonts settle. AX1 makes it overflow on a phone while keeping the second turn reachable; iPad needs AX5.
+        let category = UIDevice.current.userInterfaceIdiom == .pad
+            ? "UICTContentSizeCategoryAccessibilityXXXL" : "UICTContentSizeCategoryAccessibilityM"
+        let app = open(["-UIPreferredContentSizeCategoryName", category])
         let chip = app.buttons["followPlayback"]
         let transcript = app.descendants(matching: .any)["turn-w0"]
         XCTAssertTrue(transcript.waitForExistence(within: 5))
+        let scroll = app.staticTexts["uiTestState-readingScrollCompleted"]
+        XCTAssertTrue(scroll.waitForExistence(within: 15))
+        let before = scroll.value as? String
+        let last = app.descendants(matching: .any)["turn-w2"]
+        XCTAssertGreaterThan(last.frame.maxY, app.scrollViews.firstMatch.frame.maxY, "the fixture overflows before the drag")
         transcript.swipeUp()
-        XCTAssertTrue(chip.staysAbsent(for: 1), "paused: a drag leaves following on")
+        XCTAssertTrue(poll(within: uiWaitFloor) { (scroll.value as? String) != before }, "the drag finished")
+        XCTAssertTrue((scroll.value as? String)?.hasSuffix(":true") == true, "paused: a drag leaves following on")
+        XCTAssertFalse(chip.exists, "paused: no Follow playback chip after the drag finishes")
         let play = app.buttons["playButton"]
         play.tap()
         XCTAssertTrue(play.wait(until: NSPredicate(format: "label == 'Pause' AND value == 'Playing'"), within: 3))
@@ -295,9 +303,11 @@ final class NoteScreenTests: XCTestCase {
         let export = app.collectionViews.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Export transcript")).firstMatch
         XCTAssertEqual(export.label, "Export transcript, Available after transcription")
         XCTAssertTrue(share.exists && share.isEnabled, "the audio can be shared")
-        export.tap()
+        // iOS can open a disabled submenu. Gate on its rendered rows before inspecting their enabled state.
+        export.tapWhenSettled()
         let text = app.collectionViews.buttons["Transcript as text"]
-        XCTAssertTrue(text.staysAbsent(for: 2) || !text.isEnabled, "no transcript to export")
+        XCTAssertTrue(text.waitForExistence(within: 15), "the export submenu finished opening")
+        XCTAssertFalse(text.isEnabled, "no transcript to export")
     }
 
     @MainActor func testDocumentInfoShowsTheNotesFacts() {

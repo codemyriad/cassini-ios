@@ -325,6 +325,9 @@ attachments from the result bundle and saves them, scaled down, under `docs/scre
 `es`, `pt-BR`, `pt-PT`) takes the same set in that language under `docs/screenshots/<locale>/`, which is not committed. `--device` and `--appearance` take a
 subset. `scripts/render-icon.swift` draws the app icon (`swift scripts/render-icon.swift` from the repository root).
 
+UI absence assertions wait for a completed screen or app decision, then inspect the same accessibility state immediately.
+Debug UI-test launches expose suggestion-completion, Settings-loaded and completed-scroll markers for this purpose.
+
 UI-test launches (`--ui-testing`, Debug builds only) use a library and preferences of their own, a clock fixed at
 Thursday 8 October 2026 09:41 UTC, en_US formatting, and fake transcription and speaker analysis. Named seeds fill the
 library: `--seed library|search|reading|speakers|voices|trash|processing|recording|statuses|long`. `--parakeet` makes
@@ -332,6 +335,9 @@ the fake transcriber stand for Parakeet Ultra, so the model download screen and 
 `--ios18-platform` builds the app over the iOS 18 platform facts (no Apple speech, no continued processing) on the
 current runtime, so those flows are tested on the usual simulators. A normal
 launch starts empty, and Release builds link no fakes.
+
+UI-test word-tap checks read the last clamped seek target applied by the real audio adapter. Playback keeps advancing,
+while the test-visible target stays fixed until another seek; the assertion has no playback-position time window.
 
 The iOS UI-test harness also supports `--draft-growing`: its fake waits for
 `cassini://ui-test/append-draft?count=K` before emitting K more synthetic sentences. Each permit advances the
@@ -393,6 +399,10 @@ As an iOS URLSession recovery measure, a timeout or lost connection while readin
 retry with a separate session. It checks both metadata objects again and uses that session for the remaining model
 requests. Artifact transfers keep their existing resume rules; cancellation, pin, HTTP and local storage failures
 do not trigger this metadata retry.
+Separately, an artifact request chain may retry once through an independent session if a GET times out or loses its
+connection before response headers arrive. That retry preserves the current redirect target, hop budget and Range/If-Range
+headers. Errors after headers do not trigger this retry; existing resume and partial-deletion rules still apply. Neither scope
+retries cancellation, HTTP/status, pin/digest or local storage failures, and neither adds a delay or retries indefinitely.
 About › Model notices shows that `NOTICE.txt` from an installed revision. Every request to the host, each redirect hop included, sends `User-Agent: CassiniTalk/<CFBundleShortVersionString> (iOS <version>; build <CFBundleVersion>)` (D54, `ModelUserAgent`), built once by the app and set by `URLSessionTransport`. Before the first load in each session every
 installed file is hashed again (`ModelVerifier`, D16 §4); a file that differs retires the revision, the job fails
 with "Model verification failed", and the next job downloads it again. Provenance names Ultra

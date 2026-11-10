@@ -8,14 +8,16 @@ import CassiniNotebook
 @MainActor @Observable final class PlaybackStore {
     @ObservationIgnored let controller: PlaybackController
     @ObservationIgnored private let library: LibraryStore
+    @ObservationIgnored let seekProbe: PlaybackSeekProbe?
 
-    init(controller: PlaybackController, library: LibraryStore) {
-        self.controller = controller; self.library = library
+    init(controller: PlaybackController, library: LibraryStore, seekProbe: PlaybackSeekProbe? = nil) {
+        self.controller = controller; self.library = library; self.seekProbe = seekProbe
     }
 
     convenience init(playback: any AudioPlayback, library: LibraryStore, preview: NotePreview? = nil) {
         let positions = LibraryPlaybackPositions(library: library, preview: preview)
-        self.init(controller: PlaybackController(parts: .init(player: playback, positions: positions)), library: library)
+        self.init(controller: PlaybackController(parts: .init(player: playback, positions: positions)), library: library,
+                  seekProbe: (playback as? AVPlaybackAdapter)?.seekProbe)
     }
 
     var state: PlaybackState { controller.state }

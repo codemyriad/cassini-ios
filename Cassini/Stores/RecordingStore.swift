@@ -42,7 +42,7 @@ import CassiniNotebook
             audio: environment.audio, settings: parts.settings, handoff: ProcessingHandoff(parts.processing),
             consent: .recorded(settings: parts.settings, speech: environment.transcriber, speakers: environment.analyzer,
                                   parakeetReady: { [models = environment.models] in ModelCatalog.parakeet.ready(in: models) }),
-            liveActivity: environment.liveActivity, notifier: environment.notifier, clock: environment.clock,
+            liveActivity: environment.liveActivity, notifier: environment.notifier, clock: environment.recordingClock ?? environment.clock,
             defaultTitle: { RecordingCopy.defaultTitle(RecordingTitles.dateTime($0, locale: locale, timeZone: timeZone)) }))
         let transcriber = environment.transcriber, settings = parts.settings
         screen = RecordingScreenModel(controller: controller, ports: .init(

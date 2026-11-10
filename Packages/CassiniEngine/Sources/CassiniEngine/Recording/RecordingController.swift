@@ -113,6 +113,12 @@ public final class RecordingController {
         }
     }
 
+    deinit {
+        policy?.cancel()
+        titleWrite?.cancel()
+        events?.cancel()
+    }
+
     // MARK: Actions
 
     /// Starts a recording. False when one is already in progress.
@@ -175,9 +181,10 @@ public final class RecordingController {
     /// Calls `observer` on every change of `state`, on the main actor, right after it.
     public func observe(_ observer: @escaping @MainActor (RecordingState) -> Void) { observers.append(observer) }
 
-    /// Returns once the work asked for so far, the compression after a finish included, is done.
+    /// Returns once the work asked for so far, including the pending title write and compression, is done.
     public func settle() async {
         await operations?.value
+        await titleWrite?.value
         for compression in compressions.values { await compression.value }
     }
 
@@ -207,7 +214,7 @@ public final class RecordingController {
             let activity = activityState(active)
             self.activity = activity
             parts.liveActivity?.start(noteID: note.id, activity)
-            policy = Task { [weak self] in await self?.runPolicy() }
+            startPolicy()
         } catch {
             if let created { try? await parts.notes.discard(created) }
             captureURL = nil
