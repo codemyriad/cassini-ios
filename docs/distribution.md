@@ -149,6 +149,9 @@ work over SSH.
   https://cassini.talk/privacy/). The page is published from `Cassini/Resources/Licenses/Privacy.txt`, the text
   Settings shows, so the two say the same. When `Privacy.txt` changes, ask the coordinator to republish the page.
   It goes in App Store Connect under App Information → Privacy Policy URL.
+- **Compatible devices:** the app sets no `UIRequiredDeviceCapabilities`, so the store lists every iPhone and iPad
+  on iOS 18 or later, the iPad (7th generation) included. That iPad gets no speech engine ([iOS 18](ios18.md)): it
+  records, plays and exports but cannot transcribe. Whether to say so in the description is for Silvio to decide.
 - **Export compliance:** answered in the build (`ITSAppUsesNonExemptEncryption` false), so no question per upload.
 - **App Review note:** explain that background audio (`UIBackgroundModes` audio) keeps a recording going with the screen
   locked and lets playback continue on the lock screen, and that `processing` finishes a running transcription (on

@@ -653,20 +653,20 @@ stricter or looser than the spec.
 
 ## Transcription
 
-- **Background time.** Android runs the drain in a foreground service with an ongoing notification. iOS holds one
-  `BGContinuedProcessingTask` for the whole drain (`io.codemyriad.cassini.transcription.queue`). It is asked for at
-  the drain's first claim, from the screen. The system shows "Transcribing “title”" with the job's progress and a Stop
-  button, and each next job only changes the title. iOS grants this request only while Cassini is on the screen. A
-  drain that starts in the background, or a refused request, falls back to the finite time of
-  `beginBackgroundTask`. The standalone model download (Settings, the model download screen; Android runs it in the
-  same foreground service) holds its own continued task under a second identifier
-  (`io.codemyriad.cassini.transcription.work`), titled "Downloading models" with the subtitle "They run on this
-  device" (the queue's says "Your audio stays on this device"; it names no source, as Apple's speech assets come from
-  Apple and the rest from the model host), from its start to its end (`ModelInstalls`), so a 443 MB Ultra download
-  goes on after Cassini leaves the screen. Its progress weighs each part by its download, so it never goes back when
-  the next part starts. When iOS takes that time back, or the person presses Stop, the standalone download stops as
-  its Cancel does and the part shows "Download stopped" (STOPPED_BY_SYSTEM), as Android's `stopDownloads()` shows it,
-  until its next install.
+- **Background time** (iOS 26 and later). Android runs the drain in a foreground service with an ongoing notification.
+  iOS holds one `BGContinuedProcessingTask` for the whole drain (`io.codemyriad.cassini.transcription.queue`). It is
+  asked for at the drain's first claim, from the screen. The system shows "Transcribing “title”" with the job's progress
+  and a Stop button, and each next job only changes the title. iOS grants this request only while Cassini is on the
+  screen. A drain that starts in the background, or a refused request, falls back to the finite time of
+  `beginBackgroundTask`. The standalone model download (Settings, the model download screen; Android runs it in the same
+  foreground service) holds its own continued task under a second identifier
+  (`io.codemyriad.cassini.transcription.work`), titled "Downloading models" with the subtitle "They run on this device"
+  (the queue's says "Your audio stays on this device"; it names no source, as Apple's speech assets come from Apple and
+  the rest from the model host), from its start to its end (`ModelInstalls`), so a 443 MB Ultra download goes on after
+  Cassini leaves the screen. Its progress weighs each part by its download, so it never goes back when the next part
+  starts. When iOS takes that time back, or the person presses Stop, the standalone download stops as its Cancel does
+  and the part shows "Download stopped" (STOPPED_BY_SYSTEM), as Android's `stopDownloads()` shows it, until its next
+  install.
 - **Background time on iOS 18.** iOS 18 has no continued processing (`PlatformFacts.continuedProcessing`), so the
   drain and the standalone download always take the finite time of `beginBackgroundTask`, and `BGTaskScheduler` is
   never called. A transcription still running when that time ends (about 30 s after Cassini leaves the screen) pauses
@@ -714,9 +714,11 @@ stricter or looser than the spec.
   Name a speaker sheet saves nothing.
 - **The progress card's footnote** reads "Transcription runs on this device. If iOS stops it in the background, your
   progress is kept." in place of Android's "Keeps going if you leave the app…" and its "Notifications are off, so
-  progress shows only here." variant. iOS shows a running drain's progress in its own continued-processing UI whatever
-  the notification permission is, and may end that time (see "When iOS takes the time back" above), so neither of
-  Android's lines holds.
+  progress shows only here." variant. On iOS 26 and later, iOS shows a running drain's progress in its own
+  continued-processing UI whatever the notification permission is, and may end that time (see "When iOS takes the time
+  back" above), so neither of Android's lines holds. iOS 18 has no continued processing, so there the "Paused by iOS"
+  notification is the only sign outside the app; whether to restore Android's "Notifications are off" variant there is
+  an open product question.
 - **The draft** shows Apple's volatile results (on the fallback devices) as words that may still change. It follows its end as on Android: the
   header and the progress card stay fixed above it while 160 pt are left for the draft.
 - **Recently Deleted.** A queued job of a note moved to Recently Deleted is removed from the queue right after the
@@ -824,8 +826,8 @@ These features exist only on iOS. They were kept by decision.
 - Results are posted only while Cassini is in the background, silently. Each replaces the note's earlier one, as on
   Android's results channel. With previews hidden, the Lock Screen shows "A note was transcribed" and never the title.
   "Paused by iOS" and "Transcription stopped" carry Resume.
-- There are no ongoing notifications. The recording uses a Live Activity, and a drain uses the system's
-  continued-processing progress.
+- There are no ongoing notifications. The recording uses a Live Activity, and on iOS 26 and later a drain uses the
+  system's continued-processing progress. iOS 18 shows no drain progress outside the app.
 - Notification permission is asked once (`NoticeCenter.askNotificationsOnce`, for every path): at the first
   recording, the first Transcribe from a screen, or the model download, and only while it is not decided.
   NOTIFICATIONS_OFF means denied. Before the first question, nothing counts as off.
