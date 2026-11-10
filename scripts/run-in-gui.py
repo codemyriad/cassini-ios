@@ -11,10 +11,20 @@ from pathlib import Path
 import select
 import shlex
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
 import time
+
+
+class Interrupted(Exception):
+    def __init__(self, signum):
+        self.signum = signum
+
+
+def interrupted(signum, _frame):
+    raise Interrupted(signum)
 
 
 def run(argv):
@@ -61,43 +71,93 @@ def run(argv):
     script.chmod(0o600)
     deadline = time.monotonic() + timeout
     successful = False
-    with output.open("rb", buffering=0) as stream:
-        directory = os.open(root, os.O_RDONLY)
-        try:
-            queue = select.kqueue()
+    pane = "unknown (launch may still have succeeded)"
+    handlers = {number: signal.getsignal(number) for number in (signal.SIGINT, signal.SIGTERM)}
+    for number in handlers:
+        signal.signal(number, interrupted)
+
+    def retained(reason):
+        print(f"{reason}; GUI command was not stopped. Pane: {pane}. Log: {output}", file=sys.stderr)
+
+    try:
+        with output.open("rb", buffering=0) as stream:
+            directory = os.open(root, os.O_RDONLY)
             try:
-                changes = [select.kevent(fd, filter=select.KQ_FILTER_VNODE,
-                                         flags=select.KQ_EV_ADD | select.KQ_EV_CLEAR,
-                                         fflags=select.KQ_NOTE_WRITE | select.KQ_NOTE_EXTEND)
-                           for fd in (stream.fileno(), directory)]
-                queue.control(changes, 0, 0)  # Register before launch: even an immediate exit is observable.
-                launched = subprocess.run([tmux, "-L", "gui", "new-window", "-d", "-t", "gui:",
-                                           "-n", "run:" + Path(argv[0]).name,
-                                           shlex.join(["/bin/zsh", str(script)])])
-                if launched.returncode:
-                    return 71
-                while True:
-                    while chunk := stream.read(65536):
-                        sys.stdout.buffer.write(chunk)
-                        sys.stdout.buffer.flush()
-                    if done.exists():
-                        # The command exited before completion was published; drain its remaining output.
+                queue = select.kqueue()
+                try:
+                    changes = [select.kevent(fd, filter=select.KQ_FILTER_VNODE,
+                                             flags=select.KQ_EV_ADD | select.KQ_EV_CLEAR,
+                                             fflags=select.KQ_NOTE_WRITE | select.KQ_NOTE_EXTEND)
+                               for fd in (stream.fileno(), directory)]
+                    queue.control(changes, 0, 0)  # Register before launch: an immediate exit is observable.
+                    launched = subprocess.run([tmux, "-L", "gui", "new-window", "-d", "-t", "gui:",
+                                               "-P", "-F", "#{pane_pid} #{pane_id}",
+                                               "-n", "run:" + Path(argv[0]).name,
+                                               shlex.join(["/bin/zsh", str(script)])],
+                                              stdout=subprocess.PIPE, text=True)
+                    if launched.returncode:
+                        retained("GUI command launch failed")
+                        return 71
+                    try:
+                        pid_text, pane = launched.stdout.strip().split()
+                        pid = int(pid_text)
+                        if pid <= 0:
+                            raise ValueError()
+                    except ValueError:
+                        retained("GUI command launch returned invalid process metadata")
+                        return 71
+                    exited = False
+                    try:
+                        queue.control([select.kevent(pid, filter=select.KQ_FILTER_PROC,
+                                                     flags=select.KQ_EV_ADD | select.KQ_EV_ONESHOT,
+                                                     fflags=select.KQ_NOTE_EXIT)], 0, 0)
+                    except ProcessLookupError:
+                        # A short command may exit before its process watch is installed. Check done first below.
+                        exited = True
+
+                    def drain():
                         while chunk := stream.read(65536):
                             sys.stdout.buffer.write(chunk)
                             sys.stdout.buffer.flush()
-                        result = int(done.read_text().strip())
-                        successful = True
-                        return result
-                    remaining = deadline - time.monotonic()
-                    if remaining <= 0 or not queue.control(None, 2, remaining):
-                        print(f"GUI command timed out; it continues in tmux gui. Log: {output}", file=sys.stderr)
-                        return 124
+
+                    while True:
+                        drain()
+                        if done.exists():
+                            # EXIT published completion after all foreground command output. Drain once more.
+                            drain()
+                            result = int(done.read_text().strip())
+                            successful = True
+                            return result
+                        if exited:
+                            retained("GUI process exited without publishing its completion status")
+                            return 71
+                        remaining = deadline - time.monotonic()
+                        events = queue.control(None, 3, max(0, remaining)) if remaining > 0 else []
+                        if not events:
+                            retained("GUI command timed out")
+                            return 124
+                        exited = any(event.filter == select.KQ_FILTER_PROC for event in events)
+                finally:
+                    queue.close()
             finally:
-                queue.close()
-        finally:
-            os.close(directory)
-            if successful:
-                shutil.rmtree(root)
+                os.close(directory)
+    except Interrupted as error:
+        retained(f"GUI watcher interrupted by {signal.Signals(error.signum).name}")
+        return 128 + error.signum
+    except KeyboardInterrupt:
+        retained("GUI watcher interrupted by SIGINT")
+        return 130
+    except BrokenPipeError:
+        retained("GUI watcher output pipe closed")
+        # Prevent Python's final stdout flush from replacing the intended status with another BrokenPipe error.
+        with open(os.devnull, "wb") as discard:
+            os.dup2(discard.fileno(), sys.stdout.fileno())
+        return 141
+    finally:
+        for number, handler in handlers.items():
+            signal.signal(number, handler)
+        if successful:
+            shutil.rmtree(root)
 
 
 if __name__ == "__main__":

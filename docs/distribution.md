@@ -121,7 +121,9 @@ python3 scripts/run-in-gui.py lockf -k -t 3600 ~/.cassini-heavy.lock xcodebuild 
 The runner preserves the caller's working directory and PATH and streams the command's combined output. It waits
 on filesystem events for output and completion, then returns the command's exit status without a drain delay.
 `GUIRUN_TIMEOUT` is an upper bound (default 86400 seconds); on timeout the GUI command continues and the error
-reports its retained log. If the GUI session is absent, start `~/bin/gui-tmux.command` in the Mac's logged-in
+reports its retained log. Interrupting the local watcher or closing its output pipe also preserves the GUI command
+and reports its pane and log. If the GUI process exits without a completion status, the runner reports that failure
+instead of waiting for the deadline. If the GUI session is absent, start `~/bin/gui-tmux.command` in the Mac's logged-in
 Terminal, then retry. The shared `~/bin/guirun` tool is unchanged. `python3 scripts/test-run-in-gui.py` checks the
 runner with a fake tmux launcher and real filesystem events, without a GUI or simulator.
 
