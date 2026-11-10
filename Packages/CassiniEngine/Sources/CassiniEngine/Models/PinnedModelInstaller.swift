@@ -41,11 +41,17 @@ public final class PinnedModelInstaller: Sendable {
         var enders: [UUID: CheckedContinuation<Void, Never>] = [:]
     }
 
+    /// Per-attempt cancellation handshake. It cannot retain old request IDs in the long-lived owner.
+    final class RequestCancellation: Sendable {
+        let id = UUID()
+        private let cancelled = Mutex(false)
+        var isCancelled: Bool { cancelled.withLock { $0 } }
+        func cancel() { cancelled.withLock { $0 = true } }
+    }
+
     private struct Fields {
         var current: Install?
         var installs = 0
-        /// Callers that were cancelled before they could wait.
-        var left: Set<UUID> = []
         var status: Status = .idle
     }
 
@@ -102,14 +108,17 @@ public final class PinnedModelInstaller: Sendable {
         precondition(!parts.isEmpty, "No model part to install")
         while true {
             try Task.checkCancellation()
-            let id = UUID()
+            let request = RequestCancellation()
             do {
                 return try await withTaskCancellationHandler {
                     try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<InstallOutcome, any Error>) in
-                        attach(id, parts, onProgress, granted, continuation)
+                        attach(request, parts, onProgress, granted, continuation)
                     }
                 } onCancel: {
-                    self.leave(id)
+                    // Publish before taking the owner lock: attachment either sees this flag or installs the
+                    // waiter that leave removes. No cancellation state survives the request's lifetime.
+                    request.cancel()
+                    self.leave(request.id)
                 }
             } catch let busy as Busy {
                 // Another part set installs, or a cancelled install has not ended: wait for its end, then try again.
@@ -121,12 +130,13 @@ public final class PinnedModelInstaller: Sendable {
     /// Joins or starts the install of `parts`, or resumes `continuation` with `Busy` when another part set runs or the
     /// current install is being cancelled (its fetch can block until the read timeout, and a new install must not fetch
     /// the same files at the same time).
-    private func attach(_ id: UUID, _ parts: Set<ModelPart>, _ listener: @escaping @Sendable (DownloadProgress) -> Void,
+    private func attach(_ request: RequestCancellation, _ parts: Set<ModelPart>, _ listener: @escaping @Sendable (DownloadProgress) -> Void,
                         _ granted: Bool,
                         _ continuation: CheckedContinuation<InstallOutcome, any Error>) {
+        let id = request.id
         enum Attached { case joined(Status), started(Task<InstallOutcome, any Error>, Int, Status), busy(Int), left }
         let attached: Attached = fields.withLock { fields in
-            if fields.left.remove(id) != nil { return .left }
+            if request.isCancelled { return .left }
             if let running = fields.current, running.cancelling || running.parts != parts { return .busy(running.number) }
             var started: (Task<InstallOutcome, any Error>, Int)?
             if fields.current == nil {
@@ -160,7 +170,6 @@ public final class PinnedModelInstaller: Sendable {
         let (waiter, task, status): (CheckedContinuation<InstallOutcome, any Error>?, Task<InstallOutcome, any Error>?, Status?) =
             fields.withLock { fields in
                 guard var install = fields.current, let waiter = install.waiting.removeValue(forKey: id) else {
-                    fields.left.insert(id)
                     return (nil, nil, nil)
                 }
                 install.listeners[id] = nil
