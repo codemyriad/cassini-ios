@@ -1009,9 +1009,11 @@ iOS bundles the pinned published device/simulator arm64 Needle archives and Whis
 framework/resource set. The source archives retain minos27.0; the framework is linked for iOS 18.0 with exactly the
 audited SDK26 import closure, backed by native parity on the iOS 26.0 and 18.2 simulators, the runtime export check
 on 18.2 (every import resolves; 5 of 125 only through the host Mac's libraries) and hosted Whistle tests on 18.2, and the A12 measurement on iPadOS 26 (made with the 26.0-linked framework; owed again
-for this one). No physical iOS 18 device has run it. Whistle needs Armv8.1 atomics and Armv8.3 RCpc, so the A10 iPad (7th generation) on
-iPadOS 18 gets no Whistle (below iOS 26 the app reads the CPU features from `sysctl`; no device has run that read
-yet). Android uses its own pinned arm64 input; neither mobile
+for this one). Two AWS Device Farm runs on 2026-11-10 (iPhone 11 on iOS 18.6.2, iPhone 15 on iOS 18.0) loaded it
+and transcribed the bundled English recording in a Debug build. No A12 on iOS 18 and no Release build has run it.
+Whistle needs Armv8.1 atomics and Armv8.3 RCpc, so the A10 iPad (7th generation) on
+iPadOS 18 gets no Whistle (below iOS 26 the app reads the CPU features from `sysctl`; both iOS 18 devices answered
+1 for both keys, and no A10 has run the read). Android uses its own pinned arm64 input; neither mobile
 platform claims x86_64 support from an arm64 archive. See [the bundle contract](../Whistle/README.md).
 
 The iOS C API is in-process because ordinary iOS apps cannot spawn a recognition worker. A native abort can terminate
