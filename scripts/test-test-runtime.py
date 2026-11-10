@@ -93,8 +93,10 @@ FAKE_XCODEBUILD = r'''#!/usr/bin/python3 -I
 import json, os, plistlib, sys
 stub = os.environ["STUB"]
 args = sys.argv[1:]
+# The iOS 18 facts a run gives the UI test runner are recorded after the arguments.
+facts = ["TEST_RUNNER_CASSINI_IOS18_FACTS=1"] if os.environ.get("TEST_RUNNER_CASSINI_IOS18_FACTS") == "1" else []
 with open(os.path.join(stub, "calls"), "a") as f:
-    f.write("xcodebuild | " + " | ".join(args) + "\n")
+    f.write("xcodebuild | " + " | ".join(args + facts) + "\n")
 if "build-for-testing" in args:
     products = os.path.join(args[args.index("-derivedDataPath") + 1], "Build", "Products")
     os.makedirs(products, exist_ok=True)
@@ -114,6 +116,10 @@ elif "test-without-building" in args:
     state = json.load(open(os.path.join(stub, "state.json")))
     fails = any(d["udid"] == udid for d in state["devices"].get(os.environ.get("STUB_FAIL_RUNTIME", ""), []))
     verdict = "failed" if fails else "passed"
+    # STUB_HOST_FAILS: the hosted tests' host never launches, so no test runs and nothing is counted.
+    if os.environ.get("STUB_HOST_FAILS") and "-only-testing:CassiniTests" in args:
+        print("xcodebuild: error: Failed to launch the test host")
+        sys.exit(65)
     for a in args:
         if a == "-only-testing:CassiniTests":
             print("Test Case '-[CassiniTests.HostedTests testHosted]' started.")
@@ -601,6 +607,13 @@ class Ios18LegTests(unittest.TestCase):
         self.assertEqual(text.count(old), 1, old)
         path.write_text(text.replace(old, new))
 
+    @staticmethod
+    def by_name(h):
+        """The harness's calls with each clone's UDID replaced by the clone's name."""
+        names = {u: n for n, (_, u) in h.names().items()}
+        pattern = re.compile(r"[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}")
+        return [pattern.sub(lambda m: names.get(m.group(0), m.group(0)), c) for c in h.calls()]
+
     def test_off_by_default_an_all_run_issues_the_commands_of_a_script_without_the_leg(self):
         runs = []
         for strip in (False, True):
@@ -611,9 +624,10 @@ class Ios18LegTests(unittest.TestCase):
             result = h.run("all")
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             runs.append((h, result))
-        (h, result), (_, stripped) = runs
-        # The boot and the shards run beside each other, so only their order may differ.
-        self.assertEqual(sorted(h.calls()), sorted(runs[1][0].calls()))
+        (h, result), (stripped, _) = runs
+        # The boot and the shards run beside each other, so only their order may differ, and clones made at the same
+        # time take their UDIDs in either order: each UDID is compared as the name of its clone.
+        self.assertEqual(sorted(self.by_name(h)), sorted(self.by_name(stripped)))
         self.assertFalse([c for c in h.calls() if "iphone18" in c or "prebuilt" in c])
         self.assertNotIn("iOS 18", result.stdout + result.stderr)
         self.assertEqual(sorted(p.name for p in (h.root / "DerivedData.noindex").glob("test-logs*")), ["test-logs"])
@@ -649,7 +663,9 @@ class Ios18LegTests(unittest.TestCase):
         self.assertFalse([c for c in calls if other in c])
         self.assertTrue(all(d["state"] == "Shutdown" for n, (rt, u) in names.items() if n.startswith("ts-wt-")
                             for d in h.state()["devices"][rt] if d["udid"] == u))
-        self.assertIn("iOS 18 leg: iOS 18.6 hosted 1/1 (1 skipped), iPhone 1/1", result.stdout)
+        self.assertIn("iOS 18 leg: iOS 18.6 smoke: hosted 1/1 (1 skipped), iPhone 1/1", result.stdout)
+        # On the iOS 18 runtime the app reads the iOS 18 facts itself: no run is given them.
+        self.assertFalse([c for c in calls if "CASSINI_IOS18_FACTS" in c])
         # Logs and timing tables of each runtime are their own.
         derived = h.root / "DerivedData.noindex"
         self.assertTrue((derived / "test-logs/ui-1.log").exists() and (derived / "test-logs/hosted.log").exists())
@@ -670,7 +686,7 @@ class Ios18LegTests(unittest.TestCase):
             f"xcrun | simctl | create | ts-wt-iphone18-1 | iPhone 16 | {R186}"):])
         self.assertEqual(sorted(re.findall(r"-only-testing:CassiniUITests/(\S+)", leg)),
                          ["AlphaTests/testIPadTwo", "AlphaTests/testIPadTwo", "AlphaTests/testOne", "BetaTests/testThree"])
-        self.assertIn("iOS 18 leg: iOS 18.6 hosted 1/1 (1 skipped), iPhone 3/3, iPad 1/1", result.stdout)
+        self.assertIn("iOS 18 leg: iOS 18.6 full: hosted 1/1 (1 skipped), iPhone 3/3, iPad 1/1", result.stdout)
 
     def test_a_missing_runtime_with_the_leg_on_fails_the_run_and_its_status_before_building(self):
         h = Harness(self)
@@ -693,7 +709,34 @@ class Ios18LegTests(unittest.TestCase):
         h.write_state(WITH_18, {})
         result = h.run("all")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("iOS 18 leg: iOS 18.6 hosted 1/1 (1 skipped), iPhone 1/1", result.stdout)
+        self.assertIn("iOS 18 leg: iOS 18.6 smoke: hosted 1/1 (1 skipped), iPhone 1/1", result.stdout)
+
+    def view_branch(self, path):
+        """A switched-on worktree whose branch changes `path` since origin/main."""
+        h = Harness(self, WITH_18)
+        self.variant(h, "\nios18_default=off\n", "\nios18_default=smoke\n")
+        h.git()
+        git = ["git", "-C", str(h.root), "-c", "user.name=t", "-c", "user.email=t@example.com"]
+        subprocess.run(git + ["update-ref", "refs/remotes/origin/main", "HEAD"], check=True, env=h.env())
+        (h.root / path).parent.mkdir(parents=True, exist_ok=True)
+        (h.root / path).write_text("// changed\n")
+        for args in (["add", "-A"], ["commit", "-q", "-m", "change"]):
+            subprocess.run(git + args, check=True, capture_output=True, env=h.env())
+        return h
+
+    def test_by_default_a_branch_that_changes_views_gets_the_full_leg_and_any_other_the_smoke_run(self):
+        for path, mode in (("Cassini/Features/Note/NoteView.swift", "full"), ("Cassini/Design/Theme.swift", "full"),
+                           ("Cassini/Adapters/Store.swift", "smoke"), ("README.md", "smoke")):
+            with self.subTest(path=path):
+                h = self.view_branch(path)
+                result = h.run("all")
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn(f"iOS 18 leg: iOS 18.6 {mode}: hosted", result.stdout)
+                self.assertEqual("ts-wt-ipad18-1" in h.names(), mode == "full")
+        # Asked for by name, smoke stays smoke on a view change.
+        h = self.view_branch("Cassini/Features/Note/NoteView.swift")
+        result = h.run("all", CASSINI_IOS18="smoke")
+        self.assertIn("iOS 18 leg: iOS 18.6 smoke: hosted", result.stdout)
 
     def test_the_status_says_what_ran_and_nothing_of_ios_18_while_the_leg_is_off(self):
         h = Harness(self, WITH_18)
@@ -703,7 +746,10 @@ class Ios18LegTests(unittest.TestCase):
         result = h.run("all", CASSINI_POST_STATUS="1", CASSINI_IOS18="smoke")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(h.statuses()[-1],
-                         ("success", "passed in 1 min: iPhone 3/3, iPad 1/1; iOS 18.6 hosted 1/1 (1 skipped), iPhone 1/1"))
+                         ("success", "passed in 1 min: iPhone 3/3, iPad 1/1; iOS 18.6 smoke: hosted 1/1 (1 skipped), iPhone 1/1"))
+        result = h.run("all", CASSINI_POST_STATUS="1", CASSINI_IOS18="full")
+        self.assertEqual(h.statuses()[-1], ("success", "passed in 1 min: iPhone 3/3, iPad 1/1; "
+                                                       "iOS 18.6 full: hosted 1/1 (1 skipped), iPhone 3/3, iPad 1/1"))
 
     def test_a_failing_leg_fails_the_run_and_its_status_says_where(self):
         h = Harness(self, WITH_18)
@@ -711,7 +757,7 @@ class Ios18LegTests(unittest.TestCase):
         result = h.run("all", CASSINI_POST_STATUS="1", CASSINI_IOS18="smoke", STUB_FAIL_RUNTIME=R186)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertEqual(h.statuses()[-1],
-                         ("failure", "failed (exit 1): iPhone 3/3, iPad 1/1; iOS 18 leg failed: iOS 18.6 hosted 0/1 (1 skipped)"))
+                         ("failure", "failed (exit 1): iPhone 3/3, iPad 1/1; iOS 18.6 smoke failed: hosted 0/1 (1 skipped)"))
         self.assertTrue((h.root / "DerivedData.noindex/test-logs-ios18/FAILED").exists())
 
     def test_the_opt_out_posts_no_status_and_runs_no_leg(self):
@@ -723,12 +769,26 @@ class Ios18LegTests(unittest.TestCase):
         self.assertEqual(h.statuses(), [])
         self.assertFalse([c for c in h.calls() if "iphone18" in c])
 
-    def test_the_leg_runtime_is_one_value_that_can_run_the_leg_on_ios_26(self):
+    def test_the_leg_runtime_is_one_value_that_can_run_the_leg_on_ios_26_with_the_ios_18_facts(self):
         h, result = self.leg_run("smoke", CASSINI_IOS18_RUNTIME="26")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn(f"xcrun | simctl | create | ts-wt-iphone26-1 | iPhone 17 | {R26}", h.calls())
-        self.assertIn("iOS 26 leg: iOS 26.0 hosted 1/1 (1 skipped), iPhone 1/1", result.stdout)
+        calls = h.calls()
+        leg_start = calls.index(f"xcrun | simctl | create | ts-wt-iphone26-1 | iPhone 17 | {R26}")
+        self.assertIn("iOS 26 leg: iOS 26.0 smoke: hosted 1/1 (1 skipped), iPhone 1/1", result.stdout)
         self.assertTrue((h.root / "DerivedData.noindex/test-logs-ios26/ui-1.log").exists())
+        # Every test run of the leg, and none of the default runtime's, is given the iOS 18 facts.
+        tests = [(i, c) for i, c in enumerate(calls) if "test-without-building" in c]
+        self.assertTrue(tests and all(c.endswith(" | TEST_RUNNER_CASSINI_IOS18_FACTS=1") == (i > leg_start) for i, c in tests))
+
+    def test_a_leg_moved_to_another_runtime_posts_no_status(self):
+        h = Harness(self, WITH_18)
+        h.git()
+        for env in ({"CASSINI_IOS18": "smoke"}, {}):
+            with self.subTest(env=env):
+                result = h.run("all", CASSINI_POST_STATUS="1", CASSINI_IOS18_RUNTIME="26", **env)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn("no commit status: CASSINI_IOS18_RUNTIME is set (not the iOS 18 runtime)", result.stdout)
+        self.assertEqual(h.statuses(), [])
 
     def test_the_ios18_tier_builds_and_runs_only_the_leg(self):
         h = Harness(self, WITH_18)
@@ -761,10 +821,18 @@ class Ios18LegTests(unittest.TestCase):
                                ("", "")):
             with self.subTest(line=line):
                 (h.root / "hosted.log").write_text("Test Suite 'All tests' passed\n" + line + "\n")
-                result = h.shell(["hosted_counts"], f'hosted_counts {str(h.root / "hosted.log")!r}')
-                self.assertEqual(result.stdout.strip(), expected, result.stderr)
+                # Under set -e, as the script calls it: a log without counts gives none and goes on.
+                result = h.shell(["hosted_counts"], f'x=$(hosted_counts {str(h.root / "hosted.log")!r}); echo "$x|reached"')
+                self.assertEqual(result.stdout.strip(), expected + "|reached", result.stderr)
 
-    def test_the_smoke_list_names_ui_tests_and_plans_about_six_minutes(self):
+    def test_a_hosted_run_whose_host_never_launches_still_says_why(self):
+        h = Harness(self)
+        result = h.run("app", STUB_HOST_FAILS="1")
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("xcodebuild: error: Failed to launch the test host", result.stderr)
+        self.assertIn("see ", result.stderr)
+
+    def test_the_smoke_list_names_ui_tests_and_plans_about_five_minutes(self):
         h = Harness(self)
         listed = [line.split("#")[0].strip() for line in (ROOT / "scripts/ios18-smoke-tests.txt").read_text().splitlines()]
         listed = [line for line in listed if line]
@@ -775,7 +843,9 @@ class Ios18LegTests(unittest.TestCase):
         code = (f'timings_file=/nonexistent; committed_timings={str(ROOT / "scripts/ui-test-durations.tsv")!r}\n'
                 'printf "%s\\n" ' + " ".join(listed) + ' | planned_seconds')
         planned = int(h.shell(["planned_seconds"], code).stdout)
-        self.assertLessEqual(planned, 400, f"the smoke list plans {planned} s")
+        self.assertLessEqual(planned, 340, f"the smoke list plans {planned} s")
+        committed = {line.split("\t")[0] for line in (ROOT / "scripts/ui-test-durations.tsv").read_text().splitlines()}
+        self.assertFalse([t for t in listed if t not in committed], "every listed test has a measured time")
 
 
 if __name__ == "__main__":

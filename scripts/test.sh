@@ -48,10 +48,12 @@
 #                        UI tests listed in scripts/ios18-smoke-tests.txt on one iPhone; full: the hosted tests, every
 #                        UI test on the iPhones and the testIPad* tests on the iPad; 0: no leg, and no commit status.
 #                        Unset, all runs ios18_default below: off (no leg; the status says nothing of iOS 18) until the
-#                        iOS 18 runtime is installed on the gate's Mac, then smoke. With the leg on, a Mac without the
-#                        runtime fails the run, and its status, before anything is built; it never skips the leg.
+#                        iOS 18 runtime is installed on the gate's Mac, then smoke, or full when the branch changes
+#                        views (Cassini/Features, Cassini/Design since it left origin/main). With the leg on, a Mac
+#                        without the runtime fails the run, and its status, before anything is built; it never skips it.
 #   CASSINI_IOS18_RUNTIME  the runtime of that leg, as CASSINI_RUNTIME takes it (default 18; 26 runs the whole leg on an
-#                        installed iOS 26 runtime)
+#                        installed iOS 26 runtime, with the iOS 18 facts given to every UI test's launch). Set, the run
+#                        posts no commit status
 #   CASSINI_SIM_PREFIX   clone name prefix (default ts-<worktree directory name>)
 #   CASSINI_HEAVY_LOCK   the host-wide lock file (default ~/.cassini-heavy.lock); CASSINI_LOCK_MINUTES how long to
 #                        wait for it (default 60); CASSINI_ADMIT_MINUTES how long to wait for the host to calm down
@@ -59,9 +61,10 @@
 #   CASSINI_POST_STATUS=1  post the result of `all` as the commit status drmeyers/test-all of HEAD on GitHub (gh):
 #                        pending at the start, then success or failure. Only a full run of a clean, pushed HEAD
 #                        posts: no extra arguments, the iPad's tests, the release runtime, the default simulator
-#                        runtime (no CASSINI_RUNTIME), the iOS 18 leg not turned off (CASSINI_IOS18=0), nothing
-#                        uncommitted. The description gives the counts, with the leg's when it ran: "passed in 24 min:
-#                        iPhone 72/72, iPad 8/8; iOS 18.6 hosted 76/76 (6 skipped), iPhone 17/17".
+#                        runtime (no CASSINI_RUNTIME), the iOS 18 leg not turned off (CASSINI_IOS18=0) nor moved
+#                        (CASSINI_IOS18_RUNTIME), nothing uncommitted. The description gives the counts, with the
+#                        leg's and its mode when it ran: "passed in 24 min: iPhone 72/72, iPad 8/8; iOS 18.6 smoke:
+#                        hosted 76/76 (6 skipped), iPhone 16/16".
 #
 # One heavy run at a time per host: every tier but fast and clean takes the host-wide lock before it boots or builds
 # anything, and waits while another run (of any worktree) holds it; the lock file names the holder. Before the UI
@@ -103,7 +106,8 @@ if [ -n "$runtime_tag" ] && ! [[ $runtime_tag =~ ^[0-9]+(\.[0-9]+)*$ ]]; then
 fi
 
 # The iOS 18 leg of `all` when CASSINI_IOS18 is not set: off until the iOS 18 simulator runtime is installed on the
-# gate's Mac, then smoke. That switch is this one line (README, "The iOS 18 leg").
+# gate's Mac, then smoke (full when the branch changes views, ios18_preflight). That switch is this one line (README,
+# "The iOS 18 leg").
 ios18_default=off
 # The one runtime value the leg runs on; the script's own tests run it on an installed iOS 26 runtime instead.
 ios18_runtime="${CASSINI_IOS18_RUNTIME:-18}"
@@ -112,10 +116,11 @@ ios18_smoke_list="$root/scripts/ios18-smoke-tests.txt"
 case "${CASSINI_IOS18-unset}" in unset|smoke|full|0) ;; *)
     echo "error: CASSINI_IOS18=$CASSINI_IOS18 is none of smoke, full and 0" >&2; exit 2 ;;
 esac
-ios18_mode=off
+ios18_mode=off ios18_by_default=0
 case "$tier" in
     # A whole `all` on another runtime (CASSINI_RUNTIME) has no second leg.
-    all) [ -n "$runtime_tag" ] || ios18_mode="${CASSINI_IOS18:-$ios18_default}" ;;
+    all) [ -n "$runtime_tag" ] || ios18_mode="${CASSINI_IOS18:-$ios18_default}"
+        [ -n "${CASSINI_IOS18:-}" ] || ios18_by_default=1 ;;
     ios18) ios18_mode="${CASSINI_IOS18:-smoke}"
         [ "$ios18_mode" != 0 ] || { echo "error: CASSINI_IOS18=0 leaves the ios18 tier nothing to run" >&2; exit 2; } ;;
 esac
@@ -210,6 +215,7 @@ status_skip_reason() {
     [ ${#extra[@]} -eq 0 ] || { echo "extra arguments (${extra[*]})"; return; }
     case "${CASSINI_UI_IPAD:-1}" in 1) ;; *) echo "CASSINI_UI_IPAD=$CASSINI_UI_IPAD"; return ;; esac
     [ "${CASSINI_IOS18:-}" != 0 ] || { echo "CASSINI_IOS18=0 (no iOS 18 leg)"; return; }
+    [ -z "${CASSINI_IOS18_RUNTIME:-}" ] || { echo "CASSINI_IOS18_RUNTIME is set (not the iOS 18 runtime)"; return; }
     [ -z "${CASSINI_SHERPA_LOCAL:-}" ] || { echo "CASSINI_SHERPA_LOCAL is set (not the release runtime)"; return; }
     [ -z "$runtime_tag" ] || { echo "CASSINI_RUNTIME is set (not the default simulator runtime)"; return; }
     git -C "$root" rev-parse -q --verify HEAD > /dev/null 2>&1 || { echo "not a git checkout"; return; }
@@ -961,7 +967,7 @@ hosted_counts() {
     grep -E "Executed [0-9]+ tests?, with" "$1" 2>/dev/null | tail -1 | sed -nE \
         's/.*Executed ([0-9]+) tests?, with (([0-9]+) tests? skipped and )?([0-9]+) failures?.*/\1 \3 \4/p' |
         awk '{ if (NF == 2) { n = $1; s = 0; f = $2 } else { n = $1; s = $2; f = $3 }
-               printf "%d/%d%s\n", n - s - f, n - s, s ? " (" s " skipped)" : "" }'
+               printf "%d/%d%s\n", n - s - f, n - s, s ? " (" s " skipped)" : "" }' || true
 }
 
 # The UI test methods, as Class/method, read from the sources (one class per file is not assumed).
@@ -1171,7 +1177,29 @@ ios18_preflight() {
         die "the iOS $ios18_tag leg is on (CASSINI_IOS18=$ios18_mode) but ${picked:-the simulator runtimes could not be listed}." \
             "Install the runtime (README, Verify), or set CASSINI_IOS18=0, which posts no commit status"
     fi
+    # Decision 6: by default a branch that changes views gets the full leg, every other one the smoke run.
+    local views
+    if [ "$ios18_mode" = smoke ] && [ "$ios18_by_default" = 1 ] && views=$(ios18_view_changes) && [ -n "$views" ]; then
+        ios18_mode=full
+        echo "iOS $ios18_tag leg: full, since the branch changes views ($views)"
+    fi
     echo "iOS $ios18_tag leg: $ios18_mode, on iOS $(printf '%s' "$picked" | cut -f2) once the default runtime's tiers pass"
+}
+
+# The view sources changed since the branch left origin/main (the first three), for the leg's default mode.
+ios18_view_changes() {
+    local base
+    base=$(git -C "$root" merge-base HEAD "$(main_ref)" 2>/dev/null) || return 0
+    changed_files "$base" | grep -E '^Cassini/(Features|Design)/' | head -3 | xargs
+}
+
+# The leg's part of the status, with its mode and $2 (" failed") after it: "iOS 18.6 smoke: hosted 76/76, iPhone 17/17"
+# from the leg-counts "iOS 18.6 hosted 76/76, iPhone 17/17"; "iOS 18 full failed" when the leg left none.
+ios18_leg_text() {
+    case "$1" in
+        "iOS "[0-9]*" "*) printf 'iOS %s %s%s: %s' "$(echo "$1" | cut -d' ' -f2)" "$ios18_mode" "${2:-}" "$(echo "$1" | cut -d' ' -f3-)" ;;
+        *) printf 'iOS %s %s%s%s' "$ios18_tag" "$ios18_mode" "${2:-}" "${1:+: $1}" ;;
+    esac
 }
 
 # The leg: this worktree's clones of the default runtime are shut down first (one runtime's simulators at a time on
@@ -1188,6 +1216,9 @@ run_ios18_leg() {
         args+=("$a")
     done
     envs=(CASSINI_RUNTIME="$ios18_runtime" CASSINI_HEAVY_LOCK_HELD=1 CASSINI_KEEP_SIMS=0)
+    # On a runtime with Apple speech (the leg run on iOS 26 today), every launch gets the iOS 18 facts and the UI
+    # tests expect what iOS 18 shows (CassiniUITests/DeviceUnderTest.swift), so the iOS 18 side of each test runs.
+    [ "${ios18_tag%%.*}" -lt 26 ] || envs+=(TEST_RUNNER_CASSINI_IOS18_FACTS=1)
     if [ "$ios18_mode" = smoke ]; then
         envs+=(CASSINI_UI_IPAD=0 CASSINI_UI_WORKERS=1)
         if [ $selected = 0 ]; then
@@ -1206,12 +1237,12 @@ run_ios18_leg() {
     step_end
     line=$(cat "$leg_logs/leg-counts" 2>/dev/null || true)
     if [ $rc != 0 ]; then
-        leg_counts="iOS $ios18_tag leg failed${line:+: $line}"
+        leg_counts=$(ios18_leg_text "$line" " failed")
         echo "the iOS $ios18_tag leg failed; logs in $leg_logs" >&2
         return 1
     fi
-    leg_counts="$line"
-    echo "iOS $ios18_tag leg: $line"
+    leg_counts=$(ios18_leg_text "$line")
+    echo "iOS $ios18_tag leg: $leg_counts"
 }
 
 # ---------------------------------------------------------------- changed
