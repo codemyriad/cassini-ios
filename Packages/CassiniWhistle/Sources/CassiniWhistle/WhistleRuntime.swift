@@ -194,7 +194,7 @@ public actor WhistleRuntime {
 
     /// An observation point at C entry and at the unpublished result, for interruption tests with the pinned engine.
     package func transcribe(_ pcm: [Float], acceptance: WhistleCapability, bundle: Bundle,
-                            submitted: @Sendable () -> Void, resultReady: @Sendable () async -> Void) async throws -> WhistleResult {
+                            submitted: @escaping @Sendable () -> Void, resultReady: @Sendable () async -> Void) async throws -> WhistleResult {
         let result = try decodePCM(pcm, acceptance: acceptance, bundle: bundle, submitted: submitted)
         await resultReady()
         try Task.checkCancellation()
