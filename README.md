@@ -237,7 +237,12 @@ with Xcode 27.0, for each push to main or a pull request that changes code. The 
 and iPad Pro 13-inch (M5) clones, in light and dark, with the status bar pinned to 9:41. It then exports the named
 attachments from the result bundle and saves them, scaled down, under `docs/screenshots/`. `--locale it` (or `fr`,
 `es`, `pt-BR`, `pt-PT`) takes the same set in that language under `docs/screenshots/<locale>/`, which is not committed. `--device` and `--appearance` take a
-subset. `scripts/render-icon.swift` draws the app icon (`swift scripts/render-icon.swift` from the repository root).
+subset. For a headless English gallery run, use
+`scripts/screenshots.sh --locale en --appearance light --output /path/to/gallery/ios`.
+The folder receives stable `light/01-library.png` through `light/09-saved-voices.png` names and
+`ipad/light/01-split-landscape.png`, `ipad/light/02-split-portrait.png`. Custom output runs retain other files in the
+chosen folder. Capture runs through `simctl` and XCTest; no Simulator window is needed.
+`scripts/render-icon.swift` draws the app icon (`swift scripts/render-icon.swift` from the repository root).
 
 UI absence assertions wait for a completed screen or app decision, then inspect the same accessibility state immediately.
 Debug UI-test launches expose suggestion-completion, Settings-loaded and completed-scroll markers for this purpose.
