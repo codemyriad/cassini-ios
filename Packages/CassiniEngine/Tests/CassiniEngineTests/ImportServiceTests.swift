@@ -722,11 +722,24 @@ private func sha256(_ url: URL) throws -> String {
         let cover = "METADATA_BLOCK_PICTURE=" + String(repeating: "A", count: 7_700_000)
         let notes = #"{"gocassini.com":{"notes":[{"atMs":0,"text":""# + ImportFixtures.noise(550_000) + #""}]}}"#
         let words = Transcript([Word("S1", 0, 400, "third"), Word("S1", 500, 900, "version")])
-        // One seal makes the document (each pass over an 8 MiB header takes a second in a debug build).
-        let document = try CassiniDocument.create(ImportFixtures.opus(comments: [cover]), transcript: words, title: "Two",
+        // Seal the small header first; add the same cover only when muxing the final stale source.
+        // Its manifest still describes 792 packets, while the final audio has only 100.
+        let privateData = try JSON.parseObject(notes)
+        let document = try CassiniDocument.create(ImportFixtures.opus(), transcript: words, title: "Two",
                                                   processing: JSONObject(), carrying: CassiniDocument(
-                                                      state: .staleAudio, manifest: JSONObject([("x", .object(try JSON.parseObject(notes)))])))
-        let original = try h.input(try ImportFixtures.staleTwin(document), "two.opus")
+                                                      state: .staleAudio, manifest: JSONObject([("x", .object(privateData))])))
+        let comments = CassiniDocument.read(document).comments
+        let stale = try OggOpus.mux(OggOpus.read(ImportFixtures.opus(packets: 100)),
+                                    tags: CassiniDocument.tagsPacket([cover] + comments))
+        let parsed = CassiniDocument.read(stale)
+        try #require(parsed.state == .staleAudio)
+        try #require(parsed.comments.first == cover)
+        try #require(parsed.comments.filter { $0.hasPrefix("METADATA_BLOCK_PICTURE=") }.count == 1)
+        try #require(parsed.manifest?["x"] == .object(privateData))
+        let carriedNotes = try #require(parsed.manifest?["x"]?.object?["gocassini.com"]?.object?["notes"]?.array)
+        try #require(carriedNotes.count == 1)
+        try #require(carriedNotes.first?.object?["text"]?.string?.utf8.count == 550_000)
+        let original = try h.input(stale, "two.opus")
         #expect(try WordBodyBudget.fitsHeader(words, sealing: FileSource(original)), "the words alone fit beside the cover")
         var note = Note(title: "Two")
         note.document = DocumentInfo(state: .staleAudio)
