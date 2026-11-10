@@ -1,3 +1,11 @@
+# STOPPED — coordinator instruction, 2026-11-10 18:34 UTC
+
+**All work is pushed and this agent has stopped. No new work on this machine.** Coordinator confirms #92/#89/#86 merged; #91 re-review is running. Destruction deadline remains **2026-11-11 12:09 UTC**.
+
+Verified remote heads match all local work branches: recording71274c4, Parakeet a8bd214, draft3edd1a7, render2bedf59; handoff is pushed with this final checkpoint. Active source worktrees are clean, with no unpushed commits. No owned hog/evidence/gate process remains. No pending source changes or useful evidence exists only on this Mac; disposable build outputs/raw logs are intentionally excluded.
+
+#91 remains ready on71274c4 with exact-head CI/full gate green (724s), pending coordinator re-review. No further edits, tests, cleanup or audits will be started here. Remote handoff branch `test/d88-aws-ios-handoff` contains status, resume notes, PR bodies, audit, evidence summaries and evidence drivers. Historical details follow.
+
 # AWS iOS status
 
 Updated: 2026-11-10 18:18 UTC.
