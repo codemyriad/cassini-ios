@@ -144,17 +144,20 @@ import CassiniWhistle
         }
     }
 
-    /// Settings offers Apple's speech language only where the facts say the system has Apple speech, and reports Apple
-    /// speech as managed by iOS only where the adapter exists too: below iOS 26 even the iOS 26 facts get none.
+    /// Settings follows the facts it is given: it offers Apple's speech language and reports Apple speech as managed by
+    /// iOS exactly where the facts say the system has Apple speech, on any system. The adapter alone also needs iOS 26
+    /// (a link constraint, not a rule): below it even the iOS 26 facts get the unavailable candidate. The app passes
+    /// `LivePlatform.facts`, so the two never disagree outside tests.
     func testSettingsFollowsThePlatform() async {
         for platform in [PlatformFacts.iOS26, .iOS18] {
-            let test = TestGraph(transcriber: AppEnvironment.appleSpeechCandidate(platform: platform), platform: platform)
+            let candidate = AppEnvironment.appleSpeechCandidate(platform: platform)
+            XCTAssertEqual(isApple(candidate), platform.appleSpeech && LivePlatform.facts.appleSpeech, "\(platform)")
+            let test = TestGraph(transcriber: candidate, platform: platform)
             defer { test.tearDown() }
             XCTAssertEqual(test.graph.settingsPorts.platform, platform)
             let model = SettingsModel(ports: test.graph.settingsPorts)
             XCTAssertEqual(model.showsSpeechLanguage, platform.appleSpeech)
-            let managed = platform.appleSpeech && LivePlatform.facts.appleSpeech
-            XCTAssertEqual(test.graph.settingsPorts.size(of: .speech), managed ? .managedBySystem : .noModel)
+            XCTAssertEqual(test.graph.settingsPorts.size(of: .speech), platform.appleSpeech ? .managedBySystem : .noModel)
         }
     }
 
