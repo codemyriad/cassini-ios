@@ -16,8 +16,10 @@ enum DeviceUnderTest {
     /// and a row "Managed by iOS" in Settings.
     static let appleSpeech = ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 26 && !iOS18Facts
 
-    /// The launch arguments of a device whose recognizer runs at the UI-test defaults: none where that is Apple
-    /// speech; without it, where the default device has no recognizer and Transcribe is disabled, `--parakeet` (the
-    /// fake then stands for Parakeet Ultra, which iOS 18 runs on a device that can hold it).
-    static var workingSpeech: [String] { appleSpeech ? [] : ["--parakeet"] }
+    /// The launch arguments of a device whose recognizer runs, models installed, at the UI-test defaults: none where
+    /// that is Apple speech; without it, where the default device has no recognizer and Transcribe is disabled,
+    /// `--d78`, the bundled Whistle of a 3 GB device (most iOS 18 devices), with no Parakeet suggestion. Not
+    /// `--parakeet`: its fake counts as installed, but the consent asks for Parakeet's files on disk, so a recording
+    /// would not transcribe on its own.
+    static var workingSpeech: [String] { appleSpeech ? [] : ["--d78"] }
 }
