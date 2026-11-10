@@ -87,14 +87,35 @@ match: the framework loads and transcribes on the iOS 18.2 simulator. On devices
 a Debug build (an A13 and an A16). There is still no A12 or A10 run, no memory measurement and no TestFlight
 acceptance on iOS 18.
 
-## Library search on iOS 18
+## Typing fast on iOS 18
 
-The Library search wraps (`TextField(axis: .vertical)`), so Search on the keyboard arrives as a new line, which the
-field turns into the end of the search. On iPadOS 18.2, on a heavily loaded Mac, the field once stopped passing edits to
-its binding mid-word: the query stayed at "Thur" while the field showed "Thursday" and the new line, so the search
-never ended and the keyboard stayed up (NoteReopenTests, 10 November 2026). Below iOS 26 the field therefore also
-reads every edit from its text view (`UITextView.textDidChangeNotification`), follows it and ends editing on a line
-break (`LibrarySearchEdit`). iOS 26 keeps the binding alone; the same failure was not seen there.
+On iOS 18.2 SwiftUI skips an `onChange(of:)` action when its value changes twice within one frame, and logs
+"onChange(of: String) action tried to update multiple times per frame". A fast typist on a busy device puts two
+keystrokes into one frame; when the skipped change is the last keystroke, the field's text holds it but the action
+never sees it until the next edit. In Name a speaker that action is what gives the name to the model: on a heavily
+loaded Mac the field showed "Anna Ricci" while the model kept "Anna Ric", and Save stored "Anna Ric"
+(AcceptanceWalkTests, 10 November 2026). Measured with temporary logging on the iOS 18.2 simulator under load (not a
+test): text fields' bindings received every keystroke in all 185 typings (125 of "Anna Ricci" into Name a speaker, 60
+of "Thursday" into the Library search), the fault was logged in every run that captured the log, and once the model
+kept "Anna Ricc" while the field and its binding held "Anna Ricci", still 20 s later. It is a skipped action, not a
+late one, and not a lost binding write.
+
+Below iOS 26, a text field whose edits change something else therefore also takes each edit from its binding's
+setter (`Binding.handingEdits(to:)`, Cassini/Design/TextEdits.swift), which runs on every keystroke, and keeps its
+`onChange(of:)` for changes made in code: Name a speaker (the name, the draft kept for a relaunch and the cut to 80
+characters) and the Rename sheet (the draft and the cut to its limit; Save already read the text itself). Running an
+action twice for one edit changes nothing (`NameSpeakerModelTests.aNameReportedTwiceIsTheSameAsOnce`). The other text
+inputs read their binding directly when they act (the passage editor, the recording title, the in-note search, Add a
+speaker), so a skipped action cannot reach them. The scene-restoration copies of the Library and in-note search
+queries still follow `onChange(of:)`: after a skipped last keystroke, a relaunch restores the query without it.
+
+The Library search wraps (`TextField(axis: .vertical)`), so Search on the keyboard arrives as a new line, which an
+`onChange(of:)` turns into the end of the search. On iPadOS 18.2 that once did not happen: the field showed
+"Thursday" and the new line, the search did not end and the keyboard stayed up (NoteReopenTests). It was put down to
+the binding stopping at "Thur"; the measurement above found no lost binding write, so the skipped action is the likelier
+cause. Below iOS 26 the field also reads every edit from its text view (`UITextView.textDidChangeNotification`),
+follows it and ends editing on a line break (`LibrarySearchEdit`), which holds for either cause. iOS 26 keeps
+`onChange(of:)` alone: neither failure was seen there.
 
 ## How it is tested today
 
