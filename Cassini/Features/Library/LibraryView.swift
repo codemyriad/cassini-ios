@@ -54,6 +54,7 @@ struct LibraryView: View {
         }
         .scrollDismissesKeyboard(.immediately)
         .background(Color.paper)
+        .overlay(alignment: .topLeading) { UITestInteractiveMarker(loaded: library.isLoaded && !content.loading) }
         .trashUndoSnackbar()
         .safeAreaInset(edge: .bottom, spacing: 0) {
             CaptureBar(unavailable: content.emptyState == .unavailable) { importing = true }

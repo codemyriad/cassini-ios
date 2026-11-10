@@ -44,20 +44,14 @@ extension XCUIElement {
 }
 
 extension XCUIElement {
-    /// Taps this button until `opened` holds, at most `attempts` times, and says whether it did. Right after a cold
-    /// launch on a busy iPad a tap can land while the app is still settling and be dropped: the screen recording of
-    /// a failed audit showed the Library still there 20 s after the tap on Recently Deleted. A screen that opens late
-    /// is not tapped twice while it is opening: each tap waits up to 8 s (the last up to `uiWaitFloor`) before the next,
-    /// and a button that is gone or covered is not tapped again.
+    /// Taps once after the Library's data, UIKit presentation and active scene are ready. A missing destination is
+    /// a failure at the hang bound, never a reason to send a second tap while the first may still be in flight.
     @MainActor @discardableResult
-    func tap(until opened: () -> Bool, attempts: Int = 3) -> Bool {
-        for attempt in 1...attempts {
-            // Gone or covered: the tap took, and the screen is still on its way.
-            if attempt > 1 && !(exists && isHittable) { return poll(within: uiWaitFloor, opened) }
-            tap()
-            if poll(within: attempt == attempts ? uiWaitFloor : 8, opened) { return true }
-        }
-        return false
+    func tapWhenInteractive(in app: XCUIApplication, until opened: () -> Bool) -> Bool {
+        guard app.staticTexts["uiTestState-libraryInteractive"].waitForExistence(within: uiWaitFloor),
+              poll(within: uiWaitFloor, { exists && isEnabled && isHittable }) else { return false }
+        tap()
+        return poll(within: uiWaitFloor, opened)
     }
 
     /// Taps a menu item once it has stopped moving. A context menu or a pull-down menu still animates in when the app's
@@ -66,14 +60,15 @@ extension XCUIElement {
     /// each result), and for a moment the item has no point to tap: reading `isHittable` then fails the test ("Failed
     /// to determine hittability… Activation point invalid"). So the wait reads snapshots, which only throw, until the
     /// item is on the screen at the same frame twice in a row, then taps it.
-    @MainActor func tapWhenSettled(within timeout: TimeInterval = 10) {
+    @MainActor func tapWhenSettled(within timeout: TimeInterval = 15, file: StaticString = #filePath, line: UInt = #line) {
         let screen = XCUIApplication().frame
         var last: CGRect?
-        _ = poll(within: timeout) {
+        let settled = poll(within: max(timeout, uiWaitFloor)) {
             guard let frame = (try? snapshot())?.frame.intersection(screen), !frame.isEmpty else { last = nil; return false }
             defer { last = frame }
             return frame == last
         }
+        guard settled else { XCTFail("The menu item never settled on screen", file: file, line: line); return }
         tap()
     }
 }
@@ -95,25 +90,25 @@ extension XCUIElement {
 }
 
 extension XCUIElement {
-    /// Replaces the text of this focused field with `text` in one edit, as Android's `performTextReplacement`: the
-    /// field cleared, then `text` pasted. Typing 200 characters one key at a time takes XCTest about four seconds.
-    /// A paste that does not land (the shortcut can be dropped on a busy machine) is typed instead.
-    @MainActor func replaceText(with text: String) {
+    /// Replaces this focused field once and waits for the edit. A timeout fails the edit; it never causes another
+    /// edit that could overtake an input still arriving. The field may truncate the input to its limit.
+    @MainActor func replaceText(with text: String, expecting expected: String? = nil, emptyValue: String? = nil, file: StaticString = #filePath, line: UInt = #line) {
         let current = (value as? String) ?? ""
-        let placeholder = placeholderValue ?? ""
-        let length = current == placeholder ? 0 : current.count
-        if length > 0 { typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: length + 2)) }
-        // Short names need no clipboard handoff or paste retries.
-        if (1...10).contains(text.count) { typeText(text); return }
-        UIPasteboard.general.string = text
-        // The field may cut what is pasted to its limit. The first paste of a runner often does not land.
-        for _ in 0..<2 {
-            typeKey("v", modifierFlags: .command)
-            if poll(within: 1, { ((value as? String).map { $0.count > 1 && text.hasPrefix($0) }) ?? false }) { return }
+        // SwiftUI's multiline TextField can expose its prompt as value/label without placeholderValue.
+        let placeholder = emptyValue ?? placeholderValue.flatMap { $0.isEmpty ? nil : $0 } ?? label
+        // Deleting a displayed prompt is harmless; skipping deletion could keep real text equal to that prompt.
+        let length = current.count
+        if length > 0 {
+            typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: length + 2))
+            guard poll(within: uiWaitFloor, { (value as? String).map { $0.isEmpty || $0 == placeholder } ?? false }) else {
+                XCTFail("The field did not clear before replacement", file: file, line: line); return
+            }
         }
-        let left = (value as? String).map { $0 == placeholder ? 0 : $0.count } ?? 0
-        if left > 0 { typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: left + 2)) }
+        if text.isEmpty { return }
+        // One input operation avoids a cross-process clipboard handoff and cannot duplicate a late paste.
         typeText(text)
+        XCTAssertTrue(waitForValue(expected ?? text, within: uiWaitFloor),
+                      "The replacement edit did not arrive", file: file, line: line)
     }
 }
 

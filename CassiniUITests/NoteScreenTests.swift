@@ -78,7 +78,7 @@ final class NoteScreenTests: XCTestCase {
         // Playing scrolls the transcript back to the active word; the drag comes once that scroll has stopped.
         let second = app.descendants(matching: .any)["turn-w1"]
         var frame = CGRect.null
-        XCTAssertTrue(poll(within: 5) { defer { frame = second.frame }; return second.frame == frame })
+        XCTAssertTrue(poll(within: uiWaitFloor) { defer { frame = second.frame }; return second.frame == frame })
         second.swipeDown()
         XCTAssertTrue(chip.waitForExistence(within: 3), "a drag during playback pauses following")
         chip.tap()
