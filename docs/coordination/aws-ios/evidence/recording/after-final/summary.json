@@ -1,0 +1,44 @@
+[
+  {
+    "run": 1,
+    "head": "573a66c21a5f55b91ba37cc59b9950e0392210dc",
+    "exit": 0,
+    "hogs": 6,
+    "aws_lock": true,
+    "native_lock": true,
+    "seconds": 4.717,
+    "load": [
+      2.634765625,
+      8.4794921875,
+      18.03125
+    ]
+  },
+  {
+    "run": 2,
+    "head": "573a66c21a5f55b91ba37cc59b9950e0392210dc",
+    "exit": 0,
+    "hogs": 6,
+    "aws_lock": true,
+    "native_lock": true,
+    "seconds": 3.334,
+    "load": [
+      3.14404296875,
+      8.48779296875,
+      17.97802734375
+    ]
+  },
+  {
+    "run": 3,
+    "head": "573a66c21a5f55b91ba37cc59b9950e0392210dc",
+    "exit": 0,
+    "hogs": 6,
+    "aws_lock": true,
+    "native_lock": true,
+    "seconds": 3.315,
+    "load": [
+      3.14404296875,
+      8.48779296875,
+      17.97802734375
+    ]
+  }
+]
