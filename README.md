@@ -219,6 +219,10 @@ measured time, averaged with the time stored before. Arguments after the tier go
 environment variables. `scripts/test-remote.sh [tier]` runs the same tier on the Mac named by `CASSINI_MAC`, or here
 when that is unset.
 
+UI helper deadlines only bound hangs: menu taps require settled snapshots, Library navigation waits for loaded data
+and UIKit presentation in an active scene before one tap, and text replacement waits for a cleared field and one edit.
+A late destination or paste never triggers another input solely because a short deadline expired.
+
 `CASSINI_RUNTIME=18 scripts/test.sh app` (or `ui`) runs on the newest installed iOS 18 simulator runtime instead of
 the newest runtime; a version such as `18.6` or a runtime identifier also works. A run fails when no runtime matches,
 or when the runtime cannot run the device types: below iOS 26 they default to iPhone 16 and iPad Pro 13-inch (M4).
@@ -234,10 +238,6 @@ and iPad Pro 13-inch (M5) clones, in light and dark, with the status bar pinned 
 attachments from the result bundle and saves them, scaled down, under `docs/screenshots/`. `--locale it` (or `fr`,
 `es`, `pt-BR`, `pt-PT`) takes the same set in that language under `docs/screenshots/<locale>/`, which is not committed. `--device` and `--appearance` take a
 subset. `scripts/render-icon.swift` draws the app icon (`swift scripts/render-icon.swift` from the repository root).
-
-UI helper deadlines only bound hangs: menu taps require settled snapshots, Library navigation waits for loaded data
-and UIKit presentation in an active scene before one tap, and text replacement waits for a cleared field and one edit.
-A late destination or paste never triggers another input solely because a short deadline expired.
 
 UI-test launches (`--ui-testing`, Debug builds only) use a library and preferences of their own, a clock fixed at
 Thursday 8 October 2026 09:41 UTC, en_US formatting, and fake transcription and speaker analysis. Named seeds fill the
