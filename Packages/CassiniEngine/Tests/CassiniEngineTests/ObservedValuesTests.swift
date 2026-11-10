@@ -64,6 +64,27 @@ import Testing
         #expect(await followerEnded(&values, task))
     }
 
+    /// As the install followers do, which await work in their loop body: a change made after a value arrives and
+    /// before the follower asks for the next one is delivered at that next one. The follower makes the change itself,
+    /// on the main actor, so it always lands before the wait.
+    @Test(arguments: ObservationSource.allCases)
+    func aChangeMadeBeforeTheNextWaitIsDeliveredThen(source: ObservationSource) async {
+        let counter = Counter()
+        let (stream, report) = AsyncStream.makeStream(of: Int.self)
+        let task = Task { @MainActor in
+            for await value in ObservedValues(using: source, { counter.count }) {
+                if value == 0 { counter.count = 1 }
+                report.yield(value)
+            }
+            report.finish()
+        }
+        var values = stream.makeAsyncIterator()
+        #expect(await values.next(isolation: #isolation) == 0)
+        #expect(await values.next(isolation: #isolation) == 1)
+        task.cancel()
+        #expect(await followerEnded(&values, task))
+    }
+
     @Test(arguments: ObservationSource.allCases)
     func aChangeOfSomethingNotReadDeliversNothing(source: ObservationSource) async {
         let counter = Counter()
