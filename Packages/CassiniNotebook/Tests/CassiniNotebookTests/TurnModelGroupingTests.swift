@@ -4,7 +4,8 @@ import Testing
 
 /// The paragraph grouping gives what it gave before it compiled its patterns once and grew a block's text word by
 /// word. It used to search with `String.range(of:options: .regularExpression)` and join every word of a block again
-/// after each word; those steps are kept below as the reference.
+/// after each word; those steps are kept below as the reference. The one difference, on text with combining marks, is
+/// pinned in `compiledPatternsMatchCodePointsAsPortableDoes`.
 @Suite struct TurnModelGroupingTests {
     static let corpus = [
         "", " ", "\n", "word", "Word.", "word.\"", "word.')]", "end.\n", "end.)\n", "x\n.", "a.b", ".a", "?!", "\t.",
@@ -26,6 +27,20 @@ import Testing
                 }
             }
         }
+    }
+
+    /// Where the compiled patterns differ from that search on macOS 27: they match code points, as portable.ts's
+    /// JavaScript does, so a combining mark no longer hides the punctuation or letter before it.
+    @Test func compiledPatternsMatchCodePointsAsPortableDoes() {
+        for text in [",\u{301}", ".\u{301}", ")\u{200D}", "?\u{E33}\u{1161}"] {
+            #expect(TurnModel.Pattern.attachesToPrevious.matches(text), "\(text.debugDescription)")
+        }
+        #expect(TurnModel.joinedText(["a", ",\u{301}", "b"]) == "a,\u{301} b")
+        #expect(TurnModel.isWordLike("\u{E49}\u{E33}"))
+        #expect(TurnModel.isWordLike("\u{301}\u{E33}\u{20DD}"))
+        #expect(!TurnModel.isWordLike("\u{301}"))
+        #expect(!TurnModel.Pattern.sentenceEnd.matches("a.\u{301}"))
+        #expect(!TurnModel.Pattern.punctuationTail.matches("a.\u{301}"))
     }
 
     @Test func joiningTrimsSkipsEmptyPartsAndAttachesPunctuation() {
