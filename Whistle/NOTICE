@@ -1,4 +1,4 @@
-The JFK test recording is public-domain US federal government material, included only in Debug test builds.
+The JFK test recording is public-domain US federal government material, included only in Debug and explicitly enabled local lab builds, never normal Release or internal TestFlight exports.
 
 Whistle weights and Needle engine 3.3.0 — Cactus Compute
 
@@ -7,4 +7,4 @@ Engine revision93e88ede867e4311c39151285e74df513e4b835b; weights revisionca52876
 Published hash-verified inputs are used unchanged; see Whistle/pins.json and the documented minimum-OS exception (Whistle/README.md).
 
 Silero VAD 6.2.1, snakers4/silero-vad revision 7e30209a3e901f9842f81b225f3e93d8199902b1.
-MIT license: Silero-LICENSE. The internal recording adapter uses the pinned CPU ONNX Runtime 1.27.1 already linked by this app.
+MIT license: Silero-LICENSE. Whistle uses it to find where speech is, with the pinned CPU ONNX Runtime 1.27.1 already linked by this app.

@@ -142,10 +142,14 @@ work over SSH.
   empty, `NSPrivacyTracking` false) and `Privacy.txt`: recordings, transcripts and voiceprints stay on the device, and
   the only network use is downloading pinned models.
 - **Privacy policy URL:** https://cassini.talk/privacy/ios/ (the overview for every app is
-  https://cassini.talk/privacy/). The page is published from `Cassini/Resources/Licenses/Privacy.txt`, the text
-  Settings shows, so the two say the same. When `Privacy.txt` changes, ask the coordinator to republish the page.
-  It goes in App Store Connect under App Information → Privacy Policy URL.
+  https://cassini.talk/privacy/). That page is the legal text, which the coordinator keeps outside this repository.
+  The technical page, https://cassini.talk/privacy/ios/technical/, is published from
+  `Cassini/Resources/Licenses/Privacy.txt`, the text Settings shows, so those two say the same. When `Privacy.txt`
+  changes, ask the coordinator to republish the technical page and to check the legal page against it.
+  The legal page's URL goes in App Store Connect under App Information → Privacy Policy URL.
 - **Export compliance:** answered in the build (`ITSAppUsesNonExemptEncryption` false), so no question per upload.
 - **App Review note:** explain that background audio (`UIBackgroundModes` audio) keeps a recording going with the screen
   locked and lets playback continue on the lock screen, and that `processing` finishes a running transcription. Mention
-  that the speech and speaker models (about 531 MB) download only after the user agrees, and are data, not code.
+  that the Whistle speech model and its native engine are in the app, so transcribing with Whistle needs no download.
+  Parakeet Ultra with its speech detector (about 444 MB) and the speaker models (about 88 MB) download from
+  `dist.gocassini.com` only after the user agrees, and are data, not code.

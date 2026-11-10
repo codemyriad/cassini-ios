@@ -149,6 +149,8 @@ import CassiniNotebook
         let models = try texts.text(.models)
         #expect(models.hasPrefix("Speech recognition models\n"))
         #expect(models.contains("Downloaded models\n"))
+        #expect(models.contains("Included in the app\n") && models.contains("Whistle"), "the bundled models")
+        #expect(!thirdParty.contains("Included in the app"))
         #expect(models.contains("OpenMDW License Agreement"), "from the installed notices")
         #expect(!thirdParty.contains("FluidAudio") && !models.contains("pyannote"))
         let sources = try texts.text(.modelSources)

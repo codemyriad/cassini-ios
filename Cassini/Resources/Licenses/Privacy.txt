@@ -10,7 +10,7 @@ Cassini keeps your data in its private app storage (Application Support). Other 
 - Transcripts: the words and their times, the speaker labels, the speaker names that you give, the bookmarks and the title, in `note.json`. `provenance.json` records which models made the transcript.
 - Unfinished transcription: the words found so far and how far the transcription got, in `work/`. Cassini deletes this folder when the transcription ends, when you start again, or when it deletes the note.
 - Voiceprints: a voiceprint is a list of numbers that Cassini calculates from the voice of one speaker. Cassini uses voiceprints to recognise the people that you name. They are kept in `PrivateVoices/` only, outside the note folders.
-- Settings and state: your choices in Settings (the speech language on iOS 26 and later, automatic transcription, identifying speakers and naming voices automatically), your model download decisions and their time, and some one-time notices, in the app's preferences. The queue of transcriptions is in `jobs.json`.
+- Settings and state: your choices in Settings (the speech recognition model, the speech language on iOS 26 and later, automatic transcription, identifying speakers and naming voices automatically), your model download decisions and their time, and some one-time notices, in the app's preferences. The queue of transcriptions is in `jobs.json`.
 - Models: the downloaded models, in `CassiniModels/models/<model>/<revision>/`, each with the model host's notices (`NOTICE.txt`). They contain no personal data. On iOS 26 and later, iOS keeps Apple's speech models itself.
 
 When you import a file, or open a file with Cassini from a different app, Cassini copies the file into its storage. The original file stays where it is.
