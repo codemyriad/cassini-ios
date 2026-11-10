@@ -955,7 +955,9 @@ tier_app() {
     test_on_retrying CassiniTests "$logs/hosted.log" "$logs/hosted.xcresult" "$first_iphone" -only-testing:CassiniTests || rc=$?
     hosted_counts=$(hosted_counts "$logs/hosted.log")
     if [ $rc != 0 ]; then
-        grep -E "error:|failed \(|\*\* TEST|test.sh:" "$logs/hosted.log" | tail -20 >&2; echo "see $logs/hosted.log" >&2
+        grep -E "error:|failed \(|Restarting after|\*\* TEST|test.sh:" "$logs/hosted.log" | tail -20 >&2
+        # A test that crashes the host prints no "failed (" line; xcodebuild's own list names it.
+        sed -n '/^Failing tests:/,/^$/p' "$logs/hosted.log" >&2; echo "see $logs/hosted.log" >&2
         step_end; return 1
     fi
     step_end
@@ -964,6 +966,14 @@ tier_app() {
 
 # "passed/ran" of a hosted run's log, with the skipped ones after: "76/76 (6 skipped)".
 hosted_counts() {
+    # After a crash xcodebuild relaunches the host, and its last "Executed" line covers only the relaunch: count the
+    # test cases instead, with every test in xcodebuild's "Failing tests:" list (a crashed one has no "failed (" line).
+    if grep -q "^Restarting after unexpected exit" "$1" 2>/dev/null; then
+        awk '/^Test Case .* passed \(/ { p++ } /^Test Case .* skipped \(/ { s++ }
+             /^Failing tests:/ { list = 1; next } list && /^\t/ { f++; next } { list = 0 }
+             END { printf "%d/%d%s\n", p, p + f, s ? " (" s " skipped)" : "" }' "$1"
+        return 0
+    fi
     grep -E "Executed [0-9]+ tests?, with" "$1" 2>/dev/null | tail -1 | sed -nE \
         's/.*Executed ([0-9]+) tests?, with (([0-9]+) tests? skipped and )?([0-9]+) failures?.*/\1 \3 \4/p' |
         awk '{ if (NF == 2) { n = $1; s = 0; f = $2 } else { n = $1; s = $2; f = $3 }

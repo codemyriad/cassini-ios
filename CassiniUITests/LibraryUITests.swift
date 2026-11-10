@@ -91,7 +91,7 @@ final class LibraryUITests: XCTestCase {
         let resume = app.buttons["Resume transcribing Paused standup"]
         list(app).scroll(attempts: 4) { resume.exists && resume.isHittable }
         XCTAssertTrue(resume.waitForExistence(within: 10))
-        // iOS 18 reports the 44 pt frame as 43.99999999999997 (the frame comes back through a floating-point transform).
+        // The frame comes back through a floating-point transform: once on iOS 18.2 a 44 pt row read 43.99999999999997.
         XCTAssertGreaterThanOrEqual(resume.frame.height, 44 - 0.001, "a 44 pt target")
         resume.tap()
         XCTAssertTrue(waitFor(row(app, "Paused standup"), label: ", queued"), row(app, "Paused standup").label)

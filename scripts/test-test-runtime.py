@@ -825,6 +825,21 @@ class Ios18LegTests(unittest.TestCase):
                 result = h.shell(["hosted_counts"], f'x=$(hosted_counts {str(h.root / "hosted.log")!r}); echo "$x|reached"')
                 self.assertEqual(result.stdout.strip(), expected + "|reached", result.stderr)
 
+    def test_hosted_counts_after_a_crash_count_every_launch(self):
+        # As on iOS 18.2: a test crashes the host, xcodebuild relaunches it, and the last "Executed" line covers only
+        # the relaunch. The crashed test has no "failed (" line, only its entry in "Failing tests:".
+        h = Harness(self)
+        case = "Test Case '-[CassiniTests.T test{}]' {} (0.001 seconds)."
+        (h.root / "hosted.log").write_text("\n".join([
+            case.format("A", "passed"), case.format("B", "skipped"), case.format("C", "failed"),
+            "Test Case '-[CassiniTests.T testD]' started.",
+            "Restarting after unexpected exit, crash, or test timeout; summary will include totals from previous launches.",
+            case.format("E", "passed"),
+            "\t Executed 1 test, with 0 failures (0 unexpected) in 0.002 (0.003) seconds",
+            "Failing tests:", "\tT.testC()", "\tT.testD()", "", "** TEST EXECUTE FAILED **", ""]))
+        result = h.shell(["hosted_counts"], f'hosted_counts {str(h.root / "hosted.log")!r}')
+        self.assertEqual(result.stdout.strip(), "2/4 (1 skipped)", result.stderr)
+
     def test_a_hosted_run_whose_host_never_launches_still_says_why(self):
         h = Harness(self)
         result = h.run("app", STUB_HOST_FAILS="1")
