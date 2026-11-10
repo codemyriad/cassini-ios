@@ -95,6 +95,14 @@ if "build-for-testing" in args:
     os.makedirs(products, exist_ok=True)
     with open(os.path.join(products, "Cassini_Cassini_iphonesimulator27.0-arm64.xctestrun"), "wb") as f:
         plistlib.dump({"CassiniTests": {}, "CassiniUITests": {}, "__xctestrun_metadata__": {"FormatVersion": 1}}, f)
+    # The app the embedded-minimum check reads: its own minimum, and an extension whose minimum is STUB_EMBEDDED_MINOS
+    # (the app's when unset), so a test can make that check fail.
+    app = os.path.join(products, "Debug-iphonesimulator", "Cassini.app")
+    os.makedirs(os.path.join(app, "PlugIns", "CassiniActivity.appex"), exist_ok=True)
+    with open(os.path.join(app, "Info.plist"), "wb") as f:
+        plistlib.dump({"MinimumOSVersion": "18.0"}, f)
+    with open(os.path.join(app, "PlugIns", "CassiniActivity.appex", "Info.plist"), "wb") as f:
+        plistlib.dump({"MinimumOSVersion": os.environ.get("STUB_EMBEDDED_MINOS", "18.0")}, f)
 elif "test-without-building" in args:
     for a in args:
         if a == "-only-testing:CassiniTests":
@@ -132,7 +140,7 @@ class Harness:
         self.cache = base / "cache"
         for d in (self.root / "scripts", self.root / "CassiniUITests", self.stub / "bin", self.home, self.cache):
             d.mkdir(parents=True)
-        for name in ("test.sh", "test-events.py", "ui-test-durations.tsv"):
+        for name in ("test.sh", "test-events.py", "check-embedded-minos.py", "ui-test-durations.tsv"):
             shutil.copy2(ROOT / "scripts" / name, self.root / "scripts" / name)
         (self.root / "Package.swift").write_text("// fixture\n")
         (self.root / "Package.resolved").write_text("{}\n")
@@ -289,6 +297,13 @@ class FullRunTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertFalse([c for c in h.calls() if "simctl | create" in c])
         self.assertIn(f"id={udid(1)}", "\n".join(h.calls()))
+
+    def test_the_fake_build_passes_the_embedded_minimum_check_and_a_newer_extension_still_fails_it(self):
+        h = Harness(self)
+        result = h.run("app", STUB_EMBEDDED_MINOS="26.0")
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("PlugIns/CassiniActivity.appex/Info.plist: minimum iOS 26.0 is above the app's 18.0", result.stderr)
+        self.assertFalse([c for c in h.calls() if "test-without-building" in c], "no test runs after the check fails")
 
     def test_a_second_runtime_has_its_own_clones_leases_logs_and_timing_table(self):
         # A third iPhone of this leg, booted before, is beyond CASSINI_UI_WORKERS=2.
