@@ -29,13 +29,13 @@
 #   CASSINI_TEST_CACHE   shared cache directory (default: .test-cache beside the main checkout's .git)
 #   CASSINI_IPHONE / CASSINI_IPAD  device types to clone (default "iPhone 17", "iPad Pro 13-inch (M5)"; on a
 #                        CASSINI_RUNTIME below 26, "iPhone 16", "iPad Pro 13-inch (M4)")
-#   CASSINI_RUNTIME      the iOS simulator runtime (default: the newest): a version prefix (18, 18.6) picks the newest
-#                        available runtime it matches, an identifier (com.apple.CoreSimulator.SimRuntime.iOS-18-6) that
-#                        one. The run fails when none matches or a device type cannot run on it. Its clones
-#                        (<prefix>-iphone18-N, <prefix>-ipad18-1), logs (DerivedData/test-logs-ios18) and timing table
-#                        (ui-test-durations-ios18.tsv in the cache) are its own. It shuts down this worktree's other
-#                        booted clones before it boots, and all of them afterwards (CASSINI_KEEP_SIMS default 0), and
-#                        it posts no commit status.
+#   CASSINI_RUNTIME      the iOS simulator runtime of app, ui, all and changed (default: the newest): a version prefix
+#                        (18, 18.6) picks the newest available runtime it matches, an identifier
+#                        (com.apple.CoreSimulator.SimRuntime.iOS-18-6) that one. The run fails when none matches or a
+#                        device type cannot run on it. Its clones (<prefix>-iphone18-N, <prefix>-ipad18-1), logs
+#                        (DerivedData/test-logs-ios18) and timing table (ui-test-durations-ios18.tsv in the cache) are
+#                        its own. It shuts down this worktree's other booted clones before it boots, and all of them
+#                        afterwards (CASSINI_KEEP_SIMS default 0), and it posts no commit status.
 #   CASSINI_SIM_PREFIX   clone name prefix (default ts-<worktree directory name>)
 #   CASSINI_HEAVY_LOCK   the host-wide lock file (default ~/.cassini-heavy.lock); CASSINI_LOCK_MINUTES how long to
 #                        wait for it (default 60); CASSINI_ADMIT_MINUTES how long to wait for the host to calm down
@@ -70,11 +70,13 @@ cache="${CASSINI_TEST_CACHE:-$(dirname "$common")/.test-cache}"
 derived="$root/DerivedData.noindex"
 # CASSINI_RUNTIME's tag (18, 18.6; an identifier's version) names the second leg's clones, leases, logs and timing
 # table, so that leg never reuses or wipes the default one's. Without CASSINI_RUNTIME it is empty and every name is
-# what it always was.
+# what it always was. Only the tiers that boot clones read it: fast, build and clean ignore it.
 runtime_tag=""
-case "${CASSINI_RUNTIME:-}" in
-    com.apple.CoreSimulator.SimRuntime.iOS-*) runtime_tag=$(printf '%s' "${CASSINI_RUNTIME#com.apple.CoreSimulator.SimRuntime.iOS-}" | tr - .) ;;
-    *) runtime_tag="${CASSINI_RUNTIME:-}" ;;
+case "$tier" in app|ui|all|changed)
+    case "${CASSINI_RUNTIME:-}" in
+        com.apple.CoreSimulator.SimRuntime.iOS-*) runtime_tag=$(printf '%s' "${CASSINI_RUNTIME#com.apple.CoreSimulator.SimRuntime.iOS-}" | tr - .) ;;
+        *) runtime_tag="${CASSINI_RUNTIME:-}" ;;
+    esac ;;
 esac
 if [ -n "$runtime_tag" ] && ! [[ $runtime_tag =~ ^[0-9]+(\.[0-9]+)*$ ]]; then
     echo "error: CASSINI_RUNTIME=$CASSINI_RUNTIME is neither a version (18, 18.6) nor an iOS runtime identifier" >&2
@@ -325,7 +327,7 @@ recent = key(r)[0] >= 26
 iphone = iphone or ("iPhone 17" if recent else "iPhone 16")
 ipad = ipad or ("iPad Pro 13-inch (M5)" if recent else "iPad Pro 13-inch (M4)")
 if "supportedDeviceTypes" in r:
-    supported = {d["name"] for d in r["supportedDeviceTypes"]}
+    supported = {d[k] for d in r["supportedDeviceTypes"] for k in ("name", "identifier") if k in d}
     for kind, name in (("CASSINI_IPHONE", iphone), ("CASSINI_IPAD", ipad)):
         if name not in supported:
             print("iOS %s cannot run the device type \"%s\" (set %s)" % (r["version"], name, kind))
@@ -488,7 +490,7 @@ wait_for_room() {
     local t0 waited=0 idle free booted deadline announced=0
     t0=$(date +%s); deadline=$(( t0 + admit_minutes * 60 ))
     # This run's own booted iPhones count as free, as in auto_workers: tier_ui shuts down the ones it does not use.
-    booted=$(our_clones | grep -c "Booted $prefix-iphone$runtime_tag-" || true)
+    booted=$(our_clones | grep -cF "Booted $prefix-iphone$runtime_tag-" || true)
     while :; do
         # After the first wait, measure CPU even if this run's Swift suite is still alive.
         idle=$(cpu_idle "$announced"); free=$(( $(free_mb) + booted * 1536 )); waited=$(( $(date +%s) - t0 ))
@@ -579,7 +581,7 @@ start_heavy() {
 auto_workers() {
     local ipad_mb="${1:-0}" free booted
     free=$(free_mb)
-    booted=$(our_clones | grep -c "Booted $prefix-iphone$runtime_tag-" || true)
+    booted=$(our_clones | grep -cF "Booted $prefix-iphone$runtime_tag-" || true)
     local n=$(( (free - 4096 - ipad_mb) / 1536 + booted ))
     [ $n -gt 3 ] && n=3
     [ $n -lt 0 ] && n=0

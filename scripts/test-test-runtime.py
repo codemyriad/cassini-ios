@@ -27,7 +27,11 @@ OLD_TYPES = ["iPhone 16", "iPad Pro 13-inch (M4)"]
 
 def runtime(identifier, version, types, available=True):
     return {"identifier": identifier, "version": version, "platform": "iOS", "isAvailable": available,
-            "supportedDeviceTypes": [{"name": t} for t in types]}
+            "supportedDeviceTypes": [{"name": t, "identifier": type_id(t)} for t in types]}
+
+
+def type_id(name):
+    return "com.apple.CoreSimulator.SimDeviceType." + name.replace(" (", "-").replace(")", "").replace(" ", "-")
 
 
 INSTALLED = [runtime(R26, "26.0", NEW_TYPES), runtime(R27, "27.0", NEW_TYPES)]
@@ -241,6 +245,14 @@ class RuntimePickTests(unittest.TestCase):
         result = self.pick("26", iphone="iPhone 16", ipad="iPad Pro 13-inch (M4)")
         self.assertEqual(result.stdout.splitlines()[-1], f"{R26}|26.0|iPhone 16|iPad Pro 13-inch (M4)")
 
+    def test_a_device_type_can_be_given_by_its_identifier(self):
+        iphone, ipad = type_id("iPhone 16"), type_id("iPad Pro 13-inch (M4)")
+        result = self.pick("18", iphone=iphone, ipad=ipad)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.splitlines()[-1], f"{R186}|18.6|{iphone}|{ipad}")
+        result = self.pick("18", iphone=type_id("iPhone 17"))
+        self.assertIn(f'cannot run the device type "{type_id("iPhone 17")}"', result.stderr)
+
     def test_an_invalid_value_is_refused_before_anything_runs(self):
         h = Harness(self)
         result = h.run("app", CASSINI_RUNTIME="eighteen")
@@ -279,7 +291,9 @@ class FullRunTests(unittest.TestCase):
         self.assertIn(f"id={udid(1)}", "\n".join(h.calls()))
 
     def test_a_second_runtime_has_its_own_clones_leases_logs_and_timing_table(self):
-        h = Harness(self, devices={R27: [dev("ts-wt-iphone-1", udid(1), "Booted")]})
+        # A third iPhone of this leg, booted before, is beyond CASSINI_UI_WORKERS=2.
+        h = Harness(self, devices={R27: [dev("ts-wt-iphone-1", udid(1), "Booted")],
+                                   R26: [dev("ts-wt-iphone26-3", udid(3), "Booted")]})
         default_logs = h.root / "DerivedData.noindex/test-logs"
         default_logs.mkdir(parents=True)
         (default_logs / "ui-1.log").write_text("the default leg's log\n")
@@ -295,6 +309,9 @@ class FullRunTests(unittest.TestCase):
         calls = h.calls()
         first_create = next(i for i, c in enumerate(calls) if "simctl | create" in c)
         self.assertLess(calls.index(f"xcrun | simctl | shutdown | {udid(1)}"), first_create)
+        # The leg's own iPhone it does not use is shut down before the shards run, not only at the end.
+        first_test = next(i for i, c in enumerate(calls) if "test-without-building" in c)
+        self.assertLess(calls.index(f"xcrun | simctl | shutdown | {udid(3)}"), first_test)
         self.assertTrue(all(d["state"] == "Shutdown" for ds in h.state()["devices"].values() for d in ds))
         self.assertEqual((default_logs / "ui-1.log").read_text(), "the default leg's log\n")
         self.assertTrue((h.root / "DerivedData.noindex/test-logs-ios26/ui-1.log").exists())
@@ -302,7 +319,7 @@ class FullRunTests(unittest.TestCase):
         self.assertIn("AlphaTests/testOne\t4.0", (h.cache / "ui-test-durations-ios26.tsv").read_text())
         top = {p.name for p in (h.cache / "sim-leases").iterdir() if p.is_file()}
         runtime_leases = {p.name for p in (h.cache / "sim-leases/runtime").iterdir()}
-        ours = {u for name, (_, u) in h.names().items() if "26-" in name}
+        ours = {u for name, (_, u) in h.names().items() if "26-" in name} - {udid(3)}
         self.assertEqual(runtime_leases, ours)
         self.assertFalse(top & ours)
 
@@ -336,6 +353,38 @@ class FullRunTests(unittest.TestCase):
         self.assertIn("FAILED (app)", result.stdout)
         self.assertTrue((h.root / "DerivedData.noindex/test-logs-ios18/FAILED").exists())
         self.assertFalse([c for c in h.calls() if c.startswith("xcodebuild") or "simctl | create" in c])
+
+    def test_fast_build_and_clean_ignore_cassini_runtime(self):
+        h = Harness(self, devices={R27: [dev("ts-wt-iphone-1", udid(1), "Booted")]})
+        for value in ("18", "eighteen"):
+            with self.subTest(value=value):
+                result = h.run("build", CASSINI_RUNTIME=value)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertNotIn("runtime:", result.stdout)
+                logs = h.root / "DerivedData.noindex"
+                self.assertEqual(list(logs.glob("test-logs-ios*")), [])
+                self.assertTrue((logs / "test-logs").is_dir())
+                # The iPhone a run before kept booted stays booted, as after a build without the variable.
+                self.assertEqual(h.state()["devices"][R27][0]["state"], "Booted")
+
+    def test_the_booted_iphones_counted_as_free_are_this_legs_own(self):
+        h = Harness(self, devices={
+            R26: [dev("ts-wt-iphone26-1", udid(1), "Booted"), dev("ts-wt-iphone26-2", udid(2), "Booted")],
+            R27: [dev("ts-wt-iphone-1", udid(3), "Booted"), dev("ts-wt-iphone2600-1", udid(4), "Booted")]})
+        functions = ["clones", "clone_of", "our_clones", "auto_workers", "wait_for_room"]
+        stubs = 'free_mb() { echo 4096; }\ncpu_idle() { echo 100; }\n'
+        for tag, expected in (("26", "2"), ("", "1"), ("26.0", "0")):
+            with self.subTest(tag=tag):
+                result = h.shell(functions, stubs + f'runtime_tag={tag!r}; auto_workers 0')
+                self.assertEqual(result.stdout.strip(), expected, result.stderr)
+        # Two booted iPhones of the leg give the room the UI clones need, with nothing else free; without them, the
+        # wait would start (and here fail at once: there is no resource-event helper under this root).
+        stubs = 'free_mb() { echo 0; }\ncpu_idle() { echo 100; }\nadmit_minutes=1; root=/nonexistent\n'
+        result = h.shell(functions, stubs + 'runtime_tag=26; wait_for_room')
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("waiting for room", result.stdout)
+        result = h.shell(functions, stubs + 'runtime_tag=26.0; wait_for_room')
+        self.assertIn("waiting for room", result.stdout)
 
     def test_an_all_run_on_another_runtime_posts_no_status(self):
         h = Harness(self)
@@ -414,7 +463,26 @@ class OwnershipTests(unittest.TestCase):
         self.assertIn("deleting ts-wt-gone-iphone18-1: its worktree is gone", result.stdout)
         self.assertEqual(sorted(p.name for p in (leases / "runtime").iterdir()), [udid(3), udid(4), udid(6)])
 
-    # reclaim_disk and clone_of as origin/main 712f8e4 has them: what another worktree's older copy runs.
+    def test_another_worktrees_idle_shutdown_reads_a_runtime_clones_lease(self):
+        h = Harness(self, WITH_18, {R186: [dev("ts-wt-b-iphone18-1", udid(1), "Booted"),
+                                           dev("ts-wt-b-iphone18-2", udid(2), "Booted")]})
+        runtime_leases = h.cache / "sim-leases/runtime"
+        runtime_leases.mkdir(parents=True)
+        (runtime_leases / udid(1)).touch()
+        # Both last had an app installed an hour ago; only the first has a fresh lease.
+        for n in (1, 2):
+            apps = h.home / f"Library/Developer/CoreSimulator/Devices/{udid(n)}/data/Containers/Bundle/Application"
+            apps.mkdir(parents=True)
+            os.utime(apps, (0, os.path.getmtime(apps) - 3600))
+        result = h.shell(["clones", "clone_of", "idle_seconds", "reap_idle_clones"],
+                         'idle_minutes=15; reap_idle_clones')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("ts-wt-b-iphone18-1 was used 0 min ago; leaving it booted", result.stdout)
+        self.assertIn("shutting down ts-wt-b-iphone18-2, idle for 60 min", result.stdout)
+        self.assertEqual([c for c in h.calls() if "shutdown" in c], [f"xcrun | simctl | shutdown | {udid(2)}"])
+
+    # The clone-deletion part of reclaim_disk and clone_of as origin/main 712f8e4 has them (abridged: without the
+    # erase of oversized clones and the package-cache cleanup): what another worktree's older copy runs.
     OLD = textwrap.dedent(r'''
         clone_of() {
             local rest="${2#"$1"-}"
