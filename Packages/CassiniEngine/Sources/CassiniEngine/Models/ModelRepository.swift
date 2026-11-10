@@ -337,7 +337,8 @@ public final class ModelRepository: Sendable {
     /// Deletes everything under the root that no model of the catalog reads: the directories of earlier development
     /// builds (`parakeet-ultra/`, `vad/`, `speaker-models/`; D51, nothing is migrated), the revisions and staging
     /// directories of other pins, ids the catalog no longer has, and retired revisions. A model's pinned revision and
-    /// its staging directory stay, so this can run beside an install.
+    /// its staging directory stay, so this can run beside an install. D86's legacy Parakeet id also stays until
+    /// `ModelVerifier` verifies its replacement and retires the old install.
     public func prune() { Self.prune(root: root) }
 
     /// `prune` for the model root `root`.
@@ -351,6 +352,8 @@ public final class ModelRepository: Sendable {
         let pinned = Dictionary(ModelCatalog.all.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         for id in (try? manager.contentsOfDirectory(atPath: models.path)) ?? [] {
             let directory = models.appendingPathComponent(id, isDirectory: true)
+            // Existing files and a complete-looking replacement are not proof that the new model verified.
+            if id == ModelCatalog.legacyParakeet.id { continue }
             guard let model = pinned[id] else {
                 try? manager.removeItem(at: directory)
                 continue

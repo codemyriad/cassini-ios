@@ -162,7 +162,7 @@ TestFlight still need.
   Apple's models are per language. The pinned model catalog, plan, redirect policy, fetcher and installer are ported
   with Android's tests, behind an `HTTPTransport` port over a data-task `URLSession` that never follows a redirect
   itself, and one shared installer downloads Ultra, its speech detector and the speaker models with consent. Sizes
-  follow the shared rule of the format vectors ("443 MB"), where Android still rounds to tens.
+  follow the shared rule of the format vectors ("444 MB"), where Android still rounds to tens.
 - **Storage model.** A note is a `note.json` beside its audio. The portable Cassini document is sealed only at export,
   with the run's provenance under Android's keys. Each variant carries the language of the run that made its words
   (D53.2): `und` for Parakeet, as Android writes, the locale that ran for Apple Speech, never the Settings language.
@@ -295,7 +295,10 @@ range boundary without waiting for connection teardown; size and SHA-256 checks 
 About › Model notices shows that `NOTICE.txt` from an installed revision. Every request to the host, each redirect hop included, sends `User-Agent: CassiniTalk/<CFBundleShortVersionString> (iOS <version>; build <CFBundleVersion>)` (D54, `ModelUserAgent`), built once by the app and set by `URLSessionTransport`. Before the first load in each session every
 installed file is hashed again (`ModelVerifier`, D16 §4); a file that differs retires the revision, the job fails
 with "Model verification failed", and the next job downloads it again. Provenance names Ultra
-`parakeet-ultra-0.6b-int8@<source_sha256>` (D16 §5). These pins need the codemyriad sherpa-onnx fork at `0c2ee3f`
+`parakeet-ultra-0.6b-int8-v2@<source_sha256>` (D16 §5, D86). The default is the improved #4179 INT8 encoder
+(`50c15b94…`): 465,446,146 compressed bytes and 671,608,018 installed bytes. The previous ID remains readable in
+provenance and stays on disk until v2 is installed and verified; only then is its install removed. The model cache key
+is derived from all pins and artifact hashes in `scripts/ci-models.json`, so v2 gets a distinct cache. These pins need the codemyriad sherpa-onnx fork at `0c2ee3f`
 (D16 §1): an older runtime cannot load the v2 diarizer or the dist Ultra export.
 
 `Package.swift` links the release's two xcframeworks into `CassiniSherpa`, the only module that imports `SherpaOnnxC`;

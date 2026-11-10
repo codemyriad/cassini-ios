@@ -96,6 +96,14 @@ import CassiniNotebook
         #expect(before.contains("NOTICE.txt") && before.contains("dist.gocassini.com"))
     }
 
+    /// The bundled model section must identify every active catalog model, including revisioned IDs.
+    @Test func theModelNoticesNameEveryActiveCatalogID() throws {
+        let models = try texts.text(.models)
+        for model in ModelCatalog.all {
+            #expect(models.contains("(\(model.id))"), "Model notices do not name current catalog id \(model.id)")
+        }
+    }
+
     /// The notices are read from the newest installed revision under the model root, and none is there before a model
     /// is installed.
     @Test func theNoticeShownIsAnInstalledRevisionsCopy() throws {

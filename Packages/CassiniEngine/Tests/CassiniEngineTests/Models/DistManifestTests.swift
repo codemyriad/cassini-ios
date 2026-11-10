@@ -3,13 +3,13 @@ import Testing
 @testable import CassiniEngine
 import CassiniNotebook
 
-/// The model host's manifest against the compiled pins (Android's DistManifestTest). `manifest-2026-10-27.json` is the
-/// published manifest of that day, byte for byte (the same file as Android's fixture): every model of the catalog must
+/// The model host's manifest against the compiled pins (Android's DistManifestTest). `manifest-2026-11-10.json` is the
+/// published manifest of that day, byte for byte: every model of the catalog must
 /// resolve in it, and any change to a pinned pair or file must refuse the download with PIN_UNAVAILABLE, never with
 /// File check failed (no file was checked) and never with a Retry that cannot help.
 @Suite struct DistManifestTests {
     private static let published: Data = {
-        let url = Bundle.module.url(forResource: "manifest-2026-10-27", withExtension: "json", subdirectory: "model-host")!
+        let url = Bundle.module.url(forResource: "manifest-2026-11-10", withExtension: "json", subdirectory: "model-host")!
         return try! Data(contentsOf: url)
     }()
 
@@ -67,6 +67,23 @@ import CassiniNotebook
         }
     }
 
+    @Test func oldAndV2PinsResolveAsDistinctModelIDs() throws {
+        let manifest = try DistManifest.parse(Self.published)
+        let old = try manifest.urls(ModelCatalog.legacyParakeet)
+        let replacement = try manifest.urls(ModelCatalog.parakeet)
+        #expect(old["encoder.int8.onnx"] == ModelCatalog.legacyParakeet.artifacts[0].download?.url)
+        #expect(replacement["encoder.int8.onnx"] == ModelCatalog.parakeet.artifacts[0].download?.url)
+        #expect(old["encoder.int8.onnx"] != replacement["encoder.int8.onnx"])
+        for file in ["decoder.int8.onnx", "joiner.int8.onnx", "tokens.txt"] {
+            #expect(old[file] == replacement[file])
+        }
+        let withoutV2 = edited { json in
+            json["models"] = (json["models"] as! [[String: Any]]).filter { $0["id"] as? String != ModelCatalog.parakeetDistID }
+        }
+        refused(withoutV2, ModelCatalog.parakeet)
+        _ = try DistManifest.parse(withoutV2).urls(ModelCatalog.legacyParakeet)
+    }
+
     // ports: DistManifestTest#aPairTheManifestNoLongerListsIsNotDownloaded
     @Test func aPairTheManifestNoLongerListsIsNotDownloaded() throws {
         // A newer export under the same id: the app keeps its pinned source hash and refuses; there is no "latest".
@@ -92,9 +109,10 @@ import CassiniNotebook
     // encoding and the format version of each entry)
     @Test func anArtifactThatDisagreesWithAnyPinIsNotDownloaded() throws {
         let encoder = ModelCatalog.parakeetArtifacts[0]
-        let sha = try #require(encoder.download).sha256
+        let packed = try #require(encoder.download)
+        let sha = packed.sha256
         let changes: [(String, (inout [String: Any]) -> Void)] = [
-            ("size", { $0["size"] = 452_306_706 }),
+            ("size", { $0["size"] = packed.size + 1 }),
             ("sha256", { $0["sha256"] = String(repeating: "1", count: 64) }),
             ("uncompressed_size", { $0["uncompressed_size"] = encoder.size - 1 }),
             ("uncompressed_sha256", { $0["uncompressed_sha256"] = String(repeating: "2", count: 64) }),
@@ -112,7 +130,7 @@ import CassiniNotebook
     // ports: DistManifestTest#aFileListThatDiffersFromThePinsIsNotDownloaded
     @Test func aFileListThatDiffersFromThePinsIsNotDownloaded() throws {
         let otherArtifact = edited { json in
-            Self.model(&json, "parakeet-ultra-0.6b-int8") { row in
+            Self.model(&json, ModelCatalog.parakeetDistID) { row in
                 var files = row["files"] as! [[String: Any]]
                 files[0]["artifact"] = "models/files/\(String(repeating: "3", count: 64))/encoder.int8.onnx.zst"
                 row["files"] = files
@@ -130,7 +148,7 @@ import CassiniNotebook
         refused(extra(required: true), ModelCatalog.vad)
         _ = try DistManifest.parse(extra(required: false)).urls(ModelCatalog.vad)
         let missing = edited { json in
-            Self.model(&json, "parakeet-ultra-0.6b-int8") { row in
+            Self.model(&json, ModelCatalog.parakeetDistID) { row in
                 row["files"] = Array((row["files"] as! [[String: Any]]).dropLast())
             }
         }

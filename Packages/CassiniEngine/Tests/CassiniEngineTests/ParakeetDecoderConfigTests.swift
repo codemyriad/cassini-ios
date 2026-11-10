@@ -29,7 +29,7 @@ import CassiniNotebook
         #expect(ParakeetFiles(directory: URL(fileURLWithPath: "/m")) == files)
         // The manifest's paths in Ultra's revision directory (D4).
         #expect(ParakeetFiles(root: URL(fileURLWithPath: "/r")).encoder.path
-                == "/r/models/parakeet-ultra-0.6b-int8/18cb623004dd6c15999b93cb70b14d8a1f6e8f3a2a97ff733f104bfc3494f6a9/encoder.int8.onnx")
+                == "/r/models/parakeet-ultra-0.6b-int8-v2/50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366/encoder.int8.onnx")
     }
 
     // ports: ParakeetDecoderConfigTest#presentNeedsEveryFile
