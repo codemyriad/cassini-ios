@@ -1,24 +1,9 @@
-AWS iOS handoff
+AWS iOS handoff — updated 2026-11-10 17:11 UTC
 
-Destruction deadline: 2026-11-11 12:09 UTC.
+Read STATUS.md and latest coordinator messages. Mac destruction deadline 2026-11-11 12:09 UTC.
 
-Read STATUS.md and the coordinator's latest messages before resuming. Old local paths in STATUS.md identify artifacts on the first Mac; use the pushed branch refs on the second Mac.
+Inventory 2 / #84 and inventory 3 / #85 are merged, own clones cleaned. Inventory 6 / draft #91 is pushed at 573a66c21a5f55b91ba37cc59b9950e0392210dc; finish current-head loaded evidence, CI, full status-posting gate, then ready. Inventory 7 branch is pushed pristine c74b57c; get 3 locked baseline runs before edits. AWS owns 3,6,7 ONLY. scw-ios owns 8,9,10. No work on 8–10 here.
 
-Branches:
-- test/d88-transcript-render: PR #84 merged into main c74b57c after exact-head CI/full gate passed. Its own clones are cleaned.
-- test/d88-draft-growth: PR #85, pushed c97404c (and later checkpoints), independent base main c74b57c. Implementation and validation in progress; see STATUS.md. Locked baseline 3/3 green on c74b57c; earlier baseline preserved too.
-- test/d88-aws-ios-handoff: this checkpoint; not a product PR.
+No own hogs/gates active at checkpoint. CI #91 pending. Do not start hogs while another gate is active. Acquire mkdir ~/.aws-heavy.lock around every hog/full gate; release only own directory after processes exit. Also retain native lock. Exactly 6 hogs and 3 before/3 after; one fresh boot for simulator evidence, at most 2 booted simulators. package-evidence.py monitors foreign gate starts and stops its owned hogs/test immediately. Copy to /tmp/aws-ios-package-evidence.py if needed. draft-loaded.py is the preserved UI evidence driver.
 
-Resume inventory PR 3, then 6 and 7 ONLY. PRs 8, 9, 10 belong to scw-ios on the Scaleway Mac; do not start those. Read the coordination brief, inventory, coordinator answers and BUG-CLASSES on the replacement Mac. The new deadline and shared AWS lock rules override the original brief.
-
-Evidence summaries are JSON measurements, not build products. render/after is the failed first conversion batch with a 120-update warm-up cap. render/after-1024 is the final green 10-run batch. Earlier recording baselines cover RecordingControllerTests and RecordingScreenModelTests; Parakeet baselines cover aCancelStopsBeforeTheNextNativeCall and theInferenceTimeIsEachWindowsDecode. These predate the revised evidence standard.
-
-Future evidence: minimum 3 before + 3 after, 1 fresh boot, use at most 6 hogs (below the coordinator's latest ceiling of 10). Acquire mkdir ~/.aws-heavy.lock around ANY hog or full-gate run; release only our own acquired directory via rmdir once all owned processes exit. Keep the repository's native test lock too. Check that no other CI/local gate is running before starting hogs. Do not start hogs if a gate is active.
-
-The saved draft-loaded.py driver requires the AWS mkdir lock, uses 6 hogs and 3 iterations/1 fresh boot, and shuts down its own clone after the run. Manually check for active gates before invoking it. Run it from the draft-growth worktree after scripts/test.sh build. Use a NEW evidence label to avoid overwriting prior xcresult bundles. It runs both UI tests with opt-in screenshot execution enabled. Recheck simulator counts: at most 2 booted across this agent's runs.
-
-Generated Xcode projects, weights, DerivedData and xcresult bundles are intentionally excluded from Git. Regenerate/download them on the replacement Mac. PR #84's body preserves its full validation, mutation evidence and D87 bug-class review. Local raw logs are disposable; useful results and the driver are preserved here.
-
-Latest checkpoint: PR #85 full-gate retry is active (session 12011, test.sh PID 96448); inspect STATUS.md and the live log before any new heavy work. Recording PR 6 WIP is pushed at 2365f54 and awaits first compilation. No hogs running. This turn ended at the coordinator's explicit checkpoint request.
-
-Coordinator assignment update: AWS iOS owns inventory 3, 6, 7 only. scw-ios owns 8, 9, 10; no work on those was started here. This supersedes the original brief.
+Useful evidence JSONs and drivers are versioned; raw logs/build products/models/xcresults are not. Regenerate projects and builds on replacement Mac. Check exact pushed head CI + drmeyers/test-all green before ready; no force pushes after ready, never merge. Keep STATUS current and push every useful branch as work proceeds.

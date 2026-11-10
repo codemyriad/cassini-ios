@@ -1,0 +1,30 @@
+[
+  {
+    "run": 1,
+    "head": "2365f5481357125acbd10c0a1b71308bb04966e2",
+    "exit": 0,
+    "hogs": 6,
+    "aws_lock": true,
+    "native_lock": true,
+    "seconds": 4.215,
+    "load": [
+      24.2890625,
+      83.24267578125,
+      115.24755859375
+    ]
+  },
+  {
+    "run": 2,
+    "head": "2365f5481357125acbd10c0a1b71308bb04966e2",
+    "exit": 0,
+    "hogs": 6,
+    "aws_lock": true,
+    "native_lock": true,
+    "seconds": 3.667,
+    "load": [
+      23.384765625,
+      82.076171875,
+      114.6484375
+    ]
+  }
+]
