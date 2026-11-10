@@ -904,11 +904,24 @@ class Ios18LegTests(unittest.TestCase):
         ui = [c for c in h.calls() if "test-without-building" in c and "CassiniUITests/" in c]
         self.assertEqual([re.findall(r"CassiniUITests/(\S+)", c) for c in ui], [["BetaTests/testThree"]])
 
+    def test_the_legs_own_run_shuts_its_clones_down_under_the_callers_lock(self):
+        # The leg's run gets CASSINI_HEAVY_LOCK_HELD=1 and never takes the lock itself; it still counts as a run that
+        # got the lock, so it shuts its clones down, even when the calling run keeps its own booted.
+        h = Harness(self, WITH_18)
+        result = h.run("ios18", CASSINI_KEEP_SIMS="1")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        u18 = h.names()["ts-wt-iphone18-1"][1]
+        self.assertIn(f"xcrun | simctl | shutdown | {u18}", h.calls())
+        self.assertTrue(all(d["state"] == "Shutdown" for d in h.state()["devices"][R186] if d["udid"] == u18))
+
     def test_bad_values_are_refused_before_anything_runs(self):
         h = Harness(self, WITH_18)
         for tier, env, message in (("all", {"CASSINI_IOS18": "yes"}, "none of smoke, full and 0"),
                                    ("ios18", {"CASSINI_IOS18": "0"}, "nothing to run"),
-                                   ("all", {"CASSINI_IOS18": "smoke", "CASSINI_IOS18_RUNTIME": "eighteen"}, "neither")):
+                                   ("all", {"CASSINI_IOS18": "smoke", "CASSINI_IOS18_RUNTIME": "eighteen"}, "neither"),
+                                   # An identifier without a version must not fall back to the default runtime.
+                                   ("ios18", {"CASSINI_IOS18_RUNTIME": "com.apple.CoreSimulator.SimRuntime.iOS-"},
+                                    "CASSINI_IOS18_RUNTIME=com.apple.CoreSimulator.SimRuntime.iOS- is neither")):
             with self.subTest(tier=tier, env=env):
                 result = h.run(tier, **env)
                 self.assertEqual(result.returncode, 2)
