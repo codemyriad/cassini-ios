@@ -4,7 +4,7 @@ An injected monotonic nanoTime (defaulting to DispatchTime uptime) lets the deco
 
 Validation:
 - ParakeetTranscriberTests: **22/22 passed**, including after restoring both mutations (3.102 s). Selected converted tests 1.343 s versus baseline 1.497 s; these observations are not pass conditions.
-- Before: **3/3** loaded runs passed on pristine c74b57c, exactly 6 hogs and both AWS/native locks, no overlapping gate. Final after evidence pending until the recording gate finishes.
+- Before: **3/3** loaded runs passed on pristine c74b57c, exactly 6 hogs and both AWS/native locks, no overlapping gate. After: **3/3** loaded runs passed on exact pushed head `a8bd214e2488e0dd92f051179b1eec9fe2c98123` (8.035/2.503/2.510 s), same six hogs/both locks/no overlapping gate. An earlier attempt was stopped immediately when a foreign gate began and is not counted. All owned hogs exited.
 - Cancellation mutation: ignoring CancelFlag.set() makes the final decode count **3 versus captured 1**, and returns a result instead of CancellationError. Restored.
 - Timing mutation: replacing cumulative addition with assignment produces **80 ms versus expected 640 ms**. Restored.
 - Exact-head CI/full gate pending; remain draft until both green.
