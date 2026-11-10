@@ -163,7 +163,7 @@ private struct NoSpaceTranscriber: Transcribing {
 private struct HangingDownloads: Transcribing {
     func transcribe(_ request: TranscriptionRequest,
                     events: @escaping @Sendable (TranscriptionEvent) -> Void) async throws -> TranscriptionResult {
-        events(.preparingModel(0.3))
+        events(.preparingModel(.downloading(0.3)))
         while true { try await Task.sleep(for: .seconds(3600)) }
     }
     func assetStatus(locale: Locale) async -> ModelPartStatus { .notDownloaded }
