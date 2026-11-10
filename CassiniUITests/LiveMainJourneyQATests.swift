@@ -53,6 +53,9 @@ final class LiveMainJourneyQATests: XCTestCase {
         capture(app, "asr-imported", output)
         let consent = app.buttons["Download and transcribe"]
         if consent.exists { try tap(app, consent) }
+        // Exercise the explicit user action too; automatic admission is recorded separately in QA findings.
+        let transcribe = app.buttons["Transcribe"]
+        if transcribe.exists && transcribe.isHittable { try tap(app, transcribe) }
         try wait(app, "ASR did not seal successfully", 1800) {
             if self.has(app, "noSpeech") { throw Failure(message: "Synthetic English speech produced noSpeech") }
             return !self.paragraphs(app).isEmpty && !self.has(app, "draftTranscript") && !self.has(app, "progressHeadline")
