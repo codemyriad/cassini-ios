@@ -91,10 +91,11 @@ extension XCUIElement {
 
 extension XCUIElement {
     /// Replaces this focused field once and waits for the edit. A timeout fails the edit; it never causes another
-    /// paste that could overtake an input still arriving. The field may truncate the pasted text to its limit.
+    /// edit that could overtake an input still arriving. The field may truncate the input to its limit.
     @MainActor func replaceText(with text: String, file: StaticString = #filePath, line: UInt = #line) {
         let current = (value as? String) ?? ""
-        let placeholder = placeholderValue ?? ""
+        // SwiftUI's multiline TextField can expose its prompt as value/label without placeholderValue.
+        let placeholder = placeholderValue ?? label
         let length = current == placeholder ? 0 : current.count
         if length > 0 {
             typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: length + 2))
@@ -108,8 +109,8 @@ extension XCUIElement {
             XCTAssertTrue(waitForValue(text, within: uiWaitFloor), "The complete replacement edit did not arrive", file: file, line: line)
             return
         }
-        UIPasteboard.general.string = text
-        typeKey("v", modifierFlags: .command)
+        // One input operation avoids a cross-process clipboard handoff and cannot duplicate a late paste.
+        typeText(text)
         XCTAssertTrue(poll(within: uiWaitFloor) {
             guard let edited = value as? String, !edited.isEmpty, edited != placeholder else { return false }
             return text.hasPrefix(edited)
