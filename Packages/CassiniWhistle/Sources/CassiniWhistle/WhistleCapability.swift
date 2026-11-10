@@ -1,7 +1,7 @@
 /// Compatibility and reviewed pipeline/device evidence are independent. D78 uses the iOS 26 simulator parity and the
 /// physical A12/3GB evidence on iPadOS 26; transient load/window headroom is checked by the recording adapter. The
-/// framework is linked for iOS 18.0 (Silvio's decision of 2026-11-10); evidence on an iOS 18 runtime is still pending
-/// (Whistle/README.md).
+/// framework is linked for iOS 18.0 (Silvio's decision of 2026-11-10); simulator evidence exists on iOS 18.2, device
+/// evidence on iOS 18 is still pending (Whistle/README.md).
 public struct WhistleCapability: Hashable, Sendable {
     public var arm64: Bool
     public var operatingSystemSupported: Bool
