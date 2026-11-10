@@ -53,7 +53,7 @@ Without continued processing, work that leaves the screen gets only the finite b
 30 s, not guaranteed). Seen on the iOS 18.2 simulator for a transcription (below, "How it is tested today"); not seen
 on a device, and not checked for the standalone download.
 
-- **Transcription.** When the time ends, the job pauses with its checkpoint kept (at most 30 s of audio is redone),
+- **Transcription.** When the time ends, the job pauses with its checkpoint kept (what a resume redoes is below),
   the queue is held as paused by the system, and while Cassini is hidden the notification "Transcription paused by
   iOS" is posted. On iOS 18 this happens to every transcription that is still running about 30 s after the person
   leaves the app. When Cassini comes back to the screen (or is launched again), the system's pause is resumed from the
@@ -64,6 +64,12 @@ on a device, and not checked for the standalone download.
 - **Standalone model download** (Settings, the model download screen). When the time ends it stops and shows "iOS
   stopped the download. Try again to continue where it stopped."; the bytes already downloaded are kept and Try
   again resumes them.
+
+What a resume redoes depends on the engine. Parakeet and Apple speech continue from the checkpoint, so at most 30 s
+of audio is transcribed again. Whistle decodes the recording from its start again and drops the words before the
+checkpoint (`TranscriptionJob`, `startMs`), so the words already written are kept but the time spent on them is paid
+again on every resume. Whistle is the main engine on iOS 18, where these pauses are frequent: a long recording
+finishes only if Cassini stays on the screen for a whole decode. This is not changed here.
 - Recording and playback are unaffected: they keep running in the background through the `audio` background mode,
   as on iOS 26.
 
