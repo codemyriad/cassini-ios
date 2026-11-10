@@ -13,11 +13,12 @@ import CassiniNotebook
     @ObservationIgnored private let processing: ProcessingStore
     @ObservationIgnored private let notices: NoticeCenter
     @ObservationIgnored private let transcriber: any Transcribing
+    @ObservationIgnored let platform: PlatformFacts
 
     init(settings: SettingsStore, library: LibraryStore, voices: VoicesStore, processing: ProcessingStore,
-         notices: NoticeCenter, transcriber: any Transcribing, defaults: UserDefaults = .standard) {
+         notices: NoticeCenter, transcriber: any Transcribing, platform: PlatformFacts, defaults: UserDefaults = .standard) {
         self.settings = settings; self.library = library; self.voicesStore = voices; self.processing = processing
-        self.notices = notices; self.transcriber = transcriber; self.defaults = defaults
+        self.notices = notices; self.transcriber = transcriber; self.platform = platform; self.defaults = defaults
     }
 
     /// The stored status of each part, with the standalone install and the running job's model download over it.
@@ -35,7 +36,7 @@ import CassiniNotebook
         part == .speech ? settings.downloadsAllowed : settings.speakerDownloadsAllowed
     }
 
-    func size(of part: ModelPart) -> ModelSize { ModelRows.size(of: part, recognizer: recognizer) }
+    func size(of part: ModelPart) -> ModelSize { ModelRows.size(of: part, recognizer: recognizer, platform: platform) }
 
     func refreshModels() async { speechModels?.refresh(); await processing.models.refresh() }
 

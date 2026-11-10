@@ -20,7 +20,7 @@ import CassiniWhistle
         let files = Mutex(Files()), started = expectation(description: "hash check started"), release = DispatchSemaphore(value: 0)
         defer { release.signal() }
         let store = SpeechModelsStore(root: root, defaults: defaults, storage: FakeStorage(), whistle: accepted,
-            parakeetLinked: true, physicalMemory: 6 << 30, availableMemory: { ParakeetMemory.beforeLoadBytes },
+            parakeetLinked: true, platform: .iOS26, physicalMemory: 6 << 30, availableMemory: { ParakeetMemory.beforeLoadBytes },
             installed: { files.withLock { $0.installed } }, verified: { files.withLock { $0.verified } },
             verify: { started.fulfill(); release.wait(); return files.withLock { $0.verified } })
         let finished = expectation(description: "verification published")
@@ -40,7 +40,7 @@ import CassiniWhistle
         XCTAssertTrue(store.promotionVisible)
         store.markPromotionShown(); store.dismissPromotion()
         let reopened = SpeechModelsStore(root: root, defaults: defaults, storage: FakeStorage(), whistle: accepted,
-            parakeetLinked: true, physicalMemory: 6 << 30, availableMemory: { ParakeetMemory.beforeLoadBytes },
+            parakeetLinked: true, platform: .iOS26, physicalMemory: 6 << 30, availableMemory: { ParakeetMemory.beforeLoadBytes },
             installed: { true }, verified: { true }, verify: { true })
         reopened.refresh()
         XCTAssertFalse(reopened.promotionVisible)
@@ -53,7 +53,7 @@ import CassiniWhistle
         let suite = "cassini.d78.\(UUID())", defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
         let checks = Mutex(0)
         let store = SpeechModelsStore(root: root, defaults: defaults, storage: FakeStorage(), whistle: accepted,
-            parakeetLinked: true, physicalMemory: 3 << 30, availableMemory: { ParakeetMemory.beforeLoadBytes },
+            parakeetLinked: true, platform: .iOS26, physicalMemory: 3 << 30, availableMemory: { ParakeetMemory.beforeLoadBytes },
             installed: { true }, verified: { false }, verify: { checks.withLock { $0 += 1 }; return true })
         let graph = TestGraph(root: root, suite: suite, speechModels: store, modelRoot: root)
         defer { graph.tearDown() }
@@ -69,7 +69,7 @@ import CassiniWhistle
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let suite = "cassini.d78.\(UUID())", defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
         let store = SpeechModelsStore(root: root, defaults: defaults, storage: FakeStorage(), whistle: accepted,
-            parakeetLinked: true, physicalMemory: 6 << 30, availableMemory: { ParakeetMemory.beforeLoadBytes },
+            parakeetLinked: true, platform: .iOS26, physicalMemory: 6 << 30, availableMemory: { ParakeetMemory.beforeLoadBytes },
             installed: { false }, verified: { false }, verify: { false })
         let whistle = FakeTranscriber(.returns([], total: 1), recognizer: .whistle)
         let parakeet = FakeTranscriber(.returns([], total: 1), status: .notDownloaded, recognizer: .parakeet)

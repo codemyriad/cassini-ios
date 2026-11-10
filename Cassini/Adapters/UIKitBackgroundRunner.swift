@@ -14,7 +14,8 @@ import CassiniEngine
 /// expiration handler runs on the main actor and the token ends before iOS's handler returns, exactly once: UIKit
 /// terminates an app whose finite task is still running after its expiration handler, and documents no time after it.
 /// What the work starts from its handler (the paused job's write) is best-effort; the queue's stored `system` hold lets
-/// the launch repair finish it when Cassini is killed while suspended.
+/// the launch repair finish it when Cassini is killed while suspended. Where the system has no continued processing
+/// (`PlatformFacts.continuedProcessing`), every request takes the finite time and nothing touches `BGTaskScheduler`.
 @MainActor final class UIKitBackgroundRunner: BackgroundRunner {
     /// Match `BGTaskSchedulerPermittedIdentifiers` (`io.codemyriad.cassini.transcription.*`). A request takes the first
     /// one that no held continued task has: the queue's drain, which asks first, usually gets the first.
@@ -50,11 +51,14 @@ import CassiniEngine
 
     private var held: [BackgroundToken: Held] = [:]
     private var registered: Set<String> = []
+    private let platform: PlatformFacts
+
+    init(platform: PlatformFacts) { self.platform = platform }
 
     func begin(title: String, subtitle: String, progress: Progress,
                onExpire: @escaping @MainActor () -> Void) -> BackgroundToken {
         let token = BackgroundToken()
-        if progress.totalUnitCount > 0,
+        if platform.asksForContinuedProcessing(progressUnits: progress.totalUnitCount),
            let continued = submit(title: title, subtitle: subtitle, progress: progress, onExpire: onExpire) {
             held[token] = .continued(continued)
             return token

@@ -48,6 +48,16 @@ public struct SpeechModelPolicy: Sendable {
         return whistleAvailable ? .whistle : nil
     }
 
+    /// The recognizer new jobs use: `selected`, else Apple speech where the system has it (its adapter checks the
+    /// device and the locale before a job is admitted), else Parakeet where the device can hold it, so a Transcribe
+    /// asks for its download (Android picks Parakeet whenever the included model cannot run). Nil when no recognizer
+    /// can run here: the job is refused as `JobFailure.model`.
+    public func recognizer(preference: SpeechModelPreference = .automatic, platform: PlatformFacts) -> SpeechRecognizer? {
+        if let selected = selected(preference: preference) { return selected }
+        if platform.appleSpeech { return .appleSpeech }
+        return parakeetCapable ? .parakeet : nil
+    }
+
     public var canSuggestParakeet: Bool {
         parakeetRunnable && parakeetInstallation == .missing && !downloadPlan.isEmpty
             && downloadPlan.totalBytes > 0 && availableDiskBytes >= downloadPlan.requiredFreeBytes
