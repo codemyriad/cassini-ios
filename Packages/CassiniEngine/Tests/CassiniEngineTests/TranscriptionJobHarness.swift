@@ -129,8 +129,10 @@ extension TranscriptionJobTests {
         private var _starts: [TimeInterval] = []
         private var _emitted = 0
         var total: TimeInterval
-        var beforeSegment: @Sendable (Int) -> Void = { _ in }
-        var firstSegmentDelay: Duration?
+        /// Awaited before the result at this index is taken; the decode waits for it.
+        var beforeSegment: @Sendable (Int) async throws -> Void = { _ in }
+        /// Awaited once the result at this index has gone to the job; the decode waits for it.
+        var afterSegment: @Sendable (Int) async throws -> Void = { _ in }
         var hangs = false
         var downloadsFirst = false
         var volatileBeforeEachSegment = false
@@ -159,8 +161,7 @@ extension TranscriptionJobTests {
             for (index, segment) in script.enumerated() where segment.end > request.startOffset {
                 if let failure, failure.index == index { throw failure.error }
                 if let endsBefore, index >= endsBefore { break }
-                if index == 0, let firstSegmentDelay { beforeSegment(index); try await Task.sleep(for: firstSegmentDelay) }
-                else { beforeSegment(index) }
+                try await beforeSegment(index)
                 try Task.checkCancellation()
                 if volatileBeforeEachSegment {
                     events(.volatile(TranscriptSegment(text: "maybe", start: segment.start, end: segment.end,
@@ -170,6 +171,7 @@ extension TranscriptionJobTests {
                 events(.finalized(segment))
                 events(.progress(done: segment.end, total: total))
                 out.append(segment)
+                try await afterSegment(index)
             }
             return TranscriptionResult(segments: out)
         }
@@ -179,6 +181,19 @@ extension TranscriptionJobTests {
         func installAssets(locale: Locale, progress: @escaping @Sendable (InstallProgress) -> Void) async throws { progress(.downloading(1)) }
 
         func speechLanguages() async -> [SpeechLanguage] { [] }
+
+        /// A `beforeSegment` or `afterSegment` hook that asks `stop` for `request` at result `index`, then holds the
+        /// decode until the job cancels it, as a native call runs on until the job's stop watch sees the stop (D88). A
+        /// stop asked from a plain hook raced the watch: when it saw the stop before the result was taken, the job
+        /// kept only the results before.
+        static func stops(_ stop: StopSignal, _ request: StopRequest = .pause(.user),
+                          at index: Int) -> @Sendable (Int) async throws -> Void {
+            { current in
+                guard current == index else { return }
+                stop.stop(request)
+                try await holdUntilTheJobCancels()
+            }
+        }
     }
 
     /// The real files, recording each checkpoint saved.
@@ -272,6 +287,14 @@ extension TranscriptionJobTests {
         func installModels(progress: @escaping @Sendable (InstallProgress) -> Void) async throws {}
         var modelInstallBytes: Int64 { 0 }
     }
+}
+
+/// Holds a fake decode until the job cancels it. The job's stop watch does that once it sees a stop; the 30 s is
+/// only a hang guard: a job that never cancels records an issue, which fails the test, and then the call returns
+/// normally, so the fake decode carries on from there rather than hanging.
+func holdUntilTheJobCancels() async throws {
+    try await Task.sleep(for: .seconds(30))
+    Issue.record("The job did not cancel the decode it was asked to stop")
 }
 
 /// What a test reads of the job's events.
