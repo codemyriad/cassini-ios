@@ -12,11 +12,29 @@ public struct WhistleTranscriber: Transcribing {
     private let bundle: Bundle
     private let memoryReport: (@Sendable (WhistleMemoryReport) -> Void)?
     private let availableMemory: @Sendable () -> Int64?
+    private let trace: Trace?
+
+    struct Trace: Sendable {
+        var read: @Sendable (Range<Int64>) -> Void
+        var submitted: @Sendable (Range<Int>) -> Void
+        var resultReady: @Sendable (Range<Int>) async -> Void
+    }
     public init(acceptance: WhistleCapability, bundle: Bundle = .main,
                 availableMemory: @escaping @Sendable () -> Int64? = TranscriptionJob.availableMemory,
                 memoryReport: (@Sendable (WhistleMemoryReport) -> Void)? = nil,
                 acceptanceProvider: (@Sendable () -> WhistleCapability)? = nil) {
-        self.acceptance = acceptanceProvider ?? { acceptance }; self.bundle = bundle; self.availableMemory = availableMemory; self.memoryReport = memoryReport
+        self.init(acceptance: acceptanceProvider ?? { acceptance }, bundle: bundle,
+                  availableMemory: availableMemory, memoryReport: memoryReport, trace: nil)
+    }
+
+    init(acceptance: @escaping @Sendable () -> WhistleCapability, bundle: Bundle = .main,
+         availableMemory: @escaping @Sendable () -> Int64?, memoryReport: (@Sendable (WhistleMemoryReport) -> Void)? = nil,
+         trace: Trace?) {
+        self.acceptance = acceptance
+        self.bundle = bundle
+        self.availableMemory = availableMemory
+        self.memoryReport = memoryReport
+        self.trace = trace
     }
     public var recognizer: SpeechRecognizer { .whistle }
     public var assetInstallBytes: Int64 { 0 }
@@ -47,7 +65,7 @@ public struct WhistleTranscriber: Transcribing {
         return try await Self.sessions.withBudget {
             let measurement = WhistleMemoryMonitor()
             do {
-                let value = try await Session(acceptance: acceptance, bundle: bundle, memory: availableMemory)
+                let value = try await Session(acceptance: acceptance, bundle: bundle, memory: availableMemory, trace: trace)
                     .decode(request, events: events)
                 let released = await WhistleRuntime.shared.close()
                 memoryReport?(measurement.finish(succeeded: true, nativeModelReleased: released))
@@ -68,8 +86,9 @@ public struct WhistleTranscriber: Transcribing {
         let acceptance: WhistleCapability
         let bundle: Bundle
         let memory: @Sendable () -> Int64?
-        init(acceptance: WhistleCapability, bundle: Bundle, memory: @escaping @Sendable () -> Int64?) {
-            self.acceptance = acceptance; self.bundle = bundle; self.memory = memory
+        let trace: Trace?
+        init(acceptance: WhistleCapability, bundle: Bundle, memory: @escaping @Sendable () -> Int64?, trace: Trace?) {
+            self.acceptance = acceptance; self.bundle = bundle; self.memory = memory; self.trace = trace
         }
         private var raw: [Float] = []
         private var base = 0, totalSamples = 0, finalized = 0
@@ -109,7 +128,14 @@ public struct WhistleTranscriber: Transcribing {
                       boundary.endSample - boundary.startSample <= 240128 else { throw WhistleError.invalidInput }
                 let offset = Double(boundary.startSample) / 16000
                 let samples = Array(raw[(boundary.startSample-base)..<(boundary.endSample-base)])
-                let result = try await WhistleRuntime.shared.transcribe(samples, acceptance: acceptance, bundle: bundle)
+                let result: WhistleResult
+                if let trace {
+                    let range = boundary.startSample..<boundary.endSample
+                    result = try await WhistleRuntime.shared.transcribe(samples, acceptance: acceptance, bundle: bundle,
+                        submitted: { trace.submitted(range) }, resultReady: { await trace.resultReady(range) })
+                } else {
+                    result = try await WhistleRuntime.shared.transcribe(samples, acceptance: acceptance, bundle: bundle)
+                }
                 let words = result.words.map { TimedWord(text: $0.word, start: offset + $0.start, end: offset + $0.end) }
                 let segment = TranscriptSegment(text: result.text, start: offset, end: Double(boundary.endSample)/16000, words: words)
                 languages.append(result.language)
@@ -175,7 +201,7 @@ public struct WhistleTranscriber: Transcribing {
             try Task.checkCancellation()
             try headroom(WhistleCapability.loadHeadroom)
             events(.preparingModel(.checking))
-            let reader = try WhistleAudioReader(url: request.url, position: request.whistleResume?.sourceFrame ?? 0)
+            let reader = try WhistleAudioReader(url: request.url, position: request.whistleResume?.sourceFrame ?? 0, onRead: trace?.read)
             guard reader.duration.isFinite, reader.duration <= 36 * 3600 else { throw TranscriptionError.failed(.long) }
             let inputCount = reader.inputFrames(through: reader.length)
             let outputCount = reader.rate == 16_000 ? inputCount : (inputCount + 2) / 3

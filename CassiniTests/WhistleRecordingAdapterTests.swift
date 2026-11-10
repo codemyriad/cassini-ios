@@ -2,7 +2,8 @@ import XCTest
 import AVFoundation
 import Synchronization
 import CassiniEngine
-import CassiniInference
+import CassiniEngineTesting
+@testable import CassiniInference
 import CassiniNotebook
 import CassiniWhistle
 
@@ -111,6 +112,170 @@ final class WhistleRecordingAdapterTests: XCTestCase {
             XCTAssertTrue(batch.segments.allSatisfy { $0.start >= oldest },
                           "Each new block decodes at most one retained window of earlier audio")
         }
+    }
+
+    func testNativeInterruptionResumesAFreshJobFromDiskWithinTheRedoBounds() async throws {
+        let source = try XCTUnwrap(Bundle.main.resourceURL?.appendingPathComponent("WhistleTests/jfk.wav"))
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("whistle-interruption-\(UUID())")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let audio = root.appendingPathComponent("input.wav")
+        try repeatedSpeech(source: source, destination: audio)
+
+        let referenceFolder = root.appendingPathComponent("whole")
+        let referenceNote = try await makeNote(in: referenceFolder, audio: audio)
+        let whole = WorkTrace()
+        let referenceOutcome = try await runJob(in: referenceFolder, noteID: referenceNote, trace: whole.trace)
+        XCTAssertEqual(referenceOutcome, .done)
+        let expected = try await transcript(in: referenceFolder, noteID: referenceNote)
+        let wholeSubmissions = whole.state.withLock { $0.submissions }
+        XCTAssertGreaterThan(wholeSubmissions.count, 2)
+        XCTAssertGreaterThan(expected.flatMap(\.words).count, 20)
+
+        for graceful in [true, false] {
+            let folder = root.appendingPathComponent(graceful ? "pause" : "process-loss")
+            let noteID = try await makeNote(in: folder, audio: audio)
+            let files = try CheckpointFiles(notes: NoteStore(root: folder))
+            let stop = StopSignal()
+            let (stops, stopped) = AsyncStream<Void>.makeStream()
+            let interrupted = WorkTrace()
+            let cut = Mutex<Cut?>(nil)
+            let trace = WhistleTranscriber.Trace(read: interrupted.trace.read, submitted: { nativeRange in
+                interrupted.trace.submitted(nativeRange)
+                let observed = interrupted.state.withLock { ($0.reads.last?.upperBound ?? 0, $0.submissions.count) }
+                guard observed.1 >= 2, let saved = try? files.load(noteID)?.whistle,
+                      observed.0 - saved.sourceFrame >= 2 * 48_000 else { return }
+                cut.withLock { $0 = Cut(periodic: saved, native: nativeRange, readThrough: observed.0) }
+                // Needle is entering its synchronous C call. Let it actually run; its returned result
+                // must never escape to the batch after the job has accepted the interruption.
+                if graceful { stop.stop(.pause(.system)) }
+                else { withUnsafeCurrentTask { $0?.cancel() } }
+            }, resultReady: { nativeRange in
+                await interrupted.trace.resultReady(nativeRange)
+                if graceful && cut.withLock({ $0?.native == nativeRange }) {
+                    for await _ in stops { break }
+                }
+            })
+            let outcome = try await runJob(in: folder, noteID: noteID, trace: trace, stop: stop) { event in
+                if case .stopping = event { stopped.yield(()) }
+            }
+            stopped.finish()
+            XCTAssertEqual(outcome, graceful ? .paused(.system) : .cancelled)
+            let interruption = try XCTUnwrap(cut.withLock { $0 })
+            let attempted = interrupted.state.withLock { $0 }
+            XCTAssertEqual(attempted.submissions.last, interruption.native)
+            XCTAssertEqual(attempted.results, attempted.submissions, "the interrupted C call really returned")
+            XCTAssertGreaterThan(interruption.readThrough - interruption.periodic.sourceFrame, 48_000)
+
+            // No adapter state, TranscriptResume, or last batch is passed to the replacement job.
+            let persisted = try XCTUnwrap(try files.load(noteID))
+            let checkpoint = try XCTUnwrap(persisted.whistle)
+            XCTAssertFalse(persisted.wordsComplete)
+            XCTAssertFalse(persisted.segments.isEmpty, "exercise an already committed word prefix")
+            if graceful {
+                XCTAssertGreaterThan(checkpoint.sourceFrame, interruption.periodic.sourceFrame)
+            } else {
+                XCTAssertEqual(checkpoint, interruption.periodic, "no graceful write after simulated process loss")
+            }
+            let resumed = WorkTrace()
+            let resumedOutcome = try await runJob(in: folder, noteID: noteID, trace: resumed.trace)
+            XCTAssertEqual(resumedOutcome, .done)
+            let actual = try await transcript(in: folder, noteID: noteID)
+            XCTAssertEqual(actual, expected, "exact text, word timings, and segment bounds after \(graceful ? "pause" : "process loss")")
+
+            let remaining = resumed.state.withLock { $0 }
+            let sourceLimit: Int64 = graceful ? 48_000 : 6 * 48_000
+            let priming: Int64 = 4_800
+            let earliest = checkpoint.sourceFrame - priming
+            XCTAssertEqual(remaining.reads.first?.lowerBound, earliest)
+            XCTAssertTrue(remaining.reads.allSatisfy { $0.lowerBound >= earliest })
+            let replayedSource = remaining.reads.reduce(0) { count, read in
+                count + max(0, min(read.upperBound, interruption.readThrough) - read.lowerBound)
+            }
+            let redoFrames = interruption.readThrough - checkpoint.sourceFrame
+            XCTAssertGreaterThan(redoFrames, 0)
+            XCTAssertLessThanOrEqual(redoFrames, sourceLimit)
+            XCTAssertGreaterThan(replayedSource, 0)
+            XCTAssertLessThanOrEqual(replayedSource, Int(sourceLimit + (sourceLimit / 48_000 + 1) * priming))
+            let replayedNative = remaining.submissions.filter { attempted.submissions.contains($0) }
+            XCTAssertTrue(replayedNative.contains(interruption.native))
+            XCTAssertTrue(remaining.submissions.allSatisfy { $0.upperBound > checkpoint.doneSamples })
+            XCTAssertLessThanOrEqual(replayedNative.reduce(0) { $0 + $1.count },
+                                     graceful ? 240_128 + 16_000 : 22 * 16_000 - 1)
+            XCTAssertEqual(Array(wholeSubmissions.suffix(remaining.submissions.count)), remaining.submissions,
+                           "native ranges include exactly the suffix of the uninterrupted run")
+        }
+    }
+
+    private struct Cut: Sendable {
+        let periodic: WhistleCheckpoint
+        let native: Range<Int>
+        let readThrough: Int64
+    }
+
+    private final class WorkTrace: Sendable {
+        struct State {
+            var reads: [Range<Int64>] = []
+            var submissions: [Range<Int>] = []
+            var results: [Range<Int>] = []
+        }
+        let state = Mutex(State())
+        var trace: WhistleTranscriber.Trace {
+            .init(read: { read in self.state.withLock { $0.reads.append(read) } },
+                  submitted: { range in self.state.withLock { $0.submissions.append(range) } },
+                  resultReady: { range in self.state.withLock { $0.results.append(range) } })
+        }
+    }
+
+    private struct TimedText: Equatable {
+        let text: String
+        let start: Double
+        let end: Double
+    }
+
+    private struct Passage: Equatable {
+        let bounds: TimedText
+        let words: [TimedText]
+    }
+
+    private func transcript(in folder: URL, noteID: UUID) async throws -> [Passage] {
+        let store = try NoteStore(root: folder)
+        let stored = await store.note(noteID)
+        return try XCTUnwrap(stored).transcript.map { segment in
+            Passage(bounds: .init(text: segment.text, start: segment.start, end: segment.end),
+                    words: segment.words.map { .init(text: $0.text, start: $0.start, end: $0.end) })
+        }
+    }
+
+    private func makeNote(in folder: URL, audio: URL) async throws -> UUID {
+        let store = try NoteStore(root: folder)
+        var note = Note(id: UUID(), title: "Whistle resume", audioFilename: "input.wav")
+        let file = try AVAudioFile(forReading: audio)
+        note.duration = Double(file.length) / file.processingFormat.sampleRate
+        try await store.save(note)
+        try FileManager.default.copyItem(at: audio, to: store.audioURL(for: note))
+        return note.id
+    }
+
+    private func runJob(in folder: URL, noteID: UUID, trace: WhistleTranscriber.Trace, stop: StopSignal = StopSignal(),
+                        events: @escaping @Sendable (JobEvent) -> Void = { _ in }) async throws -> JobOutcome {
+        let store = try NoteStore(root: folder)
+        let transcriber = WhistleTranscriber(acceptance: {
+            .init(arm64: true, operatingSystemSupported: true, bundleVerified: true, pipelineAccepted: false,
+                  deviceAccepted: false, internalExperiment: true)
+        }, availableMemory: { Int64.max }, trace: trace)
+        let runner = TranscriptionJob(notes: store, transcriber: transcriber, analyzer: FakeAnalyzer(),
+                                      checkpoints: CheckpointFiles(notes: store), provenance: ProvenanceFiles(notes: store),
+                                      host: Host(), clock: FakeClock(), budget: NativeBudget())
+        return await runner.run(Job(noteID: noteID, seq: 1, kind: .transcribe, state: .running, enqueuedAt: Date()),
+                                stop: stop, events: events)
+    }
+
+    private struct Host: TranscriptionJobHost {
+        func jobSettings() async -> JobSettings {
+            .init(allowSpeechDownload: false, identifySpeakers: false, allowSpeakerDownload: false)
+        }
+        func applySpeakers(_ analysis: SpeakerAnalysis, to noteID: UUID, generation: Int) async throws {}
     }
 
     private func repeatedSpeech(source: URL, destination: URL) throws {

@@ -8,12 +8,14 @@ final class WhistleAudioReader {
     private let file: AVAudioFile
     private let sourceRate: Int
     private let padding: Int
+    private let onRead: (@Sendable (Range<Int64>) -> Void)?
     let rate: Int
     let length: Int64
     var duration: Double { Double(length) / Double(sourceRate) }
     private(set) var position: Int64
 
-    init(url: URL, position: Int64) throws {
+    init(url: URL, position: Int64, onRead: (@Sendable (Range<Int64>) -> Void)? = nil) throws {
+        self.onRead = onRead
         file = try AVAudioFile(forReading: url, commonFormat: .pcmFormatFloat32, interleaved: false)
         let hz = file.processingFormat.sampleRate
         guard hz.isFinite, (1...1_000_000).contains(hz), hz.rounded() == hz else {
@@ -69,7 +71,7 @@ final class WhistleAudioReader {
     }
 
     private func fill(_ input: AVAudioPCMBuffer, frames: AVAudioFrameCount) throws {
-        try file.read(into: input, frameCount: frames)
+        try read(input, frames: frames)
         guard input.frameLength < frames else { return }
         guard input.frameLength > 0, let destination = input.floatChannelData,
               let rest = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: frames - input.frameLength),
@@ -77,7 +79,7 @@ final class WhistleAudioReader {
         // AVAudioFile can return a partial read before EOF (e.g. a packet boundary on the simulator).
         while input.frameLength < frames {
             let offset = input.frameLength
-            try file.read(into: rest, frameCount: frames - offset)
+            try read(rest, frames: frames - offset)
             guard rest.frameLength > 0 else { throw TranscriptionError.failed(.open) }
             input.frameLength = offset + rest.frameLength
             for channel in 0..<Int(input.format.channelCount) {
@@ -85,6 +87,12 @@ final class WhistleAudioReader {
                     .update(from: source[channel], count: Int(rest.frameLength))
             }
         }
+    }
+
+    private func read(_ buffer: AVAudioPCMBuffer, frames: AVAudioFrameCount) throws {
+        let start = file.framePosition
+        try file.read(into: buffer, frameCount: frames)
+        onRead?(start..<(start + Int64(buffer.frameLength)))
     }
 
     private func mono(_ input: AVAudioPCMBuffer) throws -> AVAudioPCMBuffer {
