@@ -40,7 +40,7 @@ final class ScreenshotTests: XCTestCase {
         let headline = app.descendants(matching: .any)["progressHeadline"]
         XCTAssertTrue(headline.wait(until: NSPredicate(format: "label CONTAINS %@", "%"), within: 15))
         XCTAssertTrue(element(app, containing: "agenda").waitForExistence(within: 10), "the draft so far shows")
-        // The job's paced results give it a time left a few seconds in.
+        // Reports advance the injected uptime, so the estimate follows the synthetic pace.
         let timeLeft = app.descendants(matching: .any).matching(identifier: "timeLeftStat").firstMatch
         XCTAssertTrue(timeLeft.wait(until: NSPredicate(format: "label CONTAINS %@", "min"), within: 15), timeLeft.label)
         // The draft follows its end as it arrives; back at its start, its header shows under the card.

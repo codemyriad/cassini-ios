@@ -240,10 +240,12 @@ final class NoteScreenTests: XCTestCase {
         app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed", "processing", "--draft-growing",
                                "--open-fixture", "CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC"]
         app.launchAndWait()
+        app.appendDraft(sentences: 24)
         // The draft's header, its tag and its paragraphs all carry the section's identifier; the last one ends it.
         let parts = app.descendants(matching: .any).matching(identifier: "draftTranscript")
         XCTAssertTrue(parts.firstMatch.waitForExistence(within: 15))
         var draft: XCUIElement { parts.element(boundBy: parts.count - 1) }
+        XCTAssertTrue(poll(within: 15) { draft.label.contains("Sentence 24 ") }, "the requested draft arrived")
         let window = app.windows.firstMatch.frame
         let stop = app.buttons["Stop and keep progress"]
         // The draft outgrows the screen; its end stays in view and so does the card.
@@ -252,8 +254,9 @@ final class NoteScreenTests: XCTestCase {
         XCTAssertTrue(stop.isHittable, "the card stays fixed above the draft")
 
         draft.swipeDown()
-        XCTAssertTrue(poll(within: 10) { draft.frame.maxY > window.maxY + 100 })
-        RunLoop.current.run(until: Date().addingTimeInterval(2))
+        XCTAssertTrue(poll(within: 15) { draft.frame.maxY > window.maxY + 100 })
+        app.appendDraft(sentences: 2)
+        XCTAssertTrue(poll(within: 15) { draft.label.contains("Sentence 26 ") }, "new text arrived after the drag")
         XCTAssertGreaterThan(draft.frame.maxY, window.maxY + 100, "after a scroll up, new text does not scroll")
         XCTAssertTrue(stop.isHittable)
     }
