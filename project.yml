@@ -134,6 +134,9 @@ schemes:
         CassiniUITests: [test]
         CassiniTests: [test]
     test:
+      # English copy assertions must not inherit the simulator host's region (for example en_FR).
+      language: en
+      region: US
       targets: [CassiniTests, CassiniUITests]
   CassiniInternal:
     build:

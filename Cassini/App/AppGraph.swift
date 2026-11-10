@@ -113,7 +113,7 @@ import CassiniNotebook
     /// The transcription queue and the job it runs, over the library's notes. Without a library there is no queue.
     private static func processing(environment: AppEnvironment, library: LibraryStore, voices: VoicesStore,
                                    settings: SettingsStore, notices: NoticeCenter) -> ProcessingStore {
-        let progress = JobProgress(battery: UIDeviceBattery(), onFinalization: { [settings] in settings.recordFinalization($0) })
+        let progress = JobProgress(battery: UIDeviceBattery(), uptimeMs: environment.transcriptionUptimeMs, onFinalization: { [settings] in settings.recordFinalization($0) })
         let checkpoints: any CheckpointStoring = library.noteStore.map { CheckpointFiles(notes: $0) } ?? NoLibraryWork()
         let drafts = library.noteStore.map { DraftNamesStore(notes: $0) }
         voices.drafts = drafts
@@ -121,7 +121,7 @@ import CassiniNotebook
             let job = TranscriptionJob(notes: notes, transcriber: environment.transcriber, analyzer: environment.analyzer,
                                        checkpoints: checkpoints, provenance: ProvenanceFiles(notes: notes),
                                        host: AppJobHost(settings: settings, voices: voices), clock: environment.clock,
-                                       drafts: drafts, diagnostics: environment.speechModels?.diagnostics(base: InternalWhistle.diagnostics) ?? InternalWhistle.diagnostics)
+                                       drafts: drafts, uptimeMs: environment.transcriptionUptimeMs, diagnostics: environment.speechModels?.diagnostics(base: InternalWhistle.diagnostics) ?? InternalWhistle.diagnostics)
             let parts = TranscriptionCoordinator.Parts(
                 jobs: JobStore(repository: JobRepository(root: environment.root)), notes: notes, runner: job,
                 checkpoints: NoteWorkFolders(notes: notes, drafts: drafts),
@@ -140,7 +140,7 @@ import CassiniNotebook
                     }
                     return .recorded(settings: settings, speech: speech, speakers: environment.analyzer,
                         parakeetReady: { [models = environment.models] in ModelCatalog.parakeet.ready(in: models) })
-                })
+                }, eventUptimeMs: environment.launch.marksLaunchFinished ? environment.transcriptionUptimeMs : nil)
             return TranscriptionCoordinator(parts, settings: settings)
         }
         let models = ModelInstalls(transcriber: environment.downloadTranscriber ?? environment.transcriber, analyzer: environment.analyzer,
@@ -276,6 +276,9 @@ extension View {
             .environment(graph.imports).environment(graph.trash).environment(graph.trash.undo).environment(graph.exports)
             .environment(graph.settingsPorts)
             .environment(graph.libraryScreen).environment(graph.noteScreens)
+            #if DEBUG
+            .environment(\.marksUITestLayout, graph.environment.launch.marksLaunchFinished)
+            #endif
             .environment(\.clock, graph.environment.clock)
             .environment(\.modelRoot, graph.environment.models)
             .environment(\.locale, graph.environment.locale)

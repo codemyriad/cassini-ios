@@ -17,6 +17,11 @@ import CassiniEngineTesting
     var clock: any AppClock
     var locale: Locale
     var timeZone: TimeZone
+    /// Monotonic time of transcription reports and their progress projection.
+    var transcriptionUptimeMs: @Sendable () -> Int64 = TranscriptionJob.uptimeMs
+    #if DEBUG
+    var draftClock: PermitClock?
+    #endif
     var transcriber: any Transcribing
     var analyzer: any SpeakerAnalyzing
     var capture: any AudioCapture
@@ -196,7 +201,7 @@ extension AppEnvironment {
     /// Italian screenshots). Transcription is faked; the recording seed also fakes the microphone and its permission. With `modelsMissing` the speech and speaker models
     /// are not installed, so a Transcribe asks for the download first; with `modelDownloading` (`--model-downloading`)
     /// the processing seed's job stays in its speech model download at 46 %, and with `draftGrowing` (`--draft-growing`)
-    /// its draft grows by a sentence every half second. `heldCapture` (`--capture-held`) starts the recording seed's
+    /// its draft grows only when a UI-test append command grants results. `heldCapture` (`--capture-held`) starts the recording seed's
     /// capture 24 minutes in and holds it after 7 s of speech-like levels, with 64 GiB free, for the screenshots. Speaker models are installed on the recording and processing seeds
     /// only, or on any seed with `speakersReady` (`--speakers-ready`), whose speaker step finds the fixture's two voices
     /// taking turns; the processing seed's job has measured its pace, so its card shows a time left.
@@ -221,7 +226,7 @@ extension AppEnvironment {
         let script: FakeTranscriber.Script = switch seed {
         case .processing where modelDownloading: .downloading(fraction: 0.46)
         case .processing where draftGrowing:
-            .growing(TestFixtures.growingDraft, every: .milliseconds(500), total: TestFixtures.processingDuration)
+            .growing(TestFixtures.growingDraft, every: .milliseconds(1_200), total: TestFixtures.processingDuration)
         case .processing:
             .frozen(done: 0.62 * TestFixtures.processingDuration, total: TestFixtures.processingDuration,
                     draft: TestFixtures.processingDraft, pace: TestFixtures.processingPace)
@@ -230,7 +235,9 @@ extension AppEnvironment {
         default:
             .returns(TestFixtures.transcribedSegments, total: TestFixtures.fixtureDuration)
         }
-        let transcriber = FakeTranscriber(script, status: status, recognizer: recognizer)
+        let draftClock = draftGrowing ? PermitClock(now: uiTestingNow) : nil
+        let pacingClock: any AppClock = if let draftClock { draftClock } else { FakeClock(now: uiTestingNow) }
+        let transcriber = FakeTranscriber(script, status: status, recognizer: recognizer, clock: pacingClock)
         // Without Apple speech the Apple slot holds the candidate that refuses every job.
         let unavailable: (any Transcribing)? = platform.appleSpeech ? nil : UnavailableSpeechTranscriber()
         // The recording seed tells the speakers apart, as a walk from recording to naming needs; the processing seed's
@@ -255,6 +262,9 @@ extension AppEnvironment {
             launch: LaunchOptions(seed: seed, openFixture: openFixture, restoresNavigation: false, marksLaunchFinished: true,
                                   token: token),
             models: root.appendingPathComponent("CassiniModels", isDirectory: true))
+        value.draftClock = draftClock
+        let pacingStart = uiTestingNow
+        value.transcriptionUptimeMs = { Int64((pacingClock.now.timeIntervalSince(pacingStart) * 1_000).rounded()) }
         if bundledSpeech {
             let capability = WhistleCapability(arm64: true, operatingSystemSupported: true, bundleVerified: true,
                 pipelineAccepted: true, deviceAccepted: true)
@@ -262,8 +272,8 @@ extension AppEnvironment {
                 whistle: capability, parakeetLinked: true, platform: platform, physicalMemory: (bundledCapable ? 6 : 3) << 30,
                 availableMemory: { ParakeetMemory.beforeLoadBytes }, installed: { bundledVerified },
                 verified: { bundledVerified }, verify: { bundledVerified })
-            let parakeet = FakeTranscriber(script, status: bundledVerified ? .ready : .notDownloaded, recognizer: .parakeet)
-            let legacy = unavailable ?? FakeTranscriber(script, recognizer: .appleSpeech)
+            let parakeet = FakeTranscriber(script, status: bundledVerified ? .ready : .notDownloaded, recognizer: .parakeet, clock: pacingClock)
+            let legacy = unavailable ?? FakeTranscriber(script, recognizer: .appleSpeech, clock: pacingClock)
             let speech = RoutedTranscriber(legacy: legacy, candidates: [transcriber, parakeet]) { speechModels.selectedRecognizer() }
             value.transcriber = speech
             value.downloadTranscriber = bundledCapable ? parakeet : speech
@@ -346,6 +356,9 @@ struct DefaultsModelConsent: ModelConsentRecords, @unchecked Sendable {
 }
 
 extension EnvironmentValues {
+    #if DEBUG
+    @Entry var marksUITestLayout = false
+    #endif
     /// The clock dates are shown against.
     @Entry var clock: any AppClock = SystemClock()
     /// Screens restore what they saved with the scene, such as the library search.
