@@ -54,7 +54,7 @@ final class LibraryUITests: XCTestCase {
 
     /// Every row status of the table shows, with its text, in a fixture (Recording is in the recording test below).
     @MainActor func testEveryRowStatusShowsWithItsText() {
-        let app = launch(["--seed", "statuses"])
+        let app = launch(["--seed", "statuses"] + DeviceUnderTest.workingSpeech)
         let rows: [(String, String)] = [
             ("Weekly planning call", ", transcribing"),
             ("Interview with the printer", ", queued"),
@@ -87,7 +87,7 @@ final class LibraryUITests: XCTestCase {
 
     /// Resume and Try again are inline buttons that queue the note again (the running job is frozen, so it waits).
     @MainActor func testResumeAndTryAgainQueueTheNote() {
-        let app = launch(["--seed", "statuses"])
+        let app = launch(["--seed", "statuses"] + DeviceUnderTest.workingSpeech)
         let resume = app.buttons["Resume transcribing Paused standup"]
         list(app).scroll(attempts: 4) { resume.exists && resume.isHittable }
         XCTAssertTrue(resume.waitForExistence(within: 10))
@@ -103,7 +103,7 @@ final class LibraryUITests: XCTestCase {
     // ports: LibraryBehaviourTest#theControlsSendTheirEvents
     // ports: LibraryViewModelTest#theProgressBannerOpensTheRunningNoteOrSettings
     @MainActor func testTheControlsLeadWhereTheySay() {
-        let app = launch(["--seed", "statuses"])
+        let app = launch(["--seed", "statuses"] + DeviceUnderTest.workingSpeech)
         let banner = app.buttons["progressBanner"]
         XCTAssertTrue(banner.waitForExistence(within: 15))
         XCTAssertTrue(waitFor(banner, label: "Transcribing Weekly planning call"), banner.label)
@@ -268,7 +268,7 @@ final class LibraryUITests: XCTestCase {
     /// The long-press menu: Start over and a Transcribe again that replaces the versions ask first.
     // ports: LibraryBehaviourTest#theConfirmationsOfTheSheetRows
     @MainActor func testTheActionsMenuAsksBeforeStartingOverOrReplacingTheVersions() {
-        let app = launch(["--seed", "statuses"])
+        let app = launch(["--seed", "statuses"] + DeviceUnderTest.workingSpeech)
         let paused = scrolledRow(app, "Paused standup")
         XCTAssertTrue(paused.waitForExistence(within: 10))
         paused.press(forDuration: 1)

@@ -22,4 +22,9 @@ enum DeviceUnderTest {
     /// `--parakeet`: its fake counts as installed, but the consent asks for Parakeet's files on disk, so a recording
     /// would not transcribe on its own.
     static var workingSpeech: [String] { appleSpeech ? [] : ["--d78"] }
+
+    /// The launch arguments of a device whose speech model is a download, with `--models-missing` not yet installed:
+    /// none where that is Apple's; without it `--parakeet`, Parakeet Ultra on a device that can hold it (Whistle is
+    /// bundled and never downloaded).
+    static var downloadedSpeech: [String] { appleSpeech ? [] : ["--parakeet"] }
 }

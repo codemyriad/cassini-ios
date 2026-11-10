@@ -23,6 +23,7 @@ final class NoteFlowTests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed-test-data", "--speakers-ready",
                                "--open-fixture", Self.walk]
+            + DeviceUnderTest.workingSpeech
         app.launchAndWait()
         XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 15))
 

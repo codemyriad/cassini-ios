@@ -132,6 +132,7 @@ final class CassiniUITests: XCTestCase {
     @MainActor func testMovingARunningNoteAsksFirst() {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed", "processing", "--open-fixture", "CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC"]
+            + DeviceUnderTest.workingSpeech
         app.launchAndWait()
         XCTAssertTrue(app.descendants(matching: .any)["progressHeadline"].waitForExistence(within: 15))
         app.buttons["Share and more"].tap()
@@ -148,7 +149,7 @@ final class CassiniUITests: XCTestCase {
         XCTAssertFalse(row(app, "Weekly planning call").exists)
     }
     @MainActor func testTranscribeWithTheModelInstalledStartsWithoutAskingAndWritesTheTranscript() {
-        let app = launch()
+        let app = launch(arguments: DeviceUnderTest.workingSpeech)
         app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Thoughts from the morning walk")).firstMatch.tap()
         app.buttons["Transcribe"].tap()
         XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "What if being productive")).firstMatch
@@ -291,6 +292,7 @@ final class CassiniUITests: XCTestCase {
     @MainActor func testTheProcessingSeedShowsAJobInProgress() {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed", "processing", "--open-fixture", "CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC"]
+            + DeviceUnderTest.workingSpeech
         app.launchAndWait()
         let headline = app.descendants(matching: .any)["progressHeadline"]
         XCTAssertTrue(headline.waitForExistence(within: 15))
