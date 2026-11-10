@@ -13,8 +13,8 @@ public struct CheckpointState: Hashable, Sendable {
     /// The version `encode` writes and `decode` reads.
     public static let version = 1
 
-    /// Every member `encode` writes; `recognition` only for a Parakeet run, `speakers` only for one that tells speakers
-    /// apart as it goes.
+    /// Shared checkpoint members, including the optional Parakeet state and streaming speakers. Whistle also
+    /// writes its own optional `whistle` and `reportedLanguage` members.
     public static let keys: Set<String> = [
         "version", "source", "signature", "model", "segments", "doneMs", "totalMs", "elapsedMs", "inferenceMs",
         "resumedFromMs", "wordsComplete", "recognition", "speakers",

@@ -35,15 +35,24 @@ final class WhistleAudioReader {
     }
 
     func inputFrames(through position: Int64) -> Int {
-        Int((position * Int64(rate) + Int64(sourceRate) - 1) / Int64(sourceRate))
+        // Only whole converted frames are available at a partial final block.
+        Int(position * Int64(rate) / Int64(sourceRate))
+    }
+
+    /// Actual file read, including the codec/converter context.
+    var nextReadRange: Range<Int64>? {
+        guard position < length else { return nil }
+        let end = min(position + Int64(sourceRate), length)
+        let lower = max(0, position - Int64(padding))
+        let upper = rate == sourceRate ? end : min(length, end + Int64(padding))
+        return lower..<upper
     }
 
     func next() throws -> [Float]? {
-        guard position < length else { return nil }
+        guard let range = nextReadRange else { return nil }
         let end = min(position + Int64(sourceRate), length)
-        let startWithContext = max(0, position - Int64(padding))
-        let endWithContext = rate == sourceRate ? end : min(length, end + Int64(padding))
-        let frames = AVAudioFrameCount(endWithContext - startWithContext)
+        let startWithContext = range.lowerBound
+        let frames = AVAudioFrameCount(range.count)
         file.framePosition = startWithContext
         guard let input = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: frames) else {
             throw TranscriptionError.failed(.audio)

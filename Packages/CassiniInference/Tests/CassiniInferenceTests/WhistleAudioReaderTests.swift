@@ -34,6 +34,9 @@ import Testing
         for index in [1, 2, 4] {
             let resumed = try WhistleAudioReader(url: url, position: positions[index])
             for expected in blocks[index...] {
+                let read = try #require(resumed.nextReadRange)
+                #expect(read.lowerBound == resumed.position - Int64(rate / 10))
+                #expect(read.count <= 12 * rate / 10)
                 let actual = try #require(try resumed.next())
                 // Avoid printing hundreds of thousands of floats on a regression.
                 #expect(actual.elementsEqual(expected), "resume at block \(index), read through \(resumed.position)")

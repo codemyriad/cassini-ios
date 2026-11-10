@@ -406,11 +406,12 @@ public struct TranscriptionJob: TranscriptionJobRunning {
                                revision: ModelCatalog.parakeetRevision, segmentation: segmentation ?? "",
                                inferenceMs: words.inferenceMs, resumedFromMs: words.resumedFromMs, device: device())
         case .whistle:
+            let continuation = words.whistle == nil ? "deterministic reread on resume" : "checkpointed DSP; seekable source"
             run = TranscriptProvenance(backend: "Needle C API (CPU, on-device)", engine: "Whistle",
                 model: context.recognizer.checkpointModel(language: ""), device: device().description,
                 source: TranscriptProvenance.recordingSource, version: "Needle 3.3.0; Silero 6.2.1; ONNX Runtime 1.27.1",
                 language: language, inferenceMs: words.inferenceMs,
-                segmentation: "centred FIR97 48k/16k; raw ASR; HPF100 VAD; Silero512; gate .5/.35, votes2/3, pre5120, quiet9600, pause224000/2048, limit240128; deterministic reread on resume",
+                segmentation: "centred FIR97 48k/16k; raw ASR; HPF100 VAD; Silero512; gate .5/.35, votes2/3, pre5120, quiet9600, pause224000/2048, limit240128; \(continuation)",
                 resumedFromMs: words.resumedFromMs)
         case .appleSpeech:
             let model = await transcriber.modelName(locale: Locale(identifier: context.language))
