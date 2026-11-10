@@ -10,8 +10,8 @@ Cassini keeps your data in its private app storage (Application Support). Other 
 - Transcripts: the words and their times, the speaker labels, the speaker names that you give, the bookmarks and the title, in `note.json`. `provenance.json` records which models made the transcript.
 - Unfinished transcription: the words found so far and how far the transcription got, in `work/`. Cassini deletes this folder when the transcription ends, when you start again, or when it deletes the note.
 - Voiceprints: a voiceprint is a list of numbers that Cassini calculates from the voice of one speaker. Cassini uses voiceprints to recognise the people that you name. They are kept in `PrivateVoices/` only, outside the note folders.
-- Settings and state: your choices in Settings (speech language, automatic transcription, identifying speakers and naming voices automatically), your model download decisions and their time, and some one-time notices, in the app's preferences. The queue of transcriptions is in `jobs.json`.
-- Models: the downloaded models, in `CassiniModels/models/<model>/<revision>/`, each with the model host's notices (`NOTICE.txt`). They contain no personal data. iOS keeps Apple's speech models itself.
+- Settings and state: your choices in Settings (the speech language on iOS 26 and later, automatic transcription, identifying speakers and naming voices automatically), your model download decisions and their time, and some one-time notices, in the app's preferences. The queue of transcriptions is in `jobs.json`.
+- Models: the downloaded models, in `CassiniModels/models/<model>/<revision>/`, each with the model host's notices (`NOTICE.txt`). They contain no personal data. On iOS 26 and later, iOS keeps Apple's speech models itself.
 
 When you import a file, or open a file with Cassini from a different app, Cassini copies the file into its storage. The original file stays where it is.
 
@@ -19,9 +19,9 @@ When you import a file, or open a file with Cassini from a different app, Cassin
 
 Cassini connects to the internet only to download models. It sends no audio, transcripts, voiceprints, names or settings.
 
-Cassini downloads no model before you agree. The "Transcribe on this device" screen lists the models it needs and the size of each download from the model host; Apple's speech models are listed without a size. The first download starts only when you tap "Download and transcribe", "Download and identify speakers" or "Download". If you tap "Not now — keep the audio", Cassini downloads nothing.
+Cassini downloads no model before you agree. The "Transcribe on this device" screen lists the models it needs and the size of each download from the model host; on iOS 26 and later, Apple's speech models are listed without a size. The first download starts only when you tap "Download and transcribe", "Download and identify speakers" or "Download". If you tap "Not now — keep the audio", Cassini downloads nothing.
 
-- Speech recognition (Parakeet Ultra and its speech detector, Silero VAD): `dist.gocassini.com`, Cassini's model host. On devices without the memory for Parakeet Ultra, Cassini uses Apple's on-device speech models instead: iOS downloads them from Apple and keeps them, and Cassini asks iOS to install the model for the speech language you choose.
+- Speech recognition (Parakeet Ultra and its speech detector, Silero VAD): `dist.gocassini.com`, Cassini's model host. Cassini includes the Whistle speech model, which needs no download. On iOS 26 and later, on a device where neither Whistle nor a downloaded Parakeet Ultra can be used, Cassini uses Apple's on-device speech models instead: iOS downloads them from Apple and keeps them, and Cassini asks iOS to install the model for the speech language you choose.
 - Telling speakers apart (NVIDIA Nemotron-3-Diarization): `dist.gocassini.com`
 - Recognising saved voices (3D-Speaker CAM++): `dist.gocassini.com`
 
@@ -37,7 +37,7 @@ A host receives the IP address of your device, the name of the file, and Cassini
 
 Before Cassini uses a downloaded model for the first time after it starts, it checks the SHA-256 hash of every file again. A model that fails this check is deleted and has to be downloaded again.
 
-Internal test builds may offer bundled Whistle as an experimental option. It runs on this device without downloading a speech model. Internal memory diagnostics contain only memory, thermal and outcome numbers, with no audio, transcript text or recording identifiers.
+Cassini includes the Whistle speech model and its engine in the app. Whistle runs on this device and downloads nothing. Internal test builds also keep memory diagnostics, which contain only memory, thermal and outcome numbers, with no audio, transcript text or recording identifiers.
 
 ## Permissions
 
@@ -58,4 +58,4 @@ When you move a note to Recently Deleted, Cassini keeps it for 30 days. You can 
 
 When Cassini deletes a note, it deletes its audio, its transcripts, its unfinished transcription and its voiceprints, and it removes the note's samples from your saved voices. A saved voice that only this note taught is forgotten with it. To remove any other saved voice, use "Forget" in Saved voices. "Forget everyone" deletes all voiceprints. After a voice is forgotten, the speaker names in your notes stay.
 
-If you delete Cassini, iOS deletes all Cassini data, including the downloaded models. Apple's speech models are managed by iOS, not by Cassini.
+If you delete Cassini, iOS deletes all Cassini data, including the downloaded models. On iOS 26 and later, Apple's speech models are managed by iOS, not by Cassini.
