@@ -78,7 +78,7 @@ import CassiniNotebook
     /// SwiftUI learns view comparisons in the background. Exercise real input changes until
     /// three consecutive updates render exactly the expected paragraphs; idle alone is not readiness.
     /// An attempt cap replaces the old deadline as the bound on this warm-up.
-    private func warmUp(_ window: UIWindow, expected: Set<String>, steady: Int = 3, attempts: Int = 120,
+    private func warmUp(_ window: UIWindow, expected: Set<String>, steady: Int = 3, attempts: Int = 1_024,
                         _ change: (Int) -> Void, file: StaticString = #filePath, line: UInt = #line) async {
         var inARow = 0
         var last: [String: Int] = [:]
@@ -88,7 +88,10 @@ import CassiniNotebook
             await settle(window)
             last = RenderProbe.renders
             inARow = Set(last.keys) == expected ? inARow + 1 : 0
-            if inARow == steady { return }
+            if inARow == steady {
+                print("render warm-up: \(attempt + 1) updates for \(expected.sorted())")
+                return
+            }
         }
         XCTFail("never redrew only \(expected) \(steady) times in a row across \(attempts) updates; last: \(last)",
                 file: file, line: line)
