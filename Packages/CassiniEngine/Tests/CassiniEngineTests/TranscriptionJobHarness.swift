@@ -290,7 +290,8 @@ extension TranscriptionJobTests {
 }
 
 /// Holds a fake decode until the job cancels it. The job's stop watch does that once it sees a stop; the 30 s is
-/// only a hang guard, and a job that never cancels fails the test.
+/// only a hang guard: a job that never cancels records an issue, which fails the test, and then the call returns
+/// normally, so the fake decode carries on from there rather than hanging.
 func holdUntilTheJobCancels() async throws {
     try await Task.sleep(for: .seconds(30))
     Issue.record("The job did not cancel the decode it was asked to stop")
