@@ -238,7 +238,9 @@ subset. `scripts/render-icon.swift` draws the app icon (`swift scripts/render-ic
 UI-test launches (`--ui-testing`, Debug builds only) use a library and preferences of their own, a clock fixed at
 Thursday 8 October 2026 09:41 UTC, en_US formatting, and fake transcription and speaker analysis. Named seeds fill the
 library: `--seed library|search|reading|speakers|voices|trash|processing|recording|statuses|long`. `--parakeet` makes
-the fake transcriber stand for Parakeet Ultra, so the model download screen and Settings show its sizes. A normal
+the fake transcriber stand for Parakeet Ultra, so the model download screen and Settings show its sizes.
+`--ios18-platform` builds the app over the iOS 18 platform facts (no Apple speech, no continued processing) on the
+current runtime, so those flows are tested on the usual simulators. A normal
 launch starts empty, and Release builds link no fakes.
 
 ### Native speech runtime

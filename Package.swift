@@ -28,7 +28,7 @@ let sherpaTarget: Target = .target(
 
 let package = Package(
     name: "Cassini",
-    platforms: [.iOS("26.0"), .macOS("26.0")],
+    platforms: [.iOS("18.0"), .macOS("26.0")],
     products: [
         .library(name: "CassiniCore", targets: ["CassiniCore"]),
         .library(name: "CassiniNotebook", targets: ["CassiniNotebook"]),

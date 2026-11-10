@@ -31,12 +31,12 @@ import CassiniSherpa
     func testACapableDeviceUsesUltraBeforeItsModelIsInstalled() throws {
         try XCTSkipUnless(SherpaRuntime.isLinked, "built without the native runtime")
         XCTAssertFalse(ModelCatalog.parakeet.ready(in: root))
-        XCTAssertEqual(AppEnvironment.speechTranscriber(models: models(), physicalMemory: 8 << 30).recognizer, .parakeet,
+        XCTAssertEqual(AppEnvironment.speechTranscriber(models: models(), physicalMemory: 8 << 30, platform: .iOS26).recognizer, .parakeet,
                        "the job downloads Ultra with consent")
     }
 
     func testA4GBDeviceUsesTheCapabilityCheckedAppleCandidate() {
-        XCTAssertEqual(AppEnvironment.speechTranscriber(models: models(), physicalMemory: 4 << 30).recognizer, .appleSpeech,
+        XCTAssertEqual(AppEnvironment.speechTranscriber(models: models(), physicalMemory: 4 << 30, platform: .iOS26).recognizer, .appleSpeech,
                        "the adapter checks hardware, locale and assets before choosing Apple")
     }
 
@@ -47,7 +47,7 @@ import CassiniSherpa
         UserDefaults(suiteName: suite)!.set(NSNumber(value: 1), forKey: SettingsKeys.modelsConsentAt)
         let fetcher = HeldFetcher()
         let models = models(fetcher: fetcher)
-        let transcriber = AppEnvironment.speechTranscriber(models: models, physicalMemory: 8 << 30)
+        let transcriber = AppEnvironment.speechTranscriber(models: models, physicalMemory: 8 << 30, platform: .iOS26)
         let analyzer = AppEnvironment.speakerAnalyzer(models: models)
         XCTAssertTrue(analyzer.models.installer === models.installer)
 

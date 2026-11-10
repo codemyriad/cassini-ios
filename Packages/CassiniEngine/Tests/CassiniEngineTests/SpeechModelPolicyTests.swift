@@ -84,4 +84,69 @@ import CassiniNotebook
         #expect(!restored.shows(.afterWhistle, policy: facts))
         #expect(!ParakeetSuggestionState(completedWhistle: true).shows(.afterWhistle, policy: policy(.verified)))
     }
+
+    /// Every combination the fallback reads: Apple speech on the system or not, Whistle available or not, and
+    /// Parakeet verified and runnable, verified but short of memory now, missing on a capable device, or too big.
+    private var fallbackCases: [(name: String, policy: SpeechModelPolicy)] {
+        var cases: [(String, SpeechModelPolicy)] = []
+        for whistle in [true, false] {
+            for (name, installation, physical, available) in [
+                ("verified", ParakeetInstallation.verified, SpeechCapability.minimumPhysicalMemory, ParakeetMemory.beforeLoadBytes),
+                ("verified, low headroom", .verified, SpeechCapability.minimumPhysicalMemory, ParakeetMemory.beforeLoadBytes - 1),
+                ("missing", .missing, SpeechCapability.minimumPhysicalMemory, ParakeetMemory.beforeLoadBytes),
+                ("checking", .checking, SpeechCapability.minimumPhysicalMemory, ParakeetMemory.beforeLoadBytes),
+                ("too big", .missing, 3 << 30, ParakeetMemory.beforeLoadBytes),
+            ] as [(String, ParakeetInstallation, UInt64, Int64)] {
+                var facts = policy(installation)
+                facts.whistleAvailable = whistle
+                facts.physicalMemory = physical
+                facts.availableMemory = available
+                cases.append(("whistle \(whistle), parakeet \(name)", facts))
+            }
+        }
+        var unlinked = policy(.missing)
+        unlinked.whistleAvailable = false
+        unlinked.parakeetLinked = false
+        cases.append(("no whistle, parakeet not linked", unlinked))
+        return cases
+    }
+
+    @Test func withAppleSpeechTheRecognizerIsTodaysSelection() {
+        for (name, facts) in fallbackCases {
+            for preference in SpeechModelPreference.allCases {
+                #expect(facts.recognizer(preference: preference, platform: .iOS26)
+                        == facts.selected(preference: preference) ?? .appleSpeech, "\(name), \(preference)")
+            }
+        }
+    }
+
+    /// Without Apple speech a device that can hold Parakeet falls back to it, so a Transcribe asks for its download (as
+    /// Android does when its included model cannot run); one that cannot has no recognizer.
+    @Test func withoutAppleSpeechTheFallbackIsParakeetIfItCanRunElseNone() {
+        for (name, facts) in fallbackCases {
+            for preference in SpeechModelPreference.allCases {
+                let recognizer = facts.recognizer(preference: preference, platform: .iOS18)
+                #expect(recognizer != .appleSpeech, "\(name)")
+                if let selected = facts.selected(preference: preference) {
+                    #expect(recognizer == selected, "only the fallback changes: \(name), \(preference)")
+                }
+            }
+        }
+        var facts = policy(.missing)
+        #expect(facts.recognizer(platform: .iOS18) == .whistle, "Whistle stays the default before Parakeet is verified")
+        facts.parakeetInstallation = .verified
+        #expect(facts.recognizer(platform: .iOS18) == .parakeet)
+        #expect(facts.recognizer(preference: .whistle, platform: .iOS18) == .whistle)
+        facts.whistleAvailable = false
+        facts.parakeetInstallation = .missing
+        #expect(facts.recognizer(preference: .whistle, platform: .iOS18) == .parakeet, "missing Ultra asks for its download")
+        #expect(facts.recognizer(platform: .iOS26) == .appleSpeech)
+        facts.availableMemory = ParakeetMemory.beforeLoadBytes - 1
+        #expect(facts.recognizer(platform: .iOS18) == .parakeet, "the run checks its headroom before it loads")
+        facts.physicalMemory = 4 << 30
+        #expect(facts.recognizer(platform: .iOS18) == nil)
+        facts.physicalMemory = SpeechCapability.minimumPhysicalMemory
+        facts.parakeetLinked = false
+        #expect(facts.recognizer(platform: .iOS18) == nil)
+    }
 }

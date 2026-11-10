@@ -29,6 +29,7 @@ import CassiniNotebook
         var languages: [SpeechLanguage] = []
         func speechLanguages() async -> [SpeechLanguage] { languages }
         var recognizer = SpeechRecognizer.appleSpeech
+        var platform = PlatformFacts.iOS26
     }
 
     @MainActor private final class Effects { var list: [SettingsModel.Effect] = [] }
@@ -67,13 +68,13 @@ import CassiniNotebook
     /// speech assets. The speakers row is both speaker models; voices come with it.
     @Test func theRowsShowTheirDownloadAndTheSpeechRowTheRecognizers() {
         let speech = ModelCatalog.parakeetBytes
-        #expect(ModelRows.size(of: .speech, recognizer: .parakeet) == .precision("INT8", bytes: speech))
+        #expect(ModelRows.size(of: .speech, recognizer: .parakeet, platform: .iOS26) == .precision("INT8", bytes: speech))
         #expect(SizeText(bytes: speech).english() == "443 MB")
-        #expect(ModelRows.size(of: .speech, recognizer: .appleSpeech) == .managedBySystem)
+        #expect(ModelRows.size(of: .speech, recognizer: .appleSpeech, platform: .iOS26) == .managedBySystem)
         for recognizer in [SpeechRecognizer.parakeet, .appleSpeech] {
-            #expect(ModelRows.size(of: .speakers, recognizer: recognizer)
+            #expect(ModelRows.size(of: .speakers, recognizer: recognizer, platform: .iOS26)
                     == .bytes(ModelCatalog.speakerBytes + ModelCatalog.voiceprintBytes))
-            #expect(ModelRows.size(of: .voices, recognizer: recognizer) == .includedWith(.speakers))
+            #expect(ModelRows.size(of: .voices, recognizer: recognizer, platform: .iOS26) == .includedWith(.speakers))
         }
         #expect(SizeText(bytes: ModelCatalog.speakerBytes + ModelCatalog.voiceprintBytes).english() == "88 MB")
     }
@@ -147,6 +148,32 @@ import CassiniNotebook
         #expect(await model().showsSpeechLanguage)
         ports.recognizer = .parakeet
         #expect(await !model().showsSpeechLanguage)
+    }
+
+    /// A system without Apple speech offers no speech language whatever the recognizer, and its speech row never says
+    /// "Managed by iOS": with no recognizer that can run it shows no size, only its status. Every other row and
+    /// recognizer reads the same on both systems.
+    @Test func withoutAppleSpeechNeitherThePickerNorManagedByIOSAppear() async {
+        for platform in [PlatformFacts.iOS26, .iOS18] {
+            for recognizer in [SpeechRecognizer.appleSpeech, .parakeet, .whistle] {
+                ports.platform = platform
+                ports.recognizer = recognizer
+                #expect(await model().showsSpeechLanguage == (platform.appleSpeech && recognizer == .appleSpeech))
+            }
+        }
+        #expect(ModelRows.size(of: .speech, recognizer: .appleSpeech, platform: .iOS26) == .managedBySystem)
+        #expect(ModelRows.size(of: .speech, recognizer: .appleSpeech, platform: .iOS18) == .noModel)
+        for recognizer in [SpeechRecognizer.parakeet, .whistle] {
+            for part in ModelPart.allCases {
+                #expect(ModelRows.size(of: part, recognizer: recognizer, platform: .iOS18)
+                        == ModelRows.size(of: part, recognizer: recognizer, platform: .iOS26))
+            }
+        }
+        for part in [ModelPart.speakers, .voices] {
+            #expect(ModelRows.size(of: part, recognizer: .appleSpeech, platform: .iOS18)
+                    == ModelRows.size(of: part, recognizer: .appleSpeech, platform: .iOS26))
+        }
+        #expect(ModelRows.size(of: .speech, recognizer: .whistle, platform: .iOS18) == .included)
     }
 
     // ports: SettingsViewModelTest#theLanguageGoesToAppCompatAndPhoneIsTheEmptyList (iOS sets the app language in the

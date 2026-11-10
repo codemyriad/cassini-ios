@@ -25,7 +25,9 @@ struct ModelRowView: View {
                 Group {
                     if let modelName { Text(verbatim: modelName) } else { Text(row.part.settingsLabel) }
                 }.foregroundStyle(Color.ink)
-                Text(row.size.label(locale: locale)).font(.subheadline).foregroundStyle(Color.muted)
+                if let size = row.size.label(locale: locale) {
+                    Text(size).font(.subheadline).foregroundStyle(Color.muted)
+                }
             }
             Spacer(minLength: 8)
             Text(row.status.label).font(.subheadline.weight(.medium)).foregroundStyle(row.status.tone.color)
@@ -51,7 +53,8 @@ extension ModelPart {
 }
 
 extension ModelSize {
-    func label(locale: Locale) -> String {
+    /// The row's subtitle; nil when it has none.
+    func label(locale: Locale) -> String? {
         switch self {
         case .included: String(localized: "Included with Cassini", table: "Settings")
         case .managedBySystem: String(localized: "Managed by iOS", table: "Settings")
@@ -60,6 +63,7 @@ extension ModelSize {
             String(localized: "\(precision) · \(SizeCopy.text(bytes, locale: locale))", table: "Settings",
                    comment: "The speech row's subtitle: the model's precision and its download (INT8 · 443 MB)")
         case .includedWith: String(localized: "Comes with telling speakers apart", table: "Settings")
+        case .noModel: nil
         }
     }
 }

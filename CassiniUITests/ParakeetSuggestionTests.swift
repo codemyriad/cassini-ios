@@ -50,8 +50,19 @@ final class ParakeetSuggestionTests: XCTestCase {
     }
 
     @MainActor func testThreeGigabyteDeviceUsesWhistleWithoutAnUpgradeSuggestion() {
+        transcribeWithWhistleOnAThreeGigabyteDevice()
+    }
+
+    /// The iOS 18 facts: with the unavailable candidate in Apple's slot the router still picks Whistle, the flow PR D
+    /// enables on iOS 18 (the finite background path is the runner's rule, tested in `PlatformFactsTests`).
+    @MainActor func testWithoutAppleSpeechAThreeGigabyteDeviceStillUsesWhistle() {
+        transcribeWithWhistleOnAThreeGigabyteDevice(["--ios18-platform"])
+    }
+
+    @MainActor private func transcribeWithWhistleOnAThreeGigabyteDevice(_ arguments: [String] = []) {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed-test-data", "--d78", "--open-fixture", walk]
+            + arguments
         app.launchAndWait()
         let transcribe = app.buttons["Transcribe"].firstMatch
         XCTAssertTrue(transcribe.waitForExistence(within: 15))
