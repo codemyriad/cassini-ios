@@ -72,7 +72,7 @@ final class LiveMainJourneyQATests: XCTestCase {
                 return label.exists && label.label == title
             }
             try wait(app, "Controlled transcript did not render: " + name, 60) { !self.paragraphs(app).isEmpty }
-            let observed = try collectParagraphs(app, expected: expected, name: name, output)
+            let observed = try collectParagraphs(app, expected: expected, canonical: canonicalRows(name, inputs), name: name, output)
             try require(observed == expected, "Full controlled paragraphs differ from canonical rows: " + name)
             try writeJSON(["controlledNotASR": true, "title": title, "expected": expected, "observed": observed],
                           output.appendingPathComponent(name + "-paragraphs.json"))
@@ -189,12 +189,17 @@ final class LiveMainJourneyQATests: XCTestCase {
         capture(app, "ready-" + name, output)
     }
 
-    private func expectedRows(_ name: String, _ inputs: URL) throws -> [String] {
+    private func canonicalRows(_ name: String, _ inputs: URL) throws -> [[String: Any]] {
         let candidates = [inputs.appendingPathComponent("vectors/" + name + ".expected.json"),
                           inputs.appendingPathComponent("controlled-documents/" + name + "-expected.json")]
         guard let url = candidates.first(where: { FileManager.default.fileExists(atPath: $0.path) }),
               let object = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any],
               let rows = object["rows"] as? [[String: Any]], !rows.isEmpty else { throw Failure(message: "Expected vector missing: " + name) }
+        return rows
+    }
+
+    private func expectedRows(_ name: String, _ inputs: URL) throws -> [String] {
+        let rows = try canonicalRows(name, inputs)
         let labels = ["ada": "Ada", "ben": "Ben", "cy": "Cy"]
         return try rows.map { row in
             guard let members = row["members"] as? [[String: Any]] else { throw Failure(message: "Malformed row members") }
@@ -209,18 +214,48 @@ final class LiveMainJourneyQATests: XCTestCase {
         }
     }
 
-    @MainActor private func collectParagraphs(_ app: XCUIApplication, expected: [String], name: String, _ output: URL) throws -> [String] {
-        var ids: [String] = [], labels: [String: String] = [:]
+    @MainActor private func collectParagraphs(_ app: XCUIApplication, expected: [String], canonical: [[String: Any]], name: String, _ output: URL) throws -> [String] {
+        var ids: [String] = [], labels: [String: String] = [:], headers: [String: String] = [:]
         for viewport in 0..<30 { // Work bound only; check completion before every swipe.
             for element in self.paragraphs(app) where element.frame.intersects(app.frame) && !element.frame.isEmpty {
                 if labels[element.identifier] == nil { ids.append(element.identifier) }
                 labels[element.identifier] = element.label
+                let headerID = "speakerHeader-" + String(element.identifier.dropFirst("turn-".count))
+                let header = app.descendants(matching: .any).matching(identifier: headerID).firstMatch
+                if header.exists { headers[element.identifier] = header.label }
             }
             capture(app, name + "-viewport-\(viewport)", output)
-            if ids.count >= expected.count { return ids.compactMap { labels[$0] } }
+            if ids.count >= expected.count {
+                try writeJSON(ids.enumerated().map { ["rowIndex": $0.offset, "paragraphID": $0.element,
+                                                      "header": headers[$0.element] ?? "MISSING"] as [String: Any] },
+                              output.appendingPathComponent(name + "-headers.json"))
+                try validateHeaders(ids, headers, canonical)
+                return ids.compactMap { labels[$0] }
+            }
             app.swipeUp()
         }
         throw Failure(message: "Not all controlled paragraphs reachable: " + name + " observed \(ids.count)/\(expected.count)")
+    }
+
+    private func validateHeaders(_ ids: [String], _ headers: [String: String], _ rows: [[String: Any]]) throws {
+        try require(ids.count == rows.count, "Header row count differs from canonical vector")
+        let names = ["ada": "Ada", "ben": "Ben", "cy": "Cy"]
+        for (index, id) in ids.enumerated() {
+            guard let header = headers[id] else { throw Failure(message: "Speaker header missing for canonical row \(index)") }
+            let row = rows[index]
+            if let speaker = row["speaker"] as? String, let name = names[speaker] {
+                let continuation = row["continuation"] as? Bool == true
+                try require(header.contains(name) == !continuation,
+                            "Speaker name repetition/omission on row \(index): " + header)
+            }
+            let over = (row["over"] as? [String] ?? []).compactMap { names[$0] }
+            if over.isEmpty {
+                try require(!header.contains("(over "), "Unexpected over header on canonical row \(index): " + header)
+            } else {
+                let list = over.count == 1 ? over[0] : over.dropLast().joined(separator: ", ") + " and " + over.last!
+                try require(header.contains("(over " + list + ")"), "Competing speakers missing on canonical row \(index): " + header)
+            }
+        }
     }
 
     @MainActor private func export(_ app: XCUIApplication, format: String, ext: String, name: String, _ container: URL, _ output: URL) throws {
