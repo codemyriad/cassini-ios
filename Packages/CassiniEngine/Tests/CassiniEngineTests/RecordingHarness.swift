@@ -5,7 +5,7 @@ import CassiniEngineTesting
 import CassiniNotebook
 
 /// A recording controller over a real `NoteStore` on a temporary root, with a scripted microphone, fake storage, fake
-/// compression and a fake hand-off. The policy loop ticks every 10 ms.
+/// compression and a fake hand-off. The harness drives policy ticks and title debounce through a manual clock.
 @MainActor final class RecordingHarness {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     let suite = "cassini.recording.tests.\(UUID().uuidString)"
@@ -15,7 +15,7 @@ import CassiniNotebook
     let handoff = FakeRecordingHandoff()
     let activity = FakeLiveActivity()
     let notifier = FakeNotifier()
-    let clock = FakeClock(now: Date(timeIntervalSince1970: 1_791_452_460))
+    let clock = RecordingTestClock(now: Date(timeIntervalSince1970: 1_791_452_460))
     let settings: SettingsStore
     let store: NoteStore
     let notes: CountingRecordingNotes
@@ -31,7 +31,7 @@ import CassiniNotebook
         if consented { settings.recordConsent() }
         store = try NoteStore(root: root)
         notes = CountingRecordingNotes(store: store)
-        var harness: RecordingHarness?
+        weak var harness: RecordingHarness?
         controller = RecordingController(parts: .init(
             ready: {
                 while harness?.isReady == false { harness?.readyChecks += 1; try? await Task.sleep(for: .milliseconds(5)) }
@@ -44,6 +44,10 @@ import CassiniNotebook
     }
 
     func tearDown() {
+        controller.policy?.cancel()
+        controller.titleWrite?.cancel()
+        controller.events?.cancel()
+        clock.cancelAll()
         try? FileManager.default.removeItem(at: root)
         UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite)
     }
@@ -74,13 +78,24 @@ import CassiniNotebook
         try await waitFor("the capture's events are handled") { controller.handledEvents >= capture.sent }
     }
 
-    func waitFor(_ what: String = "condition", timeout: Duration = .seconds(30), _ condition: @MainActor () async -> Bool) async throws {
+    /// Await the captured title task to completion, driving its scheduler rather than waiting a quiet interval.
+    func settle() async throws {
+        var finished = false
+        let controller = controller
+        let task = Task { await controller.settle(); finished = true }
+        defer { task.cancel() }
+        try await waitFor("the pending title work") { finished }
+        await task.value
+    }
+
+    func waitFor(_ what: String = "condition", timeout: Duration = .seconds(30), advancingClock: Bool = true, _ condition: @MainActor () async -> Bool) async throws {
         let deadline = ContinuousClock.now + timeout
         while !(await condition()) {
             guard ContinuousClock.now < deadline else {
                 Issue.record("Timed out waiting for \(what)")
                 throw CancellationError()
             }
+            if advancingClock { clock.advanceToNextSleep() }
             try await Task.sleep(for: .milliseconds(5))
         }
     }

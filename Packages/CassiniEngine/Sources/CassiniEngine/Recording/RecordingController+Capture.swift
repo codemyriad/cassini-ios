@@ -7,14 +7,20 @@ import CassiniNotebook
 ///
 /// Touches: `titleWrite`, and reads `captureURL`; the state only through `setState`, `addLevel` and `publishActivity`.
 extension RecordingController {
-    func runPolicy() async {
-        while !Task.isCancelled {
-            try? await Task.sleep(for: parts.timing.tick)
-            guard !Task.isCancelled else { return }
-            if tick() {
-                // A new operation: the end cancels this loop.
-                serialized { await self.end(.space, title: nil) }
-                return
+    func startPolicy() {
+        // Capture only the scheduler across suspension. Unwrapping a weak controller before an
+        // unbounded async method would keep it alive for the lifetime of the policy loop.
+        let clock = parts.clock, interval = parts.timing.tick
+        policy = Task { [weak self] in
+            while !Task.isCancelled {
+                do { try await clock.sleep(for: interval) } catch { return }
+                guard !Task.isCancelled, let self else { return }
+                if tick() {
+                    // A new operation: the end cancels this loop.
+                    serialized { await self.end(.space, title: nil) }
+                    return
+                }
+                // The strong reference ends with this iteration, before the next sleep.
             }
         }
     }
@@ -61,9 +67,9 @@ extension RecordingController {
 
     func scheduleTitleWrite(for noteID: UUID) {
         titleWrite?.cancel()
-        let debounce = parts.timing.titleDebounce
+        let debounce = parts.timing.titleDebounce, clock = parts.clock
         titleWrite = Task { [weak self] in
-            try? await Task.sleep(for: debounce)
+            do { try await clock.sleep(for: debounce) } catch { return }
             guard !Task.isCancelled, let self, let active = state.activeRecording, active.noteID == noteID,
                   let title = NoteTitles.clean(active.title) else { return }
             _ = try? await parts.notes.update(noteID) { $0.title = title }

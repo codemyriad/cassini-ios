@@ -30,6 +30,7 @@ import CassiniEngineTesting
             liveActivity: liveActivity, playback: playback,
             audio: LocalAudioProcessing(), storage: FakeStorage(), background: background, notifier: notifier,
             platform: platform)
+        environment.recordingClock = RecordingClock(now: clock)
         environment.exports = self.root.appendingPathComponent("tmp/Exports", isDirectory: true)
         environment.speechModels = speechModels
         environment.downloadTranscriber = downloadTranscriber
@@ -44,4 +45,13 @@ import CassiniEngineTesting
         try? FileManager.default.removeItem(at: root)
         UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite)
     }
+}
+
+/// Hosted smoke checks keep their existing real timer cadence; FakeClock still removes search debounce.
+/// Forward dates to the graph's clock so recordings and the library always agree about "now".
+private struct RecordingClock: AppClock {
+    let source: FakeClock
+    init(now source: FakeClock) { self.source = source }
+    var now: Date { source.now }
+    func sleep(for duration: Duration) async throws { try await Task.sleep(for: duration) }
 }

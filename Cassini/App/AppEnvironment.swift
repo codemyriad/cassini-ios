@@ -15,6 +15,8 @@ import CassiniEngineTesting
     var root: URL
     var defaults: UserDefaults
     var clock: any AppClock
+    /// Recording may use a separately driven scheduler while other collaborators keep their own test clock.
+    var recordingClock: (any AppClock)?
     var locale: Locale
     var timeZone: TimeZone
     /// Monotonic time of transcription reports and their progress projection.

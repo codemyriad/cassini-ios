@@ -95,6 +95,18 @@ struct NoteDetailView: View {
                                   actions: transcriptActions, suggestion: { suggestionCard($0, in: transcript) })
             }
         }
+        .overlay(alignment: .topLeading) {
+            if let speechModels = processing.speechModels {
+                // The diagnostics callback precedes .ended. Its flag alone does not mean the reading banners exist.
+                if speechModels.suggestion.completedWhistle {
+                    if mode.showsReading {
+                        UITestStateMarker(identifier: "noteSuggestionDecision", value: "completed")
+                    }
+                } else if case .audioOnly = mode {
+                    UITestStateMarker(identifier: "noteSuggestionDecision", value: "no-result")
+                }
+            }
+        }
         .safeAreaInset(edge: .top, spacing: 0) {
             if model.screen.search != nil {
                 InNoteSearchBar(query: searchQuery, current: current, total: matches.count,
