@@ -135,6 +135,9 @@ final class CassiniUITests: XCTestCase {
             + DeviceUnderTest.workingSpeech
         app.launchAndWait()
         XCTAssertTrue(app.descendants(matching: .any)["progressHeadline"].waitForExistence(within: 15))
+        // The seed's job reports three results a little over a second apart, and each one rebuilds an open menu, which
+        // drops a tap that lands then. Its last result is 29:53 processed; after it the job is frozen.
+        XCTAssertTrue(app.staticTexts["Processed, 29:53 / 48:13"].waitForExistence(within: 15))
         app.buttons["Share and more"].tap()
         app.buttons["Move to Recently Deleted"].tapWhenSettled()
         let alert = app.alerts["Stop transcription and move to Recently Deleted?"]
