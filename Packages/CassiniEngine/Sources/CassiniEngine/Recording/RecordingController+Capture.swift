@@ -9,7 +9,7 @@ import CassiniNotebook
 extension RecordingController {
     func runPolicy() async {
         while !Task.isCancelled {
-            try? await Task.sleep(for: parts.timing.tick)
+            do { try await parts.clock.sleep(for: parts.timing.tick) } catch { return }
             guard !Task.isCancelled else { return }
             if tick() {
                 // A new operation: the end cancels this loop.
@@ -61,9 +61,9 @@ extension RecordingController {
 
     func scheduleTitleWrite(for noteID: UUID) {
         titleWrite?.cancel()
-        let debounce = parts.timing.titleDebounce
+        let debounce = parts.timing.titleDebounce, clock = parts.clock
         titleWrite = Task { [weak self] in
-            try? await Task.sleep(for: debounce)
+            do { try await clock.sleep(for: debounce) } catch { return }
             guard !Task.isCancelled, let self, let active = state.activeRecording, active.noteID == noteID,
                   let title = NoteTitles.clean(active.title) else { return }
             _ = try? await parts.notes.update(noteID) { $0.title = title }

@@ -74,7 +74,7 @@ import CassiniNotebook
         h.controller.setTitle("Test del")
         h.controller.setTitle("Choir rehearsal ")
         try await h.waitFor("the title write") { await h.note(active.noteID)?.title == "Choir rehearsal" }
-        try await Task.sleep(for: RecordingHarness.debounce * 2)
+        try await h.settle()
         #expect(h.notes.titleWrites == 1, "one write after the last change")
         #expect(try h.active.title == "Choir rehearsal ", "the state keeps the text as typed")
         #expect(h.activity.current?.title == "Choir rehearsal")

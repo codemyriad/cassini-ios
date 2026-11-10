@@ -175,9 +175,10 @@ public final class RecordingController {
     /// Calls `observer` on every change of `state`, on the main actor, right after it.
     public func observe(_ observer: @escaping @MainActor (RecordingState) -> Void) { observers.append(observer) }
 
-    /// Returns once the work asked for so far, the compression after a finish included, is done.
+    /// Returns once the work asked for so far, including the pending title write and compression, is done.
     public func settle() async {
         await operations?.value
+        await titleWrite?.value
         for compression in compressions.values { await compression.value }
     }
 
