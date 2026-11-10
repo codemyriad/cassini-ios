@@ -92,7 +92,8 @@ import CassiniWhistle
         }
     }
 
-    /// Settings offers Apple's speech language only where the system has Apple speech.
+    /// Settings offers Apple's speech language only where the facts say the system has Apple speech, and reports Apple
+    /// speech as managed by iOS only where the adapter exists too: below iOS 26 even the iOS 26 facts get none.
     func testSettingsFollowsThePlatform() async {
         for platform in [PlatformFacts.iOS26, .iOS18] {
             let test = TestGraph(transcriber: AppEnvironment.appleSpeechCandidate(platform: platform), platform: platform)
@@ -100,7 +101,8 @@ import CassiniWhistle
             XCTAssertEqual(test.graph.settingsPorts.platform, platform)
             let model = SettingsModel(ports: test.graph.settingsPorts)
             XCTAssertEqual(model.showsSpeechLanguage, platform.appleSpeech)
-            XCTAssertEqual(test.graph.settingsPorts.size(of: .speech), platform.appleSpeech ? .managedBySystem : .noModel)
+            let managed = platform.appleSpeech && LivePlatform.facts.appleSpeech
+            XCTAssertEqual(test.graph.settingsPorts.size(of: .speech), managed ? .managedBySystem : .noModel)
         }
     }
 
