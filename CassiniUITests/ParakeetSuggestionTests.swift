@@ -30,6 +30,8 @@ final class ParakeetSuggestionTests: XCTestCase {
         transcribe.tap()
         XCTAssertTrue(app.descendants(matching: .any)["turn-w0"].waitForExistence(within: 15))
         XCTAssertTrue(app.staticTexts[title].waitForExistence(within: 15))
+        // The card shows before its `.task` records the showing; end the process only once it is recorded.
+        XCTAssertTrue(app.staticTexts["parakeetSuggestionRecorded"].waitForExistence(within: 15), "the showing is recorded")
         app.launchArguments = arguments
         app.launchAndWait(fresh: true)
         XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 15))
