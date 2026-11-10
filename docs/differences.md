@@ -23,7 +23,13 @@ that were not ported, with the reason for each.
   on the host with fakes. Decodes run on one dedicated thread at `.userInitiated` (`InferenceThread`); the recognizer
   is made with the first window and released when the words step ends, before the speaker step loads its models.
   Differences:
-  - **Apple Speech fallback (decision D2, iOS only).** A device that cannot hold Ultra keeps Apple's `SpeechAnalyzer` /
+  - **Apple Speech fallback (decision D2, iOS 26 and later only).** `SpeechAnalyzer` exists only from iOS 26. On
+    iOS 18 the Apple slot holds `UnavailableSpeechTranscriber`, which refuses every job, Settings shows no speech
+    language, and a device where Whistle cannot run is offered the Parakeet download if it can hold Ultra, as on
+    Android, else it cannot transcribe (`SpeechModelPolicy.recognizer(preference:platform:)`,
+    [iOS 18](ios18.md)). Wherever this page says "Apple Speech devices" or "devices that keep Apple Speech", it means
+    devices on iOS 26 or later. Since D78, Whistle comes first and Apple Speech is the fallback only where neither
+    Whistle nor a verified Parakeet can run. On iOS 26 such a device keeps Apple's `SpeechAnalyzer` /
     `SpeechTranscriber` (`AppleSpeechTranscriber`), with the speech language setting and its failure codes; so would a
     build without the native runtime, which every iOS build now links. `AppEnvironment` asks the pure
     `SpeechCapability.choose(linked:capable:)` once at launch, whether or not Ultra is installed: a job downloads it
@@ -202,8 +208,9 @@ that were not ported, with the reason for each.
   - **A full disk** during a download is `NOT_ENOUGH_STORAGE`, as iOS reports it as its own error. Android reads it
     as an I/O error (`INTERRUPTED`). Both check the free space before the first byte.
   - **Stopped by the system.** The installer has no `startDownload`/`stopDownloads()`: the standalone download is
-    `ModelInstalls`, one more caller of the installer, and the end of its `BGContinuedProcessingTask` (Android's
-    foreground-service time-out) stops its own wait and shows "Download stopped" there. The ported
+    `ModelInstalls`, one more caller of the installer, and the end of its `BGContinuedProcessingTask` (iOS 26; on
+    iOS 18 the end of its finite background time; Android's foreground-service time-out) stops its own wait and shows
+    "Download stopped" there. The ported
     `ModelInstallOwnerTest` cases start that caller with `install`.
   - **Compressed downloads.** Every model file is seekable Zstandard, which Apple's Compression framework does not read.
     `ArtifactFetcher.fetchCompressed` takes a `Decompressing` port, which the app fills with `ZstdDecompressor`
@@ -646,20 +653,26 @@ stricter or looser than the spec.
 
 ## Transcription
 
-- **Background time.** Android runs the drain in a foreground service with an ongoing notification. iOS holds one
-  `BGContinuedProcessingTask` for the whole drain (`io.codemyriad.cassini.transcription.queue`). It is asked for at
-  the drain's first claim, from the screen. The system shows "Transcribing “title”" with the job's progress and a Stop
-  button, and each next job only changes the title. iOS grants this request only while Cassini is on the screen. A
-  drain that starts in the background, or a refused request, falls back to the finite time of
-  `beginBackgroundTask`. The standalone model download (Settings, the model download screen; Android runs it in the
-  same foreground service) holds its own continued task under a second identifier
-  (`io.codemyriad.cassini.transcription.work`), titled "Downloading models" with the subtitle "They run on this
-  device" (the queue's says "Your audio stays on this device"; it names no source, as Apple's speech assets come from
-  Apple and the rest from the model host), from its start to its end (`ModelInstalls`), so a 443 MB Ultra download
-  goes on after Cassini leaves the screen. Its progress weighs each part by its download, so it never goes back when
-  the next part starts. When iOS takes that time back, or the person presses Stop, the standalone download stops as
-  its Cancel does and the part shows "Download stopped" (STOPPED_BY_SYSTEM), as Android's `stopDownloads()` shows it,
-  until its next install.
+- **Background time** (iOS 26 and later). Android runs the drain in a foreground service with an ongoing notification.
+  iOS holds one `BGContinuedProcessingTask` for the whole drain (`io.codemyriad.cassini.transcription.queue`). It is
+  asked for at the drain's first claim, from the screen. The system shows "Transcribing “title”" with the job's progress
+  and a Stop button, and each next job only changes the title. iOS grants this request only while Cassini is on the
+  screen. A drain that starts in the background, or a refused request, falls back to the finite time of
+  `beginBackgroundTask`. The standalone model download (Settings, the model download screen; Android runs it in the same
+  foreground service) holds its own continued task under a second identifier
+  (`io.codemyriad.cassini.transcription.work`), titled "Downloading models" with the subtitle "They run on this device"
+  (the queue's says "Your audio stays on this device"; it names no source, as Apple's speech assets come from Apple and
+  the rest from the model host), from its start to its end (`ModelInstalls`), so a 443 MB Ultra download goes on after
+  Cassini leaves the screen. Its progress weighs each part by its download, so it never goes back when the next part
+  starts. When iOS takes that time back, or the person presses Stop, the standalone download stops as its Cancel does
+  and the part shows "Download stopped" (STOPPED_BY_SYSTEM), as Android's `stopDownloads()` shows it, until its next
+  install.
+- **Background time on iOS 18.** iOS 18 has no continued processing (`PlatformFacts.continuedProcessing`), so the
+  drain and the standalone download always take the finite time of `beginBackgroundTask`, and `BGTaskScheduler` is
+  never called. A transcription still running when that time ends (about 30 s after Cassini leaves the screen) pauses
+  as below and needs Resume; the standalone download stops with "iOS stopped the download. Try again to continue
+  where it stopped." and keeps its bytes. Android keeps both running in its foreground service. This is a platform
+  constraint (decision 5 in [iOS 18](ios18.md), awaiting Silvio's review). Not yet verified on iOS 18.2.
 - **When iOS takes the time back.** Expiry and the system's Stop do what Android's `onTimeout` does. The job's stop is
   signalled before iOS's expiration handler returns, the queue is held (`system`), and the job shows as paused by the
   system. While Cassini is hidden, the notification "Transcription paused by iOS · iOS needed the time back. Open
@@ -701,9 +714,11 @@ stricter or looser than the spec.
   Name a speaker sheet saves nothing.
 - **The progress card's footnote** reads "Transcription runs on this device. If iOS stops it in the background, your
   progress is kept." in place of Android's "Keeps going if you leave the app…" and its "Notifications are off, so
-  progress shows only here." variant. iOS shows a running drain's progress in its own continued-processing UI whatever
-  the notification permission is, and may end that time (see "When iOS takes the time back" above), so neither of
-  Android's lines holds.
+  progress shows only here." variant. On iOS 26 and later, iOS shows a running drain's progress in its own
+  continued-processing UI whatever the notification permission is, and may end that time (see "When iOS takes the time
+  back" above), so neither of Android's lines holds. iOS 18 has no continued processing, so there the "Paused by iOS"
+  notification is the only sign outside the app; whether to restore Android's "Notifications are off" variant there is
+  an open product question.
 - **The draft** shows Apple's volatile results (on the fallback devices) as words that may still change. It follows its end as on Android: the
   header and the progress card stay fixed above it while 160 pt are left for the draft.
 - **Recently Deleted.** A queued job of a note moved to Recently Deleted is removed from the queue right after the
@@ -811,8 +826,8 @@ These features exist only on iOS. They were kept by decision.
 - Results are posted only while Cassini is in the background, silently. Each replaces the note's earlier one, as on
   Android's results channel. With previews hidden, the Lock Screen shows "A note was transcribed" and never the title.
   "Paused by iOS" and "Transcription stopped" carry Resume.
-- There are no ongoing notifications. The recording uses a Live Activity, and a drain uses the system's
-  continued-processing progress.
+- There are no ongoing notifications. The recording uses a Live Activity, and on iOS 26 and later a drain uses the
+  system's continued-processing progress. iOS 18 shows no drain progress outside the app.
 - Notification permission is asked once (`NoticeCenter.askNotificationsOnce`, for every path): at the first
   recording, the first Transcribe from a screen, or the model download, and only while it is not decided.
   NOTIFICATIONS_OFF means denied. Before the first question, nothing counts as off.
@@ -994,9 +1009,11 @@ iOS bundles the pinned published device/simulator arm64 Needle archives and Whis
 framework/resource set. The source archives retain minos27.0; the framework is linked for iOS 18.0 with exactly the
 audited SDK26 import closure, backed by native parity on the iOS 26.0 and 18.2 simulators, the runtime export check
 on 18.2 (every import resolves; 5 of 125 only through the host Mac's libraries) and hosted Whistle tests on 18.2, and the A12 measurement on iPadOS 26 (made with the 26.0-linked framework; owed again
-for this one). No physical iOS 18 device has run it. Whistle needs Armv8.1 atomics and Armv8.3 RCpc, so the A10 iPad (7th generation) on
-iPadOS 18 gets no Whistle (below iOS 26 the app reads the CPU features from `sysctl`; no device has run that read
-yet). Android uses its own pinned arm64 input; neither mobile
+for this one). Two AWS Device Farm runs on 2026-11-10 (iPhone 11 on iOS 18.6.2, iPhone 15 on iOS 18.0) loaded it
+and transcribed the bundled English recording in a Debug build. No A12 on iOS 18 and no Release build has run it.
+Whistle needs Armv8.1 atomics and Armv8.3 RCpc, so the A10 iPad (7th generation) on
+iPadOS 18 gets no Whistle (below iOS 26 the app reads the CPU features from `sysctl`; both iOS 18 devices answered
+1 for both keys, and no A10 has run the read). Android uses its own pinned arm64 input; neither mobile
 platform claims x86_64 support from an arm64 archive. See [the bundle contract](../Whistle/README.md).
 
 The iOS C API is in-process because ordinary iOS apps cannot spawn a recognition worker. A native abort can terminate
