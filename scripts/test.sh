@@ -10,7 +10,8 @@
 #                            uncommitted and untracked files): the string catalog check when a source or a catalog
 #                            changed, the package test targets, the hosted tests and the UI test classes of the
 #                            changed areas. For iterating; run all once before finishing.
-#   scripts/test.sh build    only build for testing (scripts/screenshots.sh runs its tests from that build)
+#   scripts/test.sh build    only build for testing, then check that no embedded binary needs a newer iOS than the app
+#                            (scripts/check-embedded-minos.py); scripts/screenshots.sh runs its tests from that build
 #   scripts/test.sh clean    shut down and delete this worktree's simulator clones
 #
 # Extra arguments after the tier go to every xcodebuild test run, e.g.
@@ -663,6 +664,10 @@ build_for_testing() {
     run_logged "$logs/build.log" 2400 xcodebuild build-for-testing "${flags[@]}" \
         -destination 'generic/platform=iOS Simulator' \
         CODE_SIGNING_ALLOWED=NO COMPILER_INDEX_STORE_ENABLE=NO ONLY_ACTIVE_ARCH=YES ARCHS=arm64
+    step_end
+    step_start "embedded minimum iOS"
+    run_logged "$logs/embedded-minos.log" 60 /usr/bin/python3 -I "$root/scripts/check-embedded-minos.py" \
+        "$derived/Build/Products/Debug-iphonesimulator/Cassini.app"
     step_end
     xctestrun=$(ls -t "$derived"/Build/Products/Cassini_*.xctestrun 2>/dev/null | grep -v '\.only-' | head -1)
     [ -n "$xctestrun" ] || die "no .xctestrun in $derived/Build/Products"

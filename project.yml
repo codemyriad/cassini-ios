@@ -6,7 +6,7 @@ configs:
 options:
   bundleIdPrefix: io.codemyriad
   deploymentTarget:
-    iOS: '26.0'
+    iOS: '18.0'
 packages:
   Cassini:
     path: .

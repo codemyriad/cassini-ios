@@ -1,8 +1,9 @@
 # An off-host check of what drmeyers' gate cannot see: a clean checkout with nothing but the repository, cassini-format
 # and the network. It runs `scripts/test.sh fast` (the string catalogs and the Swift package tests, with the
 # conformance vectors required) and `scripts/test.sh build` (the app, its extension and the test bundles, built for the
-# iOS Simulator). The simulator tiers (hosted and UI tests) stay local: the merge gate is the drmeyers/test-all status
-# that `CASSINI_POST_STATUS=1 scripts/test.sh all` posts (D66).
+# iOS Simulator, then checked that no embedded binary needs a newer iOS than the app). The simulator tiers (hosted and
+# UI tests) stay local: the merge gate is the drmeyers/test-all status that `CASSINI_POST_STATUS=1 scripts/test.sh all`
+# posts (D66).
 #
 # Not a required check: the path filter leaves a PR that changes no code without this run.
 name: CI
@@ -26,6 +27,7 @@ on:
       - 'scripts/test-events.py'
       - 'scripts/test-test-events.py'
       - 'scripts/test-swift-test-product.py'
+      - 'scripts/*embedded-minos.py'
       - 'scripts/check-strings.sh'
       - 'scripts/*whistle*.py'
       - '.github/workflows/ci.yml'
@@ -76,6 +78,7 @@ jobs:
         run: |
           python3 scripts/test-test-events.py
           python3 scripts/test-swift-test-product.py
+          python3 scripts/test-check-embedded-minos.py
       - name: String catalogs and package tests
         working-directory: cassini-ios
         run: scripts/test.sh fast
