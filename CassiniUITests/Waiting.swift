@@ -10,8 +10,8 @@ let uiWaitFloor: TimeInterval =
 /// `XCTNSPredicateExpectation` first look after a whole second, so each of them cost a test a second even when the
 /// element was already on the screen. Each waits at least `uiWaitFloor`.
 ///
-/// These are for what should happen. To check that something does not appear, use `staysAbsent(for:)`: a negative
-/// check written as `XCTAssertFalse(x.waitForExistence(within: 1))` would wait the whole floor on every passing run.
+/// These are for what should happen. Check absence immediately after a positive screen/decision marker. A negative
+/// wait would use elapsed time as evidence and wait the whole floor on every passing run.
 extension XCUIElement {
     @MainActor func waitForExistence(within timeout: TimeInterval) -> Bool {
         poll(within: max(timeout, uiWaitFloor)) { exists }
@@ -19,12 +19,6 @@ extension XCUIElement {
 
     @MainActor func waitForNonExistence(within timeout: TimeInterval) -> Bool {
         poll(within: max(timeout, uiWaitFloor)) { !exists }
-    }
-
-    /// True when the element did not appear for the whole of `duration`: a check that something stays off the screen,
-    /// which no wait floor stretches.
-    @MainActor func staysAbsent(for duration: TimeInterval) -> Bool {
-        !poll(within: duration) { exists }
     }
 
     /// Waits until the element is there and enabled: the recording screen shows Pause, disabled, while the microphone
