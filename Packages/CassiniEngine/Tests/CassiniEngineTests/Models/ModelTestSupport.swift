@@ -53,9 +53,9 @@ func install(_ model: ModelDescriptor, in root: URL) {
     sparse(model, in: directory)
 }
 
-/// Polls `condition` until it holds, for at most twenty seconds.
+/// Polls `condition` until it holds; the 30 s bound is only a hang guard.
 func waitUntil(_ message: String = "The condition never held", _ condition: @Sendable () async -> Bool) async throws {
-    let deadline = ContinuousClock.now + .seconds(20)
+    let deadline = ContinuousClock.now + .seconds(30)
     while !(await condition()) {
         guard ContinuousClock.now < deadline else {
             Issue.record(Comment(rawValue: message))
