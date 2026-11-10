@@ -60,6 +60,67 @@ import CassiniEngineTesting
         XCTAssertEqual(stored.map(\.state), [.paused], "the paused job survives a relaunch")
     }
 
+    /// The iOS 18 path end to end over the real job and files: the finite time ends while the job runs, the job keeps
+    /// its checkpoint and is paused by the system; a later launch over the same library keeps exactly that one job,
+    /// still paused by the system and not started by coming to the screen; a Resume from the screen asks the
+    /// transcriber to go on from the checkpoint, not from zero, and the note gets the whole transcript.
+    func testOnIOS18AJobPausedByIOSResumesFromItsCheckpointAfterARelaunch() async throws {
+        let hello = TranscriptSegment(text: "Hello", start: 0, end: 0.8, words: [.init(text: "Hello", start: 0, end: 0.8)])
+        let there = TranscriptSegment(text: "there", start: 1.2, end: 1.5, words: [.init(text: "there", start: 1.2, end: 1.5)])
+        let rest = TranscriptSegment(text: "everyone", start: 1.6, end: 1.9, words: [.init(text: "everyone", start: 1.6, end: 1.9)])
+        let first = TestGraph(transcriber: FakeTranscriber(.frozen(done: 1.5, total: 2, draft: [hello, there])), platform: .iOS18)
+        defer { first.tearDown() }
+        let note = try await seedPlainNote(in: first)
+        first.graph.settings.recordConsent()
+        first.graph.settings.identifySpeakers = false
+        await first.graph.processing.transcribe(note.id)
+        await waitUntil { self.draftText(first.graph.processing.progress.phase(for: note.id)) == ["Hello", "there"] }
+
+        first.background.expireAll()
+        XCTAssertEqual(first.graph.settings.queueHold, .system)
+        await first.graph.processing.coordinator?.awaitIdle()
+        await first.graph.library.settle()
+        let checkpoints = CheckpointFiles(notes: try XCTUnwrap(first.graph.library.noteStore))
+        let saved = try XCTUnwrap(try checkpoints.load(note.id), "the stop kept the words so far")
+        XCTAssertEqual(saved.segments.map(\.text), ["Hello", "there"])
+        XCTAssertGreaterThan(saved.doneMs, AppleSpeechWindows.resumeOverlapMs, "a checkpoint a resume can start after")
+        let paused = try XCTUnwrap(first.graph.processing.state.jobs[note.id])
+        XCTAssertEqual(paused.state, .paused)
+        XCTAssertEqual(paused.pauseReason, .system)
+        XCTAssertEqual(paused.doneMs, saved.doneMs)
+
+        // A new launch over the same library and preferences.
+        let resuming = RecordingTranscriber(FakeTranscriber(.returns([hello, there, rest], total: 2)))
+        let second = TestGraph(root: first.root, suite: first.suite, clock: first.clock, transcriber: resuming,
+                               platform: .iOS18)
+        await second.graph.start()
+        second.graph.processing.setVisible(true)
+        XCTAssertEqual(try JobRepository(root: second.root).load().map(\.noteID), [note.id], "one job")
+        let relaunched = try XCTUnwrap(second.graph.processing.state.jobs[note.id])
+        XCTAssertEqual(relaunched.state, .paused)
+        XCTAssertEqual(relaunched.pauseReason, .system)
+        XCTAssertEqual(second.graph.settings.queueHold, .system)
+        XCTAssertEqual(Notices.job(relaunched).first?.args.bySystem, true, "the Note screen says iOS paused it")
+        XCTAssertEqual(Notices.job(relaunched).first?.actions.first, .resume)
+        XCTAssertNil(second.graph.processing.state.running)
+
+        let outcome = await second.graph.processing.transcribe(note.id, origin: .screen)
+        XCTAssertEqual(outcome, .queued(changed: true))
+        await second.graph.processing.coordinator?.awaitIdle()
+        await second.graph.library.settle()
+        await waitUntil { second.graph.library.note(note.id)?.status == .ready }
+        let start = TimeInterval(AppleSpeechWindows.resumeStartMs(doneMs: saved.doneMs)) / 1_000
+        XCTAssertGreaterThan(start, 0)
+        XCTAssertEqual(resuming.startOffsets, [start], "one run, from the checkpoint")
+        let done = try XCTUnwrap(second.graph.library.note(note.id))
+        XCTAssertEqual(done.transcript.flatMap(\.words).map(\.text), ["Hello", "there", "everyone"], "no word twice")
+        XCTAssertEqual(ProvenanceFiles(notes: try XCTUnwrap(second.graph.library.noteStore)).provenance(for: done)?.resumedFromMs,
+                       saved.doneMs)
+        XCTAssertTrue(second.graph.processing.state.jobs.isEmpty)
+        XCTAssertEqual(try JobRepository(root: second.root).load(), [])
+        XCTAssertNil(second.graph.settings.queueHold)
+    }
+
     func testTakingQueuedNotesOutOfTheQueueKeepsTheirSavedProgressAndStartOverDropsIt() async throws {
         let test = TestGraph(transcriber: FakeTranscriber(.frozen(done: 5, total: 10)))
         defer { test.tearDown() }
@@ -445,6 +506,28 @@ import CassiniEngineTesting
     private func draftText(_ phase: JobPhase?) -> [String]? {
         guard case .transcribing(_, let draft) = phase else { return nil }
         return draft.words.map(\.text)
+    }
+
+    /// A transcriber that tells where each run began.
+    private final class RecordingTranscriber: Transcribing, @unchecked Sendable {
+        private let base: FakeTranscriber
+        private let lock = NSLock()
+        private var offsets: [TimeInterval] = []
+        init(_ base: FakeTranscriber) { self.base = base }
+
+        var startOffsets: [TimeInterval] { lock.withLock { offsets } }
+
+        func transcribe(_ request: TranscriptionRequest,
+                        events: @escaping @Sendable (TranscriptionEvent) -> Void) async throws -> TranscriptionResult {
+            lock.withLock { offsets.append(request.startOffset) }
+            return try await base.transcribe(request, events: events)
+        }
+        func assetStatus(locale: Locale) async -> ModelPartStatus { await base.assetStatus(locale: locale) }
+        func installAssets(locale: Locale, progress: @escaping @Sendable (InstallProgress) -> Void) async throws {
+            try await base.installAssets(locale: locale, progress: progress)
+        }
+        func speechLanguages() async -> [SpeechLanguage] { await base.speechLanguages() }
+        func modelName(locale: Locale) async -> String? { await base.modelName(locale: locale) }
     }
 
     private func waitUntil(timeout: Duration = .seconds(30), _ condition: @MainActor () -> Bool) async {

@@ -144,6 +144,30 @@ import CassiniWhistle
         }
     }
 
+    /// On the iOS 18 facts the queue's time is the finite one, and its expiry is what pauses a transcription: what
+    /// iOS's expiration handler runs tells the work once, and the token has ended by then, so a later end or a second
+    /// expiry does nothing.
+    func testTheFiniteTimesExpiryTellsTheWorkOnceAndEndsTheToken() {
+        let runner = UIKitBackgroundRunner(platform: .iOS18)
+        var told = 0
+        var heldWhenTold: UIKitBackgroundRunner.Hold?
+        var token: BackgroundToken!
+        token = runner.begin(title: "Transcribing", subtitle: "Cassini", progress: Progress(totalUnitCount: 100)) {
+            told += 1
+            heldWhenTold = runner.hold(of: token)
+        }
+        XCTAssertEqual(runner.hold(of: token), .finite)
+
+        runner.expire(token)
+        XCTAssertEqual(told, 1)
+        XCTAssertNil(heldWhenTold, "the token is the runner's no more while the work learns of it")
+        XCTAssertNil(runner.hold(of: token))
+        runner.expire(token)
+        runner.end(token)
+        XCTAssertEqual(told, 1)
+        XCTAssertEqual(runner.registered, [])
+    }
+
     /// Settings follows the facts it is given: it offers Apple's speech language and reports Apple speech as managed by
     /// iOS exactly where the facts say the system has Apple speech, on any system. The adapter alone also needs iOS 26
     /// (a link constraint, not a rule): below it even the iOS 26 facts get the unavailable candidate. The app passes

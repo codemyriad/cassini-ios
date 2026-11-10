@@ -167,7 +167,8 @@ import CassiniEngine
     }
 
     /// iOS takes the token's time back: its work learns of it, then the token ends, both before iOS's handler returns.
-    private func expire(_ token: BackgroundToken) {
+    /// Internal so the hosted tests can run what iOS's expiration handler runs.
+    func expire(_ token: BackgroundToken) {
         guard let entry = held.removeValue(forKey: token) else { return }
         entry.onExpire()
         release(entry, success: false)
