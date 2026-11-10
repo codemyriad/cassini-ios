@@ -96,7 +96,8 @@ extension XCUIElement {
         let current = (value as? String) ?? ""
         // SwiftUI's multiline TextField can expose its prompt as value/label without placeholderValue.
         let placeholder = placeholderValue ?? label
-        let length = current == placeholder ? 0 : current.count
+        // Deleting a displayed prompt is harmless; skipping deletion could keep real text equal to that prompt.
+        let length = current.count
         if length > 0 {
             typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: length + 2))
             guard poll(within: uiWaitFloor, { (value as? String).map { $0.isEmpty || $0 == placeholder } ?? false }) else {
