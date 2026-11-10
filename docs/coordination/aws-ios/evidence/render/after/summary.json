@@ -1,0 +1,122 @@
+[
+  {
+    "run": 1,
+    "fresh_boot": true,
+    "exit": 0,
+    "seconds": 54.97,
+    "load": [
+      144.39892578125,
+      118.9609375,
+      110.43408203125
+    ],
+    "package_exit": 0
+  },
+  {
+    "run": 2,
+    "fresh_boot": true,
+    "exit": 0,
+    "seconds": 42.49,
+    "load": [
+      160.64892578125,
+      126.93310546875,
+      113.8955078125
+    ],
+    "package_exit": 0
+  },
+  {
+    "run": 3,
+    "fresh_boot": true,
+    "exit": 65,
+    "seconds": 66.62,
+    "load": [
+      137.30322265625,
+      127.3212890625,
+      115.24072265625
+    ],
+    "package_exit": 0
+  },
+  {
+    "run": 4,
+    "fresh_boot": false,
+    "exit": 0,
+    "seconds": 17.57,
+    "load": [
+      127.474609375,
+      126.00634765625,
+      115.18701171875
+    ],
+    "package_exit": 0
+  },
+  {
+    "run": 5,
+    "fresh_boot": false,
+    "exit": 65,
+    "seconds": 23.78,
+    "load": [
+      104.2255859375,
+      120.609375,
+      113.61083984375
+    ],
+    "package_exit": 0
+  },
+  {
+    "run": 6,
+    "fresh_boot": false,
+    "exit": 65,
+    "seconds": 24.04,
+    "load": [
+      90.27197265625,
+      116.0,
+      112.150390625
+    ],
+    "package_exit": 0
+  },
+  {
+    "run": 7,
+    "fresh_boot": false,
+    "exit": 65,
+    "seconds": 23.89,
+    "load": [
+      83.30078125,
+      111.94482421875,
+      110.818359375
+    ],
+    "package_exit": 0
+  },
+  {
+    "run": 8,
+    "fresh_boot": false,
+    "exit": 65,
+    "seconds": 24.12,
+    "load": [
+      66.4052734375,
+      105.6689453125,
+      108.58740234375
+    ],
+    "package_exit": 0
+  },
+  {
+    "run": 9,
+    "fresh_boot": false,
+    "exit": 65,
+    "seconds": 23.32,
+    "load": [
+      60.72314453125,
+      101.220703125,
+      106.89990234375
+    ],
+    "package_exit": 0
+  },
+  {
+    "run": 10,
+    "fresh_boot": false,
+    "exit": 0,
+    "seconds": 21.07,
+    "load": [
+      56.16455078125,
+      96.91015625,
+      105.181640625
+    ],
+    "package_exit": 0
+  }
+]

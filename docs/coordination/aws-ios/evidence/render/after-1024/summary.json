@@ -1,0 +1,122 @@
+[
+  {
+    "run": 1,
+    "fresh_boot": true,
+    "exit": 0,
+    "seconds": 70.81,
+    "load": [
+      222.283203125,
+      124.3193359375,
+      111.62939453125
+    ],
+    "package_exit": 0
+  },
+  {
+    "run": 2,
+    "fresh_boot": true,
+    "exit": 0,
+    "seconds": 31.46,
+    "load": [
+      201.4638671875,
+      132.4052734375,
+      115.25390625
+    ],
+    "package_exit": 0
+  },
+  {
+    "run": 3,
+    "fresh_boot": true,
+    "exit": 0,
+    "seconds": 63.27,
+    "load": [
+      153.22412109375,
+      134.17041015625,
+      117.50048828125
+    ],
+    "package_exit": 0
+  },
+  {
+    "run": 4,
+    "fresh_boot": false,
+    "exit": 0,
+    "seconds": 21.65,
+    "load": [
+      133.4638671875,
+      131.43115234375,
+      117.09814453125
+    ],
+    "package_exit": 0
+  },
+  {
+    "run": 5,
+    "fresh_boot": false,
+    "exit": 0,
+    "seconds": 8.02,
+    "load": [
+      154.30126953125,
+      136.0126953125,
+      118.9755859375
+    ],
+    "package_exit": 0
+  },
+  {
+    "run": 6,
+    "fresh_boot": false,
+    "exit": 0,
+    "seconds": 12.9,
+    "load": [
+      183.12939453125,
+      143.2001953125,
+      121.83251953125
+    ],
+    "package_exit": 0
+  },
+  {
+    "run": 7,
+    "fresh_boot": false,
+    "exit": 0,
+    "seconds": 14.67,
+    "load": [
+      215.1826171875,
+      152.18505859375,
+      125.40771484375
+    ],
+    "package_exit": 0
+  },
+  {
+    "run": 8,
+    "fresh_boot": false,
+    "exit": 0,
+    "seconds": 10.08,
+    "load": [
+      237.43212890625,
+      160.19140625,
+      128.73193359375
+    ],
+    "package_exit": 0
+  },
+  {
+    "run": 9,
+    "fresh_boot": false,
+    "exit": 0,
+    "seconds": 20.46,
+    "load": [
+      262.1201171875,
+      172.1767578125,
+      133.96337890625
+    ],
+    "package_exit": 0
+  },
+  {
+    "run": 10,
+    "fresh_boot": false,
+    "exit": 0,
+    "seconds": 10.09,
+    "load": [
+      265.52978515625,
+      177.38037109375,
+      136.490234375
+    ],
+    "package_exit": 0
+  }
+]
