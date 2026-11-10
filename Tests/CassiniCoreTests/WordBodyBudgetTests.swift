@@ -36,12 +36,25 @@ import Testing
     // ports: WordBodyBudgetTest#aBodyAtTheBudgetEncodes
     @Test func aBodyAtTheBudgetEncodes() throws {
         let all = LongRun().words(18 * LongRun.hourMs)
-        var low = 0, high = all.count
-        while low < high {
-            let mid = (low + high + 1) / 2
-            if WordBodyBudget.fits(Array(all[0..<mid])) { low = mid } else { high = mid - 1 }
+        // Select the same maximal prefix without recounting large slices at each binary-search step.
+        // Ask the budget for each item's contribution rather than duplicating its counting formula here.
+        let emptyBytes = WordBodyBudget.bytes([])
+        var count = 0, countedBytes = emptyBytes
+        for word in all {
+            let next = countedBytes + WordBodyBudget.bytes([word]) - emptyBytes
+            if next > WordBodyBudget.maxBytes { break }
+            countedBytes = next
+            count += 1
         }
-        let words = Array(all[0..<low])
+        try #require(count > 0 && count < all.count)
+        let words = Array(all.prefix(count))
+        // Keep failure diagnostics to scalar counts instead of dumping a roughly 150,000-word fixture.
+        let measuredBytes = WordBodyBudget.bytes(words)
+        let prefixFits = WordBodyBudget.fits(words)
+        let nextPrefixFits = WordBodyBudget.fits(Array(all.prefix(count + 1)))
+        #expect(measuredBytes == countedBytes)
+        #expect(prefixFits, "The selected \(count)-word prefix must fit")
+        #expect(!nextPrefixFits, "One more word must exceed the budget")
         let body = Transcript(words).json()
         #expect(body.utf8.count <= CassiniPayload.maxRaw)
         let (ref, tags) = try CassiniPayload.encode(prefix: "CASSINI_TX_WORDS_PAYLOAD_", mime: CassiniPayload.wordMime, text: body)
