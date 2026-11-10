@@ -29,6 +29,8 @@ on:
       - 'scripts/test-test-runtime.py'
       - 'scripts/check-strings.sh'
       - 'scripts/*whistle*.py'
+      - 'scripts/run-in-gui.py'
+      - 'scripts/test-run-in-gui.py'
       - '.github/workflows/ci.yml'
   push:
     branches: [main]
@@ -84,6 +86,9 @@ jobs:
       - name: Whistle pinned-input and SDK closure regressions
         working-directory: cassini-ios
         run: python3 scripts/test-bundle-whistle.py
+      - name: GUI runner event and lifecycle regressions
+        working-directory: cassini-ios
+        run: python3 scripts/test-run-in-gui.py
       - name: Build for testing
         working-directory: cassini-ios
         run: scripts/test.sh build
