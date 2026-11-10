@@ -430,12 +430,12 @@ sys.exit("the lock was free: this test must hold it")
         with open(lock, "w") as held:
             fcntl.flock(held, fcntl.LOCK_EX)
             result = h.run("app", CASSINI_RUNTIME="26", CASSINI_HEAVY_LOCK_HELD="", CASSINI_HEAVY_LOCK=str(lock),
-                           CASSINI_LOCK_MINUTES="0")
+                           CASSINI_LOCK_MINUTES="2")
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn(f"host busy: could not take {lock} within 0 min", result.stderr)
-        # One immediate try of the lock with the wait it was given, then no build and no clone shutdown.
+        self.assertIn(f"host busy: could not take {lock} within 2 min", result.stderr)
+        # One immediate try of the lock with the wait it was given, in seconds, then no build and no clone shutdown.
         calls = [c for c in h.calls() if c.startswith(("lock-ready", "xcodebuild")) or "simctl | shutdown" in c]
-        self.assertEqual(calls, ["lock-ready | <TMP>/home/heavy.lock | 0"])
+        self.assertEqual(calls, ["lock-ready | <TMP>/home/heavy.lock | 120"])
         self.assertEqual(h.state()["devices"][R27][0]["state"], "Booted")
 
     def test_a_cassini_runtime_run_still_shuts_its_clones_down_at_the_end(self):
