@@ -43,14 +43,17 @@ import CassiniWhistle
         XCTAssertEqual(LivePlatform.cpuFeatures, WhistleCPUFeatures(reading: LivePlatform.sysctlBytes))
         #if targetEnvironment(simulator) && arch(arm64)
         XCTAssertTrue(LivePlatform.cpuFeatures.atomics && LivePlatform.cpuFeatures.rcpc)
-        XCTAssertTrue(LivePlatform.whistleCPUSupported)
+        XCTAssertTrue(WhistleCapability.supports(cpu: LivePlatform.cpuFeatures, operatingSystemMajor: 18),
+                      "the read features alone give Whistle, as on iOS 18")
         #endif
+        XCTAssertEqual(LivePlatform.whistleCPUSupported,
+                       WhistleCapability.supports(cpu: LivePlatform.cpuFeatures, operatingSystemMajor: LivePlatform.operatingSystemMajor))
     }
 
     /// The device classes iOS 18 adds, over the facts the live app reads: the A10 iPad (7th generation, 3 GB) has no
     /// recognizer, so Transcribe is disabled with the existing caption; an A12 iPhone XR (3 GB) gets Whistle; and a
     /// device that can hold Parakeet but whose CPU refuses Whistle goes to Parakeet, so a Transcribe asks for its
-    /// download. iOS 26 keeps Apple speech in the cases where Whistle is refused.
+    /// download. On iOS 26 the CPU read is not consulted (every iOS 26 device is an A12 or newer), so Whistle stays.
     func testIOS18DeviceClassesGetTheirRecognizer() async throws {
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
         let a10 = WhistleCPUFeatures(reading: { [WhistleCPUFeatures.atomicsKey: [0, 0, 0, 0]][$0] })
@@ -58,7 +61,7 @@ import CassiniWhistle
                                                  WhistleCPUFeatures.dotProductKey: [0, 0, 0, 0]][$0] })
         func recognizer(_ cpu: WhistleCPUFeatures, memory: UInt64, platform: PlatformFacts, major: Int = 18) -> SpeechRecognizer {
             let whistle = WhistleCapability.bundled(arm64: true, osSupported: WhistleCapability.supports(operatingSystemMajor: major),
-                cpuSupported: WhistleCapability.supports(cpu: cpu), bundleVerified: true, physicalMemory: memory)
+                cpuSupported: WhistleCapability.supports(cpu: cpu, operatingSystemMajor: major), bundleVerified: true, physicalMemory: memory)
             return SpeechModelsStore(root: root, defaults: defaults, storage: FakeStorage(), whistle: whistle,
                 parakeetLinked: true, platform: platform, physicalMemory: memory,
                 availableMemory: { ParakeetMemory.beforeLoadBytes }, installed: { false }, verified: { false }, verify: { false })
@@ -68,7 +71,10 @@ import CassiniWhistle
         XCTAssertEqual(recognizer(a12, memory: 3 << 30, platform: .iOS26, major: 26), .whistle, "unchanged on iOS 26")
         XCTAssertEqual(recognizer(a12, memory: 3 << 30, platform: .iOS18, major: 17), .appleSpeech, "below the floor nothing runs")
         XCTAssertEqual(recognizer(a10, memory: 6 << 30, platform: .iOS18), .parakeet, "Transcribe asks for the Parakeet download")
-        XCTAssertEqual(recognizer(a10, memory: 6 << 30, platform: .iOS26, major: 26), .appleSpeech)
+        let unanswered = WhistleCPUFeatures(reading: { _ in nil })
+        XCTAssertEqual(recognizer(unanswered, memory: 3 << 30, platform: .iOS26, major: 26), .whistle,
+                       "iOS 26 keeps Whistle even if the system answers no CPU key")
+        XCTAssertEqual(recognizer(unanswered, memory: 3 << 30, platform: .iOS18), .appleSpeech, "no answer on iOS 18 refuses")
 
         // The A10 iPad: no recognizer, so the Apple identity reaches the candidate that refuses before a job is queued.
         XCTAssertEqual(recognizer(a10, memory: 3 << 30, platform: .iOS18), .appleSpeech)

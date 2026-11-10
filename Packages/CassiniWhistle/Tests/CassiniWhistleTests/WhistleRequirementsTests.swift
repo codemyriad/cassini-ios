@@ -46,6 +46,22 @@ import Testing
         #expect(!WhistleCapability.supports(cpu: features([lse: one, dot: one])))
     }
 
+    /// iOS 26 runs only on the A12 and later, so there the read features are not consulted; below it they decide. The
+    /// A10 (the only device below the A12 that runs iOS 18) stays refused, and nothing on iOS 26 changes.
+    @Test func theLiveCPUAnswerReadsTheFeaturesOnlyBelowIOS26() {
+        let none = WhistleCPUFeatures(reading: { _ in nil })
+        #expect(WhistleCapability.everyDeviceHasTheCPUFeaturesFromMajor == 26)
+        #expect(!WhistleCapability.supports(cpu: a10, operatingSystemMajor: 18), "the A10 iPad on iPadOS 18")
+        #expect(!WhistleCapability.supports(cpu: a11, operatingSystemMajor: 18))
+        #expect(WhistleCapability.supports(cpu: a12, operatingSystemMajor: 18), "the A12 iPhone XR on iOS 18")
+        #expect(!WhistleCapability.supports(cpu: none, operatingSystemMajor: 18), "no answer on iOS 18 refuses")
+        #expect(!WhistleCapability.supports(cpu: none, operatingSystemMajor: 25))
+        for major in [26, 27] {
+            #expect(WhistleCapability.supports(cpu: none, operatingSystemMajor: major), "no answer on iOS \(major) keeps Whistle")
+            #expect(WhistleCapability.supports(cpu: a12, operatingSystemMajor: major))
+        }
+    }
+
     @Test func anUnsupportedCPUMakesTheBundledAndTheExperimentalWhistleUnavailable() {
         for supported in [false, true] {
             let bundled = WhistleCapability.bundled(arm64: true, osSupported: true, cpuSupported: supported,

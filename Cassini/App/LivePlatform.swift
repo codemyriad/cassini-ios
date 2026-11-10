@@ -31,11 +31,16 @@ enum LivePlatform {
         return features
     }()
 
-    /// Whether the CPU has the atomics and RCpc loads the Whistle archive executes (`WhistleCapability.supports(cpu:)`):
-    /// the A12 and later do, the A10 of the iPad (7th generation) on iPadOS 18 does not. A key the system does not
-    /// answer counts as absent, so Whistle is refused there. Every device iOS 26 runs on is an A12 or newer, and xnu
-    /// has published both keys since iOS 15 (xnu-8019), so iOS 26 devices keep Whistle.
-    static var whistleCPUSupported: Bool { WhistleCapability.supports(cpu: cpuFeatures) }
+    /// Whether the CPU has the atomics and RCpc loads the Whistle archive executes, by
+    /// `WhistleCapability.supports(cpu:operatingSystemMajor:)`. On iOS 26 and later the answer is yes without the read:
+    /// every device iOS 26 runs on is an A12 or newer, so iOS 26 behaves as before even if the app could not read the
+    /// keys. On iOS 18 the read decides: the A12 and later have both features, the A10 of the iPad (7th generation) on
+    /// iPadOS 18 has neither, and a key the system does not answer counts as absent, so Whistle is refused there. xnu
+    /// has defined both keys since iOS 15 (xnu-8019) and does in xnu-11215 (iOS 18.0); that an app can read them on an
+    /// iOS 18 device is unverified until a device run (the `WhistleBundle` "CPU features" log line shows it).
+    static var whistleCPUSupported: Bool {
+        WhistleCapability.supports(cpu: cpuFeatures, operatingSystemMajor: operatingSystemMajor)
+    }
 
     /// The bytes `sysctlbyname` writes for `name`, or nil when it fails (an unknown key, or a value over 8 bytes).
     static func sysctlBytes(_ name: String) -> [UInt8]? {

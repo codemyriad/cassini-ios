@@ -61,6 +61,19 @@ public struct WhistleCapability: Hashable, Sendable {
     /// run time, and the A12, which has none, runs the fallback kernels (measured on the A12/3 GB iPad).
     public static func supports(cpu: WhistleCPUFeatures) -> Bool { cpu.atomics && cpu.rcpc }
 
+    /// The oldest iOS major version every device of which has the CPU features (`supports(cpu:)`): iOS 26 and iPadOS 26
+    /// run only on the A12 and later. Below it, iPadOS 18 still runs on the A10 iPad (7th generation); no A11 device runs
+    /// iOS 18 or later.
+    public static let everyDeviceHasTheCPUFeaturesFromMajor = 26
+
+    /// The CPU answer the live app and the internal lab use. From iOS 26 the device is known to have the features, so
+    /// the read features are not consulted and Whistle stays as before even if the system answered no `sysctl` key.
+    /// Below it the read features decide; a key the system does not answer counts as absent, so an unexpected answer
+    /// refuses Whistle on iOS 18 rather than crash on first use.
+    public static func supports(cpu: WhistleCPUFeatures, operatingSystemMajor major: Int) -> Bool {
+        major >= everyDeviceHasTheCPUFeaturesFromMajor || supports(cpu: cpu)
+    }
+
     public static let loadHeadroom: UInt64 = 512 << 20
     public static let windowHeadroom: UInt64 = 256 << 20
 
