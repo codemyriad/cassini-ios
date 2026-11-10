@@ -15,7 +15,7 @@ The app reads the system once (`Cassini/App/LivePlatform.swift`) and passes the 
 |---|---|---|
 | Apple speech (`SpeechAnalyzer`) | as before: the fallback candidate, checked per device and locale | none; its slot holds `UnavailableSpeechTranscriber`, which refuses every job |
 | Speech language in Settings | on devices that use Apple speech | never shown |
-| Whistle (bundled) | as before; the CPU is not read | where the CPU reports FEAT_LSE and FEAT_LRCPC (`hw.optional.arm.*`) |
+| Whistle (bundled) | as before; the CPU features are read but not consulted | where the CPU reports FEAT_LSE and FEAT_LRCPC (`hw.optional.arm.*`) |
 | Parakeet Ultra (downloaded) | as before: at least 5 GiB of physical memory | the same rule |
 | Background time for the queue and the standalone model download | `BGContinuedProcessingTask` when started from the screen | `beginBackgroundTask` only; `BGTaskScheduler` is never called |
 
@@ -67,16 +67,19 @@ Silvio's decision of 2026-11-10 (D85, decision 1 below) extends that exception t
 every OS version, linked at 18.0 (decision 3). [Whistle/README.md](../Whistle/README.md) has the contract, what has
 been shown with the 18.0-linked framework on the iOS 26.0 and 27.0 simulators, and the evidence still pending on the
 iOS 18.6 simulator: the runtime export check, the 13 parity fixtures and the hosted Whistle tests. Until those pass,
-nothing has shown that the framework loads or transcribes on iOS 18. With no iOS 18 device (decision 8), there is
+nothing has shown that the framework loads or transcribes on iOS 18. No iOS 18 device is known (decision 8), so there is
 also no device run, no memory measurement and no TestFlight acceptance on iOS 18.
 
 ## How it is tested today
 
 - `swift test` covers both values of every platform fact and the CPU rule.
-- `--ios18-platform` builds the app over the iOS 18 facts on the current simulator runtime (iOS 27), so the engine
-  choice, the Settings rows and the finite background runner are exercised in `CassiniTests/PlatformCompositionTests`
-  and in UI tests (`SettingsFlowTests`, `SpeechUnavailableTests`, `ParakeetSuggestionTests`). This runs iOS 26's
-  system and UIKit with iOS 18's rules; it says nothing about iOS 18's own system chrome or APIs.
+- App-hosted unit tests pass the iOS 18 facts directly (`CassiniTests/PlatformCompositionTests`): the engine choice
+  per device class, the unavailable Apple candidate, Settings, and the background runner taking the finite time.
+- The `--ios18-platform` launch argument (DEBUG `--ui-testing` launches only; the build is the same) makes the app
+  use the iOS 18 facts on the current simulator runtime (iOS 27). UI tests launched with it check the engine choice
+  and the Settings rows (`SettingsFlowTests`, `SpeechUnavailableTests`, `ParakeetSuggestionTests`); no UI test
+  checks the finite background path. This runs iOS 27's system and UIKit with iOS 18's rules; it says nothing about
+  iOS 18's own system chrome or APIs.
 - `scripts/test.sh build` runs `scripts/check-embedded-minos.py`: no embedded binary or plist may need a newer iOS
   than the app.
 - Not yet: any run on the iOS 18.6 simulator runtime, and the pre-iOS 26 system chrome (the back button's text,

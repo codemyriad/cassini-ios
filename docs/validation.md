@@ -6,11 +6,11 @@ Pro 13-inch (M5)). The counts were taken on 13 October 2026 with `scripts/test.s
 [device checklist](#device-checklist).
 
 The deployment target is iOS 18.0, but no check has run on an iOS 18 system yet: the iOS 18.6 simulator runtime is
-not installed on the build Mac and there is no iOS 18 device. The iOS 18 rules are covered by `swift test` (both
-values of each `PlatformFacts` fact and the Whistle CPU rule) and by `--ios18-platform` launches, which apply them
-on the iOS 27 simulators (`PlatformCompositionTests`, `SettingsFlowTests`, `SpeechUnavailableTests`,
-`ParakeetSuggestionTests`). They do not exercise iOS 18's own system, chrome or libraries. [iOS 18](ios18.md) lists
-what is pending.
+not installed on the build Mac and no iOS 18 device is known. The iOS 18 rules are covered by `swift test` (both
+values of each `PlatformFacts` fact and the Whistle CPU rule), by app-hosted tests that pass the iOS 18 facts
+(`PlatformCompositionTests`), and by `--ios18-platform` UI test launches, which apply them on the iOS 27 simulators
+(`SettingsFlowTests`, `SpeechUnavailableTests`, `ParakeetSuggestionTests`). They do not exercise iOS 18's own
+system, chrome or libraries. [iOS 18](ios18.md) lists what is pending.
 
 ## Automated checks
 
@@ -150,7 +150,7 @@ the kill-and-resume items.
 
 ### iOS 18 device
 
-None of this has run: there is no iOS 18 device (decision 8 in [iOS 18](ios18.md)). On an iPhone XR or XS, or any
+None of this has run: no iOS 18 device is known (decision 8 in [iOS 18](ios18.md)). On an iPhone XR or XS, or any
 device kept on iOS 18:
 
 - Install a TestFlight build. Whistle transcribes the controlled English sample (the Whistle README's distribution
