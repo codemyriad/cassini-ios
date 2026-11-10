@@ -261,6 +261,9 @@ private struct AboutCard: View {
                 OrbitMark(size: 36)
                 Text(tagline).font(.subheadline).foregroundStyle(Color.muted)
             }
+            if let copyright = Bundle.main.object(forInfoDictionaryKey: "NSHumanReadableCopyright") as? String {
+                Text(verbatim: copyright).font(.footnote).foregroundStyle(Color.muted)
+            }
             HStack(spacing: 4) {
                 Text("Free software under GPLv3.", tableName: "Settings").foregroundStyle(Color.muted)
                 Button(action: openNotices) { Text("Source code and notices", tableName: "Settings").underline() }
