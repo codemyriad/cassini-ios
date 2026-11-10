@@ -221,7 +221,7 @@ when that is unset.
 
 UI helper deadlines only bound hangs: menu taps require settled snapshots, Library navigation waits for loaded data
 and UIKit presentation in an active scene before one tap, and text replacement waits for a cleared field and one edit.
-A late destination or paste never triggers another input solely because a short deadline expired.
+A late destination or edit never triggers another input solely because a short deadline expired.
 
 `CASSINI_RUNTIME=18 scripts/test.sh app` (or `ui`) runs on the newest installed iOS 18 simulator runtime instead of
 the newest runtime; a version such as `18.6` or a runtime identifier also works. A run fails when no runtime matches,
