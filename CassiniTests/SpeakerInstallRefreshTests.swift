@@ -22,7 +22,7 @@ import CassiniWhistle
         let speech = SpeechModelsStore(root: modelRoot, defaults: defaults, storage: FakeStorage(),
             whistle: WhistleCapability(arm64: true, operatingSystemSupported: true, bundleVerified: true,
                                       pipelineAccepted: true, deviceAccepted: true),
-            parakeetLinked: true, physicalMemory: 6 << 30, installed: { true }, verified: { false },
+            parakeetLinked: true, platform: .iOS26, physicalMemory: 6 << 30, installed: { true }, verified: { false },
             verify: { verificationStarted.fulfill(); releaseVerification.wait(); return false })
         let fetcher = SpeakerRefreshFetcher()
         let repository = ModelRepository(root: modelRoot,
