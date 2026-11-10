@@ -176,7 +176,6 @@ import CassiniNotebook
     /// Runs the launch steps once; the app is ready when it returns.
     @discardableResult func start() async -> StartupReport {
         let report = await startup.run()
-        environment.speechModels?.refresh()
         #if CASSINI_INTERNAL_TESTFLIGHT
         if environment.launch.whistleLab, ProcessInfo.processInfo.arguments.contains("--internal-whistle-lab-soak") {
             Task { await InternalWhistle.runLabSoak() }
@@ -225,7 +224,10 @@ import CassiniNotebook
 
     private func registerStartup() {
         if let speechModels = environment.speechModels {
-            startup.register(.load) { await speechModels.verifyBundledSpeech() }
+            startup.register(.load) {
+                await speechModels.verifyBundledSpeech()
+                await speechModels.verifyInstalledSpeech()
+            }
         }
         #if DEBUG
         if let seed = environment.launch.seed, let store = library.noteStore {
