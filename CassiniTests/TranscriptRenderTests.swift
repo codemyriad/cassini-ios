@@ -38,84 +38,103 @@ import CassiniNotebook
         return note
     }
 
-    private func settle(_ window: UIWindow) {
-        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
-        window.layoutIfNeeded()
-    }
+    /// A real display callback gives SwiftUI a rendering opportunity. No elapsed interval decides
+    /// success. The timeout only reports a simulator that stopped delivering frames.
+    private final class Frame: NSObject {
+        let event = XCTestExpectation(description: "display frame")
+        var link: CADisplayLink?
 
-    /// The lazy stack finishes its work (rows it makes ahead of the scroll) over a few run loop passes, later on a
-    /// busy machine; waits until a pass draws nothing.
-    private func settleUntilIdle(_ window: UIWindow, passes: Int = 20) {
-        for _ in 0..<passes {
-            RenderProbe.reset()
-            settle(window)
-            if RenderProbe.renders.isEmpty { return }
+        func start() {
+            link = CADisplayLink(target: self, selector: #selector(drawn))
+            link?.add(to: .main, forMode: .common)
         }
-        XCTFail("the transcript kept drawing on its own: \(RenderProbe.renders)")
+
+        @objc private func drawn() {
+            link?.invalidate()
+            event.fulfill()
+        }
     }
 
-    /// SwiftUI learns how to compare a view type in the background, and until it has, it redraws a paragraph whose
-    /// inputs did not change (for seconds on a busy machine, and not always for good after one clean pass). Makes
-    /// `change` until it redraws only `expected` `steady` times in a row, so the checks that follow measure the steady
-    /// state a long playback runs in. A screen that never gets there within `timeout` fails: that is the regression the
-    /// checks look for, not load.
-    private func warmUp(_ window: UIWindow, expected: Set<String>, steady: Int = 3, timeout: TimeInterval = 60,
-                        _ change: (Int) -> Void, file: StaticString = #filePath, line: UInt = #line) {
-        let deadline = Date().addingTimeInterval(timeout)
-        var attempt = 0, inARow = 0
+    /// Drain rendering opportunities until the probe stays unchanged across three consecutive
+    /// passes. A plain run-loop idle callback can fire before SwiftUI has rendered anything.
+    private func settle(_ window: UIWindow, quietPasses: Int = 3,
+                        file: StaticString = #filePath, line: UInt = #line) async {
+        var previous = RenderProbe.renders
+        var quiet = 0
+        for _ in 0..<120 {
+            let frame = Frame()
+            frame.start()
+            await fulfillment(of: [frame.event], timeout: 30)
+            frame.link?.invalidate()
+            window.layoutIfNeeded()
+            let current = RenderProbe.renders
+            quiet = current == previous ? quiet + 1 : 0
+            if quiet == quietPasses { return }
+            previous = current
+        }
+        XCTFail("the transcript kept drawing across 120 display passes: \(RenderProbe.renders)", file: file, line: line)
+    }
+
+    /// SwiftUI learns view comparisons in the background. Exercise real input changes until
+    /// three consecutive updates render exactly the expected paragraphs; idle alone is not readiness.
+    /// An attempt cap replaces the old deadline as the bound on this warm-up.
+    private func warmUp(_ window: UIWindow, expected: Set<String>, steady: Int = 3, attempts: Int = 120,
+                        _ change: (Int) -> Void, file: StaticString = #filePath, line: UInt = #line) async {
+        var inARow = 0
         var last: [String: Int] = [:]
-        while Date() < deadline {
+        for attempt in 0..<attempts {
             RenderProbe.reset()
             change(attempt)
-            settle(window)
+            await settle(window)
             last = RenderProbe.renders
             inARow = Set(last.keys) == expected ? inARow + 1 : 0
             if inARow == steady { return }
-            attempt += 1
         }
-        XCTFail("never redrew only \(expected) \(steady) times in a row within \(Int(timeout)) s; last: \(last)",
+        XCTFail("never redrew only \(expected) \(steady) times in a row across \(attempts) updates; last: \(last)",
                 file: file, line: line)
     }
 
-    func testANewActiveWordRedrawsOnlyTheParagraphsThatHoldTheOldAndTheNewWord() {
+    func testANewActiveWordRedrawsOnlyTheParagraphsThatHoldTheOldAndTheNewWord() async {
+        RenderProbe.reset()
         let transcript = NoteTranscripts.sealed(longNote())
         XCTAssertEqual(transcript.turns.count, 180)
         let model = Model()
         let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
         window.rootViewController = UIHostingController(rootView: Host(model: model, transcript: transcript))
         window.makeKeyAndVisible()
-        settle(window)
+        defer { window.isHidden = true }
+        await settle(window)
         let first = transcript.turns[0].id, second = transcript.turns[1].id
         XCTAssertFalse(RenderProbe.renders.isEmpty, "the paragraphs on screen were drawn")
         XCTAssertNil(RenderProbe.renders[transcript.turns[179].id], "paragraphs far off screen are not made")
-        settleUntilIdle(window)
-        warmUp(window, expected: [first]) { model.active = WordRef(turnID: first, index: 5 + $0 % 2) }
+        await settle(window)
+        await warmUp(window, expected: [first]) { model.active = WordRef(turnID: first, index: 5 + $0 % 2) }
 
         RenderProbe.reset()
         model.active = WordRef(turnID: first, index: 3)
-        settle(window)
+        await settle(window)
         XCTAssertEqual(Set(RenderProbe.renders.keys), [first])
 
         RenderProbe.reset()
         model.active = WordRef(turnID: first, index: 4)
-        settle(window)
+        await settle(window)
         XCTAssertEqual(Set(RenderProbe.renders.keys), [first])
 
         RenderProbe.reset()
         model.active = WordRef(turnID: second, index: 0)
-        settle(window)
+        await settle(window)
         XCTAssertEqual(Set(RenderProbe.renders.keys), [first, second])
 
         RenderProbe.reset()
         model.active = WordRef(turnID: second, index: 0)
-        settle(window)
+        await settle(window)
         XCTAssertTrue(RenderProbe.renders.isEmpty, "a tick inside the same word redraws nothing")
-        window.isHidden = true
     }
 
     /// The whole Note screen over the app's player: moving the position redraws the paragraphs of the old and the new
     /// active word, and not the screen, its header or its banners.
     func testAPlaybackTickOnTheNoteScreenRedrawsOnlyTheActiveParagraphs() async throws {
+        RenderProbe.reset()
         let test = TestGraph(); defer { test.tearDown() }
         let note = longNote()
         try NoteRepository(root: test.root).save(note)
@@ -130,37 +149,36 @@ import CassiniNotebook
             rootView: NavigationStack { NoteDetailView(model: test.graph.noteScreens.model(note.id, query: nil)) }.environment(test.graph))
         window.makeKeyAndVisible()
         defer { window.isHidden = true }
-        settle(window)
+        await settle(window)
         let playback = test.graph.playback
         XCTAssertTrue(playback.owns(note.id), "the screen opened the player")
         XCTAssertNotNil(RenderProbe.renders["header"])
 
         let first = transcript.turns[0].id, second = transcript.turns[1].id
-        warmUp(window, expected: [first]) { playback.seek($0 % 2 == 0 ? 2.6 : 3.1) }
+        await warmUp(window, expected: [first]) { playback.seek($0 % 2 == 0 ? 2.6 : 3.1) }
         playback.seek(1.1)
         // The launch's own updates (the banners, the lazy stack's rows ahead) land over a few passes on a busy machine.
-        settleUntilIdle(window)
+        await settle(window)
         RenderProbe.reset()
         playback.seek(1.6)
-        settle(window)
+        await settle(window)
         XCTAssertEqual(Set(RenderProbe.renders.keys), [first], "a new word in the same paragraph")
 
         // The lazy stack finishes its work over a few run loop passes; once it has, nothing draws on its own.
-        settle(window); settle(window)
         RenderProbe.reset()
-        settle(window)
+        await settle(window)
         XCTAssertTrue(RenderProbe.renders.isEmpty, "an idle screen draws nothing: \(RenderProbe.renders)")
 
         // Ticks inside one word (word 3 spans 1.5-1.9 s) reach their steady state, then one more draws nothing.
-        warmUp(window, expected: []) { playback.seek($0 % 2 == 0 ? 1.7 : 1.8) }
+        await warmUp(window, expected: []) { playback.seek($0 % 2 == 0 ? 1.7 : 1.8) }
         RenderProbe.reset()
         playback.seek(1.75)
-        settle(window)
+        await settle(window)
         XCTAssertTrue(RenderProbe.renders.isEmpty, "a tick inside the same word: \(RenderProbe.renders)")
 
         RenderProbe.reset()
         playback.seek(60.1)
-        settle(window)
+        await settle(window)
         XCTAssertEqual(Set(RenderProbe.renders.keys), [first, second], "the old and the new active paragraph only")
     }
 }
