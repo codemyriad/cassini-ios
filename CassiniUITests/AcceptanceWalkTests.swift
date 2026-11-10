@@ -14,7 +14,8 @@ final class AcceptanceWalkTests: XCTestCase {
     // ports: AcceptanceWalkTest#realModels (the walk through the boards, over the fakes)
     @MainActor func testRecordTranscribeReadNameExportTrashAndRestore() {
         let app = XCUIApplication()
-        app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed", "recording"]
+        // Where the system has no Apple speech, a device whose recognizer runs (`DeviceUnderTest`).
+        app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed", "recording"] + DeviceUnderTest.workingSpeech
         app.launchAndWait()
         XCTAssertTrue(app.textFields["librarySearch"].waitForExistence(within: 15))
         shot("00-library")

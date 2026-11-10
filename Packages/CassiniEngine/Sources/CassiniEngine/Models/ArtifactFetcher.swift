@@ -188,7 +188,7 @@ public struct ArtifactFetcher: Sendable {
             let received: Int64
             do {
                 received = try await Self.copy(answer.body, to: partial, from: first, limit: end,
-                                               finishAtLimit: answer.expectedLength != nil) { progress($0, false) }
+                                               finishAtLimit: answer.expectedLength != nil || rangeEnd != nil) { progress($0, false) }
             } catch let error as URLError where error.code != .cancelled && !Task.isCancelled
                 && ModelFiles.length(of: partial) == artifact.size {
                 // A late transport failure after all pinned bytes arrived still goes through size/SHA checks.
@@ -362,7 +362,7 @@ public struct ArtifactFetcher: Sendable {
                 try localIO(model: "artifact", stage: "download.output-write") { try output.write(contentsOf: block) }
                 count += Int64(block.count)
                 if throttle.due() { progress(count) }
-                // Content-Length was checked against the pinned whole-file/range end before entry.
+                // A checked Content-Length or validated Content-Range bounds this response before entry.
                 // Do not wait for a stalled EOF once this response's complete body has arrived.
                 if finishAtLimit && count == limit { break }
             }

@@ -74,6 +74,28 @@ extension TranscriptionCoordinator {
         return plan.report
     }
 
+    /// Cassini came to the screen on `platform`: when `EnqueueRules.resumesOnActivation` allows it, each job the system
+    /// paused (oldest first) is resumed from its checkpoint as its Resume on the screen would be, which clears the
+    /// system hold; with none, the hold is cleared and the queue continues. Jobs the person paused stay paused. Returns
+    /// the notes it resumed.
+    @discardableResult
+    public func resumeSystemPause(onActivationOf platform: PlatformFacts) async -> [UUID] {
+        await readiness.wait()
+        guard EnqueueRules.resumesOnActivation(settings.queueHold, platform: platform) else { return [] }
+        let paused = await parts.jobs.all()
+            .filter { $0.state == .paused && $0.pauseReason == .system && !trashed.contains($0.noteID) }
+            .sorted { $0.seq < $1.seq }
+        guard !paused.isEmpty else {
+            continueQueue()
+            return []
+        }
+        var resumed: [UUID] = []
+        for job in paused {
+            if case .queued = await transcribe(job.noteID, kind: job.kind, origin: .screen) { resumed.append(job.noteID) }
+        }
+        return resumed
+    }
+
     func startWaitingQueue() async {
         await readiness.wait()
         guard visible, active == nil, drainTask == nil, settings.queueHold == nil,

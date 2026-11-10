@@ -176,7 +176,6 @@ import CassiniNotebook
     /// Runs the launch steps once; the app is ready when it returns.
     @discardableResult func start() async -> StartupReport {
         let report = await startup.run()
-        environment.speechModels?.refresh()
         #if CASSINI_INTERNAL_TESTFLIGHT
         if environment.launch.whistleLab, ProcessInfo.processInfo.arguments.contains("--internal-whistle-lab-soak") {
             Task { await InternalWhistle.runLabSoak() }
@@ -207,9 +206,15 @@ import CassiniNotebook
         Task { await handler.handle(link) }
     }
 
-    /// Cassini came back to the screen: the notification permission and the speech model may have changed in Settings.
-    func becameActive() {
-        Task { [noticeCenter] in await noticeCenter.refresh() }
+    /// Cassini came back to the screen: the notification permission and the speech model may have changed in Settings,
+    /// and on iOS 18 a transcription paused by the end of the background time resumes from its checkpoint
+    /// (`EnqueueRules.resumesOnActivation`). The returned task ends once both are done.
+    @discardableResult
+    func becameActive() -> Task<Void, Never> {
+        Task { [noticeCenter, processing, platform = environment.platform] in
+            await noticeCenter.refresh()
+            await processing.coordinator?.resumeSystemPause(onActivationOf: platform)
+        }
     }
 
     /// Saves the playback position and keeps the app awake until every pending write has landed.
@@ -225,12 +230,16 @@ import CassiniNotebook
 
     private func registerStartup() {
         if let speechModels = environment.speechModels {
-            startup.register(.load) { await speechModels.verifyBundledSpeech() }
+            startup.register(.load) {
+                await speechModels.verifyBundledSpeech()
+                await speechModels.verifyInstalledSpeech()
+            }
         }
         #if DEBUG
         if let seed = environment.launch.seed, let store = library.noteStore {
             startup.register(.load) { [environment] in
-                try await TestFixtures.seed(seed, into: store, now: environment.clock.now)
+                try await TestFixtures.seed(seed, into: store, now: environment.clock.now,
+                                            recognizer: environment.transcriber.recognizer)
             }
         }
         #endif

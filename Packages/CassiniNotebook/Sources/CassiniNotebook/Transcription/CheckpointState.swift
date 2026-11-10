@@ -13,8 +13,8 @@ public struct CheckpointState: Hashable, Sendable {
     /// The version `encode` writes and `decode` reads.
     public static let version = 1
 
-    /// Every member `encode` writes; `recognition` only for a Parakeet run, `speakers` only for one that tells speakers
-    /// apart as it goes.
+    /// Shared checkpoint members, including the optional Parakeet state and streaming speakers. Whistle also
+    /// writes its own optional `whistle` and `reportedLanguage` members.
     public static let keys: Set<String> = [
         "version", "source", "signature", "model", "segments", "doneMs", "totalMs", "elapsedMs", "inferenceMs",
         "resumedFromMs", "wordsComplete", "recognition", "speakers",
@@ -49,6 +49,8 @@ public struct CheckpointState: Hashable, Sendable {
     public var speakers: SpeakerCheckpoint?
     /// Detected language of Whistle words; nil in legacy checkpoints.
     public var reportedLanguage: String?
+    /// Whistle DSP state at the same commit boundary as the segments.
+    public var whistle: WhistleCheckpoint?
 
     public init(source: String, signature: String, model: String, segments: [TranscriptSegment], doneMs: Int64,
                 totalMs: Int64, elapsedMs: Int64, inferenceMs: Int64 = 0, resumedFromMs: Int64 = 0,
@@ -58,6 +60,7 @@ public struct CheckpointState: Hashable, Sendable {
         self.resumedFromMs = resumedFromMs; self.wordsComplete = wordsComplete; self.recognition = recognition
         self.speakers = speakers
         self.reportedLanguage = nil
+        self.whistle = nil
     }
 
     /// The `model` of an Apple Speech run in `language` (BCP-47): the words of another language do not resume.
@@ -103,6 +106,10 @@ public struct CheckpointState: Hashable, Sendable {
         if let recognition {
             guard recognition.valid, recognition.doneMs <= doneMs else { throw .recognition }
         }
+        if let whistle {
+            guard recognition == nil, whistle.valid,
+                  whistle.doneMs == doneMs || wordsComplete else { throw .recognition }
+        }
         if let speakers, !speakers.valid { throw .speakers }
     }
 
@@ -123,6 +130,26 @@ public struct CheckpointState: Hashable, Sendable {
 
     /// The words as the recognizer keeps them: the streaming speaker id or none, recording-clock milliseconds.
     public var words: [Word] { draftWords.map { Word($0.speaker, $0.startMs, $0.endMs, $0.text, lowConfidenceSpeaker: $0.lowConfidenceSpeaker == true) } }
+}
+
+/// Exact source and recognition positions of a Whistle batch, plus its versioned, bounded DSP state.
+public struct WhistleCheckpoint: Codable, Hashable, Sendable {
+    public let sourceFrame: Int64
+    public let processedSamples: Int
+    public let doneSamples: Int
+    public let state: Data
+
+    public init(sourceFrame: Int64, processedSamples: Int, doneSamples: Int, state: Data) {
+        self.sourceFrame = sourceFrame; self.processedSamples = processedSamples
+        self.doneSamples = doneSamples; self.state = state
+    }
+
+    public var valid: Bool {
+        sourceFrame >= 0 && (0...Limits.maxSamples).contains(processedSamples)
+            && (0...processedSamples).contains(doneSamples) && (1...1_100_000).contains(state.count)
+    }
+
+    public var doneMs: Int64 { CheckpointState.ms(Double(doneSamples) / 16_000) }
 }
 
 /// The `recognition` member: where `IncrementalTranscript` stood at the checkpoint, in samples at the recognition rate
@@ -162,7 +189,7 @@ public struct RecognitionCheckpoint: Codable, Hashable, Sendable {
 extension CheckpointState: Codable {
     private enum CodingKeys: String, CodingKey {
         case version, source, signature, model, segments, doneMs, totalMs, elapsedMs, inferenceMs, resumedFromMs
-        case wordsComplete, recognition, speakers, reportedLanguage
+        case wordsComplete, recognition, speakers, reportedLanguage, whistle
     }
 
     public init(from decoder: any Decoder) throws {
@@ -182,6 +209,7 @@ extension CheckpointState: Codable {
         recognition = try c.decodeIfPresent(RecognitionCheckpoint.self, forKey: .recognition)
         speakers = try c.decodeIfPresent(SpeakerCheckpoint.self, forKey: .speakers)
         reportedLanguage = try c.decodeIfPresent(String.self, forKey: .reportedLanguage)
+        whistle = try c.decodeIfPresent(WhistleCheckpoint.self, forKey: .whistle)
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -200,6 +228,7 @@ extension CheckpointState: Codable {
         try c.encodeIfPresent(recognition, forKey: .recognition)
         try c.encodeIfPresent(speakers, forKey: .speakers)
         try c.encodeIfPresent(reportedLanguage, forKey: .reportedLanguage)
+        try c.encodeIfPresent(whistle, forKey: .whistle)
     }
 
     /// Compact JSON with sorted members.

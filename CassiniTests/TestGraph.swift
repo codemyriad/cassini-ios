@@ -19,7 +19,8 @@ import CassiniEngineTesting
 
     init(root: URL? = nil, suite: String? = nil, clock: FakeClock = FakeClock(),
          transcriber: any Transcribing = FakeTranscriber(.returns([], total: 1)), analyzer: any SpeakerAnalyzing = FakeAnalyzer(), speechModels: SpeechModelsStore? = nil,
-         downloadTranscriber: (any Transcribing)? = nil, modelRoot: URL? = nil, platform: PlatformFacts = .iOS26) {
+         downloadTranscriber: (any Transcribing)? = nil, modelRoot: URL? = nil, platform: PlatformFacts = .iOS26,
+         audio: any AudioProcessing = LocalAudioProcessing()) {
         self.root = root ?? FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         self.suite = suite ?? "cassini.tests.\(UUID().uuidString)"
         self.clock = clock
@@ -28,7 +29,7 @@ import CassiniEngineTesting
             locale: Locale(identifier: "en_US"), timeZone: TimeZone(identifier: "UTC")!,
             transcriber: transcriber, analyzer: analyzer, capture: capture, microphone: microphone,
             liveActivity: liveActivity, playback: playback,
-            audio: LocalAudioProcessing(), storage: FakeStorage(), background: background, notifier: notifier,
+            audio: audio, storage: FakeStorage(), background: background, notifier: notifier,
             platform: platform)
         environment.recordingClock = RecordingClock(now: clock)
         environment.exports = self.root.appendingPathComponent("tmp/Exports", isDirectory: true)

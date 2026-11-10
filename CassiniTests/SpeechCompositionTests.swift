@@ -35,9 +35,16 @@ import CassiniSherpa
                        "the job downloads Ultra with consent")
     }
 
+    /// Over the system's own facts: Apple's adapter where the system has Apple speech, else the candidate in Apple's
+    /// slot that refuses every job (iOS 18).
     func testA4GBDeviceUsesTheCapabilityCheckedAppleCandidate() {
-        XCTAssertEqual(AppEnvironment.speechTranscriber(models: models(), physicalMemory: 4 << 30, platform: .iOS26).recognizer, .appleSpeech,
-                       "the adapter checks hardware, locale and assets before choosing Apple")
+        let transcriber = AppEnvironment.speechTranscriber(models: models(), physicalMemory: 4 << 30, platform: LivePlatform.facts)
+        XCTAssertEqual(transcriber.recognizer, .appleSpeech, "the adapter checks hardware, locale and assets before choosing Apple")
+        if #available(iOS 26.0, *) {
+            XCTAssertTrue(transcriber is AppleSpeechTranscriber)
+        } else {
+            XCTAssertTrue(transcriber is UnavailableSpeechTranscriber)
+        }
     }
 
     /// The speech download and the speaker models go through one installer: while Ultra downloads, the installer

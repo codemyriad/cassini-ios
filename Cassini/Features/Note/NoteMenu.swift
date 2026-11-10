@@ -69,7 +69,7 @@ struct NoteMenu: View {
             Button { perform(.transcribe) } label: {
                 Text(NoteCopy.transcribe)
                 if speechUnavailable { Text(NoteCopy.speechUnavailable) }
-                Image(systemName: "text.badge.waveform")
+                Image(systemName: TranscribeSymbol.name)
             }
             .disabled(disabled || speechUnavailable)
             .accessibilityLabel(Text(verbatim: [NoteCopy.transcribe, speechUnavailable ? NoteCopy.speechUnavailable : nil].compactMap { $0 }.joined(separator: ". ")))
@@ -104,4 +104,10 @@ struct NoteMenu: View {
         guard case .transcribeAgain(let version, let namesCarry)? = transcribeAction else { return nil }
         return LibraryCopy.addsVersion(version) + (namesCarry ? " " + LibraryCopy.namesCarry : "")
     }
+}
+
+/// The symbol of Transcribe in the note's menu and the Library's. The note's menu named "text.badge.waveform", which is
+/// no SF Symbol on any iOS, so its row had no icon; `TranscribeSymbolTests` checks this one exists on the running OS.
+enum TranscribeSymbol {
+    static let name = "text.badge.plus"
 }

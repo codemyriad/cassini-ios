@@ -132,8 +132,12 @@ final class CassiniUITests: XCTestCase {
     @MainActor func testMovingARunningNoteAsksFirst() {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed", "processing", "--open-fixture", "CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC"]
+            + DeviceUnderTest.workingSpeech
         app.launchAndWait()
         XCTAssertTrue(app.descendants(matching: .any)["progressHeadline"].waitForExistence(within: 15))
+        // The seed's job reports three results a little over a second apart, and each one rebuilds an open menu, which
+        // drops a tap that lands then. Its last result is 29:53 processed; after it the job is frozen.
+        XCTAssertTrue(app.staticTexts["Processed, 29:53 / 48:13"].waitForExistence(within: 15))
         app.buttons["Share and more"].tap()
         app.buttons["Move to Recently Deleted"].tapWhenSettled()
         let alert = app.alerts["Stop transcription and move to Recently Deleted?"]
@@ -148,7 +152,7 @@ final class CassiniUITests: XCTestCase {
         XCTAssertFalse(row(app, "Weekly planning call").exists)
     }
     @MainActor func testTranscribeWithTheModelInstalledStartsWithoutAskingAndWritesTheTranscript() {
-        let app = launch()
+        let app = launch(arguments: DeviceUnderTest.workingSpeech)
         app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Thoughts from the morning walk")).firstMatch.tap()
         app.buttons["Transcribe"].tap()
         XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "What if being productive")).firstMatch
@@ -291,6 +295,7 @@ final class CassiniUITests: XCTestCase {
     @MainActor func testTheProcessingSeedShowsAJobInProgress() {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed", "processing", "--open-fixture", "CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC"]
+            + DeviceUnderTest.workingSpeech
         app.launchAndWait()
         let headline = app.descendants(matching: .any)["progressHeadline"]
         XCTAssertTrue(headline.waitForExistence(within: 15))

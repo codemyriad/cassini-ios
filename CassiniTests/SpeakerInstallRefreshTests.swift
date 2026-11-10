@@ -62,9 +62,21 @@ import CassiniWhistle
     private func observe(_ message: String, condition: @escaping @MainActor @Sendable () -> Bool) async {
         let satisfied = expectation(description: message)
         let observer = Task { @MainActor in
-            for await value in Observations({ condition() }) where value {
-                satisfied.fulfill()
-                return
+            if #available(iOS 26.0, *) {
+                for await value in Observations({ condition() }) where value {
+                    satisfied.fulfill()
+                    return
+                }
+            } else {
+                // iOS 18 has no `Observations`: read the condition under tracking again after each change.
+                let (changes, changed) = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
+                var next = changes.makeAsyncIterator()
+                repeat {
+                    if withObservationTracking({ condition() }, onChange: { changed.yield() }) {
+                        satisfied.fulfill()
+                        return
+                    }
+                } while await next.next() != nil
             }
         }
         defer { observer.cancel() }

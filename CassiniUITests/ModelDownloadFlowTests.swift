@@ -2,7 +2,8 @@ import XCTest
 
 /// The model download screen on a device without Apple's speech model or the speaker models: a Transcribe opens the
 /// consent, its sources link opens Source code and notices with a plain Back, "Not now" goes back to the note without transcribing,
-/// and "Download and transcribe" transcribes the note. Nothing is downloaded: the models are faked.
+/// and "Download and transcribe" transcribes the note. Nothing is downloaded: the models are faked. Where the system
+/// has no Apple speech (`DeviceUnderTest`), the device is a Parakeet one, whose download the screen then shows.
 final class ModelDownloadFlowTests: XCTestCase {
     /// With `parakeet` the fake transcriber stands for Parakeet Ultra, as on a device that can hold it.
     @MainActor private func launchWithoutModels(parakeet: Bool = false) -> XCUIApplication {
@@ -19,7 +20,13 @@ final class ModelDownloadFlowTests: XCTestCase {
         // under the capture bar.
         XCTAssertTrue(app.otherElements["banner.DL_RECORD_NOW"].waitForExistence(within: 5))
         let row = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Thoughts from the morning walk")).firstMatch
-        app.swipeUp()
+        let list = app.scrollViews.firstMatch
+        let capture = app.buttons["recordButton"]
+        guard list.scroll(until: {
+            guard row.exists && row.isHittable else { return false }
+            let frame = row.frame
+            return list.frame.contains(frame) && frame.maxY <= capture.frame.minY
+        }) else { XCTFail("The note did not scroll clear of the capture controls"); return }
         row.tap()
         XCTAssertTrue(app.buttons["Transcribe"].waitForExistence(within: 5))
         app.buttons["Transcribe"].tap()
@@ -28,21 +35,27 @@ final class ModelDownloadFlowTests: XCTestCase {
 
     // ports: ModelDownloadFlowTest#notDownloadedRowOpensTheConsentAndNotNowGoesBack
     @MainActor func testTranscribeOpensTheConsentItsSourcesOpenLicensesAndNotNowGoesBack() {
-        let app = launchWithoutModels()
+        let app = launchWithoutModels(parakeet: !DeviceUnderTest.appleSpeech)
         transcribeTheWalk(app)
         XCTAssertTrue(app.buttons["Download and transcribe"].exists)
-        XCTAssertTrue(app.staticTexts["Speech recognition"].exists, "iOS does not tell the size of Apple's assets")
         XCTAssertTrue(part(app, "Telling speakers apart").label.hasSuffix("88 MB"))
-        XCTAssertFalse(text(app, containing: "one-time download of about").exists, "no total without the speech size")
-        // D59 (2): Apple Speech hears only the language set in Settings, so the screen names it and where to change it.
         let language = app.staticTexts["speechLanguageLine"]
-        XCTAssertTrue(language.exists)
-        XCTAssertTrue(language.label.hasPrefix("Cassini recognises speech in "), language.label)
-        XCTAssertTrue(language.label.hasSuffix(". To transcribe another language, change it in Settings › Speech language."),
-                      language.label)
-        let name = language.label.dropFirst("Cassini recognises speech in ".count).prefix { $0 != "." }
-        XCTAssertTrue(!name.isEmpty && !name.contains("-") && !name.contains("_"),
-                      "the language's name, as Settings shows it, not its code: \(name)")
+        if DeviceUnderTest.appleSpeech {
+            XCTAssertTrue(app.staticTexts["Speech recognition"].exists, "iOS does not tell the size of Apple's assets")
+            XCTAssertFalse(text(app, containing: "one-time download of about").exists, "no total without the speech size")
+            // D59 (2): Apple Speech hears only the language set in Settings, so the screen names it and where to change it.
+            XCTAssertTrue(language.exists)
+            XCTAssertTrue(language.label.hasPrefix("Cassini recognises speech in "), language.label)
+            XCTAssertTrue(language.label.hasSuffix(". To transcribe another language, change it in Settings › Speech language."),
+                          language.label)
+            let name = language.label.dropFirst("Cassini recognises speech in ".count).prefix { $0 != "." }
+            XCTAssertTrue(!name.isEmpty && !name.contains("-") && !name.contains("_"),
+                          "the language's name, as Settings shows it, not its code: \(name)")
+        } else {
+            XCTAssertEqual(part(app, "Speech recognition").label, "Speech recognition, 444 MB")
+            XCTAssertTrue(text(app, containing: "one-time download of about 532\u{00A0}MB.").exists)
+            XCTAssertFalse(language.exists, "Parakeet hears the language")
+        }
 
         app.buttons["Where the models come from · Privacy"].tap()
         XCTAssertTrue(app.navigationBars["Source code and notices"].waitForExistence(within: 5))
@@ -79,7 +92,7 @@ final class ModelDownloadFlowTests: XCTestCase {
     }
 
     @MainActor func testDownloadAndTranscribeTranscribesTheNote() {
-        let app = launchWithoutModels()
+        let app = launchWithoutModels(parakeet: !DeviceUnderTest.appleSpeech)
         transcribeTheWalk(app)
         app.buttons["Download and transcribe"].tap()
         XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "What if being productive")).firstMatch

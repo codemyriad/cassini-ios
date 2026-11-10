@@ -6,6 +6,9 @@ struct ParakeetSuggestionView: View {
     let store: SpeechModelsStore
     let placement: ParakeetSuggestionPlacement
     @Environment(\.locale) private var locale
+    #if DEBUG
+    @Environment(\.marksUITestLayout) private var marksForUITests
+    #endif
 
     var body: some View {
         if store.shows(placement) {
@@ -22,6 +25,16 @@ struct ParakeetSuggestionView: View {
                 }.buttonStyle(.bordered)
             }
             .padding(.vertical, 6)
+            #if DEBUG
+            // UI tests only: the first showing after Whistle has been recorded in the preferences, so a test can end
+            // the process after it rather than right after the card appears (`.task` records it a moment later).
+            .overlay(alignment: .bottomLeading) {
+                if marksForUITests, placement == .afterWhistle, store.suggestion.afterWhistlePresented {
+                    Text(verbatim: " ").font(.system(size: 1)).opacity(0.01).allowsHitTesting(false)
+                        .accessibilityIdentifier("parakeetSuggestionRecorded")
+                }
+            }
+            #endif
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("parakeetSuggestion")
             .task { if placement == .afterWhistle { store.markAfterWhistleShown() } }

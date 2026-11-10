@@ -25,6 +25,43 @@ import Testing
         }
     }
 
+    /// The live reader's raw answers: a key present as 1 or 0, a missing (or unreadable) key, and a value of another
+    /// size. Only a 4-byte nonzero value is a present feature.
+    @Test func theSystemsRawAnswersMapToFeatures() {
+        let one: [UInt8] = [1, 0, 0, 0], zero: [UInt8] = [0, 0, 0, 0]
+        func features(_ values: [String: [UInt8]]) -> WhistleCPUFeatures { WhistleCPUFeatures(reading: { values[$0] }) }
+        let lse = WhistleCPUFeatures.atomicsKey, rcpc = WhistleCPUFeatures.rcpcKey, dot = WhistleCPUFeatures.dotProductKey
+        #expect(lse == "hw.optional.arm.FEAT_LSE" && rcpc == "hw.optional.arm.FEAT_LRCPC" && dot == "hw.optional.arm.FEAT_DotProd")
+        #expect(features([lse: one, rcpc: one, dot: zero]) == a12)
+        #expect(features([lse: one, rcpc: one, dot: one]) == a13)
+        #expect(features([lse: one, rcpc: zero, dot: zero]) == a11)
+        #expect(features([lse: zero, rcpc: zero, dot: zero]) == a10)
+        #expect(features([:]) == a10, "a system without the keys reports nothing, so Whistle is refused")
+        #expect(features([lse: one]) == a11, "a missing key is an absent feature")
+        for size in [[UInt8](), [1], [1, 0], [1, 0, 0, 0, 0, 0, 0, 0]] {
+            #expect(!features([lse: size, rcpc: size, dot: size]).atomics, "\(size.count) bytes is no 4-byte int")
+        }
+        #expect(features([lse: [0, 0, 0, 1], rcpc: [0, 1, 0, 0], dot: zero]) == a12, "any nonzero int is present")
+        #expect(WhistleCapability.supports(cpu: features([lse: one, rcpc: one, dot: zero])))
+        #expect(!WhistleCapability.supports(cpu: features([lse: one, dot: one])))
+    }
+
+    /// iOS 26 runs only on the A12 and later, so there the read features are not consulted; below it they decide. The
+    /// A10 (the only device below the A12 that runs iOS 18) stays refused, and nothing on iOS 26 changes.
+    @Test func theLiveCPUAnswerReadsTheFeaturesOnlyBelowIOS26() {
+        let none = WhistleCPUFeatures(reading: { _ in nil })
+        #expect(WhistleCapability.everyDeviceHasTheCPUFeaturesFromMajor == 26)
+        #expect(!WhistleCapability.supports(cpu: a10, operatingSystemMajor: 18), "the A10 iPad on iPadOS 18")
+        #expect(!WhistleCapability.supports(cpu: a11, operatingSystemMajor: 18))
+        #expect(WhistleCapability.supports(cpu: a12, operatingSystemMajor: 18), "the A12 iPhone XR on iOS 18")
+        #expect(!WhistleCapability.supports(cpu: none, operatingSystemMajor: 18), "no answer on iOS 18 refuses")
+        #expect(!WhistleCapability.supports(cpu: none, operatingSystemMajor: 25))
+        for major in [26, 27] {
+            #expect(WhistleCapability.supports(cpu: none, operatingSystemMajor: major), "no answer on iOS \(major) keeps Whistle")
+            #expect(WhistleCapability.supports(cpu: a12, operatingSystemMajor: major))
+        }
+    }
+
     @Test func anUnsupportedCPUMakesTheBundledAndTheExperimentalWhistleUnavailable() {
         for supported in [false, true] {
             let bundled = WhistleCapability.bundled(arm64: true, osSupported: true, cpuSupported: supported,
@@ -40,20 +77,22 @@ import Testing
                 "a capability built without a CPU fact keeps today's meaning")
     }
 
-    @Test func theOperatingSystemFloorIsIOS26() {
-        #expect(WhistleCapability.minimumOperatingSystemMajor == 26)
-        #expect(!WhistleCapability.supports(operatingSystemMajor: 18))
-        #expect(!WhistleCapability.supports(operatingSystemMajor: 25))
-        #expect(WhistleCapability.supports(operatingSystemMajor: 26))
-        #expect(WhistleCapability.supports(operatingSystemMajor: 27))
+    @Test func theOperatingSystemFloorIsIOS18() {
+        #expect(WhistleCapability.minimumOperatingSystemMajor == 18)
+        #expect(WhistleCapability.deploymentTarget == "18.0")
+        #expect(!WhistleCapability.supports(operatingSystemMajor: 17))
+        for major in [18, 25, 26, 27] { #expect(WhistleCapability.supports(operatingSystemMajor: major)) }
     }
 
-    /// The floor is the deployment target the framework is linked and pinned for; the two move together.
+    /// The floor and the manifest the runtime accepts are the deployment target the framework is linked and pinned
+    /// for, and the source minimum is the pinned archives'; they move together.
     @Test func theFloorMatchesThePinnedDeploymentTarget() throws {
         let repository = URL(filePath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         let pins = try JSONSerialization.jsonObject(with: Data(contentsOf: repository.appending(path: "Whistle/pins.json")))
         let target = try #require((pins as? [String: Any])?["deploymentTarget"] as? String)
         #expect(target == "\(WhistleCapability.minimumOperatingSystemMajor).0")
+        #expect(target == WhistleCapability.deploymentTarget)
+        #expect((pins as? [String: Any])?["sourceArchiveMinimumOS"] as? String == WhistleRuntime.sourceArchiveMinimumOS)
     }
 }

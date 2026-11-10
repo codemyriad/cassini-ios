@@ -72,8 +72,10 @@ final class WideScreenTests: XCTestCase {
                       in: app.windows.firstMatch.frame)
     }
 
+    /// Where the system has no Apple speech (`DeviceUnderTest`), the speech model to download is Parakeet's, whose
+    /// part carries its size.
     @MainActor func testIPadModelDownloadIsCappedAndCentred() throws {
-        let app = try launch(["--seed", "library", "--models-missing"])
+        let app = try launch(["--seed", "library", "--models-missing"] + DeviceUnderTest.downloadedSpeech)
         let row = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Thoughts from the morning walk")).firstMatch
         XCTAssertTrue(row.waitForExistence(within: 5))
         for _ in 0..<3 where !row.isHittable { app.swipeUp() }
@@ -82,13 +84,14 @@ final class WideScreenTests: XCTestCase {
         app.buttons["Transcribe"].tap()
         let title = app.staticTexts["Transcribe on this device"]
         XCTAssertTrue(title.waitForExistence(within: 5))
-        assertCentred([title, app.staticTexts["Speech recognition"], app.buttons["Download and transcribe"]], in: detailColumn(app))
+        let speech = app.staticTexts[DeviceUnderTest.appleSpeech ? "Speech recognition" : "Speech recognition, 444 MB"]
+        assertCentred([title, speech, app.buttons["Download and transcribe"]], in: detailColumn(app))
     }
 
     @MainActor func testIPadSavedVoicesAreCappedAndCentred() throws {
         let app = try launch(["--seed", "voices"])
         let language = app.buttons["appLanguageRow"]
-        XCTAssertTrue(app.buttons["settingsButton"].tap(until: { language.exists }), "Settings did not open")
+        XCTAssertTrue(app.buttons["settingsButton"].tapWhenInteractive(in: app, until: { language.exists }), "Settings did not open")
         let row = app.buttons["savedVoicesRow"]
         XCTAssertTrue(app.scroll(attempts: 12) { row.exists && row.isHittable }, "Saved voices is not on the screen")
         row.tap()

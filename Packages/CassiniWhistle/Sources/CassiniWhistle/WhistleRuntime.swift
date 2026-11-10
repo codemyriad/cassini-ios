@@ -9,6 +9,8 @@ public actor WhistleRuntime {
     public static let shared = WhistleRuntime()
     public static let engineRevision = "93e88ede867e4311c39151285e74df513e4b835b"
     public static let modelSHA256 = "b6e02f048568ac5d01a2042556c658061e699acbc0aa2a1439f52f3d461dffeb"
+    /// The minimum of the unmodified published archives (`Whistle/pins.json` "sourceArchiveMinimumOS").
+    static let sourceArchiveMinimumOS = "27.0"
     private static let logger = Logger(subsystem: "io.codemyriad.cassini", category: "WhistleBundle")
     private typealias Load = @convention(c) (UnsafePointer<UInt8>?, UInt64) -> Int32
     private typealias Models = @convention(c) () -> Int32
@@ -26,6 +28,11 @@ public actor WhistleRuntime {
         var target: String
         var minimumOS: String
         var sourceArchiveMinimumOS: String
+
+        /// Built for the deployment target the OS floor implies, from the pinned archives.
+        var pinsDeployment: Bool {
+            minimumOS == WhistleCapability.deploymentTarget && sourceArchiveMinimumOS == WhistleRuntime.sourceArchiveMinimumOS
+        }
     }
 
     private static let bundleVerification = WhistleBundleVerification { url in
@@ -60,7 +67,7 @@ public actor WhistleRuntime {
             stage = "manifestPins"
             guard manifest.engineRevision == engineRevision, manifest.modelSha256 == modelSHA256,
                   manifest.target == target,
-                  manifest.minimumOS == "26.0", manifest.sourceArchiveMinimumOS == "27.0" else { throw WhistleError.integrity }
+                  manifest.pinsDeployment else { throw WhistleError.integrity }
             func hash(_ data: Data) -> String { SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined() }
             stage = "weightsRead"
             let weights = try Data(contentsOf: root.appendingPathComponent("whistle.cact"), options: .mappedIfSafe)
@@ -114,7 +121,7 @@ public actor WhistleRuntime {
         let root = resources.appendingPathComponent("Whistle", isDirectory: true)
         let manifest = try JSONDecoder().decode(Manifest.self, from: Data(contentsOf: root.appendingPathComponent("manifest.json")))
         guard manifest.engineRevision == Self.engineRevision, manifest.modelSha256 == Self.modelSHA256,
-              manifest.target == target, manifest.minimumOS == "26.0", manifest.sourceArchiveMinimumOS == "27.0" else {
+              manifest.target == target, manifest.pinsDeployment else {
             throw WhistleError.integrity
         }
         let weights = try Data(contentsOf: root.appendingPathComponent("whistle.cact"), options: .mappedIfSafe)
@@ -187,16 +194,33 @@ public actor WhistleRuntime {
     /// Actual C API, automatic language detection, no keywords; callers supply already segmented raw 16kHz PCM.
     /// Cancellation discards a late synchronous result. The serial actor cannot overlap model ownership/calls.
     public func transcribe(_ pcm: [Float], acceptance: WhistleCapability, bundle: Bundle = .main) throws -> WhistleResult {
+        let result = try decodePCM(pcm, acceptance: acceptance, bundle: bundle, submitted: nil)
+        try Task.checkCancellation()
+        return result
+    }
+
+    /// An observation point at C entry and at the unpublished result, for interruption tests with the pinned engine.
+    package func transcribe(_ pcm: [Float], acceptance: WhistleCapability, bundle: Bundle,
+                            submitted: @escaping @Sendable () -> Void, resultReady: @Sendable () async -> Void) async throws -> WhistleResult {
+        let result = try decodePCM(pcm, acceptance: acceptance, bundle: bundle, submitted: submitted)
+        await resultReady()
+        try Task.checkCancellation()
+        return result
+    }
+
+    private func decodePCM(_ pcm: [Float], acceptance: WhistleCapability, bundle: Bundle,
+                           submitted: (@Sendable () -> Void)?) throws -> WhistleResult {
         guard acceptance.available else { throw WhistleError.unavailable }
         try Task.checkCancellation()
         try Self.validatePCM(pcm)
         try open(bundle: bundle)
         guard let decode else { throw WhistleError.missingAPI }
-        let result = try WhistlePrivacy.enter(environment: privacyEnvironment()) {
+        return try WhistlePrivacy.enter(environment: privacyEnvironment()) {
             var output = [CChar](repeating: 0, count: 1_048_576)
             let count = pcm.withUnsafeBufferPointer { input in
                 output.withUnsafeMutableBufferPointer {
-                    decode(input.baseAddress, Int32(input.count), nil, nil, 1, $0.baseAddress, Int32($0.count))
+                    submitted?()
+                    return decode(input.baseAddress, Int32(input.count), nil, nil, 1, $0.baseAddress, Int32($0.count))
                 }
             }
             guard count >= 0 else { throw WhistleError.nativeFailure }
@@ -205,8 +229,6 @@ public actor WhistleRuntime {
                 try WhistleResult.parse(Data(bytes: $0.baseAddress!, count: end), samples: pcm.count)
             }
         }
-        try Task.checkCancellation()
-        return result
     }
 
     /// dyld can retain a C++ image with thread-local destructors after dlclose. Never free its borrowed weights

@@ -96,9 +96,12 @@ import CassiniEngineTesting
         return appleSpeechCandidate(platform: platform)
     }
 
-    /// Apple's adapter where the system has Apple speech, else the candidate that refuses every job.
+    /// Apple's adapter where the facts say the system has Apple speech, else the candidate that refuses every job. The
+    /// only place the app builds Apple's adapter: `LivePlatform.facts` has Apple speech exactly from iOS 26, and the
+    /// availability check keeps facts made by hand (tests, the `--ios18-platform` launch) from reaching it below.
     static func appleSpeechCandidate(platform: PlatformFacts) -> any Transcribing {
-        platform.appleSpeech ? AppleSpeechTranscriber() : UnavailableSpeechTranscriber()
+        if platform.appleSpeech, #available(iOS 26.0, *) { return AppleSpeechTranscriber() }
+        return UnavailableSpeechTranscriber()
     }
 
     /// Android's speaker pipeline (streaming Sortformer and CAM++) over the catalog's pinned files, which the shared

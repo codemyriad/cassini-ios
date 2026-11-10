@@ -33,19 +33,10 @@ struct RenameSheet: View {
         NavigationStack {
             Form {
                 Section {
-                    TextField(fieldLabel, text: $text)
+                    TextField(fieldLabel, text: $text.handingEdits(to: edited))
                         .focused($focused).submitLabel(.done).onSubmit(confirm)
                         .textInputAutocapitalization(capitalization)
-                        .onChange(of: text) { _, typed in
-                            if typed.count > limit {
-                                // Finish the native paste transaction before writing its shortened value back.
-                                // A synchronous write here can leave the field showing the uncut paste on iOS 26.
-                                DispatchQueue.main.async {
-                                    guard text == typed else { return }
-                                    text = String(typed.prefix(limit))
-                                }
-                            } else { textChanged(typed) }
-                        }
+                        .onChange(of: text) { _, typed in edited(typed) }
                         .accessibilityIdentifier(fieldIdentifier)
                 } footer: {
                     if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -65,6 +56,20 @@ struct RenameSheet: View {
             text = draft ?? original
             focused = true
         }
+    }
+
+    /// Cuts text past the limit, or hands it to the screen that keeps it. Below iOS 26 this runs from the field's
+    /// binding too (`handingEdits`), since SwiftUI can skip the `onChange` of a fast typist's last keystroke there; a
+    /// second run for the same text changes nothing.
+    private func edited(_ typed: String) {
+        if typed.count > limit {
+            // Finish the native paste transaction before writing its shortened value back.
+            // A synchronous write here can leave the field showing the uncut paste on iOS 26.
+            DispatchQueue.main.async {
+                guard text == typed else { return }
+                text = String(typed.prefix(limit))
+            }
+        } else { textChanged(typed) }
     }
 
     private func confirm() {

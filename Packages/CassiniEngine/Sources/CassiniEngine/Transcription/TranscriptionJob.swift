@@ -200,11 +200,15 @@ public struct TranscriptionJob: TranscriptionJobRunning {
                 // A checkpoint of another version or recognizer does not resume.
                 checkpoint = try checkpoints.load(job.noteID)
                 try checkpoint?.validate(expected)
+                if checkpoint?.whistle != nil, recognizer != .whistle { return .failed(.checkpointMismatch) }
             } catch {
                 return .failed(.checkpointMismatch)
             }
             // A Parakeet checkpoint goes on from its window; one without it (none was written) starts over.
             if recognizer == .parakeet, checkpoint?.wordsComplete == false, checkpoint?.recognition == nil { checkpoint = nil }
+            // Legacy Whistle checkpoints have words but no DSP state. Rebuild the prefix once
+            // rather than mixing words from two different segmentation/reader versions.
+            if recognizer == .whistle, checkpoint?.wordsComplete == false, checkpoint?.whistle == nil { checkpoint = nil }
             if checkpoint?.wordsComplete != true {
                 switch await transcriber.assetStatus(locale: Locale(identifier: language)) {
                 case .unsupported:
@@ -365,7 +369,8 @@ public struct TranscriptionJob: TranscriptionJobRunning {
         let request = TranscriptionRequest(url: context.url, language: context.language,
                                            startOffset: parakeet ? 0 : TimeInterval(startMs) / 1000, resume: resume,
                                            allowDownload: context.settings.allowSpeechDownload,
-                                           speakers: parakeet ? speakers : nil)
+                                           speakers: parakeet ? speakers : nil,
+                                           whistleResume: context.recognizer == .whistle ? checkpoint?.whistle : nil)
         let transcriber = context.transcriber ?? transcriber
         let task = Task { try await transcriber.transcribe(request) { decode.handle($0) } }
         decode.attach(task)
@@ -401,11 +406,12 @@ public struct TranscriptionJob: TranscriptionJobRunning {
                                revision: ModelCatalog.parakeetRevision, segmentation: segmentation ?? "",
                                inferenceMs: words.inferenceMs, resumedFromMs: words.resumedFromMs, device: device())
         case .whistle:
+            let continuation = words.whistle == nil ? "deterministic reread on resume" : "checkpointed DSP; seekable source"
             run = TranscriptProvenance(backend: "Needle C API (CPU, on-device)", engine: "Whistle",
                 model: context.recognizer.checkpointModel(language: ""), device: device().description,
                 source: TranscriptProvenance.recordingSource, version: "Needle 3.3.0; Silero 6.2.1; ONNX Runtime 1.27.1",
                 language: language, inferenceMs: words.inferenceMs,
-                segmentation: "centred FIR97 48k/16k; raw ASR; HPF100 VAD; Silero512; gate .5/.35, votes2/3, pre5120, quiet9600, pause224000/2048, limit240128; deterministic reread on resume",
+                segmentation: "centred FIR97 48k/16k; raw ASR; HPF100 VAD; Silero512; gate .5/.35, votes2/3, pre5120, quiet9600, pause224000/2048, limit240128; \(continuation)",
                 resumedFromMs: words.resumedFromMs)
         case .appleSpeech:
             let model = await transcriber.modelName(locale: Locale(identifier: context.language))
