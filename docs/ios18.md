@@ -50,7 +50,8 @@ answer on a device.
 ## Background on iOS 18
 
 Without continued processing, work that leaves the screen gets only the finite background time iOS allows (about
-30 s, not guaranteed). Not yet verified on iOS 18.2.
+30 s, not guaranteed). Seen on the iOS 18.2 simulator for a transcription (below, "How it is tested today"); not seen
+on a device, and not checked for the standalone download.
 
 - **Transcription.** When the time ends, the job pauses with its checkpoint kept (at most 30 s of audio is redone),
   the queue is held as paused by the system, and while Cassini is hidden the notification "Transcription paused by
@@ -92,14 +93,29 @@ break (`LibrarySearchEdit`). iOS 26 keeps the binding alone; the same failure wa
   per device class, the unavailable Apple candidate, Settings, and the background runner taking the finite time.
 - The `--ios18-platform` launch argument (DEBUG `--ui-testing` launches only; the build is the same) makes the app
   use the iOS 18 facts on the current simulator runtime (iOS 27). UI tests launched with it check the engine choice
-  and the Settings rows (`SettingsFlowTests`, `SpeechUnavailableTests`, `ParakeetSuggestionTests`); no UI test
-  checks the finite background path. This runs iOS 27's system and UIKit with iOS 18's rules; it says nothing about
+  and the Settings rows (`SettingsFlowTests`, `SpeechUnavailableTests`, `ParakeetSuggestionTests`). No UI test
+  checks the finite background path: XCTest holds a "Developer testing (BackgroundUI)" assertion on the app under
+  test, and in a UI test on the iOS 18.2 simulator Cassini stayed running in the background for 4 minutes with its
+  task held and never expired, so a UI test cannot wait for the expiry. This runs iOS 27's system and UIKit with iOS 18's rules; it says nothing about
   iOS 18's own system chrome or APIs.
 - `scripts/test.sh build` runs `scripts/check-embedded-minos.py`: no embedded binary or plist may need a newer iOS
   than the app.
 - The iOS 18 leg (README) runs the same build on the iOS 18.2 simulator. On 10 November 2026 the full leg passed
   there: hosted 98/98, iPhone 102/102, iPad 12/12, so every UI test has run against iOS 18.2's own system chrome.
-- Not yet: the finite background path on iOS 18 (no test checks it), and any run on an A12 or A10 on iOS 18.
+- The finite background path, without UI: `TranscriptionCoordinatorTests.Background` (`swift test`) follows a job
+  from the expiry through a launch on the same files to a Resume that gives the run its checkpoint, with one job
+  throughout; `AppGraphTests.testOnIOS18AJobPausedByIOSResumesFromItsCheckpointAfterARelaunch` does the same over the
+  real job and files on the iOS 18 facts (the resumed run starts at the checkpoint and the note gets every word once);
+  `PlatformCompositionTests` checks that the runner's expiry tells the work once and ends the finite token.
+- By hand on the iOS 18.2 simulator, 10 November 2026 (iPhone 16; the processing seed with the bundled Whistle's fake,
+  the Library on screen): the transcription's background task expired 32 s after it began, 27 s after Cassini left the
+  screen; the job was stored paused by the system at 00:25 (its checkpoint); after a relaunch the note said "Paused
+  at 00:25 of 48:13 · iOS ended the time Cassini had in the background", and Resume ended with the checkpoint's words,
+  none transcribed again, and an empty queue. With a note open the time did not run out: the note's prepared player
+  holds the audio session, and Cassini, which has the `audio` background mode, kept running in the background for over
+  10 minutes with its job going on.
+- Not yet: the finite background path on a device, the standalone download's stop, and any run on an A12 or A10 on
+  iOS 18.
 
 ## Decisions recorded
 

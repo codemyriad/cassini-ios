@@ -10,7 +10,8 @@ extra or a platform constraint. [Differences from Android](#differences-from-and
 why. The app is native SwiftUI for iOS 18 or later. On iOS 26 and later it can fall back to Apple's speech model and
 uses continued background processing; below iOS 26 it does without both ([iOS 18](docs/ios18.md)). On iOS 18 the
 full test leg has passed on the iOS 18.2 simulator, and Whistle has run on two iOS 18 devices (an iPhone 11 and an
-iPhone 15, in AWS Device Farm); the finite background path and A12 or A10 devices on iOS 18 are not yet verified.
+iPhone 15, in AWS Device Farm); the finite background path has been checked once by hand on the iOS 18.2 simulator,
+and A12 or A10 devices on iOS 18 are not yet verified.
 
 ## Screenshots
 
@@ -92,8 +93,8 @@ records their exact revisions.
   time and survive a relaunch. Progress is saved every 30 seconds of audio, so "Stop and keep progress", iOS taking the
   background time back, or a crash all resume from the last checkpoint. The progress card shows the stages, the percent,
   the time left, a battery projection and the draft so far. On iOS 26 or later transcription continues in the background
-  with a system progress indicator; on iOS 18 it pauses when iOS ends the short background time (not yet verified on iOS
-  18.2). A notification says when a note is done or iOS paused it.
+  with a system progress indicator; on iOS 18 it pauses when iOS ends the short background time (seen once on the iOS 18.2
+  simulator, not on a device). A notification says when a note is done or iOS paused it.
 - **Speakers.** As Android does, streaming Sortformer tells the speakers apart window by window while the words are
   decoded, and CAM++ makes a voiceprint for each speaker. The draft shows the speakers as they appear: you can name or
   merge them before the job is done, and a saved voice is suggested in the draft ("Is this Luca?"). Afterwards you
@@ -214,8 +215,8 @@ TestFlight still need.
   Whistle; with less than 5 GiB it gets no engine at all. The Whistle binary is built for iOS 27 and linked at 18.0
   under the D75.2 exception as extended, which rests on the iOS 18.2 simulator evidence in
   [Whistle/README.md](Whistle/README.md) and two AWS Device Farm runs on 2026-11-10 (iPhone 11 on iOS 18.6.2, iPhone
-  15 on iOS 18.0); no A12 or A10 device on iOS 18 has run it. The background pause and stop are not yet verified on
-  iOS 18.2 (no test checks the finite background path).
+  15 on iOS 18.0); no A12 or A10 device on iOS 18 has run it. The transcription's background pause was checked by
+  hand on the iOS 18.2 simulator (see [iOS 18](docs/ios18.md)); the download's stop was not.
 - **iOS extras.** Stars, bookmarks, playback speed, lock-screen controls, passage editing, JSON export, the Speakers
   list, the "Recently Deleted" name, "Forget all voice data", and Settings sections for transcription, speakers and
   your library.
