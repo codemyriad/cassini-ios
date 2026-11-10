@@ -312,11 +312,19 @@ class RuntimePickTests(unittest.TestCase):
         self.assertIn(f'cannot run the device type "{type_id("iPhone 17")}"', result.stderr)
 
     def test_an_invalid_value_is_refused_before_anything_runs(self):
-        h = Harness(self)
-        result = h.run("app", CASSINI_RUNTIME="eighteen")
-        self.assertEqual(result.returncode, 2)
-        self.assertIn("neither a version", result.stderr)
-        self.assertEqual(h.calls(), [])
+        # An identifier without a version strips to an empty tag: it must not read as no CASSINI_RUNTIME, which would
+        # run on the newest runtime and post a status.
+        for tier, value in (("app", "eighteen"), ("ui", "com.apple.CoreSimulator.SimRuntime.iOS-"),
+                            ("all", "com.apple.CoreSimulator.SimRuntime.iOS-"),
+                            ("changed", "com.apple.CoreSimulator.SimRuntime.iOS-")):
+            with self.subTest(tier=tier, value=value):
+                h = Harness(self)
+                result = h.run(tier, CASSINI_RUNTIME=value, CASSINI_POST_STATUS="1")
+                self.assertEqual(result.returncode, 2)
+                self.assertIn(f"error: CASSINI_RUNTIME={value} is neither a version", result.stderr)
+                self.assertEqual(h.calls(), [])
+                self.assertNotIn("commit status", result.stdout)
+                self.assertFalse((h.root / "DerivedData.noindex").exists())
 
 
 class FullRunTests(unittest.TestCase):
@@ -410,7 +418,8 @@ class FullRunTests(unittest.TestCase):
         self.assertFalse((lease / udid(1)).exists())
 
     def test_a_missing_runtime_fails_the_run_without_building_or_posting(self):
-        h = Harness(self)
+        # The default iPhone a run before kept booted (or another run of this worktree tests on) stays booted.
+        h = Harness(self, devices={R27: [dev("ts-wt-iphone-1", udid(1), "Booted")]})
         result = h.run("app", CASSINI_RUNTIME="18", CASSINI_POST_STATUS="1")
         self.assertEqual(result.returncode, 1)
         self.assertIn("no available iOS simulator runtime matches CASSINI_RUNTIME=18 (available: 26.0, 27.0)",
@@ -418,6 +427,98 @@ class FullRunTests(unittest.TestCase):
         self.assertIn("FAILED (app)", result.stdout)
         self.assertTrue((h.root / "DerivedData.noindex/test-logs-ios18/FAILED").exists())
         self.assertFalse([c for c in h.calls() if c.startswith("xcodebuild") or "simctl | create" in c])
+        self.assertFalse([c for c in h.calls() if "simctl | shutdown" in c])
+        self.assertEqual(h.state()["devices"][R27][0]["state"], "Booted")
+
+    def git_fixture(self, h):
+        """Makes the fixture a git checkout with one commit, with a fake swift and string catalog check."""
+        for name, text in (("swift", '#!/bin/sh\necho "swift | $*" >> "$STUB/calls"\n'),):
+            (h.stub / "bin" / name).write_text(text)
+            (h.stub / "bin" / name).chmod(0o755)
+        check = h.root / "scripts/check-strings.sh"
+        check.write_text("#!/bin/sh\nexit 0\n")
+        check.chmod(0o755)
+        git = ["git", "-C", str(h.root), "-c", "user.name=t", "-c", "user.email=t@example.com"]
+        for args in (["init", "-q"], ["add", "-A"], ["commit", "-q", "-m", "fixture"]):
+            subprocess.run(git + args, env=h.env(), check=True, capture_output=True)
+
+    def test_a_changed_run_that_needs_no_simulator_leaves_the_clones_alone(self):
+        for path, expected in (("Packages/CassiniAudio/Tests/CassiniAudioTests/NewTests.swift", "swift | test"),
+                               ("notes.txt", "nothing to test")):
+            with self.subTest(path=path):
+                h = Harness(self, devices={R27: [dev("ts-wt-iphone-1", udid(1), "Booted")]})
+                self.git_fixture(h)
+                (h.root / path).parent.mkdir(parents=True, exist_ok=True)
+                (h.root / path).write_text("// changed\n")
+                result = h.run("changed", "HEAD", CASSINI_RUNTIME="26")
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn("PASSED (changed)", result.stdout)
+                self.assertIn(expected, result.stdout + "\n".join(h.calls()))
+                self.assertFalse([c for c in h.calls() if c.startswith("xcodebuild") or "simctl | shutdown" in c])
+                self.assertEqual(h.state()["devices"][R27][0]["state"], "Booted")
+
+    def test_a_fast_run_leaves_the_clones_alone_even_with_keep_sims_0(self):
+        # fast never takes the host lock, so it never shuts down clones another run of this worktree may be using.
+        h = Harness(self, devices={R27: [dev("ts-wt-iphone-1", udid(1), "Booted")]})
+        self.git_fixture(h)
+        result = h.run("fast", CASSINI_KEEP_SIMS="0")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("swift | test", "\n".join(h.calls()))
+        self.assertFalse([c for c in h.calls() if "simctl | shutdown" in c])
+        self.assertEqual(h.state()["devices"][R27][0]["state"], "Booted")
+
+    # lock-ready as test.sh calls it, answering at once from a non-blocking flock instead of waiting out its deadline
+    # (at least 5 s): 124, its "not within the wait" status, while another process holds the lock. Any other command
+    # (the hold helper) is the real test-events.py.
+    LOCK_READY_NOW = r'''#!/usr/bin/python3 -I
+import errno, fcntl, os, sys
+here = os.path.dirname(os.path.abspath(__file__))
+if sys.argv[1:2] != ["lock-ready"]:
+    os.execv(sys.executable, [sys.executable, "-I", os.path.join(here, "test-events-real.py")] + sys.argv[1:])
+with open(os.path.join(os.environ["STUB"], "calls"), "a") as f:
+    f.write("lock-ready | %s | %s\n" % (sys.argv[3], sys.argv[5]))
+fd = os.open(sys.argv[3], os.O_RDWR | os.O_CREAT, 0o644)
+try:
+    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+except OSError as error:
+    sys.exit(124 if error.errno in (errno.EWOULDBLOCK, errno.EAGAIN) else 1)
+sys.exit("the lock was free: this test must hold it")
+'''
+
+    def test_a_run_that_does_not_get_the_host_lock_leaves_the_clones_alone(self):
+        import fcntl
+        h = Harness(self, devices={R27: [dev("ts-wt-iphone-1", udid(1), "Booted")]})
+        scripts = h.root / "scripts"
+        (scripts / "test-events.py").rename(scripts / "test-events-real.py")
+        (scripts / "test-events.py").write_text(self.LOCK_READY_NOW)
+        lock = h.home / "heavy.lock"
+        with open(lock, "w") as held:
+            fcntl.flock(held, fcntl.LOCK_EX)
+            result = h.run("app", CASSINI_RUNTIME="26", CASSINI_HEAVY_LOCK_HELD="", CASSINI_HEAVY_LOCK=str(lock),
+                           CASSINI_LOCK_MINUTES="2")
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn(f"host busy: could not take {lock} within 2 min", result.stderr)
+        # One immediate try of the lock with the wait it was given, in seconds, then no build and no clone shutdown.
+        calls = [c for c in h.calls() if c.startswith(("lock-ready", "xcodebuild")) or "simctl | shutdown" in c]
+        self.assertEqual(calls, ["lock-ready | <TMP>/home/heavy.lock | 120"])
+        self.assertEqual(h.state()["devices"][R27][0]["state"], "Booted")
+
+    def test_a_cassini_runtime_run_still_shuts_its_clones_down_at_the_end(self):
+        h = Harness(self)
+        result = h.run("app", CASSINI_RUNTIME="26")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        calls = h.calls()
+        clone = h.names()["ts-wt-iphone26-1"][1]
+        last_build = max(i for i, c in enumerate(calls) if c.startswith("xcodebuild"))
+        self.assertGreater(calls.index(f"xcrun | simctl | shutdown | {clone}"), last_build)
+        self.assertTrue(all(d["state"] == "Shutdown" for ds in h.state()["devices"].values() for d in ds))
+        # Without CASSINI_RUNTIME the iPhone stays booted after app, as before; CASSINI_KEEP_SIMS=0 shuts it down.
+        for keep, state in (("", "Booted"), ("0", "Shutdown")):
+            with self.subTest(keep=keep):
+                h = Harness(self)
+                result = h.run("app", **({"CASSINI_KEEP_SIMS": keep} if keep else {}))
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertEqual(h.state()["devices"][R27][0]["state"], state)
 
     def test_fast_build_and_clean_ignore_cassini_runtime(self):
         h = Harness(self, devices={R27: [dev("ts-wt-iphone-1", udid(1), "Booted")]})
@@ -443,8 +544,10 @@ class FullRunTests(unittest.TestCase):
                 result = h.shell(functions, stubs + f'runtime_tag={tag!r}; auto_workers 0')
                 self.assertEqual(result.stdout.strip(), expected, result.stderr)
         # Two booted iPhones of the leg give the room the UI clones need, with nothing else free; without them, the
-        # wait would start (and here fail at once: there is no resource-event helper under this root).
-        stubs = 'free_mb() { echo 0; }\ncpu_idle() { echo 100; }\nadmit_minutes=1; root=/nonexistent\n'
+        # wait would start (and here fail at once: there is no resource-event helper under this root). The clock
+        # stands still, so the admission deadline never decides which.
+        stubs = 'free_mb() { echo 0; }\ncpu_idle() { echo 100; }\nadmit_minutes=1; root=/nonexistent\n' \
+                'date() { echo 2000000000; }\n'
         result = h.shell(functions, stubs + 'runtime_tag=26; wait_for_room')
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertNotIn("waiting for room", result.stdout)
@@ -534,13 +637,16 @@ class OwnershipTests(unittest.TestCase):
         runtime_leases = h.cache / "sim-leases/runtime"
         runtime_leases.mkdir(parents=True)
         (runtime_leases / udid(1)).touch()
-        # Both last had an app installed an hour ago; only the first has a fresh lease.
+        # Both last had an app installed an hour ago; only the first has a lease from half a minute ago, on a clock
+        # that stands still at now.
+        now = 2000000000
+        os.utime(runtime_leases / udid(1), (now - 30, now - 30))
         for n in (1, 2):
             apps = h.home / f"Library/Developer/CoreSimulator/Devices/{udid(n)}/data/Containers/Bundle/Application"
             apps.mkdir(parents=True)
-            os.utime(apps, (0, os.path.getmtime(apps) - 3600))
+            os.utime(apps, (now - 3600, now - 3600))
         result = h.shell(["clones", "clone_of", "idle_seconds", "reap_idle_clones"],
-                         'idle_minutes=15; reap_idle_clones')
+                         f'date() {{ echo {now}; }}\nidle_minutes=15; reap_idle_clones')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("ts-wt-b-iphone18-1 was used 0 min ago; leaving it booted", result.stdout)
         self.assertIn("shutting down ts-wt-b-iphone18-2, idle for 60 min", result.stdout)

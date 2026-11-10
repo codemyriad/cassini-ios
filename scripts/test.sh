@@ -27,8 +27,8 @@
 #   CASSINI_UI_WORKERS   UI shards (default: as many as memory allows, at most 3)
 #   CASSINI_UI_IPAD      what the iPad clone runs: the tests named testIPad* (default), all (every UI test, beside
 #                        the iPhone shards; the longest step then) or 0 (nothing)
-#   CASSINI_KEEP_SIMS    0 shuts the clones down afterwards, 1 keeps the iPhones booted for the next run (default:
-#                        0 after all, 1 after the other tiers)
+#   CASSINI_KEEP_SIMS    0 shuts the clones down after a run that took the host lock, 1 keeps the iPhones booted for
+#                        the next run (default: 0 after all, 1 after the other tiers)
 #   CASSINI_CONFORMANCE_REQUIRED  1 (the default for all) fails, rather than skips, missing conformance vectors
 #   CASSINI_IDLE_MINUTES booted clones of other worktrees that no xcodebuild has used for this long are shut down,
 #                        never deleted (default 15)
@@ -99,11 +99,17 @@ runtime_tag_of() {
     esac
 }
 runtime_tag=""
-case "$tier" in app|ui|all|changed|prebuilt) runtime_tag=$(runtime_tag_of "${CASSINI_RUNTIME:-}") ;; esac
-if [ -n "$runtime_tag" ] && ! [[ $runtime_tag =~ ^[0-9]+(\.[0-9]+)*$ ]]; then
-    echo "error: CASSINI_RUNTIME=$CASSINI_RUNTIME is neither a version (18, 18.6) nor an iOS runtime identifier" >&2
-    exit 2
-fi
+case "$tier" in app|ui|all|changed|prebuilt)
+    if [ -n "${CASSINI_RUNTIME:-}" ]; then
+        runtime_tag=$(runtime_tag_of "$CASSINI_RUNTIME")
+        # Checked on the value, not on the tag: an identifier without a version (…SimRuntime.iOS-) strips to an empty
+        # tag, which would otherwise read as no CASSINI_RUNTIME, run on the newest runtime and post a status.
+        if ! [[ $runtime_tag =~ ^[0-9]+(\.[0-9]+)*$ ]]; then
+            echo "error: CASSINI_RUNTIME=$CASSINI_RUNTIME is neither a version (18, 18.6) nor an iOS runtime identifier" >&2
+            exit 2
+        fi
+    fi ;;
+esac
 
 # The iOS 18 leg of `all` when CASSINI_IOS18 is not set: off until the iOS 18 simulator runtime is installed on the
 # gate's Mac, then smoke (full when the branch changes views, ios18_preflight). That switch is this one line (README,
@@ -196,7 +202,10 @@ summary() {
             echo "no iOS $runtime_tag runtime"
         fi > "$logs/leg-counts"
     fi
-    if [ "$keep_sims" = "0" ]; then shutdown_clones; fi
+    # Only a run that got as far as the host lock shuts the clones down. One that stopped before (a missing runtime,
+    # a package-only `changed`, a lock it did not get) booted nothing, and its shutdown would hit the clones another
+    # run of this worktree is testing on, or the iPhones kept booted for the next run.
+    if [ "$keep_sims" = "0" ] && [ "$heavy_started" = 1 ]; then shutdown_clones; fi
     post_status "$rc"
     release_heavy_lock
 }
@@ -315,7 +324,7 @@ run_logged() {
 # does not wait for their own lock.
 heavy_lock="${CASSINI_HEAVY_LOCK:-$HOME/.cassini-heavy.lock}"
 lock_minutes="${CASSINI_LOCK_MINUTES:-60}"
-lock_pid="" lock_held_file=""
+lock_pid="" lock_held_file="" heavy_started=0
 take_heavy_lock() {
     [ -z "$lock_pid" ] || return 0
     [ "${CASSINI_HEAVY_LOCK_HELD:-}" != 1 ] || return 0
@@ -629,9 +638,12 @@ for devices in json.load(sys.stdin)["devices"].values():
     done
 }
 
-# The start of every run that builds or boots: the host lock, then the disk.
+# The start of every run that builds or boots: the host lock, then the disk. From here on the run may boot clones,
+# so summary shuts them down unless they are kept (also under CASSINI_HEAVY_LOCK_HELD=1, where the caller holds the
+# lock); take_heavy_lock exits the run when it does not get the lock, before heavy_started is set.
 start_heavy() {
     take_heavy_lock
+    heavy_started=1
     reclaim_disk
 }
 
