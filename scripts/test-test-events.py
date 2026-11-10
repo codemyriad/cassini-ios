@@ -7,6 +7,7 @@ import io
 import json
 import os
 from pathlib import Path
+import re
 import shlex
 import signal
 import subprocess
@@ -53,8 +54,13 @@ class FakeClock:
     def __init__(self):
         self.now = 1000.0
         self.waits = []
+        self.reads = 0
 
     def monotonic(self):
+        # Caps a loop that spins without waiting, which would otherwise hang the test.
+        self.reads += 1
+        if self.reads > 100:
+            raise AssertionError("watch kept reading the clock without waiting")
         return self.now
 
     def until(self, deadline):
@@ -104,10 +110,10 @@ class LifecycleTests(unittest.TestCase):
         pid = int(child.read_text())
         self.addCleanup(kill_quietly, pid)
         with events.Events() as queue:
-            if queue.process(pid):
-                self.assertEqual(finish(self.shell(f"end_tree {tree.pid}")), 0)
-                self.assertTrue(queue.until(time.monotonic() + HANG_GUARD),
-                                f"end_tree left the grandchild {pid} running")
+            self.assertTrue(queue.process(pid), f"grandchild {pid} ended before end_tree ran")
+            self.assertEqual(finish(self.shell(f"end_tree {tree.pid}")), 0)
+            self.assertTrue(queue.until(time.monotonic() + HANG_GUARD),
+                            f"end_tree left the grandchild {pid} running")
         self.assertIn(finish(tree), (-signal.SIGTERM, -signal.SIGKILL))
 
     def watch_stub(self, status):
@@ -125,7 +131,7 @@ class LifecycleTests(unittest.TestCase):
         # run_limited and run_watched trust the helper's answer: 0 reaps the command's own
         # status, 124 and 125 end the command tree and report which deadline ran out.
         pause = shlex.join([sys.executable, "-c", "import signal; signal.pause()", str(self.root)])
-        self.addCleanup(subprocess.run, ["/usr/bin/pkill", "-KILL", "-f", str(self.root)])
+        self.addCleanup(subprocess.run, ["/usr/bin/pkill", "-KILL", "-f", re.escape(str(self.root))])
         cases = [
             ("run_limited", "0.3", 0, '/bin/sh -c "exit 23"', 23, None),
             ("run_limited", "0.3", 124, pause, 124, "test.sh: still running after 0.3s; ended"),
