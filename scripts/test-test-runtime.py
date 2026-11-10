@@ -256,7 +256,8 @@ class RuntimePickTests(unittest.TestCase):
     def test_an_invalid_value_is_refused_before_anything_runs(self):
         # An identifier without a version strips to an empty tag: it must not read as no CASSINI_RUNTIME, which would
         # run on the newest runtime and post a status.
-        for tier, value in (("app", "eighteen"), ("all", "com.apple.CoreSimulator.SimRuntime.iOS-"),
+        for tier, value in (("app", "eighteen"), ("ui", "com.apple.CoreSimulator.SimRuntime.iOS-"),
+                            ("all", "com.apple.CoreSimulator.SimRuntime.iOS-"),
                             ("changed", "com.apple.CoreSimulator.SimRuntime.iOS-")):
             with self.subTest(tier=tier, value=value):
                 h = Harness(self)
@@ -390,6 +391,16 @@ class FullRunTests(unittest.TestCase):
                 self.assertIn(expected, result.stdout + "\n".join(h.calls()))
                 self.assertFalse([c for c in h.calls() if c.startswith("xcodebuild") or "simctl | shutdown" in c])
                 self.assertEqual(h.state()["devices"][R27][0]["state"], "Booted")
+
+    def test_a_fast_run_leaves_the_clones_alone_even_with_keep_sims_0(self):
+        # fast never takes the host lock, so it never shuts down clones another run of this worktree may be using.
+        h = Harness(self, devices={R27: [dev("ts-wt-iphone-1", udid(1), "Booted")]})
+        self.git_fixture(h)
+        result = h.run("fast", CASSINI_KEEP_SIMS="0")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("swift | test", "\n".join(h.calls()))
+        self.assertFalse([c for c in h.calls() if "simctl | shutdown" in c])
+        self.assertEqual(h.state()["devices"][R27][0]["state"], "Booted")
 
     def test_a_run_that_does_not_get_the_host_lock_leaves_the_clones_alone(self):
         import fcntl
