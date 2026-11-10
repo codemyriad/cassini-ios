@@ -14,11 +14,11 @@ final class TextLimitTests: XCTestCase {
     }
 
     /// Fills `field` past `limit` in one edit, then types one more character; it shows `limit` characters each time.
-    @MainActor private func fillPastTheLimit(_ field: XCUIElement, _ limit: Int, file: StaticString = #filePath, line: UInt = #line) {
+    @MainActor private func fillPastTheLimit(_ field: XCUIElement, _ limit: Int, emptyValue: String? = nil, file: StaticString = #filePath, line: UInt = #line) {
         // The cursor goes to the end, so the deletes clear the whole field.
         field.coordinate(withNormalizedOffset: CGVector(dx: 0.98, dy: 0.5)).tap()
         let full = String(repeating: "a", count: limit)
-        field.replaceText(with: full + "a")
+        field.replaceText(with: full + "a", expecting: full, emptyValue: emptyValue)
         // The field cuts what goes past the limit as it changes, a moment after the typing on a busy machine.
         _ = field.wait(until: NSPredicate(format: "value == %@", full), within: 3)
         XCTAssertEqual(field.value as? String, full, file: file, line: line)
@@ -78,6 +78,7 @@ final class TextLimitTests: XCTestCase {
         XCTAssertTrue(app.buttons["Pause recording"].waitForEnabled(within: 8))
         let field = app.textFields["recordingTitle"]
         field.tap()
-        fillPastTheLimit(field, Self.titleLimit)
+        // The multiline SwiftUI field exposes its empty prompt as value without placeholderValue.
+        fillPastTheLimit(field, Self.titleLimit, emptyValue: "Title")
     }
 }

@@ -88,7 +88,7 @@ final class WideScreenTests: XCTestCase {
     @MainActor func testIPadSavedVoicesAreCappedAndCentred() throws {
         let app = try launch(["--seed", "voices"])
         let language = app.buttons["appLanguageRow"]
-        XCTAssertTrue(app.buttons["settingsButton"].tap(until: { language.exists }), "Settings did not open")
+        XCTAssertTrue(app.buttons["settingsButton"].tapWhenInteractive(in: app, until: { language.exists }), "Settings did not open")
         let row = app.buttons["savedVoicesRow"]
         XCTAssertTrue(app.scroll(attempts: 12) { row.exists && row.isHittable }, "Saved voices is not on the screen")
         row.tap()

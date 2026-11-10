@@ -19,7 +19,13 @@ final class ModelDownloadFlowTests: XCTestCase {
         // under the capture bar.
         XCTAssertTrue(app.otherElements["banner.DL_RECORD_NOW"].waitForExistence(within: 5))
         let row = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Thoughts from the morning walk")).firstMatch
-        app.swipeUp()
+        let list = app.scrollViews.firstMatch
+        let capture = app.buttons["recordButton"]
+        guard list.scroll(until: {
+            guard row.exists && row.isHittable else { return false }
+            let frame = row.frame
+            return list.frame.contains(frame) && frame.maxY <= capture.frame.minY
+        }) else { XCTFail("The note did not scroll clear of the capture controls"); return }
         row.tap()
         XCTAssertTrue(app.buttons["Transcribe"].waitForExistence(within: 5))
         app.buttons["Transcribe"].tap()
