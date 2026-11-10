@@ -76,6 +76,15 @@ match: the framework loads and transcribes on the iOS 18.2 simulator. On devices
 a Debug build (an A13 and an A16). There is still no A12 or A10 run, no memory measurement and no TestFlight
 acceptance on iOS 18.
 
+## Library search on iOS 18
+
+The Library search wraps (`TextField(axis: .vertical)`), so Search on the keyboard arrives as a new line, which the
+field turns into the end of the search. On iPadOS 18.2, on a heavily loaded Mac, the field once stopped passing edits to
+its binding mid-word: the query stayed at "Thur" while the field showed "Thursday" and the new line, so the search
+never ended and the keyboard stayed up (NoteReopenTests, 10 November 2026). Below iOS 26 the field therefore also
+reads every edit from its text view (`UITextView.textDidChangeNotification`), follows it and ends editing on a line
+break (`LibrarySearchEdit`). iOS 26 keeps the binding alone; the same failure was not seen there.
+
 ## How it is tested today
 
 - `swift test` covers both values of every platform fact and the CPU rule.
