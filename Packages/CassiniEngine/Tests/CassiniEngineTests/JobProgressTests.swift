@@ -42,4 +42,20 @@ import CassiniNotebook
         progress.end()
         #expect(progress.phase(for: id) == nil)
     }
+    @Test func queuedReportsKeepTheirProducerTimesForThePaceEstimate() {
+        let uptime = Uptime()
+        let progress = JobProgress(uptimeMs: { uptime.value })
+        progress.begin(UUID(), finalizationMs: nil)
+        // All events arrive after the producer has advanced to its final virtual instant.
+        uptime.advance(3_600)
+        progress.apply(.started(JobStart(totalMs: 600_000, speakers: false, prints: false)), receivedAt: 0)
+        progress.apply(.windowDone(doneMs: 60_000, totalMs: 600_000, words: []), receivedAt: 1_200)
+        progress.apply(.windowDone(doneMs: 90_000, totalMs: 600_000, words: []), receivedAt: 2_400)
+        progress.apply(.windowDone(doneMs: 120_000, totalMs: 600_000, words: []), receivedAt: 3_600)
+        progress.refresh()
+        guard case .transcribing(let running, _) = progress.phase else { Issue.record("Not transcribing"); return }
+        #expect(running.percent == 20)
+        if case .range = running.timeLeft {} else { Issue.record("queued virtual reports lost their distinct pace samples: \(running.timeLeft)") }
+    }
+
 }

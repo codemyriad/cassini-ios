@@ -33,12 +33,14 @@ final class DateLabelsTests: XCTestCase {
     }
 
     func testRecentlyDeletedAndVersionsUseTheShortDate() {
+        XCTAssertEqual(Locale.current.language.languageCode?.identifier, "en")
+        XCTAssertEqual(Locale.current.region?.identifier, "US", "English copy tests use the scheme's pinned locale")
         let first = now.addingTimeInterval(-7 * 86_400)
         XCTAssertEqual(TrashCopy.deleted(TrashDay(first, now: now, calendar: calendar), calendar: calendar), "Deleted 1 Oct")
         let dates = DateLabels(calendar: calendar)
         XCTAssertEqual(plainSpaces(dates.shortDateTime(first, now: now)), "1 Oct, 9:41 AM")
         XCTAssertEqual(plainSpaces(SpeakersCopy.versionTranscribed(at: dates.shortDateTime(first, now: now), words: 4_812)),
-                       "Transcribed 1 Oct, 9:41 AM · \(4_812.formatted()) words", "the count is grouped")
+                       "Transcribed 1 Oct, 9:41 AM · 4,812 words", "the count is grouped")
         XCTAssertEqual(SpeakersCopy.versionMerged(from: 1, at: "1 Oct, 9:41 AM"), "Speakers merged · from version 1 · 1 Oct, 9:41 AM")
         XCTAssertEqual(SpeakersCopy.wordCount(1), "1 word")
     }

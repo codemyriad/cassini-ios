@@ -22,23 +22,21 @@ struct TranscriptActions {
 /// The view is `Equatable` over what it draws, so a new playback position redraws only the paragraphs that hold the
 /// old and the new active word.
 struct TurnView: View, Equatable {
-    enum Style { case reading, draft }
+    typealias Style = TurnRenderInput.Style
 
-    let turn: NoteTurn
-    var activeIndex: Int?
-    var matches: [Range<Int>] = []
-    var currentMatch: Range<Int>?
-    var style: Style = .reading
-    /// The header opens Name a speaker (an attempt the transcript does not allow then shows why).
-    var renamable = true
+    let input: TurnRenderInput
     var actions = TranscriptActions()
     /// Where the paragraph is, for auto-follow.
     var geometry: FollowGeometry?
 
-    nonisolated static func == (a: TurnView, b: TurnView) -> Bool {
-        a.turn == b.turn && a.activeIndex == b.activeIndex && a.matches == b.matches && a.currentMatch == b.currentMatch
-            && a.style == b.style && a.renamable == b.renamable
-    }
+    private var turn: NoteTurn { input.turn }
+    private var activeIndex: Int? { input.activeIndex }
+    private var matches: [Range<Int>] { input.matches }
+    private var currentMatch: Range<Int>? { input.currentMatch }
+    private var style: Style { input.style }
+    private var renamable: Bool { input.renamable }
+
+    nonisolated static func == (a: TurnView, b: TurnView) -> Bool { a.input == b.input }
 
     var body: some View {
         #if DEBUG
