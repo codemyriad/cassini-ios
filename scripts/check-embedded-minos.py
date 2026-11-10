@@ -14,16 +14,6 @@ import struct
 import sys
 from pathlib import Path
 
-# Framework bundles allowed a higher minimum than the app's, each with the highest minimum allowed, until the work
-# named beside it lands. It covers only the framework's own executable (named after the bundle) and its Info.plist,
-# not anything else put in its folder. An exception that is no longer needed fails the check, so it is deleted with
-# that work.
-EXCEPTIONS = {
-    # The pinned private Whistle runtime stays linked for iOS 26 (scripts/bundle-whistle.py) and is offered only
-    # from iOS 26 (WhistleCapability's OS floor), loaded lazily, never at launch. Until: Whistle linked for iOS 18.
-    'Frameworks/CassiniWhistleRuntime.framework': (26, 0, 0),
-}
-
 LC_REQ_DYLD = 0x80000000
 LC_VERSION_MIN_IPHONEOS = 0x25
 LC_BUILD_VERSION = 0x32
@@ -88,21 +78,10 @@ def check(app):
     """The problems found in `app`, one line each."""
     target = version(plistlib.loads((app / 'Info.plist').read_bytes())['MinimumOSVersion'])
     problems = []
-    needed = set()
-
-    def allowed(relative):
-        for bundle, ceiling in EXCEPTIONS.items():
-            if relative in (f'{bundle}/{Path(bundle).stem}', f'{bundle}/Info.plist'):
-                return bundle, ceiling
-        return None, target
 
     def judge(relative, minimum):
-        bundle, ceiling = allowed(relative)
-        if minimum > ceiling:
-            problems.append(f'{relative}: minimum iOS {shown(minimum)} is above '
-                            + (f'its exception, {shown(ceiling)}' if bundle else f"the app's {shown(target)}"))
-        elif bundle and minimum > target:
-            needed.add(bundle)
+        if minimum > target:
+            problems.append(f"{relative}: minimum iOS {shown(minimum)} is above the app's {shown(target)}")
 
     for path in sorted(app.rglob('*')):
         if path.is_symlink() or not path.is_file():
@@ -123,9 +102,6 @@ def check(app):
                 problems.append(f'{relative}: a Mach-O without a minimum OS')
             else:
                 judge(relative, minimum)
-    for bundle in EXCEPTIONS:
-        if bundle not in needed:
-            problems.append(f'{bundle}: no longer needs its exception in scripts/check-embedded-minos.py; delete it')
     return target, problems
 
 
@@ -139,8 +115,7 @@ def main(arguments):
         print(f'error: {problem}', file=sys.stderr)
     if problems:
         return 1
-    print(f'{app.name}: every embedded binary needs iOS {shown(target)} or older'
-          + ''.join(f' (exception: {bundle} up to {shown(ceiling)})' for bundle, ceiling in EXCEPTIONS.items()))
+    print(f'{app.name}: every embedded binary needs iOS {shown(target)} or older')
     return 0
 
 

@@ -61,20 +61,22 @@ import Testing
                 "a capability built without a CPU fact keeps today's meaning")
     }
 
-    @Test func theOperatingSystemFloorIsIOS26() {
-        #expect(WhistleCapability.minimumOperatingSystemMajor == 26)
-        #expect(!WhistleCapability.supports(operatingSystemMajor: 18))
-        #expect(!WhistleCapability.supports(operatingSystemMajor: 25))
-        #expect(WhistleCapability.supports(operatingSystemMajor: 26))
-        #expect(WhistleCapability.supports(operatingSystemMajor: 27))
+    @Test func theOperatingSystemFloorIsIOS18() {
+        #expect(WhistleCapability.minimumOperatingSystemMajor == 18)
+        #expect(WhistleCapability.deploymentTarget == "18.0")
+        #expect(!WhistleCapability.supports(operatingSystemMajor: 17))
+        for major in [18, 25, 26, 27] { #expect(WhistleCapability.supports(operatingSystemMajor: major)) }
     }
 
-    /// The floor is the deployment target the framework is linked and pinned for; the two move together.
+    /// The floor and the manifest the runtime accepts are the deployment target the framework is linked and pinned
+    /// for, and the source minimum is the pinned archives'; they move together.
     @Test func theFloorMatchesThePinnedDeploymentTarget() throws {
         let repository = URL(filePath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         let pins = try JSONSerialization.jsonObject(with: Data(contentsOf: repository.appending(path: "Whistle/pins.json")))
         let target = try #require((pins as? [String: Any])?["deploymentTarget"] as? String)
         #expect(target == "\(WhistleCapability.minimumOperatingSystemMajor).0")
+        #expect(target == WhistleCapability.deploymentTarget)
+        #expect((pins as? [String: Any])?["sourceArchiveMinimumOS"] as? String == WhistleRuntime.sourceArchiveMinimumOS)
     }
 }

@@ -18,7 +18,7 @@ enum LivePlatform {
 
     static var operatingSystemMajor: Int { ProcessInfo.processInfo.operatingSystemVersion.majorVersion }
 
-    /// Whether this iOS is one the bundled Whistle framework is linked for (iOS 26 until Whistle is linked for 18).
+    /// Whether this iOS is one the bundled Whistle framework is linked for (iOS 18 and later).
     static var whistleOperatingSystemSupported: Bool {
         WhistleCapability.supports(operatingSystemMajor: operatingSystemMajor)
     }

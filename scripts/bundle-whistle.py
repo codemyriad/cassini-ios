@@ -3,6 +3,10 @@
 
 Run as an Xcode build phase, under the build's heavy-job lock on drmeyers.
 No source load commands are changed; deployment warnings remain visible.
+
+The framework's deployment target is Whistle/pins.json "deploymentTarget", the one source of truth: it is the link
+target, the asserted minos, the framework's MinimumOSVersion and the manifest's minimumOS. The app accepts only the
+manifest that WhistleCapability's OS floor implies, and a package test ties that floor to the same pin.
 """
 import argparse
 import hashlib
@@ -19,6 +23,11 @@ from whistle_binary_identity import identity
 
 ROOT = Path(__file__).resolve().parents[1]
 PINS = json.loads((ROOT / "Whistle/pins.json").read_text())
+# The source archives keep their own (newer) minimum; ld warns about it on every link, and that warning stays visible.
+DEPLOYMENT_TARGET = PINS["deploymentTarget"]
+SOURCE_ARCHIVE_MINIMUM_OS = PINS["sourceArchiveMinimumOS"]
+if not re.fullmatch(r"[1-9][0-9]*\.[0-9]+", DEPLOYMENT_TARGET):
+    raise ValueError(f"Whistle deploymentTarget must be major.minor: {DEPLOYMENT_TARGET!r}")
 EXPORTS = ["needle_load", "needle_models", "needle_last_error", "needle_transcribe", "needle_reset"]
 
 
@@ -61,13 +70,29 @@ def fetch(cache, name, offline=False):
 
 
 def check_imports(kind, imports):
+    """The link must import exactly the audited SDK 26 closure (Whistle/sdk26-imports.json): no symbol outside it, and
+    none of it missing, whatever the deployment target. A different set needs a fresh audit, not an edited list."""
     evidence = json.loads((ROOT / "Whistle/sdk26-imports.json").read_text())
     if evidence["engineRevision"] != PINS["engineRevision"] or evidence["sourceArchiveSha256"][kind] != PINS["artifacts"][kind + "/libneedle.a"]["sha256"]:
         raise ValueError("Whistle archive changed without fresh SDK26 evidence")
     allowed = evidence["targets"][kind]
-    missing = sorted(set(imports) - allowed.keys())
-    if missing:
-        raise ValueError(f"Whistle imports without SDK26 evidence: {missing}")
+    unaudited = sorted(set(imports) - allowed.keys())
+    if unaudited:
+        raise ValueError(f"Whistle imports without SDK26 evidence: {unaudited}")
+    absent = sorted(allowed.keys() - set(imports))
+    if absent:
+        raise ValueError(f"Whistle import set differs from the SDK26 audit; no longer imported: {absent}")
+
+
+def check_build_version(kind, build):
+    """`build` is `vtool -show-build` of the linked framework: one LC_BUILD_VERSION, for the slice's platform, at
+    exactly the pinned deployment target."""
+    expected_platform = "IOSSIMULATOR" if kind == "ios-sim-arm64" else "IOS"
+    platforms = re.findall(r"\bplatform\s+(\S+)", build)
+    minimums = re.findall(r"\bminos\s+(\S+)", build)
+    if platforms != [expected_platform] or minimums != [DEPLOYMENT_TARGET]:
+        raise ValueError(f"Whistle final deployment command is not {expected_platform} at the pinned target "
+                         f"{DEPLOYMENT_TARGET}: platform {platforms}, minos {minimums}")
 
 
 def run(command):
@@ -108,7 +133,7 @@ def bundle(cache, offline=False):
         binary = staged / "CassiniWhistleRuntime"
         exports = Path(staging) / "exports.txt"
         exports.write_text("".join("_" + name + "\n" for name in EXPORTS))
-        target = "arm64-apple-ios26.0" + ("-simulator" if platform == "iphonesimulator" else "")
+        target = "arm64-apple-ios" + DEPLOYMENT_TARGET + ("-simulator" if platform == "iphonesimulator" else "")
         run(["xcrun", "clang++", "-target", target, "-isysroot", sdk, "-dynamiclib",
              "-Wl,-undefined,error", "-Wl,-no_weak_imports", "-Wl,-force_load," + str(archive),
              "-Wl,-exported_symbols_list," + str(exports), "-install_name",
@@ -117,9 +142,7 @@ def bundle(cache, offline=False):
         check_imports(kind, imports)
         build = subprocess.check_output(["xcrun", "vtool", "-show-build", binary], text=True)
         print(build, flush=True)
-        expected_platform = "IOSSIMULATOR" if kind == "ios-sim-arm64" else "IOS"
-        if not re.search(r"\bminos\s+26\.0\b", build) or not re.search(r"\bplatform\s+" + expected_platform + r"\b", build):
-            raise ValueError("Whistle final deployment command is not the reviewed target26 platform")
+        check_build_version(kind, build)
         dependencies = subprocess.check_output(["otool", "-L", binary], text=True)
         print(dependencies, flush=True)
         linked = {line.strip().split(" ")[0] for line in dependencies.splitlines()[1:]}
@@ -131,7 +154,7 @@ def bundle(cache, offline=False):
             "CFBundleExecutable": binary.name, "CFBundleIdentifier": "io.codemyriad.cassini.whistle.runtime",
             "CFBundleName": "CassiniWhistleRuntime", "CFBundleInfoDictionaryVersion": "6.0",
             "CFBundlePackageType": "FMWK", "CFBundleVersion": "1", "CFBundleShortVersionString": "3.3.0",
-            "MinimumOSVersion": "26.0", "CFBundleSupportedPlatforms": ["iPhoneSimulator" if kind == "ios-sim-arm64" else "iPhoneOS"],
+            "MinimumOSVersion": DEPLOYMENT_TARGET, "CFBundleSupportedPlatforms": ["iPhoneSimulator" if kind == "ios-sim-arm64" else "iPhoneOS"],
         }))
         signing_identity = env.get("EXPANDED_CODE_SIGN_IDENTITY", "")
         if platform == "iphoneos" and env.get("CODE_SIGNING_ALLOWED") != "NO" and not signing_identity:
@@ -142,7 +165,7 @@ def bundle(cache, offline=False):
         # Pre-Apple build/export fingerprint, not an installed-runtime check: Apple can encrypt the image.
         # iOS validates the distributed framework's code signature when loading the app-bundled image.
         manifest = {"engineRevision": PINS["engineRevision"], "modelSha256": PINS["artifacts"]["whistle.cact"]["sha256"],
-                    "runtimeIdentity": identity(binary.read_bytes()), "identitySchema": "cassini-whistle-sections-v1", "target": kind, "minimumOS": "26.0", "sourceArchiveMinimumOS": "27.0"}
+                    "runtimeIdentity": identity(binary.read_bytes()), "identitySchema": "cassini-whistle-sections-v1", "target": kind, "minimumOS": DEPLOYMENT_TARGET, "sourceArchiveMinimumOS": SOURCE_ARCHIVE_MINIMUM_OS}
         verify(archive, PINS["artifacts"][kind + "/libneedle.a"])
         shutil.rmtree(framework, ignore_errors=True)
         shutil.move(staged, framework)

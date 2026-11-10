@@ -45,8 +45,8 @@ class EmbeddedMinimumTests(unittest.TestCase):
     def app(self, root, files, target='18.0'):
         app = Path(root) / 'Cassini.app'
         defaults = {'Info.plist': plistlib.dumps({'MinimumOSVersion': target}), 'Cassini': macho(target),
-                    WHISTLE + '/CassiniWhistleRuntime': macho('26.0'),
-                    WHISTLE + '/Info.plist': plistlib.dumps({'MinimumOSVersion': '26.0'})}
+                    WHISTLE + '/CassiniWhistleRuntime': macho(target),
+                    WHISTLE + '/Info.plist': plistlib.dumps({'MinimumOSVersion': target})}
         for relative, content in {**defaults, **files}.items():
             if content is None:
                 continue
@@ -59,7 +59,7 @@ class EmbeddedMinimumTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix='cassini minos ') as root:
             return checker.check(self.app(root, files, target))
 
-    def test_an_app_at_its_target_with_the_whistle_exception_passes(self):
+    def test_an_app_whose_binaries_are_at_or_below_its_target_passes(self):
         target, problems = self.check({
             'PlugIns/CassiniActivity.appex/CassiniActivity': macho('18.0'),
             'PlugIns/CassiniActivity.appex/Info.plist': plistlib.dumps({'MinimumOSVersion': '18.0'}),
@@ -83,28 +83,15 @@ class EmbeddedMinimumTests(unittest.TestCase):
                 self.assertTrue(problems[0].startswith(relative + ': minimum iOS '), problems)
                 self.assertIn("above the app's 18.0", problems[0])
 
-    def test_the_whistle_exception_covers_only_its_executable_and_plist(self):
-        for relative in [WHISTLE + '/Other.dylib', WHISTLE + '/Frameworks/Inner.framework/Inner',
-                         WHISTLE + '/Resources/Info.plist']:
-            with self.subTest(relative=relative):
-                content = (plistlib.dumps({'MinimumOSVersion': '26.0'}) if relative.endswith('.plist')
-                           else macho('26.0'))
-                _, problems = self.check({relative: content})
-                self.assertEqual(problems, [relative + ": minimum iOS 26.0 is above the app's 18.0"])
-
-    def test_whistle_may_not_exceed_its_exception(self):
-        _, problems = self.check({WHISTLE + '/CassiniWhistleRuntime': macho('27.0')})
-        self.assertEqual(problems, [WHISTLE + '/CassiniWhistleRuntime: minimum iOS 27.0 is above its exception, 26.0'])
-
-    def test_an_exception_no_longer_needed_fails_until_it_is_deleted(self):
-        for files, target in [({WHISTLE + '/CassiniWhistleRuntime': macho('18.0'),
-                                WHISTLE + '/Info.plist': plistlib.dumps({'MinimumOSVersion': '18.0'})}, '18.0'),
-                              ({WHISTLE + '/CassiniWhistleRuntime': None, WHISTLE + '/Info.plist': None}, '18.0'),
-                              ({}, '26.0')]:
-            with self.subTest(files=sorted(files), target=target):
-                _, problems = self.check(files, target)
-                self.assertEqual(problems, [WHISTLE + ': no longer needs its exception in '
-                                            'scripts/check-embedded-minos.py; delete it'])
+    def test_whistle_has_no_exception(self):
+        """The private Whistle runtime is linked for the app's own target (Whistle/pins.json); one linked for iOS 26
+        or for its source archives' 27 fails like any other binary, executable and plist alike."""
+        for minimum in ['26.0', '27.0']:
+            with self.subTest(minimum=minimum):
+                _, problems = self.check({WHISTLE + '/CassiniWhistleRuntime': macho(minimum),
+                                          WHISTLE + '/Info.plist': plistlib.dumps({'MinimumOSVersion': minimum})})
+                self.assertEqual(problems, [f"{WHISTLE}/CassiniWhistleRuntime: minimum iOS {minimum} is above the app's 18.0",
+                                            f"{WHISTLE}/Info.plist: minimum iOS {minimum} is above the app's 18.0"])
 
     def test_a_mach_o_without_a_minimum_fails(self):
         _, problems = self.check({'Frameworks/Bare.framework/Bare': macho()})

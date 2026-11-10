@@ -47,6 +47,40 @@ import CassiniWhistle
         #endif
     }
 
+    /// The device classes iOS 18 adds, over the facts the live app reads: the A10 iPad (7th generation, 3 GB) has no
+    /// recognizer, so Transcribe is disabled with the existing caption; an A12 iPhone XR (3 GB) gets Whistle; and a
+    /// device that can hold Parakeet but whose CPU refuses Whistle goes to Parakeet, so a Transcribe asks for its
+    /// download. iOS 26 keeps Apple speech in the cases where Whistle is refused.
+    func testIOS18DeviceClassesGetTheirRecognizer() async throws {
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        let a10 = WhistleCPUFeatures(reading: { [WhistleCPUFeatures.atomicsKey: [0, 0, 0, 0]][$0] })
+        let a12 = WhistleCPUFeatures(reading: { [WhistleCPUFeatures.atomicsKey: [1, 0, 0, 0], WhistleCPUFeatures.rcpcKey: [1, 0, 0, 0],
+                                                 WhistleCPUFeatures.dotProductKey: [0, 0, 0, 0]][$0] })
+        func recognizer(_ cpu: WhistleCPUFeatures, memory: UInt64, platform: PlatformFacts, major: Int = 18) -> SpeechRecognizer {
+            let whistle = WhistleCapability.bundled(arm64: true, osSupported: WhistleCapability.supports(operatingSystemMajor: major),
+                cpuSupported: WhistleCapability.supports(cpu: cpu), bundleVerified: true, physicalMemory: memory)
+            return SpeechModelsStore(root: root, defaults: defaults, storage: FakeStorage(), whistle: whistle,
+                parakeetLinked: true, platform: platform, physicalMemory: memory,
+                availableMemory: { ParakeetMemory.beforeLoadBytes }, installed: { false }, verified: { false }, verify: { false })
+                .selectedRecognizer()
+        }
+        XCTAssertEqual(recognizer(a12, memory: 3 << 30, platform: .iOS18), .whistle)
+        XCTAssertEqual(recognizer(a12, memory: 3 << 30, platform: .iOS26, major: 26), .whistle, "unchanged on iOS 26")
+        XCTAssertEqual(recognizer(a12, memory: 3 << 30, platform: .iOS18, major: 17), .appleSpeech, "below the floor nothing runs")
+        XCTAssertEqual(recognizer(a10, memory: 6 << 30, platform: .iOS18), .parakeet, "Transcribe asks for the Parakeet download")
+        XCTAssertEqual(recognizer(a10, memory: 6 << 30, platform: .iOS26, major: 26), .appleSpeech)
+
+        // The A10 iPad: no recognizer, so the Apple identity reaches the candidate that refuses before a job is queued.
+        XCTAssertEqual(recognizer(a10, memory: 3 << 30, platform: .iOS18), .appleSpeech)
+        let models = PinnedModels(root: root, defaults: defaults, storage: FileSystemStorageProbe())
+        let refusing = AppEnvironment.speechTranscriber(models: models, physicalMemory: 3 << 30, platform: .iOS18)
+        XCTAssertTrue(refusing is UnavailableSpeechTranscriber)
+        let failure = await refusing.unavailability(locale: Locale(identifier: "en_US"))
+        XCTAssertEqual(failure, .model)
+        XCTAssertEqual(failure?.transcriptionMessage,
+                       "On-device transcription is unavailable on this device. Your audio can still be played or exported.")
+    }
+
     /// Apple's adapter is built exactly where the facts say the system has Apple speech, and the system has it.
     func testTheAppleCandidateFollowsTheFactsAndTheSystem() {
         for platform in [LivePlatform.facts, .iOS26, .iOS18] {

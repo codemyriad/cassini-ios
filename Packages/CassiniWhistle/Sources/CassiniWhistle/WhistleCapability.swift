@@ -1,5 +1,7 @@
-/// Compatibility and reviewed pipeline/device evidence are independent. D78 uses the iOS26 parity and
-/// physical A12/3GB evidence; transient load/window headroom is checked by the recording adapter.
+/// Compatibility and reviewed pipeline/device evidence are independent. D78 uses the iOS 26 simulator parity and the
+/// physical A12/3GB evidence on iPadOS 26; transient load/window headroom is checked by the recording adapter. The
+/// framework is linked for iOS 18.0 (Silvio's decision of 2026-11-10); evidence on an iOS 18 runtime is still pending
+/// (Whistle/README.md).
 public struct WhistleCapability: Hashable, Sendable {
     public var arm64: Bool
     public var operatingSystemSupported: Bool
@@ -34,7 +36,7 @@ public struct WhistleCapability: Hashable, Sendable {
                      bundleVerified: bundleVerified,
                      pipelineAccepted: false, deviceAccepted: false, internalExperiment: admitted)
     }
-    /// D78 rollout after iOS26 DC/adapter parity and the default-limit A12/3GB physical memory gate.
+    /// D78 rollout after the iOS 26 DC/adapter parity and the default-limit A12/3GB physical memory gate on iPadOS 26.
     /// The minimum reported physical memory admits the measured 3GB class; runtime preflights recheck headroom.
     public static func bundled(arm64: Bool, osSupported: Bool, cpuSupported: Bool, bundleVerified: Bool,
                                physicalMemory: UInt64) -> Self {
@@ -42,10 +44,14 @@ public struct WhistleCapability: Hashable, Sendable {
               pipelineAccepted: true, deviceAccepted: physicalMemory >= 2 << 30)
     }
 
-    /// The oldest iOS major version the bundled framework is linked for and checked on (`scripts/bundle-whistle.py`
-    /// links it at 26.0, and `WhistleRuntime` accepts only that manifest). The live app and the internal lab both ask
-    /// `supports(operatingSystemMajor:)`.
-    public static let minimumOperatingSystemMajor = 26
+    /// The oldest iOS major version the bundled framework is linked for: `Whistle/pins.json` "deploymentTarget", which
+    /// `scripts/bundle-whistle.py` links, asserts and writes into the manifest, is `deploymentTarget` (a package test
+    /// ties the two), and `WhistleRuntime` accepts only a manifest with that minimum. The live app and the internal lab
+    /// both ask `supports(operatingSystemMajor:)`.
+    public static let minimumOperatingSystemMajor = 18
+
+    /// The framework's deployment target as the bundle manifest states it ("18.0").
+    public static var deploymentTarget: String { "\(minimumOperatingSystemMajor).0" }
 
     public static func supports(operatingSystemMajor major: Int) -> Bool { major >= minimumOperatingSystemMajor }
 
@@ -59,7 +65,7 @@ public struct WhistleCapability: Hashable, Sendable {
     public static let windowHeadroom: UInt64 = 256 << 20
 
     /// An explicitly unaccepted bundle stays unavailable. D78 uses the separate bundled factory after the
-    /// iOS26 pipeline and physical3GB measurement; a pending input never grants support.
+    /// iOS 26 pipeline and physical 3GB measurement; a pending input never grants support.
     public static func pending(bundleVerified: Bool) -> Self {
         #if arch(arm64) && os(iOS)
         let supported = true
