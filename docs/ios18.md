@@ -122,6 +122,6 @@ Apple no longer offers the iOS 18.6 simulator runtime that decisions 1 and 2 nam
 (22C150) the iOS 18 test runtime, and decision 1's evidence was gathered there
 ([Whistle/README.md](../Whistle/README.md)).
 
-Decisions 6 and 7 describe the iOS 18 leg (README); it is off by default for now (`ios18_default=off` in
+Decisions 6 and 7 describe the iOS 18 leg (README); it is on by default (`ios18_default=smoke` in
 `scripts/test.sh`). Decision 8 stands as recorded: the two AWS Device Farm runs on 2026-11-10 (iPhone 11 on
 iOS 18.6.2, iPhone 15 on iOS 18.0) were not a D75.2 lab-device run, a memory measurement or a TestFlight acceptance.

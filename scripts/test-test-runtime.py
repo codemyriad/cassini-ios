@@ -156,6 +156,11 @@ UI_TESTS = textwrap.dedent('''\
 ''')
 
 
+# The repository's default for the iOS 18 leg of `all`, and the fixture's.
+LEG_ON = "\nios18_default=smoke\n"
+LEG_OFF = "\nios18_default=off\n"
+
+
 class Harness:
     """A copy of the repository's scripts in a temporary worktree called wt, with fake tools first on PATH."""
 
@@ -171,6 +176,12 @@ class Harness:
             d.mkdir(parents=True)
         for name in ("test.sh", "test-events.py", "check-embedded-minos.py", "ui-test-durations.tsv"):
             shutil.copy2(ROOT / "scripts" / name, self.root / "scripts" / name)
+        # The fixture starts with the leg off by default, so the tests of everything else run without an iOS 18 runtime;
+        # Ios18LegTests switch the line back to the repository's value where the default is what they test.
+        script = self.root / "scripts/test.sh"
+        text = script.read_text()
+        assert text.count(LEG_ON) == 1, "scripts/test.sh no longer has the line " + LEG_ON.strip()
+        script.write_text(text.replace(LEG_ON, LEG_OFF))
         (self.root / "Package.swift").write_text("// fixture\n")
         (self.root / "Package.resolved").write_text("{}\n")
         (self.root / "CassiniUITests/Fixture.swift").write_text(UI_TESTS)
@@ -807,7 +818,7 @@ class Ios18LegTests(unittest.TestCase):
 
     def test_after_the_one_line_switch_an_all_run_without_the_runtime_fails(self):
         h = Harness(self)
-        self.variant(h, "\nios18_default=off\n", "\nios18_default=smoke\n")
+        self.variant(h, LEG_OFF, LEG_ON)
         result = h.run("all")
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("the iOS 18 leg is on (CASSINI_IOS18=smoke)", result.stderr)
@@ -820,7 +831,7 @@ class Ios18LegTests(unittest.TestCase):
     def view_branch(self, path):
         """A switched-on worktree whose branch changes `path` since origin/main."""
         h = Harness(self, WITH_18)
-        self.variant(h, "\nios18_default=off\n", "\nios18_default=smoke\n")
+        self.variant(h, LEG_OFF, LEG_ON)
         h.git()
         git = ["git", "-C", str(h.root), "-c", "user.name=t", "-c", "user.email=t@example.com"]
         subprocess.run(git + ["update-ref", "refs/remotes/origin/main", "HEAD"], check=True, env=h.env())

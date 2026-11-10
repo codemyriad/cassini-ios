@@ -47,9 +47,9 @@
 #                        CASSINI_RUNTIME=18 (its clones, logs and timing table, above). smoke: the hosted tests, then the
 #                        UI tests listed in scripts/ios18-smoke-tests.txt on one iPhone; full: the hosted tests, every
 #                        UI test on the iPhones and the testIPad* tests on the iPad; 0: no leg, and no commit status.
-#                        Unset, all runs ios18_default below: off (no leg; the status says nothing of iOS 18) until the
-#                        iOS 18 runtime is installed on the gate's Mac, then smoke, or full when the branch changes
-#                        views (Cassini/Features, Cassini/Design since it left origin/main). With the leg on, a Mac
+#                        Unset, all runs ios18_default below: smoke, or full when the branch changes views
+#                        (Cassini/Features, Cassini/Design since it left origin/main); with ios18_default=off there
+#                        is no leg and the status says nothing of iOS 18. With the leg on, a Mac
 #                        without the runtime fails the run, and its status, before anything is built; it never skips it.
 #   CASSINI_IOS18_RUNTIME  the runtime of that leg, as CASSINI_RUNTIME takes it (default 18; 26 runs the whole leg on an
 #                        installed iOS 26 runtime, with the iOS 18 facts given to every UI test's launch). Set, the run
@@ -111,10 +111,10 @@ case "$tier" in app|ui|all|changed|prebuilt)
     fi ;;
 esac
 
-# The iOS 18 leg of `all` when CASSINI_IOS18 is not set: off until the iOS 18 simulator runtime is installed on the
-# gate's Mac, then smoke (full when the branch changes views, ios18_preflight). That switch is this one line (README,
-# "The iOS 18 leg").
-ios18_default=off
+# The iOS 18 leg of `all` when CASSINI_IOS18 is not set: smoke (full when the branch changes views, ios18_preflight),
+# since the app's minimum is iOS 18 and the gate's Macs have the iOS 18 simulator runtime. `off` here is the one-line
+# switch back (README, "The iOS 18 leg").
+ios18_default=smoke
 # The one runtime value the leg runs on; the script's own tests run it on an installed iOS 26 runtime instead.
 ios18_runtime="${CASSINI_IOS18_RUNTIME:-18}"
 ios18_tag=$(runtime_tag_of "$ios18_runtime")

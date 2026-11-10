@@ -267,10 +267,9 @@ status names what the leg ran and how, for example `passed in 24 min: iPhone 72/
 76/76 (6 skipped), iPhone 16/16`.
 
 The iOS 18 test runtime is iOS 18.2 (22C150): Apple no longer offers 18.6 for download, and the app's floor is 18.0.
-Until the leg is switched on, it is off by default (`ios18_default=off` in `scripts/test.sh`). An `all` run is then
-unchanged, and its status says nothing about iOS 18.
-Once the leg is on, a Mac without the runtime fails the run and its status before anything is built; the leg is never
-skipped. `CASSINI_IOS18=0` turns the leg off and posts no status, the same way `CASSINI_UI_IPAD=0` does.
+The leg is on by default (`ios18_default=smoke` in `scripts/test.sh`), so every Mac that runs `all` needs the iOS 18
+runtime (install steps below). A Mac without it fails the run and its status before anything is built; the leg is never
+skipped. With `ios18_default=off` an `all` run has no leg and its status says nothing about iOS 18. `CASSINI_IOS18=0` turns the leg off and posts no status, the same way `CASSINI_UI_IPAD=0` does.
 `CASSINI_IOS18_RUNTIME=26` runs the whole leg on the installed iOS 26.0 runtime, to try it without iOS 18. There
 every UI test is given the iOS 18 facts (below), so the iOS 18 side of each test runs, and the run posts no status.
 In tests,
@@ -312,8 +311,8 @@ df -h /System/Volumes/Data                           # check what stays free on 
 
 `simctl` copies the inner image, about 8.7 GB, into the system's store on the internal disk, and the first boot of the
 runtime builds its dyld cache, about 3.5 GB more under `/Library/Developer/CoreSimulator/Caches`. The DMG stays
-external as the backup. Then change `ios18_default=off` to `ios18_default=smoke` in `scripts/test.sh`. That one
-line turns the leg on.
+external as the backup. The leg then runs: `ios18_default=smoke` in `scripts/test.sh` is the one line that
+turns it on.
 
 On GitHub, `.github/workflows/ci.yml` runs `scripts/test.sh fast` and `scripts/test.sh build` on a hosted runner
 with Xcode 27.0, for each push to main or a pull request that changes code. The simulator tiers run only locally: the
