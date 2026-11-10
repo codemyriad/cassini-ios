@@ -13,9 +13,12 @@ final class SettingsFlowTests: XCTestCase {
         return app
     }
 
-    /// Scrolls the screen up until `element` is on it.
+    /// Scrolls the screen up until the whole of `element` is on it. Hittable is not enough: an element cut by the bottom
+    /// edge is hittable, and its tap point can fall in the home indicator's strip, where the tap does nothing. On an
+    /// iPhone 16 (iOS 18.2) "Source code and notices" stopped at y 827.7–865.7 of 852 and the tap at y 846.7 did not
+    /// open the notices.
     @MainActor private func reveal(_ element: XCUIElement, in app: XCUIApplication) {
-        app.scroll { element.exists && element.isHittable }
+        app.scroll { element.exists && element.isHittable && app.frame.contains(element.frame) }
         XCTAssertTrue(element.waitForExistence(within: 2), "\(element) is not on the screen")
     }
 
