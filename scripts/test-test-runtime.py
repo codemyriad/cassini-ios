@@ -4,9 +4,14 @@
 Covers the runtime pick, the device types per runtime, clone names and leases per runtime, never reusing a clone of
 another runtime, which clones clean and the disk reclaim (also an older copy of it) treat as whose, separate logs and
 timing tables, and that without CASSINI_RUNTIME a run issues the commands it always did.
+
+Ios18LegTests cover the iOS 18 leg of `all` (CASSINI_IOS18): off by default with the commands of a run without it,
+its order after the default runtime's clones are shut down, smoke and full, a missing runtime failing the run and the
+status, the opt-out posting none, the status text, separate logs and timings, and the real smoke list.
 """
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -85,7 +90,7 @@ with open(os.path.join(stub, "state.lock"), "w") as lock:
 
 # build-for-testing writes an .xctestrun; test-without-building passes every test it is given.
 FAKE_XCODEBUILD = r'''#!/usr/bin/python3 -I
-import os, plistlib, sys
+import json, os, plistlib, sys
 stub = os.environ["STUB"]
 args = sys.argv[1:]
 with open(os.path.join(stub, "calls"), "a") as f:
@@ -104,15 +109,33 @@ if "build-for-testing" in args:
     with open(os.path.join(app, "PlugIns", "CassiniActivity.appex", "Info.plist"), "wb") as f:
         plistlib.dump({"MinimumOSVersion": os.environ.get("STUB_EMBEDDED_MINOS", "18.0")}, f)
 elif "test-without-building" in args:
+    # STUB_FAIL_RUNTIME: every test fails on a clone of that runtime.
+    udid = [a for a in args if a.startswith("platform=iOS Simulator,id=")][0].split("id=")[1]
+    state = json.load(open(os.path.join(stub, "state.json")))
+    fails = any(d["udid"] == udid for d in state["devices"].get(os.environ.get("STUB_FAIL_RUNTIME", ""), []))
+    verdict = "failed" if fails else "passed"
     for a in args:
         if a == "-only-testing:CassiniTests":
             print("Test Case '-[CassiniTests.HostedTests testHosted]' started.")
-            print("Test Case '-[CassiniTests.HostedTests testHosted]' passed (0.100 seconds).")
-            print("Executed 1 tests, with 0 failures")
+            print("Test Case '-[CassiniTests.HostedTests testHosted]' %s (0.100 seconds)." % verdict)
+            print("Test Case '-[CassiniTests.HostedTests testSkipped]' started.")
+            print("Test Case '-[CassiniTests.HostedTests testSkipped]' skipped (0.001 seconds).")
+            print("Executed 2 tests, with 1 test skipped and %d failures (0 unexpected)" % fails)
         elif a.startswith("-only-testing:CassiniUITests/"):
             cls, method = a.split("/", 1)[1].split("/")
             print("Test Case '-[CassiniUITests.%s %s]' started." % (cls, method))
-            print("Test Case '-[CassiniUITests.%s %s]' passed (4.000 seconds)." % (cls, method))
+            print("Test Case '-[CassiniUITests.%s %s]' %s (4.000 seconds)." % (cls, method, verdict))
+    sys.exit(65 if fails else 0)
+'''
+
+FAKE_SWIFT = r'''#!/bin/sh
+echo "swift | $*" >> "$STUB/calls"
+case "$*" in *--help-hidden*) exit 0 ;; esac
+echo "✔ Test run with 1 test passed after 0.1 seconds."
+'''
+
+FAKE_GH = r'''#!/bin/sh
+{ printf 'gh'; for a in "$@"; do printf ' | %s' "$a"; done; echo; } >> "$STUB/calls"
 '''
 
 UI_TESTS = textwrap.dedent('''\
@@ -145,11 +168,32 @@ class Harness:
         (self.root / "Package.swift").write_text("// fixture\n")
         (self.root / "Package.resolved").write_text("{}\n")
         (self.root / "CassiniUITests/Fixture.swift").write_text(UI_TESTS)
-        tools = {"xcrun": FAKE_XCRUN, "xcodebuild": FAKE_XCODEBUILD, "xcodegen": "#!/bin/sh\nexit 0\n"}
+        (self.root / "scripts/ios18-smoke-tests.txt").write_text("# the fixture's smoke list\nAlphaTests/testOne\n")
+        (self.root / "scripts/check-strings.sh").write_text("#!/bin/sh\nexit 0\n")
+        (self.root / "scripts/check-strings.sh").chmod(0o755)
+        tools = {"xcrun": FAKE_XCRUN, "xcodebuild": FAKE_XCODEBUILD, "xcodegen": "#!/bin/sh\nexit 0\n",
+                 "swift": FAKE_SWIFT, "gh": FAKE_GH}
         for name, text in tools.items():
             (self.stub / "bin" / name).write_text(text)
             (self.stub / "bin" / name).chmod(0o755)
         self.write_state(runtimes, devices or {})
+
+    def git(self):
+        """Makes the worktree a clean checkout with a GitHub origin, so `all` can post its status (to the fake gh)."""
+        (self.root / ".gitignore").write_text("DerivedData*\n.build\n")
+        git = ["git", "-C", str(self.root), "-c", "user.name=t", "-c", "user.email=t@example.com"]
+        for args in (["init", "-q"], ["add", "-A"], ["commit", "-q", "-m", "fixture"],
+                     ["remote", "add", "origin", "https://github.com/owner/repo.git"]):
+            subprocess.run(git + args, check=True, capture_output=True, env=self.env())
+
+    def statuses(self):
+        """(state, description) of each status posted."""
+        found = []
+        for c in self.calls():
+            if c.startswith("gh | api"):
+                fields = dict(f.split("=", 1) for f in c.split(" | ") if "=" in f and not f.startswith("repos/"))
+                found.append((fields["state"], fields["description"]))
+        return found
 
     def write_state(self, runtimes, devices):
         (self.stub / "state.json").write_text(json.dumps({"runtimes": runtimes, "devices": devices, "next": 0}))
@@ -207,7 +251,7 @@ class RuntimePickTests(unittest.TestCase):
         if ipad: env["CASSINI_IPAD"] = ipad
         code = f'runtime_tag={tag!r}; iphone_type="iPhone 17"; ipad_type="iPad Pro 13-inch (M5)"\n' \
                'select_runtime\nprintf "%s|%s|%s|%s\\n" "$runtime" "$runtime_version" "$iphone_type" "$ipad_type"'
-        return h.shell(["select_runtime"], code, **env)
+        return h.shell(["pick_runtime", "select_runtime"], code, **env)
 
     def test_a_major_version_picks_its_newest_runtime_and_the_devices_it_can_run(self):
         result = self.pick("18")
@@ -545,6 +589,193 @@ class OwnershipTests(unittest.TestCase):
         self.assertNotIn("iphone18", result.stdout)
         self.assertEqual(sorted(p.name for p in (leases / "runtime").iterdir()),
                          [udid(3), udid(4), udid(5), udid(6), udid(99)])
+
+
+class Ios18LegTests(unittest.TestCase):
+    DEFAULT_CLONES = ("ts-wt-iphone-1", "ts-wt-iphone-2", "ts-wt-ipad-1")
+
+    def variant(self, h, old, new):
+        """The worktree's test.sh with `old` replaced by `new`."""
+        path = h.root / "scripts/test.sh"
+        text = path.read_text()
+        self.assertEqual(text.count(old), 1, old)
+        path.write_text(text.replace(old, new))
+
+    def test_off_by_default_an_all_run_issues_the_commands_of_a_script_without_the_leg(self):
+        runs = []
+        for strip in (False, True):
+            h = Harness(self, WITH_18)
+            if strip:
+                for name in ("ios18_preflight", "run_ios18_leg"):
+                    self.variant(h, function(name), name + "() { return 0; }\n")
+            result = h.run("all")
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            runs.append((h, result))
+        (h, result), (_, stripped) = runs
+        # The boot and the shards run beside each other, so only their order may differ.
+        self.assertEqual(sorted(h.calls()), sorted(runs[1][0].calls()))
+        self.assertFalse([c for c in h.calls() if "iphone18" in c or "prebuilt" in c])
+        self.assertNotIn("iOS 18", result.stdout + result.stderr)
+        self.assertEqual(sorted(p.name for p in (h.root / "DerivedData.noindex").glob("test-logs*")), ["test-logs"])
+
+    def leg_run(self, mode, devices=None, **extra):
+        h = Harness(self, WITH_18, devices)
+        result = h.run("all", CASSINI_IOS18=mode, **extra)
+        return h, result
+
+    def test_the_leg_runs_after_the_default_clones_are_shut_down_and_smoke_runs_its_list_on_one_iphone(self):
+        other = udid(50)
+        h, result = self.leg_run("smoke", {R27: [dev("ts-other-iphone-1", other, "Booted")]})
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        calls, names = h.calls(), h.names()
+        leg_start = calls.index(f"xcrun | simctl | create | ts-wt-iphone18-1 | iPhone 16 | {R186}")
+        for name in self.DEFAULT_CLONES:
+            u = names[name][1]
+            booted = max(i for i, c in enumerate(calls) if c == f"xcrun | simctl | bootstatus | {u} | -b")
+            down = [i for i, c in enumerate(calls) if c == f"xcrun | simctl | shutdown | {u}" and booted < i < leg_start]
+            self.assertTrue(down, f"{name} is shut down before the iOS 18 clone is made")
+            self.assertFalse([c for c in calls[leg_start:] if c == f"xcrun | simctl | bootstatus | {u} | -b"])
+        # One build, tested on both runtimes.
+        self.assertEqual(len([c for c in calls if "build-for-testing" in c]), 1)
+        leg_tests = [c for c in calls[leg_start:] if "test-without-building" in c]
+        self.assertEqual(len(leg_tests), 2, leg_tests)
+        u18 = names["ts-wt-iphone18-1"][1]
+        self.assertTrue(all(f"id={u18}" in c for c in leg_tests))
+        self.assertIn("-only-testing:CassiniTests", leg_tests[0])
+        self.assertEqual(re.findall(r"-only-testing:CassiniUITests/\S+", leg_tests[1]),
+                         ["-only-testing:CassiniUITests/AlphaTests/testOne"])
+        self.assertEqual(sorted(n for n in names if "18" in n), ["ts-wt-iphone18-1"], "no second iPhone, no iPad")
+        # Only this worktree's clones are touched, and all of them are down at the end.
+        self.assertFalse([c for c in calls if other in c])
+        self.assertTrue(all(d["state"] == "Shutdown" for n, (rt, u) in names.items() if n.startswith("ts-wt-")
+                            for d in h.state()["devices"][rt] if d["udid"] == u))
+        self.assertIn("iOS 18 leg: iOS 18.6 hosted 1/1 (1 skipped), iPhone 1/1", result.stdout)
+        # Logs and timing tables of each runtime are their own.
+        derived = h.root / "DerivedData.noindex"
+        self.assertTrue((derived / "test-logs/ui-1.log").exists() and (derived / "test-logs/hosted.log").exists())
+        self.assertTrue((derived / "test-logs-ios18/ui-1.log").exists())
+        self.assertTrue((derived / "test-logs-ios18/hosted.log").exists())
+        self.assertEqual((h.cache / "ui-test-durations-ios18.tsv").read_text(), "AlphaTests/testOne\t4.0\n")
+        self.assertEqual(len((h.cache / "ui-test-durations.tsv").read_text().splitlines()), 3)
+        runtime_leases = {p.name for p in (h.cache / "sim-leases/runtime").iterdir()}
+        self.assertEqual(runtime_leases, {u18})
+
+    def test_full_runs_every_ui_test_on_the_iphones_and_the_ipad_tests_on_the_ipad(self):
+        h, result = self.leg_run("full")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        names = h.names()
+        self.assertEqual(sorted(n for n in names if "18" in n), ["ts-wt-ipad18-1", "ts-wt-iphone18-1", "ts-wt-iphone18-2"])
+        self.assertEqual(names["ts-wt-ipad18-1"][0], R186)
+        leg = "\n".join(h.calls()[h.calls().index(
+            f"xcrun | simctl | create | ts-wt-iphone18-1 | iPhone 16 | {R186}"):])
+        self.assertEqual(sorted(re.findall(r"-only-testing:CassiniUITests/(\S+)", leg)),
+                         ["AlphaTests/testIPadTwo", "AlphaTests/testIPadTwo", "AlphaTests/testOne", "BetaTests/testThree"])
+        self.assertIn("iOS 18 leg: iOS 18.6 hosted 1/1 (1 skipped), iPhone 3/3, iPad 1/1", result.stdout)
+
+    def test_a_missing_runtime_with_the_leg_on_fails_the_run_and_its_status_before_building(self):
+        h = Harness(self)
+        h.git()
+        result = h.run("all", CASSINI_IOS18="smoke", CASSINI_POST_STATUS="1")
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("the iOS 18 leg is on (CASSINI_IOS18=smoke) but no available iOS simulator runtime matches "
+                      "CASSINI_IOS18_RUNTIME=18 (available: 26.0, 27.0)", result.stderr)
+        self.assertFalse([c for c in h.calls() if c.startswith("xcodebuild") or c.startswith("swift")])
+        self.assertEqual(h.statuses(), [("pending", "running scripts/test.sh all on drmeyers"),
+                                        ("failure", "failed (exit 1): no iOS 18 runtime for the iOS 18 leg")])
+
+    def test_after_the_one_line_switch_an_all_run_without_the_runtime_fails(self):
+        h = Harness(self)
+        self.variant(h, "\nios18_default=off\n", "\nios18_default=smoke\n")
+        result = h.run("all")
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("the iOS 18 leg is on (CASSINI_IOS18=smoke)", result.stderr)
+        # And with the runtime there, it runs.
+        h.write_state(WITH_18, {})
+        result = h.run("all")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("iOS 18 leg: iOS 18.6 hosted 1/1 (1 skipped), iPhone 1/1", result.stdout)
+
+    def test_the_status_says_what_ran_and_nothing_of_ios_18_while_the_leg_is_off(self):
+        h = Harness(self, WITH_18)
+        h.git()
+        self.assertEqual(h.run("all", CASSINI_POST_STATUS="1").returncode, 0)
+        self.assertEqual(h.statuses()[-1], ("success", "passed in 1 min: iPhone 3/3, iPad 1/1"))
+        result = h.run("all", CASSINI_POST_STATUS="1", CASSINI_IOS18="smoke")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(h.statuses()[-1],
+                         ("success", "passed in 1 min: iPhone 3/3, iPad 1/1; iOS 18.6 hosted 1/1 (1 skipped), iPhone 1/1"))
+
+    def test_a_failing_leg_fails_the_run_and_its_status_says_where(self):
+        h = Harness(self, WITH_18)
+        h.git()
+        result = h.run("all", CASSINI_POST_STATUS="1", CASSINI_IOS18="smoke", STUB_FAIL_RUNTIME=R186)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertEqual(h.statuses()[-1],
+                         ("failure", "failed (exit 1): iPhone 3/3, iPad 1/1; iOS 18 leg failed: iOS 18.6 hosted 0/1 (1 skipped)"))
+        self.assertTrue((h.root / "DerivedData.noindex/test-logs-ios18/FAILED").exists())
+
+    def test_the_opt_out_posts_no_status_and_runs_no_leg(self):
+        h = Harness(self, WITH_18)
+        h.git()
+        result = h.run("all", CASSINI_POST_STATUS="1", CASSINI_IOS18="0")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("no commit status: CASSINI_IOS18=0 (no iOS 18 leg)", result.stdout)
+        self.assertEqual(h.statuses(), [])
+        self.assertFalse([c for c in h.calls() if "iphone18" in c])
+
+    def test_the_leg_runtime_is_one_value_that_can_run_the_leg_on_ios_26(self):
+        h, result = self.leg_run("smoke", CASSINI_IOS18_RUNTIME="26")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn(f"xcrun | simctl | create | ts-wt-iphone26-1 | iPhone 17 | {R26}", h.calls())
+        self.assertIn("iOS 26 leg: iOS 26.0 hosted 1/1 (1 skipped), iPhone 1/1", result.stdout)
+        self.assertTrue((h.root / "DerivedData.noindex/test-logs-ios26/ui-1.log").exists())
+
+    def test_the_ios18_tier_builds_and_runs_only_the_leg(self):
+        h = Harness(self, WITH_18)
+        result = h.run("ios18", "-only-testing:CassiniUITests/BetaTests")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertFalse([c for c in h.calls() if "ts-wt-iphone-" in c or c.startswith("swift")])
+        ui = [c for c in h.calls() if "test-without-building" in c and "CassiniUITests/" in c]
+        self.assertEqual([re.findall(r"CassiniUITests/(\S+)", c) for c in ui], [["BetaTests/testThree"]])
+
+    def test_bad_values_are_refused_before_anything_runs(self):
+        h = Harness(self, WITH_18)
+        for tier, env, message in (("all", {"CASSINI_IOS18": "yes"}, "none of smoke, full and 0"),
+                                   ("ios18", {"CASSINI_IOS18": "0"}, "nothing to run"),
+                                   ("all", {"CASSINI_IOS18": "smoke", "CASSINI_IOS18_RUNTIME": "eighteen"}, "neither")):
+            with self.subTest(tier=tier, env=env):
+                result = h.run(tier, **env)
+                self.assertEqual(result.returncode, 2)
+                self.assertIn(message, result.stderr)
+        self.assertEqual(h.calls(), [])
+        result = h.run("prebuilt")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("no .xctestrun", result.stderr)
+
+    def test_hosted_counts(self):
+        h = Harness(self)
+        for line, expected in (("Executed 82 tests, with 6 tests skipped and 0 failures (0 unexpected) in 9.1 (9.2) seconds",
+                                "76/76 (6 skipped)"),
+                               ("Executed 1 test, with 1 test skipped and 0 failures (0 unexpected)", "0/0 (1 skipped)"),
+                               ("Executed 82 tests, with 2 failures (0 unexpected) in 9.1 (9.2) seconds", "80/82"),
+                               ("", "")):
+            with self.subTest(line=line):
+                (h.root / "hosted.log").write_text("Test Suite 'All tests' passed\n" + line + "\n")
+                result = h.shell(["hosted_counts"], f'hosted_counts {str(h.root / "hosted.log")!r}')
+                self.assertEqual(result.stdout.strip(), expected, result.stderr)
+
+    def test_the_smoke_list_names_ui_tests_and_plans_about_six_minutes(self):
+        h = Harness(self)
+        listed = [line.split("#")[0].strip() for line in (ROOT / "scripts/ios18-smoke-tests.txt").read_text().splitlines()]
+        listed = [line for line in listed if line]
+        code = (f'ui_tests {str(ROOT)!r}/CassiniUITests/*.swift')
+        known = set(h.shell(["ui_tests"], code).stdout.split())
+        self.assertFalse([t for t in listed if t not in known], "every line names a UI test")
+        self.assertEqual(len(listed), len(set(listed)))
+        code = (f'timings_file=/nonexistent; committed_timings={str(ROOT / "scripts/ui-test-durations.tsv")!r}\n'
+                'printf "%s\\n" ' + " ".join(listed) + ' | planned_seconds')
+        planned = int(h.shell(["planned_seconds"], code).stdout)
+        self.assertLessEqual(planned, 400, f"the smoke list plans {planned} s")
 
 
 if __name__ == "__main__":
