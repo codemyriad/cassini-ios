@@ -187,5 +187,5 @@ The export and the upload sign in the cloud and work over SSH.
   check (each embedded `MinimumOSVersion` against its binary's minos) is covered locally by
   `scripts/check-embedded-minos.py`, but Apple's processing of an 18.0 build has not been seen yet. On iOS 18 the
   full test leg passed on the iOS 18.2 simulator ([iOS 18](ios18.md)), and two AWS Device Farm runs on 2026-11-10
-  (iPhone 11 on iOS 18.6.2, iPhone 15 on iOS 18.0) ran the Whistle tests in a Debug build with development signing.
+  (iPhone 11 on iOS 18.6.2, iPhone 15 on iOS 18.0) ran hosted Whistle and platform tests in a Debug build with development signing.
   No A12 or A10 device on iOS 18 and no Release build has run the app.

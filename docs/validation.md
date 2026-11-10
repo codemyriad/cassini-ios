@@ -6,13 +6,14 @@ Pro 13-inch (M5)). The counts were taken on 13 October 2026 with `scripts/test.s
 `scripts/test.sh` header), with logs in `DerivedData.noindex/test-logs-ios<version>`. A real device is still needed
 for the checks in the [device checklist](#device-checklist).
 
-The deployment target is iOS 18.0. Only Whistle's checks have run on an iOS 18 system so far: on the iOS 18.2
-simulator (the iOS 18 test runtime; Apple no longer offers 18.6) its imports resolve, its hosted tests pass and the 13
-parity fixtures match ([Whistle/README.md](../Whistle/README.md)). No iOS 18 device is known. The iOS 18 rules are
-covered by `swift test` (both values of each `PlatformFacts` fact and the Whistle CPU rule), by app-hosted tests that
-pass the iOS 18 facts (`PlatformCompositionTests`), and by `--ios18-platform` UI test launches, which apply them on the
-iOS 27 simulators (`SettingsFlowTests`, `SpeechUnavailableTests`, `ParakeetSuggestionTests`). They do not exercise
-iOS 18's own system, chrome or libraries. [iOS 18](ios18.md) lists what is pending.
+The deployment target is iOS 18.0. On the iOS 18.2 simulator (the iOS 18 test runtime; Apple no longer offers 18.6)
+Whistle's imports resolve and its 13 parity fixtures match ([Whistle/README.md](../Whistle/README.md)), and on 10
+November 2026 the full iOS 18 leg passed (hosted 98/98, iPhone 102/102, iPad 12/12). That day two AWS Device Farm runs
+(iPhone 11 on iOS 18.6.2, iPhone 15 on iOS 18.0) ran hosted Whistle and platform tests on devices in a Debug build.
+The iOS 18 rules are covered by `swift test` (both values of each `PlatformFacts` fact and the Whistle CPU rule), by
+app-hosted tests that pass the iOS 18 facts (`PlatformCompositionTests`), and by `--ios18-platform` UI test launches,
+which apply them on the iOS 27 simulators (`SettingsFlowTests`, `SpeechUnavailableTests`, `ParakeetSuggestionTests`).
+They do not exercise iOS 18's own system, chrome or libraries. [iOS 18](ios18.md) lists what is pending.
 
 ## Automated checks
 
@@ -117,8 +118,8 @@ xcodebuild -project Cassini.xcodeproj -scheme Cassini -configuration Release \
 
 The simulator has no microphone, no Apple speech models of its own, no Live Activities on a Lock Screen, and no
 background limits like a device's. Run these checks on a physical iPhone (and an iPad for the split view) with iOS 26
-or later, with Live Activities and notifications allowed, and, when an iOS 18 device is available, again on it (none
-is yet; see [iOS 18 device](#ios-18-device)). Android's `device-kill-resume.sh` covers the same ground as
+or later, with Live Activities and notifications allowed, and again on a device kept on iOS 18 (see
+[iOS 18 device](#ios-18-device)). Android's `device-kill-resume.sh` covers the same ground as
 the kill-and-resume items.
 
 ### Live Activity
@@ -152,8 +153,9 @@ the kill-and-resume items.
 
 ### iOS 18 device
 
-None of this has run: no iOS 18 device is known (decision 8 in [iOS 18](ios18.md)). On an iPhone XR or XS, or any
-device kept on iOS 18:
+None of this has run (decision 8 in [iOS 18](ios18.md)). The two AWS Device Farm runs on 2026-11-10 (iPhone 11 on iOS
+18.6.2, iPhone 15 on iOS 18.0) ran only hosted Whistle and platform tests in a Debug build; they read the CPU features as 1
+([Whistle/README.md](../Whistle/README.md)). On an iPhone XR or XS, or any device kept on iOS 18:
 
 - Install a TestFlight build. Whistle transcribes the controlled English sample (the Whistle README's distribution
   acceptance), and the `WhistleBundle` log shows the CPU features read as atomics and rcpc true.

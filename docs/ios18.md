@@ -1,11 +1,12 @@
 # iOS 18
 
 The app's deployment target is iOS 18.0 (`project.yml`). On iOS 26 and later it behaves as it did when the target was
-iOS 26. Below iOS 26 two system features are missing, and the app does without them. Everything on this page about
-iOS 18 is read from the code and its unit tests, except Whistle's evidence on the iOS 18.2 simulator (below). **Apart
-from that, nothing has run yet on an iOS 18 system: not on the iOS 18.2 simulator, the iOS 18 test runtime since
-Apple no longer offers 18.6, and not on a device.** Each statement below that depends on that says "not yet verified
-on iOS 18.2".
+iOS 26. Below iOS 26 two system features are missing, and the app does without them. Everything on this page about iOS
+18 is read from the code and its unit tests, except what has run on iOS 18 (below): the full iOS 18 test leg on the
+iOS 18.2 simulator, the iOS 18 test runtime since Apple no longer offers 18.6 (hosted 98/98, iPhone 102/102, iPad
+12/12 on 10 November 2026), and two AWS Device Farm runs on 2026-11-10 (iPhone 11 on iOS 18.6.2, iPhone 15 on iOS
+18.0), which ran only hosted Whistle and platform tests in a Debug build. Each statement below that none of these runs covers says
+"not yet verified on iOS 18.2".
 
 ## What the system decides
 
@@ -41,8 +42,10 @@ The devices that stop at iOS 18 and cannot run iOS 26 (from Apple's support list
 A newer device kept on iOS 18 follows the same rules: Whistle on every one (A12 or later), Parakeet from 5 GiB.
 
 The CPU rule is unit-tested with the A10's and the A12's values (`WhistleRequirementsTests`). That an app can read
-those `sysctl` keys on an iOS 18 device is not yet verified: if the read fails, Whistle is refused on iOS 18 rather
-than allowed to crash on first use. The `WhistleBundle` "CPU features" log line shows the answer on a device.
+those `sysctl` keys on an iOS 18 device is shown on an iPhone 11 (A13, iOS 18.6.2) and an iPhone 15 (A16, iOS 18.0),
+which read both as 1 in AWS Device Farm runs on 2026-11-10. No A12 or A10 has run the read. If the read fails, Whistle
+is refused on iOS 18 rather than allowed to crash on first use. The `WhistleBundle` "CPU features" log line shows the
+answer on a device.
 
 ## Background on iOS 18
 
@@ -68,8 +71,10 @@ Silvio's decision of 2026-11-10 (D85, decision 1 below) extends that exception t
 every OS version, linked at 18.0 (decision 3). [Whistle/README.md](../Whistle/README.md) has the contract and what has
 been shown with the 18.0-linked framework on the iOS 18.2, 26.0 and 27.0 simulators. On iOS 18.2 every simulator
 import resolves (five only through the host Mac's libraries), the hosted Whistle tests pass and the 13 parity fixtures
-match: the framework loads and transcribes on the iOS 18.2 simulator. No iOS 18 device is known (decision 8), so there
-is no device run, no memory measurement and no TestFlight acceptance on iOS 18.
+match: the framework loads and transcribes on the iOS 18.2 simulator. On devices, two AWS Device Farm runs on
+2026-11-10 (iPhone 11 on iOS 18.6.2, iPhone 15 on iOS 18.0) loaded it and transcribed the bundled English recording in
+a Debug build (an A13 and an A16). There is still no A12 or A10 run, no memory measurement and no TestFlight
+acceptance on iOS 18.
 
 ## How it is tested today
 
@@ -83,9 +88,9 @@ is no device run, no memory measurement and no TestFlight acceptance on iOS 18.
   iOS 18's own system chrome or APIs.
 - `scripts/test.sh build` runs `scripts/check-embedded-minos.py`: no embedded binary or plist may need a newer iOS
   than the app.
-- Not yet: a run of the other app-hosted and UI tests on the iOS 18.2 simulator runtime (only the Whistle tests have
-  run there), and the pre-iOS 26 system chrome (the back button's text,
-  navigation bar material, scroll following), which only such a run can show.
+- The iOS 18 leg (README) runs the same build on the iOS 18.2 simulator. On 10 November 2026 the full leg passed
+  there: hosted 98/98, iPhone 102/102, iPad 12/12, so every UI test has run against iOS 18.2's own system chrome.
+- Not yet: the finite background path on iOS 18 (no test checks it), and any run on an A12 or A10 on iOS 18.
 
 ## Decisions recorded
 
@@ -108,4 +113,6 @@ Apple no longer offers the iOS 18.6 simulator runtime that decisions 1 and 2 nam
 (22C150) the iOS 18 test runtime, and decision 1's evidence was gathered there
 ([Whistle/README.md](../Whistle/README.md)).
 
-Decisions 6 and 7 describe a test leg that is not on this branch.
+Decisions 6 and 7 describe the iOS 18 leg (README); it is off by default for now (`ios18_default=off` in
+`scripts/test.sh`). Decision 8 stands as recorded: the two AWS Device Farm runs on 2026-11-10 (iPhone 11 on
+iOS 18.6.2, iPhone 15 on iOS 18.0) were not a D75.2 lab-device run, a memory measurement or a TestFlight acceptance.
