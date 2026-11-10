@@ -19,6 +19,7 @@ public struct FakeTranscriber: Transcribing {
         case fails(TranscriptionError)
     }
 
+    private let clock: any AppClock
     public let script: Script
     private static let resultInterval = Duration.milliseconds(1_200)
     public let status: ModelPartStatus
@@ -26,8 +27,9 @@ public struct FakeTranscriber: Transcribing {
     /// then show Ultra's sizes.
     public let recognizer: SpeechRecognizer
 
-    public init(_ script: Script, status: ModelPartStatus = .ready, recognizer: SpeechRecognizer = .appleSpeech) {
-        self.script = script; self.status = status; self.recognizer = recognizer
+    public init(_ script: Script, status: ModelPartStatus = .ready, recognizer: SpeechRecognizer = .appleSpeech,
+                clock: any AppClock = SystemClock()) {
+        self.script = script; self.status = status; self.recognizer = recognizer; self.clock = clock
     }
 
     /// Parakeet's figure for a fresh install of Ultra and its detector, or the estimate for Apple's assets.
@@ -47,11 +49,11 @@ public struct FakeTranscriber: Transcribing {
         case .frozen(let done, let total, let draft, let pace):
             for segment in draft { events(.finalized(segment)) }
             // The job shows its results at most once a second; a report after the pause is shown whole.
-            if !draft.isEmpty || pace != nil { try await Task.sleep(for: Self.resultInterval) }
+            if !draft.isEmpty || pace != nil { try await clock.sleep(for: Self.resultInterval) }
             if let pace {
                 for back in [2.0, 1.0] {
                     events(.progress(done: done - back * pace, total: total))
-                    try await Task.sleep(for: Self.resultInterval)
+                    try await clock.sleep(for: Self.resultInterval)
                 }
             }
             events(.progress(done: done, total: total))
@@ -61,7 +63,7 @@ public struct FakeTranscriber: Transcribing {
             while true { try await Task.sleep(for: .seconds(3600)) }
         case .growing(let segments, let interval, let total):
             for segment in segments {
-                try await Task.sleep(for: interval)
+                try await clock.sleep(for: interval)
                 events(.finalized(segment))
                 events(.progress(done: segment.end, total: total))
             }

@@ -79,13 +79,13 @@ extension TranscriptionCoordinator {
         active = current
         setRunning(RunningJob(noteID: current.noteID, title: current.title))
         parts.progress?.begin(current.noteID, finalizationMs: settings.finalizationMs)
-        let (events, sink) = AsyncStream.makeStream(of: JobEvent.self)
+        let (events, sink) = AsyncStream.makeStream(of: (JobEvent, Int64?).self)
         current.events = Task { [weak self] in
-            for await event in events { self?.apply(event, to: current) }
+            for await (event, receivedAt) in events { self?.apply(event, to: current, receivedAt: receivedAt) }
         }
-        let runner = parts.runner, job = current.job, stop = current.stop
+        let runner = parts.runner, job = current.job, stop = current.stop, eventUptimeMs = parts.eventUptimeMs
         current.run = Task.detached {
-            let outcome = await runner.run(job, stop: stop) { sink.yield($0) }
+            let outcome = await runner.run(job, stop: stop) { sink.yield(($0, eventUptimeMs?())) }
             sink.finish()
             return outcome
         }
@@ -108,11 +108,11 @@ extension TranscriptionCoordinator {
         await announce(current, outcome)
     }
 
-    func apply(_ event: JobEvent, to current: Active) {
+    func apply(_ event: JobEvent, to current: Active, receivedAt: Int64? = nil) {
         guard active === current, let running = state.running else { return }
         let updated = running.applying(event)
         setRunning(updated)
-        parts.progress?.apply(event)
+        parts.progress?.apply(event, receivedAt: receivedAt)
         let fraction = parts.progress?.fraction(for: current.noteID) ?? updated.fraction
         backgroundProgress.completedUnitCount = Int64(((fraction ?? 0) * 100).rounded())
         if case .checkpointed(let doneMs) = event {
