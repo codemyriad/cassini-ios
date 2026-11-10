@@ -1,50 +1,35 @@
-# CURRENT UPDATE — 2026-11-10 18:10 UTC
-
-**#91 BACK TO DRAFT per agy fix-first review.** New clean PUSHED head **71274c47e98a3c450ead6ec4741021aaaa3822fc**. Previous 573a66c ready evidence below is historical, not current readiness.
-- Title test registers50ms sleep; verifies no write at10/20/30ms, replaces/cancels that exact sleep, crosses old deadline with no write through70ms, releases only replacement at80ms, asserts one final title write.
-- Policy captures clock/interval across suspension and rechecks weak self per iteration. Deinit cancels policy/title/event tasks. New deallocation test runs one tick, waits for next sleep, drops owner and requires controller release/policy completion.
-- Revised suites47/47 passed (restored1.527s). Mutations detected: bypass debounce, remove sleep cancellation, retain self across loop. All restored.
-- Final current-head locked loaded evidence **3/3 passed**, 6 hogs, both locks/no overlap, 4.152/3.291/3.305s. Hogs exited.
-- Current-head CI **PASSED**, run42871363925. Full gate **RUNNING**, tool session **9075**, `/tmp/d88-recording-agy-full-gate.log`, one iPhone worker/default iPad/status posting. Wrapper owns AWS lock and releases on exit. Do not remove while running. Remain draft until exact-head CI + full gate green.
-- #92 remains ready/in review, untouched. After #91 ready, refresh the audit for any newer main merges; assigned inventory3/6/7 otherwise done. No work on scw-ios8/9/10.
-
 # AWS iOS status
 
-Updated: 2026-11-10 17:44 UTC.
-**Assigned inventory list FINISHED: 3 merged as #85; 6 and 7 READY as #91/#92.** Follow-up fresh-main audit completed; no additional engine/package wall-clock conversion found beyond these two ready PRs.
+Updated: 2026-11-10 18:18 UTC.
+**#91 agy fix-first findings FIXED; READY again on71274c4 with exact-head CI/full gate green. #92 MERGED.** Assigned inventory3/6/7 complete to merged/ready. Refreshed main audit found no additional engine/package conversion beyond E7/E8 in ready #91.
 
-Mac destruction deadline: **2026-11-11 12:09 UTC**. All useful work is pushed. Remote handoff: branch `test/d88-aws-ios-handoff`, directory `docs/coordination/aws-ios/`, including STATUS, resume notes, evidence summaries/drivers and fresh audit report. No build products/models/recordings/xcresults committed.
+Mac destruction deadline: **2026-11-11 12:09 UTC**. All useful source/evidence/docs are pushed. Handoff branch `test/d88-aws-ios-handoff`, directory `docs/coordination/aws-ios/`. Build products, models, recordings, generated projects and xcresults excluded.
 
-## Completed
-- Inventory2 / #84 merged, exact-head CI/full gate green, own clones cleaned. Primary checkout retained on main.
-- Inventory3 / #85 merged at head3edd1a7. Permit-driven draft growth and uptime, producer timestamps, layout/end-geometry acknowledgement. Loaded before3/3 and after3/3 (both draft-follow and screenshot), 6 hogs/fresh boot/both locks. Dropped-timestamp and forced-follow mutations detected. Full retry680s green, exact-head CI green; initial iPad timeout resolved with own fresh clones and isolated WideScreen check. Own clones cleaned, merged worktree removed and pruned.
-
-## Inventory6 / #91 — READY, awaiting coordinator review/merge
+## Inventory6 / #91 — READY AGAIN, coordinator review/merge pending
 - https://github.com/codemyriad/cassini-ios/pull/91
-- Clean PUSHED head `573a66c21a5f55b91ba37cc59b9950e0392210dc`, branch `test/d88-recording-timers`, worktree `~/agents/cassini-ios-d88-recording`. Independent main c74b57c base, no draft dependency. Never force-push after ready.
-- Policy/title sleeps use AppClock; settle awaits title task; manual harness drives registered deadlines/cancels owned tasks. Hosted recording-specific clock retains real sleep cadence while shared FakeClock dates/search debounce stay unchanged.
-- Package46/46 current head, hosted subset11/11 on preceding head with identical production changes. Duplicate stale-title mutation detected (2 writes vs1), restored. Baseline3/3 and final after3/3 loaded green with6 hogs/both locks/no overlap. Older partial2-run batch retained separately and not counted for final head.
-- CI run42860564858 SUCCESS and exact-head full gate **PASSED763s**, drmeyers/test-all SUCCESS. Hosted99/7 skipped/0 failures, iPhone102/23 skipped/0 failures, iPad12/0 failures, packages/catalogs green. Body and D87 checklist updated before ready. Log `/tmp/d88-recording-full-gate.log`.
+- Clean PUSHED exact head **71274c47e98a3c450ead6ec4741021aaaa3822fc**, normal additional commit (no force push). Branch `test/d88-recording-timers`, worktree `~/agents/cassini-ios-d88-recording`. Independent base main c74b57c. PR put back to draft for agy fixes, then ready only after new CI + full gate green.
+- Review1 FIXED: title test registers50ms sleep, checks no write after10/20/30ms policy ticks, edits again and verifies cancellation of that sleep ID. Crosses old50ms deadline with no write through70ms; at80ms only the replacement title writes, once. Clock stores exact Duration deadlines, cancellation IDs; wait helpers can observe events without auto-advancing time.
+- Review2 FIXED: policy captures only clock/interval across suspension, re-acquires weak self inside each loop iteration; deinit cancels policy/title/event tasks. Lifetime test executes a policy tick, waits for the next registered sleep, drops owner, requires controller deallocation and cancelled policy completion.
+- Revised recording suites **47/47 passed**, restored1.527s. Mutations detected: bypass debounce (sleep count0 vs1), remove cancellation (old ID not cancelled), retain self across loop (deallocation failure). All restored. Earlier duplicate-title mutation detected2 writes vs1.
+- Main baseline **3/3** loaded passes retained. Revised exact-head after **3/3 passed** (4.152/3.291/3.305s),6 hogs, AWS/native locks, no overlapping gate. All hogs exited before full gate. Evidence `evidence/recording/after-agy-fix/` on handoff branch.
+- Current-head CI **SUCCESS**, run42871363925; full gate **PASSED724s**, drmeyers/test-all SUCCESS. Hosted99/7 skipped/0 failures, iPhone102/23 skipped/0 failures, iPad12/0 failures, packages/catalogs green. One iPhone worker/default iPad, AWS/native locks. Log `/tmp/d88-recording-agy-full-gate.log`. Gate exited, own sims shut down, locks released. Body/D87 checklist updated before ready. Prior573a66c gate763s is historical only.
 
-## Inventory7 / #92 — READY, awaiting coordinator review/merge
-- https://github.com/codemyriad/cassini-ios/pull/92
-- Clean PUSHED head `a8bd214e2488e0dd92f051179b1eec9fe2c98123`, branch `test/d88-parakeet-clocks`, worktree `~/agents/cassini-ios-d88-parakeet`. Independent main c74b57c base. No force pushes.
-- Native decode signals started and holds until test releases; cancel/capture count happen before release, final count must match (no assumption of exactly1 decode per window). Injected nanoTime advances20ms per decode; exact cumulative window/result sums replace real delays.
-- Suite22/22 passed after both mutations restored. Ignored cancel flag fails3 decodes vs captured1 and missing CancellationError; cumulative assignment fails80ms vs expected640ms. Selected observations1.343s versus baseline1.497s are not pass conditions.
-- Before3/3 and after3/3 loaded green with6 hogs/both locks/no overlap. First after attempt stopped immediately on foreign gate start, zero runs counted; all owned hogs exited.
-- CI run42865585963 SUCCESS, exact-head full gate **PASSED729s**, drmeyers/test-all SUCCESS. Hosted99/7 skipped/0 failures, iPhone102/23 skipped/0 failures, iPad12/0 failures, packages/catalogs green. Body/checklist updated before ready. Log `/tmp/d88-parakeet-full-gate.log`.
+## Completed / cleanup
+- Inventory2 / #84 merged, own clones cleaned, primary checkout retained on main.
+- Inventory3 / #85 merged, head3edd1a7, CI/full retry680s green, loaded before3/3 and after3/3, two mutations detected. Own clones cleaned, merged worktree removed/pruned.
+- Inventory7 / **#92 MERGED** as dac3495 into main. Head `a8bd214e2488e0dd92f051179b1eec9fe2c98123`, branch `test/d88-parakeet-clocks` pushed. Suite22/22; decode cancellation gate/count-before-release, virtual nanoTime exact cumulative sums. Cancel and timing mutations detected/restored. Before3/3 and after3/3 loaded,6 hogs/both locks/no overlap. CI run42865585963 and exact-head full gate729s green before ready, hosted99/iPhone102/iPad12 with no failures. Own clones cleaned with test.sh clean, merged worktree removed/pruned at18:16. Historical logs `/tmp/d88-parakeet-full-gate.log`; summaries remote.
 
-## Follow-up audit — completed
-- Freshly fetched clean main **dba4afae94b36df57819c8e695276b3654af1bb4**, including all merged D88 changes through #85. #91/#92 were still open ready at scan time; report explicitly accounts for their unmerged conversions.
-- `docs/coordination/aws-ios/WALL-CLOCK-AUDIT-2026-11-10.md` on handoff branch records scope, reproduction commands,56 package timing candidate lines, remaining known cases and reasons for exclusions.
-- Remaining main engine/package violations are E7/E8 in ready #91 and P1/P2 in ready #92. **No additional conversion found.** Other matches are positive event polling, cancelable holds/hang guards, fixed input dates/media lengths, thread CPU/scaling checks, or report-only diagnostics.
-- UI absence/playback/helper work (inventory8/9/10) remains scw-ios on Scaleway. No code or branch for those was started here. Re-scan main after further merges change its revision.
+## Follow-up fresh main audit — refreshed, complete
+- Fetched clean main **711606f56e9daaf5b5ae1673966450bdd2302506** at18:16; includes merged #92 and #89 artifact request retry. Primary checkout now on that main revision.
+- Report `docs/coordination/aws-ios/WALL-CLOCK-AUDIT-2026-11-10.md`, package timing candidates and extended semaphore/timer candidates pushed on handoff branch.
+- Remaining main engine/package D88 cases are only E7/E8 in ready #91. P1/P2 are now fixed on main by merged #92. **No additional conversion found.** New ArtifactRequestRetryTests inject synchronous errors/responses; no real timeout/network/clock. Other candidates are positive event polling, release/cancel gates and hang bounds, fixed date/media inputs, CPU/scaling checks or report-only diagnostics.
+- Inventory8/9/10 remains scw-ios on Scaleway. No code/branch for those started here. Never touch others' PRs. Re-scan after later main merges.
 
-## Shared sources and Mac rules
-- Shared decisions/contracts/vectors/strings/design/bug classes now sourced from **codemyriad/cassini-ux main**, read D87/D88 and review/BUG-CLASSES.md there at1e8a722. PR bodies cite it. No vendored strings/vectors touched; re-pin to cassini-ux at a commit when next touched. Propose shared changes to coordinator, never edit local shared copies. cassini-coordination keeps briefs/status/reviews/evidence only.
-- No owned hogs or gate active. Both gates shut down owned simulators and released locks. At most2 booted simulators while running. No foreign processes/clones touched.
-- Atomic mkdir `~/.aws-heavy.lock` around EVERY hog/full gate; rmdir only our acquired directory after owned processes exit; retain native lock. Exactly6 hogs,3 before+3 after, one fresh simulator boot when relevant. Never hog during another gate. Saved `package-evidence.py` monitors foreign gate starts and immediately stops owned hogs/test; `draft-loaded.py` preserves UI evidence driver.
-- Before marking ready: clean pushed head, exact-head CI plus `CASSINI_UI_WORKERS=1 CASSINI_KEEP_SIMS=0 CASSINI_POST_STATUS=1 scripts/test.sh all` green under AWS/native locks. After #91/#92 merge, clean only that worktree's clones, remove its worktree, prune. Never merge PRs ourselves.
+## Shared sources / execution rules
+- Shared decisions/contracts/vectors/strings/design/bug classes sourced from codemyriad/cassini-ux main. D87/D88 and review/BUG-CLASSES.md read at1e8a722; PR bodies cite it. No vendored vectors/strings changed here. Re-pin to cassini-ux at a commit when next touched; propose shared edits to coordinator, do not edit local shared copies. Coordination repo keeps status/briefs/reviews/evidence only.
+- No owned hogs or gate active. At most2 booted sims during gates; owned sims shut down afterwards. No foreign processes/clones touched.
+- Atomic mkdir `~/.aws-heavy.lock` around EVERY hog/full gate; rmdir only own acquired directory after owned children exit, retain native lock too. Exactly6 hogs,3 before+3 after; one fresh simulator boot when relevant. No hogs during any other gate. Saved package-evidence.py stops owned hogs/test immediately if a foreign gate starts; draft-loaded.py preserves UI evidence driver.
+- Ready requires clean pushed head, exact-head CI plus `CASSINI_UI_WORKERS=1 CASSINI_KEEP_SIMS=0 CASSINI_POST_STATUS=1 scripts/test.sh all` green. No force pushes; never merge ourselves. After coordinator merges #91, clean only its worktree's clones, remove worktree, prune.
 
 ## Questions
-None. Assigned inventory and follow-up audit are complete. No additional engine/package code changes remain from this scan; coordinator review/merge of ready #91/#92 is pending.
+None. Both agy findings addressed and #91 ready again; assigned inventory and follow-up audit complete. Coordinator review/merge of #91 pending.

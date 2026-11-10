@@ -1,56 +1,56 @@
 Packages/CassiniEngine/Sources/CassiniEngineTesting/FakeCheckpoints.swift:40:        while state.withLock({ $0.held.contains(noteID) }) { try? await Task.sleep(for: .milliseconds(2)) }
-Packages/CassiniInference/Tests/CassiniInferenceTests/ParakeetTranscriberTests.swift:99:            if delay > 0 { Thread.sleep(forTimeInterval: delay) }
-Packages/CassiniInference/Tests/CassiniInferenceTests/ParakeetTranscriberTests.swift:491:            let deadline = ContinuousClock.now + .seconds(30)
-Packages/CassiniInference/Tests/CassiniInferenceTests/ParakeetTranscriberTests.swift:494:                if ContinuousClock.now > deadline {
-Packages/CassiniInference/Tests/CassiniInferenceTests/ParakeetTranscriberTests.swift:504:        let deadline = ContinuousClock.now + .seconds(20)
-Packages/CassiniInference/Tests/CassiniInferenceTests/ParakeetTranscriberTests.swift:506:            guard ContinuousClock.now < deadline else { Issue.record("The check never started"); return }
-Packages/CassiniInference/Tests/CassiniInferenceTests/ParakeetTranscriberTests.swift:702:    let deadline = ContinuousClock.now + .seconds(20)
-Packages/CassiniInference/Tests/CassiniInferenceTests/ParakeetTranscriberTests.swift:704:        guard ContinuousClock.now < deadline else {
-Packages/CassiniInference/Tests/CassiniInferenceTests/ParakeetTranscriberTests.swift:708:        try await Task.sleep(for: .milliseconds(5))
+Packages/CassiniEngine/Tests/CassiniEngineTests/LibraryStoreTests.swift:79:        let deadline = ContinuousClock.now + .seconds(30) // An upper bound for a busy machine.
+Packages/CassiniEngine/Tests/CassiniEngineTests/LibraryStoreTests.swift:80:        while library.note(id)?.playbackPosition != 5, ContinuousClock.now < deadline {
+Packages/CassiniEngine/Tests/CassiniEngineTests/LibraryStoreTests.swift:81:            try await Task.sleep(for: .milliseconds(10))
 Packages/CassiniEngine/Sources/CassiniEngineTesting/FakeTranscriber.swift:60:            while true { try await Task.sleep(for: .seconds(3600)) }
 Packages/CassiniEngine/Sources/CassiniEngineTesting/FakeTranscriber.swift:63:            while true { try await Task.sleep(for: .seconds(3600)) }
 Packages/CassiniEngine/Sources/CassiniEngineTesting/FakeTranscriber.swift:70:            while true { try await Task.sleep(for: .seconds(3600)) }
+Packages/CassiniInference/Tests/CassiniInferenceTests/ParakeetTranscriberTests.swift:218:                             nanoTime: @escaping @Sendable () -> UInt64 = { DispatchTime.now().uptimeNanoseconds }) -> ParakeetTranscriber {
+Packages/CassiniInference/Tests/CassiniInferenceTests/ParakeetTranscriberTests.swift:536:            let deadline = ContinuousClock.now + .seconds(30)
+Packages/CassiniInference/Tests/CassiniInferenceTests/ParakeetTranscriberTests.swift:539:                if ContinuousClock.now > deadline {
+Packages/CassiniInference/Tests/CassiniInferenceTests/ParakeetTranscriberTests.swift:549:        let deadline = ContinuousClock.now + .seconds(20)
+Packages/CassiniInference/Tests/CassiniInferenceTests/ParakeetTranscriberTests.swift:551:            guard ContinuousClock.now < deadline else { Issue.record("The check never started"); return }
+Packages/CassiniInference/Tests/CassiniInferenceTests/ParakeetTranscriberTests.swift:750:    let deadline = ContinuousClock.now + .seconds(20)
+Packages/CassiniInference/Tests/CassiniInferenceTests/ParakeetTranscriberTests.swift:752:        guard ContinuousClock.now < deadline else {
+Packages/CassiniInference/Tests/CassiniInferenceTests/ParakeetTranscriberTests.swift:756:        try await Task.sleep(for: .milliseconds(5))
 Packages/CassiniEngine/Sources/CassiniEngineTesting/FakeAudioProcessing.swift:80:        while state.withLock({ $0.held }) { try await Task.sleep(for: .milliseconds(5)) }
+Packages/CassiniEngine/Tests/CassiniEngineTests/Models/ModelTestSupport.swift:58:    let deadline = ContinuousClock.now + .seconds(30)
+Packages/CassiniEngine/Tests/CassiniEngineTests/Models/ModelTestSupport.swift:60:        guard ContinuousClock.now < deadline else {
+Packages/CassiniEngine/Tests/CassiniEngineTests/Models/ModelTestSupport.swift:64:        try await Task.sleep(for: .milliseconds(5))
+Packages/CassiniEngine/Tests/CassiniEngineTests/NativeBudgetTests.swift:16:        let deadline = ContinuousClock.now + .seconds(30)
+Packages/CassiniEngine/Tests/CassiniEngineTests/NativeBudgetTests.swift:18:            guard ContinuousClock.now < deadline else {
+Packages/CassiniEngine/Tests/CassiniEngineTests/NativeBudgetTests.swift:22:            try await Task.sleep(for: .milliseconds(5))
+Packages/CassiniEngine/Sources/CassiniEngineTesting/FakeClock.swift:30:    public func sleep(for duration: Duration) async throws { try await Task.sleep(for: duration) }
+Packages/CassiniEngine/Tests/CassiniEngineTests/FakeTranscriberClockTests.swift:18:            group.addTask { try await Task.sleep(for: .seconds(30)); throw Bound.timeout }
+Packages/CassiniEngine/Tests/CassiniEngineTests/Models/ModelInstallerTests.swift:227:                try await Task.sleep(for: .seconds(30))
 Packages/CassiniEngine/Sources/CassiniEngineTesting/FakeCapture.swift:34:        return banked + (startedAt.map { Date().timeIntervalSince($0) } ?? 0)
 Packages/CassiniEngine/Sources/CassiniEngineTesting/FakeCapture.swift:49:        banked += Date().timeIntervalSince(startedAt)
 Packages/CassiniEngine/Sources/CassiniEngineTesting/FakeCapture.swift:79:                try? await Task.sleep(for: .milliseconds(100))
 Packages/CassiniEngine/Sources/CassiniEngineTesting/FakeCapture.swift:91:                try? await Task.sleep(for: .milliseconds(50))
-Packages/CassiniEngine/Sources/CassiniEngineTesting/FakeClock.swift:30:    public func sleep(for duration: Duration) async throws { try await Task.sleep(for: duration) }
-Packages/CassiniEngine/Sources/CassiniEngineTesting/FakeJobRunner.swift:27:        let clock = ContinuousClock()
-Packages/CassiniEngine/Sources/CassiniEngineTesting/FakeJobRunner.swift:31:            try await Task.sleep(for: .milliseconds(5))
-Packages/CassiniEngine/Sources/CassiniEngineTesting/FakeJobRunner.swift:84:            try? await Task.sleep(for: .milliseconds(2))
-Packages/CassiniNotebook/Tests/CassiniNotebookTests/LongRunMeasurementTests.swift:32:            let started = DispatchTime.now().uptimeNanoseconds
-Packages/CassiniNotebook/Tests/CassiniNotebookTests/LongRunMeasurementTests.swift:40:            nanos += DispatchTime.now().uptimeNanoseconds - started
-Packages/CassiniNotebook/Tests/CassiniNotebookTests/LongRunMeasurementTests.swift:58:            let started = DispatchTime.now().uptimeNanoseconds
-Packages/CassiniNotebook/Tests/CassiniNotebookTests/LongRunMeasurementTests.swift:63:            let seconds = Double(DispatchTime.now().uptimeNanoseconds - started) / 1e9
-Packages/CassiniEngine/Tests/CassiniEngineTests/NativeBudgetTests.swift:16:        let deadline = ContinuousClock.now + .seconds(30)
-Packages/CassiniEngine/Tests/CassiniEngineTests/NativeBudgetTests.swift:18:            guard ContinuousClock.now < deadline else {
-Packages/CassiniEngine/Tests/CassiniEngineTests/NativeBudgetTests.swift:22:            try await Task.sleep(for: .milliseconds(5))
-Packages/CassiniEngine/Tests/CassiniEngineTests/FakeTranscriberClockTests.swift:18:            group.addTask { try await Task.sleep(for: .seconds(30)); throw Bound.timeout }
 Packages/CassiniEngine/Tests/CassiniEngineTests/PlaybackControllerTests.swift:44:        let deadline = ContinuousClock.now + .seconds(30) // An upper bound for a busy machine.
 Packages/CassiniEngine/Tests/CassiniEngineTests/PlaybackControllerTests.swift:46:            guard ContinuousClock.now < deadline else {
 Packages/CassiniEngine/Tests/CassiniEngineTests/PlaybackControllerTests.swift:50:            try await Task.sleep(for: .milliseconds(2))
+Packages/CassiniEngine/Sources/CassiniEngineTesting/FakeJobRunner.swift:27:        let clock = ContinuousClock()
+Packages/CassiniEngine/Sources/CassiniEngineTesting/FakeJobRunner.swift:31:            try await Task.sleep(for: .milliseconds(5))
+Packages/CassiniEngine/Sources/CassiniEngineTesting/FakeJobRunner.swift:84:            try? await Task.sleep(for: .milliseconds(2))
+Packages/CassiniEngine/Tests/CassiniEngineTests/RecordingHarness.swift:37:                while harness?.isReady == false { harness?.readyChecks += 1; try? await Task.sleep(for: .milliseconds(5)) }
+Packages/CassiniEngine/Tests/CassiniEngineTests/RecordingHarness.swift:78:        let deadline = ContinuousClock.now + timeout
+Packages/CassiniEngine/Tests/CassiniEngineTests/RecordingHarness.swift:80:            guard ContinuousClock.now < deadline else {
+Packages/CassiniEngine/Tests/CassiniEngineTests/RecordingHarness.swift:84:            try await Task.sleep(for: .milliseconds(5))
 Packages/CassiniEngine/Tests/CassiniEngineTests/ModelInstallsTests.swift:776:    let deadline = ContinuousClock.now + .seconds(30)
 Packages/CassiniEngine/Tests/CassiniEngineTests/ModelInstallsTests.swift:778:        guard ContinuousClock.now < deadline else {
 Packages/CassiniEngine/Tests/CassiniEngineTests/ModelInstallsTests.swift:782:        try await Task.sleep(for: .milliseconds(5))
-Packages/CassiniEngine/Tests/CassiniEngineTests/RecordingScreenModelTests.swift:28:                    while screen?.lookupHeld == true { try? await Task.sleep(for: .milliseconds(5)) }
 Packages/CassiniEngine/Tests/CassiniEngineTests/QueueHarness.swift:96:        let clock = ContinuousClock()
 Packages/CassiniEngine/Tests/CassiniEngineTests/QueueHarness.swift:103:            try await Task.sleep(for: .milliseconds(5))
-Packages/CassiniEngine/Tests/CassiniEngineTests/LibraryStoreTests.swift:79:        let deadline = ContinuousClock.now + .seconds(30) // An upper bound for a busy machine.
-Packages/CassiniEngine/Tests/CassiniEngineTests/LibraryStoreTests.swift:80:        while library.note(id)?.playbackPosition != 5, ContinuousClock.now < deadline {
-Packages/CassiniEngine/Tests/CassiniEngineTests/LibraryStoreTests.swift:81:            try await Task.sleep(for: .milliseconds(10))
-Packages/CassiniEngine/Tests/CassiniEngineTests/Models/ModelTestSupport.swift:58:    let deadline = ContinuousClock.now + .seconds(30)
-Packages/CassiniEngine/Tests/CassiniEngineTests/Models/ModelTestSupport.swift:60:        guard ContinuousClock.now < deadline else {
-Packages/CassiniEngine/Tests/CassiniEngineTests/Models/ModelTestSupport.swift:64:        try await Task.sleep(for: .milliseconds(5))
+Packages/CassiniEngine/Tests/CassiniEngineTests/RecordingScreenModelTests.swift:28:                    while screen?.lookupHeld == true { try? await Task.sleep(for: .milliseconds(5)) }
 Packages/CassiniEngine/Tests/CassiniEngineTests/TranscriptionJobHarness.swift:15:            let deadline = ContinuousClock.now + .seconds(30)
 Packages/CassiniEngine/Tests/CassiniEngineTests/TranscriptionJobHarness.swift:17:                guard ContinuousClock.now < deadline else {
 Packages/CassiniEngine/Tests/CassiniEngineTests/TranscriptionJobHarness.swift:21:                try await Task.sleep(for: .milliseconds(5))
 Packages/CassiniEngine/Tests/CassiniEngineTests/TranscriptionJobHarness.swift:157:            if hangs { while true { try await Task.sleep(for: .seconds(60)) } }
 Packages/CassiniEngine/Tests/CassiniEngineTests/TranscriptionJobHarness.swift:296:    try await Task.sleep(for: .seconds(30))
-Packages/CassiniEngine/Tests/CassiniEngineTests/RecordingHarness.swift:37:                while harness?.isReady == false { harness?.readyChecks += 1; try? await Task.sleep(for: .milliseconds(5)) }
-Packages/CassiniEngine/Tests/CassiniEngineTests/RecordingHarness.swift:78:        let deadline = ContinuousClock.now + timeout
-Packages/CassiniEngine/Tests/CassiniEngineTests/RecordingHarness.swift:80:            guard ContinuousClock.now < deadline else {
-Packages/CassiniEngine/Tests/CassiniEngineTests/RecordingHarness.swift:84:            try await Task.sleep(for: .milliseconds(5))
-Packages/CassiniEngine/Tests/CassiniEngineTests/TrashServiceTests.swift:127:        let start = ContinuousClock.now
-Packages/CassiniEngine/Tests/CassiniEngineTests/Models/ModelInstallerTests.swift:227:                try await Task.sleep(for: .seconds(30))
 Packages/CassiniEngine/Tests/CassiniEngineTests/RecordingControllerTests.swift:77:        try await Task.sleep(for: RecordingHarness.debounce * 2)
+Packages/CassiniEngine/Tests/CassiniEngineTests/TrashServiceTests.swift:127:        let start = ContinuousClock.now
+Packages/CassiniNotebook/Tests/CassiniNotebookTests/LongRunMeasurementTests.swift:32:            let started = DispatchTime.now().uptimeNanoseconds
+Packages/CassiniNotebook/Tests/CassiniNotebookTests/LongRunMeasurementTests.swift:40:            nanos += DispatchTime.now().uptimeNanoseconds - started
+Packages/CassiniNotebook/Tests/CassiniNotebookTests/LongRunMeasurementTests.swift:58:            let started = DispatchTime.now().uptimeNanoseconds
+Packages/CassiniNotebook/Tests/CassiniNotebookTests/LongRunMeasurementTests.swift:63:            let seconds = Double(DispatchTime.now().uptimeNanoseconds - started) / 1e9

@@ -10,7 +10,7 @@ Validation:
 - Revised recording suites **47/47 passed**, including after restoring all mutations (1.527 s).
 - New mutation checks: removing debounce fails the full-50ms registration requirement; removing cancellation fails the cancelled-sleep identity requirement; retaining self before the loop fails the controller deallocation requirement. All restored. Earlier duplicate-title mutation also detected 2 writes versus1.
 - Main baseline **3/3** loaded passes retained. Current revised head **3/3** loaded passes (4.152/3.291/3.305 s), exactly6 hogs, AWS mkdir/native locks, no overlapping gate. All hogs exited before full gate.
-- Current-head CI **PASSED** (run42871363925); full status-posting gate **pending**. Gate runs with one iPhone worker/default iPad under AWS/native locks; remains draft until both pass on exact head. Prior 573a66c full gate763s is historical and does not establish current readiness.
+- Current-head CI **PASSED** (run42871363925). Full status-posting gate **PASSED724s** on clean pushed `71274c47e98a3c450ead6ec4741021aaaa3822fc`: hosted99/7 skipped/0 failures, iPhone102/23 skipped/0 failures, iPad12/0 failures, packages/catalogs green. One iPhone worker/default iPad under AWS/native locks; `drmeyers/test-all` success confirmed. Owned simulators shut down, locks released. Prior573a66c gate763s is historical; this724s run establishes revised-head readiness.
 
 ## Checked bug classes
 Reference: [cassini-ux review/BUG-CLASSES.md](https://github.com/codemyriad/cassini-ux/blob/1e8a722060c3f014c67fa4eff13c454307cc31ea/review/BUG-CLASSES.md) (D87).
@@ -19,4 +19,4 @@ Reference: [cassini-ux review/BUG-CLASSES.md](https://github.com/codemyriad/cass
 - 14–16: checked where applicable; new edits cancel the actual registered title sleep, controller teardown cancels timer/event tasks, and sleeping policy cannot retain its owner. Existing recording tests cover storage stops, interruptions, final titles, compression failures and handoff. No data format/protection changes.
 - 17: checked; title no-write checks advance exact virtual ticks gated on actual policy progress, then await the final task. Cancellation identity and deallocation are explicit assertions; timeouts only bound hangs. Mutations prove the assertions detect the protected bugs.
 - 18: checked; independent branch from main, no draft/failing dependency; normal additional commit after review, no force push.
-- 19: pending exact-head CI and full `CASSINI_POST_STATUS=1 scripts/test.sh all` on 71274c4; remains draft.
+- 19: checked; exact-head CI and full `CASSINI_POST_STATUS=1 scripts/test.sh all` both green on `71274c47e98a3c450ead6ec4741021aaaa3822fc`.

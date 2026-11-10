@@ -1,0 +1,3 @@
+Packages/CassiniWhistle/Tests/CassiniWhistleTests/WhistleBundleVerificationTests.swift:8:        let started = AsyncStream<Void>.makeStream(), release = DispatchSemaphore(value: 0)
+Packages/CassiniInference/Tests/CassiniInferenceTests/ParakeetTranscriberTests.swift:144:        private let condition = NSCondition()
+Packages/CassiniEngine/Tests/CassiniEngineTests/Models/PinnedModelInstallerTests.swift:333:    private let busy = DispatchSemaphore(value: 0)
