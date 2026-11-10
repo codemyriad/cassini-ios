@@ -5,6 +5,7 @@
 #   scripts/screenshots.sh --locale it     the same in Italian, under docs/screenshots/it/ (also fr, es, pt-BR and pt-PT)
 #   scripts/screenshots.sh --device iphone|ipad --appearance light|dark
 #                                          only that device or appearance (stale files are then left alone)
+#   scripts/screenshots.sh --output DIR  save the same stable layout under DIR (relative to the calling directory)
 #   scripts/screenshots.sh --no-build      use the last `scripts/test.sh build`
 #   scripts/screenshots.sh -- <xcodebuild arguments>, e.g. -- -only-testing:CassiniUITests/ScreenshotTests/test03Transcribing
 #
@@ -25,13 +26,7 @@
 # Environment: CASSINI_IPHONE / CASSINI_IPAD device types (default "iPhone 17", "iPad Pro 13-inch (M5)"),
 # CASSINI_SIM_PREFIX as for scripts/test.sh, CASSINI_KEEP_SIMS=1 to leave the clones booted.
 set -euo pipefail
-# One heavy run at a time per host (scripts/test.sh, "the host"): this script runs under the host lock, which the
-# scripts/test.sh it calls then knows it holds.
-if [ "${CASSINI_HEAVY_LOCK_HELD:-}" != 1 ]; then
-    echo "taking the host lock ${CASSINI_HEAVY_LOCK:-$HOME/.cassini-heavy.lock} (waits while another run holds it)"
-    exec env CASSINI_HEAVY_LOCK_HELD=1 /usr/bin/lockf -k -t $(( ${CASSINI_LOCK_MINUTES:-60} * 60 )) \
-        "${CASSINI_HEAVY_LOCK:-$HOME/.cassini-heavy.lock}" "$0" "$@"
-fi
+script_args=("$@")
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
 derived="$root/DerivedData.noindex"
@@ -40,16 +35,20 @@ iphone_type="${CASSINI_IPHONE:-iPhone 17}"
 ipad_type="${CASSINI_IPAD:-iPad Pro 13-inch (M5)}"
 # The shots ScreenshotTests takes in each appearance: test01Library to test09SavedVoices, and the two split views.
 iphone_shots=9 ipad_shots=2
-locale=en devices="iphone ipad" appearances="light dark" build=1 extra=()
+locale=en devices="iphone ipad" appearances="light dark" build=1 extra=() output=""
+usage() { awk 'NR > 1 && !/^#/ { exit } NR > 1' "$0" | sed 's/^# \{0,1\}//'; }
+require_value() { [ $# -ge 2 ] && [ -n "$2" ] || { echo "error: $1 needs a value" >&2; exit 2; }; }
 
 while [ $# -gt 0 ]; do
     case "$1" in
-        --locale) locale="$2"; shift 2 ;;
-        --device) devices="$2"; shift 2 ;;
-        --appearance) appearances="$2"; shift 2 ;;
+        --locale) require_value "$@"; locale="$2"; shift 2 ;;
+        --device) require_value "$@"; devices="$2"; shift 2 ;;
+        --appearance) require_value "$@"; appearances="$2"; shift 2 ;;
+        --output) require_value "$@"; output="$2"; shift 2 ;;
+        --help|-h) usage; exit 0 ;;
         --no-build) build=0; shift ;;
         --) shift; extra=("$@"); break ;;
-        *) awk 'NR > 1 && !/^#/ { exit } NR > 1' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+        *) usage; exit 2 ;;
     esac
 done
 case "$locale" in
@@ -58,11 +57,38 @@ case "$locale" in
     pt-BR|pt-PT) region="${locale/-/_}" out="$root/docs/screenshots/$locale" ;;
     *) echo "error: --locale is en, it, fr, es, pt-BR or pt-PT" >&2; exit 2 ;;
 esac
+case "$devices" in iphone|ipad|"iphone ipad") ;; *) echo "error: --device is iphone or ipad" >&2; exit 2 ;; esac
+case "$appearances" in light|dark|"light dark") ;; *) echo "error: --appearance is light or dark" >&2; exit 2 ;; esac
+if [ -n "$output" ]; then
+    case "$output" in /*) out="$output" ;; *) out="$PWD/$output" ;; esac
+fi
 # Every screenshot test, unless the extra arguments pick some (two -only-testing would run both).
 only=(-only-testing:CassiniUITests/ScreenshotTests)
 for argument in ${extra[@]+"${extra[@]}"}; do case "$argument" in -only-testing*) only=() ;; esac; done
 full=1
-[ "$devices" = "iphone ipad" ] && [ "$appearances" = "light dark" ] && [ ${#extra[@]} = 0 ] || full=0
+[ "$devices" = "iphone ipad" ] && [ "$appearances" = "light dark" ] && [ ${#extra[@]} = 0 ] && [ -z "$output" ] || full=0
+
+# One heavy run at a time per host (scripts/test.sh, "the host"): this script runs under the host lock, which the
+# scripts/test.sh it calls then knows it holds.
+if [ "${CASSINI_HEAVY_LOCK_HELD:-}" != 1 ]; then
+    echo "taking the host lock ${CASSINI_HEAVY_LOCK:-$HOME/.cassini-heavy.lock} (waits while another run holds it)"
+    exec env CASSINI_HEAVY_LOCK_HELD=1 /usr/bin/lockf -k -t $(( ${CASSINI_LOCK_MINUTES:-60} * 60 )) \
+        "${CASSINI_HEAVY_LOCK:-$HOME/.cassini-heavy.lock}" "$0" ${script_args[@]+"${script_args[@]}"}
+fi
+
+# Record only clones touched by this invocation; failure/signal cleanup never boots or changes another worktree.
+owned=()
+cleanup() {
+    local rc=$? udid
+    trap - EXIT
+    for udid in ${owned[@]+"${owned[@]}"}; do
+        xcrun simctl ui "$udid" appearance light >/dev/null 2>&1 || true
+        if [ "${CASSINI_KEEP_SIMS:-0}" != 1 ]; then xcrun simctl shutdown "$udid" >/dev/null 2>&1 || true; fi
+    done
+    exit "$rc"
+}
+trap cleanup EXIT
+trap 'exit 129' HUP; trap 'exit 130' INT; trap 'exit 143' TERM
 
 work="$derived/screenshots"
 rm -rf "$work"; mkdir -p "$work"
@@ -119,6 +145,7 @@ for device in $devices; do
         ipad) udid=$(clone_udid "$prefix-shots-ipad" "$ipad_type"); dest="$out/ipad" expected=$ipad_shots ;;
         *) echo "error: --device is iphone or ipad" >&2; exit 2 ;;
     esac
+    owned+=("$udid")
     echo "==> $device ($udid)"
     xcrun simctl bootstatus "$udid" -b > /dev/null
     # The status bar's clock follows the device's region, not the app's: set it, and boot again for it to apply.
@@ -142,6 +169,7 @@ for device in $devices; do
             TEST_RUNNER_CASSINI_SCREENSHOT_REGION="$region" \
             xcodebuild test-without-building -xctestrun "$xctestrun" -destination "platform=iOS Simulator,id=$udid" \
             -resultBundlePath "$bundle" -collect-test-diagnostics never -parallel-testing-enabled NO \
+            -test-timeouts-enabled YES -default-test-execution-time-allowance 300 -maximum-test-execution-time-allowance 600 \
             ${only[@]+"${only[@]}"} ${extra[@]+"${extra[@]}"} > "$work/$device-$appearance.log" 2>&1; then
             grep -E "error:|failed \(" "$work/$device-$appearance.log" | tail -20 >&2 || true
             echo "  the screenshot tests failed; see $work/$device-$appearance.log" >&2
@@ -161,6 +189,7 @@ for device in $devices; do
     done
     xcrun simctl ui "$udid" appearance light
     [ "${CASSINI_KEEP_SIMS:-0}" = 1 ] || xcrun simctl shutdown "$udid" 2> /dev/null || true
+    owned=()
 done
 
 # A full run that succeeded, every shot taken, leaves only the shots it took.
