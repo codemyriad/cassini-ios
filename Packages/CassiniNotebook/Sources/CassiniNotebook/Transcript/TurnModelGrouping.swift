@@ -15,15 +15,19 @@ extension TurnModel {
                 let gap = max(0, word.startMs - block.endMs)
                 let duration = max(0, word.endMs - block.startMs)
                 let targetReached = block.words.count >= 96 || block.endMs - block.startMs >= 45_000
-                let boundary = matches(block.text.trimmingCharacters(in: .whitespacesAndNewlines), #"[.!?]["')\]]*$"#) || gap >= 2200
+                let boundary = Pattern.sentenceEnd.matches(block.text.trimmingCharacters(in: .whitespacesAndNewlines)) || gap >= 2200
                 if block.speaker != word.speaker || gap > 4200 || duration > 90_000 || block.words.count + 1 > 140 || (targetReached && boundary) {
                     grouped.append(block)
                     current = Block(id: index, speaker: word.speaker, startMs: word.startMs,
                                     endMs: word.endMs, text: word.text, words: [item])
                 } else {
+                    // The text of every word joined, extended by the new word rather than joined again from the
+                    // first word: the same text, without a rejoin per word (quadratic in the block's words). A block
+                    // of one word still holds that word as given, untrimmed.
+                    if block.words.count == 1 { block.text = joinedText([block.text]) }
                     block.words.append(item)
                     block.endMs = word.endMs
-                    block.text = joinedText(block.words.map { $0.word.text })
+                    appendJoined(word.text, to: &block.text)
                     current = block
                 }
             } else {
@@ -56,22 +60,45 @@ extension TurnModel {
 
     static func joinedText(_ parts: [String]) -> String {
         var result = ""
-        for part in parts {
-            let part = part.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !part.isEmpty else { continue }
-            if !result.isEmpty && !matches(part, #"^[,.;:!?)]"#) { result += " " }
-            result += part
-        }
+        for part in parts { appendJoined(part, to: &result) }
         return result
+    }
+
+    /// Extends `joined`, the `joinedText` of some parts, to the `joinedText` of those parts and `part`.
+    static func appendJoined(_ part: String, to joined: inout String) {
+        let part = part.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !part.isEmpty else { return }
+        if !joined.isEmpty && !Pattern.attachesToPrevious.matches(part) { joined += " " }
+        joined += part
     }
 
     static func textWordCount(_ text: String) -> Int { text.split(whereSeparator: \.isWhitespace).count }
 
-    static func matches(_ text: String, _ pattern: String) -> Bool {
-        text.range(of: pattern, options: .regularExpression) != nil
+    /// A regular expression compiled once. `String.range(of:options: .regularExpression)` took about 2.3 µs a call on
+    /// iOS 18.2 (0.7 µs on iOS 27; Debug builds in the simulator), against 0.6 µs for a compiled one; the matching
+    /// itself is the same ICU expression with no options. The model gives the patterns anchored at the end
+    /// trimmed text only: a compiled `$` also matches before a final line break, where that search did not.
+    struct Pattern: @unchecked Sendable { // NSRegularExpression is immutable and safe to share between threads.
+        let regex: NSRegularExpression
+
+        init(_ pattern: String) {
+            do { regex = try NSRegularExpression(pattern: pattern) } catch { preconditionFailure("\(pattern): \(error)") }
+        }
+
+        func matches(_ text: String) -> Bool {
+            regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) != nil
+        }
+
+        /// A paragraph may end after this text.
+        static let sentenceEnd = Pattern(#"[.!?]["')\]]*$"#)
+        /// A word that follows the previous one without a space.
+        static let attachesToPrevious = Pattern(#"^[,.;:!?)]"#)
+        static let wordLike = Pattern(#"[\p{L}\p{N}]"#)
+        /// A punctuated word whose end timing may be inflated.
+        static let punctuationTail = Pattern(#"[.?!,;:…。．！？；：，、।॥؛؟][)\]}"'’”»›」』〉》]*$"#)
     }
 
-    static func isWordLike(_ text: String) -> Bool { matches(text, #"[\p{L}\p{N}]"#) }
+    static func isWordLike(_ text: String) -> Bool { Pattern.wordLike.matches(text) }
 
     struct Candidate {
         var indices: [Int]
@@ -87,7 +114,7 @@ extension TurnModel {
             var end = index + 1
             while end < words.count && !isWordLike(words[end].word.text) { end += 1 }
             let text = words[index..<end].map { $0.word.text }.joined().trimmingCharacters(in: .whitespacesAndNewlines)
-            if matches(text, #"[.?!,;:…。．！？；：，、।॥؛؟][)\]}"'’”»›」』〉》]*$"#) {
+            if Pattern.punctuationTail.matches(text) {
                 let timed = (index..<end).filter {
                     let word = words[$0].word
                     return word.startMs.isFinite && word.endMs.isFinite && word.endMs >= word.startMs

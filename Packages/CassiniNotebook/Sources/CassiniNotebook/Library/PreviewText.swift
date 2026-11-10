@@ -67,7 +67,7 @@ public enum PreviewText {
                 let label = chip ? id.map { labels[$0] ?? $0 } ?? SpeakerName.unknown.label : nil
                 return member.wordIndices.enumerated().map { offset, index in
                     let text = words[index].text.trimmingCharacters(in: .whitespacesAndNewlines)
-                    let spaced = offset == 0 || !TurnModel.matches(text, #"^[,.;:!?)]"#)
+                    let spaced = offset == 0 || !TurnModel.Pattern.attachesToPrevious.matches(text)
                     return Entry(text: text, canonical: index, row: rowIndex, spaceBefore: spaced,
                                  prefix: label.flatMap { offset == 0 ? "(\($0): " : nil } ?? "",
                                  suffix: chip && offset == member.wordIndices.count - 1 ? ")" : "", chipLabel: label)
