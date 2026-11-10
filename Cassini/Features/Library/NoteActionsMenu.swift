@@ -28,7 +28,7 @@ struct NoteActionsMenu: View {
     @ViewBuilder private func transcribeItems(_ menu: LibraryRowMenu) -> some View {
         switch menu.transcribe {
         case .transcribe:
-            Button(LibraryCopy.transcribe, systemImage: "text.badge.plus") { perform(.transcribe) }.disabled(menu.transcribeWaits)
+            Button(LibraryCopy.transcribe, systemImage: TranscribeSymbol.name) { perform(.transcribe) }.disabled(menu.transcribeWaits)
         case .transcribeAgain(let version, let namesCarry):
             Button { perform(.transcribeAgain) } label: {
                 Label(LibraryCopy.transcribeAgain, systemImage: "arrow.clockwise")
