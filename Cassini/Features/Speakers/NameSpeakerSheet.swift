@@ -85,7 +85,6 @@ struct NameSpeakerSheet: View {
                         nameChanged(state?.name ?? text)
                         if let name = state?.name, name != text { nameField = name }
                     }
-                    .onChange(of: ui.name) { _, name in if name != nameField { nameField = name } }
                     .textInputAutocapitalization(.words)
                     .autocorrectionDisabled()
                     .submitLabel(.done)
@@ -180,7 +179,14 @@ struct NameSpeakerSheet: View {
 
     // MARK: - Events
 
-    private func send(_ event: NamingEvent) { model.send(event, sheet: handle) }
+    /// Sends `event`; a name the model chose (a picked voice) goes into the field. The field's own typing is not
+    /// written back: a name the view rendered one keystroke earlier would overwrite text typed since, and the field
+    /// would keep showing that text while the stale name is saved (iOS 18.2: "Anna Ricci" shown, "Anna Ric" saved).
+    private func send(_ event: NamingEvent) {
+        model.send(event, sheet: handle)
+        if case .nameChanged = event { return }
+        if let name = state?.name, name != nameField { nameField = name }
+    }
 
     private func handle(_ action: NameSpeakerModel.SheetAction) {
         switch action {
