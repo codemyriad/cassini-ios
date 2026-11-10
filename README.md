@@ -252,18 +252,14 @@ In tests,
 on 18 and the iOS 26 screens on 26 and 27. With `TEST_RUNNER_CASSINI_IOS18_FACTS=1`, every launch gets
 `--ios18-platform` and those expectations follow, which runs the iOS 18 side on the current simulators.
 
-The smoke list passes that way on iOS 27 and, as the leg, on iOS 26.0. Sixteen other UI tests still expect the Apple
-speech device at the UI-test defaults and fail with the iOS 18 facts, so `full` cannot pass on iOS 18 until they follow
-`DeviceUnderTest` too: `CassiniUITests` `testMovingARunningNoteAsksFirst`, `testTheProcessingSeedShowsAJobInProgress`
-and `testTranscribeWithTheModelInstalledStartsWithoutAskingAndWritesTheTranscript`; `LibraryUITests`
-`testEveryRowStatusShowsWithItsText`, `testResumeAndTryAgainQueueTheNote`,
-`testTheActionsMenuAsksBeforeStartingOverOrReplacingTheVersions` and `testTheControlsLeadWhereTheySay`;
-`NoteFlowTests/testTranscribeReadSeekVersionsAndExports`; `NoteScreenTests` `testAPlainNoteShowsItsBannerAndSubtitle`,
-`testAPlainNotesMenuHasNoDocumentInfoAndCannotExportText`, `testAQueuedNoteCanStillBeRenamed`,
-`testAQueuedNoteKeepsItsTranscriptButCannotBeRenamed`, `testCancelInTheCardsDownloadStopsTheJob`,
-`testTheDraftFollowsItsEndBelowTheFixedCard` and `testTheQueuedCardCountsTheNotesAheadOfIt`; and the iPad's
-`WideScreenTests/testIPadModelDownloadIsCappedAndCentred`. `ScreenshotTests` skip unless `scripts/screenshots.sh`
-runs them.
+Where a test needs a recognizer that runs and the system has no Apple speech, it launches the bundled Whistle
+device of a 3 GB phone (`DeviceUnderTest.workingSpeech`, `--d78`); where it needs a speech model to download, the
+Parakeet device (`DeviceUnderTest.downloadedSpeech`, `--parakeet`). With Apple speech both add nothing, so the iOS 26
+and 27 runs launch with the same arguments as before. The statuses seed's paused job carries the recognizer of the
+device it is seeded on, so Resume queues it on the Whistle device too. Every UI test now follows the platform: with the
+iOS 18 facts, the smoke list passes on iOS 27, and the full leg (`CASSINI_IOS18=full`) passes on the iOS 26.0 runtime.
+Neither has run on a real iOS 18 runtime yet.
+`ScreenshotTests` skip unless `scripts/screenshots.sh` runs them.
 
 To install the runtime, download the iOS 18.6 simulator runtime DMG with the owner's Apple ID and keep it on
 `/Volumes/DrMeyers2/sim-runtimes`. Then, on the Mac:
