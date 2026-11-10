@@ -24,6 +24,14 @@ import CassiniEngine
         #expect(LibrarySearchEdit(text: "", query: "Thur") == .follow(""))
     }
 
+    @Test func anUnfinishedCompositionIsLeftAlone() {
+        // A dead key or an input method: "^" is marked text until "e" makes it "ê". Following it would end the composition.
+        #expect(LibrarySearchEdit(text: "caf^", query: "caf", composing: true) == .none)
+        #expect(LibrarySearchEdit(text: "ni\nhao", query: "", composing: true) == .none)
+        // Committed, it is followed like any other edit.
+        #expect(LibrarySearchEdit(text: "cafê", query: "caf", composing: false) == .follow("cafê"))
+    }
+
     @Test func textTheQueryHoldsChangesNothing() {
         #expect(LibrarySearchEdit(text: "Thursday", query: "Thursday") == .none)
         #expect(LibrarySearchEdit(text: "", query: "") == .none)

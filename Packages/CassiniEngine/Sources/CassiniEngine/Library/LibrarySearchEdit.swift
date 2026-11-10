@@ -12,8 +12,14 @@ public enum LibrarySearchEdit: Equatable, Sendable {
     /// A line break was typed (Search) or pasted: the text without line breaks is the query, and editing ends.
     case submit(String)
 
-    public init(text: String, query: String) {
-        if text.contains(where: \.isNewline) {
+    /// - Parameter composing: the text view holds marked text (an input method's or a dead key's unfinished
+    ///   composition). The text is then not the user's yet, and writing it to the query would make SwiftUI set the
+    ///   field's text and end the composition ("^e" instead of "ê"), so nothing happens until it is committed. UIKit
+    ///   commits marked text before it inserts Search's line break.
+    public init(text: String, query: String, composing: Bool = false) {
+        if composing {
+            self = .none
+        } else if text.contains(where: \.isNewline) {
             self = .submit(text.filter { !$0.isNewline })
         } else if text != query {
             self = .follow(text)

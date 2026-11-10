@@ -71,7 +71,7 @@ private struct TextViewEdits: ViewModifier {
             content.onReceive(NotificationCenter.default.publisher(for: UITextView.textDidChangeNotification)) { note in
                 guard let view = note.object as? UITextView, view.accessibilityIdentifier == SearchField.identifier,
                       let text = view.text else { return }
-                switch LibrarySearchEdit(text: text, query: query) {
+                switch LibrarySearchEdit(text: text, query: query, composing: view.markedTextRange != nil) {
                 case .none: break
                 case .follow(let typed): query = typed
                 case .submit(let typed):
