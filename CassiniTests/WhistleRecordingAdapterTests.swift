@@ -31,7 +31,7 @@ final class WhistleRecordingAdapterTests: XCTestCase {
         let url = try XCTUnwrap(Bundle.main.resourceURL?.appendingPathComponent("WhistleTests/jfk.wav"))
         let languages = Mutex<[String]>([])
         let result = try await transcriber().transcribe(.init(url: url, language: "it-IT", allowDownload: false)) {
-            if case .detectedLanguage(let language) = $0 { languages.withLock { $0.append(language) } }
+            if case .whistleBatch(let batch) = $0 { languages.withLock { $0 += batch.languages } }
         }
         XCTAssertFalse(result.segments.isEmpty)
         XCTAssertTrue(result.segments.flatMap(\.words).contains { $0.text.lowercased().contains("country") })

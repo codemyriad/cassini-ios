@@ -17,11 +17,15 @@ struct WhistleJobTestTranscriber: Transcribing {
     func transcribe(_ request: TranscriptionRequest, events: @escaping @Sendable (TranscriptionEvent) -> Void) async throws -> TranscriptionResult {
         let script = TranscriptionJobTests.ScriptedTranscriber.seventySeconds
         events(.progress(done: 0, total: 70))
-        for (index, segment) in script.enumerated() {
+        let first = (request.whistleResume?.processedSamples ?? 0) / 16_000
+        for (index, segment) in script.enumerated().dropFirst(first) {
             try Task.checkCancellation()
-            if let reported = mixed ? (index < 7 ? "en" : "es") : language { events(.detectedLanguage(reported)) }
-            events(.finalized(segment))
-            events(.progress(done: segment.end, total: 70))
+            let reported = mixed ? (index < 7 ? "en" : "es") : language
+            let position = (index + 1) * 16_000
+            let checkpoint = WhistleCheckpoint(sourceFrame: Int64(position), processedSamples: position,
+                                               doneSamples: position, state: Data([1]))
+            events(.whistleBatch(.init(checkpoint: checkpoint, segments: [segment],
+                                       languages: reported.map { [$0] } ?? [])))
             if index == 6, let pause {
                 pause.stop(.pause(.user))
                 throw CancellationError()
@@ -42,7 +46,9 @@ struct WhistleJobTestTranscriber: Transcribing {
         let checkpoint = try #require(try h.files.load(h.noteID))
         #expect(checkpoint.model == SpeechRecognizer.whistle.checkpointModel(language: ""))
         #expect(checkpoint.reportedLanguage == "en")
-        #expect(checkpoint.doneMs > 0)
+        #expect(checkpoint.doneMs == 7_000)
+        #expect(checkpoint.whistle?.sourceFrame == 112_000)
+        #expect(h.checkpoints.saved.map(\.doneMs) == [5_000, 7_000])
         #expect(await h.run(using: WhistleJobTestTranscriber(mixed: true)).outcome == .done)
         let note = try #require(await h.note())
         #expect(note.language == "mul")
@@ -54,6 +60,9 @@ struct WhistleJobTestTranscriber: Transcribing {
         #expect(provenance.resumedFromMs == checkpoint.doneMs)
         let words = note.transcript.flatMap(\.draftWords)
         #expect(words.count == 70)
-        #expect(Set(words.map(\.startMs)).count == words.count)
+        let expected = TranscriptionJobTests.ScriptedTranscriber.seventySeconds.flatMap(\.draftWords)
+        #expect(words.map(\.text) == expected.map(\.text))
+        #expect(words.map(\.startMs) == expected.map(\.startMs))
+        #expect(words.map(\.endMs) == expected.map(\.endMs))
     }
 }

@@ -205,6 +205,9 @@ public struct TranscriptionJob: TranscriptionJobRunning {
             }
             // A Parakeet checkpoint goes on from its window; one without it (none was written) starts over.
             if recognizer == .parakeet, checkpoint?.wordsComplete == false, checkpoint?.recognition == nil { checkpoint = nil }
+            // Legacy Whistle checkpoints have words but no DSP state. Rebuild the prefix once
+            // rather than mixing words from two different segmentation/reader versions.
+            if recognizer == .whistle, checkpoint?.wordsComplete == false, checkpoint?.whistle == nil { checkpoint = nil }
             if checkpoint?.wordsComplete != true {
                 switch await transcriber.assetStatus(locale: Locale(identifier: language)) {
                 case .unsupported:
@@ -365,7 +368,8 @@ public struct TranscriptionJob: TranscriptionJobRunning {
         let request = TranscriptionRequest(url: context.url, language: context.language,
                                            startOffset: parakeet ? 0 : TimeInterval(startMs) / 1000, resume: resume,
                                            allowDownload: context.settings.allowSpeechDownload,
-                                           speakers: parakeet ? speakers : nil)
+                                           speakers: parakeet ? speakers : nil,
+                                           whistleResume: context.recognizer == .whistle ? checkpoint?.whistle : nil)
         let transcriber = context.transcriber ?? transcriber
         let task = Task { try await transcriber.transcribe(request) { decode.handle($0) } }
         decode.attach(task)
