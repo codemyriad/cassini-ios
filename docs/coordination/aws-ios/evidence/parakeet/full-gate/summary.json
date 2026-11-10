@@ -1,0 +1,26 @@
+{
+  "pr": 92,
+  "head": "a8bd214e2488e0dd92f051179b1eec9fe2c98123",
+  "ci": "success",
+  "full_gate": "success",
+  "seconds": 729,
+  "status": "drmeyers/test-all",
+  "aws_lock": true,
+  "native_lock": true,
+  "ui_workers": 1,
+  "hosted": {
+    "tests": 99,
+    "skipped": 7,
+    "failures": 0
+  },
+  "iphone": {
+    "tests": 102,
+    "skipped": 23,
+    "failures": 0
+  },
+  "ipad": {
+    "tests": 12,
+    "failures": 0
+  },
+  "packages_and_catalogs": "passed"
+}

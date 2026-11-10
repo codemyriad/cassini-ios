@@ -1,15 +1,10 @@
-AWS iOS handoff — updated 2026-11-10 17:11 UTC
+AWS iOS handoff — 2026-11-10 17:44 UTC
 
-Read STATUS.md and latest coordinator messages. Mac destruction deadline 2026-11-11 12:09 UTC.
+Read STATUS.md and latest coordinator messages. Destruction deadline 2026-11-11 12:09 UTC.
+Assigned inventory3/6/7 complete: #85 merged/worktree cleaned+removed, #91 READY on573a66c and #92 READY ona8bd214. Exact-head CI and full gates763s/729s green; no force pushes, never merge ourselves. All source, evidence summaries and drivers pushed. No owned gate/hogs running, own simulators shut down, AWS/native locks released.
 
-Inventory 2 / #84 and inventory 3 / #85 are merged, own clones cleaned. Inventory 6 / draft #91 is pushed at 573a66c21a5f55b91ba37cc59b9950e0392210dc; finish current-head loaded evidence, CI, full status-posting gate, then ready. Inventory 7 branch is pushed pristine c74b57c; get 3 locked baseline runs before edits. AWS owns 3,6,7 ONLY. scw-ios owns 8,9,10. No work on 8–10 here.
+Fresh-main audit complete at dba4afae94b36df57819c8e695276b3654af1bb4: see WALL-CLOCK-AUDIT-2026-11-10.md and package-timing-candidates.txt. No new engine/package violations beyond those fixed in ready #91/#92 (not yet merged at scan). Inventory8/9/10 belong to scw-ios; no duplicate work here. Re-scan after later merges change main. Shared rule source is cassini-ux main; no vendored vectors/strings changed.
 
-No own hogs/gates active at checkpoint. CI #91 pending. Do not start hogs while another gate is active. Acquire mkdir ~/.aws-heavy.lock around every hog/full gate; release only own directory after processes exit. Also retain native lock. Exactly 6 hogs and 3 before/3 after; one fresh boot for simulator evidence, at most 2 booted simulators. package-evidence.py monitors foreign gate starts and stops its owned hogs/test immediately. Copy to /tmp/aws-ios-package-evidence.py if needed. draft-loaded.py is the preserved UI evidence driver.
+After coordinator merges #91/#92, scripts/test.sh clean in only its own worktree, remove worktree, prune. Preserve ready branches without force pushing. Check actual GitHub state before acting.
 
-Useful evidence JSONs and drivers are versioned; raw logs/build products/models/xcresults are not. Regenerate projects and builds on replacement Mac. Check exact pushed head CI + drmeyers/test-all green before ready; no force pushes after ready, never merge. Keep STATUS current and push every useful branch as work proceeds.
-
-17:18 resumed by coordinator: #91 CI and after-final 3/3 GREEN; full gate running session 68036 holding AWS lock. #7 pushed a8bd214, baseline 3/3 and converted suite22/22 pass; mutation verification active. After inventory6/7 ready, audit main freshly and convert remaining engine/package waits. Shared contracts now sourced from cassini-ux main.
-
-17:29: #91 READY on 573a66c: exact-head CI and full gate763s green, locks released. #7 final evidence retry in progress, first attempt aborted immediately on foreign gate start with zero counted runs. Continue #7 then audit.
-
-17:30: Inventory7 draft #92 opened on a8bd214 after #91 ready. Final locked3/3 passed, all hogs exited. Full gate running session46282 holding AWS lock, log /tmp/d88-parakeet-full-gate.log; CI pending. Remain draft until exact-head checks green.
+For future evidence: atomic mkdir ~/.aws-heavy.lock around any hog or full gate, rmdir only own acquired directory after owned children exit; retain native lock. Exactly6 hogs and3 before/3 after, one fresh simulator boot where relevant, at most2 booted sims. Never hog with another active gate. package-evidence.py stops owned hogs/test if a foreign gate starts; copy to /tmp/aws-ios-package-evidence.py if migrating. draft-loaded.py is the UI evidence driver. Build products/models/recordings/xcresults are excluded; regenerate on replacement Mac.
