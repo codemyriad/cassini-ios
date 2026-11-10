@@ -6,24 +6,20 @@ Pro 13-inch (M5)). The counts were taken on 13 October 2026 with `scripts/test.s
 `scripts/test.sh` header), with logs in `DerivedData.noindex/test-logs-ios<version>`. The iOS 18 leg of `all`
 (`CASSINI_IOS18`, [README](../README.md#the-ios-18-leg)) runs the same build on the iOS 18.2 runtime (22C150; Apple
 no longer offers 18.6). It runs the hosted tests and the UI smoke list `scripts/ios18-smoke-tests.txt`, or with `full`
-every UI test. It is off by default for now, so the counts below do not come from iOS 18. On 10 November 2026 on iOS
-18.2 the smoke list passed 16/16 and the hosted tests 95/97 (7 skipped): the thousand-note frame budget failed (about
-20 ms against 16 ms; the cause was fixed on main by #81, 7.7-8.4 ms of main-thread CPU on 18.2 on a branch with the
-same code, and the hosted run on 18.2 has to be repeated on this head), and the shared installer test crashed the
-host (a nil task executor preference, fixed since but not yet re-run on 18.2); every UI test: iPhone 95/102, iPad
-11/12 (before the 44 pt checks were fixed). Earlier that day
-the leg ran on the iOS 26.0 runtime instead (`CASSINI_IOS18_RUNTIME=26 scripts/test.sh ios18`, with the iOS 18 facts
-given to every UI launch): hosted 95/95 (7 skipped) and the smoke list 16/16, 3.5 minutes after the build. A real device is still
-needed for the checks in the [device checklist](#device-checklist).
+every UI test. It is off by default for now, so the counts below do not come from iOS 18. On 10 November 2026 (at
+bc7bb8e) the full leg passed on iOS 18.2: hosted 98/98 (7 skipped), iPhone 102/102, iPad 12/12. Earlier that day the
+leg ran on the iOS 26.0 runtime instead (`CASSINI_IOS18_RUNTIME=26 scripts/test.sh ios18`, with the iOS 18 facts given
+to every UI launch): hosted 95/95 (7 skipped) and the smoke list 16/16, 3.5 minutes after the build. A real device is
+still needed for the checks in the [device checklist](#device-checklist).
 
 The deployment target is iOS 18.0. On the iOS 18.2 simulator (the iOS 18 test runtime; Apple no longer offers 18.6)
-Whistle's imports resolve and its 13 parity fixtures match ([Whistle/README.md](../Whistle/README.md)), and on 10
-November 2026 the full iOS 18 leg passed (hosted 98/98, iPhone 102/102, iPad 12/12). That day two AWS Device Farm runs
-(iPhone 11 on iOS 18.6.2, iPhone 15 on iOS 18.0) ran hosted Whistle and platform tests on devices in a Debug build.
-The iOS 18 rules are covered by `swift test` (both values of each `PlatformFacts` fact and the Whistle CPU rule), by
-app-hosted tests that pass the iOS 18 facts (`PlatformCompositionTests`), and by `--ios18-platform` UI test launches,
-which apply them on the iOS 27 simulators (`SettingsFlowTests`, `SpeechUnavailableTests`, `ParakeetSuggestionTests`).
-They do not exercise iOS 18's own system, chrome or libraries. [iOS 18](ios18.md) lists what is pending.
+Whistle's imports resolve and its 13 parity fixtures match ([Whistle/README.md](../Whistle/README.md)), besides the
+full leg above. Two AWS Device Farm runs on 10 November 2026 (iPhone 11 on iOS 18.6.2, iPhone 15 on iOS 18.0) ran
+hosted Whistle and platform tests on devices in a Debug build. The iOS 18 rules are covered by `swift test` (both
+values of each `PlatformFacts` fact and the Whistle CPU rule), by app-hosted tests that pass the iOS 18 facts
+(`PlatformCompositionTests`), and by `--ios18-platform` UI test launches, which apply them on the iOS 27 simulators
+(`SettingsFlowTests`, `SpeechUnavailableTests`, `ParakeetSuggestionTests`). Those launches do not exercise iOS 18's
+own system, chrome or libraries; the leg on iOS 18.2 does. [iOS 18](ios18.md) lists what is pending.
 
 ## Automated checks
 
@@ -36,7 +32,7 @@ command below runs from the repository root, not from a folder under `Packages/`
 | `app` | The hosted unit tests (`CassiniTests`) in the app on a simulator | 82, of which the 6 real-model ones skip unless `scripts/sherpa-bench.sh` or `scripts/speaker-smoke.sh` names their models |
 | `ui` | The UI tests (`CassiniUITests`) on up to three iPhone clones, and the `testIPad*` tests on an iPad clone | 91 test methods: 72 run on the iPhones, the 8 `testIPad*` tests on the iPad, and the 11 `ScreenshotTests` skip |
 | `all` | All three; the package tests run beside the build. Then the iOS 18 leg, when it is on | |
-| `ios18` | Build, then only the iOS 18 leg: the hosted tests and the UI smoke list (`CASSINI_IOS18=full`: every UI test and the iPad's) on the iOS 18 runtime | not yet run on iOS 18; on iOS 26.0 with the iOS 18 facts: hosted 95/95 (7 skipped), UI 16/16 |
+| `ios18` | Build, then only the iOS 18 leg: the hosted tests and the UI smoke list (`CASSINI_IOS18=full`: every UI test and the iPad's) on the iOS 18 runtime | full leg on iOS 18.2 at bc7bb8e: hosted 98/98 (7 skipped), iPhone 102/102, iPad 12/12; on iOS 26.0 with the iOS 18 facts: hosted 95/95 (7 skipped), UI 16/16 |
 
 ### `fast`: the string catalogs and the package tests
 

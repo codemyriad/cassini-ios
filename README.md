@@ -8,8 +8,9 @@ This is the iOS port of [Cassini for Android](https://github.com/codemyriad/cass
 <AndroidTest>#<name>`. Where the two apps disagree, Android's behaviour wins, unless the difference is an iOS-only
 extra or a platform constraint. [Differences from Android](#differences-from-android) lists what remains different and
 why. The app is native SwiftUI for iOS 18 or later. On iOS 26 and later it can fall back to Apple's speech model and
-uses continued background processing; below iOS 26 it does without both ([iOS 18](docs/ios18.md)). On iOS 18 only
-Whistle has run so far, on the iOS 18.2 simulator; the rest of iOS 18 support is not yet verified on iOS 18.2.
+uses continued background processing; below iOS 26 it does without both ([iOS 18](docs/ios18.md)). On iOS 18 the
+full test leg has passed on the iOS 18.2 simulator, and Whistle has run on two iOS 18 devices (an iPhone 11 and an
+iPhone 15, in AWS Device Farm); the finite background path and A12 or A10 devices on iOS 18 are not yet verified.
 
 ## Screenshots
 
@@ -283,14 +284,14 @@ Parakeet device (`DeviceUnderTest.downloadedSpeech`, `--parakeet`). With Apple s
 and 27 runs launch with the same arguments as before. The statuses seed's paused job carries the recognizer of the
 device it is seeded on, so Resume queues it on the Whistle device too. Every UI test now follows the platform: with the
 iOS 18 facts, the smoke list passes on iOS 27, and the full leg (`CASSINI_IOS18=full`) passes on the iOS 26.0 runtime.
-On the real iOS 18.2 runtime (10 November 2026) the smoke list passed 16/16. Two hosted tests failed:
-`LibraryScreenTests/testAThousandNotesFilterWithoutDroppingFrames` (about 20 ms against its 16 ms budget, every run;
-its cause, the turn model's per-word regex rejoin, was fixed on main by #81, which also measures the keystroke in
-main-thread CPU: 7.7-8.4 ms on 18.2, measured on a branch with the same code; the hosted run on 18.2 has to be
-repeated on this head) and `SpeechCompositionTests/testSpeechAndTheSpeakerModelsShareOneInstaller`, which crashed the test host: on iOS 18
-`Task(executorPreference: nil)` crashes, so every pinned-model download crashed the app. `PinnedModelInstaller` now
-starts a plain `Task` when it has no executor; that fix has not run on 18.2 yet. Every UI test on 18.2: iPhone
-95/102, iPad 11/12 (before the 44 pt checks were fixed). The leg stays off by default for now.
+On the real iOS 18.2 runtime (10 November 2026, at bc7bb8e) the full leg passed: hosted 98/98 (7 skipped), iPhone
+102/102, iPad 12/12. Earlier runs there had found the frame-budget regression (its cause, the turn model's per-word
+regex rejoin, was fixed on main by #81, which measures the keystroke in main-thread CPU: 7.64 ms on 18.2 against
+16 ms), a crash of every pinned-model download (on iOS 18 `Task(executorPreference: nil)` crashes; `PinnedModelInstaller`
+now starts a plain `Task` when it has no executor), and seven UI failures, fixed on this branch: Name a speaker could
+save a name one keystroke old (on every OS), the iPadOS 18 split view started without its sidebar, the running draft
+did not follow its end, and the audit reported clipped text with no element on Settings and Saved voices. The leg
+stays off by default for now.
 `ScreenshotTests` skip unless `scripts/screenshots.sh` runs them.
 
 To install the runtime, download the iOS 18.2 simulator runtime DMG (22C150) with the owner's Apple ID and keep it on
