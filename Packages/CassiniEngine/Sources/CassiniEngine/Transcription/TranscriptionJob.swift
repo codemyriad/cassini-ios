@@ -200,6 +200,7 @@ public struct TranscriptionJob: TranscriptionJobRunning {
                 // A checkpoint of another version or recognizer does not resume.
                 checkpoint = try checkpoints.load(job.noteID)
                 try checkpoint?.validate(expected)
+                if checkpoint?.whistle != nil, recognizer != .whistle { return .failed(.checkpointMismatch) }
             } catch {
                 return .failed(.checkpointMismatch)
             }

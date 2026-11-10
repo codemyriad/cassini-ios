@@ -107,7 +107,7 @@ public struct CheckpointState: Hashable, Sendable {
             guard recognition.valid, recognition.doneMs <= doneMs else { throw .recognition }
         }
         if let whistle {
-            guard model == SpeechRecognizer.whistle.checkpointModel(language: ""), whistle.valid,
+            guard recognition == nil, whistle.valid,
                   whistle.doneMs == doneMs || wordsComplete else { throw .recognition }
         }
         if let speakers, !speakers.valid { throw .speakers }

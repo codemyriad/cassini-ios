@@ -8,6 +8,7 @@ struct WhistleJobTestTranscriber: Transcribing {
     var language: String? = "en"
     var mixed = false
     var pause: StopSignal?
+    var pauseBeforeWords = false
     var recognizer: SpeechRecognizer { .whistle }
     func assetStatus(locale: Locale) async -> ModelPartStatus { .ready }
     func speechLanguages() async -> [SpeechLanguage] { [] }
@@ -17,11 +18,17 @@ struct WhistleJobTestTranscriber: Transcribing {
     func transcribe(_ request: TranscriptionRequest, events: @escaping @Sendable (TranscriptionEvent) -> Void) async throws -> TranscriptionResult {
         let script = TranscriptionJobTests.ScriptedTranscriber.seventySeconds
         events(.progress(done: 0, total: 70))
-        let first = (request.whistleResume?.processedSamples ?? 0) / 16_000
+        if pauseBeforeWords, let pause {
+            events(.whistleBatch(.init(checkpoint: .init(sourceFrame: 16_000, processedSamples: 16_000,
+                                                        doneSamples: 0, state: Data([1])), segments: [], languages: [])))
+            pause.stop(.pause(.user))
+            throw CancellationError()
+        }
+        let first = (request.whistleResume?.processedSamples ?? 0) / 80_000
         for (index, segment) in script.enumerated().dropFirst(first) {
             try Task.checkCancellation()
             let reported = mixed ? (index < 7 ? "en" : "es") : language
-            let position = (index + 1) * 16_000
+            let position = (index + 1) * 80_000
             let checkpoint = WhistleCheckpoint(sourceFrame: Int64(position), processedSamples: position,
                                                doneSamples: position, state: Data([1]))
             events(.whistleBatch(.init(checkpoint: checkpoint, segments: [segment],
@@ -46,9 +53,9 @@ struct WhistleJobTestTranscriber: Transcribing {
         let checkpoint = try #require(try h.files.load(h.noteID))
         #expect(checkpoint.model == SpeechRecognizer.whistle.checkpointModel(language: ""))
         #expect(checkpoint.reportedLanguage == "en")
-        #expect(checkpoint.doneMs == 7_000)
-        #expect(checkpoint.whistle?.sourceFrame == 112_000)
-        #expect(h.checkpoints.saved.map(\.doneMs) == [5_000, 7_000])
+        #expect(checkpoint.doneMs == 35_000)
+        #expect(checkpoint.whistle?.sourceFrame == 560_000)
+        #expect(h.checkpoints.saved.map(\.doneMs) == (1...7).map { Int64($0) * 5_000 })
         #expect(await h.run(using: WhistleJobTestTranscriber(mixed: true)).outcome == .done)
         let note = try #require(await h.note())
         #expect(note.language == "mul")
@@ -65,4 +72,20 @@ struct WhistleJobTestTranscriber: Transcribing {
         #expect(words.map(\.startMs) == expected.map(\.startMs))
         #expect(words.map(\.endMs) == expected.map(\.endMs))
     }
+    @Test func pauseBeforeTheFirstWordsKeepsSourceProgress() async throws {
+        let h = try await TranscriptionJobTests.Harness(settings: JobSettings(allowSpeechDownload: false,
+            identifySpeakers: false, allowSpeakerDownload: false))
+        defer { try? FileManager.default.removeItem(at: h.root) }
+        let stop = StopSignal()
+        let first = await h.run(stop: stop, using: WhistleJobTestTranscriber(pause: stop, pauseBeforeWords: true))
+        #expect(first.outcome == .paused(.user))
+        let checkpoint = try #require(try h.files.load(h.noteID))
+        #expect(checkpoint.doneMs == 0)
+        #expect(checkpoint.segments.isEmpty)
+        #expect(checkpoint.whistle?.sourceFrame == 16_000)
+        #expect(await h.run(using: WhistleJobTestTranscriber()).outcome == .done)
+        let note = try #require(await h.note())
+        #expect(note.transcript.flatMap(\.draftWords).count == 70)
+    }
+
 }

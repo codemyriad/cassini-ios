@@ -123,7 +123,9 @@ public struct WhistleTranscriber: Transcribing {
             guard raw.count <= Self.maximumRawSamples else { throw WhistleError.invalidInput }
             let state = PipelineState(version: 1, finished: final, gate: gate, fir: resampler.state, vad: vad.state,
                                       raw: raw.withUnsafeBufferPointer { Data(buffer: $0) })
-            let bytes = try PropertyListEncoder().encode(state)
+            let encoder = PropertyListEncoder()
+            encoder.outputFormat = .binary
+            let bytes = try encoder.encode(state)
             let checkpoint = WhistleCheckpoint(sourceFrame: reader.position, processedSamples: totalSamples,
                                                doneSamples: finalized, state: bytes)
             segments += decoded
