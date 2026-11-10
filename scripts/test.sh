@@ -21,20 +21,29 @@
 #   CASSINI_UI_WORKERS   UI shards (default: as many as memory allows, at most 3)
 #   CASSINI_UI_IPAD      what the iPad clone runs: the tests named testIPad* (default), all (every UI test, beside
 #                        the iPhone shards; the longest step then) or 0 (nothing)
-#   CASSINI_KEEP_SIMS    0 shuts the clones down afterwards, 1 keeps the iPhones booted for the next run (default:
-#                        0 after all, 1 after the other tiers)
+#   CASSINI_KEEP_SIMS    0 shuts the clones down after a run that took the host lock, 1 keeps the iPhones booted for
+#                        the next run (default: 0 after all, 1 after the other tiers)
 #   CASSINI_CONFORMANCE_REQUIRED  1 (the default for all) fails, rather than skips, missing conformance vectors
 #   CASSINI_IDLE_MINUTES booted clones of other worktrees that no xcodebuild has used for this long are shut down,
 #                        never deleted (default 15)
 #   CASSINI_TEST_CACHE   shared cache directory (default: .test-cache beside the main checkout's .git)
-#   CASSINI_IPHONE / CASSINI_IPAD  device types to clone (default "iPhone 17", "iPad Pro 13-inch (M5)")
+#   CASSINI_IPHONE / CASSINI_IPAD  device types to clone (default "iPhone 17", "iPad Pro 13-inch (M5)"; on a
+#                        CASSINI_RUNTIME below 26, "iPhone 16", "iPad Pro 13-inch (M4)")
+#   CASSINI_RUNTIME      the iOS simulator runtime of app, ui, all and changed (default: the newest): a version prefix
+#                        (18, 18.6) picks the newest available runtime it matches, an identifier
+#                        (com.apple.CoreSimulator.SimRuntime.iOS-18-6) that one. The run fails when none matches or a
+#                        device type cannot run on it. Its clones (<prefix>-iphone18-N, <prefix>-ipad18-1), logs
+#                        (DerivedData/test-logs-ios18) and timing table (ui-test-durations-ios18.tsv in the cache) are
+#                        its own. It shuts down this worktree's other booted clones before it boots, and all of them
+#                        afterwards (CASSINI_KEEP_SIMS default 0), and it posts no commit status.
 #   CASSINI_SIM_PREFIX   clone name prefix (default ts-<worktree directory name>)
 #   CASSINI_HEAVY_LOCK   the host-wide lock file (default ~/.cassini-heavy.lock); CASSINI_LOCK_MINUTES how long to
 #                        wait for it (default 60); CASSINI_ADMIT_MINUTES how long to wait for the host to calm down
 #                        before booting the UI clones (default 10, 0 not at all)
 #   CASSINI_POST_STATUS=1  post the result of `all` as the commit status drmeyers/test-all of HEAD on GitHub (gh):
 #                        pending at the start, then success or failure. Only a full run of a clean, pushed HEAD
-#                        posts: no extra arguments, the iPad's tests, the release runtime, nothing uncommitted.
+#                        posts: no extra arguments, the iPad's tests, the release runtime, the default simulator
+#                        runtime (no CASSINI_RUNTIME), nothing uncommitted.
 #
 # One heavy run at a time per host: every tier but fast and clean takes the host-wide lock before it boots or builds
 # anything, and waits while another run (of any worktree) holds it; the lock file names the holder. Before the UI
@@ -59,17 +68,41 @@ root="$(cd "$(dirname "$0")/.." && pwd)"
 common="$(git -C "$root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || echo "$root/.git")"
 cache="${CASSINI_TEST_CACHE:-$(dirname "$common")/.test-cache}"
 derived="$root/DerivedData.noindex"
-logs="$derived/test-logs"
+# CASSINI_RUNTIME's tag (18, 18.6; an identifier's version) names the second leg's clones, leases, logs and timing
+# table, so that leg never reuses or wipes the default one's. Without CASSINI_RUNTIME it is empty and every name is
+# what it always was. Only the tiers that boot clones read it: fast, build and clean ignore it.
+runtime_tag=""
+case "$tier" in app|ui|all|changed)
+    if [ -n "${CASSINI_RUNTIME:-}" ]; then
+        case "$CASSINI_RUNTIME" in
+            com.apple.CoreSimulator.SimRuntime.iOS-*) runtime_tag=$(printf '%s' "${CASSINI_RUNTIME#com.apple.CoreSimulator.SimRuntime.iOS-}" | tr - .) ;;
+            *) runtime_tag="$CASSINI_RUNTIME" ;;
+        esac
+        # Checked on the value, not on the tag: an identifier without a version (…SimRuntime.iOS-) strips to an empty
+        # tag, which would otherwise read as no CASSINI_RUNTIME, run on the newest runtime and post a status.
+        if ! [[ $runtime_tag =~ ^[0-9]+(\.[0-9]+)*$ ]]; then
+            echo "error: CASSINI_RUNTIME=$CASSINI_RUNTIME is neither a version (18, 18.6) nor an iOS runtime identifier" >&2
+            exit 2
+        fi
+    fi ;;
+esac
+logs="$derived/test-logs${runtime_tag:+-ios$runtime_tag}"
 prefix="${CASSINI_SIM_PREFIX:-ts-$(basename "$root")}"
 iphone_type="${CASSINI_IPHONE:-iPhone 17}"
 ipad_type="${CASSINI_IPAD:-iPad Pro 13-inch (M5)}"
 # After the whole gate the clones go (Mac and Android work on this host never reclaims their memory); after the
-# iterating tiers the iPhones stay booted for the next run.
-keep_sims="${CASSINI_KEEP_SIMS:-$( [ "$tier" = all ] && echo 0 || echo 1 )}"
+# iterating tiers the iPhones stay booted for the next run, unless they are another runtime's, which the next run
+# would not use.
+keep_sims="${CASSINI_KEEP_SIMS:-$( { [ "$tier" = all ] || [ -n "$runtime_tag" ]; } && echo 0 || echo 1 )}"
 # The whole gate fails, rather than skips, the format's conformance vectors when it cannot find them.
 [ "$tier" != all ] || export CASSINI_CONFORMANCE_REQUIRED="${CASSINI_CONFORMANCE_REQUIRED:-1}"
 idle_minutes="${CASSINI_IDLE_MINUTES:-15}"
 leases="$cache/sim-leases"
+# A CASSINI_RUNTIME clone's lease lives one level down. A copy of this script from before CASSINI_RUNTIME does not
+# know its name, and deletes a shut-down clone it cannot place only when it finds that clone's lease in $leases
+# itself; it skips directories when it tidies the leases. So an older copy in another worktree leaves these clones
+# alone.
+lease_dir="$leases${runtime_tag:+/runtime}"
 
 # Spotlight indexes a build folder in an indexed location; it skips a directory whose name ends in .noindex (and
 # ignores .metadata_never_index there). An older DerivedData moves over once, and the old name links to the new one.
@@ -77,6 +110,7 @@ if [ -d "$root/DerivedData" ] && [ ! -L "$root/DerivedData" ] && [ ! -e "$derive
     mv "$root/DerivedData" "$derived"
 fi
 mkdir -p "$cache" "$derived" "$leases"
+[ -z "$runtime_tag" ] || mkdir -p "$lease_dir"
 [ -e "$root/DerivedData" ] || ln -s "$(basename "$derived")" "$root/DerivedData"
 # The previous run's logs stay beside this run's. A failed run's logs (marked FAILED by summary) then move to
 # test-logs.failed/<when it failed>, which keeps the five newest: a flaky failure is not lost to the next two runs.
@@ -111,7 +145,10 @@ summary() {
         echo "$tier exit $rc" > "$logs/FAILED"
         echo "FAILED ($tier), logs in $logs (kept in $failed_logs after the next run)"
     fi
-    if [ "$keep_sims" = "0" ]; then shutdown_clones; fi
+    # Only a run that got as far as the host lock shuts the clones down. One that stopped before (a missing runtime,
+    # a package-only `changed`, a lock it did not get) booted nothing, and its shutdown would hit the clones another
+    # run of this worktree is testing on, or the iPhones kept booted for the next run.
+    if [ "$keep_sims" = "0" ] && [ "$heavy_started" = 1 ]; then shutdown_clones; fi
     post_status "$rc"
     release_heavy_lock
 }
@@ -130,6 +167,7 @@ status_skip_reason() {
     [ ${#extra[@]} -eq 0 ] || { echo "extra arguments (${extra[*]})"; return; }
     case "${CASSINI_UI_IPAD:-1}" in 1) ;; *) echo "CASSINI_UI_IPAD=$CASSINI_UI_IPAD"; return ;; esac
     [ -z "${CASSINI_SHERPA_LOCAL:-}" ] || { echo "CASSINI_SHERPA_LOCAL is set (not the release runtime)"; return; }
+    [ -z "$runtime_tag" ] || { echo "CASSINI_RUNTIME is set (not the default simulator runtime)"; return; }
     git -C "$root" rev-parse -q --verify HEAD > /dev/null 2>&1 || { echo "not a git checkout"; return; }
     [ -z "$(git -C "$root" status --porcelain)" ] || { echo "uncommitted changes"; return; }
     command -v gh > /dev/null || { echo "gh is not installed"; return; }
@@ -226,7 +264,7 @@ run_logged() {
 # does not wait for their own lock.
 heavy_lock="${CASSINI_HEAVY_LOCK:-$HOME/.cassini-heavy.lock}"
 lock_minutes="${CASSINI_LOCK_MINUTES:-60}"
-lock_pid="" lock_held_file=""
+lock_pid="" lock_held_file="" heavy_started=0
 take_heavy_lock() {
     [ -z "$lock_pid" ] || return 0
     [ "${CASSINI_HEAVY_LOCK_HELD:-}" != 1 ] || return 0
@@ -263,22 +301,74 @@ end_own_processes() {
 
 # ---------------------------------------------------------------- simulators
 
+runtime="" runtime_version=""
 runtime_id() {
+    [ -z "$runtime" ] || { echo "$runtime"; return; }
     xcrun simctl list runtimes -j | /usr/bin/python3 -c '
 import json, sys
 rs = [r for r in json.load(sys.stdin)["runtimes"] if r["platform"] == "iOS" and r["isAvailable"]]
 print(sorted(rs, key=lambda r: [int(x) for x in r["version"].split(".")])[-1]["identifier"])'
 }
 
-# The UDID of the clone called $1, created from device type $2 when missing.
+# CASSINI_RUNTIME's runtime: the newest available iOS runtime whose version is the value or starts with it and a dot,
+# or whose identifier it is; and the device types for it (iPhone 17 and the M5 iPad Pro need 26). Fails when there is
+# none, or when it cannot run a device type: it never falls back to another runtime.
+select_runtime() {
+    [ -n "$runtime_tag" ] || return 0
+    local picked
+    picked=$(xcrun simctl list runtimes -j | /usr/bin/python3 -I -c '
+import json, sys
+wanted, iphone, ipad = sys.argv[1:4]
+key = lambda r: [int(x) for x in r["version"].split(".")]
+rs = sorted((r for r in json.load(sys.stdin)["runtimes"] if r["platform"] == "iOS" and r["isAvailable"]), key=key)
+if wanted.startswith("com.apple."):
+    match = [r for r in rs if r["identifier"] == wanted]
+else:
+    match = [r for r in rs if r["version"] == wanted or r["version"].startswith(wanted + ".")]
+if not match:
+    print("no available iOS simulator runtime matches CASSINI_RUNTIME=%s (available: %s)"
+          % (wanted, ", ".join(r["version"] for r in rs) or "none"))
+    sys.exit(3)
+r = match[-1]
+recent = key(r)[0] >= 26
+iphone = iphone or ("iPhone 17" if recent else "iPhone 16")
+ipad = ipad or ("iPad Pro 13-inch (M5)" if recent else "iPad Pro 13-inch (M4)")
+if "supportedDeviceTypes" in r:
+    supported = {d[k] for d in r["supportedDeviceTypes"] for k in ("name", "identifier") if k in d}
+    for kind, name in (("CASSINI_IPHONE", iphone), ("CASSINI_IPAD", ipad)):
+        if name not in supported:
+            print("iOS %s cannot run the device type \"%s\" (set %s)" % (r["version"], name, kind))
+            sys.exit(3)
+print("\t".join((r["identifier"], r["version"], iphone, ipad)))' "$CASSINI_RUNTIME" "${CASSINI_IPHONE:-}" "${CASSINI_IPAD:-}") \
+        || die "${picked:-could not list the simulator runtimes}"
+    IFS=$'\t' read -r runtime runtime_version iphone_type ipad_type <<< "$picked"
+    echo "runtime: iOS $runtime_version ($runtime); clones $prefix-iphone$runtime_tag-N ($iphone_type)," \
+        "$prefix-ipad$runtime_tag-1 ($ipad_type)"
+}
+
+# The UDID of the clone called $1, created from device type $2 when missing. On a CASSINI_RUNTIME only a clone of that
+# runtime counts: one of the same name on another (CASSINI_RUNTIME=18 picked 18.5 before, 18.6 now) is this
+# worktree's own and is deleted rather than reused.
 clone_udid() {
-    local name="$1" type="$2" udid
+    local name="$1" type="$2" udid stale
     udid=$(xcrun simctl list devices -j | /usr/bin/python3 -c '
 import json, sys
-name = sys.argv[1]
-for devices in json.load(sys.stdin)["devices"].values():
+name, runtime = sys.argv[1], sys.argv[2]
+for key, devices in json.load(sys.stdin)["devices"].items():
     for d in devices:
-        if d["name"] == name and d["isAvailable"]: print(d["udid"]); sys.exit()' "$name")
+        if d["name"] == name and d["isAvailable"] and runtime in ("", key): print(d["udid"]); sys.exit()' "$name" "$runtime")
+    if [ -z "$udid" ] && [ -n "$runtime" ] && clone_of "$prefix" "$name"; then
+        for stale in $(xcrun simctl list devices -j | /usr/bin/python3 -c '
+import json, sys
+name, runtime = sys.argv[1], sys.argv[2]
+for key, devices in json.load(sys.stdin)["devices"].items():
+    for d in devices:
+        if d["name"] == name and key != runtime: print(d["udid"])' "$name" "$runtime"); do
+            echo "  deleting $name ($stale): it was made on another runtime" >&2
+            xcrun simctl shutdown "$stale" 2>/dev/null || true
+            xcrun simctl delete "$stale" && rm -f "$leases/$stale" "$leases/runtime/$stale"
+        done
+    fi
     if [ -z "$udid" ]; then
         udid=$(xcrun simctl create "$name" "$type" "$(runtime_id)")
     fi
@@ -286,7 +376,7 @@ for devices in json.load(sys.stdin)["devices"].values():
 }
 
 # Marks a clone as used now; other worktrees' runs leave a clone alone while its lease is fresh.
-lease() { touch "$leases/$1"; }
+lease() { touch "$lease_dir/$1"; }
 
 # Boots a clone and waits until it can install apps; a booted one returns at once. A boot that fails, or has not
 # finished after 5 minutes (a wedged CoreSimulatorService would otherwise hold the run and its memory for good), is
@@ -311,12 +401,14 @@ for devices in json.load(sys.stdin)["devices"].values():
     for d in devices:
         if d["name"].startswith(prefix): print(d["udid"], d["state"], d["name"])' "$1"
 }
-# Whether clone $2 is one of worktree prefix $1's: <prefix>-iphone-N, -ipad-N, -bench, -shots-iphone or -shots-ipad. A
-# prefix match alone would take in the clones of a worktree whose name extends this one's (capture-start-failure and
-# capture-start-failure-test), and shut down, erase or delete them in the middle of that worktree's run.
+# Whether clone $2 is one of worktree prefix $1's: <prefix>-iphone-N, -ipad-N, a CASSINI_RUNTIME's -iphone18-N or
+# -ipad18.6-N, -bench, -shots-iphone or -shots-ipad. A prefix match alone would take in the clones of a worktree whose
+# name extends this one's (capture-start-failure and capture-start-failure-test), and shut down, erase or delete them
+# in the middle of that worktree's run. No other worktree's clone has one of these names after this prefix: theirs
+# end in -iphone-N or -ipad18-N after a longer prefix.
 clone_of() {
     local rest="${2#"$1"-}"
-    [ "$rest" != "$2" ] && [[ $rest =~ ^(iphone-[0-9]+|ipad-[0-9]+|bench|shots-iphone|shots-ipad)$ ]]
+    [ "$rest" != "$2" ] && [[ $rest =~ ^((iphone|ipad)([0-9]+(\.[0-9]+)*)?-[0-9]+|bench|shots-iphone|shots-ipad)$ ]]
 }
 our_clones() {
     local udid state name
@@ -335,7 +427,17 @@ delete_clones() {
     our_clones | while read -r udid _; do
         xcrun simctl shutdown "$udid" 2>/dev/null || true
         xcrun simctl delete "$udid"
-        rm -f "$leases/$udid"
+        rm -f "$leases/$udid" "$leases/runtime/$udid"
+    done
+}
+
+# On a CASSINI_RUNTIME: shuts down this worktree's booted clones that are not that runtime's (the default iPhones a
+# run before kept booted), so the second leg does not boot beside them.
+shutdown_other_runtimes() {
+    [ -n "$runtime_tag" ] || return 0
+    our_clones | while read -r udid state name; do
+        case "$name" in "$prefix-iphone$runtime_tag-"*|"$prefix-ipad$runtime_tag-"*) continue ;; esac
+        [ "$state" = Booted ] && xcrun simctl shutdown "$udid" 2>/dev/null || true
     done
 }
 
@@ -344,6 +446,7 @@ delete_clones() {
 idle_seconds() {
     local udid="$1" now apps; now=$(date +%s)
     if [ -f "$leases/$udid" ]; then echo $(( now - $(stat -f %m "$leases/$udid") )); return; fi
+    if [ -f "$leases/runtime/$udid" ]; then echo $(( now - $(stat -f %m "$leases/runtime/$udid") )); return; fi
     apps="$HOME/Library/Developer/CoreSimulator/Devices/$udid/data/Containers/Bundle/Application"
     if [ -d "$apps" ]; then echo $(( now - $(stat -f %m "$apps") )); return; fi
     ps -Ao etime=,args= | awk -v u="Devices/$udid/" '$0 ~ /launchd_sim/ && index($0, u) {
@@ -394,7 +497,7 @@ wait_for_room() {
     local t0 waited=0 idle free booted deadline announced=0
     t0=$(date +%s); deadline=$(( t0 + admit_minutes * 60 ))
     # This run's own booted iPhones count as free, as in auto_workers: tier_ui shuts down the ones it does not use.
-    booted=$(our_clones | grep -c "Booted $prefix-iphone-" || true)
+    booted=$(our_clones | grep -cF "Booted $prefix-iphone$runtime_tag-" || true)
     while :; do
         # After the first wait, measure CPU even if this run's Swift suite is still alive.
         idle=$(cpu_idle "$announced"); free=$(( $(free_mb) + booted * 1536 )); waited=$(( $(date +%s) - t0 ))
@@ -443,19 +546,19 @@ reclaim_disk() {
             fi
             continue
         fi
-        [ -f "$leases/$udid" ] || continue
+        [ -f "$leases/$udid" ] || [ -f "$leases/runtime/$udid" ] || continue
         owned=""
         for p in $names; do if clone_of "$p" "$name"; then owned=1; break; fi; done
         [ -z "$owned" ] || continue
         echo "  deleting $name: its worktree is gone"
-        xcrun simctl delete "$udid" 2>/dev/null && rm -f "$leases/$udid"
+        xcrun simctl delete "$udid" 2>/dev/null && rm -f "$leases/$udid" "$leases/runtime/$udid"
     done < <(clones "ts-")
     local devices lease_file
     devices=$(xcrun simctl list devices -j | /usr/bin/python3 -c '
 import json, sys
 for devices in json.load(sys.stdin)["devices"].values():
     for d in devices: print(d["udid"])') || return 0
-    for lease_file in "$leases"/*; do
+    for lease_file in "$leases"/* "$leases"/runtime/*; do
         [ -f "$lease_file" ] || continue
         printf '%s\n' "$devices" | grep -qx "$(basename "$lease_file")" || rm -f "$lease_file"
     done
@@ -471,9 +574,12 @@ for devices in json.load(sys.stdin)["devices"].values():
     done
 }
 
-# The start of every run that builds or boots: the host lock, then the disk.
+# The start of every run that builds or boots: the host lock, then the disk. From here on the run may boot clones,
+# so summary shuts them down unless they are kept (also under CASSINI_HEAVY_LOCK_HELD=1, where the caller holds the
+# lock); take_heavy_lock exits the run when it does not get the lock, before heavy_started is set.
 start_heavy() {
     take_heavy_lock
+    heavy_started=1
     reclaim_disk
 }
 
@@ -485,7 +591,7 @@ start_heavy() {
 auto_workers() {
     local ipad_mb="${1:-0}" free booted
     free=$(free_mb)
-    booted=$(our_clones | grep -c "Booted $prefix-iphone-" || true)
+    booted=$(our_clones | grep -cF "Booted $prefix-iphone$runtime_tag-" || true)
     local n=$(( (free - 4096 - ipad_mb) / 1536 + booted ))
     [ $n -gt 3 ] && n=3
     [ $n -lt 0 ] && n=0
@@ -764,11 +870,12 @@ test_on_retrying() {
 boot_pid=""
 first_iphone=""
 start_first_boot() {
-    first_iphone=$(clone_udid "$prefix-iphone-1" "$iphone_type")
+    shutdown_other_runtimes
+    first_iphone=$(clone_udid "$prefix-iphone$runtime_tag-1" "$iphone_type")
     boot "$first_iphone" & boot_pid=$!
 }
 wait_first_boot() {
-    if [ -n "$boot_pid" ]; then wait "$boot_pid" || die "could not boot $prefix-iphone-1"; boot_pid=""; fi
+    if [ -n "$boot_pid" ]; then wait "$boot_pid" || die "could not boot $prefix-iphone$runtime_tag-1"; boot_pid=""; fi
 }
 
 tier_app() {
@@ -796,7 +903,8 @@ ui_tests() {
 }
 
 # Shared between worktrees, so a fresh worktree balances its first run too; the committed table covers a fresh cache.
-timings_file="$cache/ui-test-durations.tsv"
+# A CASSINI_RUNTIME records into a table of its own and plans from the committed one until it has one.
+timings_file="$cache/ui-test-durations${runtime_tag:+-ios$runtime_tag}.tsv"
 committed_timings="$root/scripts/ui-test-durations.tsv"
 # The seconds the tests on stdin took before, by the same table as plan_shards (15 for a test it has not seen).
 planned_seconds() {
@@ -908,7 +1016,7 @@ tier_ui() {
     [ "$workers" -gt "$count" ] && workers=$count
     # Booted iPhone clones this run does not use give their memory back.
     our_clones | while read -r udid state name; do
-        case "$name" in "$prefix-iphone-"*) ;; *) continue ;; esac
+        case "$name" in "$prefix-iphone$runtime_tag-"*) ;; *) continue ;; esac
         if [ "$state" = Booted ] && [ "${name##*-}" -gt "$workers" ]; then xcrun simctl shutdown "$udid" 2>/dev/null || true; fi
     done
     local plan; plan=$(printf '%s\n' "$tests" | plan_shards "$workers")
@@ -926,9 +1034,9 @@ tier_ui() {
         while IFS= read -r t; do [ -n "$t" ] && shard_args+=("-only-testing:CassiniUITests/$t"); done \
             < <(printf '%s\n' "$plan" | awk -F'\t' -v k="$k" '$1 == k { print $2 }')
         [ ${#shard_args[@]} -gt 0 ] || continue
-        ( udid=$(clone_udid "$prefix-iphone-$k" "$iphone_type")
+        ( udid=$(clone_udid "$prefix-iphone$runtime_tag-$k" "$iphone_type")
           shard_seconds=$(printf '%s\n' "$plan" | awk -F'\t' -v k="$k" '$1 == k { print $2 }' | planned_seconds)
-          boot "$udid" || { echo "could not boot $prefix-iphone-$k" > "$logs/ui-$k.log"; exit 1; }
+          boot "$udid" || { echo "could not boot $prefix-iphone$runtime_tag-$k" > "$logs/ui-$k.log"; exit 1; }
           test_on_retrying CassiniUITests "$logs/ui-$k.log" "$logs/ui-$k.xcresult" "$udid" "${shard_args[@]}" ) & pids+=("$!:$k")
     done
     local failed="" p
@@ -938,18 +1046,18 @@ tier_ui() {
     fi
     local ipad=""
     if [ -n "$ipad_tests" ]; then
-        ipad=$(clone_udid "$prefix-ipad-1" "$ipad_type")
+        ipad=$(clone_udid "$prefix-ipad$runtime_tag-1" "$ipad_type")
         shard_args=()
         while IFS= read -r t; do shard_args+=("-only-testing:CassiniUITests/$t"); done <<< "$ipad_tests"
         ( shard_seconds=$(printf '%s\n' "$ipad_tests" | planned_seconds)
-          boot "$ipad" || { echo "could not boot $prefix-ipad-1" > "$logs/ui-ipad.log"; exit 1; }
+          boot "$ipad" || { echo "could not boot $prefix-ipad$runtime_tag-1" > "$logs/ui-ipad.log"; exit 1; }
           test_on_retrying CassiniUITests "$logs/ui-ipad.log" "$logs/ui-ipad.xcresult" "$ipad" "${shard_args[@]}" ) & pids+=("$!:ipad")
     fi
     for p in ${pids[@]+"${pids[@]}"}; do wait "${p%%:*}" || failed="$failed ${p##*:}"; done
     local still=""
     for p in $failed; do
         if [ "$p" = ipad ]; then retry_killed_tests ipad "$ipad" && continue
-        else retry_killed_tests "$p" "$(clone_udid "$prefix-iphone-$p" "$iphone_type")" && continue
+        else retry_killed_tests "$p" "$(clone_udid "$prefix-iphone$runtime_tag-$p" "$iphone_type")" && continue
         fi
         still="$still $p"
     done
@@ -1081,7 +1189,7 @@ extra_xcodebuild_from_extra() {
 case "$tier" in
     clean) delete_clones; echo "deleted the $prefix-* clones"; exit 0 ;;
     fast|app|ui|all|changed|build) ;;
-    *) sed -n '2,49p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+    *) sed -n '2,58p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac
 
 extra_xcodebuild_from_extra
@@ -1091,6 +1199,8 @@ trap summary EXIT
 # own trap hands summary the real status.
 trap 'exit 129' HUP; trap 'exit 130' INT; trap 'exit 143' TERM
 start_status
+# Inside the trap: a missing runtime fails the run (and the status of a run that posts one), never skips it.
+case "$tier" in fast|build) ;; *) select_runtime ;; esac
 case "$tier" in
     fast) tier_fast ;;
     app)  start_heavy; start_first_boot; build_for_testing; tier_app ;;
