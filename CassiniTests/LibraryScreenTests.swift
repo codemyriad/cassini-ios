@@ -47,10 +47,19 @@ import CassiniEngineTesting
     }
 
     /// The acceptance check: with a thousand notes, what a keystroke costs the main actor fits in a frame. That is
-    /// indexing the notes after one of them changed (a new array, so nothing is compared by storage) and building the
-    /// Library's content: the flat results while searching, the day sections once the query is cleared. The search
-    /// itself runs off the main actor once its tokens are cached.
-    func testAThousandNotesFilterWithoutDroppingFrames() async {
+    /// indexing the notes after one of them changed (a new array, so nothing is compared by storage; the changed
+    /// note's preview is worked out again) and building the Library's content: the flat results while searching, the
+    /// day sections once the query is cleared. The search itself runs off the main actor once its tokens are cached,
+    /// so it is not part of the frame; it has its own, looser bound.
+    ///
+    /// Both parts are synchronous and run here, on the main actor, so they are measured in this thread's CPU time:
+    /// the main actor's own work, not the time a busy machine (a simulator that just booted) makes it wait (D88).
+    /// Each part of each keystroke is measured three times and its least kept, as one sample can still be inflated
+    /// (once 12.1 ms against a 6.7 ms median, iOS 27); the slowest keystroke must fit. That code measured 7.7-8.4 ms
+    /// on iOS 18.2, 6.4-6.8 ms on iOS 27 and 7.45 ms on iOS 26; before a paragraph's text grew word by word it was
+    /// 20 ms on iOS 18.2 and 13 ms on iOS 27. How that cost grows with the words and the notes is checked without a
+    /// budget in CassiniNotebookTests' LibraryScalingTests.
+    func testAThousandNotesFilterWithoutDroppingFrames() async throws {
         let words = ["delivery", "Thursday", "price", "supplier", "order", "warehouse", "meeting", "budget"]
         let notes = Notes((0..<1_000).map { index -> Note in
             var note = Note(title: "Note \(index) \(words[index % words.count])",
@@ -70,21 +79,35 @@ import CassiniEngineTesting
             clock: FakeClock(now: Date(timeIntervalSince1970: 1_791_452_460)), calendar: calendar))
         model.query = "warm"
         await model.settle() // the tokens are worked out once
-
-        let clock = ContinuousClock()
-        var slowestIndex = Duration.zero, slowestContent = Duration.zero, slowestSearch = Duration.zero
         var index = LibraryIndex(notes.all)
+        _ = index.search(SearchQuery("warm"))
+
+        var slowest: (index: Duration, content: Duration, search: Duration) = (.zero, .zero, .zero)
         for (step, query) in ["d", "de", "deli", "delivery", "delivery thu", "zzz", ""].enumerated() {
             // One note changes between keystrokes; the model indexes the new array on the main actor.
             notes.all[step * 97].title += " edited"
             let changed = notes.all
-            slowestIndex = max(slowestIndex, clock.measure { index.update(changed) })
+            var indexed = index, indexing = Duration.seconds(1)
+            for _ in 0..<3 {
+                var trial = index
+                indexing = min(indexing, try measureThreadCPU { trial.update(changed) }.elapsed)
+                indexed = trial
+            }
+            index = indexed
+            // The search the model runs off the main actor, on a copy of the index, measured here on its own.
+            var searched = index
+            let searching = try measureThreadCPU { searched.search(SearchQuery(query)) }.elapsed
+            index.adoptTokens(from: searched)
             model.query = query
-            let started = clock.now
-            await model.settle()
-            slowestSearch = max(slowestSearch, clock.now - started)
-            var content = LibraryContent()
-            slowestContent = max(slowestContent, clock.measure { content = model.content })
+            await model.settle() // the event gate: the model indexed the notes and its search answered
+            var content = LibraryContent(), building = Duration.seconds(1)
+            for _ in 0..<3 {
+                let (built, elapsed) = try measureThreadCPU { model.content }
+                content = built
+                building = min(building, elapsed)
+            }
+            if indexing + building > slowest.index + slowest.content { (slowest.index, slowest.content) = (indexing, building) }
+            slowest.search = max(slowest.search, searching)
             if query.isEmpty {
                 XCTAssertEqual(content.sections.flatMap(\.rows).count, 1_000, "the cleared query lists every note")
             } else {
@@ -92,10 +115,11 @@ import CassiniEngineTesting
             }
         }
         // Printed when it passes too, so the logs show how much of the frame is left.
-        let measured = "indexing \(slowestIndex), content \(slowestContent)"
-        print("the main actor's part of the slowest keystroke: \(measured)")
-        XCTAssertLessThan(slowestIndex + slowestContent, .milliseconds(16), "the main actor's part of the slowest keystroke (\(measured))")
-        XCTAssertLessThan(slowestSearch, .milliseconds(400), "the debounce and the search off the main actor")
+        let measured = "indexing \(slowest.index), content \(slowest.content), main-thread CPU, least of 3 each"
+        print("the main actor's part of the slowest keystroke: \(measured); the slowest search: \(slowest.search) of CPU")
+        XCTAssertLessThan(slowest.index + slowest.content, .milliseconds(16),
+                          "the main actor's part of the slowest keystroke fits in a frame (\(measured))")
+        XCTAssertLessThan(slowest.search, .milliseconds(400), "the search, off the main actor (\(slowest.search) of CPU)")
     }
 }
 
