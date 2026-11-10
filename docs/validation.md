@@ -3,8 +3,11 @@
 The automated checks below run on an Apple Silicon Mac with Xcode 27 and the iOS 27 simulators (iPhone 17 and iPad
 Pro 13-inch (M5)). The counts were taken on 13 October 2026 with `scripts/test.sh all`, from the logs in
 `DerivedData.noindex/test-logs`. `CASSINI_RUNTIME` runs the simulator tiers on another installed runtime (the
-`scripts/test.sh` header), with logs in `DerivedData.noindex/test-logs-ios<version>`. A real device is still needed
-for the checks in the [device checklist](#device-checklist).
+`scripts/test.sh` header), with logs in `DerivedData.noindex/test-logs-ios<version>`. The iOS 18 leg of `all`
+(`CASSINI_IOS18`, [README](../README.md#the-ios-18-leg)) runs the same build on the iOS 18.6 runtime. It runs the
+hosted tests and the UI smoke list `scripts/ios18-smoke-tests.txt`, or with `full` every UI test. It stays off until
+that runtime is installed on the gate's Mac, so none of the counts here come from iOS 18 yet. A real device is still
+needed for the checks in the [device checklist](#device-checklist).
 
 ## Automated checks
 
@@ -16,7 +19,8 @@ command below runs from the repository root, not from a folder under `Packages/`
 | `fast` | `scripts/check-strings.sh`, then `swift test` over the packages | 1,567 tests: 1,558 Swift Testing tests in 198 suites and 9 XCTest cases; the real-model test is skipped unless enabled |
 | `app` | The hosted unit tests (`CassiniTests`) in the app on a simulator | 82, of which the 6 real-model ones skip unless `scripts/sherpa-bench.sh` or `scripts/speaker-smoke.sh` names their models |
 | `ui` | The UI tests (`CassiniUITests`) on up to three iPhone clones, and the `testIPad*` tests on an iPad clone | 91 test methods: 72 run on the iPhones, the 8 `testIPad*` tests on the iPad, and the 11 `ScreenshotTests` skip |
-| `all` | All three; the package tests run beside the build | |
+| `all` | All three; the package tests run beside the build. Then the iOS 18 leg, when it is on | |
+| `ios18` | Build, then only the iOS 18 leg: the hosted tests and the UI smoke list (`CASSINI_IOS18=full`: every UI test and the iPad's) on the iOS 18 runtime | not yet run on iOS 18 |
 
 ### `fast`: the string catalogs and the package tests
 

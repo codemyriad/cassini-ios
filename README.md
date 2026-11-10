@@ -209,6 +209,7 @@ scripts/test.sh ui       # build for testing, then the UI tests, sharded across 
 scripts/test.sh all      # all of the above (the package tests run beside the build); prints the time of each step
 scripts/test.sh changed  # only what the changes since origin/main touch (or since a base: changed <ref>)
 scripts/test.sh build    # only build for testing
+scripts/test.sh ios18    # build for testing, then only the iOS 18 leg (below)
 scripts/test.sh clean    # delete this worktree's simulator clones
 ```
 
@@ -225,6 +226,39 @@ the newest runtime; a version such as `18.6` or a runtime identifier also works.
 or when the runtime cannot run the device types: below iOS 26 they default to iPhone 16 and iPad Pro 13-inch (M4).
 That leg keeps its own clones (`ts-<worktree>-iphone18-N`), logs (`DerivedData/test-logs-ios18`) and UI timing table,
 so it neither reuses nor disturbs the default leg, and it posts no commit status. `clean` deletes its clones too.
+
+### The iOS 18 leg
+
+`CASSINI_IOS18=smoke` adds an iOS 18 leg to `scripts/test.sh all`. It starts once the default runtime's tiers pass.
+The worktree's clones are shut down first, and the same build then runs on the iOS 18 runtime: the hosted tests,
+which load Whistle and ONNX Runtime for real, then the UI tests in `scripts/ios18-smoke-tests.txt` on one iPhone 16.
+The list plans about six minutes by `scripts/ui-test-durations.tsv`. `CASSINI_IOS18=full` runs every UI test and the
+`testIPad*` tests on an iPad Pro 13-inch (M4) instead, for pull requests that change views.
+`scripts/test.sh ios18` builds and runs only the leg. The leg is `CASSINI_RUNTIME=18 scripts/test.sh prebuilt`, which
+tests the last build without building, so its clones, logs and timing table are those described above. The commit
+status names what the leg ran, for example `passed in 24 min: iPhone 72/72, iPad 8/8; iOS 18.6 hosted 76/76 (6
+skipped), iPhone 17/17`.
+
+Until the iOS 18.6 simulator runtime is installed on the gate's Mac, the leg is off by default
+(`ios18_default=off` in `scripts/test.sh`). An `all` run is then unchanged, and its status says nothing about iOS 18.
+Once the leg is on, a Mac without the runtime fails the run and its status before anything is built; the leg is never
+skipped. `CASSINI_IOS18=0` turns the leg off and posts no status, the same way `CASSINI_UI_IPAD=0` does.
+`CASSINI_IOS18_RUNTIME=26` runs the whole leg on the installed iOS 26.0 runtime, to try it without iOS 18. In tests,
+`DeviceUnderTest` (in `CassiniUITests`) reads which platform the device has, so the same test checks the iOS 18 screens
+on 18 and the iOS 26 screens on 26 and 27. With `TEST_RUNNER_CASSINI_IOS18_FACTS=1`, every launch gets
+`--ios18-platform` and those expectations follow, which runs the iOS 18 side on the current simulators.
+
+To install the runtime, download the iOS 18.6 simulator runtime DMG with the owner's Apple ID and keep it on
+`/Volumes/DrMeyers2/sim-runtimes`. Then, on the Mac:
+
+```sh
+xcrun simctl runtime add /Volumes/DrMeyers2/sim-runtimes/<the iOS 18.6 DMG>
+xcrun simctl list runtimes | grep 'iOS 18'   # iOS 18.6 (22G86) is listed
+df -h /                                      # at least 25 GB must stay free on the internal disk
+```
+
+`simctl` copies the image into the system's store on the internal disk, about 9 GB. The DMG stays external as the
+backup. Then change `ios18_default=off` to `ios18_default=smoke` in `scripts/test.sh`. That one line turns the leg on.
 
 On GitHub, `.github/workflows/ci.yml` runs `scripts/test.sh fast` and `scripts/test.sh build` on a hosted runner
 with Xcode 27.0, for each push to main or a pull request that changes code. The simulator tiers run only locally: the
