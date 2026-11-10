@@ -69,8 +69,8 @@ import CassiniEngineTesting
         var heard: [[Float]] = []
         var threads: Set<String> = []
         var failsLoading = false
-        /// Each decode waits this long first.
-        var decodeDelay: TimeInterval = 0
+        /// Invoked outside the fixture lock, including when the test holds a decode gate.
+        var onDecode: @Sendable () -> Void = {}
         /// Off, the recognizer hears no words: for audio whose bursts it cannot read, such as audio with an offset.
         var hearsWords = true
 
@@ -95,8 +95,8 @@ import CassiniEngineTesting
         deinit { native.record { $0.releases += 1 } }
         func decode(_ samples: [Float]) throws -> RecognizedTokens {
             native.record { $0.decodes += 1; $0.threads.insert(Thread.current.name ?? "") }
-            let delay = native.lock.withLock { native.decodeDelay }
-            if delay > 0 { Thread.sleep(forTimeInterval: delay) }
+            let onDecode = native.lock.withLock { native.onDecode }
+            onDecode()
             guard native.lock.withLock({ native.hearsWords }) else {
                 return RecognizedTokens(text: "", tokens: [], timestamps: [], durations: [])
             }
@@ -139,6 +139,42 @@ import CassiniEngineTesting
         func flush() { if let first = open { segments.append(.init(first, Array(fed[first...]))); open = nil } }
     }
 
+    /// Blocks only the native inference thread; the test awaits a real start notification.
+    private final class DecodeGate: @unchecked Sendable {
+        private let condition = NSCondition()
+        private var released = false
+        private let started: AsyncStream<Void>
+        private let continuation: AsyncStream<Void>.Continuation
+
+        init() { (started, continuation) = AsyncStream.makeStream(bufferingPolicy: .bufferingNewest(1)) }
+
+        func hold() {
+            condition.lock()
+            continuation.yield(())
+            while !released { condition.wait() }
+            condition.unlock()
+        }
+
+        func waitForStart() async -> Bool {
+            for await _ in started { return true }
+            return false
+        }
+
+        func release() {
+            condition.lock()
+            released = true
+            condition.broadcast()
+            condition.unlock()
+            continuation.finish()
+        }
+    }
+
+    private final class NanoClock: Sendable {
+        private let value = Mutex<UInt64>(0)
+        var now: UInt64 { value.withLock { $0 } }
+        func advance(_ nanoseconds: UInt64) { value.withLock { $0 += nanoseconds } }
+    }
+
     /// The installer's calls.
     final class Installs: @unchecked Sendable {
         let lock = NSLock()
@@ -178,7 +214,8 @@ import CassiniEngineTesting
     private static let pins = Dictionary(uniqueKeysWithValues: ModelCatalog.all.flatMap(\.artifacts).map { ($0.name, $0.sha256) })
 
     private func transcriber(_ native: Native, online: Bool = false, installs: Installs? = nil,
-                             memory: Int64? = nil, verifier: ModelVerifier? = nil) -> ParakeetTranscriber {
+                             memory: Int64? = nil, verifier: ModelVerifier? = nil,
+                             nanoTime: @escaping @Sendable () -> UInt64 = { DispatchTime.now().uptimeNanoseconds }) -> ParakeetTranscriber {
         let verification = verifier ?? checked(), root = root
         let installation: ParakeetTranscriber.Models.Install?
         if let installs {
@@ -197,14 +234,15 @@ import CassiniEngineTesting
         } else { installation = nil }
         return ParakeetTranscriber(models: .init(root: root, online: { online }, install: installation,
                                                  verifier: verification),
-                                   runtime: native.runtime, availableMemory: { memory })
+                                   runtime: native.runtime, availableMemory: { memory }, nanoTime: nanoTime)
     }
 
     private func run(_ transcriber: ParakeetTranscriber, _ url: URL, resume: TranscriptResume? = nil,
-                     allowDownload: Bool = true) async throws -> (TranscriptionResult, Events) {
+                     allowDownload: Bool = true,
+                     onEvent: @escaping @Sendable (TranscriptionEvent) -> Void = { _ in }) async throws -> (TranscriptionResult, Events) {
         let events = Events()
         let result = try await transcriber.transcribe(TranscriptionRequest(url: url, language: "it-IT", resume: resume,
-                                                                           allowDownload: allowDownload)) { events.add($0) }
+                                                                           allowDownload: allowDownload)) { events.add($0); onEvent($0) }
         return (result, events)
     }
 
@@ -255,13 +293,20 @@ import CassiniEngineTesting
         try install(ModelCatalog.vad)
         let url = try audio(seconds: 30)
         let native = Native()
-        native.decodeDelay = 0.02
-        let (result, events) = try await run(transcriber(native), url)
-        let windowMs = try #require(events.windows.first?.inferenceMs)
-        let inferenceMs = try #require(result.inferenceMs)
-        #expect(windowMs >= 20)
-        #expect(inferenceMs >= windowMs + 20, "the last window adds its own")
-        #expect(inferenceMs >= Int64(native.counts.decodes) * 20)
+        let clock = NanoClock()
+        native.onDecode = { clock.advance(20_000_000) }
+        let windowDecodeCounts = Mutex<[Int]>([])
+        let (result, events) = try await run(transcriber(native, nanoTime: { clock.now }), url) { event in
+            if case .window = event { windowDecodeCounts.withLock { $0.append(native.counts.decodes) } }
+        }
+        let counts = windowDecodeCounts.withLock { $0 }
+        #expect(!counts.isEmpty, "exercise a published window as well as the final window")
+        #expect(events.windows.count == counts.count)
+        for (window, count) in zip(events.windows, counts) {
+            #expect(window.inferenceMs == Int64(count) * 20, "each published window includes all preceding decode time")
+        }
+        #expect(result.inferenceMs == Int64(native.counts.decodes) * 20, "the final window adds its own decode time")
+        #expect(native.counts.decodes > (counts.last ?? 0), "exercise additional decode work after the last published window")
     }
 
     // ports: TranscriptionJobTest#aMissingSpeechDetectorIsFetchedAgainOnlyOnline
@@ -647,22 +692,25 @@ import CassiniEngineTesting
     }
 
     // ports: TranscriptionJobTest#cancelInsideASlowNativeCallKeepsThePreviousCheckpointAndReleasesHandles
-    @Test func aCancelStopsBeforeTheNextNativeCall() async throws {
+    @Test(.timeLimit(.minutes(1))) func aCancelStopsBeforeTheNextNativeCall() async throws {
         defer { try? FileManager.default.removeItem(at: folder) }
         try install(ModelCatalog.parakeet)
         let url = try audio(seconds: 70)
         let native = Native()
-        native.decodeDelay = 0.3
+        let gate = DecodeGate()
+        native.onDecode = { gate.hold() }
         let parakeet = transcriber(native)
         let task = Task { try await run(parakeet, url) }
-        try await waitUntil("The first decode never started") { native.counts.decodes > 0 }
+        defer { task.cancel(); gate.release() }
+        let started = await gate.waitForStart()
+        try #require(started, "The first decode never started")
         task.cancel()
-        await #expect(throws: CancellationError.self) { try await task.value }
         let decodes = native.counts.decodes
+        gate.release()
+        await #expect(throws: CancellationError.self) { try await task.value }
         // The run's end releases its recognizer: no decode can come after it.
         try await waitUntil("The recognizer was never released") { native.lock.withLock { native.releases } == 1 }
         #expect(native.counts.decodes == decodes, "nothing decodes after the cancel")
-        #expect(decodes < 3)
     }
 
     /// The streaming speakers of a run: each window's words go to them after the decode, on the speech thread with the

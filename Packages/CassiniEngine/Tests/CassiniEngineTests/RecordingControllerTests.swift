@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-import CassiniEngine
+@testable import CassiniEngine
 import CassiniEngineTesting
 import CassiniNotebook
 
@@ -64,18 +64,96 @@ import CassiniNotebook
         #expect(!h.activity.isRunning)
     }
 
+    @Test func thePolicyWaitsOnTheInjectedClockBeforeRefreshingElapsed() async throws {
+        let h = try RecordingHarness(); defer { h.tearDown() }
+        try await h.startRecording()
+        try await h.waitFor("the policy's injected sleep") { h.clock.pendingSleeps > 0 }
+        h.capture.elapsed = 47
+        #expect(try h.active.elapsed == 0, "a registered sleep has not ticked yet")
+        h.clock.advanceToNextSleep()
+        try await h.waitFor("the released policy tick") { (try? h.active.elapsed) == 47 }
+    }
+
+    @Test(.timeLimit(.minutes(1))) func aSleepingPolicyDoesNotRetainItsController() async throws {
+        var harness: RecordingHarness? = try RecordingHarness()
+        let clock = try #require(harness?.clock)
+        let root = try #require(harness?.root), suite = try #require(harness?.suite)
+        var policy: Task<Void, Never>?
+        defer {
+            policy?.cancel()
+            clock.cancelAll()
+            try? FileManager.default.removeItem(at: root)
+            UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite)
+        }
+        try await harness?.startRecording()
+        await harness?.controller.settle()
+        try await harness?.waitFor("the policy sleep before dropping its owner", advancingClock: false) {
+            clock.pendingSleepIDs(for: .milliseconds(10)).count == 1
+        }
+        harness?.capture.elapsed = 1
+        clock.advance(by: .milliseconds(10))
+        try await harness?.waitFor("the next policy sleep after a tick", advancingClock: false) {
+            harness?.controller.state.activeRecording?.elapsed == 1 && clock.pendingSleepIDs(for: .milliseconds(10)).count == 1
+        }
+        policy = harness?.controller.policy
+        weak var controller = harness?.controller
+        harness = nil
+        try #require(controller == nil, "The sleeping policy retained the recording controller")
+        await policy?.value
+        #expect(clock.pendingSleeps == 0, "controller teardown cancels its pending policy sleep")
+    }
+
     // ports: RecordingControllerTest#titleEditsAreDebouncedAndKept
-    @Test func titleEditsAreDebouncedAndKept() async throws {
+    @Test(.timeLimit(.minutes(1))) func titleEditsAreDebouncedAndKept() async throws {
         let h = try RecordingHarness(); defer { h.tearDown() }
         let active = try await h.startRecording()
+        await h.controller.settle()
+        try await h.waitFor("the initial policy sleep", advancingClock: false) {
+            h.clock.pendingSleepIDs(for: .milliseconds(10)).count == 1
+        }
         #expect(await h.note(active.noteID)?.title == active.defaultTitle)
-
         h.controller.setTitle("Test")
-        h.controller.setTitle("Test del")
+        try await h.waitFor("the first title sleep", advancingClock: false) {
+            h.clock.pendingSleeps == 2 || h.notes.titleWrites > 0
+        }
+        let first = h.clock.pendingSleepIDs(for: RecordingHarness.debounce)
+        try #require(first.count == 1, "a title edit must register the full 50 ms debounce")
+        let firstWrite = try #require(h.controller.titleWrite)
+
+        // Three real policy ticks, but only 30 ms of the title's 50 ms debounce.
+        for tick in 1...3 {
+            h.capture.elapsed = Double(tick)
+            h.clock.advance(by: .milliseconds(10))
+            try await h.waitFor("policy tick \(tick)", advancingClock: false) {
+                (try? h.active.elapsed) == Double(tick) && h.clock.pendingSleepIDs(for: .milliseconds(10)).count == 1
+            }
+            #expect(h.notes.titleWrites == 0, "no title write before the debounce deadline")
+            #expect(await h.note(active.noteID)?.title == active.defaultTitle)
+        }
+
         h.controller.setTitle("Choir rehearsal ")
-        try await h.waitFor("the title write") { await h.note(active.noteID)?.title == "Choir rehearsal" }
-        try await Task.sleep(for: RecordingHarness.debounce * 2)
-        #expect(h.notes.titleWrites == 1, "one write after the last change")
+        try await h.waitFor("the replacement title sleep", advancingClock: false) {
+            !h.clock.pendingSleepIDs(for: RecordingHarness.debounce).subtracting(first).isEmpty || h.notes.titleWrites > 0
+        }
+        let replacement = h.clock.pendingSleepIDs(for: RecordingHarness.debounce)
+        try #require(first.isSubset(of: h.clock.cancelledSleepIDs), "the next edit must cancel the registered sleep")
+        try #require(replacement.count == 1 && replacement.isDisjoint(with: first), "only the replacement sleep remains")
+        await firstWrite.value
+
+        // Advance through the old 50 ms deadline and stop at 70 ms, still below the new 80 ms deadline.
+        for tick in 4...7 {
+            h.capture.elapsed = Double(tick)
+            h.clock.advance(by: .milliseconds(10))
+            try await h.waitFor("policy tick \(tick)", advancingClock: false) {
+                (try? h.active.elapsed) == Double(tick) && h.clock.pendingSleepIDs(for: .milliseconds(10)).count == 1
+            }
+            #expect(h.notes.titleWrites == 0, "the old deadline must not write the replacement title early")
+            #expect(await h.note(active.noteID)?.title == active.defaultTitle)
+        }
+        h.clock.advance(by: .milliseconds(10))
+        await h.controller.settle()
+        #expect(await h.note(active.noteID)?.title == "Choir rehearsal")
+        #expect(h.notes.titleWrites == 1, "only the last edit writes, after its own debounce")
         #expect(try h.active.title == "Choir rehearsal ", "the state keeps the text as typed")
         #expect(h.activity.current?.title == "Choir rehearsal")
 

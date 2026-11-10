@@ -94,15 +94,19 @@ public struct ParakeetTranscriber: Transcribing {
     private let runtime: SpeechRuntime
     private let availableMemory: @Sendable () -> Int64?
     private let thread: InferenceThread
+    private let nanoTime: @Sendable () -> UInt64
 
     public init(models: Models, runtime: SpeechRuntime,
-                availableMemory: @escaping @Sendable () -> Int64? = TranscriptionJob.availableMemory) {
-        self.init(models: models, runtime: runtime, availableMemory: availableMemory, thread: .speech)
+                availableMemory: @escaping @Sendable () -> Int64? = TranscriptionJob.availableMemory,
+                nanoTime: @escaping @Sendable () -> UInt64 = { DispatchTime.now().uptimeNanoseconds }) {
+        self.init(models: models, runtime: runtime, availableMemory: availableMemory, thread: .speech, nanoTime: nanoTime)
     }
 
     init(models: Models, runtime: SpeechRuntime, availableMemory: @escaping @Sendable () -> Int64?,
-         thread: InferenceThread) {
+         thread: InferenceThread,
+         nanoTime: @escaping @Sendable () -> UInt64 = { DispatchTime.now().uptimeNanoseconds }) {
         self.models = models; self.runtime = runtime; self.availableMemory = availableMemory; self.thread = thread
+        self.nanoTime = nanoTime
     }
 
     public var recognizer: SpeechRecognizer { .parakeet }
@@ -139,13 +143,13 @@ public struct ParakeetTranscriber: Transcribing {
         // The native loader ends the process on a missing file: the revision's files are checked first.
         let files = ParakeetFiles(root: models.root)
         guard models.speechReady, files.present() else { throw TranscriptionError.failed(.model) }
-        let models = models, runtime = runtime, availableMemory = availableMemory
+        let models = models, runtime = runtime, availableMemory = availableMemory, nanoTime = nanoTime
         if models.needsCheck { events(.preparingModel(.checking)) }
         let cancel = CancelFlag()
         return try await withTaskCancellationHandler {
             try await thread.run {
                 let detector = try models.checked(cancel: cancel)
-                let run = Run(files: files, detector: detector, runtime: runtime, availableMemory: availableMemory)
+                let run = Run(files: files, detector: detector, runtime: runtime, availableMemory: availableMemory, nanoTime: nanoTime)
                 return try run.transcribe(request, cancel: cancel, events: events)
             }
         } onCancel: {
@@ -199,6 +203,7 @@ extension ParakeetTranscriber {
         let detector: URL?
         let runtime: SpeechRuntime
         let availableMemory: @Sendable () -> Int64?
+        let nanoTime: @Sendable () -> UInt64
 
         static let format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: Double(Limits.asrRate), channels: 1,
                                           interleaved: false)!
@@ -237,13 +242,13 @@ extension ParakeetTranscriber {
                         throw JobFailure.model
                     }
                 }
-                let began = DispatchTime.now().uptimeNanoseconds
+                let began = nanoTime()
                 let start = startMs * Int64(Limits.asrRate) / 1000
                 let detectorInput = speech.map { _ in Self.detectorInput(input, from: start, audio) }
                 let decoded = try ParakeetDecode.transcribe(audio, decoder: decoder!, detector: speech,
                                                             detectorInput: detectorInput, policy: .wholeSpans,
                                                             cutting: DecodeCutting.cutting(detectorReady: speech != nil))
-                inferenceNanoseconds += DispatchTime.now().uptimeNanoseconds - began
+                inferenceNanoseconds += nanoTime() - began
                 // The next window starts at this one's overlap.
                 input?.discard(before: start + Int64(audio.samples.count - IncrementalTranscript.overlapSamples))
                 let words = Transcript(decoded.words.map { Word("", $0.startMs, $0.endMs, $0.text) })

@@ -91,7 +91,7 @@ final class SettingsFlowTests: XCTestCase {
         // The line would come with the plan, which lists the speaker models.
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Telling speakers apart"))
             .firstMatch.waitForExistence(within: 5))
-        XCTAssertTrue(app.staticTexts["speechLanguageLine"].staysAbsent(for: 2))
+        XCTAssertFalse(app.staticTexts["speechLanguageLine"].exists)
     }
 
     /// A Parakeet device without Ultra: its row is a button that opens the download screen with the sizes.
