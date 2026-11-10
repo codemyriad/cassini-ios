@@ -98,6 +98,47 @@ import CassiniEngineTesting
         }
     }
 
+    @Test(arguments: [false, true])
+    func lengthlessRangeCompletesAtItsDeclaredEndWithoutEOF(_ capped: Bool) async throws {
+        let folder = TemporaryFolder()
+        defer { folder.remove() }
+        let offset = 7, end = capped ? 13 : bytes.count
+        try Data(bytes.prefix(offset)).write(to: partial(folder.root))
+        let held = Self.heldEOF(Data(bytes[offset..<end]), status: 206,
+            headers: ["ETag": "\"\(sha256(bytes))\"",
+                      "Content-Range": "bytes \(offset)-\(end - 1)/\(bytes.count)"], lengthless: true)
+        if capped {
+            #expect(await failure { try await fetch(held.transport, folder.root) } == .modelDownload)
+            #expect(try Data(contentsOf: partial(folder.root)) == Data(bytes.prefix(end)))
+            #expect(!exists(folder.root.appendingPathComponent("model.onnx")))
+        } else {
+            try await fetch(held.transport, folder.root)
+            #expect(try Data(contentsOf: folder.root.appendingPathComponent("model.onnx")) == bytes)
+            #expect(!exists(partial(folder.root)))
+        }
+        #expect(held.pulledPastLength.value == 0, "Content-Range bounds this response without Content-Length or EOF")
+        #expect(held.closed.value == 1)
+        #expect(held.transport.calls.value == 1, "Completion must not introduce another request")
+    }
+
+    @Test func lengthlessFinalRangeStillChecksThePinnedHashBeforeReplacingAFile() async throws {
+        let folder = TemporaryFolder()
+        defer { folder.remove() }
+        let offset = 7
+        let original = Data("Existing installed copy".utf8)
+        let destination = folder.root.appendingPathComponent("model.onnx")
+        try original.write(to: destination)
+        try Data(bytes.prefix(offset)).write(to: partial(folder.root))
+        let held = Self.heldEOF(Data(repeating: 0, count: bytes.count - offset), status: 206,
+            headers: ["ETag": "\"\(sha256(bytes))\"",
+                      "Content-Range": "bytes \(offset)-\(bytes.count - 1)/\(bytes.count)"], lengthless: true)
+        #expect(await failure { try await fetch(held.transport, folder.root) } == .modelVerify)
+        #expect(try Data(contentsOf: destination) == original)
+        #expect(!exists(partial(folder.root)))
+        #expect(held.pulledPastLength.value == 0)
+        #expect(held.closed.value == 1)
+    }
+
     @Test func lengthlessRangeCannotDeliverPastItsDeclaredEnd() async throws {
         let folder = TemporaryFolder()
         defer { folder.remove() }
@@ -393,11 +434,13 @@ import CassiniEngineTesting
         #expect(!exists(folder.root.appendingPathComponent("NOTICE.txt")))
     }
 
-    /// A known-length answer that delivers `data` and has no EOF of its own: transport would end it only at teardown.
+    /// An answer with a known body boundary that delivers `data` and has no EOF of its own: transport would end it only at teardown.
     /// A pull past the declared length before the fetcher closes the answer means the fetcher waits for that EOF. The
     /// pull is counted and ended at once, so the regression fails the test with a message instead of hanging.
     /// A pull after close is legitimate (the answer is already released) and is not counted.
-    private static func heldEOF(_ data: Data) -> (transport: CompletionTransport, closed: Counter, pulledPastLength: Counter) {
+    private static func heldEOF(_ data: Data, status: Int = 200, headers: [String: String] = [:],
+                                lengthless: Bool = false)
+        -> (transport: CompletionTransport, closed: Counter, pulledPastLength: Counter) {
         let closed = Counter(), pulledPastLength = Counter()
         let transport = CompletionTransport { _, _ in
             let pulls = Counter()
@@ -406,7 +449,7 @@ import CassiniEngineTesting
                 if closed.value == 0 { _ = pulledPastLength.next() }
                 return nil
             })
-            return HTTPAnswer(status: 200, headers: [:], expectedLength: Int64(data.count), body: body,
+            return HTTPAnswer(status: status, headers: headers, expectedLength: lengthless ? nil : Int64(data.count), body: body,
                               close: { _ = closed.next() })
         }
         return (transport, closed, pulledPastLength)
