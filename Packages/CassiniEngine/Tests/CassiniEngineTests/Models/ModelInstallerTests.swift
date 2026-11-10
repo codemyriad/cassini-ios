@@ -313,3 +313,19 @@ private final class FakeStore: ModelStore, Sendable {
         }
     }
 }
+
+extension ModelInstallerTests {
+    @Test func wrappedAndDirectTransportCodesUseTheSameClassification() {
+        let codes: [URLError.Code] = [.timedOut, .cannotFindHost, .dnsLookupFailed, .cannotConnectToHost,
+            .notConnectedToInternet, .dataNotAllowed, .internationalRoamingOff, .networkConnectionLost, .badServerResponse]
+        for online in [true, false] {
+            for code in codes {
+                let wrapped = ModelError(.modelDownload, "diagnostic without a transport code", urlErrorCode: code)
+                #expect(ModelInstaller.downloadError(wrapped, online: { online })
+                    == ModelInstaller.downloadError(URLError(code), online: { online }))
+            }
+        }
+        #expect(ModelInstaller.isCancellation(ModelError(.modelDownload, urlErrorCode: .cancelled)))
+        #expect(!ModelInstaller.isCancellation(ModelError(.modelDownload, urlErrorCode: .networkConnectionLost)))
+    }
+}

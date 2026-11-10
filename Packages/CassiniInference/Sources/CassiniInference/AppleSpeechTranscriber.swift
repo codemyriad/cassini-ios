@@ -136,8 +136,8 @@ public actor AppleSpeechTranscriber: Transcribing {
                                events: @escaping @Sendable (TranscriptionEvent) -> Void) async throws {
         guard await AssetInventory.status(forModules: [transcriber]) != .installed else { return }
         guard allowDownload else { throw TranscriptionError.needsConsent }
-        events(.preparingModel(nil))
-        try await Self.install(transcriber, locale: locale) { events(.preparingModel($0)) }
+        events(.preparingModel(.downloading(nil)))
+        try await Self.install(transcriber, locale: locale) { events(.preparingModel(.downloading($0))) }
     }
 
     /// Reserves `locale` and installs the assets `module` needs, reporting the share done (nil while unknown) about

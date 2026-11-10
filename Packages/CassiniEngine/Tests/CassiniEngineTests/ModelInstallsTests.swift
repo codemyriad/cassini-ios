@@ -125,6 +125,78 @@ import CassiniNotebook
         #expect(installs.status(of: .speakers) == .ready)
     }
 
+    @Test func aRefreshClearsTheSpeakerFailureNoticeWhenTheModelsBecomeReady() async throws {
+        let analyzer = ScriptedAnalyzer(status: .notDownloaded, gated: true)
+        let installs = ModelInstalls(transcriber: FakeTranscriber(.returns([], total: 0)), analyzer: analyzer,
+                                     clock: FakeClock()) { "en-US" }
+        await installs.refresh()
+        installs.install([.speakers])
+        try await until { analyzer.isWaiting }
+        #expect(analyzer.installs == 1)
+        analyzer.finish(with: .download(.interrupted, requiredFreeBytes: 0), status: .notDownloaded)
+        try await until { installs.installsEnded == 1 }
+        await installs.refresh()
+        #expect(installs.status(of: .speakers) == .failed(.interrupted), "a missing model still needs its failure notice")
+        #expect(installs.download?.failure == .interrupted)
+
+        // A job sharing the models can finish the install after the standalone caller stopped waiting.
+        analyzer.finish(with: nil, status: .ready)
+        await installs.refresh()
+        #expect(installs.status(of: .speakers) == .ready)
+        #expect(installs.status(of: .voices) == .ready)
+        #expect(installs.failures[.speakers] == nil)
+        #expect(installs.download == nil, "the Library must not offer a failed download for models that are ready")
+        #expect(!Notices.library(NoticeFacts(download: installs.download), LibraryFacts()).contains { $0.kind.isDownloadFailure })
+    }
+
+    @Test func aJobsSpeakerDownloadClearsTheStandaloneFailureBeforeTheJobEnds() async throws {
+        let analyzer = ScriptedAnalyzer(status: .notDownloaded, gated: true)
+        let job = JobProgress(uptimeMs: { 0 })
+        defer { job.end() }
+        let installs = ModelInstalls(transcriber: FakeTranscriber(.returns([], total: 0)), analyzer: analyzer,
+                                     clock: FakeClock(), job: job) { "en-US" }
+        await installs.refresh()
+        installs.install([.speakers])
+        try await until { analyzer.isWaiting }
+        analyzer.finish(with: .download(.interrupted, requiredFreeBytes: 0), status: .notDownloaded)
+        try await until { installs.installsEnded == 1 }
+        #expect(installs.download?.failure == .interrupted)
+
+        let noteID = UUID()
+        job.begin(noteID, finalizationMs: nil)
+        job.apply(.started(JobStart(totalMs: 10_000, speakers: true, prints: true)))
+        let progress = DownloadProgress(part: .speakers, doneBytes: 30, totalBytes: 100, verifying: false)
+        job.apply(.downloading(progress))
+        try #require(job.modelDownload == progress, "speaker preparation publishes without waiting for a ticker")
+        try await until { installs.downloadsFollowed == 1 }
+        analyzer.finish(with: nil, status: .ready)
+        job.apply(.stageChanged(.speakers))
+        #expect(job.modelDownload == nil, "leaving the download publishes immediately too")
+        try await until { installs.status(of: .speakers) == .ready && installs.download == nil }
+        #expect(job.noteID == noteID, "the refresh must not need the job to end")
+        #expect(installs.status(of: .voices) == .ready)
+        #expect(installs.failures[.speakers] == nil)
+        #expect(!Notices.library(NoticeFacts(download: installs.download), LibraryFacts()).contains { $0.kind.isDownloadFailure })
+    }
+
+    @Test func aClosingRefreshCannotRestoreAnObsoleteSpeakerFailure() async throws {
+        let analyzer = ScriptedAnalyzer(status: .notDownloaded, gated: true)
+        let installs = ModelInstalls(transcriber: FakeTranscriber(.returns([], total: 0)), analyzer: analyzer,
+                                     clock: FakeClock()) { "en-US" }
+        await installs.refresh()
+        installs.install([.speakers])
+        try await until { analyzer.isWaiting }
+        #expect(analyzer.installs == 1)
+        // The caller reports failure, but the files became ready before the closing refresh.
+        analyzer.finish(with: .download(.interrupted, requiredFreeBytes: 0), status: .ready)
+        try await until { installs.installsEnded == 1 }
+        #expect(installs.status(of: .speakers) == .ready)
+        #expect(installs.status(of: .voices) == .ready)
+        #expect(installs.failures[.speakers] == nil)
+        #expect(installs.download == nil)
+        #expect(!Notices.library(NoticeFacts(download: installs.download), LibraryFacts()).contains { $0.kind.isDownloadFailure })
+    }
+
     @Test func theStandaloneDownloadInstallsSpeechThenTheSpeakerModels() async throws {
         let analyzer = ScriptedAnalyzer(status: .notDownloaded)
         let installs = ModelInstalls(transcriber: FakeTranscriber(.returns([], total: 0), status: .notDownloaded),
@@ -491,6 +563,7 @@ private final class ScriptedAnalyzer: SpeakerAnalyzing {
 
     var installs: Int { state.withLock { $0.installs } }
     var cancels: Int { held.cancels }
+    var isWaiting: Bool { held.isWaiting }
 
     func report(_ fraction: Double) { state.withLock { $0.progress }?(.downloading(fraction)) }
 
@@ -532,6 +605,7 @@ private final class HeldInstall: Sendable {
     private let state = Mutex(State())
 
     var cancels: Int { state.withLock { $0.cancels } }
+    var isWaiting: Bool { state.withLock { $0.waiter != nil } }
 
     func wait() async throws {
         state.withLock { $0.cancelled = false }

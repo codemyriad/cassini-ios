@@ -151,7 +151,7 @@ extension TranscriptionJobTests {
         func transcribe(_ request: TranscriptionRequest,
                         events: @escaping @Sendable (TranscriptionEvent) -> Void) async throws -> TranscriptionResult {
             lock.withLock { _starts.append(request.startOffset) }
-            if downloadsFirst { events(.preparingModel(0.25)); onDownload() }
+            if downloadsFirst { events(.preparingModel(.downloading(0.25))); onDownload() }
             if hangs { while true { try await Task.sleep(for: .seconds(60)) } }
             if let failure, failure.index < 0 { throw failure.error }
             events(.progress(done: request.startOffset, total: total))

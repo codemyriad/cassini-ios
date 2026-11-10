@@ -289,7 +289,7 @@ import CassiniEngineTesting
         installs.onInstall = { [self] in try install(models) }
         let (result, events) = try await run(parakeet, url)
         #expect(words(result) == ["w0", "w1", "w2"])
-        #expect(events.preparing >= 2, "nil first, then the fraction")
+        #expect(events.preparing >= 2, "unknown download first, then the measured fraction")
         #expect(native.counts.loads == 1)
 
         // A build that installs nothing itself cannot transcribe without the model.
@@ -333,7 +333,7 @@ import CassiniEngineTesting
         #expect(hashed.withLock { $0 } == ModelCatalog.parakeet.artifacts.map(\.name) + ["silero_vad.onnx"])
         #expect(threads.withLock { $0 } == ["Cassini speech"], "never on the cooperative pool")
         #expect(events.preparing == 1, "the Preparing stage while the files are checked")
-        if case .preparingModel(nil) = events.all.first {} else { Issue.record("Preparing comes first: \(events.all)") }
+        if case .preparingModel(.checking) = events.all.first {} else { Issue.record("Checking comes first: \(events.all)") }
 
         let (_, again) = try await run(transcriber(native, verifier: verifier), url)
         #expect(hashed.withLock { $0 }.count == 5, "checked once a session")
@@ -401,6 +401,25 @@ import CassiniEngineTesting
         #expect(words(result) == ["w0", "w1", "w2"])
         #expect(native.counts.loads == 1)
         #expect(hashed.withLock { $0 } == checks, "an install counts as this session's check")
+    }
+
+    @Test func aJobsDownloadAndVerificationRemainDistinctPreparationEvents() async throws {
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let url = try audio(seconds: 3)
+        let installs = Installs()
+        installs.reports = [DownloadProgress(part: .speech, doneBytes: 4, totalBytes: 4, verifying: false),
+                            DownloadProgress(part: .speech, doneBytes: 4, totalBytes: 4, verifying: true)]
+        let model = ModelCatalog.parakeet
+        installs.onInstall = { [self] in try install(model) }
+        let native = Native()
+        let (result, events) = try await run(transcriber(native, online: true, installs: installs), url)
+        let preparation: [InstallProgress] = events.all.compactMap {
+            if case .preparingModel(let progress) = $0 { progress } else { nil }
+        }
+        #expect(preparation == [.downloading(nil), .downloading(1), .checking])
+        #expect(installs.list == [[.speech]])
+        #expect(native.counts.loads == 1)
+        #expect(words(result) == ["w0", "w1", "w2"])
     }
 
     /// The standalone download (Settings, the model download screen): the fraction of the download, then Checking
