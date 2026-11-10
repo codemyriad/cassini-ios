@@ -206,8 +206,8 @@ enum AuditFilter {
         guard let element = issue.element else { return false }
         // The status bar and the keyboard belong to the system.
         if [.statusBar, .key, .keyboard].contains(element.elementType) { return true }
-        // The UI-test launch marker, an invisible 1 pt text that only DEBUG builds draw.
-        if element.identifier == "launchFinished" || element.identifier == "uiTestState-playbackSeekTarget" { return true }
+        // Invisible event markers exist only in Debug UI-test launches.
+        if element.identifier == "launchFinished" || element.identifier.hasPrefix("uiTestState-") { return true }
         // A Library row's title and preview stop at two lines by design (Android maxLines = 2); in the iPad's sidebar a
         // long title reaches them.
         if issue.auditType == .textClipped, ["rowPreview", "rowTitle"].contains(element.identifier) { return true }
