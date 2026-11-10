@@ -49,7 +49,7 @@ Parakeet Ultra with its actual pinned download size. Once Parakeet is installed 
 automatically; Whistle remains selectable. Devices below Parakeet's capability/memory/disk requirements never see
 the suggestion. Existing queued and paused jobs keep their recognizer. See [Whistle/README.md](Whistle/README.md)
 for the documented minos27 archive exception (linked for iOS 18.0), the iOS 26 and iOS 18.2 simulator parity, the
-A12/3GB measurements (made with the 26.0-linked framework; owed again for the 18.0-linked one), and what the iOS 18 evidence does not show (no physical iOS 18 device has run Whistle). Internal TestFlight builds
+A12/3GB measurements (made with the 26.0-linked framework; owed again for the 18.0-linked one), and what the iOS 18 evidence does not show (two AWS Device Farm runs on 2026-11-10, iPhone 11 on iOS 18.6.2 and iPhone 15 on iOS 18.0, ran Whistle in a Debug build; no A12 or A10 device on iOS 18 has run it). Internal TestFlight builds
 retain private memory diagnostics and must export with testFlightInternalTestingOnly=true.
 
 ## Run

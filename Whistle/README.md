@@ -66,8 +66,8 @@ same build):
 - the CPU rule: the archive needs FEAT_LSE and FEAT_LRCPC; unit tests show that a CPU reporting either as missing or
   0 (the A10's values) is refused and the A12's values are accepted (`WhistleCapability.supports(cpu:)`). The app reads
   them from `hw.optional.arm.*` only below iOS 26 (`supports(cpu:operatingSystemMajor:)`): every iOS 26 device is an
-  A12 or newer, so iOS 26 keeps Whistle whatever the read answers. The live read has run only in simulators (18.2
-  included), which answer with the host Mac's features; no A10 or iOS 18 device has run it.
+  A12 or newer, so iOS 26 keeps Whistle whatever the read answers. In simulators (18.2 included) the read answers
+  with the host Mac's features. On the two iOS 18 devices below it answered 1 for both keys; no A10 has run it.
 
 The parity harness is outside the repository, on drmeyers under
 `/Volumes/DrMeyers2/cassini-ios18-cache/ios18-e/evidence/` (`INDEX.txt` lists every run, `run-ios18.2.sh` the 18.2
@@ -78,15 +78,31 @@ spike's unchanged `scripts/whistle-ios26-spike/driver.mm` (SHA-256
 `a1b827dfa6c6fc2bdd6b3d692cb3b4231dc616be4be588aeca427a4e64094afd`) from the `whistle-ios26-spike` worktree; check
 the hashes before trusting a rerun.
 
-**Not shown.** All of the above is simulator evidence: the arm64 simulator slice, running on the Mac's CPU against
-the simulator runtime's libraries (and the host Mac's for the five imports above). It says nothing about:
-- the device slice on iOS 18: there is no physical iOS 18 device, so no device load, D75.2 lab-device run, memory
-  measurement or TestFlight acceptance on 18. The device import list was audited against SDK 26 stubs only;
-- A12 instruction support on iOS 18: the simulator executes on the Mac's CPU, which has every feature the archive
-  uses, so it cannot show that an A12 under iOS 18 runs the code or that the CPU gate refuses an A10;
-- whether an app can read the `hw.optional.arm.FEAT_*` keys on a device: on iOS 18 a refused read turns Whistle off
-  (it never lets an A10 through); on iOS 26 the read is not consulted. The `WhistleBundle` "CPU features" log line
-  shows the answer in the first device run;
+**On devices.** Two AWS Device Farm runs on 2026-11-10 (iPhone 11 on iOS 18.6.2, iPhone 15 on iOS 18.0) ran hosted
+tests of this branch at 4709744. The build was Debug with development signing; Device Farm signed it again. It added
+one uncommitted test that only prints the device, its CPU keys, memory and one timed transcription. The iPhone 11 is
+an A13 and the iPhone 15 an A16. On both devices:
+- the app launches, and the bundled Whistle passes verification on the device slice (`ios-arm64`, minos 18.0);
+- `WhistleRuntimeTests` passes: the bundle loads through the guarded C API, and text, language and words match the
+  golden, with word times within 80 ms;
+- `WhistleRecordingAdapterTests/testBundledEnglishRecordingRunsThroughFIRVADAndNeedle` passes;
+- the app reads `hw.optional.arm.FEAT_LSE` and `FEAT_LRCPC` (and `FEAT_DotProd`) as 1, so the CPU gate accepts
+  Whistle; `PlatformCompositionTests/testTheCPUFeaturesAreTheSystems` and `testIOS18DeviceClassesGetTheirRecognizer`
+  pass, and the app selects Whistle.
+
+The logs are in coordination `evidence/ios18-devicefarm/` (`INDEX.txt`).
+
+**Not shown.** The simulator evidence runs the arm64 simulator slice on the Mac's CPU against the simulator
+runtime's libraries (and the host Mac's for the five imports above). The device runs cover an A13 and an A16 only.
+Still not shown:
+- an A12 on iOS 18: Device Farm has no A12 device on iOS 18 (its only iPhone XR runs iOS 16.4), so nothing shows
+  that an A12 under iOS 18 runs the code;
+- the CPU gate refusing an A10 on a device. On iOS 18 a refused read turns Whistle off; on iOS 26 the read is not
+  consulted;
+- the Whistle DC gate (six boundaries) on a device: the shared DC recordings were not uploaded;
+- a Release build, a D75.2 lab-device run, a memory gate or TestFlight acceptance on 18. The device runs printed a
+  footprint but checked no limit. The device import list was audited against SDK 26 stubs only;
+- whether the increased-memory-limit entitlement survives Device Farm's signing; no test depends on it;
 - the A12 measurement on iPadOS 26 named in decision 1: it exists for the **26.0-linked** framework (the A12/3GB
   iPad, about 91 MiB footprint). For this 18.0-linked framework it is **still owed**: the next TestFlight build from
   main after this change merges repeats the A12 acceptance.
@@ -106,8 +122,9 @@ Whistle is the immediate bundled default on arm64 devices from iOS 18 with FEAT_
 on iOS 18 the CPU must report both, so the A10 iPad 7th generation on iPadOS 18 is refused; every iOS 26 device has
 them), with verified assets and the measured 3GB-class
 memory floor (at least2GiB reported physical RAM,512MiB available before load,256MiB per window). The physical
-A12/3GB gate on iPadOS 26 and the iOS 26 adapter/DC gates below back this rollout; on iOS 18 only simulator evidence
-exists (see above). The pending capability factory remains
+A12/3GB gate on iPadOS 26 and the iOS 26 adapter/DC gates below back this rollout. On iOS 18 there is simulator
+evidence and two device runs on an A13 and an A16, but no A12 run and no memory gate (see above). The pending
+capability factory remains
 unavailable; the D78 bundled factory is separate from the earlier explicit internal experiment.
 
 `SpeechModelPolicy` uses Whistle until Parakeet is installed and hash-verified, then defaults new jobs to Parakeet
