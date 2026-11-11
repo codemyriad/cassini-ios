@@ -7,7 +7,7 @@ extension CassiniDocument {
      * a fresh seal carries [source]'s private and unknown manifest members, its meeting id and its meeting and
      * provenance members not tied to its transcripts; see [seal]. `recordedAt` is the trustworthy instant at
      * playback position zero. It fills an absent recordedAtUtc on fresh, existing or carried manifests; an existing
-     * UTC start is never overwritten. An unknown start stays absent, and no local recording-site label is inferred
+     * UTC start over matching audio is never overwritten; a stale source’s UTC/local fields are discarded first. An unknown start stays absent, and no local recording-site label is inferred
      * from the machine clock.
      */
     public static func create(_ audioBytes: [UInt8], transcript: Transcript, title: String, processing: JSONObject,
@@ -130,12 +130,15 @@ extension CassiniDocument {
     /**
      * The `meeting` a fresh seal starts from: [source]'s, verbatim and in its order, when it has an id. A fresh seal
      * covers the same audio packets, so it is a tag rewrite and keeps the meeting's id (SPEC `meeting.id`) along with
-     * every member this build does not know; it then sets [resealedMeetingMembers] itself. The site-local label is
+     * every member this build does not know; it then sets [resealedMeetingMembers] itself. Recording-time metadata is
      * retained only while the source has not been shown to describe different audio (`staleAudio`).
      */
     public static func carriedMeeting(of source: CassiniDocument?) -> JSONObject? {
         guard var meeting = source?.manifest?["meeting"]?.object, meeting["id"]?.string?.isEmpty == false else { return nil }
-        if source?.state == .staleAudio { meeting["recordedAtLocal"] = nil }
+        if source?.state == .staleAudio {
+            meeting["recordedAtUtc"] = nil
+            meeting["recordedAtLocal"] = nil
+        }
         return meeting
     }
 
@@ -192,7 +195,7 @@ extension CassiniDocument {
             ("speakers", .array([])), ("transcripts", .array([])),
         ])
         // A caller's trustworthy start can repair a legacy own document without rebinding its
-        // meeting id or audio. The file's existing UTC start remains authoritative on every path.
+        // meeting id or audio. An existing UTC start stays authoritative while its source audio still matches.
         if let recordedAt, var recordedMeeting = manifest["meeting"]?.object,
            recordedMeeting["recordedAtUtc"] == nil {
             recordedMeeting["recordedAtUtc"] = .string(instantText(recordedAt))

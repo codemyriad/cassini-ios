@@ -54,7 +54,7 @@ struct MeetingOrderTests {
         }
     }
 
-    @Test func nonexistentDSTClockIsNotNormalizedAndRepeatedClocksHaveStableDisplayOrder() throws {
+    @Test func nonexistentDSTClockIsNotNormalizedAndRepeatedClocksHaveDeterministicDisplayOrder() throws {
         let calendar = calendar(try #require(TimeZone(identifier: "America/New_York")))
         let before = try note("English before gap", time: .instant(instant("2026-03-08T06:45:00Z")), sealed: "2026-11-01T12:00:00Z")
         let gap = try note("English written gap", time: .local("2026-03-08T02:30:00"), sealed: "2026-11-03T12:00:00Z")
@@ -70,18 +70,42 @@ struct MeetingOrderTests {
         #expect(MeetingOrder.sorted([ambiguous, secondFold, firstFold], calendar: calendar, note: { $0 }).map(\.id)
             == [firstFold.id, ambiguous.id, secondFold.id])
         let equalInstant = try note("English equal fold", time: .instant(instant("2026-11-01T06:30:00Z")), sealed: "2026-11-05T12:00:00Z")
-        #expect(MeetingOrder.sorted([ambiguous, equalInstant], calendar: calendar, note: { $0 }).map(\.id) == [ambiguous.id, equalInstant.id])
+        #expect(MeetingOrder.sorted([ambiguous, equalInstant], calendar: calendar, note: { $0 }).map(\.id) == [equalInstant.id, ambiguous.id])
         #expect(MeetingOrder.sorted([equalInstant, ambiguous], calendar: calendar, note: { $0 }).map(\.id) == [equalInstant.id, ambiguous.id])
     }
 
-    @Test func onlyUnknownUsesCreationFallbackAndMalformedLocalLabelsRemainUndated() throws {
+    @Test func unknownTimesFollowEveryKnownTimeAndUseCreationFallbackOnlyWithinUndated() throws {
         let calendar = calendar(try #require(TimeZone(secondsFromGMT: 0)))
         let known = try note("English known", time: .local("2026-11-10T12:00:00"), sealed: "2099-01-01T00:00:00Z")
         let unknown = try note("English unknown", time: .unknown, sealed: "2026-11-11T12:00:00Z")
         let malformed = try note("English malformed", time: .local("not a recording date"), sealed: "2199-01-01T00:00:00Z")
         let sorted = MeetingOrder.sorted([malformed, known, unknown], calendar: calendar, note: { $0 })
-        #expect(sorted.map(\.id) == [unknown.id, known.id, malformed.id])
-        #expect(sorted.map(\.meetingTime) == [.unknown, .local("2026-11-10T12:00:00"), .local("not a recording date")])
+        #expect(sorted.map(\.id) == [known.id, malformed.id, unknown.id])
+        #expect(sorted.map(\.meetingTime) == [.local("2026-11-10T12:00:00"), .local("not a recording date"), .unknown])
         #expect(malformed.meetingTime.day(in: calendar) == nil)
     }
+    @Test func equalCalendarClocksUseInstantThenIdentityAndUnknownSearchHitsStayLast() throws {
+        let calendar = calendar(try #require(TimeZone(identifier: "America/New_York")))
+        let first = try note("English first clock", time: .instant(instant("2026-11-01T05:30:00Z")), sealed: "2026-11-12T12:00:00Z")
+        let second = try note("English second clock", time: .instant(instant("2026-11-01T06:30:00Z")), sealed: "2026-11-11T12:00:00Z")
+        let floating = try note("English floating clock", time: .local("2026-11-01T01:30:00"), sealed: "2026-11-30T12:00:00Z")
+        var olderUnknown = try note("English unknown earlier", time: .unknown, sealed: "2026-11-29T12:00:00Z")
+        var equalUnknown = try note("English unknown equal", time: .unknown, sealed: "2026-11-29T12:00:00Z")
+        let recentUnknown = try note("English unknown recent", time: .unknown, sealed: "2026-11-30T12:00:00Z")
+        olderUnknown.id = UUID(uuidString: "11111111-1111-4111-8111-111111111111")!
+        equalUnknown.id = UUID(uuidString: "22222222-2222-4222-8222-222222222222")!
+        let input = [equalUnknown, floating, first, recentUnknown, olderUnknown, second]
+        let expected = [second.id, first.id, floating.id, recentUnknown.id, olderUnknown.id, equalUnknown.id]
+        #expect(MeetingOrder.sorted(input, calendar: calendar, note: { $0 }).map(\.id) == expected)
+        #expect(MeetingOrder.sorted(Array(input.reversed()), calendar: calendar, note: { $0 }).map(\.id) == expected)
+        var index = LibraryIndex(input)
+        let rows = LibraryMapping.results(index.search(SearchQuery("English")), context: RowContext(),
+                                          now: try instant("2026-11-30T12:00:00Z"), calendar: calendar)
+        #expect(rows.map(\.id) == expected)
+        let sections = LibraryMapping.sections(index.entries, context: RowContext(),
+                                               now: try instant("2026-11-30T12:00:00Z"), calendar: calendar)
+        #expect(sections.last?.key == .undated)
+        #expect(sections.last?.rows.map(\.id) == [recentUnknown.id, olderUnknown.id, equalUnknown.id])
+    }
+
 }

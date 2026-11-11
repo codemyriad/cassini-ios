@@ -100,7 +100,7 @@ extension Note: Codable {
         // that stamp; imports and recovery use their import/seal/filesystem times instead.
         // Schema 1 had no origin and imported M4A also used audio.m4a, so only its recorder-only
         // capture.caf filename is evidence. Do not replace an explicit unknown/new-format value.
-        if !c.contains(.meetingTime), origin == .recorded,
+        if !c.contains(.meetingTime), origin == .recorded, status != .recording, audio != .live,
            document == nil, sourceSha256 == nil, originalAudioFilename == nil,
            versions?.contains(where: { $0.portableID != nil }) != true,
            schema >= 2 || audioFilename == "capture.caf" {

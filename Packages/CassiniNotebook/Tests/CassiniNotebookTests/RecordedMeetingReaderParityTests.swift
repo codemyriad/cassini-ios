@@ -38,6 +38,10 @@ struct RecordedMeetingReaderParityTests {
             ("utc-priority", "2026-11-09T23:59:59+09:00", "2026-11-09T09:31:48.250Z", "2026-11-09T01:00:00", "recordedAtUtc"),
             ("equal-seal-falls-back-local", "2026-11-09t10:40:48.000000+01:00", nil, "2026-11-09T01:00:00", "recordedAtLocal"),
             ("offsetless-date-falls-back-local", "2026-11-09T09:31:48", nil, "2026-11-09T01:00:00", "recordedAtLocal"),
+            ("non-z-utc-falls-back-date", "2026-11-09t09:31:48z", "2026-11-09T01:00:00+00:00", nil, "DATE"),
+            ("lower-z-utc-falls-back-local", nil, "2026-11-09T01:00:00z", "2026-11-09T01:00:00", "recordedAtLocal"),
+            ("invalid-utc-falls-back-local", nil, "not a timestamp", "2026-11-09T01:00:00", "recordedAtLocal"),
+            ("invalid-utc-with-no-start-is-unknown", nil, "not a timestamp", nil, nil),
             ("only-seal-is-unknown", nil, nil, nil, nil)
         ]
         for (name, date, utc, local, source) in cases {

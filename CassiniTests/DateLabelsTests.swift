@@ -78,6 +78,21 @@ final class DateLabelsTests: XCTestCase {
         XCTAssertEqual(Locale.current.identifier, globalLocale)
     }
 
+    func testUndatedSectionHasTheSharedNonblankHeadingInAllSixLanguages() throws {
+        let cases = [("en", "Date unknown"), ("it", "Data sconosciuta"), ("fr", "Date inconnue"),
+                     ("es", "Fecha desconocida"), ("pt-BR", "Data desconhecida"), ("pt-PT", "Data desconhecida")]
+        for (language, expected) in cases {
+            let path = try XCTUnwrap(Bundle.main.path(forResource: language, ofType: "lproj"))
+            let bundle = try XCTUnwrap(Bundle(path: path))
+            let heading = DateLabels.unknownDate(bundle: bundle)
+            XCTAssertEqual(heading, expected, language)
+            XCTAssertFalse(heading.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                           "The Library's accessibility heading must never be blank")
+        }
+        XCTAssertEqual(DateLabels(calendar: calendar).day(.undated), "Date unknown",
+                       "The actual day-header path uses the shared heading")
+    }
+
     func testRecentlyDeletedAndVersionsUseTheShortDate() {
         XCTAssertEqual(Locale.current.language.languageCode?.identifier, "en")
         XCTAssertEqual(Locale.current.region?.identifier, "US", "English copy tests use the scheme's pinned locale")

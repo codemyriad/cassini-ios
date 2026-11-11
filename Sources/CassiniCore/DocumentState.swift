@@ -24,6 +24,13 @@ extension CassiniDocument {
     public static func readChecked(_ url: URL, verify: Bool = true) -> CassiniDocument {
         read(verify: verify, reportsIOErrors: true) { try FileSource(url) }
     }
+
+    /// Reads and verifies only the comment envelope and manifest payload. Transcript descriptors are
+    /// retained, but no transcript body is decompressed or parsed and audio is never scanned. A valid
+    /// result is `.unverified`; IO errors remain `.unreadable`, distinct from invalid/unknown metadata.
+    public static func readMetadataChecked(_ url: URL) -> CassiniDocument {
+        read(verify: false, reportsIOErrors: true, decodeTranscripts: false) { try FileSource(url) }
+    }
 }
 
 extension CassiniDocument {

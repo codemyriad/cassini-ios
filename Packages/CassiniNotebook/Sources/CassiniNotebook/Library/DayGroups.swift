@@ -17,7 +17,7 @@ public struct CalendarDay: Hashable, Sendable {
 public enum DayKey: Hashable, Sendable {
     case today
     case yesterday
-    /// No meeting instant is known; local wall times stay as written on each row.
+    /// No usable meeting date is known. This group follows all resolved meeting days.
     case undated
     case date(CalendarDay, withYear: Bool)
 }

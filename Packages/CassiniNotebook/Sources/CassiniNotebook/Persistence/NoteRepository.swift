@@ -41,12 +41,17 @@ public struct NoteRepository: Sendable {
         var report = LoadReport()
         for folder in folders where UUID(uuidString: folder.lastPathComponent) != nil {
             do {
-                var note = try JSONDecoder().decode(Note.self, from: Data(contentsOf: folder.appendingPathComponent(Self.metadataFilename)))
+                let stored = try JSONDecoder().decode(StoredNote.self, from: Data(contentsOf: folder.appendingPathComponent(Self.metadataFilename)))
+                var note = stored.note
                 guard note.id.uuidString == folder.lastPathComponent, Self.isValid(note) else { throw RepositoryError.invalidDocument }
-                if note.origin == .importedDocument {
-                    let source = originalAudioURL(for: note)
-                    if FileManager.default.fileExists(atPath: source.path) {
-                        note.meetingTime = MeetingTime.read(CassiniDocument.readChecked(source, verify: false))
+                if note.origin == .importedDocument, !stored.hadMeetingTime {
+                    let metadata = CassiniDocument.readMetadataChecked(originalAudioURL(for: note))
+                    if PortableTranscript.readableStates.contains(metadata.state), metadata.manifest != nil {
+                        note.meetingTime = MeetingTime.read(metadata)
+                        // A valid manifest can also establish that the start is unknown. Persist either result once.
+                        // Failed I/O or unsupported/damaged metadata never replaces the catalogue's existing values.
+                        // A failed metadata save leaves the legacy file intact and eligible for another attempt.
+                        try? save(note)
                     }
                 }
                 report.notes.append(note)
@@ -57,6 +62,21 @@ public struct NoteRepository: Sendable {
         report.notes.sort { $0.sortDate > $1.sortDate }
         report.unreadable.sort { $0.lastPathComponent < $1.lastPathComponent }
         return report
+    }
+
+    /// Inspect root-key presence using the same decoder/map as Note, without parsing its transcript JSON twice.
+    /// Explicit values (including unknown or null) are cached facts; only a genuinely absent key needs backfill.
+    private struct StoredNote: Decodable {
+        let note: Note
+        let hadMeetingTime: Bool
+
+        private enum Keys: String, CodingKey { case meetingTime }
+
+        init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: Keys.self)
+            hadMeetingTime = container.contains(.meetingTime)
+            note = try Note(from: decoder)
+        }
     }
 
     /// Deletes the note's directory. It is first renamed out of the notes (`<id>.purging`), in one atomic step, so a

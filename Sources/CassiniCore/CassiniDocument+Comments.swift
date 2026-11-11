@@ -141,10 +141,15 @@ extension CassiniDocument {
             let previous = text.first { sameBytes(tagName($0), "DATE") }.map { String($0.dropFirst(5)) }
             let sourceCreated = source?.manifest?["meeting"]?.object?["createdAtUtc"]?.string.flatMap(parseInstant)
             let legacy = previous.flatMap { value -> String? in
-                guard source != nil, let date = parseInstant(value), date != sourceCreated else { return nil }
+                guard let source, source.state != .staleAudio, let date = parseInstant(value), date != sourceCreated else { return nil }
                 return value
             }
-            let date = meeting["recordedAtUtc"]?.string ?? legacy ?? meeting["createdAtUtc"]?.string
+            let recorded = meeting["recordedAtUtc"]?.string.flatMap { value -> String? in
+                let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard trimmed.hasSuffix("Z"), parseInstant(trimmed) != nil else { return nil }
+                return value
+            }
+            let date = recorded ?? legacy ?? meeting["createdAtUtc"]?.string
             guard let date else { return self }
             // DATE is ordinary metadata, so do not add it to the set of load-bearing derived tags.
             // Replace all spellings here, including opaque entries, just as TITLE does.

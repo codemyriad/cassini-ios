@@ -38,10 +38,10 @@ struct RecordedMeetingDisplayTests {
         let sections = LibraryMapping.sections(LibraryIndex([unknown, known, local]).entries,
                                                context: RowContext(), now: recorded, calendar: calendar)
         #expect(sections.count == 3)
-        #expect(sections[0].key == .undated)
-        #expect(sections[1].key == .today)
-        #expect(sections[2].key == DayGroups.key(CalendarDay(year: 2026, month: 11, day: 8), now: recorded, calendar: calendar))
-        #expect(sections[2].rows[0].meetingTime == .local("2026-11-08T09:15:00"))
+        #expect(sections[2].key == .undated)
+        #expect(sections[0].key == .today)
+        #expect(sections[1].key == DayGroups.key(CalendarDay(year: 2026, month: 11, day: 8), now: recorded, calendar: calendar))
+        #expect(sections[1].rows[0].meetingTime == .local("2026-11-08T09:15:00"))
         #expect(Set(sections.map(\.id)).count == sections.count)
         for note in [unknown, local] {
             let subtitle = NoteSubtitle.of(note, mode: .audioOnly, now: recorded, calendar: calendar)

@@ -68,9 +68,13 @@ struct RecordedMeetingTimeTests {
         let portable = try #require(PortableTranscript(CassiniDocument.read(bytes)))
         var note = ImportedNote.make(id: UUID(), displayName: nil, fallbackTitle: "Import", sha256: "hash", importedAt: start.addingTimeInterval(540),
             audio: ImportedAudio(filename: "playback.caf", originalFilename: "document.opus", duration: 1), document: portable)
-        // Simulate an older catalogue whose cached date was the seal stamp.
+        // A pre-D95 catalogue had no meetingTime key; explicit modern unknown values are authoritative.
         note.meetingTime = .unknown
         try repository.save(note)
+        let metadata = repository.directory(for: note.id).appendingPathComponent(NoteRepository.metadataFilename)
+        var legacy = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: metadata)) as? [String: Any])
+        legacy.removeValue(forKey: "meetingTime")
+        try JSONSerialization.data(withJSONObject: legacy).write(to: metadata)
         try Data(bytes).write(to: repository.originalAudioURL(for: note))
         try Data("decoded playback".utf8).write(to: repository.audioURL(for: note))
         #expect(try repository.load().notes.first?.meetingTime == .instant(start))

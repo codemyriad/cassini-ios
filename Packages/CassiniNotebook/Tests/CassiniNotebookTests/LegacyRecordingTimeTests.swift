@@ -79,6 +79,15 @@ struct LegacyRecordingTimeTests {
         #expect(try #require(PortableTranscript.read(from: exported)).meetingTime == .unknown)
     }
 
+    @Test(arguments: [("recording", "plain"), ("ready", "live"), ("recording", "live")])
+    func legacyUnstartedOrLiveCaptureDoesNotClaimACaptureStart(_ status: String, _ audio: String) throws {
+        var object = try #require(JSONSerialization.jsonObject(with: legacy(schema: 2, filename: "capture.caf")) as? [String: Any])
+        object["status"] = status
+        object["audio"] = [audio: [String: String]()]
+        let note = try JSONDecoder().decode(Note.self, from: JSONSerialization.data(withJSONObject: object))
+        #expect(note.meetingTime == .unknown)
+    }
+
     @Test func ambiguousSchemaOneM4aAndExplicitUnknownOrImportEvidenceStayUnknown() throws {
         let ambiguous = try JSONDecoder().decode(Note.self, from: legacy(schema: 1, filename: "audio.m4a"))
         #expect(ambiguous.origin == .recorded, "The old origin heuristic alone cannot distinguish this filename")

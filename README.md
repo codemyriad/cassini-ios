@@ -161,6 +161,10 @@ TestFlight still need.
 
 [docs/differences.md](docs/differences.md) describes each difference in detail. In summary:
 
+- **Unknown meeting dates (D95).** The Library names the group with the shared “Date unknown” heading in all six
+  languages, including for VoiceOver. iOS omits the repeated unknown-date label from individual row metadata,
+  the Note subtitle and the Document info Recorded row; the Note subtitle keeps the duration. Android repeats
+  “Date unknown” on those surfaces. Neither app displays a document's sealing or import time as its recording date.
 - **Engines and thresholds.** D78 starts with bundled Whistle and promotes Parakeet Ultra after its pinned files
   are verified. Parakeet needs at least 5 GiB physical RAM (the existing provisional rule) and the normal runtime
   memory preflight; its download suggestion also checks the pinned install's actual disk requirement. Whistle's

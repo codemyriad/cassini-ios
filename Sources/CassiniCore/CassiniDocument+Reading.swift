@@ -9,7 +9,8 @@ extension CassiniDocument {
     }
 
     /** [reportsIOErrors] makes a file that cannot be opened or read [DocumentState.unreadable] instead of plain audio. */
-    static func read(verify: Bool, reportsIOErrors: Bool, open: () throws -> ByteSource) -> CassiniDocument {
+    static func read(verify: Bool, reportsIOErrors: Bool, decodeTranscripts: Bool = true,
+                     open: () throws -> ByteSource) -> CassiniDocument {
         // Audio corruption must not conceal an otherwise intact manifest/transcript.
         let head: [UInt8], tagPacket: [UInt8]
         do {
@@ -76,6 +77,9 @@ extension CassiniDocument {
             for (field, suffix) in fields where !sameBytes(tags[prefix + suffix], ref[field]?.text) {
                 warnings.append("tag-manifest-disagreement: \(prefix)\(suffix)")
             }
+            guard decodeTranscripts else {
+                return Variant(id: id, descriptor: descriptor, body: nil, transcript: nil)
+            }
             do {
                 // The format names the body; the media type is only a hint.
                 try check(ref.hasExactly(refKeys) && descriptor["format"] == .string(Transcript.format), "unsupported-transcript-format")
@@ -126,10 +130,8 @@ extension CassiniDocument {
         try nonempty(meeting, "id"); try nonempty(meeting, "title"); _ = try meeting.number("durationMs")
         let created = try meeting.string("createdAtUtc")
         try check(created.hasSuffix("Z") && parseInstant(created) != nil, "Invalid createdAtUtc")
-        if let recorded = meeting["recordedAtUtc"] {
-            guard let value = recorded.string else { throw CassiniError("Invalid recordedAtUtc") }
-            try check(value.hasSuffix("Z") && parseInstant(value) != nil, "Invalid recordedAtUtc")
-        }
+        // Optional meeting-time metadata is interpreted by readers, not load-bearing transcript
+        // schema. An unusable recordedAtUtc must allow DATE/local fallback without hiding words.
         let audio = try m.object("audio")
         try check(audio["container"] == .string("ogg") && audio["codec"] == .string("opus") && audio.number("sampleRate") == 48000, "Unsupported audio")
         try check((1...2).contains(audio.number("channels")), "Unsupported channel count")
