@@ -27,11 +27,12 @@ struct SettingsView: View {
             #if DEBUG
             if let recorder = installRecorder {
                 let installing = processing.models.isInstalling
+                let download = processing.models.download
                 let snapshot = recorder.snapshot
                 if !snapshot.requested.isEmpty {
                     UITestStateMarker(identifier: "modelInstallRequested",
                                       value: snapshot.requested.map(\.rawValue).joined(separator: ","))
-                    if !installing, !snapshot.completed.isEmpty {
+                    if !installing, download == nil, !snapshot.completed.isEmpty {
                         let consent: [ModelPart] = (settings.downloadsAllowed ? [.speech] : [])
                             + (settings.speakerDownloadsAllowed ? [.speakers] : [])
                         UITestStateMarker(identifier: "modelInstallCompleted", value:

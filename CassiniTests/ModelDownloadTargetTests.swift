@@ -56,7 +56,7 @@ import CassiniNotebook
             let (changes, changed) = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
             var next = changes.makeAsyncIterator()
             repeat {
-                if withObservationTracking({ !models.isInstalling }, onChange: { changed.yield() }) {
+                if withObservationTracking({ models.download == nil && !models.isInstalling }, onChange: { changed.yield() }) {
                     ended.fulfill()
                     return
                 }
