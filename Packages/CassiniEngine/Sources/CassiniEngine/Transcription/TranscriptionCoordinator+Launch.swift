@@ -4,8 +4,8 @@ import CassiniNotebook
 /// The launch repair, and starting a waiting queue when Cassini comes to the screen.
 ///
 /// Touches: `visible`, `trashed` (read from the notes at launch), the stored queue and `work/` before the queue is
-/// ready, `systemStopWrites` (read, to wait for them); the observed state only through `recordLoadFailure`, `refresh`
-/// and `markReady`, the hold through `continueQueue`.
+/// ready, `systemStopWrites` (read, to wait for them), `unresolvedSystemStops` (resolved ones dropped); the observed
+/// state only through `recordLoadFailure`, `refresh` and `markReady`, the hold through `continueQueue`.
 extension TranscriptionCoordinator {
     /// The app came to the screen or left it. On the screen, a waiting queue starts when nothing runs, nothing holds
     /// it and the models may be used; paused jobs never resume on their own.
@@ -100,6 +100,7 @@ extension TranscriptionCoordinator {
                 let jobs = await parts.jobs.all()
                 // Checked after the read, with no wait from here on: a system stop or a Stop during the read counts.
                 guard systemStopWrites.isEmpty else { return false }
+                dropResolvedSystemStops(jobs)
                 guard !resumingSystemPause,
                       EnqueueRules.resumesOnActivation(settings.queueHold, platform: platform) else { return true }
                 paused = jobs
@@ -135,12 +136,22 @@ extension TranscriptionCoordinator {
             }
         }
         resumingSystemPause = false
+        // The last wait: from here on nothing else runs before the hold is decided.
+        dropResolvedSystemStops(await parts.jobs.all())
         // A job that could not be saved as queued again keeps the hold, so the next activation, or the next launch's,
         // tries again.
         if !unsaved, unresolvedSystemStops.isEmpty, settings.queueHold == .system, systemStops == stopsWhenRead {
             continueQueue()
         }
         return resumed
+    }
+
+    /// Forgets the unresolved system stops whose job `jobs` (the stored queue) no longer has as running: an outcome
+    /// was stored for it, or the job was removed (a permanent delete, Trash, the launch repair), so nothing is left
+    /// for the hold to recover.
+    func dropResolvedSystemStops(_ jobs: [Job]) {
+        guard !unresolvedSystemStops.isEmpty else { return }
+        unresolvedSystemStops.formIntersection(jobs.filter { $0.state == .running }.map(\.noteID))
     }
 
     func startWaitingQueue() async {
