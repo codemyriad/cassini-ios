@@ -54,11 +54,15 @@ public enum NoteBanners {
             break
         }
         if mode.showsReading, let trust = trustBanner(note, toggled: facts.trustToggled) { specs.append(trust) }
-        var jobBanners = Notices.job(job, oneVoice: oneVoice(note), failureText: job?.failure.map(failureText),
+        let awaitingSpeakerConsent = job?.kind == .speakersOnly && job?.state == .needsConsent
+        let offersSpeakerDownload = !note.transcript.isEmpty && (awaitingSpeakerConsent ||
+            ((facts.speakerModelsMissing || facts.speakerModelsInstalling) && note.canDownloadSpeakerAnalysis))
+        var jobBanners = Notices.job(awaitingSpeakerConsent ? nil : job,
+                             oneVoice: oneVoice(note) || offersSpeakerDownload, failureText: job?.failure.map(failureText),
                              requiredFreeBytes: (job?.kind == .speakersOnly ? facts.speakersInstallBytes
                                                  : facts.speechInstallBytes) ?? downloadFreeBytes,
                              noNewVersion: note.refusesNewVersion)
-        if facts.speakerModelsMissing || facts.speakerModelsInstalling {
+        if offersSpeakerDownload {
             for index in jobBanners.indices where jobBanners[index].kind == .txOneVoice {
                 jobBanners[index].actions = ReadOnlyReason.of(note, job: job) == nil ? [.download] : []
                 if facts.speakerModelsInstalling { jobBanners[index].disabledActions.insert(.download) }

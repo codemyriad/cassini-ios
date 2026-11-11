@@ -186,6 +186,35 @@ import CassiniNotebook
         }
     }
 
+    @Test func skippedAnalysisOffersDownloadAndPendingConsentKeepsItsEntryPoint() throws {
+        var note = transcribed
+        note.speakers = [NoteSpeaker.oneVoice(prefix: "run_")]
+        note.speakerAnalysisFailure = nil
+        let facts = NoteBannerFacts(speakerModelsMissing: true)
+        #expect(banners(note, facts: facts).first?.actions == [.download])
+        var screen = NoteScreenState()
+        #expect(screen.bannerAction(.download, note: note, job: nil) == .transcribe(.speakersOnly))
+        var waiting = job(.needsConsent)
+        waiting.kind = .speakersOnly
+        #expect(banners(note, job: waiting, facts: facts).first?.actions == [.download])
+        #expect(screen.bannerAction(.download, note: note, job: waiting) == .transcribe(.speakersOnly))
+        note.speakers?[0].name = "Alex"
+        #expect(banners(note, facts: facts).isEmpty, "Naming alone does not introduce a new offer")
+        #expect(banners(note, job: waiting, facts: facts).first?.actions == [.download], "Explicit pending intent survives naming")
+        #expect(screen.bannerAction(.download, note: note, job: waiting) == .transcribe(.speakersOnly))
+        waiting.kind = .transcribeAgain
+        #expect(banners(note, job: waiting, facts: facts).isEmpty)
+        #expect(screen.bannerAction(.download, note: note, job: waiting) == nil)
+        note.speakers = [NoteSpeaker.oneVoice(prefix: "a_"), NoteSpeaker.oneVoice(prefix: "b_")]
+        #expect(!note.canDownloadSpeakerAnalysis)
+        note.speakers = [NoteSpeaker.oneVoice(prefix: "a_")]
+        note.speakers?[0].match = .confirmed(voice: UUID(), score: 1)
+        #expect(!note.canDownloadSpeakerAnalysis)
+        note.speakers = [NoteSpeaker.oneVoice(prefix: "a_")]
+        note.speakerAnalysisFailure = .empty
+        #expect(!note.canDownloadSpeakerAnalysis)
+    }
+
     /// iOS: a speaker step that found nobody is no one-voice banner, but its own notice.
     @Test func noSpeakersIsNotOneVoice() {
         var note = transcribed

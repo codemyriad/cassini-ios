@@ -125,8 +125,9 @@ public struct NoteScreenState: Hashable, Sendable {
         case .transcribeAgain: return transcribeAgain(note)
         case .download:
             // A finished note missing speaker models asks for Identify speakers, retaining its words.
-            guard job == nil, ReadOnlyReason.of(note, job: job) == nil, !note.transcript.isEmpty,
-                  let failure = note.speakerAnalysisFailure, failure != .empty else { return nil }
+            let awaitingConsent = job?.kind == .speakersOnly && job?.state == .needsConsent
+            guard (job == nil || awaitingConsent), ReadOnlyReason.of(note, job: job) == nil,
+                  !note.transcript.isEmpty, awaitingConsent || note.canDownloadSpeakerAnalysis else { return nil }
             return .transcribe(.speakersOnly)
         case .playAnyway: return .acknowledgeTrustAndPlay
         case .continue: return .continueQueue
