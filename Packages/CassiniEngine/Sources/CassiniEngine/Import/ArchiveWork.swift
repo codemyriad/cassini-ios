@@ -26,12 +26,18 @@ enum ArchiveWork {
                                  _ body: @escaping @Sendable (Cancellation) throws -> T) async throws -> T {
         let cancellation = Cancellation()
         return try await withTaskCancellationHandler {
-            try Task.checkCancellation()
-            let value: T = try await withCheckedThrowingContinuation { continuation in
-                queue.async { continuation.resume(with: Result { try cancellation.check(); return try body(cancellation) }) }
+            do {
+                try Task.checkCancellation()
+                let value: T = try await withCheckedThrowingContinuation { continuation in
+                    queue.async { continuation.resume(with: Result { try cancellation.check(); return try body(cancellation) }) }
+                }
+                try Task.checkCancellation()
+                return value
+            } catch {
+                // A provider/filesystem failure racing cancellation must not turn Cancel into a generic error.
+                try Task.checkCancellation()
+                throw error
             }
-            try Task.checkCancellation()
-            return value
         } onCancel: { cancellation.cancel() }
     }
 }

@@ -345,6 +345,18 @@ private actor BulkProgressTrace {
         await #expect(throws: CancellationError.self) { try await task.value }
     }
 
+    @Test func cancellationWinsOverAnIOErrorFromTheExecutingWorker() async throws {
+        let arrived = BulkEvent(), release = DispatchSemaphore(value: 0)
+        let task = Task {
+            try await ArchiveWork.run { _ -> Void in
+                arrived.signal(); release.wait()
+                throw CocoaError(.fileReadUnknown)
+            }
+        }
+        await arrived.wait(); task.cancel(); release.signal()
+        await #expect(throws: CancellationError.self) { try await task.value }
+    }
+
     @Test func namingAndOriginalAudioPolicyHaveNoTranscriptSideEffects() {
         var names = ArchiveNames()
         #expect(names.next(title: "English", extension: "opus") == "English.opus")
