@@ -24,7 +24,7 @@ trap 'rm -rf "$work"' EXIT
 
 sources=()
 while IFS= read -r file; do sources+=("$file"); done < <(find "$root/Cassini" "$root/CassiniShared" "$root/CassiniActivity" -name '*.swift' | sort)
-xcrun xcstringstool extract --modern-localizable-strings --SwiftUI "${sources[@]}" --output-directory "$work" > /dev/null
+xcrun xcstringstool extract --modern-localizable-strings --legacy-localizable-strings --SwiftUI "${sources[@]}" --output-directory "$work" > /dev/null
 plutil -convert json -o "$work/Info.json" "$root/Cassini/Resources/Info.plist"
 
 /usr/bin/python3 -I - "$root/Cassini/Resources/Strings" "$work" "$root/Cassini/Resources/InfoPlist.xcstrings" "$work/Info.json" <<'PY'

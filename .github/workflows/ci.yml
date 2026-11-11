@@ -30,6 +30,7 @@ on:
       - 'scripts/*embedded-minos.py'
       - 'scripts/test-test-runtime.py'
       - 'scripts/check-strings.sh'
+      - 'scripts/test-check-strings.py'
       - 'scripts/*whistle*.py'
       - 'scripts/run-in-gui.py'
       - 'scripts/test-run-in-gui.py'
@@ -83,6 +84,7 @@ jobs:
           python3 scripts/test-swift-test-product.py
           python3 scripts/test-check-embedded-minos.py
           python3 scripts/test-test-runtime.py
+          python3 scripts/test-check-strings.py
       - name: String catalogs and package tests
         working-directory: cassini-ios
         run: scripts/test.sh fast
