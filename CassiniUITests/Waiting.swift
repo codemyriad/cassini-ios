@@ -77,10 +77,9 @@ extension XCUIElement {
 /// waiting for the list to settle, so the condition is checked before every swipe, not swiped past.
 extension XCUIElement {
     /// Swipes this scroll view up (towards the end of the list) or down until `done` holds, at most `attempts` times.
-    /// `fast` swipes fling further, for getting to the end of a list rather than to a row.
     @MainActor @discardableResult
-    func scroll(up: Bool = true, attempts: Int = 8, fast: Bool = false, until done: () -> Bool) -> Bool {
-        let velocity: XCUIGestureVelocity = fast ? .fast : .default
+    func scroll(up: Bool = true, attempts: Int = 8, velocity: XCUIGestureVelocity = .default,
+                until done: () -> Bool) -> Bool {
         for _ in 0..<attempts {
             if done() { return true }
             if up { swipeUp(velocity: velocity) } else { swipeDown(velocity: velocity) }
