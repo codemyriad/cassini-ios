@@ -8,6 +8,42 @@ import CassiniNotebook
 @MainActor @Suite(.serialized) struct RecordingControllerTests {
     let floor = Limits.minRecordingFreeBytes
 
+    @Test func positionZeroIsPersistedAfterPreparationAndSurvivesPauseResume() async throws {
+        let h = try RecordingHarness()
+        defer { h.tearDown() }
+        let preparing = AsyncStream<Void>.makeStream()
+        let permission = AsyncStream<Void>.makeStream()
+        defer { preparing.continuation.finish(); permission.continuation.finish() }
+        h.capture.beforeStart = {
+            preparing.continuation.yield(())
+            for await _ in permission.stream { break }
+        }
+        let requestedAt = h.clock.now
+        #expect(h.controller.start())
+        for await _ in preparing.stream { break }
+        let waiting = try #require(await h.store.all().first)
+        #expect(waiting.createdAt == requestedAt)
+        #expect(waiting.meetingTime == .unknown, "Permission/session preparation has not established position zero")
+        h.clock.advance(by: .seconds(90))
+        let recordedAt = h.clock.now
+        h.capture.recordedAt = recordedAt
+        permission.continuation.yield(())
+        await h.controller.settle()
+        let active = try h.active
+        let saved = try #require(await h.note(active.noteID))
+        #expect(saved.createdAt == requestedAt, "Catalogue creation remains distinct from microphone start")
+        #expect(saved.meetingTime == .instant(recordedAt))
+        #expect(try NoteRepository(root: h.root).load().notes.first?.meetingTime == .instant(recordedAt),
+                "The actual start is durable, not an in-memory-only controller value")
+        h.controller.pause()
+        h.clock.advance(by: .seconds(300))
+        h.capture.recordedAt = h.clock.now
+        h.controller.resume()
+        await h.controller.settle()
+        #expect(await h.note(active.noteID)?.meetingTime == .instant(recordedAt), "Resume never moves position zero")
+        #expect(try NoteRepository(root: h.root).load().notes.first?.meetingTime == .instant(recordedAt))
+    }
+
     @Test(arguments: [JobFailure.model, .unsupportedLanguage], [false, true])
     func unavailableSpeechIsSealedAudioOnlyBeforeCompression(_ failure: JobFailure, _ consented: Bool) async throws {
         let consent = ModelConsent(unavailability: { _, _ in failure }) { _, _ in
