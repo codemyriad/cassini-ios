@@ -31,7 +31,7 @@ public final class URLSessionTransport: HTTPTransport {
 
     deinit { session.invalidateAndCancel() }
 
-    /// A separate session for one bounded metadata retry; existing transfers keep their own session and delegate.
+    /// An independent session for the caller's bounded recovery; existing transfers keep their session and delegate.
     public func freshForRetry() -> (any HTTPTransport)? {
         URLSessionTransport(userAgent: userAgent, configuration: session.configuration)
     }
