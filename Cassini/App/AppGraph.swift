@@ -286,6 +286,7 @@ extension View {
             .environment(graph.libraryScreen).environment(graph.noteScreens)
             .environment(\.uiTesting, graph.environment.launch.marksLaunchFinished)
             #if DEBUG
+            .environment(\.modelInstallRecorder, graph.environment.modelInstallRecorder)
             .environment(\.marksUITestLayout, graph.environment.launch.marksLaunchFinished)
             #endif
             .environment(\.clock, graph.environment.clock)

@@ -116,6 +116,13 @@ import CassiniNotebook
         }
     }
 
+    /// Whether a section of the queue runs now, and how many wait for it: what a test waits on to know that a call
+    /// reached the queue's serial section behind one it keeps busy.
+    var sectionBusy: Bool { coordinator.lock.isBusy }
+    var sectionWaiting: Int { coordinator.lock.waiting }
+    /// An activation has claimed the resume of the system's pause and is queueing the jobs again.
+    var activationClaimed: Bool { coordinator.resumingSystemPause }
+
     func tearDown() {
         try? FileManager.default.removeItem(at: root)
         UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite)

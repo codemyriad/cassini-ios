@@ -109,7 +109,7 @@ import CassiniNotebook
     /// starts the download again. Other rows do nothing.
     public func openModel(_ part: ModelPart) {
         guard models.first(where: { $0.part == part })?.status.opensModelDownload == true else { return }
-        onEffect(.open(.modelDownload(noteID: nil)))
+        onEffect(.open(.modelDownload(noteID: nil, part: part)))
     }
 
     public func openVoices() { onEffect(.open(.savedVoices)) }

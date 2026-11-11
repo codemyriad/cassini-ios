@@ -31,6 +31,19 @@ final class SettingsFlowTests: XCTestCase {
         app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", title)).firstMatch
     }
 
+    @MainActor private func downloadAndAssertRequests(_ app: XCUIApplication, group: String) {
+        app.buttons["Download"].tap()
+        let requested = app.staticTexts["uiTestState-modelInstallRequested"]
+        XCTAssertTrue(requested.waitForExistence(within: 15), "No installer received a request")
+        let completed = app.staticTexts["uiTestState-modelInstallCompleted"]
+        XCTAssertTrue(completed.waitForExistence(within: 15), "The install queue never completed")
+        // The completion marker is emitted only once the entire queue has drained and refreshed.
+        // Exact journals after that event also exclude unrelated and duplicate requests.
+        XCTAssertEqual(requested.value as? String, group)
+        XCTAssertEqual(completed.value as? String,
+                       "requested=\(group);completed=\(group);consented=\(group)")
+    }
+
     // ports: SettingsViewModelTest#showsTheModelRowsTheCountsTheVersionAndTheNotificationsBanner (on the screen)
     /// Where the system has no Apple speech (iOS 18) the default device has no recognizer: no picker, and the speech
     /// row says it is not available. That repeats, on purpose, the row of
@@ -116,6 +129,31 @@ final class SettingsFlowTests: XCTestCase {
         XCTAssertTrue(app.buttons["Download"].exists)
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label == %@", "Speech recognition, 444 MB")).firstMatch
             .exists)
+        XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Telling speakers apart"))
+            .firstMatch.exists, "The speech row downloads only speech")
+        downloadAndAssertRequests(app, group: "speech")
+    }
+
+    @MainActor func testEachSpeakerRowDownloadsOnlyTheSpeakerBundleWhileSpeechIsMissing() {
+        for label in ["Telling speakers apart", "Recognising saved voices"] {
+            let app = openSettings(["--parakeet", "--models-missing"])
+            let selected = row(app, startingWith: label)
+            reveal(selected, in: app)
+            selected.tap()
+            XCTAssertTrue(app.buttons["Download"].waitForExistence(within: 5))
+            XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Telling speakers apart"))
+                .firstMatch.exists)
+            XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Speech recognition"))
+                .firstMatch.exists, "A speaker row must not add the missing speech model")
+            XCTAssertFalse(app.staticTexts["speechLanguageLine"].exists)
+            downloadAndAssertRequests(app, group: "speakers")
+            XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(within: 5))
+            let pending = element(app, startingWith: "Telling speakers apart")
+            reveal(pending, in: app)
+            XCTAssertTrue(pending.label.contains("Downloads with next transcription"), pending.label)
+            XCTAssertTrue(row(app, startingWith: "Speech recognition").label.contains("Not downloaded"))
+            app.terminate()
+        }
     }
 
     // ports: SettingsViewModelTest#onlyANotDownloadedOrAFailedRowOpensModelDownload (on the screen)
