@@ -27,7 +27,9 @@ Recovered interrupted captures without usable audio and active recordings are ex
 and selection controls. A Library containing only a live recording offers no Edit/ZIP action. Trashing a selected note immediately prunes the selection. Share-sheet cleanup
 runs on a worker with an awaitable completion fence, so removing a large archive never blocks the main actor.
 Before preparing each member, export awaits recording finalization and re-reads the live note and audio URLs,
-so a stopped recording that rotates from capture.caf to audio.m4a uses the completed file.
+so a stopped recording that rotates from capture.caf to audio.m4a uses the completed file. Cancelling export
+ends that wait immediately and leaves recording compression running. If the current transcription has no speech,
+export seals the last local version with words; when only imported variants remain it keeps the original document bytes.
 
 Archive bounds follow cassini-ux main `4d577376f6360ed352fa75307f4dc47890ed9858`, D96:
 

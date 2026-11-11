@@ -10,7 +10,8 @@ import CassiniNotebook
 @MainActor @Suite struct LibraryScreenModelTests {
     /// A clock whose sleeps wait until `release()`, so a test sees the state before and after the debounce.
     final class GatedClock: AppClock {
-        let now = Date(timeIntervalSince1970: 1_791_452_460)
+        private let current = Mutex(Date(timeIntervalSince1970: 1_791_452_460))
+        var now: Date { current.withLock { $0 } }
         private let waiters = Mutex<[CheckedContinuation<Void, Never>]>([])
         var sleeping: Int { waiters.withLock { $0.count } }
 
@@ -18,6 +19,8 @@ import CassiniNotebook
             await withCheckedContinuation { continuation in waiters.withLock { $0.append(continuation) } }
             try Task.checkCancellation()
         }
+
+        func set(_ date: Date) { current.withLock { $0 = date } }
 
         func release() {
             let waiting = waiters.withLock { waiting in defer { waiting = [] }; return waiting }
@@ -302,6 +305,39 @@ import CassiniNotebook
         #expect(model.content.results?.map(\.id) == [beforeEnd, atStart])
         model.searchDate = .any
         #expect(model.content.results?.count == 4)
+    }
+
+    /// A search left open across midnight: the clock moves, the query and the notes do not. The rows are read again
+    /// only when `clockChanged()` sees a new local day, and then Today no longer holds yesterday's note.
+    @Test func aNewLocalDayRedrawsAnOpenSearch() async throws {
+        let library = Library()
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try #require(TimeZone(identifier: "UTC"))
+        let evening = try #require(calendar.date(bySettingHour: 23, minute: 50, second: 0, of: library.clock.now))
+        library.clock.set(evening)
+        let planning = library.add("English planning")
+        let model = library.model
+        model.query = "English"
+        await waitUntilSleeping(library.clock)
+        library.clock.release()
+        await model.settle()
+        model.searchDate = .today
+        #expect(model.content.results?.map(\.id) == [planning])
+
+        let redrawn = Mutex(false)
+        withObservationTracking { _ = model.content } onChange: { redrawn.withLock { $0 = true } }
+        library.clock.set(evening.addingTimeInterval(5 * 60))
+        model.clockChanged()
+        #expect(!redrawn.withLock { $0 }, "the same day does not redraw")
+        library.clock.set(evening.addingTimeInterval(20 * 60))
+        #expect(!redrawn.withLock { $0 }, "nothing redraws before the day change is heard")
+        model.clockChanged()
+        #expect(redrawn.withLock { $0 }, "the new day redraws the open search")
+        #expect(model.query == "English" && model.searchDate == .today)
+        #expect(model.content.results == [])
+        #expect(model.content.emptyState == .noMatch("English"))
+        model.searchDate = .week
+        #expect(model.content.results?.map(\.id) == [planning], "yesterday's note is still within the week")
     }
 
     @Test func clearingBeforeDebounceAlsoClearsTheDateFilter() async {

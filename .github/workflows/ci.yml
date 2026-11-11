@@ -33,6 +33,7 @@ on:
       - 'scripts/*whistle*.py'
       - 'scripts/run-in-gui.py'
       - 'scripts/test-run-in-gui.py'
+      - 'scripts/test-ci-runner-selection.py'
       - '.github/workflows/ci.yml'
   push:
     branches: [main]
@@ -52,7 +53,9 @@ jobs:
   # job removes the ~95 s serial prefix when a second runner is free. Each job keeps its own checkout and logs.
   harness:
     name: Harness regressions
-    runs-on: xcode-27
+    # CM_MAC_RUNNER=cm-mac-m4 moves trusted runs (push, schedule, workflow_dispatch, or same-repo PR) to the
+    # self-hosted Apple Silicon runners; fork PRs, unallowlisted events, and any other variable value keep xcode-27.
+    runs-on: ${{ (github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)) && vars.CM_MAC_RUNNER == 'cm-mac-m4' && fromJSON('["self-hosted","macOS","ARM64","cm-mac-m4"]') || 'xcode-27' }}
     timeout-minutes: 20
     env:
       CASSINI_CONFORMANCE_REQUIRED: '1'
@@ -63,6 +66,7 @@ jobs:
       - name: Test harness regressions
         working-directory: cassini-ios
         run: |
+          python3 scripts/test-ci-runner-selection.py
           python3 scripts/test-test-events.py
           python3 scripts/test-swift-test-product.py
           python3 scripts/test-check-embedded-minos.py
@@ -79,8 +83,9 @@ jobs:
   fast-and-build:
     name: Package tests and build
     # Xcode 27.0 (27A266a), the build drmeyers' gate uses. Hosted runners have Xcode 27 only on this preview image; the
-    # GA macos-26 image's Xcode 26.6 (Swift 6.2) does not compile the package tests.
-    runs-on: xcode-27
+    # GA macos-26 image's Xcode 26.6 (Swift 6.2) does not compile the package tests. Trusted runs with
+    # CM_MAC_RUNNER=cm-mac-m4 use the self-hosted Apple Silicon runners; fork PRs and unset values keep xcode-27.
+    runs-on: ${{ (github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)) && vars.CM_MAC_RUNNER == 'cm-mac-m4' && fromJSON('["self-hosted","macOS","ARM64","cm-mac-m4"]') || 'xcode-27' }}
     # About 3x the measured run (6.3 min from a cold runner: package tests 3.9, build 2.0), so a hang frees the org's
     # shared macOS slot.
     timeout-minutes: 20

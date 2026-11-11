@@ -77,6 +77,50 @@ struct ExportServiceTests {
         #expect(try Data(contentsOf: original) == bytes)
     }
 
+    @Test func archiveUsesLastLocalVersionAfterANoSpeechResult() async throws {
+        defer { try? FileManager.default.removeItem(at: base) }
+        try FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
+        let original = base.appendingPathComponent("source.m4a")
+        let bytes = Data(ImportFixtures.m4a)
+        try bytes.write(to: original)
+        var note = Note(title: "No speech on the latest pass", audioFilename: "source.m4a")
+        note.versions = [TranscriptVersion(kind: .transcription, segments: [.init(text: "Earlier local", start: 0, end: 1)], speakers: []),
+                         TranscriptVersion(kind: .editedTranscript, segments: [.init(text: "Latest local", start: 0, end: 1, speakerID: "a")],
+                                           speakers: [.init(id: "a", name: "Ada")], language: "fr")]
+        #expect(note.transcript.isEmpty && note.selectedVersionID == nil)
+        let output = try await PortableExportService(audio: FakeAudioProcessing(), provenance: FakeProvenance(), unassignedLabel: "Unknown speaker")
+            .archiveSnapshot(note, original: original, playable: original, into: base)
+        let document = CassiniDocument.read(output)
+        #expect(document.state == .ok)
+        #expect(document.selected()?.transcript?.words.map(\.text) == ["Latest", "local"])
+        #expect(document.selected()?.transcript?.language == "fr")
+        #expect(document.speakerLabel("a") == "Ada")
+        #expect(Set(document.variants.compactMap { $0.transcript?.words.map(\.text).joined(separator: " ") }) == ["Earlier local", "Latest local"])
+        #expect(try Data(contentsOf: original) == bytes)
+    }
+
+    @Test func archiveCopiesRenamedImportedEmptyDefaultWithEarlierWords() async throws {
+        defer { try? FileManager.default.removeItem(at: base) }
+        try FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
+        let first = try ImportFixtures.document("Earlier imported words", title: "Original")
+        let bytes = Data(try CassiniDocument.create(first, transcript: Transcript([]), title: "Original", processing: JSONObject(), existing: CassiniDocument.read(first)))
+        let original = base.appendingPathComponent("empty-default.opus")
+        try bytes.write(to: original)
+        let document = CassiniDocument.read(original)
+        #expect(document.state == .ok && document.variants.count == 2)
+        #expect(document.selected()?.transcript?.words.isEmpty == true)
+        let imported = try #require(PortableTranscript(document))
+        var note = Note(title: "Renamed imported document", audioFilename: "empty-default.opus")
+        note.document = DocumentInfo(state: .ok); note.origin = .importedDocument
+        note.versions = imported.versions; note.selectedVersionID = imported.selectedVersionID
+        note.speakers = imported.speakers; note.language = imported.language
+        #expect(imported.segments.isEmpty)
+        #expect(note.versions?.contains { !$0.segments.isEmpty } == true)
+        let output = try await PortableExportService(audio: FakeAudioProcessing(), provenance: FakeProvenance(), unassignedLabel: "Unknown speaker")
+            .archiveSnapshot(note, original: original, playable: original, into: base)
+        #expect(try Data(contentsOf: output) == bytes)
+    }
+
     // ports: DocumentRepositoryTest#exportsEqualTheExpectedBytes
     @Test func exportsEqualTheExpectedBytes() async throws {
         defer { try? FileManager.default.removeItem(at: base) }

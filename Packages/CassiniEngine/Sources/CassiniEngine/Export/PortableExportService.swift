@@ -78,7 +78,7 @@ public struct PortableExportService: Sendable {
             current.language = note.language
             // An imported version is sealed again only over audio that vouches for it; otherwise the newest version
             // made here is the default.
-            if !verified, note.showsImportedVersion, let last = versions.popLast() { current = last }
+            if current.segments.isEmpty || (!verified && note.showsImportedVersion), let last = versions.popLast() { current = last }
             for (index, version) in versions.enumerated() {
                 try Task.checkCancellation()
                 let next = work.appendingPathComponent("version-\(index).opus")
