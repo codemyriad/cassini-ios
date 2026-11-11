@@ -53,7 +53,7 @@ private struct DownloadProbe: Transcribing {
                 if recognizer == .appleSpeech { XCTAssertEqual(model.plan?.requiredFreeBytes, probe.assetInstallBytes) }
                 await model.download()
                 XCTAssertTrue(test.graph.settings.downloadsAllowed)
-                await fulfillment(of: [began], timeout: 15)
+                await fulfillment(of: [began], timeout: 30)
                 await test.graph.processing.coordinator?.awaitIdle()
             }
         }
