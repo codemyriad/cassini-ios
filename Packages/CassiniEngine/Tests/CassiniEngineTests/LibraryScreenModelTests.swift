@@ -3,7 +3,7 @@ import Observation
 import Synchronization
 import Testing
 import CassiniCore
-import CassiniEngine
+@testable import CassiniEngine
 import CassiniNotebook
 
 /// The Library's model over plain ports (Android `LibraryViewModelTest`).
@@ -96,12 +96,15 @@ import CassiniNotebook
         #expect(initial.meetingTime == .unknown)
         #expect(model.recordingCard == nil)
 
+        let initialRevision = model.presentationRevision
         let activeRowChanged = Mutex(false)
         let activeCardChanged = Mutex(false)
         _ = withObservationTracking { model.content } onChange: { activeRowChanged.withLock { $0 = true } }
         _ = withObservationTracking { model.recordingCard } onChange: { activeCardChanged.withLock { $0 = true } }
         library.recording = .active(ActiveRecording(noteID: note.id, title: note.title, defaultTitle: note.title,
                                                      format: .pcm48kMono, elapsed: 15))
+        await model.settle()
+        #expect(model.presentationRevision > initialRevision, "Capture changes must publish the model's own invalidation")
         #expect(activeRowChanged.withLock { $0 }, "Reading content must subscribe to recording-state changes")
         #expect(activeCardChanged.withLock { $0 }, "The card has its own live observation dependency")
         let active = try #require(model.content.sections.flatMap(\.rows).first)
@@ -112,11 +115,13 @@ import CassiniNotebook
         #expect(model.recordingCard?.noteID == note.id)
         #expect(model.recordingCard?.elapsed == 15)
 
+        let activeRevision = model.presentationRevision
         let timestampChanged = Mutex(false)
         _ = withObservationTracking { model.content } onChange: { timestampChanged.withLock { $0 = true } }
         let recordedAt = library.clock.now.addingTimeInterval(90)
         library.notes[0].meetingTime = .instant(recordedAt)
         await model.settle() // The index publishes its revision after the notes' mutation event.
+        #expect(model.presentationRevision > activeRevision)
         #expect(timestampChanged.withLock { $0 }, "A durable timestamp update must invalidate the row projection")
         let timestamped = try #require(model.content.sections.flatMap(\.rows).first)
         #expect(timestamped.id == initial.id, "Moving from an undated section never changes the note's identity")
@@ -125,9 +130,12 @@ import CassiniNotebook
         #expect(timestamped.isRecording)
         #expect(model.recordingCard?.noteID == timestamped.id)
 
+        let timestampRevision = model.presentationRevision
         let endedRowChanged = Mutex(false)
         _ = withObservationTracking { model.content } onChange: { endedRowChanged.withLock { $0 = true } }
         library.recording = .ended(noteID: note.id, outcome: .saved(.audioOnly))
+        await model.settle()
+        #expect(model.presentationRevision > timestampRevision)
         #expect(endedRowChanged.withLock { $0 }, "Ending invalidates the same observed projection without editing notes")
         let ended = try #require(model.content.sections.flatMap(\.rows).first)
         #expect(ended.id == initial.id)
@@ -135,6 +143,32 @@ import CassiniNotebook
         #expect(!ended.isRecording)
         #expect(ended.meetingTime == .instant(recordedAt))
         #expect(model.recordingCard == nil)
+    }
+
+    @Test func queueChangesPublishRowInvalidationWithoutChangingTheNote() async throws {
+        let library = Library()
+        let id = library.add("English queue invalidation")
+        let model = library.model
+        let original = library.notes
+        for state in [JobState.queued, .running, .paused] {
+            let before = model.presentationRevision
+            let changed = Mutex(false)
+            _ = withObservationTracking { model.content } onChange: { changed.withLock { $0 = true } }
+            library.processing.jobs[id] = Job(noteID: id, seq: 1, kind: .transcribe, state: state,
+                                               doneMs: 500, language: "en", enqueuedAt: library.clock.now, updatedAt: library.clock.now)
+            library.processing.running = state == .running ? RunningJob(noteID: id, title: "English queue invalidation") : nil
+            await model.settle()
+            #expect(model.presentationRevision > before)
+            #expect(changed.withLock { $0 })
+            #expect(library.notes == original, "The presentation refresh cannot depend on a note write")
+            let row = try #require(model.content.sections.flatMap(\.rows).first)
+            let expected: LibraryRow.Status = switch state {
+            case .queued: .queued
+            case .running: .transcribing
+            default: .paused(atMs: 500)
+            }
+            #expect(row.status == expected)
+        }
     }
 
     // ports: LibraryViewModelTest#searchesAfterTheDebounceAndKeepsTheQuery

@@ -84,35 +84,6 @@ extension AppGraph {
         return true
     }
 
-    /// Temporary synthetic-test diagnostic: compare current stored/indexed/projected rows with a stale UI row.
-    /// Called only after a UI assertion has already failed; it adds no view observer or rendering dependency.
-    func captureUITestLibraryProjection(_ url: URL) -> Bool {
-        guard environment.launch.marksLaunchFinished, url.scheme == "cassini", url.host == "ui-test",
-              url.path == "/library-projection" else { return false }
-        let rows = libraryScreen.content.sections.flatMap(\.rows)
-        let notes: [[String: String]] = library.notes.map { note in
-            let indexed = libraryScreen.note(note.id)
-            return ["id": note.id.uuidString, "title": note.title, "audio": String(describing: note.audio),
-                    "meetingTime": String(describing: note.meetingTime),
-                    "indexedAudio": String(describing: indexed?.audio),
-                    "indexedMeetingTime": String(describing: indexed?.meetingTime)]
-        }
-        let snapshot: [String: Any] = [
-            "root": library.root?.path ?? "nil", "graph": String(describing: ObjectIdentifier(self)),
-            "activeID": recording.state.activeRecording?.noteID.uuidString ?? "nil",
-            "cardID": libraryScreen.recordingCard?.noteID.uuidString ?? "nil",
-            "notes": notes,
-            "rows": rows.map { ["id": $0.id.uuidString, "title": $0.title, "status": String(describing: $0.status),
-                                  "meetingTime": String(describing: $0.meetingTime), "duration": String($0.duration)] }
-        ]
-        let destination = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("CassiniUITestLibraryProjection.json")
-        do {
-            try JSONSerialization.data(withJSONObject: snapshot, options: [.prettyPrinted, .sortedKeys])
-                .write(to: destination, options: .atomic)
-        } catch { assertionFailure("Could not save synthetic UI-test projection: \(error)") }
-        return true
-    }
-
     /// Stops what the graph does on its own, so a graph replaced by a relaunch inside the app neither records, plays
     /// nor transcribes beside the new one.
     func quietForUITestRelaunch() {

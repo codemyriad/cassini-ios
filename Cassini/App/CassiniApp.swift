@@ -26,7 +26,6 @@ import CassiniEngine
                 #endif
                 .onOpenURL { url in
                     #if DEBUG
-                    if graph.captureUITestLibraryProjection(url) { return }
                     if graph.appendUITestDraft(url) { return }
                     if let relaunch = UITestRelaunch(url: url, launchedForUITests: graph.environment.launch.marksLaunchFinished) {
                         graph = relaunch.graph(replacing: graph)
