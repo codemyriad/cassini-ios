@@ -64,7 +64,9 @@ on a device, and not checked for the standalone download.
   until every paused job is queued again, so a kill meanwhile leaves the resume to the next launch; it is then cleared
   only if it is still the system hold that was read (a system stop or the person's Stop meanwhile keeps theirs). A job
   that cannot be queued again (no consent to download the model, or refused) stays "Ready to transcribe" or paused for
-  Resume, and the hold is cleared all the same, so it never keeps the rest of the queue waiting. On iOS 26 nothing changes: there the system's pause can be the person's
+  Resume, and the hold is cleared all the same, so it never keeps the rest of the queue waiting. When the queue itself
+  cannot be written (a full disk, or a `jobs.json` that takes no writes in this run), the job stays paused by the
+  system and the hold stays, so the next activation, or the next launch's, resumes it once the queue can be written. On iOS 26 nothing changes: there the system's pause can be the person's
   Stop in the system's progress, so it waits for Resume. Android has no such rule (its system pause comes only from the
   rare `onTimeout`, and waits for Resume); this is a proposal, decision 5 below.
 - **Standalone model download** (Settings, the model download screen). When the time ends it stops and shows "iOS
@@ -154,8 +156,9 @@ follows it and ends editing on a line break (`LibrarySearchEdit`), which holds f
 - The proposal that resumes the system's pause on coming back: `EnqueueRules.resumesOnActivation` (`swift test`,
   both platform facts and both holds), `TranscriptionCoordinatorTests.Activation` (only the system's pause, never the
   person's, not on the iOS 26 facts, after a kill, an activation before the system stop's pause is written, two
-  activations at once or back to back, a system stop or the person's Stop during the activation, a kill during it, and
-  a resume that needs consent or is refused) and `ActivationResumeTests` (hosted, from the checkpoint). By hand on the iOS 18.2 simulator the same day: coming back
+  activations at once or back to back, a system stop or the person's Stop during the activation, a kill during it, a
+  resume that needs consent or is refused, and a resume that cannot be saved, then resumed in the same run and after a
+  relaunch) and `ActivationResumeTests` (hosted, from the checkpoint). By hand on the iOS 18.2 simulator the same day: coming back
   after the expiry the job ran again from 00:25 with no tap, and a launch after a kill while suspended resumed it and
   finished it with the checkpoint's words.
 - Not yet: the finite background path on a device, the standalone download's stop, and any run on an A12 or A10 on

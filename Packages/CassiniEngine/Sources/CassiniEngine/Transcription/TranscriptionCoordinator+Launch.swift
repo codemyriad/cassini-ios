@@ -79,6 +79,8 @@ extension TranscriptionCoordinator {
     /// paused (oldest first) is queued again from its checkpoint as its Resume on the screen would queue it, then the
     /// system hold is cleared so the queue continues. Jobs the person paused stay paused. Returns the notes it queued
     /// again; one that cannot be (no consent, refused) stays as that leaves it, and the hold is cleared all the same.
+    /// Only when the queue cannot be written (its save failed, or `jobs.json` takes no writes in this run) does the
+    /// hold stay, with the job paused by the system, so a later activation resumes it once the queue can be written.
     ///
     /// The hold and the paused jobs are read in one serial section that runs only once every system stop's pause is
     /// written, so a job iOS just stopped is read as paused, never as running. That section claims the resume in
@@ -111,12 +113,27 @@ extension TranscriptionCoordinator {
         }
         guard !paused.isEmpty else { return [] }
         var resumed: [UUID] = []
+        var unsaved = false
         for job in paused {
             // Under the system hold: queued, not started, and no hold is cleared.
-            if case .queued = await transcribe(job.noteID, kind: job.kind, origin: .automatic) { resumed.append(job.noteID) }
+            let outcome = await transcribe(job.noteID, kind: job.kind, origin: .automatic)
+            switch outcome {
+            case .queued, .needsConsent:
+                // A write of the queue that failed leaves the job paused by the system, in memory and in `jobs.json`,
+                // though `transcribe` answers as if it went through.
+                let stored = await parts.jobs.job(job.noteID)
+                if stored?.state == .paused, stored?.pauseReason == .system { unsaved = true }
+                else if case .queued = outcome { resumed.append(job.noteID) }
+            case .refused(.queueUnavailable):
+                unsaved = true
+            case .refused:
+                break
+            }
         }
         resumingSystemPause = false
-        if settings.queueHold == .system, systemStops == stopsWhenRead { continueQueue() }
+        // A job that could not be saved as queued again keeps the hold, so the next activation, or the next launch's,
+        // tries again.
+        if !unsaved, settings.queueHold == .system, systemStops == stopsWhenRead { continueQueue() }
         return resumed
     }
 

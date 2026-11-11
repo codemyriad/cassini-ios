@@ -359,6 +359,64 @@ extension TranscriptionCoordinatorTests {
             await first.coordinator.awaitIdle()
         }
 
+        /// Third review of #101: the activation's requeue of A cannot be saved (`jobs.json` cannot be written, as on a
+        /// full disk). A must not count as resumed and the stored system hold must stay, so that once the queue can be
+        /// written again the next activation resumes A once, from its checkpoint.
+        @Test func aRequeueThatCannotBeSavedKeepsTheHoldForTheNextActivation() async throws {
+            let h = try QueueHarness(); defer { h.tearDown() }
+            let (a, b) = try await pausedBySystem(h)
+            let manager = FileManager.default
+            try manager.setAttributes([.posixPermissions: 0o555], ofItemAtPath: h.root.path)
+            defer { try? manager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: h.root.path) }
+
+            h.coordinator.setVisible(true)
+            let failed = await h.coordinator.resumeSystemPause(onActivationOf: .iOS18)
+            try manager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: h.root.path)
+            #expect(failed == [], "A was not queued again")
+            #expect(h.settings.queueHold == .system, "the hold still says that A waits for an activation")
+            #expect(try JobRepository(root: h.root).load().first { $0.noteID == a }?.pauseReason == .system)
+            try await h.settle()
+            #expect(h.runner.runs.count == 1)
+
+            #expect(await h.coordinator.resumeSystemPause(onActivationOf: .iOS18) == [a])
+            #expect(h.settings.queueHold == nil)
+            try await h.run(1).finish(.done)
+            let again = try await h.run(2)
+            #expect(again.noteID == a)
+            #expect(again.job.doneMs == 28_000, "from its checkpoint")
+            again.finish(.done)
+            await h.coordinator.awaitIdle()
+            #expect(await h.jobs.all().isEmpty)
+            #expect(h.runner.runs.map(\.noteID) == [a, b, a])
+        }
+
+        /// The same failed save, then Cassini is closed: the next launch's activation resumes A once, from its checkpoint.
+        @Test func aRequeueThatCannotBeSavedLeavesTheResumeForTheNextLaunch() async throws {
+            let h = try QueueHarness(); defer { h.tearDown() }
+            let (a, b) = try await pausedBySystem(h)
+            let manager = FileManager.default
+            try manager.setAttributes([.posixPermissions: 0o555], ofItemAtPath: h.root.path)
+            defer { try? manager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: h.root.path) }
+            h.coordinator.setVisible(true)
+            _ = await h.coordinator.resumeSystemPause(onActivationOf: .iOS18)
+            try manager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: h.root.path)
+            try await h.settle()
+
+            let next = try QueueHarness.snapshot(of: h)
+            defer { next.tearDown() }
+            try await next.start(visible: true)
+            try #require(await next.coordinator.resumeSystemPause(onActivationOf: .iOS18) == [a],
+                         "the next launch resumes A")
+            try await next.run(0).finish(.done)
+            let resumed = try await next.run(1)
+            #expect(resumed.noteID == a)
+            #expect(resumed.job.doneMs == 28_000, "from its checkpoint")
+            resumed.finish(.done)
+            await next.coordinator.awaitIdle()
+            #expect(await next.jobs.all().isEmpty)
+            #expect(next.runner.runs.map(\.noteID) == [b, a])
+        }
+
         /// A job that cannot be queued again without the model download's consent: it waits as "Ready to transcribe",
         /// and the system hold is cleared so the rest of the queue goes on.
         @Test func aResumeThatNeedsConsentClearsTheHoldAndLeavesTheJobReady() async throws {
