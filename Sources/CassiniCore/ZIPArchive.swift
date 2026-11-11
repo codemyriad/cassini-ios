@@ -148,6 +148,7 @@ public struct ZIPArchive: Sendable {
         var bytes: UInt64 = 0, checksum: UInt32 = 0
         func emit(_ data: Data) throws {
             try check()
+            guard !data.isEmpty else { return }
             guard UInt64(data.count) <= remainingBytes - bytes else { throw ZIPFailure.tooLarge }
             bytes += UInt64(data.count)
             try observed(data.count)
@@ -188,6 +189,9 @@ public struct ZIPArchive: Sendable {
                         let produced = Self.chunkBytes - Int(stream.avail_out)
                         try emit(Data(output.prefix(produced)))
                         if rc == Z_STREAM_END { ended = true; break }
+                        // A full output buffer can consume exactly the last input byte. The next inflate
+                        // needs another input chunk; Z_BUF_ERROR here means starvation, not corruption.
+                        if rc == Z_BUF_ERROR && stream.avail_in == 0 && produced == 0 { break }
                         guard rc == Z_OK, produced > 0 || stream.avail_in < before else { throw ZIPFailure.entry }
                     } while stream.avail_in > 0 || stream.avail_out == 0
                 }

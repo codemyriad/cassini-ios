@@ -185,21 +185,54 @@ import CryptoKit
     }
 
     #if os(macOS)
+    @Test func deflateExactChunkBoundaryAcceptsAnInputStarvedNonfinalBlock() async throws {
+        let folder = URL.temporaryDirectory.appendingPathComponent("zip-boundary-" + UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        try await python("""
+        import sys,random,zlib,struct,zipfile,io
+        from pathlib import Path
+        folder=Path(sys.argv[1]); data=bytes(random.Random(96).randbytes(65536))
+        # Find a valid nonfinal deflate segment filling both the input and output chunk exactly.
+        for n in range(1024):
+         payload=bytes(n)+data[n:]
+         c=zlib.compressobj(wbits=-15)
+         first=c.compress(payload)+c.flush(zlib.Z_SYNC_FLUSH)
+         if len(first)==65536:break
+        else:raise AssertionError('Missing exact chunk-boundary fixture')
+        tail=b'English fixture end'; raw=first+c.compress(tail)+c.flush(); plain=payload+tail
+        name=b'English.wav';crc=zlib.crc32(plain);size=len(plain);packed=len(raw)
+        local=struct.pack('<I5H3I2H',0x04034b50,20,0,8,0,0,crc,packed,size,len(name),0)+name+raw
+        central=struct.pack('<I6H3I5H2I',0x02014b50,20,20,0,8,0,0,crc,packed,size,len(name),0,0,0,0,0,0)+name
+        archive=local+central+struct.pack('<I4H2IH',0x06054b50,0,0,1,1,len(central),len(local),0)
+        assert zipfile.ZipFile(io.BytesIO(archive)).read(name.decode())==plain
+        (folder/'boundary.zip').write_bytes(archive);(folder/'expected').write_bytes(plain)
+        """, arguments: [folder.path])
+        let zip = try ZIPArchive(url: folder.appendingPathComponent("boundary.zip"))
+        var output = Data()
+        try zip.read(try #require(zip.entries.first), remainingBytes: 100_000) { output.append($0) }
+        #expect(output == (try Data(contentsOf: folder.appendingPathComponent("expected"))))
+    }
+
     @Test func pythonReadsTheStoredZIP64OutputAndVerifiesEveryCRC() async throws {
         let folder = URL.temporaryDirectory.appendingPathComponent("zip-interop-" + UUID().uuidString)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: folder) }
         let url = try one(folder)
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
-        process.arguments = ["-c", """
+        try await python("""
         import sys,zipfile
         with zipfile.ZipFile(sys.argv[1]) as z:
             assert z.namelist()==['English.wav']
             assert all(e.compress_type==zipfile.ZIP_STORED for e in z.infolist())
             assert z.testzip() is None
             assert z.read('English.wav')==b'English sample'
-        """, url.path]
+        """, arguments: [url.path])
+    }
+
+    private func python(_ script: String, arguments: [String]) async throws {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
+        process.arguments = ["-c", script] + arguments
         let output = Pipe(); process.standardOutput = output; process.standardError = output
         let rc: Int32 = try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in

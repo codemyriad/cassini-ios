@@ -136,20 +136,23 @@ struct LibraryView: View {
             HStack {
                 filterButton(LibraryCopy.all, selected: !model.favoritesOnly) { model.favoritesOnly = false }
                 filterButton(LibraryCopy.starred, symbol: "star", selected: model.favoritesOnly) { model.favoritesOnly = true }
-                Spacer()
-            }
-            if library.notes.contains(where: { $0.trashedAt == nil }) {
-                HStack {
-                    EditButton().accessibilityIdentifier("selectNotesForExport")
-                    Spacer()
+                Spacer(minLength: 0)
+                if library.notes.contains(where: { $0.trashedAt == nil }) {
+                    EditButton().buttonStyle(ArchiveSelectionButtonStyle())
+                        .accessibilityIdentifier("selectNotesForExport")
                     Menu {
                         Button(BulkTransferCopy.all) { exportArchive(selected: false) }
                         if !selectedNotes.isEmpty { Button(BulkTransferCopy.selected) { exportArchive(selected: true) } }
-                    } label: { Label(BulkTransferCopy.all, systemImage: "square.and.arrow.up") }
+                    } label: {
+                        Image(systemName: "square.and.arrow.up")
+                            .frame(minWidth: HitTarget.minimum, minHeight: HitTarget.minimum)
+                            .contentShape(Rectangle())
+                    }
+                    .accessibilityLabel(BulkTransferCopy.all)
                     .accessibilityIdentifier("libraryArchiveMenu")
                     .disabled(archiveExport.progress != nil)
-                }.font(.subheadline)
-            }
+                }
+            }.font(.subheadline)
             if model.isSearching {
                 Menu {
                     ForEach(SearchDate.allCases, id: \.self) { date in
@@ -269,5 +272,13 @@ private extension ToolbarContent {
     /// Keeps the item out of iOS 26's shared glass background; earlier systems draw no background behind bar items.
     @ToolbarContentBuilder func sharedBackgroundHidden() -> some ToolbarContent {
         if #available(iOS 26.0, *) { sharedBackgroundVisibility(.hidden) } else { self }
+    }
+}
+
+/// Native Edit/Done keeps its system localization, with a full target inside the button label.
+private struct ArchiveSelectionButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label.frame(minWidth: HitTarget.minimum, minHeight: HitTarget.minimum)
+            .contentShape(Rectangle()).opacity(configuration.isPressed ? 0.6 : 1)
     }
 }
