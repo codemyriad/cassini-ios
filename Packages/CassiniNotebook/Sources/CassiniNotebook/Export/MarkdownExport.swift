@@ -59,8 +59,8 @@ public enum MarkdownExport {
         for row in rows {
             let speaker = row.speaker ?? ExportTranscript.unassignedSpeaker
             let prefix = row.continuation ? "" : "**" + escape(transcript.label(speaker)) + "** · "
-            var overNames = Set<String>()
-            let over = row.over.map(transcript.label).filter { overNames.insert($0).inserted }
+            var overNames = Set<Data>()
+            let over = row.over.map(transcript.label).filter { overNames.insert(Data($0.utf8)).inserted }
             let suffix = over.isEmpty ? "" : " " + escape(copy.overLine.replacingOccurrences(of: "{names}",
                                                                                           with: copy.speakerList(over)))
             let text = TranscriptTurns.text(of: row.members) { transcript.label($0 ?? ExportTranscript.unassignedSpeaker) }
@@ -76,18 +76,24 @@ public enum MarkdownExport {
     }
 
     public static func escape(_ text: String) -> String {
-        let normalized = text.unicodeScalars.split { $0.properties.isWhitespace }.map(String.init).joined(separator: " ")
+        let normalized = text.unicodeScalars.split(whereSeparator: isWhitespace).map(String.init).joined(separator: " ")
         var escaped = ""
         for scalar in normalized.unicodeScalars {
             if "\\`*_[]<>".unicodeScalars.contains(scalar) { escaped.append("\\") }
             escaped.unicodeScalars.append(scalar)
         }
-        if let first = escaped.first, "#-+".contains(first) { return "\\" + escaped }
-        let digits = escaped.prefix { $0.isASCII && $0.isNumber }
-        if !digits.isEmpty, escaped.dropFirst(digits.count).first == "." {
-            return String(digits) + "\\" + escaped.dropFirst(digits.count)
+        let scalars = escaped.unicodeScalars
+        if let first = scalars.first, "#-+".unicodeScalars.contains(first) { return "\\" + escaped }
+        let digits = scalars.prefix { (0x30...0x39).contains($0.value) }
+        if !digits.isEmpty, scalars.dropFirst(digits.count).first == "." {
+            return String(String.UnicodeScalarView(digits)) + "\\" + String(String.UnicodeScalarView(scalars.dropFirst(digits.count)))
         }
         return escaped
+    }
+
+    /// Android's `[\s\p{Z}]`: ASCII whitespace plus Unicode separators, preserving other stored scalars.
+    private static func isWhitespace(_ scalar: Unicode.Scalar) -> Bool {
+        (0x09...0x0D).contains(scalar.value) || [.spaceSeparator, .lineSeparator, .paragraphSeparator].contains(scalar.properties.generalCategory)
     }
 
     /// S-5 suggestion only: unique export folders avoid app collisions; the share provider handles destination ones.

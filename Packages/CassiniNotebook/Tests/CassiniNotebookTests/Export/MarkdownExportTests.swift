@@ -75,6 +75,29 @@ struct MarkdownExportTests {
         #expect(MarkdownExport.filename(accents, untitled: "Untitled meeting").dropLast(3).unicodeScalars.count == 120)
     }
 
+    @Test func combiningScalarsAndWhitespaceMatchAndroidBytes() {
+        let cases = [
+            ("#\u{0301} heading", "\\#\u{0301} heading"),
+            ("1.\u{0301} item", "1\\.\u{0301} item"),
+            ("1\u{0301}. item", "1\u{0301}. item"),
+            ("one\u{0085}two", "one\u{0085}two"),
+            ("\u{000B}one\u{202F}\u{2028}two\u{000C}", "one two")
+        ]
+        for (input, expected) in cases {
+            #expect(Data(MarkdownExport.escape(input).utf8) == Data(expected.utf8))
+        }
+    }
+
+    @Test func overlapNamesKeepDistinctStoredUnicodeBytes() throws {
+        let transcript = ExportTranscript(title: "English overlap", durationMs: 10_000,
+            words: [Word("host", 0, 10_000, "Host"), Word("first", 1_000, 5_000, "First"), Word("second", 2_000, 6_000, "Second")],
+            labels: ["host": "Host", "first": "René", "second": "Rene\u{0301}"], endsBoundedByAudio: true)
+        let output = MarkdownExport.write(transcript, dateLine: "", copy: try Self.copy("en"))
+        let header = try #require(output.split(separator: "\n").first { $0.hasPrefix("**Host**") })
+        #expect(Data(header.utf8) == Data("**Host** · 00:00:00 (over René and Rene\u{0301})".utf8))
+        #expect(Data(output.utf8).range(of: Data("Speakers: Host, René, Rene\u{0301}\n".utf8)) != nil)
+    }
+
     @Test func personalNotesUseOnlyTheD13NamespaceAndValidNumbers() throws {
         let manifest = try JSON.parseObject(#"{"x":{"gocassini.com":{"notes":[{"atMs":1000,"text":"English note"},{"atMs":1.5,"text":"fraction"},{"atMs":"2","text":"string"},{"atMs":-1,"text":"negative"},{"atMs":true,"text":"boolean"},{"atMs":2,"text":4},{"atMs":1e0,"text":"Integral"}]},"codemyriad.io":{"notes":[{"atMs":0,"text":"Wrong namespace"}]}},"meeting":{"notes":[{"atMs":0,"text":"Wrong field"}]}}"#)
         #expect(MarkdownExport.notes(in: manifest) == [.init(atMs: 1000, text: "English note"), .init(atMs: 1, text: "Integral")])
