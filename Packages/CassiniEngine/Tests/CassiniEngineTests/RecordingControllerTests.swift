@@ -8,6 +8,19 @@ import CassiniNotebook
 @MainActor @Suite(.serialized) struct RecordingControllerTests {
     let floor = Limits.minRecordingFreeBytes
 
+    @Test func aFailedPositionZeroWriteStopsCaptureAndDiscardsTheUnstartedNote() async throws {
+        let h = try RecordingHarness()
+        defer { h.tearDown() }
+        h.notes.failUpdates = true
+        #expect(h.controller.start())
+        await h.controller.settle()
+        #expect(h.controller.state == .ended(noteID: nil, outcome: .couldNotStart))
+        #expect(h.capture.stops == 1)
+        #expect(await h.store.all().isEmpty)
+        #expect(h.activity.started.isEmpty)
+        #expect(h.handoff.handedOff.isEmpty)
+    }
+
     @Test func positionZeroIsPersistedAfterPreparationAndSurvivesPauseResume() async throws {
         let h = try RecordingHarness()
         defer { h.tearDown() }

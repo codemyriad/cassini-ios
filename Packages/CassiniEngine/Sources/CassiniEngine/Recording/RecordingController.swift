@@ -204,12 +204,6 @@ public final class RecordingController {
             guard let url = await parts.notes.captureURL(for: note) else { throw CocoaError(.fileNoSuchFile) }
             let format = try await parts.capture.start(url: url)
             let positionZero = parts.capture.recordedAt ?? parts.clock.now.addingTimeInterval(-parts.capture.elapsed)
-            do {
-                _ = try await parts.notes.update(note.id) { $0.meetingTime = .instant(positionZero) }
-            } catch {
-                _ = try? await parts.capture.stop()
-                throw error
-            }
             captureURL = url
             bars = WaveformBars()
             let typed = startingTitle ?? ""
@@ -218,8 +212,18 @@ public final class RecordingController {
                                          elapsed: parts.capture.elapsed)
             active.space = policyCheck(elapsed: active.elapsed, at: url).space
             setState(.active(active))
+            // Publish the live controller before the timestamp's Library snapshot, so the row and card
+            // observe one active capture rather than keeping a pre-active row projection.
+            do {
+                guard try await parts.notes.update(note.id, { $0.meetingTime = .instant(positionZero) }) != nil else {
+                    throw CocoaError(.fileWriteUnknown)
+                }
+            } catch {
+                _ = try? await parts.capture.stop()
+                throw error
+            }
             if !typed.isEmpty { scheduleTitleWrite(for: note.id) }
-            let activity = activityState(active)
+            let activity = activityState(state.activeRecording ?? active)
             self.activity = activity
             parts.liveActivity?.start(noteID: note.id, activity)
             startPolicy()

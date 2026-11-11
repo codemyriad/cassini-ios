@@ -18,6 +18,7 @@ import CassiniEngineTesting
         await graph.start()
         await graph.recording.start()
         await waitUntil { graph.recording.state.isActive }
+        await graph.recording.controller.settle()
         await graph.library.settle()
         await graph.libraryScreen.settle()
         let id = try XCTUnwrap(graph.recording.state.noteID)
