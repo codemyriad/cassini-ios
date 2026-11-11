@@ -80,6 +80,9 @@ public final class LibraryScreenModel {
     @ObservationIgnored private var index = LibraryIndex()
     /// `index.revision`, observed, so the view reads the rows again when the notes change.
     private var revision = 0
+    /// The start of the local day the rows were built for, observed, so the view reads the rows again (the date
+    /// filters, the sections and the relative dates) when `clockChanged()` finds a new day.
+    private var day: Date
     @ObservationIgnored private var pendingSearch: Task<Void, Never>?
     @ObservationIgnored private var pendingNotes: Task<Void, Never>?
     /// The last search's results: for `query` over the notes at `revision` of the index.
@@ -95,6 +98,7 @@ public final class LibraryScreenModel {
 
     public init(ports: Ports) {
         self.ports = ports
+        day = ports.calendar.startOfDay(for: ports.clock.now)
         observeNotes()
     }
 
@@ -103,6 +107,7 @@ public final class LibraryScreenModel {
 
     public var content: LibraryContent {
         _ = revision
+        _ = day
         let processing = ports.processing(), now = ports.clock.now, calendar = ports.calendar
         let context = RowContext(processing: processing, recording: ports.recording())
         let loading = ports.loading(), unavailable = ports.unavailable()
@@ -244,6 +249,13 @@ public final class LibraryScreenModel {
         if dialog == .rename(id) { dialog = nil }
         if note(id)?.title != cleaned { ports.update(id) { $0.title = cleaned } }
         return true
+    }
+
+    /// The app became active or the system says the day or the clock changed: a new local day redraws the rows,
+    /// even with the query and the notes unchanged (a search left open across midnight). The same day changes nothing.
+    public func clockChanged() {
+        let today = ports.calendar.startOfDay(for: ports.clock.now)
+        if today != day { day = today }
     }
 
     /// Asks whether the speaker models are installed, for Transcribe again's "Speaker names carry over."

@@ -206,12 +206,14 @@ import CassiniNotebook
         Task { await handler.handle(link) }
     }
 
-    /// Cassini came back to the screen: the notification permission and the speech model may have changed in Settings,
+    /// Cassini came back to the screen: the Library redraws if the local day changed meanwhile; the notification
+    /// permission and the speech model may have changed in Settings,
     /// and on iOS 18 a transcription paused by the end of the background time resumes from its checkpoint
     /// (`EnqueueRules.resumesOnActivation`). The returned task ends once both are done.
     @discardableResult
     func becameActive() -> Task<Void, Never> {
-        Task { [noticeCenter, processing, platform = environment.platform] in
+        libraryScreen.clockChanged()
+        return Task { [noticeCenter, processing, platform = environment.platform] in
             await noticeCenter.refresh()
             await processing.coordinator?.resumeSystemPause(onActivationOf: platform)
         }
