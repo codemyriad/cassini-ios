@@ -30,6 +30,9 @@ public final class TranscriptionCoordinator {
             return recognizer
         }
         public var consentForRecognizer: (@MainActor @Sendable (String?) -> ModelConsent)?
+        /// The recognizer that takes over a job whose own recognizer failed with `failure` (`RecognizerFallback`), or
+        /// nil when the job fails as it is. Asked only for failures a second recognizer can get past.
+        public var fallbackRecognizer: (@MainActor @Sendable (_ job: Job, _ failure: JobFailure) async -> String?)?
         public var notifier: any Notifier
         public var background: any BackgroundRunner
         public var clock: any AppClock
@@ -51,12 +54,14 @@ public final class TranscriptionCoordinator {
                     progress: JobProgress? = nil, recognizer: String? = nil,
                     recognizerChoice: (@MainActor @Sendable () -> String?)? = nil,
                     consentForRecognizer: (@MainActor @Sendable (String?) -> ModelConsent)? = nil,
+                    fallbackRecognizer: (@MainActor @Sendable (_ job: Job, _ failure: JobFailure) async -> String?)? = nil,
                     eventUptimeMs: (@Sendable () -> Int64)? = nil) {
             self.jobs = jobs; self.notes = notes; self.runner = runner; self.checkpoints = checkpoints
             self.consent = consent; self.notifier = notifier; self.background = background; self.clock = clock
             self.backgroundTitle = backgroundTitle; self.backgroundSubtitle = backgroundSubtitle
             self.eventUptimeMs = eventUptimeMs
             self.progress = progress; self.recognizer = recognizer; self.recognizerChoice = recognizerChoice; self.consentForRecognizer = consentForRecognizer
+            self.fallbackRecognizer = fallbackRecognizer
         }
     }
 

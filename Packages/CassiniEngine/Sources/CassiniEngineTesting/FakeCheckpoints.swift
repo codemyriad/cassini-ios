@@ -12,6 +12,7 @@ public final class FakeCheckpoints: JobCheckpoints {
         var work: Set<UUID> = []
         var discarded: [UUID] = []
         var held: Set<UUID> = []
+        var failDiscard = false
     }
     private let state = Mutex(State())
 
@@ -41,7 +42,14 @@ public final class FakeCheckpoints: JobCheckpoints {
         return state.withLock { $0.statuses[noteID] ?? .missing }
     }
 
+    /// Makes `discard` throw, as a `work/` directory that cannot be removed does.
+    public var failDiscard: Bool {
+        get { state.withLock { $0.failDiscard } }
+        set { state.withLock { $0.failDiscard = newValue } }
+    }
+
     public func discard(_ noteID: UUID) async throws {
+        if failDiscard { throw CocoaError(.fileWriteNoPermission) }
         state.withLock {
             $0.statuses[noteID] = nil
             $0.languages[noteID] = nil

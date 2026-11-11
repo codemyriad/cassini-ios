@@ -97,8 +97,9 @@ extension TranscriptionCoordinator {
     func runOne(_ current: Active) async {
         let outcome = await current.run?.value ?? .failed(.unknown)
         await current.events?.value
+        var fellBack = false
         await lock.run {
-            await record(current, outcome)
+            fellBack = await record(current, outcome)
             if unresolvedSystemStops.contains(current.noteID), await parts.jobs.job(current.noteID)?.state != .running {
                 unresolvedSystemStops.remove(current.noteID)
             }
@@ -109,7 +110,8 @@ extension TranscriptionCoordinator {
             parts.progress?.end()
         }
         current.finished.signal()
-        await announce(current, outcome)
+        // A job handed to another recognizer has not ended: its result is announced when that run ends.
+        if !fellBack { await announce(current, outcome) }
     }
 
     func apply(_ event: JobEvent, to current: Active, receivedAt: Int64? = nil) {
@@ -130,8 +132,10 @@ extension TranscriptionCoordinator {
         }
     }
 
-    /// Writes the job for `outcome`; runs inside the serial section.
-    func record(_ current: Active, _ outcome: JobOutcome) async {
+    /// Writes the job for `outcome`; runs inside the serial section. True when the job was queued again for another
+    /// recognizer instead of failing (`fallBack`).
+    @discardableResult
+    func record(_ current: Active, _ outcome: JobOutcome) async -> Bool {
         let id = current.noteID
         // One read: the mode does not change between the checks below.
         let cancel = current.cancel
@@ -139,7 +143,7 @@ extension TranscriptionCoordinator {
         if cancel == .discard, !sealed {
             await discardWork(id)
             await mirror(id)
-            return
+            return false
         }
         if cancel == .restore, Self.isStop(outcome) {
             if case .saved = await parts.checkpoints.status(of: id) {
@@ -148,16 +152,20 @@ extension TranscriptionCoordinator {
                 await write { try await $0.remove(id) }
             }
             await mirror(id)
-            return
+            return false
         }
         switch outcome {
         case .done, .adoptPending:
             await write { try await $0.remove(id) }
             await mirror(id, clearingFailure: true)
-            return
+            return false
         case .paused(let reason):
             await markPaused(id, reason)
         case .failed(let failure):
+            if await fallBack(id, after: failure) {
+                await mirror(id)
+                return true
+            }
             await markFailed(id, failure)
         case .downloadFailed(let download):
             await markFailed(id, .download(download.error))
@@ -167,6 +175,30 @@ extension TranscriptionCoordinator {
             await markPaused(id, cancel == .keep ? .user : .interrupted)
         }
         await mirror(id)
+        return false
+    }
+
+    /// A run that its recognizer could not hold in memory or could not load goes back to the front of the queue for
+    /// the recognizer `Parts.fallbackRecognizer` names, from the start: the first recognizer's saved progress cannot
+    /// be continued by another, so it is discarded first, and a process that ends between the two steps leaves a job
+    /// without progress for the first recognizer rather than progress that the second would refuse. The recording and
+    /// the note's earlier transcript are not touched. False when the job fails as it is.
+    func fallBack(_ id: UUID, after failure: JobFailure) async -> Bool {
+        guard RecognizerFallback.applies(to: failure), let job = await parts.jobs.job(id), job.kind != .speakersOnly,
+              let recognizer = await parts.fallbackRecognizer?(job, failure), recognizer != job.recognizer else { return false }
+        do { try await parts.checkpoints.discard(id) } catch {
+            log.error("Cannot discard the work of \(id) before another recognizer takes it: \(String(describing: error))")
+            return false
+        }
+        let queued = await write {
+            try await $0.transition(id, now: self.parts.clock.now) { job in
+                job.state = .queued; job.recognizer = recognizer; job.failure = nil; job.pauseReason = nil
+                job.doneMs = 0; job.totalMs = nil; job.words = 0
+            }
+        }
+        guard (queued ?? nil)?.state == .queued else { return false }
+        log.notice("A \(job.recognizer ?? "legacy", privacy: .public) run ended with \(failure.code, privacy: .public); queued again for \(recognizer, privacy: .public)")
+        return true
     }
 
     static func isStop(_ outcome: JobOutcome) -> Bool {

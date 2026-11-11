@@ -171,7 +171,7 @@ as 1 ([Whistle/README.md](../Whistle/README.md)). On an iPhone XR or XS, or any 
 - Settings shows no speech language row and no "Managed by iOS".
 - Queue a note longer than a few minutes from the screen, then leave Cassini. No system progress indicator appears;
   after about 30 s the job pauses, "Transcription paused by iOS" is posted, and Resume continues from the checkpoint.
-- On a device with at least 5 GiB, start the Parakeet download from Settings and leave Cassini. It stops with "iOS
+- On a device with 4 GB or more, start the Parakeet download from Settings and leave Cassini. It stops with "iOS
   stopped the download. Try again to continue where it stopped."; Try again continues from the bytes kept.
 - On an iPad (7th generation) on iPadOS 18, if one is available: Whistle is unavailable, Transcribe is disabled, and
   recording, playback and export work.

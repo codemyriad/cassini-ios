@@ -44,14 +44,21 @@ remain absent on iOS. Copy is pinned in [shared-strings-pin.md](shared-strings-p
     `SpeechTranscriber` (`AppleSpeechTranscriber`), with the speech language setting and its failure codes; so would a
     build without the native runtime, which every iOS build now links. `AppEnvironment` asks the pure
     `SpeechCapability.choose(linked:capable:)` once at launch, whether or not Ultra is installed: a job downloads it
-    with consent, as on Android. The capability rule (at least 5 GiB of physical memory) is **provisional until the
-    WP0 device gate**. On the Apple path the file goes to the
+    with consent, as on Android. The capability rule is at least 3.25 GiB of reported physical memory: every 4 GB device
+    (they report 3665 to 3854 MiB) and no 3 GB one. It was measured on an iPhone 11, 12 and 13 and a 2022 iPad on
+    2026-11-11; no 3 GB device and no A12 device has run Parakeet. Android asks for 4,000,000,000 bytes, which the
+    4 GB iPhone 12 and 13 do not report. On the Apple path the file goes to the
     analyzer one second at a time from the resume point; a "window" is one finalized result, and a final result
     without words counts as an empty finalized segment so silences still advance `doneMs`. Its block size and resume
     point live in `AppleSpeechWindows` (iOS-only `AppleSpeechWindowsTests`).
   - **Memory.** Before the model loads and before each window the transcriber checks `os_proc_available_memory()`
-    against `ParakeetMemory` (1200 MiB before the load, 640 MiB before a window, from the simulator figures and
-    **provisional until the device gate**) and fails with `MEMORY` instead of being ended by iOS. Android pauses with
+    against `ParakeetMemory` (1450 MiB before the load, 400 MiB before a later window; on the 4 GB devices a run took 1250 to
+    1335 MiB from before the load until its memory stopped growing, up to 340 MiB of it after the first window) and
+    fails with `MEMORY` instead of being ended by iOS. A Parakeet run that fails so, or with `MODEL` because the
+    recognizer could not be loaded, is not left failed when Whistle can run: the coordinator discards its saved
+    progress, which Whistle could not continue, and puts the job back at the front of the queue for Whistle from the
+    start (`RecognizerFallback`, `SpeechFallback`). The recording, the note's earlier transcript and the model chosen
+    in Settings are not touched, and a Whistle run that fails stays failed. iOS only. Android pauses with
     `MEMORY` on a Java `OutOfMemoryError`, which iOS cannot catch.
   - **Cancellation** stops before the next native call: a flag the decoder checks before each recognizer call, set by
     the task's cancellation handler (Android interrupts the thread). It ends `CANCELLED`, or paused when a pause asked

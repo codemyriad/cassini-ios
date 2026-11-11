@@ -185,7 +185,8 @@ import CassiniNotebook
     /// Parakeet whenever the runtime is linked and the device can hold Ultra, installed or not: the job downloads it.
     @Test func theRecognizerIsChosenByLinkAndMemory() {
         let gib: UInt64 = 1 << 30
-        #expect(!SpeechCapability.parakeetCapable(physicalMemory: 4 * gib))
+        #expect(!SpeechCapability.parakeetCapable(physicalMemory: 3 * gib))
+        #expect(SpeechCapability.parakeetCapable(physicalMemory: 4 * gib))
         #expect(SpeechCapability.parakeetCapable(physicalMemory: 5_900_000_000))
         #expect(SpeechCapability.choose(linked: true, capable: true, apple: .init(hardwareAvailable: true, localeSupported: true, assets: .ready)) == .parakeet)
         #expect(SpeechCapability.choose(linked: false, capable: true, apple: .init(hardwareAvailable: true, localeSupported: true, assets: .ready)) == .appleSpeech)
@@ -197,10 +198,17 @@ import CassiniNotebook
     @Test func theMemoryCheckStopsBeforeTheLoadAndBeforeEachWindow() {
         #expect(ParakeetMemory.allows(availableBytes: nil, loaded: false), "the system does not tell")
         #expect(ParakeetMemory.allows(availableBytes: 0, loaded: false), "the simulator reports 0")
-        #expect(!ParakeetMemory.allows(availableBytes: 1_100 << 20, loaded: false))
-        #expect(ParakeetMemory.allows(availableBytes: 1_200 << 20, loaded: false))
-        #expect(!ParakeetMemory.allows(availableBytes: 600 << 20, loaded: true))
-        #expect(ParakeetMemory.allows(availableBytes: 640 << 20, loaded: true))
+        // Measured on 4 GB devices: 1250 to 1335 MiB from before the load until the memory stops growing, of which
+        // up to 340 MiB after the first window.
+        #expect(!ParakeetMemory.allows(availableBytes: 1_335 << 20, loaded: false))
+        #expect(ParakeetMemory.allows(availableBytes: 1_450 << 20, loaded: false))
+        #expect(!ParakeetMemory.allows(availableBytes: 340 << 20, loaded: true))
+        #expect(ParakeetMemory.allows(availableBytes: 400 << 20, loaded: true))
+        // A 4 GB iPhone had 2075 MiB before the load and 754 MiB at its lowest with the speaker models loaded.
+        #expect(ParakeetMemory.allows(availableBytes: 2_075 << 20, loaded: false))
+        #expect(ParakeetMemory.allows(availableBytes: 754 << 20, loaded: true))
+        // A run that may start can also pass the check before its second window (995 MiB went to the first).
+        #expect(ParakeetMemory.beforeLoadBytes - (995 << 20) >= ParakeetMemory.beforeWindowBytes)
     }
 
     // ports: TranscriptionJobTest#aMissingSpeechDetectorIsFetchedAgainOnlyOnline (the rule; ParakeetTranscriberTests runs it)

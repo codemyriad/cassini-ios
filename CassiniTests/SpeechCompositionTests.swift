@@ -35,10 +35,21 @@ import CassiniSherpa
                        "the job downloads Ultra with consent")
     }
 
+    /// What 4 GB devices report (3665 MiB an iPhone 13, 3854 MiB an iPhone 11) is enough for Ultra; what a 3 GB device
+    /// can report at most (3072 MiB) is not.
+    func testA4GBDeviceUsesUltraAndA3GBDeviceDoesNot() throws {
+        try XCTSkipUnless(SherpaRuntime.isLinked, "built without the native runtime")
+        for mebibytes in [3665, 3854] as [UInt64] {
+            XCTAssertEqual(AppEnvironment.speechTranscriber(models: models(), physicalMemory: mebibytes << 20, platform: .iOS18).recognizer,
+                           .parakeet, "\(mebibytes) MiB")
+        }
+        XCTAssertNotEqual(AppEnvironment.speechTranscriber(models: models(), physicalMemory: 3072 << 20, platform: .iOS18).recognizer, .parakeet)
+    }
+
     /// Over the system's own facts: Apple's adapter where the system has Apple speech, else the candidate in Apple's
     /// slot that refuses every job (iOS 18).
-    func testA4GBDeviceUsesTheCapabilityCheckedAppleCandidate() {
-        let transcriber = AppEnvironment.speechTranscriber(models: models(), physicalMemory: 4 << 30, platform: LivePlatform.facts)
+    func testA3GBDeviceUsesTheCapabilityCheckedAppleCandidate() {
+        let transcriber = AppEnvironment.speechTranscriber(models: models(), physicalMemory: 3 << 30, platform: LivePlatform.facts)
         XCTAssertEqual(transcriber.recognizer, .appleSpeech, "the adapter checks hardware, locale and assets before choosing Apple")
         if #available(iOS 26.0, *) {
             XCTAssertTrue(transcriber is AppleSpeechTranscriber)
