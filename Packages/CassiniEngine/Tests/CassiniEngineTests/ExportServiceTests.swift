@@ -32,7 +32,7 @@ struct ExportServiceTests {
     }
 
     @Test(arguments: [DocumentState.invalidMetadata, .unreadable])
-    func archivePreservesLocalWordsFromABrokenDocument(state: DocumentState) async throws {
+    func archivePreservesTheNonOKOriginalWithoutResigningLocalWords(state: DocumentState) async throws {
         defer { try? FileManager.default.removeItem(at: base) }
         try FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
         let bytes = try ImportFixtures.document("Old words", title: "Old title")
@@ -50,10 +50,13 @@ struct ExportServiceTests {
         let output = try await PortableExportService(audio: FakeAudioProcessing(), provenance: FakeProvenance(), unassignedLabel: "Unknown speaker")
             .archiveSnapshot(note, original: original, playable: original, into: base)
         let document = CassiniDocument.read(output)
-        #expect(document.state == .ok)
-        #expect(document.title == note.title)
-        #expect(document.selected()?.transcript?.words.map(\.text) == ["Edited", "local", "words"])
-        #expect(document.speakerLabel("a") == "Edited speaker")
+        #expect(try Data(contentsOf: output) == broken, "Local words cannot authenticate a non-OK original")
+        #expect(document.state == .invalidMetadata)
+        #expect(document.comments == CassiniDocument.read(original).comments)
+        #expect(note.title == "Edited local title")
+        #expect(note.transcript.map(\.text) == ["Edited local words"], "The on-device transcript stays available")
+        #expect(note.speakers?.first?.name == "Edited speaker")
+        #expect(note.versions?.first?.segments == note.transcript)
         #expect(try Data(contentsOf: original) == broken)
     }
 

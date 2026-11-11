@@ -31,7 +31,8 @@ public struct PortableExportService: Sendable {
     }
 
     /// D96 backup: clean imported documents and raw/opaque audio keep their exact bytes, so re-import deduplicates.
-    /// Local transcript/title/speaker changes still need a complete portable snapshot; the source is never written.
+    /// Local transcript/title/speaker changes need a snapshot only for a verified original. Non-OK documents
+    /// retain their exact bytes even with local versions, so an archive cannot silently re-sign untrusted metadata.
     public func archiveSnapshot(_ note: Note, original: URL, playable: URL, into folder: URL) async throws -> URL {
         var originalBytes = ArchiveContents.preservesOriginal(note)
         if !originalBytes, note.document != nil {
