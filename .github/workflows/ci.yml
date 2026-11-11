@@ -48,6 +48,34 @@ permissions:
   contents: read
 
 jobs:
+  # These regressions use isolated temporary fixtures, not the package/build outputs. Running them in their own
+  # job removes the ~95 s serial prefix when a second runner is free. Each job keeps its own checkout and logs.
+  harness:
+    name: Harness regressions
+    runs-on: xcode-27
+    timeout-minutes: 20
+    env:
+      CASSINI_CONFORMANCE_REQUIRED: '1'
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: cassini-ios
+      - name: Test harness regressions
+        working-directory: cassini-ios
+        run: |
+          python3 scripts/test-test-events.py
+          python3 scripts/test-swift-test-product.py
+          python3 scripts/test-check-embedded-minos.py
+          python3 scripts/test-test-runtime.py
+      - name: Whistle pinned-input, SDK closure and runtime-export regressions
+        working-directory: cassini-ios
+        run: |
+          python3 scripts/test-bundle-whistle.py
+          python3 scripts/test-check-whistle-runtime-exports.py
+      - name: GUI runner event and lifecycle regressions
+        working-directory: cassini-ios
+        run: python3 scripts/test-run-in-gui.py
+
   fast-and-build:
     name: Package tests and build
     # Xcode 27.0 (27A266a), the build drmeyers' gate uses. Hosted runners have Xcode 27 only on this preview image; the
@@ -76,24 +104,9 @@ jobs:
           swift --version
       - name: Install XcodeGen
         run: brew install xcodegen
-      - name: Test harness regressions
-        working-directory: cassini-ios
-        run: |
-          python3 scripts/test-test-events.py
-          python3 scripts/test-swift-test-product.py
-          python3 scripts/test-check-embedded-minos.py
-          python3 scripts/test-test-runtime.py
       - name: String catalogs and package tests
         working-directory: cassini-ios
         run: scripts/test.sh fast
-      - name: Whistle pinned-input, SDK closure and runtime-export regressions
-        working-directory: cassini-ios
-        run: |
-          python3 scripts/test-bundle-whistle.py
-          python3 scripts/test-check-whistle-runtime-exports.py
-      - name: GUI runner event and lifecycle regressions
-        working-directory: cassini-ios
-        run: python3 scripts/test-run-in-gui.py
       - name: Build for testing
         working-directory: cassini-ios
         run: scripts/test.sh build
