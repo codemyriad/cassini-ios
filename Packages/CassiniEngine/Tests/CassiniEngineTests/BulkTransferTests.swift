@@ -4,6 +4,7 @@ import CassiniNotebook
 import CassiniEngineTesting
 import Foundation
 import Testing
+import Synchronization
 
 private final class BulkSandbox: Sendable {
     let folder = URL.temporaryDirectory.appendingPathComponent("bulk-test-" + UUID().uuidString)
@@ -41,11 +42,28 @@ private final class BulkSandbox: Sendable {
 }
 
 private final class BulkEvent: Sendable {
-    private let stream: AsyncStream<Void>
-    private let continuation: AsyncStream<Void>.Continuation
-    init() { (stream, continuation) = AsyncStream.makeStream(bufferingPolicy: .bufferingNewest(1)) }
-    func signal() { continuation.yield(()); continuation.finish() }
-    func wait() async { for await _ in stream { return } }
+    private struct State {
+        var signaled = false
+        var waiters: [CheckedContinuation<Void, Never>] = []
+    }
+    private let state = Mutex(State())
+    func signal() {
+        let waiters = state.withLock { state in
+            state.signaled = true
+            let waiters = state.waiters; state.waiters.removeAll()
+            return waiters
+        }
+        for waiter in waiters { waiter.resume() }
+    }
+    func wait() async {
+        await withCheckedContinuation { continuation in
+            let signaled = state.withLock { state in
+                if state.signaled { return true }
+                state.waiters.append(continuation); return false
+            }
+            if signaled { continuation.resume() }
+        }
+    }
 }
 
 private actor BulkProgressTrace {
@@ -105,7 +123,7 @@ private struct HeldArchiveCopy: FileImporting {
             var bad = ZIPAgyFixture.Member("Folder/", Data([1]))
             switch kind {
             case 1:
-                bad = ZIPAgyFixture.bomb(padded: false); bad.name = "Folder/"; bad.size = 0
+                bad = ZIPAgyFixture.bomb(padded: false); bad.name = "Folder/"; bad.size = 0; bad.crc = 0
             case 2:
                 bad.name = "Folder"; bad.attributes = 0x4000 << 16 // Unix directory without trailing slash
             case 3:
@@ -117,6 +135,10 @@ private struct HeldArchiveCopy: FileImporting {
             default: break
             }
             try ZIPAgyFixture.write([.init("Good.wav", Data(ImportFixtures.wav)), bad], to: zip)
+            if kind == 1 {
+                let parsed = try ZIPArchive(url: zip)
+                #expect(parsed.entries[1].isDirectory, "The forged-zero fixture must reach runtime validation")
+            }
             let calls = BulkProgressTrace()
             let importer = BulkImportService(files: CoordinatedFileImporter(storage: sandbox.storage), scratch: sandbox.scratch) { _, _ in
                 // Calling the importer could publish an editable note; rollback afterward would be too late.
@@ -129,6 +151,81 @@ private struct HeldArchiveCopy: FileImporting {
             #expect(report.summary == ImportSummary())
             #expect(try sandbox.scratchContents().isEmpty)
         }
+    }
+
+    @Test(arguments: ["dosPayload", "dosForgedZero", "rawSlashAlias", "unicodeSlashAlias", "rawBackslashAlias",
+                      "unicodeBackslashAlias", "crc", "lzma", "zstd", "localSignature", "localName", "deflatePadding"])
+    func malformedDirectoryRepresentationsRefuseBeforeAnyImport(kind: String) async throws {
+        let sandbox = try BulkSandbox()
+        var bad = ZIPAgyFixture.Member("Folder/", Data())
+        switch kind {
+        case "dosPayload": bad = .init("Folder.opus", Data([1])); bad.attributes = 0x10
+        case "dosForgedZero":
+            bad = ZIPAgyFixture.corruptTailBomb(); bad.name = "Folder"; bad.attributes = 0x10; bad.size = 0; bad.crc = 0
+        case "rawSlashAlias", "rawBackslashAlias":
+            bad = .init(kind == "rawSlashAlias" ? "Folder/" : "Folder\\", Data([1])); bad.flags = 0
+            bad.extra = ZIPAgyFixture.unicodePath(raw: bad.name, path: "Note.wav")
+        case "unicodeSlashAlias", "unicodeBackslashAlias":
+            bad = .init("Note.wav", Data([1]))
+            bad.extra = ZIPAgyFixture.unicodePath(raw: bad.name, path: kind == "unicodeSlashAlias" ? "Folder/" : "Folder\\")
+        case "crc": bad.crc = 1
+        case "lzma": bad.method = 14
+        case "zstd": bad.method = 93
+        case "localSignature": bad.localSignature = 0
+        case "localName": bad.localName = "Other/"
+        case "deflatePadding": bad.method = 8; bad.packed = Data([3, 0, 0])
+        default: Issue.record("Unknown directory fixture")
+        }
+        let zip = sandbox.folder.appendingPathComponent("directory.zip")
+        try ZIPAgyFixture.write([.init("Good.wav", Data(ImportFixtures.wav)), bad], to: zip)
+        let calls = BulkProgressTrace()
+        let report = await sandbox.service().run([zip], imported: { _ in await calls.append(.init(done: 1, total: 1)) })
+        #expect(report.archives == [.damaged])
+        #expect(report.summary == ImportSummary())
+        #expect(await calls.values.isEmpty)
+        #expect(await sandbox.notes.all().isEmpty)
+        #expect(try sandbox.scratchContents().isEmpty)
+    }
+
+    @Test(arguments: ["Bomb.wav", "README.txt", "__MACOSX/._Meeting.wav"], [false, true])
+    func corruptDeflateTailsCannotHidePaddedRatioBombs(name: String, goodFirst: Bool) async throws {
+        let sandbox = try BulkSandbox()
+        var bomb = ZIPAgyFixture.corruptTailBomb(); bomb.name = name
+        let zip = sandbox.folder.appendingPathComponent("corrupt-bomb.zip")
+        try ZIPAgyFixture.write((goodFirst ? [.init("Good.wav", Data(ImportFixtures.wav))] : []) + [bomb], to: zip)
+        let published = BulkProgressTrace()
+        let report = await sandbox.service().run([zip], imported: { _ in await published.append(.init(done: 1, total: 1)) })
+        #expect(report.archives == [.tooLarge])
+        #expect(report.summary == ImportSummary())
+        #expect(await published.values.isEmpty)
+        #expect(await sandbox.notes.all().isEmpty)
+        #expect(try sandbox.scratchContents().isEmpty)
+    }
+
+    @Test(arguments: [UInt16(0), 0x800])
+    func unicodeMetadataAliasIsIgnoredWithEitherEncodingFlag(flags: UInt16) async throws {
+        let sandbox = try BulkSandbox()
+        var metadata = ZIPAgyFixture.Member("Alias.wav", Data([1])); metadata.flags = flags
+        metadata.extra = ZIPAgyFixture.unicodePath(raw: metadata.name, path: "__MACOSX/._Meeting.wav")
+        let zip = sandbox.folder.appendingPathComponent("metadata-alias.zip")
+        try ZIPAgyFixture.write([.init("Good.wav", Data(ImportFixtures.wav)), metadata], to: zip)
+        let report = await sandbox.service().run([zip])
+        #expect(report.archives.isEmpty)
+        #expect(report.summary.imported == 1 && report.summary.unsupported == 1 && report.summary.failed == 0)
+        #expect(await sandbox.notes.all().count == 1)
+        #expect(try sandbox.scratchContents().isEmpty)
+    }
+
+    @Test func ordinaryCorruptDeflateStillAllowsGoodSiblings() async throws {
+        let sandbox = try BulkSandbox()
+        var bad = ZIPAgyFixture.Member("Broken.wav", Data()); bad.method = 8; bad.packed = Data([7])
+        let zip = sandbox.folder.appendingPathComponent("corrupt.zip")
+        try ZIPAgyFixture.write([.init("Good.wav", Data(ImportFixtures.wav)), bad], to: zip)
+        let report = await sandbox.service().run([zip])
+        #expect(report.archives.isEmpty)
+        #expect(report.summary.imported == 1 && report.summary.failed == 1)
+        #expect(await sandbox.notes.all().count == 1)
+        #expect(try sandbox.scratchContents().isEmpty)
     }
 
     @Test func singleAndBulkImportsRacingPastDigestLookupCreateOnlyOneNote() async throws {
@@ -150,6 +247,8 @@ private struct HeldArchiveCopy: FileImporting {
         #expect(combined.imported == 1 && combined.duplicates == 1 && combined.failed == 0)
         #expect(report.archives.isEmpty)
         #expect(await sandbox.notes.all().count == 1)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: sandbox.notes.root.path).count == 1,
+                "The race loser's note staging folder must be removed")
         #expect(try sandbox.scratchContents().isEmpty)
     }
 
@@ -259,7 +358,8 @@ private struct HeldArchiveCopy: FileImporting {
         let zip = sandbox.folder.appendingPathComponent("Finder.zip")
         var emptyDeflated = ZIPAgyFixture.Member("Empty/", Data())
         emptyDeflated.method = 8; emptyDeflated.packed = Data([3, 0])
-        try ZIPAgyFixture.write([emptyDeflated, .init("Meetings/", Data()), .init("__MACOSX/", Data()),
+        var emptyDOS = ZIPAgyFixture.Member("EmptyDOS", Data()); emptyDOS.attributes = 0x10
+        try ZIPAgyFixture.write([emptyDOS, emptyDeflated, .init("Meetings/", Data()), .init("__MACOSX/", Data()),
                                 .init("__MACOSX/._English.wav", Data("AppleDouble".utf8)),
                                 .init("Meetings/English.wav", Data(ImportFixtures.wav))], to: zip)
         let report = await sandbox.service().run([zip])

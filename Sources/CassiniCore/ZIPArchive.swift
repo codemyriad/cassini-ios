@@ -105,11 +105,14 @@ public struct ZIPArchive: Sendable {
             guard var name = String(data: rawName, encoding: encoding) else { throw ZIPFailure.damaged }
             try Self.checkPath(name)
             var metadata = Self.isFinderMetadata(name)
+            var directory = Self.isDirectoryPath(name)
             if let unicode = try Self.extra(0x7075, in: extra), unicode.count >= 5, unicode[0] == 1 {
                 let crc = rawName.withUnsafeBytes { UInt32(CZlib.crc32(0, $0.bindMemory(to: UInt8.self).baseAddress, uInt(rawName.count))) }
                 if unicode.z32(1) == crc {
                     guard let path = String(data: unicode.dropFirst(5), encoding: .utf8) else { throw ZIPFailure.damaged }
                     try Self.checkPath(path)
+                    directory = directory || Self.isDirectoryPath(path)
+                    metadata = metadata || Self.isFinderMetadata(path)
                     if flags & 0x800 == 0 { name = path }
                 }
             }
@@ -139,10 +142,13 @@ public struct ZIPArchive: Sendable {
                                            name: rawName, packed: packed)
             let mode = (header.z32(38) >> 16) & 0xf000
             let normalized = name.replacingOccurrences(of: "\\", with: "/")
-            let directory = normalized.hasSuffix("/") || mode == 0x4000
+            directory = directory || mode == 0x4000 || header.z32(38) & 0x10 != 0
             // Directories carry no expanded data. Deflated empty directories have a small stream that
             // preflight still drains: a forged zero size must not hide a payload in an ignored member.
-            if directory && (unpacked != 0 || (packed != 0 && header.z16(10) != 8)) { throw ZIPFailure.damaged }
+            if directory {
+                guard unpacked == 0, header.z32(16) == 0, payload != nil,
+                      (header.z16(10) == 0 && packed == 0) || header.z16(10) == 8 else { throw ZIPFailure.damaged }
+            }
             let regular = !directory && mode != 0xa000
             // Only the first 512 title characters can affect the import's 200-character title. Keep the extension.
             let base = String(normalized.split(separator: "/", omittingEmptySubsequences: false).last ?? "")
@@ -161,7 +167,8 @@ public struct ZIPArchive: Sendable {
     @discardableResult public func read(_ entry: Entry, remainingBytes: UInt64, check: () throws -> Void = {},
                                        observed: (Int) throws -> Void = { _ in },
                                        consume: (Data) throws -> Void) throws -> UInt64 {
-        guard entry.readable else { throw ZIPFailure.entry }
+        let memberFailure: ZIPFailure = entry.isDirectory ? .damaged : .entry
+        guard entry.readable else { throw memberFailure }
         let input = try FileHandle(forReadingFrom: url)
         defer { try? input.close() }
         try input.seek(toOffset: entry.offset)
@@ -183,19 +190,26 @@ public struct ZIPArchive: Sendable {
             while left > 0 {
                 try check()
                 let data = try input.read(upToCount: Int(min(UInt64(Self.chunkBytes), left))) ?? Data()
-                guard !data.isEmpty else { throw ZIPFailure.entry }
+                guard !data.isEmpty else { throw memberFailure }
                 left -= UInt64(data.count)
                 try emit(data)
             }
         } else if entry.method == 8 {
             var stream = z_stream()
-            guard inflateInit2_(&stream, -15, zlibVersion(), Int32(MemoryLayout<z_stream>.size)) == Z_OK else { throw ZIPFailure.entry }
+            guard inflateInit2_(&stream, -15, zlibVersion(), Int32(MemoryLayout<z_stream>.size)) == Z_OK else { throw memberFailure }
             defer { inflateEnd(&stream) }
+            // A corrupt/truncated stream still owes its consumed-input ratio check. Padding that inflate
+            // never consumed cannot make an already expanded bomb into an ordinary corrupt member.
+            func malformedDeflate() throws -> Never {
+                try check()
+                try Self.checkRatio(bytes, UInt64(stream.total_in), ratio)
+                throw memberFailure
+            }
             var ended = false
             while left > 0 && !ended {
                 try check()
                 let data = try input.read(upToCount: Int(min(UInt64(Self.chunkBytes), left))) ?? Data()
-                guard !data.isEmpty else { throw ZIPFailure.entry }
+                guard !data.isEmpty else { try malformedDeflate() }
                 left -= UInt64(data.count)
                 try data.withUnsafeBytes { raw in
                     stream.next_in = UnsafeMutablePointer(mutating: raw.bindMemory(to: UInt8.self).baseAddress)
@@ -214,14 +228,14 @@ public struct ZIPArchive: Sendable {
                         // A full output buffer can consume exactly the last input byte. The next inflate
                         // needs another input chunk; Z_BUF_ERROR here means starvation, not corruption.
                         if rc == Z_BUF_ERROR && stream.avail_in == 0 && produced == 0 { break }
-                        guard rc == Z_OK, produced > 0 || stream.avail_in < before else { throw ZIPFailure.entry }
+                        guard rc == Z_OK, produced > 0 || stream.avail_in < before else { try malformedDeflate() }
                     } while stream.avail_in > 0 || stream.avail_out == 0
                 }
             }
-            if ended { try Self.checkRatio(bytes, UInt64(stream.total_in), ratio) }
-            guard ended, left == 0, stream.avail_in == 0 else { throw ZIPFailure.entry }
-        } else { throw ZIPFailure.entry }
-        guard bytes == entry.expandedBytes, checksum == entry.checksum else { throw ZIPFailure.entry }
+            try Self.checkRatio(bytes, UInt64(stream.total_in), ratio)
+            guard ended, left == 0, stream.avail_in == 0 else { throw memberFailure }
+        } else { throw memberFailure }
+        guard bytes == entry.expandedBytes, checksum == entry.checksum else { throw memberFailure }
         return bytes
     }
 
@@ -231,6 +245,9 @@ public struct ZIPArchive: Sendable {
         let drive = prefix.count == 2 && prefix[1] == 58 && ((65...90).contains(prefix[0]) || (97...122).contains(prefix[0]))
         guard !normalized.isEmpty, !normalized.hasPrefix("/"), !normalized.contains("\0"), !drive,
               !normalized.split(separator: "/").contains("..") else { throw ZIPFailure.unsafePaths }
+    }
+    private static func isDirectoryPath(_ name: String) -> Bool {
+        name.hasSuffix("/") || name.hasSuffix("\\")
     }
     private static func isFinderMetadata(_ name: String) -> Bool {
         let components = name.replacingOccurrences(of: "\\", with: "/").split(separator: "/")

@@ -7,7 +7,7 @@ archive safety limits but never toward unsupported-file counters. Whole-archive 
 without also counting a failed file; repeated identical messages are deduplicated. Storage-full errors use the existing
 localized storage notice, and a new nonempty batch clears the preceding import error. Nested
 archives, empty directories, symlinks and Finder metadata (`__MACOSX` / `._` sidecars) are ignored; they are never
-opened as notes or followed as paths. A directory carrying expanded data refuses the whole archive as damaged, including a directory marked only by Unix attributes.
+opened as notes or followed as paths. A directory carrying expanded data refuses the whole archive as damaged. Directory identity is preserved across raw/Unicode path aliases, Windows separators, DOS attributes and Unix attributes. Even an empty directory requires zero CRC, a readable matching local header, and stored or deflated encoding; deflated directories must prove their streams are empty and complete.
 
 Library's native Edit control selects notes. Export All as ZIP includes every finished Library note, independently
 of search/Starred filters; Export Selected as ZIP appears only for a nonempty selection. The save/share sheet
@@ -38,8 +38,8 @@ Archive bounds follow cassini-ux main `4d577376f6360ed352fa75307f4dc47890ed9858`
 - The existing 4 GiB single-file import limit also applies to members. An oversized member is counted as failed.
 - Stored and deflated payloads stream in 64 KiB chunks, with CRC, exact size and actual-byte budget checks.
   A false expanded size stops publication of extra bytes, while validation keeps draining so actual size/ratio
-  violations are refused as too large. The final ratio uses compressed bytes consumed through deflate end-of-stream,
-  excluding forged padding. Before any note is imported, every deflated member (including ignored/oversized entries)
+  violations are refused as too large. The final ratio uses compressed bytes actually consumed on completion **or corruption/truncation**,
+  excluding padding the inflater never consumed. A malformed tail cannot downgrade an over-ratio stream to an individual failed member. Before any note is imported, every deflated member (including ignored/oversized entries)
   streams to a discard consumer to enforce actual archive-wide limits; stored members account their payload size without reading it.
   This preflight writes no expanded data to disk. Central/local compression methods must agree before any import; a mismatch refuses the archive as damaged, even in an ignored member. Corrupt individual payloads still allow valid siblings to import.
   No archive path is passed to a filesystem write.
@@ -72,11 +72,11 @@ covered by regression tests here.
 
 | Defect class | Finding and regression |
 | --- | --- |
-| Directory payload / ignored bomb | Fixed directory payloads being silently ignored. `BulkTransferTests.directoryPayloadsAndMethodMismatchesRefuseBeforePublishingAnyNote` checks ordinary, Unix-attribute and forged-empty deflated directories after Good.wav. Ignored runtime bombs already refused: `runtimeBombsRefuseArchiveBeforeAnyMemberIsImported` and `ignoredPayloadsAlsoConsumeTheActualArchiveBudgetBeforeImport`. |
+| Directory payload / ignored bomb | Fixed directory payloads being silently ignored. `BulkTransferTests.directoryPayloadsAndMethodMismatchesRefuseBeforePublishingAnyNote` checks ordinary, Unix-attribute and forged-empty deflated directories after Good.wav. Normal ignored runtime bombs already refused; fixed corrupt-tail padded bombs being downgraded to corrupt members. `corruptDeflateTailsCannotHidePaddedRatioBombs` covers supported, ignored and AppleDouble members alone and after Good.wav; `malformedDirectoryRepresentationsRefuseBeforeAnyImport` covers DOS/Unicode aliases, bad CRC/method/local header and padded empty deflate. Valid empty DOS directories remain ignored. |
 | Visibility before runtime validation | Already preflights every deflated entry to discard before calling the ordinary importer; no rollback of published notes. Bomb regressions observe no publication callbacks. `lateArchiveRefusalNeverPublishesOrRollsBackAnIndependentEditableImport` proves no importer call and retains the independent note's edited metadata byte-for-byte. |
 | Central/local method mismatch | Fixed being downgraded to an individual failed entry. The directory-payload regression includes both mismatch directions and an ignored README member, after Good.wav, and observes zero importer calls. |
-| Ratio at completion | Already uses whole declared compressed size as a conservative streaming denominator, then actual compressed bytes at deflate completion (excluding padding). `ZIPAgyReviewTests.mixedCompressibilityIsJudgedByTheCompleteStreamNotItsHighlyCompressiblePrefix` accepts a compressible prefix plus random tail and compares every byte; `runtimeRatioUsesActualOutputAndActualCompressedInputBeforePadding` still refuses forged/padded bombs. |
-| Single import alongside ZIP | Already uses atomic `NoteStore.insert(_:unlessLiveSourceIs:)`, with no bulk rollback. `singleAndBulkImportsRacingPastDigestLookupCreateOnlyOneNote` gates both after early digest lookup and checks exactly one new note plus one duplicate; the late-refusal regression retains the independent edited note. |
+| Ratio at completion | Uses whole declared compressed size as a conservative streaming denominator, then actual consumed bytes at success **or a corrupt/truncated exit** (fixed after review). `ZIPAgyReviewTests.mixedCompressibilityIsJudgedByTheCompleteStreamNotItsHighlyCompressiblePrefix` independently verifies a prefix above 100:1, accepts the complete valid mixed stream and compares every byte; `prematureEOFStillChecksConsumedRatioBeforeReportingCorruption` exercises EOF after expanded output; `runtimeRatioUsesActualOutputAndActualCompressedInputBeforePadding` still refuses forged/padded bombs. |
+| Single import alongside ZIP | Already uses atomic `NoteStore.insert(_:unlessLiveSourceIs:)`, with no bulk rollback. `singleAndBulkImportsRacingPastDigestLookupCreateOnlyOneNote` gates both after early digest lookup and uses a multiwaiter continuation latch, checks exactly one new note plus one duplicate and verifies the loser staging folder is absent on disk; the late-refusal regression retains the independent edited note. |
 | Queued/failed transcript export | Already serializes stored words independently of the pending/failed transcription status. `ExportServiceTests.archiveKeepsStoredTranscriptWhileAnotherTranscriptionIsQueuedOrFailed` extracts the ZIP and verifies the complete Cassini transcript for both states. |
 
 These are local regressions; no shared vectors, strings or contract files are changed.
