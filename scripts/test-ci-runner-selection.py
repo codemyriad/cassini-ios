@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Verify CI self-hosted macOS runner selection enforces the 4-event trusted allow-list."""
 
+from __future__ import annotations
+
 import json
 import pathlib
 import re
@@ -37,7 +39,7 @@ class _CIString(str):
 class _NullContext:
     """GitHub Actions dereferences missing/null context properties to null instead of raising."""
 
-    def __getattr__(self, _name: str) -> "_NullContext":
+    def __getattr__(self, _name: str) -> _NullContext:
         return self
 
     def __bool__(self) -> bool:
