@@ -33,6 +33,21 @@ public struct PortableExportService: Sendable {
         self.unassignedLabel = unassignedLabel
     }
 
+    /// D96 backup: clean imported documents and raw/opaque audio keep their exact bytes, so re-import deduplicates.
+    /// Local transcript/title/speaker changes still need a complete portable snapshot; the source is never written.
+    public func archiveSnapshot(_ note: Note, original: URL, playable: URL, into folder: URL) async throws -> URL {
+        var originalBytes = ArchiveContents.preservesOriginal(note)
+        if !originalBytes, note.document != nil {
+            let document = try await CancellableFileWork.run { PortableTranscript.read(from: original) }
+            if let document { originalBytes = ArchiveContents.matchesImportedDocument(note, document) }
+        }
+        if originalBytes {
+            let ext = original.pathExtension
+            return try await BulkExportService.copyOriginal(original, to: folder.appendingPathComponent("original" + (ext.isEmpty ? "" : "." + ext)))
+        }
+        return try await export(note, original: original, playable: playable, into: folder, filename: "document")
+    }
+
     /// The exported file, `<folder>/<filename>.opus`. Nothing it made stays in `folder` when it throws.
     public func export(_ note: Note, original: URL, playable: URL, into folder: URL, filename: String) async throws -> URL {
         let work = folder.appendingPathComponent("work", isDirectory: true)
@@ -72,6 +87,9 @@ public struct PortableExportService: Sendable {
                 let next = work.appendingPathComponent("version-\(index).opus")
                 variants[version.id] = try await seal(Self.showing(version, of: note), opus, next,
                                                       Self.record(version, runs, variants, note, audit), source)
+                // Each successor contains every preceding variant. Keeping old complete-audio copies would
+                // multiply scratch space by the version count for one note.
+                if opus != original { try FileManager.default.removeItem(at: opus) }
                 opus = next
                 source = nil
             }

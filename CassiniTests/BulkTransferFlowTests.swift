@@ -81,6 +81,85 @@ import CassiniNotebook
         XCTAssertEqual(try Data(contentsOf: store.audioURL(for: raw)), wav)
     }
 
+    func testCleanImportedDocumentsKeepExactBytesAndReimportAsDuplicates() async throws {
+        let audio = FakeAudioProcessing()
+        let harness = TestGraph(audio: audio)
+        defer { harness.tearDown() }
+        _ = await harness.graph.start()
+        harness.graph.settings.autoTranscribe = false
+        let source = harness.root.appendingPathComponent("English.wav")
+        try wav.write(to: source)
+        var producer = Note(title: "English manifest title")
+        producer.transcript = [.init(text: "English original words", start: 0, end: 1)]
+        producer.language = "en"
+        let portable = PortableExportService(audio: audio, provenance: FakeProvenance(), unassignedLabel: "Unknown speaker")
+        let generated = try await portable.export(producer, original: source, playable: source, into: harness.root, filename: "generated")
+        let document = CassiniDocument.readChecked(generated)
+        XCTAssertEqual(document.state, .ok)
+        var originals: [UUID: Data] = [:]
+        let store = try XCTUnwrap(harness.graph.library.noteStore)
+        for titleTag in ["", "TITLE=A stale optional tag"] {
+            var comments = document.comments.filter { !$0.uppercased().hasPrefix("TITLE=") }
+            if !titleTag.isEmpty { comments.append(titleTag) }
+            let input = harness.root.appendingPathComponent(UUID().uuidString + ".opus")
+            try OggOpus.rewrite(generated, tags: CassiniDocument.tagsPacket(comments), to: input)
+            let outcome = await harness.graph.imports.importFile(input, opensNote: false).value
+            let id = try XCTUnwrap(outcome?.noteID)
+            originals[id] = try Data(contentsOf: input)
+        }
+        let before = harness.graph.library.notes
+        let metadata = try Dictionary(uniqueKeysWithValues: before.map { note in
+            (note.id, try Data(contentsOf: store.directory(for: note.id).appendingPathComponent("note.json")))
+        })
+        let archive = try await harness.graph.exports.exportArchive(before.map(\.id), progress: { _ in })
+        let zip = try ZIPArchive(url: archive)
+        var archived: Set<Data> = []
+        for entry in zip.entries {
+            var bytes = Data()
+            try zip.read(entry, remainingBytes: 1_000_000) { bytes.append($0) }
+            archived.insert(bytes)
+            XCTAssertTrue(originals.values.contains(bytes), "Clean documents must remain byte-identical, even without a matching TITLE tag")
+        }
+        XCTAssertEqual(archived, Set(originals.values))
+        for note in before {
+            XCTAssertEqual(try Data(contentsOf: store.originalAudioURL(for: note)), originals[note.id])
+            XCTAssertEqual(try Data(contentsOf: store.directory(for: note.id).appendingPathComponent("note.json")), metadata[note.id])
+        }
+        XCTAssertEqual(harness.graph.library.notes, before)
+        harness.graph.imports.start([archive])
+        let batch = try XCTUnwrap(harness.graph.imports.batches.last)
+        let task = try XCTUnwrap(batch.task)
+        await task.value
+        let report = try XCTUnwrap(batch.report)
+        XCTAssertEqual(report.summary.duplicates, 2)
+        XCTAssertEqual(report.summary.imported, 0)
+        XCTAssertEqual(report.summary.failed, 0)
+        XCTAssertEqual(harness.graph.library.notes.count, 2)
+        harness.graph.exports.discard(archive)
+
+        // A local edit needs a new portable snapshot, while the stored original and metadata stay read-only.
+        let editedID = try XCTUnwrap(before.first?.id)
+        await harness.graph.library.commit(editedID) { note in
+            let original = note.transcript[0]
+            let revised = original.revised(text: "English locally edited words", speakerID: original.speakerID, speakers: note.speakers ?? [])
+            note.revisePassage(original, to: revised, stamp: .init(date: Date(timeIntervalSince1970: 1_700_000_000)))
+        }
+        let editedNote = try XCTUnwrap(harness.graph.library.note(editedID))
+        let metadataURL = store.directory(for: editedID).appendingPathComponent("note.json")
+        let editedMetadata = try Data(contentsOf: metadataURL)
+        let changed = try await harness.graph.exports.exportArchive([editedID], progress: { _ in })
+        let changedZIP = try ZIPArchive(url: changed)
+        var changedBytes = Data()
+        try changedZIP.read(try XCTUnwrap(changedZIP.entries.first), remainingBytes: 1_000_000) { changedBytes.append($0) }
+        let verified = harness.root.appendingPathComponent("Edited English.opus")
+        try changedBytes.write(to: verified)
+        XCTAssertEqual(CassiniDocument.readChecked(verified).selected()?.transcript?.words.map(\.text).joined(separator: " "),
+                       "English locally edited words")
+        XCTAssertEqual(try Data(contentsOf: store.originalAudioURL(for: editedNote)), originals[editedID])
+        XCTAssertEqual(try Data(contentsOf: metadataURL), editedMetadata)
+        harness.graph.exports.discard(changed)
+    }
+
     func testMissingSelectionIsNotSilentlyOmitted() async throws {
         let harness = TestGraph(audio: FakeAudioProcessing())
         defer { harness.tearDown() }

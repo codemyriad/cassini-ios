@@ -36,6 +36,56 @@ import CryptoKit
         }
     }
 
+    @Test func everyClassicEOCDSentinelUsesTheZIP64Directory() throws {
+        try withTemporaryDirectory { folder in
+            let url = try one(folder)
+            let original = try Data(contentsOf: url)
+            let zip64 = try #require(original.range(of: Data([0x50, 0x4b, 6, 6]))).lowerBound
+            let end = original.count - 22
+            for field in [4, 6, 8, 10, 12, 16] {
+                var bytes = original
+                func put16(_ offset: Int, _ value: UInt16) { var d = Data(); d.zip16(value); bytes.replaceSubrange((end + offset)..<(end + offset + 2), with: d) }
+                func put32(_ offset: Int, _ value: UInt32) { var d = Data(); d.zip32(value); bytes.replaceSubrange((end + offset)..<(end + offset + 4), with: d) }
+                put16(4, 0); put16(6, 0); put16(8, 1); put16(10, 1)
+                put32(12, UInt32(original.z64(zip64 + 40))); put32(16, UInt32(original.z64(zip64 + 48)))
+                if field < 12 { put16(field, .max) } else { put32(field, .max) }
+                try bytes.write(to: url)
+                do {
+                    let zip = try ZIPArchive(url: url)
+                    var result = Data()
+                    try zip.read(try #require(zip.entries.first), remainingBytes: 100) { result.append($0) }
+                    #expect(result == Data("English sample".utf8))
+                } catch { Issue.record("EOCD sentinel at offset \(field) must use ZIP64: \(error)") }
+            }
+            var multipleDisks = original
+            multipleDisks[zip64 + 16] = 1
+            try multipleDisks.write(to: url)
+            #expect(throws: ZIPFailure.damaged) { try ZIPArchive(url: url) }
+        }
+    }
+
+    @Test func localAndCentralDescriptorEncodingAndOptionFlagsMayDiffer() throws {
+        try withTemporaryDirectory { folder in
+            let url = try one(folder)
+            let original = try Data(contentsOf: url)
+            let central = try #require(original.range(of: Data([0x50, 0x4b, 1, 2]))).lowerBound
+            for flags: (UInt16, UInt16) in [(8, 0), (0, 8), (0, 0x800), (2, 0)] {
+                var bytes = original
+                var local = Data(); local.zip16(flags.0)
+                var directory = Data(); directory.zip16(flags.1)
+                bytes.replaceSubrange(6..<8, with: local)
+                bytes.replaceSubrange((central + 8)..<(central + 10), with: directory)
+                try bytes.write(to: url)
+                let zip = try ZIPArchive(url: url)
+                var result = Data()
+                do {
+                    try zip.read(try #require(zip.entries.first), remainingBytes: 100) { result.append($0) }
+                    #expect(result == Data("English sample".utf8))
+                } catch { Issue.record("Harmless header flags \(flags) must not lose a member: \(error)") }
+            }
+        }
+    }
+
     @Test func independentlyDeflatedFixtureMatchesItsDigest() throws {
         try withTemporaryDirectory { folder in
             let url = folder.appendingPathComponent("deflated.zip")

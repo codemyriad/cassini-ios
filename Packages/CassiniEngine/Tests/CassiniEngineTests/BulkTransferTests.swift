@@ -71,6 +71,44 @@ private actor BulkProgressTrace {
         #expect(try sandbox.scratchContents().isEmpty)
     }
 
+    @Test func finderMetadataCountsUnsupportedWithoutOpeningItsAudioLookingMembers() async throws {
+        let sandbox = try BulkSandbox()
+        let zip = try sandbox.archive([("English.wav", Data(ImportFixtures.wav)),
+                                       ("MMMMMMMMM._English.wav", Data("AppleDouble".utf8)),
+                                       ("._English.wav", Data("AppleDouble".utf8)),
+                                       ("MMMMMMMMMAnother.wav", Data("Metadata".utf8))])
+        var bytes = try Data(contentsOf: zip)
+        while let range = bytes.range(of: Data("MMMMMMMMM".utf8)) { bytes.replaceSubrange(range, with: Data("__MACOSX/".utf8)) }
+        try bytes.write(to: zip)
+        let report = await sandbox.service().run([zip])
+        #expect(report.summary.imported == 1)
+        #expect(report.summary.unsupported == 3)
+        #expect(report.summary.failed == 0)
+        #expect(report.archives.isEmpty)
+        #expect(try sandbox.scratchContents().isEmpty)
+    }
+
+    @Test func exportWritesEachMemberAndDeletesItsSnapshotBeforePreparingTheNext() async throws {
+        let sandbox = try BulkSandbox()
+        let first = Note(title: "English first"), second = Note(title: "English second")
+        let bytes = Data(repeating: 7, count: 2 * ZIPArchive.chunkBytes)
+        let source = try sandbox.file("original.wav", bytes)
+        let exports = sandbox.folder.appendingPathComponent("exports")
+        let service = BulkExportService(folder: exports) { note, work in
+            let parent = work.deletingLastPathComponent()
+            let contents = try FileManager.default.contentsOfDirectory(atPath: parent.path)
+            #expect(Set(contents) == Set(["Cassini.zip", work.lastPathComponent]), "Only the current note may be staged")
+            if note.id == second.id {
+                let size = try FileManager.default.attributesOfItem(atPath: parent.appendingPathComponent("Cassini.zip").path)[.size] as? NSNumber
+                #expect((size?.intValue ?? 0) > bytes.count, "The first member must already be in the destination ZIP")
+            }
+            return try await BulkExportService.copyOriginal(source, to: work.appendingPathComponent("original.wav"))
+        }
+        let output = try await service.export([first, second])
+        #expect(try FileManager.default.contentsOfDirectory(atPath: output.deletingLastPathComponent().path) == ["Cassini.zip"])
+        #expect(try Data(contentsOf: source) == bytes)
+    }
+
     @Test func unsafeLaterMemberRefusesWholeArchiveBeforeFirstImport() async throws {
         let sandbox = try BulkSandbox()
         let zip = try sandbox.archive([("First.wav", Data(ImportFixtures.wav)), ("aa_notes.wav", Data(ImportFixtures.wav))])

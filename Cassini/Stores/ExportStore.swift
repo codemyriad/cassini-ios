@@ -79,11 +79,7 @@ import CassiniNotebook
             guard let original = await library.originalAudioURL(note), let audio = await library.audioURL(note) else {
                 throw ExportError.noNote
             }
-            if !ArchiveContents.preservesOriginal(note) {
-                return try await portable.export(note, original: original, playable: audio, into: folder, filename: "document")
-            }
-            let ext = original.pathExtension
-            return try await BulkExportService.copyOriginal(original, to: folder.appendingPathComponent("original" + (ext.isEmpty ? "" : "." + ext)))
+            return try await portable.archiveSnapshot(note, original: original, playable: audio, into: folder)
         }
         return try await batch.export(notes, progress: progress)
     }

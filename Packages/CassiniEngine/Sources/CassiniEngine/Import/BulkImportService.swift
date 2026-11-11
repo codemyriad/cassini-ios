@@ -44,7 +44,7 @@ public struct BulkImportService: Sendable {
                     let archive = try await ArchiveWork.run { try ZIPArchive(url: archiveURL, limits: limits, check: $0.check) }
                     units = max(1, archive.entries.count)
                     total += units - 1
-                    guard archive.entries.contains(where: { $0.isFile && ArchiveAudio.supports($0.name) }) else {
+                    guard archive.entries.contains(where: { $0.isFile && !$0.isMetadata && ArchiveAudio.supports($0.name) }) else {
                         report.summary.unsupported += archive.entries.count
                         throw ZIPFailure.empty
                     }
@@ -53,7 +53,7 @@ public struct BulkImportService: Sendable {
                         try Task.checkCancellation()
                         await progress(.init(done: done + 1, total: total))
                         defer { done += 1 }
-                        guard entry.isFile && ArchiveAudio.supports(entry.name) else { report.summary.unsupported += 1; continue }
+                        guard entry.isFile && !entry.isMetadata && ArchiveAudio.supports(entry.name) else { report.summary.unsupported += 1; continue }
                         guard entry.expandedBytes <= memberLimit else { report.summary.failed += 1; continue }
                         let staged = folder.appendingPathComponent(UUID().uuidString + ".tmp")
                         defer { try? FileManager.default.removeItem(at: staged) }

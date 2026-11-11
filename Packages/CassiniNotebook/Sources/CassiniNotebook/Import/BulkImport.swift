@@ -33,6 +33,42 @@ public enum ArchiveAudio {
 }
 
 public enum ArchiveContents {
+    /// A clean imported document is backed up as stored, even if its optional TITLE mirror is absent/stale.
+    /// Compare portable content, not UUIDs assigned by the importer or Library-only fields such as bookmarks.
+    public static func matchesImportedDocument(_ note: Note, _ document: PortableTranscript) -> Bool {
+        guard note.document != nil, sameSegments(note.transcript, document.segments), sameSpeakers(note.speakers ?? [], document.speakers),
+              note.language == document.language else { return false }
+        if let title = NoteTitles.fit(document.title), note.title != title { return false }
+        let versions = (note.versions ?? []).filter { !$0.segments.isEmpty }
+        var originals: [String: TranscriptVersion] = [:]
+        for version in document.versions where !version.segments.isEmpty {
+            guard let id = version.portableID, originals.updateValue(version, forKey: id) == nil else { return false }
+        }
+        guard versions.count == originals.count else { return false }
+        for version in versions {
+            guard let id = version.portableID, let original = originals.removeValue(forKey: id),
+                  sameSegments(version.segments, original.segments), sameSpeakers(version.speakers, original.speakers),
+                  version.language == original.language else { return false }
+        }
+        let selected = note.versions?.first { $0.id == note.selectedVersionID }?.portableID
+        return selected == document.selected?.portableID
+    }
+
+    private static func sameSegments(_ lhs: [TranscriptSegment], _ rhs: [TranscriptSegment]) -> Bool {
+        guard lhs.count == rhs.count else { return false }
+        return zip(lhs, rhs).allSatisfy { left, right in
+            // Group/word UUIDs belong to the UI cache, not to the portable file.
+            var normalized = left
+            normalized.id = right.id
+            guard normalized.words.count == right.words.count else { return false }
+            for index in normalized.words.indices { normalized.words[index].id = right.words[index].id }
+            return normalized == right
+        }
+    }
+    private static func sameSpeakers(_ lhs: [NoteSpeaker], _ rhs: [NoteSpeaker]) -> Bool {
+        lhs.count == rhs.count && zip(lhs, rhs).allSatisfy { $0.id == $1.id && $0.name == $1.name }
+    }
+
     public static func preservesOriginal(_ note: Note) -> Bool {
         if let state = note.document?.state, state == .unknownFormat || state == .unreadable || state == .invalidMetadata { return true }
         return note.document == nil && note.transcript.isEmpty && !(note.versions?.contains { !$0.segments.isEmpty } ?? false)
