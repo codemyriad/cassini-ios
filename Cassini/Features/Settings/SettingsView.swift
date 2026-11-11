@@ -271,7 +271,6 @@ private struct BackupSection: View {
 
     var body: some View {
         Section {
-            Text(verbatim: BackupDraftCopy.body).foregroundStyle(Color.ink).fixedSize(horizontal: false, vertical: true)
             Button(action: open) {
                 HStack {
                     Text(verbatim: BackupDraftCopy.learnMore).foregroundStyle(Color.ink)
@@ -283,6 +282,10 @@ private struct BackupSection: View {
             .accessibilityIdentifier("backupInfoRow")
         } header: {
             Text(verbatim: BackupDraftCopy.heading).foregroundStyle(Color.muted)
+        } footer: {
+            // A footer like the other sections' explanations, not a row: on iOS 18 the audit predicts clipping for
+            // every visible List row of text (`AuditFilter.isListRowPrediction`), and the iPad shows them all.
+            Text(verbatim: BackupDraftCopy.body).foregroundStyle(Color.muted)
         }
     }
 }
