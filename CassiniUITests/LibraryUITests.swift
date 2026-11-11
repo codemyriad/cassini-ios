@@ -130,7 +130,11 @@ final class LibraryUITests: XCTestCase {
         XCTAssertEqual(record.label, "Return to recording")
         let recordingRow = row(app, "Voice note 8 Oct, 09:41")
         XCTAssertTrue(recordingRow.waitForExistence(within: 5))
-        let rowIsRecording = waitFor(recordingRow, label: ", recording")
+        var rowIsRecording = false
+        XCTAssertTrue({
+            rowIsRecording = waitFor(recordingRow, label: ", recording")
+            return rowIsRecording
+        }(), recordingRow.label)
         if !rowIsRecording {
             let matches = app.buttons.matching(NSPredicate(format: "identifier == 'noteRow' AND label BEGINSWITH %@",
                                                             "Voice note 8 Oct, 09:41"))
@@ -141,7 +145,6 @@ final class LibraryUITests: XCTestCase {
             }
             XCUIDevice.shared.system.open(URL(string: "cassini://ui-test/library-projection")!)
         }
-        XCTAssertTrue(rowIsRecording, recordingRow.label)
         capture("Library while recording")
         record.tap()
         XCTAssertTrue(app.buttons["finishRecording"].waitForExistence(within: 5))
