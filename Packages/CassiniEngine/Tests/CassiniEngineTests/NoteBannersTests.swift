@@ -147,6 +147,24 @@ import CassiniNotebook
         #expect(!NoteBanners.oneVoice(empty), "one voice needs a transcript")
     }
 
+    @Test func missingSpeakerModelsOfferTheirDownloadWithoutRepeatingSpeech() throws {
+        var note = transcribed
+        note.speakerAnalysisFailure = .speakers
+        let facts = NoteBannerFacts(speakerModelsMissing: true)
+        let banner = try #require(banners(note, facts: facts).first)
+        #expect(banner.kind == .txOneVoice)
+        #expect(banner.actions == [.download])
+        var screen = NoteScreenState()
+        #expect(screen.bannerAction(.download, note: note, job: nil) == .transcribe(.speakersOnly))
+        #expect(banners(note, job: job(.queued), facts: facts).isEmpty)
+        #expect(screen.bannerAction(.download, note: note, job: job(.queued)) == nil)
+        #expect(screen.bannerAction(.download, note: plain, job: nil) == nil)
+        #expect(banners(note).first?.actions == [.transcribeAgain], "Installed models keep the existing retry")
+        note.document = DocumentInfo(state: .unverified)
+        #expect(banners(note, facts: facts).first { $0.kind == .txOneVoice }?.actions == [])
+        #expect(screen.bannerAction(.download, note: note, job: nil) == nil)
+    }
+
     /// iOS: a speaker step that found nobody is no one-voice banner, but its own notice.
     @Test func noSpeakersIsNotOneVoice() {
         var note = transcribed

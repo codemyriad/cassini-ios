@@ -44,10 +44,16 @@ public enum NoteBanners {
             break
         }
         if mode.showsReading, let trust = trustBanner(note, toggled: facts.trustToggled) { specs.append(trust) }
-        specs += Notices.job(job, oneVoice: oneVoice(note), failureText: job?.failure.map(failureText),
+        var jobBanners = Notices.job(job, oneVoice: oneVoice(note), failureText: job?.failure.map(failureText),
                              requiredFreeBytes: (job?.kind == .speakersOnly ? facts.speakersInstallBytes
                                                  : facts.speechInstallBytes) ?? downloadFreeBytes,
                              noNewVersion: note.refusesNewVersion)
+        if facts.speakerModelsMissing {
+            for index in jobBanners.indices where jobBanners[index].kind == .txOneVoice {
+                jobBanners[index].actions = ReadOnlyReason.of(note, job: job) == nil ? [.download] : []
+            }
+        }
+        specs += jobBanners
         if case .paused = mode, facts.queueHold != nil, facts.waitingJobs > 0 {
             specs.append(BannerSpec(.txQueueHeld, BannerArgs(count: facts.waitingJobs)))
         }

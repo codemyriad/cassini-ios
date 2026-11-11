@@ -123,9 +123,14 @@ public struct NoteScreenState: Hashable, Sendable {
             return nil
         case .transcribe: return .transcribe(.transcribe)
         case .transcribeAgain: return transcribeAgain(note)
+        case .download:
+            // A finished note missing speaker models asks for Identify speakers, retaining its words.
+            guard job == nil, ReadOnlyReason.of(note, job: job) == nil, !note.transcript.isEmpty,
+                  let failure = note.speakerAnalysisFailure, failure != .empty else { return nil }
+            return .transcribe(.speakersOnly)
         case .playAnyway: return .acknowledgeTrustAndPlay
         case .continue: return .continueQueue
-        case .open, .openNote, .openSettings, .turnOn, .download, .cancel, .chooseAnother, .record, .import:
+        case .open, .openNote, .openSettings, .turnOn, .cancel, .chooseAnother, .record, .import:
             // Not on a Note banner.
             return nil
         }

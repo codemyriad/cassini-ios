@@ -17,12 +17,15 @@ public struct NoteBannerFacts: Hashable, Sendable {
     public var speakersInstallBytes: Int64?
     /// A known unavailable device/locale/model, separately from missing downloadable assets.
     public var speechUnavailableText: String?
+    /// The speaker bundle is absent or its download failed; the note can request it without decoding speech again.
+    public var speakerModelsMissing: Bool
 
     public init(trustToggled: Bool = false, queueHold: QueueHold? = nil, waitingJobs: Int = 0,
-                dismissed: Set<String> = [], speechInstallBytes: Int64? = nil, speakersInstallBytes: Int64? = nil, speechUnavailableText: String? = nil) {
+                dismissed: Set<String> = [], speechInstallBytes: Int64? = nil, speakersInstallBytes: Int64? = nil, speechUnavailableText: String? = nil, speakerModelsMissing: Bool = false) {
         self.trustToggled = trustToggled; self.queueHold = queueHold; self.waitingJobs = waitingJobs
         self.dismissed = dismissed; self.speechInstallBytes = speechInstallBytes
         self.speakersInstallBytes = speakersInstallBytes; self.speechUnavailableText = speechUnavailableText
+        self.speakerModelsMissing = speakerModelsMissing
     }
 }
 
