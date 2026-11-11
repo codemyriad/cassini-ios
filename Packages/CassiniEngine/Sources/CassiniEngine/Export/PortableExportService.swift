@@ -9,13 +9,10 @@ import CassiniNotebook
 /// The audio is the imported Ogg Opus when the note has one, else the playable file encoded to Opus. What the export
 /// keeps of an imported document depends on how that document reads now, verified once per export:
 /// - `ok`: every variant stays, with the note's title and speaker names.
-/// - `unverified` or `staleAudio`, with nothing made on this device (`Note.holdsOnlyImportedVersions`): the export is
-///   the document itself, byte for byte, as Android's Save a copy is. Its variants, provenance, private data and
-///   honest state all survive.
-/// - `unverified` or `staleAudio` with versions made here: a fresh seal of only those versions over the same audio,
-///   carrying the source manifest's private `x` data, unknown members and meeting verbatim. The imported variants
-///   are not sealed again, since the audio does not vouch for them; the note still shows them.
-/// - anything else: a fresh seal that keeps only the foreign tags.
+/// - Any non-OK Cassini document: copy the original byte for byte, including after Transcribe again has added
+///   local versions. Neither a new transcript nor a local edit can vouch for the source's meeting time,
+///   provenance or audio binding. The source's variants, private data and honest trust state all survive.
+/// - Plain audio: make a fresh seal over its audio and the note's local transcript.
 ///
 /// Intermediate files go in `<folder>/work/`, which is removed afterwards, so no title can collide with them. The
 /// source is never changed.
@@ -44,17 +41,16 @@ public struct PortableExportService: Sendable {
             var source: CassiniDocument?
             if (try? ImportClassifier.sniff(fileAt: original)) == .oggOpus {
                 source = await Self.read(original)
+                if let state = source?.state, state != .ok, state != .plainAudio {
+                    try Task.checkCancellation()
+                    try FileManager.default.copyItem(at: original, to: output)
+                    return output
+                }
             } else {
                 opus = work.appendingPathComponent("encoded.opus")
                 try await audio.encodeOpus(playable, to: opus)
             }
-            let state = source?.state
-            if let state, PortableTranscript.untrustedStates.contains(state), note.holdsOnlyImportedVersions {
-                try Task.checkCancellation()
-                try FileManager.default.copyItem(at: original, to: output)
-                return output
-            }
-            let verified = state == .ok
+            let verified = source?.state == .ok
             var variants = verified ? Self.keptVariants(of: note) : [:]
             let runs = provenance.records(note.id)
             let audit = verified ? Self.attributionAudit(of: note, original: original) : nil

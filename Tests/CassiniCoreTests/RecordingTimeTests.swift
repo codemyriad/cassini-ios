@@ -62,7 +62,8 @@ import Testing
         let initial = CassiniDocument.read(try CassiniDocument.create(silence(), transcript: words,
                                                                      title: "Meeting", processing: JSONObject()))
         let created = try #require(initial.manifest?["meeting"]?.object?["createdAtUtc"]?.string)
-        for legacyDate in ["2026-11-09T10:31:48+01:00", created] {
+        for legacyDate in ["2026-11-09T10:31:48+01:00", "2026-11-09t09:31:48Z",
+                           "2026-11-09T09:31:48z", " 2026-11-09t09:31:48.250z ", created] {
             var source = initial
             source.comments = source.comments.filter { CassiniDocument.tagName($0) != "DATE" } + ["DATE=\(legacyDate)"]
             let after = CassiniDocument.read(try CassiniDocument.create(silence(source.comments), transcript: words,

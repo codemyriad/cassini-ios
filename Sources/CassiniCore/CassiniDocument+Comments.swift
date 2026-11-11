@@ -141,8 +141,7 @@ extension CassiniDocument {
             let previous = text.first { sameBytes(tagName($0), "DATE") }.map { String($0.dropFirst(5)) }
             let sourceCreated = source?.manifest?["meeting"]?.object?["createdAtUtc"]?.string.flatMap(parseInstant)
             let legacy = previous.flatMap { value -> String? in
-                guard source != nil, fullMatch(value, ".*(Z|[+-][0-9]{2}:[0-9]{2})"),
-                      let date = parseInstant(value), date != sourceCreated else { return nil }
+                guard source != nil, let date = parseInstant(value), date != sourceCreated else { return nil }
                 return value
             }
             let date = meeting["recordedAtUtc"]?.string ?? legacy ?? meeting["createdAtUtc"]?.string

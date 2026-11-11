@@ -112,13 +112,13 @@ struct RecordedMeetingTimeTests {
         #expect(try OggOpus.read(Array(Data(contentsOf: output))).audio == OggOpus.read(bytes).audio)
     }
 
-    @Test func legacyRecordingWithoutTrustedPositionZeroStaysUnknown() throws {
+    @Test func legacyRecordedOriginPreservesItsRecorderStartStamp() throws {
         let note = Note(title: "Old English recording", createdAt: start)
         let bytes = try JSONEncoder().encode(note)
         var json = try #require(JSONSerialization.jsonObject(with: bytes) as? [String: Any])
         json.removeValue(forKey: "meetingTime")
         let loaded = try JSONDecoder().decode(Note.self, from: JSONSerialization.data(withJSONObject: json))
-        #expect(loaded.meetingTime == .unknown)
+        #expect(loaded.meetingTime == .instant(start))
         #expect(loaded.sortDate == start)
     }
 

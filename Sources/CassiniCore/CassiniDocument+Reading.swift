@@ -164,11 +164,22 @@ extension CassiniDocument {
 
     static func nonempty(_ o: JSONObject, _ key: String) throws { try check(!(try o.string(key)).isEmpty, "Empty \(key)") }
 
-    static func parseInstant(_ text: String) -> Date? {
-        let fractional = ISO8601DateFormatter()
-        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return fractional.date(from: text) ?? ISO8601DateFormatter().date(from: text)
+    /// Offset-bearing RFC3339, shared by meeting-time readers and writers. Preserve legacy separator/case
+    /// compatibility and the pinned reference reader's microsecond precision when comparing instants.
+    public static func parseInstant(_ text: String) -> Date? {
+        let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let match = rfc3339Instant.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) else { return nil }
+        func part(_ index: Int) -> String? { Range(match.range(at: index), in: text).map { String(text[$0]) } }
+        guard let date = part(1), let clock = part(2), let zone = part(4) else { return nil }
+        // Match cassini-format 32f37a6's pure reader: RFC3339 separators/offsets and microsecond precision.
+        let fraction = part(3).map { String($0.prefix(7)) } ?? ""
+        let normalized = "\(date)T\(clock)\(fraction)\(zone.uppercased())"
+        return (try? Date(normalized, strategy: .iso8601))
+            ?? (try? Date(normalized, strategy: Date.ISO8601FormatStyle(includingFractionalSeconds: true)))
     }
+
+    private static let rfc3339Instant = try! NSRegularExpression(
+        pattern: #"^([0-9]{4}-[0-9]{2}-[0-9]{2})[Tt ]([0-9]{2}:[0-9]{2}:[0-9]{2})(\.[0-9]+)?([Zz]|[+-][0-9]{2}:[0-9]{2})$"#)
     static func now() -> String { instantText(Date()) }
 
     static func instantText(_ date: Date) -> String {

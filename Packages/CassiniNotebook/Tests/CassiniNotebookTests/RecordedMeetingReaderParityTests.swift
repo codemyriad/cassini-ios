@@ -15,6 +15,7 @@ struct RecordedMeetingReaderParityTests {
     func publishedVectorsMatchReferenceWhen(_ name: String) throws {
         let source = name.hasPrefix("027") ? "recordedAtUtc" : name.hasPrefix("028") ? "recordedAtLocal" : "DATE"
         try assertParity(Conformance.vector(name), expectedSource: source)
+        try assertExportParity(Conformance.vector(name), expectedSource: source)
     }
 
     @Test func generatedRFC3339FormsAndPriorityMatchReferenceWhen() throws {
@@ -31,6 +32,7 @@ struct RecordedMeetingReaderParityTests {
             let file = folder.appendingPathComponent("English-date-\(index).opus")
             try Data(document(date: date)).write(to: file)
             try assertParity(file, expectedSource: "DATE")
+            try assertExportParity(file, expectedSource: "DATE")
         }
         let cases: [(String, String?, String?, String?, String?)] = [
             ("utc-priority", "2026-11-09T23:59:59+09:00", "2026-11-09T09:31:48.250Z", "2026-11-09T01:00:00", "recordedAtUtc"),
@@ -42,6 +44,7 @@ struct RecordedMeetingReaderParityTests {
             let file = folder.appendingPathComponent("English-\(name).opus")
             try Data(document(date: date, recordedAtUTC: utc, recordedAtLocal: local)).write(to: file)
             try assertParity(file, expectedSource: source)
+            try assertExportParity(file, expectedSource: source)
         }
     }
 
@@ -97,6 +100,32 @@ struct RecordedMeetingReaderParityTests {
         let comments = parsed.comments.filter { $0.split(separator: "=", maxSplits: 1).first?.uppercased() != "DATE" }
             + ["DATE=\(date)"]
         return try OggOpus.mux(OggOpus.read(sealed), tags: CassiniDocument.tagsPacket(comments))
+    }
+
+    /// Invoke the real writer, not PortableExportService's unchanged-import byte-copy fast path.
+    private func assertExportParity(_ original: URL, expectedSource: String?) throws {
+        let folder = try PortableFixtures.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let source = CassiniDocument.readChecked(original)
+        #expect(source.state == .ok)
+        let portable = try #require(PortableTranscript(source))
+        let note = ImportedNote.make(id: UUID(), displayName: nil, fallbackTitle: "English export parity",
+            sha256: "synthetic", importedAt: Date(timeIntervalSince1970: 1_794_212_100),
+            audio: ImportedAudio(filename: original.lastPathComponent, duration: 1), document: portable)
+        let output = folder.appendingPathComponent("rewritten.opus")
+        try PortableTranscript.export(note: note, opus: original, destination: output,
+                                      unassignedLabel: "Unknown speaker", source: source)
+        let rewritten = CassiniDocument.readChecked(output)
+        #expect(rewritten.state == .ok)
+        #expect(MeetingTime.read(rewritten) == portable.meetingTime)
+        #expect(rewritten.variants.count > source.variants.count, "Exercise resealing rather than byte copying")
+        try assertParity(output, expectedSource: expectedSource)
+        if expectedSource == "DATE" {
+            func dateTag(_ document: CassiniDocument) -> String? {
+                document.comments.first { $0.split(separator: "=", maxSplits: 1).first?.uppercased() == "DATE" }
+            }
+            #expect(dateTag(rewritten) == dateTag(source), "Keep valid legacy DATE bytes, including lowercase t/z")
+        }
     }
 
     private func assertParity(_ file: URL, expectedSource: String?, document: CassiniDocument? = nil) throws {

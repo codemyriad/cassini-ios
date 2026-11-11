@@ -232,12 +232,12 @@ public enum LibraryMapping {
             isRecording: recording, isFavorite: note.isFavorite, bookmarkCount: note.bookmarks.count)
     }
 
-    /// The day sections of `entries` (newest first), grouped by the local day of their creation at `now`.
+    /// Meeting-day sections and rows, ordered by the viewer's calendar and each meeting's own clock (D95).
     public static func sections(_ entries: [LibraryIndex.Entry], context: RowContext, now: Date,
                                 calendar: Calendar) -> [DaySection] {
         var sections: [DaySection] = []
         var sectionIndices: [DayKey: Int] = [:]
-        for entry in entries {
+        for entry in LibraryIndex.orderedEntries(entries, calendar: calendar) {
             let key = entry.note.meetingTime.day(in: calendar).map { DayGroups.key($0, now: now, calendar: calendar) } ?? .undated
             if let index = sectionIndices[key] {
                 sections[index].rows.append(row(entry, context: context))
@@ -253,7 +253,7 @@ public enum LibraryMapping {
     /// match; a title-only match highlights the title and shows no snippet. A title that the snippet cut (a very
     /// long title) is shown plain, without ranges.
     public static func results(_ hits: [LibraryIndex.Hit], context: RowContext, now: Date, calendar: Calendar) -> [LibraryRow] {
-        hits.map { found in
+        LibraryIndex.orderedHits(hits, calendar: calendar).map { found in
             let title = found.markedTitle
             let shownTitle = title.text.isEmpty || title.leadingEllipsis || title.trailingEllipsis ? nil : title
             let hit = Hit(day: found.entry.note.meetingTime.day(in: calendar).map { DayGroups.key($0, now: now, calendar: calendar) } ?? .undated,

@@ -53,7 +53,8 @@ public struct LibraryIndex: Sendable {
         }
     }
 
-    /// The notes outside Recently Deleted, newest first.
+    /// The notes outside Recently Deleted in catalogue input order. Display ordering is calendar-dependent
+    /// (`orderedEntries`), so an unzoned label never receives an invented instant here.
     public private(set) var entries: [Entry] = []
     /// Changes whenever a note is added, changed, moved or removed, so a search knows its results are out of date.
     public private(set) var revision = 0
@@ -90,6 +91,16 @@ public struct LibraryIndex: Sendable {
         }
     }
 
+    /// The UI's ordering uses its explicit calendar; source/cache order never assigns an instant to local labels.
+    public static func orderedEntries(_ entries: [Entry], calendar: Calendar) -> [Entry] {
+        MeetingOrder.sorted(entries, calendar: calendar, note: \.note)
+    }
+
+    /// A search keeps its matching/snippet work, then applies the same calendar ordering as day sections.
+    public static func orderedHits(_ hits: [Hit], calendar: Calendar) -> [Hit] {
+        MeetingOrder.sorted(hits, calendar: calendar, note: { $0.entry.note })
+    }
+
     public func entry(_ id: UUID) -> Entry? { cache[id] }
 
     /// `hits` (of `query`, from an earlier copy of the index) over the notes as they are now: a note that went is
@@ -106,8 +117,8 @@ public struct LibraryIndex: Sendable {
         }
     }
 
-    /// The notes that match every phrase of `query`, newest first; every note when there is no query (only
-    /// punctuation was typed).
+    /// The notes that match every phrase of `query` in index order; every note when there is no query (only
+    /// punctuation was typed). `orderedHits` supplies the viewer-calendar order without repeating matching work.
     public mutating func search(_ query: SearchQuery?) -> [Hit] {
         guard let query else { return entries.map { Hit(entry: $0, snippet: "", titleSnippet: $0.note.title) } }
         var hits: [Hit] = []

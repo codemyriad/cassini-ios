@@ -95,6 +95,17 @@ extension Note: Codable {
             failure = try c.decodeIfPresent(JobFailure.self, forKey: .failure)
             speakerAnalysisFailure = try c.decodeIfPresent(JobFailure.self, forKey: .speakerAnalysisFailure)
         }
+        // Before D95 the recorder persisted its admission/start stamp in createdAt and never
+        // changed it at finish or compression. An explicit schema-2 recorded origin identifies
+        // that stamp; imports and recovery use their import/seal/filesystem times instead.
+        // Schema 1 had no origin and imported M4A also used audio.m4a, so only its recorder-only
+        // capture.caf filename is evidence. Do not replace an explicit unknown/new-format value.
+        if !c.contains(.meetingTime), origin == .recorded,
+           document == nil, sourceSha256 == nil, originalAudioFilename == nil,
+           versions?.contains(where: { $0.portableID != nil }) != true,
+           schema >= 2 || audioFilename == "capture.caf" {
+            meetingTime = .instant(createdAt)
+        }
     }
 
     private mutating func decodeSchemaOne(_ c: KeyedDecodingContainer<CodingKeys>) throws {

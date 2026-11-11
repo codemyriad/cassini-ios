@@ -100,11 +100,12 @@ struct LibraryMappingTests {
         let hits = [LibraryIndex.Hit(entry: entry(a), snippet: "…the \u{2}delivery\u{3} slips…", titleSnippet: "Call with supplier"),
                     LibraryIndex.Hit(entry: entry(b), snippet: "no markers here", titleSnippet: "\u{2}Invoice\u{3} March")]
         let results = LibraryMapping.results(hits, context: RowContext(), now: now, calendar: rome)
-        let first = results[0]
+        #expect(results.map(\.id) == [b.id, a.id], "Search displays meeting order rather than incoming hit order")
+        let first = results[1]
         #expect(first.day == .yesterday)
         #expect(first.preview == Highlighted("the delivery slips", ranges: [4..<12], leadingEllipsis: true, trailingEllipsis: true))
         #expect(first.titleRanges.isEmpty)
-        let second = results[1]
+        let second = results[0]
         #expect(second.title == "Invoice March")
         #expect(second.titleRanges == [0..<7])
         #expect(second.preview == nil, "a title-only match shows no snippet")
