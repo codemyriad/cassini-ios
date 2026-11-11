@@ -31,6 +31,7 @@ public struct ZipArchive: Sendable {
     public static let maxUncompressedBytes: UInt64 = 20_000_000_000
     public static let bufferBytes = 65_536
     public let entries: [ZipEntry]
+    private let knownEntries: Set<ZipEntry>
     private let url: URL
     private let fileSize: UInt64
 
@@ -39,13 +40,15 @@ public struct ZipArchive: Sendable {
         defer { file.close() }
         self.url = url
         fileSize = file.size
-        entries = try Self.inspect(file)
+        let inspected = try Self.inspect(file)
+        entries = inspected
+        knownEntries = Set(inspected)
     }
 
     /// `onChunk` runs before each output write, so callers can enforce their free-space reserve.
     public func extract(_ entry: ZipEntry, to destination: URL, maxBytes: Int64,
                         onChunk: @Sendable (_ bytesAboutToWrite: Int) throws -> Void = { _ in }) throws -> Int64 {
-        guard entries.contains(entry), !entry.isDirectory, maxBytes >= 0 else { throw ZipArchiveError.damaged }
+        guard knownEntries.contains(entry), !entry.isDirectory, maxBytes >= 0 else { throw ZipArchiveError.damaged }
         guard entry.uncompressedSize <= maxBytes else { throw ZipArchiveError.tooLarge }
         let file = try ZIPFile(url)
         defer { file.close() }
