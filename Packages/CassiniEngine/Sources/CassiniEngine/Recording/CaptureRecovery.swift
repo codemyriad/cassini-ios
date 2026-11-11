@@ -14,7 +14,7 @@ public struct CaptureRecovery: Sendable {
     public static let corruptPrefix = NoteRepository.metadataFilename + ".corrupt-"
     /// The files a recording leaves, in the order a rebuilt note prefers them.
     static let recordingFiles = [RecordingController.captureFilename, RecordingController.compressedFilename]
-    static let audioExtensions: Set<String> = ["caf", "m4a", "wav", "aif", "aiff", "mp3", "aac", "flac"]
+    static let audioExtensions: Set<String> = ["caf", "m4a", "wav", "aif", "aiff", "mp3", "aac", "flac", "opus"]
 
     private let audio: any AudioProcessing
     private let repairer: any CaptureRepairing
@@ -55,7 +55,17 @@ public struct CaptureRecovery: Sendable {
             let createdAt = (try? url.resourceValues(forKeys: [.creationDateKey]).creationDate) ?? now
             var note = Note(id: id, title: recoveredTitle(createdAt), createdAt: createdAt, audioFilename: audioFile)
             note.origin = .recovered
-            apply(await finish(url), to: &note)
+            // Filesystem creation is a sorting fallback, never proof of recording position zero.
+            note.meetingTime = .unknown
+            if let portable = PortableTranscript.read(from: url) {
+                note = ImportedNote.make(id: id, displayName: nil, fallbackTitle: recoveredTitle(createdAt),
+                    sha256: "", importedAt: createdAt,
+                    audio: ImportedAudio(filename: audioFile, originalFilename: nil, duration: 0, waveform: [], state: .plain),
+                    document: portable)
+                note.sourceSha256 = nil
+            } else {
+                apply(await finish(url), to: &note)
+            }
             do {
                 try repository.save(note)
                 rebuilt.append(RecoveredRecording(noteID: id, createdAt: createdAt, recoveredAt: now, duration: note.duration))

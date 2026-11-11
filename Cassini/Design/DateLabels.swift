@@ -12,6 +12,7 @@ struct DateLabels {
     /// "Today", "Yesterday", "Monday 5 Oct", "5 Oct 2025".
     func day(_ key: DayKey) -> String {
         switch key {
+        case .undated: return ""
         case .today: return LibraryCopy.today
         case .yesterday: return LibraryCopy.yesterday
         case .date(let day, let withYear):

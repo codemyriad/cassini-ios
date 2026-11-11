@@ -126,6 +126,10 @@ extension CassiniDocument {
         try nonempty(meeting, "id"); try nonempty(meeting, "title"); _ = try meeting.number("durationMs")
         let created = try meeting.string("createdAtUtc")
         try check(created.hasSuffix("Z") && parseInstant(created) != nil, "Invalid createdAtUtc")
+        if let recorded = meeting["recordedAtUtc"] {
+            guard let value = recorded.string else { throw CassiniError("Invalid recordedAtUtc") }
+            try check(value.hasSuffix("Z") && parseInstant(value) != nil, "Invalid recordedAtUtc")
+        }
         let audio = try m.object("audio")
         try check(audio["container"] == .string("ogg") && audio["codec"] == .string("opus") && audio.number("sampleRate") == 48000, "Unsupported audio")
         try check((1...2).contains(audio.number("channels")), "Unsupported channel count")
@@ -165,10 +169,12 @@ extension CassiniDocument {
         fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return fractional.date(from: text) ?? ISO8601DateFormatter().date(from: text)
     }
-    static func now() -> String {
+    static func now() -> String { instantText(Date()) }
+
+    static func instantText(_ date: Date) -> String {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter.string(from: Date())
+        return formatter.string(from: date)
     }
 
     static func decimal(_ value: String?) throws -> Int64 {

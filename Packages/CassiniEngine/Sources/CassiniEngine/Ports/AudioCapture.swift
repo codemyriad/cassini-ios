@@ -27,6 +27,12 @@ public struct CaptureResult: Hashable, Sendable {
     func pause()
     func resume() throws
     func stop() async throws -> CaptureResult
+    /// UTC instant at position zero, captured after permission/session preparation.
+    var recordedAt: Date? { get }
     var elapsed: TimeInterval { get }
     var fileBytes: Int64 { get }
+}
+
+extension AudioCapture {
+    public var recordedAt: Date? { nil }
 }

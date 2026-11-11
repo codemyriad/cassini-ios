@@ -5,12 +5,14 @@ extension CassiniDocument {
     /**
      * Adds a variant while retaining existing descriptors, bodies, extensions and unrelated tags. Without [existing],
      * a fresh seal carries [source]'s private and unknown manifest members, its meeting id and its meeting and
-     * provenance members not tied to its transcripts; see [seal].
+     * provenance members not tied to its transcripts; see [seal]. `recordedAt` is the trustworthy instant at
+     * playback position zero of a new recording. Existing or carried documents keep their own meeting time; an
+     * unknown start stays absent. No local recording-site label is inferred from the machine clock.
      */
     public static func create(_ audioBytes: [UInt8], transcript: Transcript, title: String, processing: JSONObject,
                               existing: CassiniDocument? = nil, speakerLabels: [String: String] = [:],
-                              carrying source: CassiniDocument? = nil) throws -> [UInt8] {
-        let (comments, digest) = try seal(OggOpus.scan(ArraySource(audioBytes)), transcript, title, processing, existing, speakerLabels, source)
+                              carrying source: CassiniDocument? = nil, recordedAt: Date? = nil) throws -> [UInt8] {
+        let (comments, digest) = try seal(OggOpus.scan(ArraySource(audioBytes)), transcript, title, processing, existing, speakerLabels, source, recordedAt)
         let out = ArraySink()
         try check(try OggOpus.rewrite(ArraySource(audioBytes), tags: comments.packet, to: out).digest() == digest, "Audio changed while sealing")
         try verify(read(out.bytes), transcript)
@@ -20,9 +22,9 @@ extension CassiniDocument {
     /** Streams [audio] into [target] behind the new tags and verifies the written file from disk; nothing is left on failure. */
     @discardableResult
     public static func create(_ audio: URL, transcript: Transcript, title: String, processing: JSONObject, existing: CassiniDocument?,
-                              speakerLabels: [String: String], carrying source: CassiniDocument? = nil,
+                              speakerLabels: [String: String], carrying source: CassiniDocument? = nil, recordedAt: Date? = nil,
                               target: URL) throws -> CassiniDocument {
-        let (comments, digest) = try seal(OggOpus.scan(audio), transcript, title, processing, existing, speakerLabels, source)
+        let (comments, digest) = try seal(OggOpus.scan(audio), transcript, title, processing, existing, speakerLabels, source, recordedAt)
         do {
             try writeWithTags(audio, comments, digest, target)
             let sealed = read(target)
@@ -89,6 +91,7 @@ extension CassiniDocument {
         let digest = try manifest.object("integrity").string("opusAudioSha256")
         var kept = Comments(text: existing.comments, opaque: existing.opaqueComments)
         if let title { kept = kept.titled(title) }
+        kept = kept.dated(meeting: try manifest.object("meeting"), source: existing)
         let comments = kept.deriving(try copies(of: manifest) + manifestTags(manifest))
         do {
             try writeWithTags(source, comments, digest, target)
@@ -164,7 +167,7 @@ extension CassiniDocument {
      */
     static func seal(_ stream: OggOpus.Info, _ transcript: Transcript, _ title: String, _ processing: JSONObject,
                      _ existing: CassiniDocument?, _ speakerLabels: [String: String],
-                     _ source: CassiniDocument? = nil) throws -> (comments: Comments, digest: String) {
+                     _ source: CassiniDocument? = nil, _ recordedAt: Date? = nil) throws -> (comments: Comments, digest: String) {
         let digest = try stream.digest()
         try check(existing == nil || existing!.state == .ok, "Never rebind stale transcripts to different audio")
         try check(existing == nil || source == nil, "A seal beside a document keeps its manifest; it carries nothing else")
@@ -175,6 +178,9 @@ extension CassiniDocument {
         var meeting = carriedMeeting(of: source) ?? JSONObject([("id", .string("mtg_" + UUID().uuidString.lowercased()))])
         meeting["title"] = .string(trimmedTitle.isEmpty ? "Recording" : trimmedTitle)
         meeting["createdAtUtc"] = .string(now)
+        if source == nil, let recordedAt {
+            meeting["recordedAtUtc"] = .string(instantText(recordedAt))
+        }
         meeting["durationMs"] = .int(stream.durationMs)
         var manifest = existing?.manifest ?? JSONObject([
             ("kind", .string("cassini-portable-meeting")), ("version", .int(1)), ("profile", .string("ogg-opus")),
@@ -230,6 +236,7 @@ extension CassiniDocument {
             comments = Comments(text: foreign.text, opaque: foreign.opaque)
         }
         comments = comments.titled(try manifest.object("meeting").string("title"))
+        comments = comments.dated(meeting: try manifest.object("meeting"), source: existing ?? source)
         comments = comments.deriving(try copies(of: manifest) + bodyTags.filter { !isDerived(tagName($0)) } + manifestTags(manifest))
         return (comments, digest)
     }

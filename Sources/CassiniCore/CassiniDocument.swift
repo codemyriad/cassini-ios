@@ -54,7 +54,8 @@ public struct CassiniDocument: Equatable, Sendable {
     /** The optional origin tags and the `meeting` member each one copies; written only when the member is there. */
     static let meetingMirrors: [(tag: String, field: String)] = [
         ("CASSINI_ROOM_ID", "roomId"), ("CASSINI_JOB_ID", "jobId"), ("CASSINI_ATTEMPT_NUMBER", "attemptNumber"),
-        ("CASSINI_PROCESSED_AT", "processedAtUtc"), ("CASSINI_RECORDED_AT_LOCAL", "recordedAtLocal"),
+        ("CASSINI_PROCESSED_AT", "processedAtUtc"), ("CASSINI_RECORDED_AT_UTC", "recordedAtUtc"),
+        ("CASSINI_RECORDED_AT_LOCAL", "recordedAtLocal"),
     ]
     /**
      * The non-chunk tags every write derives from the manifest it embeds. A source's own spelling of them may be

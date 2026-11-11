@@ -1,4 +1,5 @@
 import Foundation
+import CassiniCore
 
 /// What a load found: the readable notes, newest first, and the note directories whose `note.json` could not be used.
 /// Those stay on disk untouched.
@@ -40,14 +41,20 @@ public struct NoteRepository: Sendable {
         var report = LoadReport()
         for folder in folders where UUID(uuidString: folder.lastPathComponent) != nil {
             do {
-                let note = try JSONDecoder().decode(Note.self, from: Data(contentsOf: folder.appendingPathComponent(Self.metadataFilename)))
+                var note = try JSONDecoder().decode(Note.self, from: Data(contentsOf: folder.appendingPathComponent(Self.metadataFilename)))
+                if note.origin == .importedDocument {
+                    let source = originalAudioURL(for: note)
+                    if FileManager.default.fileExists(atPath: source.path) {
+                        note.meetingTime = MeetingTime.read(CassiniDocument.readChecked(source, verify: false))
+                    }
+                }
                 guard note.id.uuidString == folder.lastPathComponent, Self.isValid(note) else { throw RepositoryError.invalidDocument }
                 report.notes.append(note)
             } catch {
                 report.unreadable.append(folder)
             }
         }
-        report.notes.sort { $0.createdAt > $1.createdAt }
+        report.notes.sort { $0.sortDate > $1.sortDate }
         report.unreadable.sort { $0.lastPathComponent < $1.lastPathComponent }
         return report
     }

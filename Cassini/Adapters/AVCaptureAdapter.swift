@@ -50,6 +50,7 @@ extension AVAudioRecorder: CaptureRecorder {}
     private let continuation: AsyncStream<CaptureEvent>.Continuation
     private let session: CaptureSession
     private let makeRecorder: @MainActor (URL) throws -> any CaptureRecorder
+    private(set) var recordedAt: Date?
     private var recorder: (any CaptureRecorder)?
     private var timer: Timer?
     private var observers: [NSObjectProtocol] = []
@@ -97,6 +98,7 @@ extension AVAudioRecorder: CaptureRecorder {}
             try await session.prepare()
             let capture = try makeRecorder(url)
             capture.isMeteringEnabled = true; capture.delegate = self
+            let start = Date()
             guard capture.record() else {
                 // A record() that fails can leave the recorder's audio queue running, and its input callback reads the
                 // recorder: released unstopped, the recorder ended the app (EXC_BAD_ACCESS in
@@ -104,6 +106,7 @@ extension AVAudioRecorder: CaptureRecorder {}
                 capture.delegate = nil; capture.stop()
                 throw AudioError.startFailed
             }
+            recordedAt = start
             recorder = capture; isPaused = false
             let meterTimer = Timer(timeInterval: 0.1, repeats: true) { [weak self] _ in
                 MainActor.assumeIsolated { self?.tick() }

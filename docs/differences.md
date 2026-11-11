@@ -1034,3 +1034,7 @@ and queue rebuild. Low live memory is checked at admission/load/window and can r
 hardware/locale/assets probe remains separate. The physical measurement did not include downloaded speaker models.
 Settings and the first Whistle result use the coordinator's dismissible Parakeet suggestion only when the device
 passes capability, memory and disk checks; its size comes from the speech-only pinned download plan.
+
+### Meeting time (D95)
+
+iOS follows the shared recordedAtUtc/offset DATE/local-label reader order; createdAtUtc is only a sorting fallback. Local labels stay as written, and an unknown meeting time is omitted from rows, headers and text exports. Date filters require a known instant rather than assuming the viewer zone for a zone-less label. See [format pin](format-pin.md).

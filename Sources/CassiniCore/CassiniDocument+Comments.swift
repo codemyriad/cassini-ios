@@ -135,6 +135,32 @@ extension CassiniDocument {
             Comments(text: withTitle(text, title), opaque: opaque.filter { !sameBytes(tagName($0), "TITLE") })
         }
 
+        /// The recording instant wins. A legacy offset DATE remains useful when it differs from the
+        /// source's pack stamp; copying that stamp after a fresh seal would instead invent a start.
+        func dated(meeting: JSONObject, source: CassiniDocument?) -> Comments {
+            let previous = text.first { sameBytes(tagName($0), "DATE") }.map { String($0.dropFirst(5)) }
+            let sourceCreated = source?.manifest?["meeting"]?.object?["createdAtUtc"]?.string.flatMap(parseInstant)
+            let legacy = previous.flatMap { value -> String? in
+                guard source != nil, fullMatch(value, ".*(Z|[+-][0-9]{2}:[0-9]{2})"),
+                      let date = parseInstant(value), date != sourceCreated else { return nil }
+                return value
+            }
+            let date = meeting["recordedAtUtc"]?.string ?? legacy ?? meeting["createdAtUtc"]?.string
+            guard let date else { return self }
+            // DATE is ordinary metadata, so do not add it to the set of load-bearing derived tags.
+            // Replace all spellings here, including opaque entries, just as TITLE does.
+            let replacement = "DATE=\(date)"
+            var replaced = false
+            var result = text.compactMap { comment -> String? in
+                guard sameBytes(tagName(comment), "DATE") else { return comment }
+                guard !replaced else { return nil }
+                replaced = true
+                return replacement
+            }
+            if !replaced { result.append(replacement) }
+            return Comments(text: result, opaque: opaque.filter { !sameBytes(tagName($0), "DATE") })
+        }
+
         /**
          * These comments with every derived tag (see [isDerived]) replaced by its spelling in [fresh]: where the first
          * one of a name stands, so a rewrite moves nothing it keeps. Derived tags [fresh] has no value for are dropped,

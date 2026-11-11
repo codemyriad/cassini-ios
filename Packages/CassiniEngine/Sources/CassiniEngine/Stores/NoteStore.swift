@@ -76,7 +76,7 @@ public actor NoteStore {
     }
 
     /// Newest first.
-    public func all() -> [Note] { notes.values.sorted { $0.createdAt > $1.createdAt } }
+    public func all() -> [Note] { notes.values.sorted { $0.sortDate > $1.sortDate } }
 
     public func note(_ id: UUID) -> Note? { notes[id] }
 

@@ -28,8 +28,29 @@ final class DateLabelsTests: XCTestCase {
                                                                                    now: note.createdAt, calendar: calendar)),
                                                      calendar: calendar)), "Today, 9:41 AM · 00:24")
         note.createdAt = now.addingTimeInterval(-400 * 86_400)
+        note.meetingTime = .instant(note.createdAt)
         let lastYear = try XCTUnwrap(NoteSubtitle.of(note, mode: .audioOnly, now: now, calendar: calendar))
         XCTAssertEqual(plainSpaces(NoteCopy.subtitle(lastYear, calendar: calendar)), "3 Sep 2025, 9:41 AM · 00:24")
+    }
+
+    @MainActor func testUnknownAndLocalMeetingTimesNeverDisplayTheSealDate() throws {
+        var note = Note(title: "Undated meeting", createdAt: now)
+        note.duration = 24
+        note.meetingTime = .unknown
+        let unknown = try XCTUnwrap(NoteSubtitle.of(note, mode: .audioOnly, now: now, calendar: calendar))
+        XCTAssertEqual(NoteCopy.subtitle(unknown, calendar: calendar), "00:24")
+        let unknownRow = try XCTUnwrap(LibraryMapping.sections(LibraryIndex([note]).entries, context: RowContext(),
+                                                             now: now, calendar: calendar).first?.rows.first)
+        let format = LibraryFormat(calendar: calendar)
+        XCTAssertNil(format.meetingTime(unknownRow))
+        XCTAssertFalse(format.rowLabel(unknownRow, day: .undated).contains("9:41"))
+        note.meetingTime = .local("2026-11-08T09:15:00")
+        let local = try XCTUnwrap(NoteSubtitle.of(note, mode: .audioOnly, now: now, calendar: calendar))
+        XCTAssertEqual(NoteCopy.subtitle(local, calendar: calendar), "2026-11-08T09:15:00 · 00:24")
+        let localRow = try XCTUnwrap(LibraryMapping.sections(LibraryIndex([note]).entries, context: RowContext(),
+                                                           now: now, calendar: calendar).first?.rows.first)
+        XCTAssertEqual(format.meetingTime(localRow), "2026-11-08T09:15:00")
+        XCTAssertTrue(format.rowLabel(localRow, day: .undated).contains("2026-11-08T09:15:00"))
     }
 
     func testRecentlyDeletedAndVersionsUseTheShortDate() {

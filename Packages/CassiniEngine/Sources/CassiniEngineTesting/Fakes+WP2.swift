@@ -25,7 +25,7 @@ import CassiniNotebook
         for note in notes { stored[note.id] = note }
     }
 
-    public var notes: [Note] { stored.values.sorted { $0.createdAt > $1.createdAt } }
+    public var notes: [Note] { stored.values.sorted { $0.sortDate > $1.sortDate } }
 
     public func note(_ id: UUID) -> Note? { stored[id] }
 

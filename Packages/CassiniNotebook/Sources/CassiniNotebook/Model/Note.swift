@@ -7,7 +7,10 @@ public struct Note: Identifiable, Hashable, Sendable {
 
     public var id: UUID
     public var title: String
+    /// Catalogue fallback only; never display this as an imported meeting start.
     public var createdAt: Date
+    public var meetingTime: MeetingTime
+    public var sortDate: Date { meetingTime.instant ?? createdAt }
     public var audioFilename: String
     public var duration: Double = 0
     public var status: NoteStatus = .audioOnly
@@ -37,6 +40,7 @@ public struct Note: Identifiable, Hashable, Sendable {
 
     public init(id: UUID = UUID(), title: String, createdAt: Date = Date(), audioFilename: String = "audio.m4a") {
         self.id = id; self.title = title; self.createdAt = createdAt; self.audioFilename = audioFilename
+        self.meetingTime = .instant(createdAt)
     }
 
     public var text: String { transcript.map(\.text).joined(separator: " ") }
@@ -50,7 +54,7 @@ public enum NoteDecodingError: Error, Equatable {
 
 extension Note: Codable {
     private enum CodingKeys: String, CodingKey {
-        case schemaVersion, id, title, createdAt, audioFilename, duration, status, transcript, bookmarks, waveform
+        case schemaVersion, id, title, createdAt, meetingTime, audioFilename, duration, status, transcript, bookmarks, waveform
         case isFavorite, trashedAt, playbackPosition, language, audio, origin, document, sourceSha256, trashedJob
         case previewText, failure, speakerAnalysisFailure, originalAudioFilename, speakers, versions, selectedVersionID
         // Schema 1 only.
@@ -64,6 +68,7 @@ extension Note: Codable {
         id = try c.decode(UUID.self, forKey: .id)
         title = try c.decode(String.self, forKey: .title)
         createdAt = try c.decode(Date.self, forKey: .createdAt)
+        meetingTime = try c.decodeIfPresent(MeetingTime.self, forKey: .meetingTime) ?? .unknown
         audioFilename = try c.decode(String.self, forKey: .audioFilename)
         duration = try c.decodeIfPresent(Double.self, forKey: .duration) ?? 0
         status = (try? c.decodeIfPresent(NoteStatus.self, forKey: .status)) ?? .audioOnly
@@ -90,6 +95,7 @@ extension Note: Codable {
             failure = try c.decodeIfPresent(JobFailure.self, forKey: .failure)
             speakerAnalysisFailure = try c.decodeIfPresent(JobFailure.self, forKey: .speakerAnalysisFailure)
         }
+        if !c.contains(.meetingTime), origin == .recorded { meetingTime = .instant(createdAt) }
     }
 
     private mutating func decodeSchemaOne(_ c: KeyedDecodingContainer<CodingKeys>) throws {
@@ -115,6 +121,7 @@ extension Note: Codable {
         try c.encode(id, forKey: .id)
         try c.encode(title, forKey: .title)
         try c.encode(createdAt, forKey: .createdAt)
+        try c.encode(meetingTime, forKey: .meetingTime)
         try c.encode(audioFilename, forKey: .audioFilename)
         try c.encode(duration, forKey: .duration)
         try c.encode(status, forKey: .status)

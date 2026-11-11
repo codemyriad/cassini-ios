@@ -165,6 +165,29 @@ import CassiniNotebook
         #expect(Library().model.searchDate == .any, "Date filters are not persisted")
     }
 
+    @Test func dateFiltersUseMeetingInstantAndExcludeUnknownOrUnzonedTimes() async throws {
+        let library = Library()
+        let today = library.add("English recorded today")
+        let yesterday = library.add("English sealed today")
+        let unknown = library.add("English unknown date")
+        let local = library.add("English local date")
+        let yesterdayIndex = try #require(library.notes.firstIndex { $0.id == yesterday })
+        let unknownIndex = try #require(library.notes.firstIndex { $0.id == unknown })
+        let localIndex = try #require(library.notes.firstIndex { $0.id == local })
+        library.notes[yesterdayIndex].meetingTime = .instant(library.clock.now.addingTimeInterval(-86_400))
+        library.notes[unknownIndex].meetingTime = .unknown
+        library.notes[localIndex].meetingTime = .local("2026-10-08T09:41:00")
+        let model = library.model
+        model.query = "English"
+        model.searchDate = .today
+        await waitUntilSleeping(library.clock)
+        library.clock.release()
+        await model.settle()
+        #expect(model.content.results?.map(\.id) == [today], "Seal and catalogue dates do not establish a meeting date")
+        model.searchDate = .any
+        #expect(Set(model.content.results?.map(\.id) ?? []) == Set([today, yesterday, unknown, local]))
+    }
+
     @Test func dateFilterUsesInclusiveLocalStartAndExclusiveTomorrow() async throws {
         let library = Library()
         let now = library.clock.now

@@ -48,11 +48,13 @@ public enum ImportedNote {
         note.duration = audio.duration
         note.waveform = audio.waveform
         note.audio = audio.state
+        note.meetingTime = .unknown
         note.origin = .imported
         note.sourceSha256 = sha256
         guard let document else { return note }
         note.origin = .importedDocument
         note.document = document.info
+        note.meetingTime = document.meetingTime
         if let title = NoteTitles.fit(document.title) { note.title = title }
         if let createdAt = document.createdAt { note.createdAt = createdAt }
         if let duration = document.duration { note.duration = duration }

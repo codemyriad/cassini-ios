@@ -197,11 +197,19 @@ public final class RecordingController {
             let now = parts.clock.now
             let defaultTitle = parts.defaultTitle(now)
             var note = Note(title: defaultTitle, createdAt: now, audioFilename: Self.captureFilename)
+            note.meetingTime = .unknown
             note.status = .recording; note.audio = .live; note.origin = .recorded
             try await parts.notes.create(note)
             created = note.id
             guard let url = await parts.notes.captureURL(for: note) else { throw CocoaError(.fileNoSuchFile) }
             let format = try await parts.capture.start(url: url)
+            let positionZero = parts.capture.recordedAt ?? parts.clock.now.addingTimeInterval(-parts.capture.elapsed)
+            do {
+                _ = try await parts.notes.update(note.id) { $0.meetingTime = .instant(positionZero) }
+            } catch {
+                _ = try? await parts.capture.stop()
+                throw error
+            }
             captureURL = url
             bars = WaveformBars()
             let typed = startingTitle ?? ""

@@ -19,8 +19,13 @@ struct DocumentInfoSheet: View {
                     Section {
                         if let trust = facts.trust { row(Self.status, DocumentTrustChip.label(trust)) }
                         row(Self.title, facts.title)
-                        row(Self.recorded, facts.createdAt.formatted(
-                            Date.FormatStyle(date: .long, time: .shortened, locale: locale, timeZone: timeZone)))
+                        switch facts.meetingTime {
+                        case .instant(let instant):
+                            row(Self.recorded, instant.formatted(
+                                Date.FormatStyle(date: .long, time: .shortened, locale: locale, timeZone: timeZone)))
+                        case .local(let text): row(Self.recorded, text)
+                        case .unknown: EmptyView()
+                        }
                         row(Self.duration, TimeText.clock(facts.duration))
                         row(Self.contents, "\(Self.versions(facts.versions)) · \(NoteCopy.speakerCount(facts.speakers))")
                     }

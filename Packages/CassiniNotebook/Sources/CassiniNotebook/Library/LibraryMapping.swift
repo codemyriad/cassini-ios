@@ -70,6 +70,7 @@ public struct LibraryRow: Identifiable, Hashable, Sendable {
     /// The recording's elapsed time while it records.
     public var duration: TimeInterval
     public var createdAt: Date
+    public var meetingTime: MeetingTime = .unknown
     /// Set in the flat search results only; day sections carry the day in their header.
     public var day: DayKey?
     public var status: Status
@@ -224,7 +225,7 @@ public enum LibraryMapping {
         let recording = note.id == context.activeNoteID && note.audio == .live
         return LibraryRow(
             id: note.id, title: hit?.title ?? note.title, titleRanges: hit?.titleRanges ?? [],
-            duration: recording ? context.recordingElapsed : note.duration, createdAt: note.createdAt, day: hit?.day,
+            duration: recording ? context.recordingElapsed : note.duration, createdAt: note.createdAt, meetingTime: note.meetingTime, day: hit?.day,
             status: status(note, context: context, speakerCount: entry.speakerCount, hasWords: entry.hasWords),
             preview: hit.map(\.snippet) ?? entry.preview,
             highlighted: context.jobState(note.id) == .running,
@@ -234,8 +235,18 @@ public enum LibraryMapping {
     /// The day sections of `entries` (newest first), grouped by the local day of their creation at `now`.
     public static func sections(_ entries: [LibraryIndex.Entry], context: RowContext, now: Date,
                                 calendar: Calendar) -> [DaySection] {
-        DayGroups.group(entries, now: now, calendar: calendar) { $0.note.createdAt }
-            .map { DaySection(key: $0.key, rows: $0.items.map { row($0, context: context) }) }
+        var sections: [DaySection] = []
+        var sectionIndices: [DayKey: Int] = [:]
+        for entry in entries {
+            let key = entry.note.meetingTime.instant.map { DayGroups.key($0, now: now, calendar: calendar) } ?? .undated
+            if let index = sectionIndices[key] {
+                sections[index].rows.append(row(entry, context: context))
+            } else {
+                sectionIndices[key] = sections.count
+                sections.append(DaySection(key: key, rows: [row(entry, context: context)]))
+            }
+        }
+        return sections
     }
 
     /// The flat search results, newest first, each with its day. The transcript snippet is the preview when it has a
@@ -245,7 +256,7 @@ public enum LibraryMapping {
         hits.map { found in
             let title = found.markedTitle
             let shownTitle = title.text.isEmpty || title.leadingEllipsis || title.trailingEllipsis ? nil : title
-            let hit = Hit(day: DayGroups.key(found.entry.note.createdAt, now: now, calendar: calendar),
+            let hit = Hit(day: found.entry.note.meetingTime.instant.map { DayGroups.key($0, now: now, calendar: calendar) } ?? .undated,
                           title: shownTitle?.text, titleRanges: shownTitle?.ranges ?? [], snippet: found.markedSnippet)
             return row(found.entry, context: context, hit: hit)
         }

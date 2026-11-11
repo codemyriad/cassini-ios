@@ -13,7 +13,10 @@ enum ExportCopy {
             emptyText: String(localized: "No words were found in this recording.", table: "Export",
                               comment: "The body of a TXT export without words"),
             unassignedLabel: String(localized: "Unknown speaker", table: "Export",
-                                    comment: "The label of passages no speaker was found for, in an export"))
+                                    comment: "The label of passages no speaker was found for, in an export"),
+            meetingSubtitle: { meetingTime, durationMs, speakers in
+                subtitle(meetingTime: meetingTime, durationMs: durationMs, speakers: speakers, locale: locale, timeZone: timeZone)
+            })
     }
 
     /// The TXT subtitle line: "Oct 8, 2026, 3:10 PM · 23:50 · 3 speakers"; the speakers part from 2 on.
@@ -22,7 +25,18 @@ enum ExportCopy {
         let time = Date.FormatStyle(date: .omitted, time: .shortened, locale: locale, timeZone: timeZone)
         let day = String(localized: "\(createdAt.formatted(date)), \(createdAt.formatted(time))", table: "Export",
                          locale: locale, comment: "A date and a time of day: 8 Oct 2026, 15:10")
-        var parts = [day, ExportClock.clock(durationMs, durationMs: durationMs)]
+        return subtitleParts(day: day, durationMs: durationMs, speakers: speakers, locale: locale)
+    }
+
+    static func subtitle(meetingTime: MeetingTime, durationMs: Int64, speakers: Int, locale: Locale, timeZone: TimeZone) -> String {
+        if let instant = meetingTime.instant {
+            return subtitle(createdAt: instant, durationMs: durationMs, speakers: speakers, locale: locale, timeZone: timeZone)
+        }
+        return subtitleParts(day: meetingTime.localText, durationMs: durationMs, speakers: speakers, locale: locale)
+    }
+
+    private static func subtitleParts(day: String?, durationMs: Int64, speakers: Int, locale: Locale) -> String {
+        var parts = [day, ExportClock.clock(durationMs, durationMs: durationMs)].compactMap { $0 }
         if speakers >= 2 {
             parts.append(String(localized: "\(speakers) speakers", table: "Export", locale: locale,
                                 comment: "The number of speakers in a TXT export"))

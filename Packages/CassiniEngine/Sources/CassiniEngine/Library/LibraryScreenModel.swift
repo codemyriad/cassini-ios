@@ -123,7 +123,9 @@ public final class LibraryScreenModel {
         let hits = current.filter {
             let note = $0.entry.note
             return (!favoritesOnly || note.isFavorite) &&
-                (interval.map { note.createdAt >= $0.start && note.createdAt < $0.end } ?? true)
+                (interval.map { range in
+                    note.meetingTime.instant.map { $0 >= range.start && $0 < range.end } ?? false
+                } ?? true)
         }
         if found.query == searched {
             facts.query = searched
