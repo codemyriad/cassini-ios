@@ -75,8 +75,9 @@ public enum ArchiveContents {
     }
 
     public static func preservesOriginal(_ note: Note) -> Bool {
-        let hasWords = !note.transcript.isEmpty || (note.versions?.contains { !$0.segments.isEmpty } ?? false)
-        if !hasWords || note.document?.state == .unknownFormat { return true }
+        let hasLocalWords = note.versions?.contains { $0.portableID == nil && !$0.segments.isEmpty } ?? false
+        if note.transcript.isEmpty && !hasLocalWords { return true }
+        if note.document?.state == .unknownFormat { return true }
         if case .unplayable = note.audio, note.holdsOnlyImportedVersions { return true }
         return false
     }

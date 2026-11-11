@@ -87,7 +87,7 @@ import CassiniNotebook
         let notes = ids.compactMap { library.note($0) }.filter(ArchiveSelection.isExportable)
         guard notes.count == ids.count else { throw ExportError.noNote }
         let batch = BulkExportService(folder: service.folder) { [library, portable, audioReady] selected, folder in
-            await audioReady()
+            try await CancellableWait.run { await audioReady() }
             try Task.checkCancellation()
             let (note, original, audio) = try await MainActor.run {
                 guard let note = library.note(selected.id), ArchiveSelection.isExportable(note),
