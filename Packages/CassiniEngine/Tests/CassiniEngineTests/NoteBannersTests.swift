@@ -168,6 +168,24 @@ import CassiniNotebook
         #expect(screen.bannerAction(.download, note: note, job: nil) == nil)
     }
 
+    @Test func speakerDownloadWaitsForAvailabilityAndTracksEachInstallState() throws {
+        var note = transcribed
+        note.speakerAnalysisFailure = .speakers
+        let cases: [(ModelPartStatus?, Bool, Bool)] = [
+            (nil, false, true), (.checking, false, true), (.downloading(0.5), false, true),
+            (.notDownloaded, true, false), (.failed(.fileCheckFailed), true, false),
+            (.ready, false, false), (.unsupported, false, false)]
+        for (status, missing, installing) in cases {
+            let state = NoteBanners.speakerDownloadState(status)
+            #expect(state.missing == missing)
+            #expect(state.installing == installing)
+            let banner = try #require(banners(note, facts: NoteBannerFacts(
+                speakerModelsMissing: state.missing, speakerModelsInstalling: state.installing)).first)
+            #expect(banner.actions == (missing || installing ? [.download] : [.transcribeAgain]))
+            #expect(banner.disabledActions == (installing ? [.download] : []))
+        }
+    }
+
     /// iOS: a speaker step that found nobody is no one-voice banner, but its own notice.
     @Test func noSpeakersIsNotOneVoice() {
         var note = transcribed

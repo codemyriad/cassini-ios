@@ -21,6 +21,16 @@ public enum NoteBanners {
     /// iOS: the speaker step found no speakers ("You can assign passages manually"); not a catalogue banner.
     public static func noSpeakers(_ note: Note, job: Job?) -> Bool { job == nil && note.speakerAnalysisFailure == .empty }
 
+    /// The speaker row is unknown until the asynchronous availability read publishes. Keep the download action
+    /// disabled during that read, downloading and verification, instead of briefly offering speech transcription.
+    public static func speakerDownloadState(_ status: ModelPartStatus?) -> (missing: Bool, installing: Bool) {
+        switch status {
+        case .notDownloaded, .failed: (true, false)
+        case nil, .checking, .downloading: (false, true)
+        case .ready, .unsupported: (false, false)
+        }
+    }
+
     /// The banners of `note` in `mode`, less the ids closed on the screen, in Android's order. `failureText` gives a
     /// failure's message (a failed job's, and LONG for audio too long to transcribe); `unplayableText` the body of an
     /// unplayable note, nil for the catalogue's ("Cassini closed before the recording was saved.").

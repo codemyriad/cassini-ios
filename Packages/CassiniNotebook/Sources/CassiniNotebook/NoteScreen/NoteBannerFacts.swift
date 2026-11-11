@@ -19,7 +19,7 @@ public struct NoteBannerFacts: Hashable, Sendable {
     public var speechUnavailableText: String?
     /// The speaker bundle is absent or its download failed; the note can request it without decoding speech again.
     public var speakerModelsMissing: Bool
-    /// A standalone speaker download or verification is already in progress.
+    /// Speaker availability is still being read, or a standalone download/verification is in progress.
     public var speakerModelsInstalling: Bool
 
     public init(trustToggled: Bool = false, queueHold: QueueHold? = nil, waitingJobs: Int = 0,
