@@ -186,7 +186,7 @@ extension PortableTranscript {
         if newLabels[ExportTranscript.unassignedSpeaker] == nil { newLabels[ExportTranscript.unassignedSpeaker] = unassignedLabel }
         return try CassiniDocument.create(opus, transcript: transcript, title: note.title, processing: processing,
                                           existing: existing, speakerLabels: newLabels, carrying: carried,
-                                          recordedAt: note.origin == .recorded ? note.meetingTime.instant : nil,
+                                          recordedAt: (note.origin == .recorded || note.origin == .recovered) ? note.meetingTime.instant : nil,
                                           target: destination).defaultId
     }
 

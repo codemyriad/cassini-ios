@@ -44,24 +44,36 @@ public enum MeetingTime: Hashable, Codable, Sendable {
     }
 
     public static func read(_ document: CassiniDocument) -> MeetingTime {
-        let meeting = document.manifest?["meeting"]?.object
-        if let text = meeting?["recordedAtUtc"]?.string, text.hasSuffix("Z"), let date = parse(text) {
+        // A DATE tag alone cannot restore metadata that failed verification or names an unknown format.
+        guard PortableTranscript.readableStates.contains(document.state),
+              let meeting = document.manifest?["meeting"]?.object else { return .unknown }
+        if let text = meeting["recordedAtUtc"]?.string?.trimmingCharacters(in: .whitespacesAndNewlines),
+           text.hasSuffix("Z"), let date = parse(text) {
             return .instant(date)
         }
-        let created = meeting?["createdAtUtc"]?.string.flatMap(parse)
+        let created = meeting["createdAtUtc"]?.string.flatMap(parse)
         // DATE must explicitly carry a zone; an offset-less label cannot establish an instant.
         if let comment = document.comments.first(where: { $0.split(separator: "=", maxSplits: 1).first?.uppercased() == "DATE" }),
            let equal = comment.firstIndex(of: "=") {
             let text = String(comment[comment.index(after: equal)...]).trimmingCharacters(in: .whitespacesAndNewlines)
-            if text.range(of: #"(?:Z|[+-][0-9]{2}:[0-9]{2})$"#, options: .regularExpression) != nil,
-               let date = parse(text), date != created { return .instant(date) }
+            if let date = parse(text), date != created { return .instant(date) }
         }
-        if let text = meeting?["recordedAtLocal"]?.string, !text.isEmpty { return .local(text) }
+        if let text = meeting["recordedAtLocal"]?.string, !text.isEmpty { return .local(text) }
         return .unknown
     }
 
     static func parse(_ text: String) -> Date? {
-        (try? Date(text, strategy: .iso8601))
-            ?? (try? Date(text, strategy: Date.ISO8601FormatStyle(includingFractionalSeconds: true)))
+        let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let match = rfc3339.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) else { return nil }
+        func part(_ index: Int) -> String? { Range(match.range(at: index), in: text).map { String(text[$0]) } }
+        guard let date = part(1), let clock = part(2), let zone = part(4) else { return nil }
+        // Match cassini-format 32f37a6's pure reader: RFC3339 separators/offsets and microsecond precision.
+        let fraction = part(3).map { String($0.prefix(7)) } ?? ""
+        let normalized = "\(date)T\(clock)\(fraction)\(zone.uppercased())"
+        return (try? Date(normalized, strategy: .iso8601))
+            ?? (try? Date(normalized, strategy: Date.ISO8601FormatStyle(includingFractionalSeconds: true)))
     }
+
+    private static let rfc3339 = try! NSRegularExpression(
+        pattern: #"^([0-9]{4}-[0-9]{2}-[0-9]{2})[Tt ]([0-9]{2}:[0-9]{2}:[0-9]{2})(\.[0-9]+)?([Zz]|[+-][0-9]{2}:[0-9]{2})$"#)
 }

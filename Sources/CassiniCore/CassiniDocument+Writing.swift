@@ -6,8 +6,9 @@ extension CassiniDocument {
      * Adds a variant while retaining existing descriptors, bodies, extensions and unrelated tags. Without [existing],
      * a fresh seal carries [source]'s private and unknown manifest members, its meeting id and its meeting and
      * provenance members not tied to its transcripts; see [seal]. `recordedAt` is the trustworthy instant at
-     * playback position zero of a new recording. Existing or carried documents keep their own meeting time; an
-     * unknown start stays absent. No local recording-site label is inferred from the machine clock.
+     * playback position zero. It fills an absent recordedAtUtc on fresh, existing or carried manifests; an existing
+     * UTC start is never overwritten. An unknown start stays absent, and no local recording-site label is inferred
+     * from the machine clock.
      */
     public static func create(_ audioBytes: [UInt8], transcript: Transcript, title: String, processing: JSONObject,
                               existing: CassiniDocument? = nil, speakerLabels: [String: String] = [:],
@@ -129,10 +130,12 @@ extension CassiniDocument {
     /**
      * The `meeting` a fresh seal starts from: [source]'s, verbatim and in its order, when it has an id. A fresh seal
      * covers the same audio packets, so it is a tag rewrite and keeps the meeting's id (SPEC `meeting.id`) along with
-     * `recordedAtLocal` and every member this build does not know; it then sets [resealedMeetingMembers] itself.
+     * every member this build does not know; it then sets [resealedMeetingMembers] itself. The site-local label is
+     * retained only while the source has not been shown to describe different audio (`staleAudio`).
      */
     public static func carriedMeeting(of source: CassiniDocument?) -> JSONObject? {
-        guard let meeting = source?.manifest?["meeting"]?.object, meeting["id"]?.string?.isEmpty == false else { return nil }
+        guard var meeting = source?.manifest?["meeting"]?.object, meeting["id"]?.string?.isEmpty == false else { return nil }
+        if source?.state == .staleAudio { meeting["recordedAtLocal"] = nil }
         return meeting
     }
 
@@ -178,9 +181,6 @@ extension CassiniDocument {
         var meeting = carriedMeeting(of: source) ?? JSONObject([("id", .string("mtg_" + UUID().uuidString.lowercased()))])
         meeting["title"] = .string(trimmedTitle.isEmpty ? "Recording" : trimmedTitle)
         meeting["createdAtUtc"] = .string(now)
-        if source == nil, let recordedAt {
-            meeting["recordedAtUtc"] = .string(instantText(recordedAt))
-        }
         meeting["durationMs"] = .int(stream.durationMs)
         var manifest = existing?.manifest ?? JSONObject([
             ("kind", .string("cassini-portable-meeting")), ("version", .int(1)), ("profile", .string("ogg-opus")),
@@ -191,6 +191,13 @@ extension CassiniDocument {
             ("integrity", .object(JSONObject([("matchPolicy", .string(matchPolicy)), ("opusAudioSha256", .string(digest))] + shape))),
             ("speakers", .array([])), ("transcripts", .array([])),
         ])
+        // A caller's trustworthy start can repair a legacy own document without rebinding its
+        // meeting id or audio. The file's existing UTC start remains authoritative on every path.
+        if let recordedAt, var recordedMeeting = manifest["meeting"]?.object,
+           recordedMeeting["recordedAtUtc"] == nil {
+            recordedMeeting["recordedAtUtc"] = .string(instantText(recordedAt))
+            manifest["meeting"] = .object(recordedMeeting)
+        }
         var descriptors = try manifest.array("transcripts")
         let id = descriptors.isEmpty ? "words" : "words-" + UUID().uuidString.lowercased().prefix(8)
         descriptors = descriptors.map { d in

@@ -97,6 +97,41 @@ import CassiniEngine
         XCTAssertEqual(TranscriptExports.availability(of: damaged), .notReadable)
     }
 
+    func testExportDateAndClockUseTheSameExplicitZoneAcrossMidnight() throws {
+        let cases: [(TimeZone, String, String)] = [
+            (try XCTUnwrap(TimeZone(secondsFromGMT: 20_700)), "2026-01-01T00:15:00Z", "Jan 1, 2026, 6:00 AM · 00:04"),
+            (try XCTUnwrap(TimeZone(secondsFromGMT: -12_600)), "2026-01-01T00:15:00Z", "Dec 31, 2025, 8:45 PM · 00:04"),
+            (try XCTUnwrap(TimeZone(secondsFromGMT: 50_400)), "2025-12-31T12:15:00Z", "Jan 1, 2026, 2:15 AM · 00:04"),
+            (try XCTUnwrap(TimeZone(identifier: "Etc/GMT-14")), "2025-12-31T12:15:00Z", "Jan 1, 2026, 2:15 AM · 00:04"),
+            (try XCTUnwrap(TimeZone(identifier: "Etc/GMT+12")), "2026-01-01T00:15:00Z", "Dec 31, 2025, 12:15 PM · 00:04"),
+            (try XCTUnwrap(TimeZone(identifier: "EST5EDT")), "2026-01-01T00:15:00Z", "Dec 31, 2025, 7:15 PM · 00:04"),
+            (try XCTUnwrap(TimeZone(identifier: "EST5EDT")), "2026-07-01T00:15:00Z", "Jun 30, 2026, 8:15 PM · 00:04")
+        ]
+        let globalZone = TimeZone.current.identifier
+        let globalLocale = Locale.current.identifier
+        for (zone, timestamp, expected) in cases {
+            let date = try XCTUnwrap(ISO8601DateFormatter().date(from: timestamp))
+            let value = ExportCopy.subtitle(meetingTime: .instant(date), durationMs: 4_000, speakers: 1,
+                                            locale: Locale(identifier: "en_US"), timeZone: zone)
+            XCTAssertEqual(plainSpaces(value), expected, zone.identifier)
+        }
+        XCTAssertEqual(TimeZone.current.identifier, globalZone)
+        XCTAssertEqual(Locale.current.identifier, globalLocale)
+    }
+
+    func testExportPreservesUnzonedLabelVerbatimAndNeverFabricatesAnUnknownDate() throws {
+        let local = "2026-01-01T00:15:00"
+        for zone in [try XCTUnwrap(TimeZone(secondsFromGMT: 50_400)),
+                     try XCTUnwrap(TimeZone(identifier: "EST5EDT"))] {
+            let locale = Locale(identifier: "en_US")
+            XCTAssertEqual(ExportCopy.subtitle(meetingTime: .local(local), durationMs: 65_000, speakers: 2,
+                                                locale: locale, timeZone: zone),
+                           "2026-01-01T00:15:00 · 01:05 · 2 speakers")
+            XCTAssertEqual(ExportCopy.subtitle(meetingTime: .unknown, durationMs: 65_000, speakers: 2,
+                                                locale: locale, timeZone: zone), "01:05 · 2 speakers")
+        }
+    }
+
     private func transcribedNote() -> Note {
         var note = Note(title: "Meeting", audioFilename: "audio.caf")
         note.duration = 5; note.status = .ready

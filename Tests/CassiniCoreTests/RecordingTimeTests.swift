@@ -73,6 +73,67 @@ import Testing
             #expect(comments(after) { $0 == "DATE" } == ["DATE=\(legacyDate == created ? packed : legacyDate)"])
         }
     }
+
+    @Test(arguments: [false, true])
+    func explicitStartFillsLegacyVerifiedDocumentsWithoutReplacingKnownUtc(_ alreadyKnown: Bool) throws {
+        try withTemporaryDirectory { folder in
+            let supplied = try #require(CassiniDocument.parseInstant(startText))
+            let knownText = "2026-11-08T08:15:00.125Z"
+            let known = try #require(CassiniDocument.parseInstant(knownText))
+            let source = folder.appendingPathComponent("legacy.opus")
+            try Data(try CassiniDocument.create(silence(), transcript: words, title: "English planning meeting",
+                                               processing: JSONObject(), recordedAt: alreadyKnown ? known : nil)).write(to: source)
+            let before = CassiniDocument.read(source)
+            let after = try CassiniDocument.create(source, transcript: Transcript([Word("spk_1", 0, 20, "Welcome")]),
+                title: "English planning meeting", processing: JSONObject(), existing: before, speakerLabels: [:],
+                recordedAt: supplied, target: folder.appendingPathComponent("exported.opus"))
+            let expected = alreadyKnown ? knownText : startText
+            #expect(after.state == .ok)
+            #expect(after.manifest?["meeting"]?.object?["recordedAtUtc"] == .string(expected))
+            #expect(after.manifest?["meeting"]?.object?["id"] == before.manifest?["meeting"]?.object?["id"])
+            #expect(after.manifest?["meeting"]?.object?["createdAtUtc"] == before.manifest?["meeting"]?.object?["createdAtUtc"])
+            #expect(after.manifest?["integrity"] == before.manifest?["integrity"])
+            #expect(Array(after.variants.dropLast().map(\.body)) == before.variants.map(\.body))
+            #expect(comments(after) { $0 == "CASSINI_RECORDED_AT_UTC" } == ["CASSINI_RECORDED_AT_UTC=\(expected)"])
+            #expect(comments(after) { $0 == "DATE" } == ["DATE=\(expected)"])
+        }
+    }
+
+    @Test(arguments: [false, true])
+    func explicitStartFillsCarriedDocumentsAndStaleLocalLabelsAreDropped(_ alreadyKnown: Bool) throws {
+        let fixtures = CassiniDocumentCarryTests()
+        let supplied = try #require(CassiniDocument.parseInstant(startText))
+        let knownText = "2026-11-08T08:15:00.125Z"
+        let known = try #require(CassiniDocument.parseInstant(knownText))
+        var bytes = try fixtures.documentWithPrivateData()
+        if alreadyKnown {
+            bytes = try CassiniDocument.create(bytes, transcript: words, title: "English planning meeting",
+                processing: JSONObject(), existing: CassiniDocument.read(bytes), recordedAt: known)
+        }
+        for carried in [try fixtures.unverifiedTwin(bytes), try fixtures.staleTwin(bytes)] {
+            let before = CassiniDocument.read(carried)
+            let after = CassiniDocument.read(try CassiniDocument.create(carried, transcript: words,
+                title: "English planning meeting", processing: JSONObject(), carrying: before, recordedAt: supplied))
+            let expected = alreadyKnown ? knownText : startText
+            #expect(after.state == .ok)
+            #expect(after.manifest?["meeting"]?.object?["recordedAtUtc"] == .string(expected))
+            #expect(after.manifest?["meeting"]?.object?["id"] == before.manifest?["meeting"]?.object?["id"])
+            #expect(after.manifest?["x"]?.serialized() == before.manifest?["x"]?.serialized())
+            #expect(after.manifest?["cassiniFutureField"]?.serialized() == before.manifest?["cassiniFutureField"]?.serialized())
+            #expect(after.manifest?["meeting"]?.object?["futureMeetingField"]?.serialized() ==
+                    before.manifest?["meeting"]?.object?["futureMeetingField"]?.serialized())
+            #expect(comments(after) { $0 == "CASSINI_RECORDED_AT_UTC" } == ["CASSINI_RECORDED_AT_UTC=\(expected)"])
+            #expect(comments(after) { $0 == "DATE" } == ["DATE=\(expected)"])
+            if before.state == .staleAudio {
+                #expect(after.manifest?["meeting"]?.object?["recordedAtLocal"] == nil)
+                #expect(comments(after) { $0 == "CASSINI_RECORDED_AT_LOCAL" }.isEmpty)
+            } else {
+                #expect(after.manifest?["meeting"]?.object?["recordedAtLocal"] == .string("2026-10-30T09:15:00"))
+                #expect(comments(after) { $0 == "CASSINI_RECORDED_AT_LOCAL" } == ["CASSINI_RECORDED_AT_LOCAL=2026-10-30T09:15:00"])
+            }
+        }
+    }
+
 }
 
 @Suite(.enabled(if: Conformance.available, Comment(rawValue: Conformance.missing)))

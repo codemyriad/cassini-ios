@@ -53,6 +53,31 @@ final class DateLabelsTests: XCTestCase {
         XCTAssertTrue(format.rowLabel(localRow, day: .undated).contains("2026-11-08T09:15:00"))
     }
 
+    func testDateAndClockStayInTheSameExplicitZoneAcrossMidnight() throws {
+        let cases: [(TimeZone, String, String, String)] = [
+            (try XCTUnwrap(TimeZone(secondsFromGMT: 20_700)), "2026-01-01T00:15:00Z", "1 Jan, 6:00 AM", "6:00 AM"),
+            (try XCTUnwrap(TimeZone(secondsFromGMT: -12_600)), "2026-01-01T00:15:00Z", "31 Dec, 8:45 PM", "8:45 PM"),
+            (try XCTUnwrap(TimeZone(secondsFromGMT: 50_400)), "2025-12-31T12:15:00Z", "1 Jan, 2:15 AM", "2:15 AM"),
+            (try XCTUnwrap(TimeZone(identifier: "Etc/GMT-14")), "2025-12-31T12:15:00Z", "1 Jan, 2:15 AM", "2:15 AM"),
+            (try XCTUnwrap(TimeZone(identifier: "Etc/GMT+12")), "2026-01-01T00:15:00Z", "31 Dec, 12:15 PM", "12:15 PM"),
+            (try XCTUnwrap(TimeZone(identifier: "EST5EDT")), "2026-01-01T00:15:00Z", "31 Dec, 7:15 PM", "7:15 PM"),
+            (try XCTUnwrap(TimeZone(identifier: "EST5EDT")), "2026-07-01T00:15:00Z", "30 Jun, 8:15 PM", "8:15 PM")
+        ]
+        let globalZone = TimeZone.current.identifier
+        let globalLocale = Locale.current.identifier
+        for (zone, timestamp, expected, clock) in cases {
+            var calendar = Calendar(identifier: .gregorian)
+            calendar.locale = Locale(identifier: "en_US")
+            calendar.timeZone = zone
+            let date = try XCTUnwrap(ISO8601DateFormatter().date(from: timestamp))
+            let labels = DateLabels(calendar: calendar)
+            XCTAssertEqual(plainSpaces(labels.time(date)), clock, zone.identifier)
+            XCTAssertEqual(plainSpaces(labels.shortDateTime(date, now: date)), expected, zone.identifier)
+        }
+        XCTAssertEqual(TimeZone.current.identifier, globalZone)
+        XCTAssertEqual(Locale.current.identifier, globalLocale)
+    }
+
     func testRecentlyDeletedAndVersionsUseTheShortDate() {
         XCTAssertEqual(Locale.current.language.languageCode?.identifier, "en")
         XCTAssertEqual(Locale.current.region?.identifier, "US", "English copy tests use the scheme's pinned locale")

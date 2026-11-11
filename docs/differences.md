@@ -590,10 +590,12 @@ stricter or looser than the spec.
     when the note shows an imported version. The imported variants are not sealed again, because the audio does not
     vouch for them; the note still shows them, and no provenance record names them. What the source manifest holds
     apart from its transcripts and audio is carried verbatim (D53.2 Q3, SPEC "Extensibility"): `x` (desktop notes
-    under `x["gocassini.com"]`), any top-level member the schema does not define, the `meeting` with its id,
-    `recordedAtLocal` and unknown members (only the title, `createdAtUtc` and `durationMs` are written afresh), and
-    the `provenance` members other than `speechToText`, `displayTranscript`, `meetingSummary`, `attribution` and
-    `wordTimings`. Its integrity, audio, speakers, transcripts, readable transcripts, summary, attachments and
+    under `x["gocassini.com"]`), any top-level member the schema does not define, the `meeting` with its id and
+    unknown members (only the title, `createdAtUtc` and `durationMs` are written afresh). A stale-audio reseal drops
+    `recordedAtLocal` and its mirror because that label describes different audio; a same-audio unverified source
+    retains it. A trustworthy caller start fills missing `recordedAtUtc` on fresh seals and re-exports without
+    replacing an existing UTC start. It also keeps the `provenance` members other than `speechToText`,
+    `displayTranscript`, `meetingSummary`, `attribution` and `wordTimings`. Its integrity, audio, speakers, transcripts, readable transcripts, summary, attachments and
     `CASSINI_*` tags are not carried; foreign and `X_*` tags are. The speakers are rebuilt from the new words, so
     unknown members of the source's speaker entries are lost. `CassiniDocument.create(…, carrying:)` does the
     carrying, and Android's has no such parameter yet.

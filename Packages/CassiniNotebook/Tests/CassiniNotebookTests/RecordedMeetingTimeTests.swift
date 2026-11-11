@@ -77,6 +77,38 @@ struct RecordedMeetingTimeTests {
         #expect(try Data(contentsOf: repository.originalAudioURL(for: note)) == Data(bytes))
     }
 
+    @Test(arguments: [NoteOrigin.recorded, .recovered])
+    func ownRecordingKeepsKnownStartAcrossReloadAndLegacyFileReexport(_ origin: NoteOrigin) throws {
+        let folder = try PortableFixtures.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let repository = try NoteRepository(root: folder)
+        let bytes = try PortableFixtures.document([Word("a", 0, 20, "Hello")], title: "English meeting", language: "en")
+        let source = CassiniDocument.read(bytes)
+        #expect(source.manifest?["meeting"]?.object?["recordedAtUtc"] == nil)
+        var note = Note(title: "English meeting", createdAt: start.addingTimeInterval(540), audioFilename: "playback.caf")
+        note.origin = origin
+        note.originalAudioFilename = "document.opus"
+        note.meetingTime = .instant(start)
+        note.transcript = [TranscriptSegment(text: "Hello", start: 0, end: 0.02)]
+        try repository.save(note)
+        let original = repository.originalAudioURL(for: note)
+        try Data(bytes).write(to: original)
+        try Data("decoded playback".utf8).write(to: repository.audioURL(for: note))
+        let reloaded = try #require(repository.load().notes.first)
+        #expect(reloaded.meetingTime == .instant(start))
+        let output = folder.appendingPathComponent("exported.opus")
+        try PortableTranscript.export(note: reloaded, opus: original, destination: output, unassignedLabel: "Unknown speaker")
+        let exported = CassiniDocument.readChecked(output)
+        #expect(exported.state == .ok)
+        #expect(exported.manifest?["meeting"]?.object?["recordedAtUtc"]?.string == start.ISO8601Format())
+        #expect(exported.comments.contains("CASSINI_RECORDED_AT_UTC=" + start.ISO8601Format()))
+        #expect(exported.comments.contains("DATE=" + start.ISO8601Format()))
+        #expect(MeetingTime.read(exported) == .instant(start))
+        #expect(exported.manifest?["meeting"]?.object?["id"] == source.manifest?["meeting"]?.object?["id"])
+        #expect(try Data(contentsOf: original) == Data(bytes))
+        #expect(try OggOpus.read(Array(Data(contentsOf: output))).audio == OggOpus.read(bytes).audio)
+    }
+
     @Test func legacyRecordingWithoutTrustedPositionZeroStaysUnknown() throws {
         let note = Note(title: "Old English recording", createdAt: start)
         let bytes = try JSONEncoder().encode(note)
