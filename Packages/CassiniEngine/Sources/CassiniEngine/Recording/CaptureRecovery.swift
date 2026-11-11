@@ -57,11 +57,23 @@ public struct CaptureRecovery: Sendable {
             note.origin = .recovered
             // Filesystem creation is a sorting fallback, never proof of recording position zero.
             note.meetingTime = .unknown
-            if let portable = PortableTranscript.read(from: url) {
+            let original = folder.appendingPathComponent(ImportService.documentFilename)
+            let documentURL = fileManager.fileExists(atPath: original.path) ? original : url
+            if let portable = PortableTranscript.read(from: documentURL) {
+                let playback = folder.appendingPathComponent(ImportService.playbackFilename)
+                var importedAudio = ImportedAudio(filename: documentURL.lastPathComponent, duration: portable.duration ?? 0,
+                                                   state: .unplayable(.unsupportedFormat))
+                let hadPlayback = fileManager.fileExists(atPath: playback.path)
+                do {
+                    if !hadPlayback { try await audio.decodeOpus(documentURL, to: playback) }
+                    let summary = try await audio.inspect(playback)
+                    importedAudio = ImportedAudio(filename: ImportService.playbackFilename,
+                        originalFilename: documentURL.lastPathComponent, duration: summary.duration, waveform: summary.waveform)
+                } catch {
+                    if !hadPlayback { try? fileManager.removeItem(at: playback) }
+                }
                 note = ImportedNote.make(id: id, displayName: nil, fallbackTitle: recoveredTitle(createdAt),
-                    sha256: "", importedAt: createdAt,
-                    audio: ImportedAudio(filename: audioFile, originalFilename: nil, duration: 0, waveform: [], state: .plain),
-                    document: portable)
+                    sha256: "", importedAt: createdAt, audio: importedAudio, document: portable)
                 note.sourceSha256 = nil
             } else {
                 apply(await finish(url), to: &note)

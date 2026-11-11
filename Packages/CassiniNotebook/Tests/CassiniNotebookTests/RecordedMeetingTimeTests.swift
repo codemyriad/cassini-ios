@@ -80,6 +80,9 @@ struct RecordedMeetingTimeTests {
         let portable = try #require(PortableTranscript.read(from: url))
         #expect(portable.state == .ok)
         if id.hasPrefix("028") { #expect(portable.meetingTime == .local("2026-11-09T09:31:48")) }
-        else { #expect(portable.meetingTime.instant == MeetingTime.parse("2026-11-09T09:31:48Z")) }
+        else {
+            let expected = id.hasPrefix("027") ? "2026-11-09T09:31:48.250Z" : "2026-11-09T09:31:48Z"
+            #expect(portable.meetingTime.instant == MeetingTime.parse(expected))
+        }
     }
 }
