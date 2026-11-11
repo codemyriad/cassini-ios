@@ -43,8 +43,9 @@ import Testing
     @Test func rewriteKeepsTheStartAndReplacesStaleMirrors() throws {
         try withTemporaryDirectory { dir in
             let source = dir.appendingPathComponent("source.opus")
+            let start = try #require(CassiniDocument.parseInstant(startText))
             try Data(try CassiniDocument.create(silence(), transcript: words, title: "Meeting", processing: JSONObject(),
-                                               recordedAt: #require(CassiniDocument.parseInstant(startText)))).write(to: source)
+                                               recordedAt: start)).write(to: source)
             var existing = CassiniDocument.read(source)
             existing.comments += ["cassini_recorded_at_utc=1999-01-01T00:00:00Z", "date=1999-01-01T00:00:00Z"]
             let after = try CassiniDocument.retitle(source, existing: existing, title: "Renamed",
