@@ -25,6 +25,7 @@
 #
 # Environment: CASSINI_IPHONE / CASSINI_IPAD device types (default "iPhone 17", "iPad Pro 13-inch (M5)"),
 # CASSINI_SIM_PREFIX as for scripts/test.sh, CASSINI_KEEP_SIMS=1 to leave the clones booted.
+# CASSINI_SHOTS_QUANTIZE=0 disables pngquant (default for --output, which also writes shots.json).
 set -euo pipefail
 script_args=("$@")
 
@@ -62,6 +63,7 @@ case "$appearances" in light|dark|"light dark") ;; *) echo "error: --appearance 
 if [ -n "$output" ]; then
     case "$output" in /*) out="$output" ;; *) out="$PWD/$output" ;; esac
 fi
+[ -z "$output" ] || export CASSINI_SHOTS_QUANTIZE="${CASSINI_SHOTS_QUANTIZE:-0}"
 # Every screenshot test, unless the extra arguments pick some (two -only-testing would run both).
 only=(-only-testing:CassiniUITests/ScreenshotTests)
 for argument in ${extra[@]+"${extra[@]}"}; do case "$argument" in -only-testing*) only=() ;; esac; done
@@ -129,7 +131,7 @@ for test in json.load(open(sys.argv[1])):
         if match: print(f"{match.group(1)}\t{attachment['exportedFileName']}")
 PY
         sips -Z 1200 "$exported/$file" --out "$target/$name.png" > /dev/null
-        if command -v pngquant > /dev/null; then
+        if [ "${CASSINI_SHOTS_QUANTIZE:-1}" != 0 ] && command -v pngquant > /dev/null; then
             pngquant --force --skip-if-larger --quality 75-95 --strip --output "$target/$name.png" "$target/$name.png" || true
         fi
         echo "$target/$name.png"
@@ -201,4 +203,8 @@ if [ "$full" = 1 ] && [ "$failed" = 0 ]; then
     find "$out" -type d -empty -delete
 fi
 [ "$failed" = 0 ] || exit 1
+if [ -n "$output" ]; then
+    /usr/bin/python3 "$root/scripts/screenshot-manifest.py" --root "$root" --output "$out" --written "$written" \
+        --prefix "$prefix" --locale "$locale" --region "$region"
+fi
 echo "$(wc -l < "$written" | tr -d ' ') screenshots in ${out#$root/}"

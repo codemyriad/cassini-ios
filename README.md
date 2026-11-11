@@ -337,6 +337,25 @@ subset. For a headless English gallery run, use
 The folder receives stable `light/01-library.png` through `light/09-saved-voices.png` names and
 `ipad/light/01-split-landscape.png`, `ipad/light/02-split-portrait.png`. Custom output runs retain other files in the
 chosen folder. Capture runs through `simctl` and XCTest; no Simulator window is needed.
+For local before/after PR renders, fetch main and run (outside any enclosing heavy lock):
+
+```sh
+scripts/pr-shots.sh --base origin/main --out /path/to/new/pr-render
+```
+
+The base is the merge base of that ref and the head worktree (`--head PATH` defaults to this checkout).
+Commit tracked changes first. It renders all 22 existing English screenshots on each side, light and dark,
+using the head's renderer and one private simulator pair. Each render takes `~/.scw-heavy.lock` itself
+(or `CASSINI_HEAVY_LOCK`); the wrapper removes only its temporary worktree and uniquely named clones.
+Output has `before/`, `after/`, per-side `shots.json`, logs and `render.json` with source SHAs and elapsed time.
+`--output` disables lossy pngquant by default and records actual runtime/device, locale, seed, test and pixel size;
+the 1200-pixel downscale remains. Existing normal README renders keep their previous compression behavior.
+
+The canonical cassini-ux `pr-shots.py` is owned by the shared-tool seat. Until it merges, this command produces
+renders/manifests only. Once available, `--diff-tool /path/to/pr-shots.py` (or a vendored `scripts/pr-shots.py`)
+adds `pr-shots/` using its `diff` command. Use that tool's pinned Python/Pillow environment when needed.
+This wrapper never accesses GitHub or publishes; the coordinator alone uploads images and replaces PR blocks.
+
 `scripts/render-icon.swift` draws the app icon (`swift scripts/render-icon.swift` from the repository root).
 
 UI absence assertions wait for a completed screen or app decision, then inspect the same accessibility state immediately.

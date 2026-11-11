@@ -69,6 +69,7 @@ jobs:
           python3 scripts/test-ci-runner-selection.py
           python3 scripts/test-test-events.py
           python3 scripts/test-swift-test-product.py
+          python3 scripts/test-pr-shots-local.py
           python3 scripts/test-check-embedded-minos.py
           python3 scripts/test-test-runtime.py
       - name: Whistle pinned-input, SDK closure and runtime-export regressions
