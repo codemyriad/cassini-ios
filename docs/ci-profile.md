@@ -108,3 +108,10 @@ keep a longer worktree prefix and benchmark clone untouched, exercise automatic 
 shutdown and check that crash retry boots its phone again. The two initial ordering/ownership tests fail against
 the previous script. Before/after simulator measurements use identical source and test selections, one heavy-run
 slot on the rented Mac. Times are diagnostic, not pass conditions.
+
+CI also exposed an existing file-worker cancellation handoff race: a detached worker could run before its caller
+installed the forwarding handler. The real-file regression caught an extra read after Cancel. Keep the same GCD
+executor, but create a structured child so cancellation is registered before enqueue. A test executor cancels at
+enqueue and runs the job before enqueue returns: the old implementation starts the operation, the structured
+version does not. The original first-chunk read assertion remains unchanged. Both cancellation tests and the full
+Core product pass; simulator qualification remains required on the final head.
