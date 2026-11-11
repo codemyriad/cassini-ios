@@ -42,11 +42,11 @@ import Testing
         let read = CassiniDocument.read(output)
         #expect(read.state == .ok)
         #expect(read.selected()?.transcript == words)
-        #expect(read.manifest?["meeting"]?.object?["recordedAtUtc"] == .string(optional))
+        #expect(read.manifest?["meeting"]?.object?["recordedAtUtc"] == nil)
         #expect(comments(read) { $0 == "DATE" } == ["DATE=\(legacy)"])
     }
 
-    @Test func nonStringOptionalUtcMetadataIsPreservedWithoutHidingTheTranscript() throws {
+    @Test func nonStringOptionalUtcIsOmittedWithoutHidingTheTranscript() throws {
         let bytes = try CassiniDocument.create(silence(), transcript: words, title: "English meeting", processing: JSONObject())
         for optional in [JSON.int(7), .null, .array([])] {
             var source = CassiniDocument.read(bytes)
@@ -57,7 +57,7 @@ import Testing
             let document = CassiniDocument.read(rewritten)
             #expect(document.state == .ok)
             #expect(document.selected()?.transcript == words)
-            #expect(document.manifest?["meeting"]?.object?["recordedAtUtc"] == optional)
+            #expect(document.manifest?["meeting"]?.object?["recordedAtUtc"] == nil)
         }
     }
 

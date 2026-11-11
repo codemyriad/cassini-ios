@@ -173,11 +173,31 @@ extension CassiniDocument {
         guard let match = rfc3339Instant.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) else { return nil }
         func part(_ index: Int) -> String? { Range(match.range(at: index), in: text).map { String(text[$0]) } }
         guard let date = part(1), let clock = part(2), let zone = part(4) else { return nil }
+        let day = date.split(separator: "-").compactMap { Int($0) }
+        let time = clock.split(separator: ":").compactMap { Int($0) }
+        guard day.count == 3, time.count == 3,
+              (1...9999).contains(day[0]), (1...12).contains(day[1]),
+              (0...23).contains(time[0]), (0...59).contains(time[1]), (0...59).contains(time[2]) else { return nil }
+        // Foundation's ISO parser rolls February 30 and hour 24 into another day. Validate
+        // proleptic Gregorian components first so an impossible value can never outrank DATE.
+        let year = day[0]
+        let leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)
+        let monthDays = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+        guard (1...monthDays[day[1] - 1]).contains(day[2]) else { return nil }
+        var offsetSeconds = 0
+        if zone != "Z", zone != "z" {
+            let offset = zone.dropFirst().split(separator: ":").compactMap { Int($0) }
+            guard offset.count == 2, (0...23).contains(offset[0]), (0...59).contains(offset[1]) else { return nil }
+            offsetSeconds = (offset[0] * 3600 + offset[1] * 60) * (zone.hasPrefix("-") ? -1 : 1)
+        }
         // Match cassini-format 32f37a6's pure reader: RFC3339 separators/offsets and microsecond precision.
         let fraction = part(3).map { String($0.prefix(7)) } ?? ""
-        let normalized = "\(date)T\(clock)\(fraction)\(zone.uppercased())"
-        return (try? Date(normalized, strategy: .iso8601))
+        // Parse the validated local components as UTC, then apply the numeric offset ourselves.
+        // Foundation rejects valid RFC3339 offsets near 24 hours that the reference reader accepts.
+        let normalized = "\(date)T\(clock)\(fraction)Z"
+        let local = (try? Date(normalized, strategy: .iso8601))
             ?? (try? Date(normalized, strategy: Date.ISO8601FormatStyle(includingFractionalSeconds: true)))
+        return local?.addingTimeInterval(-Double(offsetSeconds))
     }
 
     private static let rfc3339Instant = try! NSRegularExpression(

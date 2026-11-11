@@ -87,8 +87,9 @@ extension CassiniDocument {
      * exactly that manifest, those other comments and every variant body of [existing]. Nothing is left at [target] on
      * failure.
      */
-    static func rewriteManifest(_ source: URL, existing: CassiniDocument, manifest: JSONObject, title: String? = nil,
+    static func rewriteManifest(_ source: URL, existing: CassiniDocument, manifest input: JSONObject, title: String? = nil,
                                         target: URL) throws -> CassiniDocument {
+        let manifest = try canonicalizingTimestamps(input)
         let digest = try manifest.object("integrity").string("opusAudioSha256")
         var kept = Comments(text: existing.comments, opaque: existing.opaqueComments)
         if let title { kept = kept.titled(title) }
@@ -194,6 +195,7 @@ extension CassiniDocument {
             ("integrity", .object(JSONObject([("matchPolicy", .string(matchPolicy)), ("opusAudioSha256", .string(digest))] + shape))),
             ("speakers", .array([])), ("transcripts", .array([])),
         ])
+        manifest = try canonicalizingTimestamps(manifest)
         // A caller's trustworthy start can repair a legacy own document without rebinding its
         // meeting id or audio. An existing UTC start stays authoritative while its source audio still matches.
         if let recordedAt, var recordedMeeting = manifest["meeting"]?.object,

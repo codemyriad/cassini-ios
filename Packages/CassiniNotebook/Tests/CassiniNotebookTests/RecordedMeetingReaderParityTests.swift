@@ -2,7 +2,7 @@
 import CryptoKit
 import Foundation
 import Testing
-import CassiniCore
+@testable import CassiniCore
 @testable import CassiniNotebook
 
 /// D95's oracle is cassini-format 32f37a6's independent standard-library reader, not a second Swift implementation.
@@ -52,6 +52,91 @@ struct RecordedMeetingReaderParityTests {
         }
     }
 
+    @Test(arguments: ["2026-02-30T09:31:48Z", "2026-11-09T24:00:00Z", "1900-02-29T09:31:48Z",
+                      "2026-11-09T09:60:00Z", "2026-11-09T09:31:60Z"])
+    func impossibleUTCNeverOverridesValidDATEThroughExportAndReimport(_ timestamp: String) throws {
+        let folder = try PortableFixtures.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let file = folder.appendingPathComponent("English impossible UTC.opus")
+        let date = "2026-11-08T08:15:00.123456Z"
+        try Data(document(date: date, recordedAtUTC: timestamp)).write(to: file)
+        #expect(CassiniDocument.readChecked(file).manifest?["meeting"]?.object?["recordedAtUtc"] == .string(timestamp))
+        try assertParity(file, expectedSource: "DATE")
+        try assertExportParity(file, expectedSource: "DATE")
+    }
+
+    @Test func acceptedLegacyUTCCanonicalizesWithoutRoundingFractionsOrChangingPackStampEquality() throws {
+        let folder = try PortableFixtures.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let cases: [(String, String?, String, String?)] = [
+            ("lower-t-utc", " 2026-11-09t09:31:48.123456789Z ", "2026-11-09T09:40:48Z", "recordedAtUtc"),
+            ("space-utc", "2026-11-09 09:31:48.000001Z", "2026-11-09T09:40:48Z", "recordedAtUtc"),
+            ("micro-pack-stamp", nil, "2026-11-09t09:40:48.123456789Z", "recordedAtLocal")
+        ]
+        for (name, utc, created, expected) in cases {
+            let file = folder.appendingPathComponent("English \(name).opus")
+            let date = utc == nil ? " 2026-11-09 10:40:48.123456999+01:00 " : "2026-11-08T08:15:00Z"
+            try Data(document(date: date, recordedAtUTC: utc, recordedAtLocal: "2026-11-07T12:15:00",
+                              createdAtUTC: created, processedAtUTC: "2026-11-10t09:31:48.999999999z")).write(to: file)
+            try assertParity(file, expectedSource: expected)
+            try assertExportParity(file, expectedSource: expected)
+        }
+    }
+
+    @Test(arguments: ["reseal", "retitle", "relabel"])
+    func everyWriterCanonicalizesUsableFieldsWithoutLosingFractionalDigits(_ operation: String) throws {
+        let folder = try PortableFixtures.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let input = folder.appendingPathComponent("English legacy field casing.opus")
+        let bytes = try document(date: "2026-11-08T08:15:00Z", recordedAtUTC: " 2026-11-09t09:31:48.123456789Z ",
+            recordedAtLocal: "2026-11-09T09:31:48", createdAtUTC: "2026-11-09t09:40:48.000001999Z",
+            processedAtUTC: "2026-11-10 09:31:48.999999999z")
+        try Data(bytes).write(to: input)
+        let source = CassiniDocument.readChecked(input)
+        #expect(source.state == .ok)
+        #expect(throws: (any Error).self) { try ManifestSchema.check(source) }
+        let output = folder.appendingPathComponent("English canonical fields.opus")
+        let rewritten: CassiniDocument
+        switch operation {
+        case "retitle": rewritten = try CassiniDocument.retitle(input, existing: source, title: "English renamed meeting", target: output)
+        case "relabel": rewritten = try CassiniDocument.relabel(input, existing: source, labels: ["a": "Jordan"], target: output)
+        default: rewritten = try CassiniDocument.create(input, transcript: try #require(source.selected()?.transcript),
+            title: "English rewritten meeting", processing: JSONObject(), existing: source, speakerLabels: [:], target: output)
+        }
+        try ManifestSchema.check(rewritten)
+        #expect(rewritten.manifest?["meeting"]?.object?["createdAtUtc"] == .string("2026-11-09T09:40:48.000001999Z"))
+        #expect(rewritten.manifest?["meeting"]?.object?["recordedAtUtc"] == .string("2026-11-09T09:31:48.123456789Z"))
+        #expect(rewritten.manifest?["meeting"]?.object?["processedAtUtc"] == .string("2026-11-10T09:31:48.999999999Z"))
+        #expect(rewritten.comments.contains("CASSINI_RECORDED_AT_UTC=2026-11-09T09:31:48.123456789Z"))
+        #expect(rewritten.comments.contains("DATE=2026-11-09T09:31:48.123456789Z"))
+        #expect(MeetingTime.read(rewritten) == MeetingTime.read(source))
+        try assertParity(output, expectedSource: "recordedAtUtc")
+        #expect(Array(rewritten.variants.prefix(source.variants.count)).map(\.body) == source.variants.map(\.body))
+        #expect(try OggOpus.scan(output).digest() == OggOpus.scan(input).digest())
+        #expect(try Data(contentsOf: input) == Data(bytes))
+    }
+
+    @Test(arguments: ["2026-11-09t09:31:48", "2026-02-30T09:31:48", "2026-11-09T24:00:00",
+                      " 2026-11-09T09:31:48 ", "2026-11-09T09:31:48.125", "2026-11-09T09:31:48+01:00"])
+    func unusableOptionalLocalLabelIsOmittedRatherThanAssignedAnInstant(_ local: String) throws {
+        let folder = try PortableFixtures.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let input = folder.appendingPathComponent("English unusable local label.opus")
+        try Data(document(recordedAtLocal: local)).write(to: input)
+        let source = CassiniDocument.readChecked(input)
+        // The tolerant reference reader exposes any nonempty local string as stored. A producer must
+        // discard an unusable label to meet the schema; it never converts that label into an instant.
+        try assertParity(input, expectedSource: "recordedAtLocal")
+        let output = folder.appendingPathComponent("English cleaned local label.opus")
+        _ = try CassiniDocument.create(input, transcript: try #require(source.selected()?.transcript),
+            title: "English cleaned meeting", processing: JSONObject(), existing: source, speakerLabels: [:], target: output)
+        let written = CassiniDocument.readChecked(output)
+        #expect(written.manifest?["meeting"]?.object?["recordedAtLocal"] == nil)
+        #expect(written.manifest?["meeting"]?.object?["recordedAtUtc"] == nil)
+        try ManifestSchema.check(written)
+        try assertParity(output, expectedSource: nil)
+    }
+
     @Test func damagedAndUnknownFormatsCannotRecoverAWhenFromDATEOrAnInjectedManifest() throws {
         let folder = try PortableFixtures.temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: folder) }
@@ -78,32 +163,29 @@ struct RecordedMeetingReaderParityTests {
         }
     }
 
+    /// Build the input envelope directly: invoking the producer here would sanitize the malformed legacy
+    /// timestamp before the reader/export regression sees it. Preserve valid payload hashes and real audio.
     private func document(date: String? = nil, recordedAtUTC: String? = nil,
-                          recordedAtLocal: String? = nil) throws -> [UInt8] {
+                          recordedAtLocal: String? = nil, createdAtUTC: String = "2026-11-09T09:40:48Z",
+                          processedAtUTC: String? = nil) throws -> [UInt8] {
         let transcript = Transcript([Word("a", 0, 300, "Hello"), Word("a", 400, 700, "everyone")], language: "en")
-        let audio = try PortableFixtures.silence()
-        let original = try CassiniDocument.create(audio, transcript: transcript, title: "English reader parity",
-                                                  processing: JSONObject(), speakerLabels: ["a": "Alex"])
-        var base = CassiniDocument.read(original)
-        var manifest = try #require(base.manifest)
+        let original = try CassiniDocument.create(PortableFixtures.silence(), transcript: transcript,
+            title: "English reader parity", processing: JSONObject(), speakerLabels: ["a": "Alex"])
+        let parsed = CassiniDocument.read(original)
+        var manifest = try #require(parsed.manifest)
         var meeting = try manifest.object("meeting")
-        meeting["createdAtUtc"] = .string("2026-11-09T09:40:48Z")
+        meeting["createdAtUtc"] = .string(createdAtUTC)
         if let recordedAtUTC { meeting["recordedAtUtc"] = .string(recordedAtUTC) }
         if let recordedAtLocal { meeting["recordedAtLocal"] = .string(recordedAtLocal) }
+        if let processedAtUTC { meeting["processedAtUtc"] = .string(processedAtUTC) }
         manifest["meeting"] = .object(meeting)
-        base.manifest = manifest
-        // Keep the fixture's DATE equal to its deterministic pack stamp before a deliberate legacy override.
-        // Otherwise the original creation clock would masquerade as a genuine historical DATE on reseal.
-        base.comments = base.comments.map {
-            $0.split(separator: "=", maxSplits: 1).first?.uppercased() == "DATE" ? "DATE=2026-11-09T09:40:48Z" : $0
+        let kept = parsed.comments.filter {
+            let name = CassiniDocument.tagName($0)
+            return !CassiniDocument.isDerived(name) && name != "DATE"
         }
-        let sealed = try CassiniDocument.create(audio, transcript: transcript, title: "English reader parity",
-                                                processing: JSONObject(), existing: base)
-        guard let date else { return sealed }
-        let parsed = CassiniDocument.read(sealed)
-        let comments = parsed.comments.filter { $0.split(separator: "=", maxSplits: 1).first?.uppercased() != "DATE" }
-            + ["DATE=\(date)"]
-        return try OggOpus.mux(OggOpus.read(sealed), tags: CassiniDocument.tagsPacket(comments))
+        let comments = kept + (try CassiniDocument.copies(of: manifest))
+            + (try CassiniDocument.manifestTags(manifest)) + ["DATE=\(date ?? createdAtUTC)"]
+        return try OggOpus.mux(OggOpus.read(original), tags: CassiniDocument.tagsPacket(comments))
     }
 
     /// Invoke the real writer, not PortableExportService's unchanged-import byte-copy fast path.
@@ -121,6 +203,7 @@ struct RecordedMeetingReaderParityTests {
                                       unassignedLabel: "Unknown speaker", source: source)
         let rewritten = CassiniDocument.readChecked(output)
         #expect(rewritten.state == .ok)
+        try ManifestSchema.check(rewritten)
         #expect(MeetingTime.read(rewritten) == portable.meetingTime)
         #expect(rewritten.variants.count > source.variants.count, "Exercise resealing rather than byte copying")
         try assertParity(output, expectedSource: expectedSource)

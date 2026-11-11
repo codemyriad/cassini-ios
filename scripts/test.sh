@@ -746,6 +746,11 @@ swift_test() {
     local filter="${1:-}" product
     local args=(test)
     conformance_env
+    if [ -z "${CASSINI_SCHEMA_PYTHON:-}" ] && [ -f "${CASSINI_CONFORMANCE:-}/index.json" ]; then
+        local schema_python
+        schema_python=$("$root/scripts/prepare-schema-tests.sh" "$cache") || return $?
+        export CASSINI_SCHEMA_PYTHON="$schema_python"
+    fi
     seed_swiftpm
     product=$(swift_test_product "$filter")
     [ -z "$product" ] || args+=(--test-product "$product")
