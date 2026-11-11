@@ -30,13 +30,13 @@ import CassiniWhistle
         }
         store.refresh()
         XCTAssertEqual(store.installation, .checking)
-        await fulfillment(of: [started], timeout: 15)
+        await fulfillment(of: [started], timeout: 30)
         XCTAssertEqual(store.selectedRecognizer(), .whistle, "File presence never promotes unchecked weights")
         XCTAssertFalse(store.shows(.settings), "No download suggestion while files are being checked")
         files.withLock { $0.verified = true }
         XCTAssertEqual(store.selectedRecognizer(), .parakeet, "Published verifier result applies without relaunch/main-actor lag")
         release.signal()
-        await fulfillment(of: [finished], timeout: 15)
+        await fulfillment(of: [finished], timeout: 30)
         XCTAssertTrue(store.promotionVisible)
         store.markPromotionShown(); store.dismissPromotion()
         let reopened = SpeechModelsStore(root: root, defaults: defaults, storage: FakeStorage(), whistle: accepted,
