@@ -21,6 +21,8 @@ values of each `PlatformFacts` fact and the Whistle CPU rule), by app-hosted tes
 (`SettingsFlowTests`, `SpeechUnavailableTests`, `ParakeetSuggestionTests`). Those launches do not exercise iOS 18's
 own system, chrome or libraries; the leg on iOS 18.2 does. [iOS 18](ios18.md) lists what is pending.
 
+The [D82 CI/full-gate profile](ci-profile.md) records recent step timings and the CI scheduling change.
+
 ## Automated checks
 
 `scripts/test.sh` runs the tiers. The modules are targets of the one root `Package.swift`, so every `swift test`
