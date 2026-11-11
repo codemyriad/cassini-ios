@@ -89,3 +89,22 @@ package job alone is insufficient to call the workflow green.
 Raw `measurements.json`, per-command logs, environment metadata, driver script and CI job metadata are retained
 with the profiling evidence. Final qualification uses current main (including #107) plus this workflow/docs change;
 the comparison above deliberately uses identical source on both sides.
+
+## Next two cuts: serial simulator residency
+
+For a run explicitly forced to one phone then iPad (`CASSINI_UI_WORKERS=0`), delay the first simulator boot until
+package/app build work has finished. A simulator has no tests to execute during that build interval. Existing
+owned UI clones are shut down first; no other worktree or benchmark/screenshot clone is part of this handoff.
+Normal concurrent scheduling retains its early boot.
+
+When the existing memory policy runs iPad tests after the phone, shut down the idle phone before booting the iPad.
+This also applies when the automatic memory budget selects serial execution. A permitted crash retry boots its
+phone again, releasing the idle iPad first. Shutdown uses the existing bounded process runner and fails closed if
+memory cannot be handed back; no test, assertion, retry eligibility, timeout or status requirement is removed.
+`CASSINI_KEEP_SIMS=1` cannot keep an idle phone resident beside a serial iPad run.
+
+Fixture regressions record actual device states at build/test invocations, verify every selected phone/iPad case,
+keep a longer worktree prefix and benchmark clone untouched, exercise automatic serial selection, reject failed
+shutdown and check that crash retry boots its phone again. The two initial ordering/ownership tests fail against
+the previous script. Before/after simulator measurements use identical source and test selections, one heavy-run
+slot on the rented Mac. Times are diagnostic, not pass conditions.

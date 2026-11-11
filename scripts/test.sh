@@ -24,7 +24,8 @@
 # (-only-testing:CassiniUITests/Class or /Class/method selections are sharded like a full run).
 #
 # Environment:
-#   CASSINI_UI_WORKERS   UI shards (default: as many as memory allows, at most 3)
+#   CASSINI_UI_WORKERS   UI shards (default: as many as memory allows, at most 3). 0 forces one phone, then iPad,
+#                        boots only after build work, and shuts down idle UI clones before the next clone boots.
 #   CASSINI_UI_IPAD      what the iPad clone runs: the tests named testIPad* (default), all (every UI test, beside
 #                        the iPhone shards; the longest step then) or 0 (nothing)
 #   CASSINI_KEEP_SIMS    0 shuts the clones down after a run that took the host lock, 1 keeps the iPhones booted for
@@ -442,11 +443,27 @@ for key, devices in json.load(sys.stdin)["devices"].items():
 # Marks a clone as used now; other worktrees' runs leave a clone alone while its lease is fresh.
 lease() { touch "$lease_dir/$1"; }
 
+# Serial UI runs hand memory back before booting their next clone. The ownership predicate also excludes
+# longer worktree prefixes; benchmark/screenshot clones and other worktrees are never part of this handoff.
+shutdown_other_ui_clones() {
+    local keep="$1"
+    our_clones | while read -r udid state name; do
+        [ "$udid" != "$keep" ] && [ "$state" = Booted ] || continue
+        case "$name" in "$prefix-iphone$runtime_tag-"*|"$prefix-ipad$runtime_tag-"*)
+            echo "  serial simulators: shutting down $name" >&2
+            run_limited "$logs/shutdown-$udid.log" 60 xcrun simctl shutdown "$udid" || exit 1 ;;
+        esac
+    done
+}
+
 # Boots a clone and waits until it can install apps; a booted one returns at once. A boot that fails, or has not
 # finished after 5 minutes (a wedged CoreSimulatorService would otherwise hold the run and its memory for good), is
 # shut down and tried once more.
 boot() {
     local udid="$1" rc=0
+    if [ "${serial_ui:-0}" = 1 ] || [ "${CASSINI_UI_WORKERS:-}" = 0 ]; then
+        shutdown_other_ui_clones "$udid" || return 1
+    fi
     lease "$udid"
     run_limited "$logs/boot-$udid.log" 300 xcrun simctl bootstatus "$udid" -b || rc=$?
     [ $rc != 0 ] || return 0
@@ -953,11 +970,18 @@ test_on_retrying() {
 boot_pid=""
 first_iphone=""
 start_first_boot() {
+    [ -z "$first_iphone" ] || return 0
     shutdown_other_runtimes
+    # A forced serial run budgets simulator memory for tests, not for idle time beside package/app builds.
+    if [ "${CASSINI_UI_WORKERS:-}" = 0 ] && [ "${1:-}" != now ]; then
+        shutdown_other_ui_clones "" || die "could not release idle UI simulators before the build"
+        return 0
+    fi
     first_iphone=$(clone_udid "$prefix-iphone$runtime_tag-1" "$iphone_type")
     boot "$first_iphone" & boot_pid=$!
 }
 wait_first_boot() {
+    [ -n "$first_iphone" ] || start_first_boot now
     if [ -n "$boot_pid" ]; then wait "$boot_pid" || die "could not boot $prefix-iphone$runtime_tag-1"; boot_pid=""; fi
 }
 
@@ -1075,6 +1099,8 @@ retry_killed_tests() {
     echo "  ui-$shard: the simulator's backboardd crashed (Metal texture validation) and took the runner with it;" \
         "running again: $(echo $killed)"
     while IFS= read -r t; do args+=("-only-testing:CassiniUITests/$t"); done <<< "$killed"
+    # The serial iPad leg may have shut down this phone after its first attempt.
+    if [ "${serial_ui:-0}" = 1 ] || [ "${CASSINI_UI_WORKERS:-}" = 0 ]; then boot "$udid" || return 1; fi
     test_on CassiniUITests "$logs/ui-$shard-retry.log" "$logs/ui-$shard-retry.xcresult" "$udid" "${args[@]}" || return 1
     [ "$(count_ran "$logs/ui-$shard-retry.log")" = "$(printf '%s\n' "$killed" | wc -l | tr -d ' ')" ]
 }
@@ -1115,6 +1141,7 @@ tier_ui() {
         workers=1
         if [ -n "$ipad_tests" ]; then ipad_after=1; echo "  memory is short: the iPad runs after the iPhone shard"; fi
     fi
+    serial_ui=$ipad_after
     [ "$workers" -gt "$count" ] && workers=$count
     # Booted iPhone clones this run does not use give their memory back.
     our_clones | while read -r udid state name; do

@@ -79,6 +79,7 @@ with open(os.path.join(stub, "state.lock"), "w") as lock:
         print(udid)
     elif cmd[0] == "bootstatus": find(cmd[1])[1]["state"] = "Booted"
     elif cmd[0] == "shutdown":
+        if os.environ.get("STUB_FAIL_SHUTDOWN") == cmd[1]: sys.exit(9)
         d = find(cmd[1])[1]
         if d: d["state"] = "Shutdown"
     elif cmd[0] == "delete":
@@ -95,6 +96,12 @@ stub = os.environ["STUB"]
 args = sys.argv[1:]
 # The iOS 18 facts a run gives the UI test runner are recorded after the arguments.
 facts = ["TEST_RUNNER_CASSINI_IOS18_FACTS=1"] if os.environ.get("TEST_RUNNER_CASSINI_IOS18_FACTS") == "1" else []
+if os.environ.get("STUB_SIM_SNAPSHOTS"):
+    state = json.load(open(os.path.join(stub, "state.json")))
+    action = "build" if "build-for-testing" in args else "test" if "test-without-building" in args else "resolve"
+    with open(os.path.join(stub, "simulator-snapshots"), "a") as f:
+        f.write(json.dumps({"action": action, "booted": [d["name"] for ds in state["devices"].values() for d in ds if d["state"] == "Booted"], "args": args}) + "\n")
+
 with open(os.path.join(stub, "calls"), "a") as f:
     f.write("xcodebuild | " + " | ".join(args + facts) + "\n")
 if "build-for-testing" in args:
@@ -573,6 +580,83 @@ sys.exit("the lock was free: this test must hold it")
         # Without it the reasons are as before: here, the fixture is not a git checkout.
         result = h.shell(["status_skip_reason"], 'tier=all; extra=(); runtime_tag=""; status_skip_reason')
         self.assertEqual(result.stdout.strip(), "not a git checkout")
+
+
+class SerialResidencyTests(unittest.TestCase):
+    def snapshots(self, h):
+        return [json.loads(line) for line in (h.stub / "simulator-snapshots").read_text().splitlines()]
+
+    def test_forced_serial_boots_only_after_the_build_and_runs_every_test(self):
+        h = Harness(self)
+        result = h.run("all", CASSINI_UI_WORKERS="0", STUB_SIM_SNAPSHOTS="1", CASSINI_KEEP_SIMS="1")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        snapshots = self.snapshots(h)
+        self.assertEqual(next(s["booted"] for s in snapshots if s["action"] == "build"), [])
+        tests = [s for s in snapshots if s["action"] == "test"]
+        self.assertTrue(tests)
+        self.assertTrue(all(len(s["booted"]) == 1 for s in tests), tests)
+        selections = [a for s in tests for a in s["args"] if a.startswith("-only-testing:CassiniUITests/")]
+        self.assertCountEqual(selections, ["-only-testing:CassiniUITests/AlphaTests/testOne",
+                                           "-only-testing:CassiniUITests/AlphaTests/testIPadTwo",
+                                           "-only-testing:CassiniUITests/BetaTests/testThree",
+                                           "-only-testing:CassiniUITests/AlphaTests/testIPadTwo"])
+
+    def test_serial_handoff_shuts_only_this_worktrees_ui_clones(self):
+        foreign = "ts-wt-b-iphone-1"
+        bench = "ts-wt-bench"
+        h = Harness(self, devices={R27: [dev("ts-wt-ipad-1", udid(40), "Booted"),
+                                         dev(foreign, udid(41), "Booted"), dev(bench, udid(42), "Booted")]})
+        leases = h.cache / "sim-leases"
+        leases.mkdir(parents=True)
+        for n in (40, 41, 42): (leases / udid(n)).touch()
+        result = h.run("ui", CASSINI_UI_WORKERS="0", STUB_SIM_SNAPSHOTS="1", CASSINI_KEEP_SIMS="1")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        tests = [s for s in self.snapshots(h) if s["action"] == "test"]
+        self.assertTrue(tests)
+        for snapshot in tests:
+            self.assertIn(foreign, snapshot["booted"])
+            self.assertIn(bench, snapshot["booted"])
+            self.assertEqual(len(set(snapshot["booted"]) - {foreign, bench}), 1)
+        self.assertEqual(next(s for s in tests if "ts-wt-ipad-1" in s["booted"])["booted"],
+                         ["ts-wt-ipad-1", foreign, bench])
+
+    def test_memory_selected_serial_mode_releases_the_phone_before_ipad(self):
+        h = Harness(self)
+        script = h.root / "scripts/test.sh"
+        script.write_text(script.read_text().replace(function("auto_workers"), "auto_workers() { echo 0; }\n"))
+        result = h.run("ui", CASSINI_UI_WORKERS="", STUB_SIM_SNAPSHOTS="1", CASSINI_KEEP_SIMS="1")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        tests = [s for s in self.snapshots(h) if s["action"] == "test"]
+        self.assertTrue(any("ts-wt-ipad-1" in s["booted"] for s in tests))
+        self.assertTrue(all(len(s["booted"]) == 1 for s in tests), tests)
+
+    def test_shutdown_failure_stops_the_serial_run_instead_of_oversubscribing(self):
+        h = Harness(self, devices={R27: [dev("ts-wt-ipad-1", udid(50), "Booted")]})
+        leases = h.cache / "sim-leases"
+        leases.mkdir(parents=True); (leases / udid(50)).touch()
+        result = h.run("ui", CASSINI_UI_WORKERS="0", CASSINI_KEEP_SIMS="1", STUB_FAIL_SHUTDOWN=udid(50))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("could not release idle UI simulators before the build", result.stdout + result.stderr)
+        self.assertFalse(any("test-without-building" in c for c in h.calls()))
+
+    def test_serial_crash_retry_boots_its_phone_again_after_ipad(self):
+        h = Harness(self)
+        logs = h.root / "logs"; logs.mkdir()
+        (logs / "ui-1.log").write_text("Test Case '-[CassiniUITests.AlphaTests testOne]' started.\n")
+        marker = logs / ".ui-started"; marker.touch(); os.utime(marker, (0, 0))
+        reports = h.home / "Library/Logs/DiagnosticReports"; reports.mkdir(parents=True)
+        (reports / "backboardd-fixture.ips").write_text("SimDevice." + udid(1))
+        (h.root / "retry-passed.log").write_text("Test Case '-[CassiniUITests.AlphaTests testOne]' passed (0.1 seconds).\n")
+        code = '''
+serial_ui=1
+events="$root/retry-events"
+boot() { printf '%s\n' boot >> "$events"; }
+test_on() { printf '%s\n' test >> "$events"; cp "$root/retry-passed.log" "$2"; }
+retry_killed_tests 1 "00000001-1111-4000-8000-000000000001"
+'''
+        result = h.shell(["killed_tests", "count_ran", "retry_killed_tests"], code)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual((h.root / "retry-events").read_text().splitlines(), ["boot", "test"])
 
 
 class OwnershipTests(unittest.TestCase):
