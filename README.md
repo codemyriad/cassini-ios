@@ -353,7 +353,8 @@ the 1200-pixel downscale remains. Existing normal README renders keep their prev
 
 The canonical cassini-ux `pr-shots.py` is owned by the shared-tool seat. Until it merges, this command produces
 renders/manifests only. Once available, `--diff-tool /path/to/pr-shots.py` (or a vendored `scripts/pr-shots.py`)
-adds `pr-shots/` using its `diff` command. Use that tool's pinned Python/Pillow environment when needed.
+adds `pr-shots/` using its `diff` command. Activate that tool's pinned Python/Pillow environment first;
+the wrapper uses `python3` from PATH.
 This wrapper never accesses GitHub or publishes; the coordinator alone uploads images and replaces PR blocks.
 
 `scripts/render-icon.swift` draws the app icon (`swift scripts/render-icon.swift` from the repository root).
