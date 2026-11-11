@@ -19,14 +19,18 @@ enum ExportCopy {
 
     static func markdownOptions(uiLanguage: String, locale: Locale, timeZone: TimeZone) -> MarkdownOptions {
         let words = MarkdownDate.uiLocale(uiLanguage)
-        let under = String(localized: "under 1 min", table: "Export", locale: words)
-        let minutes = String(localized: "{m} min", table: "Export", locale: words)
-        let hours = String(localized: "{h} h {mm} min", table: "Export", locale: words)
+        // String's locale formats values; resource lookup still uses its bundle's language. Resolve that separately.
+        let language = Bundle.preferredLocalizations(from: Bundle.main.localizations,
+            forPreferences: [words.identifier.replacingOccurrences(of: "_", with: "-")]).first ?? "en"
+        let bundle = Bundle.main.path(forResource: language, ofType: "lproj").flatMap(Bundle.init(path:)) ?? Bundle.main
+        let under = String(localized: "under 1 min", table: "Export", bundle: bundle, locale: words)
+        let minutes = String(localized: "{m} min", table: "Export", bundle: bundle, locale: words)
+        let hours = String(localized: "{h} h {mm} min", table: "Export", bundle: bundle, locale: words)
         return MarkdownOptions(copy: MarkdownCopy(
-            speakersLine: String(localized: "Speakers: {names}", table: "Export", locale: words),
-            transcriptHeading: String(localized: "Transcript", table: "Export", locale: words),
-            notesHeading: String(localized: "Notes", table: "Export", locale: words),
-            overLine: String(localized: "(over {names})", table: "Export", locale: words),
+            speakersLine: String(localized: "Speakers: {names}", table: "Export", bundle: bundle, locale: words),
+            transcriptHeading: String(localized: "Transcript", table: "Export", bundle: bundle, locale: words),
+            notesHeading: String(localized: "Notes", table: "Export", bundle: bundle, locale: words),
+            overLine: String(localized: "(over {names})", table: "Export", bundle: bundle, locale: words),
             speakerList: { names in
                 let formatter = ListFormatter()
                 formatter.locale = words
@@ -34,7 +38,7 @@ enum ExportCopy {
             }), dateLine: { createdAt, durationMs in
                 MarkdownDate.line(at: createdAt, timeZone: timeZone, uiLanguage: uiLanguage, formattingLocale: locale,
                     duration: MarkdownDate.duration(durationMs, locale: locale, underMinute: under, minutes: minutes, hours: hours))
-            }, untitled: String(localized: "Untitled meeting", table: "Export", locale: words),
+            }, untitled: String(localized: "Untitled meeting", table: "Export", bundle: bundle, locale: words),
             unnamedSpeaker: { DefaultLabels.placeholder($0, language: words.identifier.replacingOccurrences(of: "_", with: "-")) })
     }
 
