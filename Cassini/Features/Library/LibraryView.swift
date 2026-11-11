@@ -12,7 +12,6 @@ struct LibraryView: View {
     @Environment(LibraryStore.self) private var library
     @Environment(Router.self) private var router
     @Environment(ErrorPresenter.self) private var errors
-    @Environment(ExportStore.self) private var exports
     @Environment(\.dynamicTypeSize) private var dynamicType
     @Environment(\.calendar) private var calendar
     @Environment(\.restoresSceneState) private var restoresSceneState
