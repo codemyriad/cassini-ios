@@ -98,6 +98,10 @@ public final class TranscriptionCoordinator {
     /// An activation is queueing the system's paused jobs again (`resumeSystemPause`): another one finds nothing to
     /// do. In memory only: after a kill the stored hold and jobs still say what to resume.
     @ObservationIgnored var resumingSystemPause = false
+    /// Notes whose system stop could not store their job as paused (a failed write of the queue): the job is still
+    /// stored as running until its run's own outcome is stored. Meanwhile an activation keeps the system hold, which
+    /// is what makes a later one resume the job.
+    @ObservationIgnored var unresolvedSystemStops: Set<UUID> = []
     @ObservationIgnored let log = Logger(subsystem: "io.codemyriad.cassini", category: "queue")
 
     /// How an interrupted job ends: `discard` (Start over) drops its work, `keep` pauses it with its progress, and
