@@ -44,7 +44,7 @@ WITH_18 = [runtime(R185, "18.5", OLD_TYPES), runtime(R186, "18.6", OLD_TYPES)] +
 
 
 def function(name):
-    start = SOURCE.index(name + "() {")
+    start = re.search(r"(?m)^" + re.escape(name) + r"\(\) \{", SOURCE).start()
     return SOURCE[start:SOURCE.index("\n}\n", start) + 3]
 
 

@@ -93,7 +93,7 @@ the comparison above deliberately uses identical source on both sides.
 ## Next two cuts: serial simulator residency
 
 For a run explicitly forced to one phone then iPad (`CASSINI_UI_WORKERS=0`), delay the first simulator boot until
-package/app build work has finished. A simulator has no tests to execute during that build interval. Existing
+app build work has finished. A simulator has no tests to execute during that build interval. Existing
 owned UI clones are shut down first; no other worktree or benchmark/screenshot clone is part of this handoff.
 Normal concurrent scheduling retains its early boot.
 
