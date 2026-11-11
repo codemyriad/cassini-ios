@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 import Synchronization
 import Testing
 import CassiniCore
@@ -76,6 +77,64 @@ import CassiniNotebook
         }
 
         func title(_ id: UUID) -> String { notes.first { $0.id == id }?.title ?? "?" }
+    }
+
+    /// The view must observe these projections, rather than retain a pre-active row captured by a lazy builder.
+    @Test func liveRecordingAndTimestampChangesInvalidateTheObservedRowProjection() async throws {
+        let library = Library()
+        var note = Note(title: "English live meeting", createdAt: library.clock.now)
+        note.audio = .live
+        note.status = .recording
+        note.meetingTime = .unknown
+        library.notes = [note]
+        library.recording = .starting
+        let model = library.model
+        let initial = try #require(model.content.sections.flatMap(\.rows).first)
+        #expect(initial.id == note.id)
+        #expect(initial.status == .audioOnly)
+        #expect(!initial.isRecording)
+        #expect(initial.meetingTime == .unknown)
+        #expect(model.recordingCard == nil)
+
+        let activeRowChanged = Mutex(false)
+        let activeCardChanged = Mutex(false)
+        _ = withObservationTracking { model.content } onChange: { activeRowChanged.withLock { $0 = true } }
+        _ = withObservationTracking { model.recordingCard } onChange: { activeCardChanged.withLock { $0 = true } }
+        library.recording = .active(ActiveRecording(noteID: note.id, title: note.title, defaultTitle: note.title,
+                                                     format: .pcm48kMono, elapsed: 15))
+        #expect(activeRowChanged.withLock { $0 }, "Reading content must subscribe to recording-state changes")
+        #expect(activeCardChanged.withLock { $0 }, "The card has its own live observation dependency")
+        let active = try #require(model.content.sections.flatMap(\.rows).first)
+        #expect(active.id == initial.id)
+        #expect(active.status == .recording)
+        #expect(active.isRecording)
+        #expect(active.duration == 15)
+        #expect(model.recordingCard?.noteID == note.id)
+        #expect(model.recordingCard?.elapsed == 15)
+
+        let timestampChanged = Mutex(false)
+        _ = withObservationTracking { model.content } onChange: { timestampChanged.withLock { $0 = true } }
+        let recordedAt = library.clock.now.addingTimeInterval(90)
+        library.notes[0].meetingTime = .instant(recordedAt)
+        await model.settle() // The index publishes its revision after the notes' mutation event.
+        #expect(timestampChanged.withLock { $0 }, "A durable timestamp update must invalidate the row projection")
+        let timestamped = try #require(model.content.sections.flatMap(\.rows).first)
+        #expect(timestamped.id == initial.id, "Moving from an undated section never changes the note's identity")
+        #expect(timestamped.meetingTime == .instant(recordedAt))
+        #expect(timestamped.status == .recording)
+        #expect(timestamped.isRecording)
+        #expect(model.recordingCard?.noteID == timestamped.id)
+
+        let endedRowChanged = Mutex(false)
+        _ = withObservationTracking { model.content } onChange: { endedRowChanged.withLock { $0 = true } }
+        library.recording = .ended(noteID: note.id, outcome: .saved(.audioOnly))
+        #expect(endedRowChanged.withLock { $0 }, "Ending invalidates the same observed projection without editing notes")
+        let ended = try #require(model.content.sections.flatMap(\.rows).first)
+        #expect(ended.id == initial.id)
+        #expect(ended.status == .audioOnly)
+        #expect(!ended.isRecording)
+        #expect(ended.meetingTime == .instant(recordedAt))
+        #expect(model.recordingCard == nil)
     }
 
     // ports: LibraryViewModelTest#searchesAfterTheDebounceAndKeepsTheQuery
