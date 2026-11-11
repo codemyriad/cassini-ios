@@ -95,7 +95,6 @@ extension Note: Codable {
             failure = try c.decodeIfPresent(JobFailure.self, forKey: .failure)
             speakerAnalysisFailure = try c.decodeIfPresent(JobFailure.self, forKey: .speakerAnalysisFailure)
         }
-        if !c.contains(.meetingTime), origin == .recorded { meetingTime = .instant(createdAt) }
     }
 
     private mutating func decodeSchemaOne(_ c: KeyedDecodingContainer<CodingKeys>) throws {

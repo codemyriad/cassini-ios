@@ -42,13 +42,13 @@ public struct NoteRepository: Sendable {
         for folder in folders where UUID(uuidString: folder.lastPathComponent) != nil {
             do {
                 var note = try JSONDecoder().decode(Note.self, from: Data(contentsOf: folder.appendingPathComponent(Self.metadataFilename)))
+                guard note.id.uuidString == folder.lastPathComponent, Self.isValid(note) else { throw RepositoryError.invalidDocument }
                 if note.origin == .importedDocument {
                     let source = originalAudioURL(for: note)
                     if FileManager.default.fileExists(atPath: source.path) {
                         note.meetingTime = MeetingTime.read(CassiniDocument.readChecked(source, verify: false))
                     }
                 }
-                guard note.id.uuidString == folder.lastPathComponent, Self.isValid(note) else { throw RepositoryError.invalidDocument }
                 report.notes.append(note)
             } catch {
                 report.unreadable.append(folder)

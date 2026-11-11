@@ -48,6 +48,16 @@ struct RecordedMeetingTimeTests {
         #expect(try Data(contentsOf: repository.originalAudioURL(for: note)) == Data(bytes))
     }
 
+    @Test func legacyRecordingWithoutTrustedPositionZeroStaysUnknown() throws {
+        let note = Note(title: "Old English recording", createdAt: start)
+        let bytes = try JSONEncoder().encode(note)
+        var json = try #require(JSONSerialization.jsonObject(with: bytes) as? [String: Any])
+        json.removeValue(forKey: "meetingTime")
+        let loaded = try JSONDecoder().decode(Note.self, from: JSONSerialization.data(withJSONObject: json))
+        #expect(loaded.meetingTime == .unknown)
+        #expect(loaded.sortDate == start)
+    }
+
     @Test func dateFallbackComparesInstantsAndKeepsZoneLessLabelAsWritten() {
         let m = JSONObject([("meeting", .object(JSONObject([("createdAtUtc", .string("2026-11-09T09:40:48Z")),
             ("recordedAtLocal", .string("2026-11-09T09:31:48"))])))])
