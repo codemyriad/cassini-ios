@@ -36,7 +36,7 @@ The devices that stop at iOS 18 and cannot run iOS 26 (from Apple's support list
 | Device | Chip, memory | Engines on iOS 18 |
 |---|---|---|
 | iPhone XR | A12, 3 GB | Whistle only |
-| iPhone XS, XS Max | A12, 4 GB | Whistle, and Parakeet Ultra after its download. Parakeet has not been measured on an A12; a run that cannot get its memory falls back to Whistle |
+| iPhone XS, XS Max | A12, 4 GB | Whistle, and Parakeet Ultra after its download. Parakeet has not been measured on an A12; a run that cannot get its memory before its first saved progress falls back to Whistle |
 | iPad (7th generation) | A10, 3 GB | none: the A10 lacks both CPU features and the memory for Parakeet. Recording, playback, search and export work; Transcribe is disabled |
 
 A newer device kept on iOS 18 follows the same rules: Whistle on every one (A12 or later), Parakeet from 4 GB.

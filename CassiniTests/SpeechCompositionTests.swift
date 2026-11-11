@@ -58,6 +58,35 @@ import CassiniSherpa
         }
     }
 
+    /// An upgrade on a 4 GB device: a paused job stored before jobs named their recognizer, with the Apple Speech
+    /// checkpoint it made, still resolves to Apple's slot, the recognizer its checkpoint names, although new jobs on
+    /// the device now get Parakeet. On a 6 GB device such a job was and stays Parakeet's.
+    func testALegacyJobWithAnAppleCheckpointOnA4GBDeviceStaysApples() async throws {
+        try XCTSkipUnless(SherpaRuntime.isLinked, "built without the native runtime")
+        let notes = try NoteStore(root: root.appendingPathComponent("Notes", isDirectory: true))
+        try await TestFixtures.seed(.statuses, into: notes, now: AppEnvironment.uiTestingNow, recognizer: .appleSpeech)
+        let job = try XCTUnwrap(JobRepository(root: notes.root).load().first { $0.noteID == TestFixtures.pausedID })
+        XCTAssertNil(job.recognizer)
+        let checkpoint = try XCTUnwrap(CheckpointFiles(notes: notes).load(TestFixtures.pausedID))
+        XCTAssertEqual(SpeechRecognizer.fromCheckpoint(model: checkpoint.model), .appleSpeech)
+
+        func router(_ physicalMemory: UInt64) -> RoutedTranscriber {
+            let first = AppEnvironment.speechTranscriber(models: models(), physicalMemory: physicalMemory, platform: .iOS26)
+            let apple = AppEnvironment.appleSpeechCandidate(platform: .iOS26)
+            XCTAssertEqual(first.recognizer, .parakeet)
+            let legacy = AppEnvironment.legacySpeechTranscriber(first: first, apple: apple, physicalMemory: physicalMemory)
+            return RoutedTranscriber(legacy: legacy, candidates: [apple, first]) { .parakeet }
+        }
+        for mebibytes in [3665, 3854] as [UInt64] {
+            let speech = router(mebibytes << 20)
+            XCTAssertEqual(try speech.forJob(recognizer: job.recognizer).recognizer, .appleSpeech, "\(mebibytes) MiB")
+            XCTAssertEqual(try speech.forJob(recognizer: "parakeet").recognizer, .parakeet, "a new job")
+            let fallback = await SpeechFallback.recognizer(for: job, transcriber: speech)
+            XCTAssertNil(fallback, "not a Parakeet job: nothing takes it over")
+        }
+        XCTAssertEqual(try router(6 << 30).forJob(recognizer: job.recognizer).recognizer, .parakeet)
+    }
+
     /// The speech download and the speaker models go through one installer: while Ultra downloads, the installer
     /// shows that install to the speaker side, and it stops when its only caller leaves.
     func testSpeechAndTheSpeakerModelsShareOneInstaller() async throws {

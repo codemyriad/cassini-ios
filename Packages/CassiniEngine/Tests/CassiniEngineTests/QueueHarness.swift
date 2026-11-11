@@ -39,7 +39,8 @@ import CassiniNotebook
 
     init(root: URL? = nil, suite: String? = nil, clock: FakeClock = FakeClock(), checkpoints: FakeCheckpoints = FakeCheckpoints(),
          recognizer: String? = nil, recognizerChoice: (@MainActor @Sendable () -> String?)? = nil, consentForRecognizer: (@MainActor @Sendable (String?) -> ModelConsent)? = nil,
-         fallbackRecognizer: (@MainActor @Sendable (Job, JobFailure) async -> String?)? = nil) throws {
+         fallbackRecognizer: (@MainActor @Sendable (Job, JobFailure) async -> String?)? = nil,
+         work: ((NoteStore) -> any JobCheckpoints)? = nil) throws {
         self.root = root ?? FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         self.suite = suite ?? "cassini.queue-tests.\(UUID().uuidString)"
         self.clock = clock
@@ -50,7 +51,7 @@ import CassiniNotebook
         let consent = ConsentSwitch()
         self.consent = consent
         let parts = TranscriptionCoordinator.Parts(
-            jobs: jobs, notes: notes, runner: runner, checkpoints: checkpoints,
+            jobs: jobs, notes: notes, runner: runner, checkpoints: work?(notes) ?? checkpoints,
             consent: ModelConsent(unavailability: { kind, _ in kind == .speakersOnly ? nil : consent.failure }) { _, _ in consent.allowed }, notifier: notifier, background: background, clock: clock,
             progress: progress, recognizer: recognizer, recognizerChoice: recognizerChoice, consentForRecognizer: consentForRecognizer,
             fallbackRecognizer: fallbackRecognizer)

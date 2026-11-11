@@ -88,7 +88,8 @@ records their exact revisions.
 - **Transcribe on the device** with the bundled Whistle model at once, or with Parakeet Ultra after a one-time download
   of about 531 MB (Ultra, its speech detector and the speaker models, from Cassini's model host) on devices with
   4 GB of memory or more (those that report at least 3.25 GiB). A Parakeet run that cannot get the memory it needs or
-  cannot load its model is run again from the start with Whistle, for that note only. On iOS 26 or later, where neither Whistle nor a verified Parakeet can run, Cassini uses Apple's
+  cannot load its model before it has saved any progress is run again with Whistle, for that note only; one that
+  has saved progress or speaker names fails and keeps them. On iOS 26 or later, where neither Whistle nor a verified Parakeet can run, Cassini uses Apple's
   `SpeechAnalyzer` after a model download for the speech language you choose; iOS 18 has no Apple speech, so a device
   that can run neither engine cannot transcribe there ([iOS 18](docs/ios18.md)). The queue is durable: jobs run one at a
   time and survive a relaunch. Progress is saved every 30 seconds of audio, so "Stop and keep progress", iOS taking the
@@ -166,8 +167,8 @@ TestFlight still need.
   are verified. Parakeet needs a device that reports at least 3.25 GiB of physical RAM (every 4 GB device and no 3 GB
   one; Android asks for 4,000,000,000 bytes, which the 4 GB iPhone 12 and 13 do not report) and the normal runtime
   memory preflight, whose figures were measured on four 4 GB devices on 2026-11-11. A Parakeet run that fails that
-  preflight or cannot load goes back to the front of the queue for Whistle, from the start (iOS only: Android's run
-  fails with `MEMORY`); its download suggestion also checks the pinned install's actual disk requirement. Whistle's
+  preflight or cannot load, and has no saved progress or draft speaker names, goes back to the front of the queue
+  for Whistle (iOS only: Android's run fails with `MEMORY`, as a run with saved progress does here); its download suggestion also checks the pinned install's actual disk requirement. Whistle's
   production pipeline and default-limit A12/3GB memory gate passed. On iOS 26 or later Apple Speech remains a
   separately checked fallback candidate when neither bundled nor verified downloaded speech is available; unsupported
   devices/locales are refused before queueing or download consent. On iOS 18 there is no Apple Speech: where Whistle

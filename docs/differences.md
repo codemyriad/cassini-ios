@@ -55,10 +55,16 @@ remain absent on iOS. Copy is pinned in [shared-strings-pin.md](shared-strings-p
     against `ParakeetMemory` (1450 MiB before the load, 400 MiB before a later window; on the 4 GB devices a run took 1250 to
     1335 MiB from before the load until its memory stopped growing, up to 340 MiB of it after the first window) and
     fails with `MEMORY` instead of being ended by iOS. A Parakeet run that fails so, or with `MODEL` because the
-    recognizer could not be loaded, is not left failed when Whistle can run: the coordinator discards its saved
-    progress, which Whistle could not continue, and puts the job back at the front of the queue for Whistle from the
-    start (`RecognizerFallback`, `SpeechFallback`). The recording, the note's earlier transcript and the model chosen
-    in Settings are not touched, and a Whistle run that fails stays failed. iOS only. Android pauses with
+    recognizer could not be loaded, is not left failed when Whistle can run and the run left nothing behind: the coordinator puts the job back at the
+    front of the queue for Whistle (`RecognizerFallback`, `SpeechFallback`). A run whose `work/` holds a checkpoint or
+    draft speaker names, merges or matches (`JobCheckpoints.holdsDraft`) fails as on Android and keeps them, because
+    Whistle cannot continue Parakeet's progress and the names live beside it; Try again continues with Parakeet.
+    Nothing is deleted. A job that was asked to stop is not handed over, and a stop that arrives during the
+    hand-over undoes it: the job fails with its own failure and no Whistle run starts. The recording, the note's
+    earlier transcript and the model chosen in Settings are not touched, and a Whistle run that fails stays failed.
+    A job stored before jobs named their recognizer keeps the device's choice under the old 5 GiB limit
+    (`SpeechCapability.legacyJobsAreParakeets`), so on a 4 GB device it resumes with the recognizer that made its
+    checkpoint. iOS only. Android pauses with
     `MEMORY` on a Java `OutOfMemoryError`, which iOS cannot catch.
   - **Cancellation** stops before the next native call: a flag the decoder checks before each recognizer call, set by
     the task's cancellation handler (Android interrupts the thread). It ends `CANCELLED`, or paused when a pause asked

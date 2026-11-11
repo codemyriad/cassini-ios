@@ -44,6 +44,17 @@ public enum SpeechCapability {
     /// Whether a device with `physicalMemory` bytes can hold Ultra.
     public static func parakeetCapable(physicalMemory: UInt64) -> Bool { physicalMemory >= minimumPhysicalMemory }
 
+    /// The limit while jobs did not yet name their recognizer: 5 GiB. It is kept only to say which recognizer such a
+    /// job was given, and so made its saved progress with.
+    public static let legacyMinimumPhysicalMemory: UInt64 = 5 << 30
+
+    /// Whether a job stored without a recognizer is Parakeet's on a device with `physicalMemory` bytes: the choice the
+    /// device made when the job was stored, not today's. A 4 GB device, which gets Parakeet now, gave such a job to
+    /// Apple Speech; resuming it through Parakeet would refuse its saved progress (`CHECKPOINT_MISMATCH`).
+    public static func legacyJobsAreParakeets(physicalMemory: UInt64) -> Bool {
+        physicalMemory >= legacyMinimumPhysicalMemory
+    }
+
     /// A supported downloadable Apple model remains eligible, but cannot decode until its assets are installed.
     /// The caller must probe hardware, the equivalent locale and asset status; RAM alone cannot select Apple.
     public static func choose(linked: Bool, capable: Bool, apple: AppleSpeechCapability) -> SpeechRecognizer? {
