@@ -279,6 +279,47 @@ import CassiniNotebook
         await exporter.waitForDiscards()
     }
 
+    func testCancellingArchiveStopsWaitingWithoutCancellingRecordingFinalization() async throws {
+        let harness = TestGraph(audio: FakeAudioProcessing())
+        defer { harness.tearDown() }
+        _ = await harness.graph.start()
+        let library = harness.graph.library
+        let store = try XCTUnwrap(library.noteStore)
+        let note = Note(title: "Still compressing", audioFilename: "capture.caf")
+        try await store.save(note); library.adopt(note)
+        try wav.write(to: store.audioURL(for: note))
+        let release = AsyncStream<Void>.makeStream()
+        defer { release.continuation.finish() }
+        var compressionFinished = false
+        let compression = Task {
+            for await _ in release.stream { break }
+            XCTAssertFalse(Task.isCancelled, "Export cancellation must leave recording compression running")
+            compressionFinished = true
+        }
+        let entered = expectation(description: "export awaits the recording task")
+        let ended = expectation(description: "export cancellation completes while recording remains held")
+        let exporter = ExportStore(library: library, audio: FakeAudioProcessing(), folder: harness.graph.environment.exports,
+                                   texts: ExportCopy.texts(locale: .init(identifier: "en_US"), timeZone: .gmt),
+                                   audioReady: { entered.fulfill(); await compression.value }, ready: {})
+        let exporting = Task {
+            do {
+                _ = try await exporter.exportArchive([note.id], progress: { _ in })
+                XCTFail("A cancelled archive must not publish a ZIP")
+            } catch is CancellationError {} catch { XCTFail("Unexpected error: \(error)") }
+            ended.fulfill()
+        }
+        await fulfillment(of: [entered], timeout: 30)
+        exporting.cancel()
+        await fulfillment(of: [ended], timeout: 30)
+        XCTAssertFalse(compressionFinished, "Cancellation finished before recording finalization was released")
+        let leftovers = (try? FileManager.default.contentsOfDirectory(atPath: harness.graph.environment.exports.path)) ?? []
+        XCTAssertTrue(leftovers.isEmpty, "Cancelled export scratch is gone before compression ends")
+        release.continuation.yield(())
+        await compression.value
+        await exporting.value
+        XCTAssertTrue(compressionFinished)
+    }
+
     func testMissingSelectionIsNotSilentlyOmitted() async throws {
         let harness = TestGraph(audio: FakeAudioProcessing())
         defer { harness.tearDown() }
