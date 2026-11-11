@@ -16,14 +16,17 @@ export handles Cassini documents/versions/provenance. Clean imported documents r
 a missing/stale optional TITLE tag, so importing the ZIP detects the original digest. The stored audio/document
 and note.json are never written by bulk export. Actual local transcript/title/speaker edits require a private
 portable snapshot because iOS stores those edits beside the source; that snapshot includes the edits without
-replacing the source. Audio-only notes keep their original bytes and extension; unknown/unreadable Cassini
-documents keep their original bytes. Export names use the existing naming rule, with case-insensitive numeric
+replacing the source. Audio-only notes keep their original bytes and extension; unknown-format or
+wordless Cassini documents keep their original bytes. Broken metadata with local words is sealed into a valid
+portable snapshot, including local edits and speaker labels. Export names use the existing naming rule, with case-insensitive numeric
 collision suffixes. A missing/deleted/live-recording member fails the export atomically rather than being
 silently omitted. Single-note export formats remain unchanged.
 
-Active recordings are excluded from all/selected export and selection controls. A Library containing only a live
-recording offers no Edit/ZIP action. Trashing a selected note immediately prunes the selection. Share-sheet cleanup
+Recovered interrupted captures without usable audio and active recordings are excluded from all/selected export
+and selection controls. A Library containing only a live recording offers no Edit/ZIP action. Trashing a selected note immediately prunes the selection. Share-sheet cleanup
 runs on a worker with an awaitable completion fence, so removing a large archive never blocks the main actor.
+Before preparing each member, export awaits recording finalization and re-reads the live note and audio URLs,
+so a stopped recording that rotates from capture.caf to audio.m4a uses the completed file.
 
 Archive bounds follow cassini-ux main `4d577376f6360ed352fa75307f4dc47890ed9858`, D96:
 
@@ -34,7 +37,10 @@ Archive bounds follow cassini-ux main `4d577376f6360ed352fa75307f4dc47890ed9858`
 - Stored and deflated payloads stream in 64 KiB chunks, with CRC, exact size and actual-byte budget checks.
   A false expanded size stops publication of extra bytes, while validation keeps draining so actual size/ratio
   violations are refused as too large. The final ratio uses compressed bytes consumed through deflate end-of-stream,
-  excluding forged padding. Ignored/oversized members are not expanded. No archive path is passed to a filesystem write.
+  excluding forged padding. Before any note is imported, every deflated member (including ignored/oversized entries)
+  streams to a discard consumer to enforce actual archive-wide limits; stored members account their payload size without reading it.
+  This preflight writes no expanded data to disk. Corrupt individual members still allow valid siblings to import.
+  No archive path is passed to a filesystem write.
 - All six classic EOCD ZIP64 sentinels and harmless local/directory descriptor/encoding/option flag differences are accepted; encryption (including AES method99/extra0x9901) and path checks still apply independently to both headers. Relative
   Windows separators normalize to `/`, valid POSIX colon names are accepted, and absolute/drive/parent paths are refused. Stored ZIP64 output supports the full archive size limit. Payloads and the directory are each written once.
   Partial exports and per-import UUID staging folders are removed on cancellation/failure; exports are also swept

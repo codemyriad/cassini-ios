@@ -12,14 +12,17 @@ import CassiniNotebook
     @ObservationIgnored private let texts: ExportTexts
     @ObservationIgnored private var discardTask: Task<Void, Never>?
     @ObservationIgnored private let ready: @MainActor () async -> Void
+    @ObservationIgnored private let audioReady: @MainActor () async -> Void
 
     /// `texts` are the localized lines of every export (`ExportCopy.texts`); the sealed document labels passages without
     /// a speaker with `texts.unassignedLabel`, as the transcript exports do. `ready` returns once the launch work has
-    /// run, so the launch sweep never removes an export being shared.
+    /// run, so the launch sweep never removes an export being shared. `audioReady` waits for pending recording
+    /// finalization before a bulk member resolves its current source path.
     init(library: LibraryStore, audio: any AudioProcessing, folder: URL, texts: ExportTexts,
-         ready: @escaping @MainActor () async -> Void) {
+         audioReady: @escaping @MainActor () async -> Void = {}, ready: @escaping @MainActor () async -> Void) {
         self.library = library
         self.ready = ready
+        self.audioReady = audioReady
         self.texts = texts
         service = library.noteStore.map { ExportService(notes: $0, folder: folder) }
         portable = library.noteStore.map {
@@ -81,11 +84,17 @@ import CassiniNotebook
         await ready()
         await library.settle()
         guard let service, let portable else { throw ExportError.cannotSave }
-        let notes = ids.compactMap { library.note($0) }.filter { $0.trashedAt == nil }
+        let notes = ids.compactMap { library.note($0) }.filter(ArchiveSelection.isExportable)
         guard notes.count == ids.count else { throw ExportError.noNote }
-        let batch = BulkExportService(folder: service.folder) { [library, portable] note, folder in
-            guard let original = await library.originalAudioURL(note), let audio = await library.audioURL(note) else {
-                throw ExportError.noNote
+        let batch = BulkExportService(folder: service.folder) { [library, portable, audioReady] selected, folder in
+            await audioReady()
+            try Task.checkCancellation()
+            let (note, original, audio) = try await MainActor.run {
+                guard let note = library.note(selected.id), ArchiveSelection.isExportable(note),
+                      let original = library.originalAudioURL(note), let audio = library.audioURL(note) else {
+                    throw ExportError.noNote
+                }
+                return (note, original, audio)
             }
             return try await portable.archiveSnapshot(note, original: original, playable: audio, into: folder)
         }

@@ -63,7 +63,8 @@ import CassiniNotebook
             undo: TrashUndo(), clock: environment.clock, calendar: environment.calendar))
         exports = ExportStore(library: library, audio: environment.audio,
                               folder: environment.exports,
-                              texts: ExportCopy.texts(locale: environment.locale, timeZone: environment.timeZone)) { [startup] in
+                              texts: ExportCopy.texts(locale: environment.locale, timeZone: environment.timeZone),
+                              audioReady: { [recording] in await recording.controller.settle() }) { [startup] in
             _ = await startup.ready()
         }
         libraryScreen = Self.libraryScreen(environment: environment, library: library, processing: processing,

@@ -41,7 +41,24 @@ public struct BulkImportService: Sendable {
                                              maxBytes: Int64.max - Limits.minFreeImportBytes,
                                              reserveBytes: Limits.minFreeImportBytes)
                     let limits = limits
-                    let archive = try await ArchiveWork.run { try ZIPArchive(url: archiveURL, limits: limits, check: $0.check) }
+                    let archive = try await ArchiveWork.run { cancel in
+                        let archive = try ZIPArchive(url: archiveURL, limits: limits, check: cancel.check)
+                        let budget = ArchiveWork.Budget(limits.expandedBytes)
+                        // Refuse archive-wide runtime violations before creating even the first note. Ignored
+                        // members are subject to the same limits; validation uses no member-sized disk staging.
+                        for entry in archive.entries {
+                            try cancel.check()
+                            if entry.method == 0 {
+                                try budget.account(entry.compressedBytes)
+                            } else if entry.method == 8 {
+                                do {
+                                    try archive.read(entry, remainingBytes: budget.remaining, check: cancel.check,
+                                                     observed: budget.observed) { _ in }
+                                } catch ZIPFailure.entry { /* A corrupt member may still have good siblings. */ }
+                            }
+                        }
+                        return archive
+                    }
                     units = max(1, archive.entries.count)
                     total += units - 1
                     guard archive.entries.contains(where: { $0.isFile && !$0.isMetadata && ArchiveAudio.supports($0.name) }) else {

@@ -11,9 +11,12 @@ enum ArchiveWork {
         init(_ limit: UInt64) { self.limit = limit }
         var remaining: UInt64 { bytes.withLock { limit - $0 } }
         func observed(_ count: Int) throws {
+            try account(UInt64(count))
+        }
+        func account(_ count: UInt64) throws {
             try bytes.withLock { value in
-                guard UInt64(count) <= limit - value else { throw ZIPFailure.tooLarge }
-                value += UInt64(count)
+                guard count <= limit - value else { throw ZIPFailure.tooLarge }
+                value += count
             }
         }
     }

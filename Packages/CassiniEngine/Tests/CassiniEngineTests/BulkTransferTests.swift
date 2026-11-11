@@ -109,11 +109,13 @@ private actor BulkProgressTrace {
         #expect(try Data(contentsOf: source) == bytes)
     }
 
-    @Test func runtimeBombsRefuseArchiveAndNeverImportTheFollowingGoodMember() async throws {
-        for padded in [false, true] {
+    @Test func runtimeBombsRefuseArchiveBeforeAnyMemberIsImported() async throws {
+        for (padded, name) in [(false, "Bomb.wav"), (true, "Bomb.wav"), (false, "README.txt"), (true, "nested.zip")] {
             let sandbox = try BulkSandbox()
             let zip = sandbox.folder.appendingPathComponent("bomb.zip")
-            try ZIPAgyFixture.write([ZIPAgyFixture.bomb(padded: padded, forgedSize: !padded), .init("Good.wav", Data(ImportFixtures.wav))], to: zip)
+            var bomb = ZIPAgyFixture.bomb(padded: padded, forgedSize: !padded)
+            bomb.name = name
+            try ZIPAgyFixture.write([.init("Good.wav", Data(ImportFixtures.wav)), bomb], to: zip)
             let report = await sandbox.service().run([zip])
             #expect(report.archives == [.tooLarge])
             #expect(report.summary.imported == 0)
@@ -122,6 +124,21 @@ private actor BulkProgressTrace {
             #expect(try sandbox.scratchContents().isEmpty)
         }
     }
+    @Test func ignoredPayloadsAlsoConsumeTheActualArchiveBudgetBeforeImport() async throws {
+        let sandbox = try BulkSandbox()
+        let zip = sandbox.folder.appendingPathComponent("budget.zip")
+        var ignored = ZIPAgyFixture.bomb(padded: false)
+        ignored.name = "README.txt"
+        try ZIPAgyFixture.write([.init("Good.wav", Data(ImportFixtures.wav)), ignored], to: zip)
+        // The declared total and ratio pass; only the actual expanded bytes exceed this small test budget.
+        let report = await sandbox.service(limits: .init(expandedBytes: 100_000, ratio: 10_000)).run([zip])
+        #expect(report.archives == [.tooLarge])
+        #expect(report.summary.imported == 0)
+        #expect(report.summary.failed == 0)
+        #expect(await sandbox.notes.all().isEmpty)
+        #expect(try sandbox.scratchContents().isEmpty)
+    }
+
     @Test func directoriesDoNotCountAsUnsupportedAndArchiveErrorsAreNotFailedFiles() async throws {
         let sandbox = try BulkSandbox()
         let zip = sandbox.folder.appendingPathComponent("Finder.zip")
@@ -168,7 +185,8 @@ private actor BulkProgressTrace {
         var live = Note(title: "English recording"); live.audio = .live
         var trashed = Note(title: "English trashed"); trashed.trashedAt = Date()
         var opaque = Note(title: "English future document"); opaque.audio = .unplayable(.unsupportedFormat)
-        #expect(ArchiveSelection.ids([normal, live, trashed, opaque]) == [normal.id, opaque.id])
+        var interrupted = Note(title: "Missing capture"); interrupted.audio = .unplayable(.interrupted)
+        #expect(ArchiveSelection.ids([normal, live, trashed, interrupted, opaque]) == [normal.id, opaque.id])
         #expect(ArchiveSelection.ids([live]).isEmpty)
     }
 

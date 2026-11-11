@@ -187,6 +187,98 @@ import CassiniNotebook
         XCTAssertTrue(harness.graph.library.notes.isEmpty)
     }
 
+    func testExportAllExcludesRecoveredCapturesWithoutAudio() async throws {
+        let harness = TestGraph(audio: FakeAudioProcessing())
+        defer { harness.tearDown() }
+        _ = await harness.graph.start()
+        let store = try XCTUnwrap(harness.graph.library.noteStore)
+        let good = Note(title: "Good", audioFilename: "audio.wav")
+        var missing = Note(title: "Recovered without audio", audioFilename: "capture.caf")
+        missing.audio = .unplayable(.interrupted)
+        for note in [good, missing] { try await store.save(note); harness.graph.library.adopt(note) }
+        try wav.write(to: store.audioURL(for: good))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: store.audioURL(for: missing).path))
+        let ids = ArchiveSelection.ids(harness.graph.library.notes)
+        XCTAssertEqual(ids, [good.id])
+        let output = try await harness.graph.exports.exportArchive(ids, progress: { _ in })
+        let zip = try ZIPArchive(url: output)
+        XCTAssertEqual(zip.entries.map(\.name), ["Good.wav"])
+        var bytes = Data()
+        try zip.read(try XCTUnwrap(zip.entries.first), remainingBytes: 1_000_000) { bytes.append($0) }
+        XCTAssertEqual(bytes, wav)
+        harness.graph.exports.discard(output)
+        await harness.graph.exports.waitForDiscards()
+    }
+
+    func testArchiveRereadsACaptureRotatedBeforeItsTurn() async throws {
+        let harness = TestGraph(audio: FakeAudioProcessing())
+        defer { harness.tearDown() }
+        _ = await harness.graph.start()
+        let library = harness.graph.library
+        let store = try XCTUnwrap(library.noteStore)
+        let first = Note(title: "First", audioFilename: "audio.wav")
+        let capture = Note(title: "Stopped recording", audioFilename: "capture.caf")
+        for note in [first, capture] { try await store.save(note); library.adopt(note) }
+        try wav.write(to: store.audioURL(for: first))
+        let oldURL = store.audioURL(for: capture)
+        try Data("Old capture".utf8).write(to: oldURL)
+        let compressed = Data("Finished compressed recording".utf8)
+        let output = try await harness.graph.exports.exportArchive([first.id, capture.id]) { progress in
+            if progress.done == 1 {
+                do {
+                    try compressed.write(to: oldURL.deletingLastPathComponent().appendingPathComponent("audio.m4a"))
+                    await library.commit(capture.id) { $0.audioFilename = "audio.m4a" }
+                    try FileManager.default.removeItem(at: oldURL)
+                } catch { XCTFail("Could not rotate fixture: \(error)") }
+            }
+        }
+        let zip = try ZIPArchive(url: output)
+        XCTAssertEqual(zip.entries.map(\.name), ["First.wav", "Stopped recording.m4a"])
+        var bytes = Data()
+        try zip.read(zip.entries[1], remainingBytes: 1_000_000) { bytes.append($0) }
+        XCTAssertEqual(bytes, compressed)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: oldURL.path))
+        harness.graph.exports.discard(output)
+        await harness.graph.exports.waitForDiscards()
+    }
+
+    func testArchiveWaitsForFinalizationBeforeResolvingTheCapture() async throws {
+        let harness = TestGraph(audio: FakeAudioProcessing())
+        defer { harness.tearDown() }
+        _ = await harness.graph.start()
+        let library = harness.graph.library
+        let store = try XCTUnwrap(library.noteStore)
+        let note = Note(title: "Finalizing recording", audioFilename: "capture.caf")
+        try await store.save(note); library.adopt(note)
+        let oldURL = store.audioURL(for: note)
+        try Data("Capture before compression".utf8).write(to: oldURL)
+        let entered = expectation(description: "export reached recording finalization fence")
+        let release = AsyncStream<Void>.makeStream()
+        defer { release.continuation.finish() }
+        let exporter = ExportStore(library: library, audio: FakeAudioProcessing(), folder: harness.graph.environment.exports,
+                                   texts: ExportCopy.texts(locale: .init(identifier: "en_US"), timeZone: .gmt),
+                                   audioReady: {
+            entered.fulfill()
+            for await _ in release.stream { break }
+        }, ready: {})
+        let exporting = Task { try await exporter.exportArchive([note.id], progress: { _ in }) }
+        defer { exporting.cancel() }
+        await fulfillment(of: [entered], timeout: 30)
+        let compressed = Data("Final compressed bytes".utf8)
+        try compressed.write(to: oldURL.deletingLastPathComponent().appendingPathComponent("audio.m4a"))
+        await library.commit(note.id) { $0.audioFilename = "audio.m4a" }
+        try FileManager.default.removeItem(at: oldURL)
+        release.continuation.yield(())
+        let output = try await exporting.value
+        let zip = try ZIPArchive(url: output)
+        XCTAssertEqual(zip.entries.map(\.name), ["Finalizing recording.m4a"])
+        var bytes = Data()
+        try zip.read(try XCTUnwrap(zip.entries.first), remainingBytes: 1_000_000) { bytes.append($0) }
+        XCTAssertEqual(bytes, compressed)
+        exporter.discard(output)
+        await exporter.waitForDiscards()
+    }
+
     func testMissingSelectionIsNotSilentlyOmitted() async throws {
         let harness = TestGraph(audio: FakeAudioProcessing())
         defer { harness.tearDown() }

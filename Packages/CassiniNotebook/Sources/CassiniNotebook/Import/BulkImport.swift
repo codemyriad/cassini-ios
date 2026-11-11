@@ -75,8 +75,10 @@ public enum ArchiveContents {
     }
 
     public static func preservesOriginal(_ note: Note) -> Bool {
-        if let state = note.document?.state, state == .unknownFormat || state == .unreadable || state == .invalidMetadata { return true }
-        return note.document == nil && note.transcript.isEmpty && !(note.versions?.contains { !$0.segments.isEmpty } ?? false)
+        let hasWords = !note.transcript.isEmpty || (note.versions?.contains { !$0.segments.isEmpty } ?? false)
+        if !hasWords || note.document?.state == .unknownFormat { return true }
+        if case .unplayable = note.audio, note.holdsOnlyImportedVersions { return true }
+        return false
     }
 }
 
@@ -100,6 +102,8 @@ public struct ArchiveNames: Sendable {
 }
 
 public enum ArchiveSelection {
-    public static func isExportable(_ note: Note) -> Bool { note.trashedAt == nil && !note.isRecording }
+    public static func isExportable(_ note: Note) -> Bool {
+        note.trashedAt == nil && !note.isRecording && note.audio != .unplayable(.interrupted)
+    }
     public static func ids(_ notes: [Note]) -> [UUID] { notes.filter(isExportable).map(\.id) }
 }

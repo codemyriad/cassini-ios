@@ -1,5 +1,6 @@
 import CassiniCore
 import Foundation
+import CassiniEngineTesting
 import Testing
 @testable import CassiniEngine
 @testable import CassiniNotebook
@@ -28,6 +29,49 @@ struct ExportServiceTests {
                 .init(text: "Yes,", start: 1.8, end: 2.1), .init(text: "a", start: 2.2, end: 2.5), .init(text: "Thursday.", start: 2.6, end: 2.9)])
         ]
         return note
+    }
+
+    @Test(arguments: [DocumentState.invalidMetadata, .unreadable])
+    func archivePreservesLocalWordsFromABrokenDocument(state: DocumentState) async throws {
+        defer { try? FileManager.default.removeItem(at: base) }
+        try FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
+        let bytes = try ImportFixtures.document("Old words", title: "Old title")
+        let comments = CassiniDocument.read(bytes).comments.map { $0.hasPrefix("CASSINI_PROFILE=") ? "CASSINI_PROFILE=other" : $0 }
+        let broken = Data(try OggOpus.mux(OggOpus.read(bytes), tags: CassiniDocument.tagsPacket(comments)))
+        let original = base.appendingPathComponent("broken.opus")
+        try broken.write(to: original)
+        #expect(CassiniDocument.read(original).state == .invalidMetadata)
+        var note = Note(title: "Edited local title", audioFilename: "broken.opus")
+        note.document = DocumentInfo(state: state)
+        note.origin = .importedDocument
+        note.transcript = [.init(text: "Edited local words", start: 0, end: 1, speakerID: "a")]
+        note.speakers = [.init(id: "a", name: "Edited speaker")]
+        note.saveCurrentVersion(.editedTranscript)
+        let output = try await PortableExportService(audio: FakeAudioProcessing(), provenance: FakeProvenance(), unassignedLabel: "Unknown speaker")
+            .archiveSnapshot(note, original: original, playable: original, into: base)
+        let document = CassiniDocument.read(output)
+        #expect(document.state == .ok)
+        #expect(document.title == note.title)
+        #expect(document.selected()?.transcript?.words.map(\.text) == ["Edited", "local", "words"])
+        #expect(document.speakerLabel("a") == "Edited speaker")
+        #expect(try Data(contentsOf: original) == broken)
+    }
+
+    @Test func archiveCopiesRenamedZeroWordDocumentWithoutSealing() async throws {
+        defer { try? FileManager.default.removeItem(at: base) }
+        try FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
+        let bytes = Data(try CassiniDocument.create(ImportFixtures.opus(packets: 100), transcript: Transcript([]),
+                                                  title: "Original title", processing: JSONObject()))
+        let original = base.appendingPathComponent("empty.opus")
+        try bytes.write(to: original)
+        #expect(CassiniDocument.read(original).state == .ok)
+        var note = Note(title: "Renamed title", audioFilename: "empty.opus")
+        note.document = DocumentInfo(state: .ok)
+        note.origin = .importedDocument
+        let output = try await PortableExportService(audio: FakeAudioProcessing(), provenance: FakeProvenance(), unassignedLabel: "Unknown speaker")
+            .archiveSnapshot(note, original: original, playable: original, into: base)
+        #expect(try Data(contentsOf: output) == bytes)
+        #expect(try Data(contentsOf: original) == bytes)
     }
 
     // ports: DocumentRepositoryTest#exportsEqualTheExpectedBytes
