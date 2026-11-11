@@ -114,4 +114,38 @@ installed the forwarding handler. The real-file regression caught an extra read 
 executor, but create a structured child so cancellation is registered before enqueue. A test executor cancels at
 enqueue and runs the job before enqueue returns: the old implementation starts the operation, the structured
 version does not. The original first-chunk read assertion remains unchanged. Both cancellation tests and the full
-Core product pass; simulator qualification remains required on the final head.
+Core product pass. Final qualification uses the complete gate and posted status on the final pushed head.
+
+### Local controlled comparison
+
+The coordinator moved the native comparisons from the overloaded rented Mac to this 16 GB, 10-core Mac
+(macOS27.2.1, Xcode27.0). All compared app/test source is `f7d3abe`; only `scripts/test.sh` changes between
+baseline `84af997` and candidate `f7d3abe`. One `~/.scw-heavy.lock` covers the experiment. A49s warm build is
+excluded. The wrapper records device states at build/test events and forwards the original tool arguments.
+
+Each run selects `CassiniUITests/testEmptyLibraryAndSettings` and
+`WideScreenTests/testIPadNoteContentIsCappedAndCentred`: two planned phone cases (one device skip) and one iPad
+case, with unchanged assertions and bounds. All six runs passed with identical planned coverage.
+
+| Runtime and order | Before seconds | After seconds | Before setup/admission | After setup/admission |
+| --- | ---: | ---: | ---: | ---: |
+| iOS27, before → after | 544.040 | 220.248 | 289s | 126s |
+| iOS27, after → before | 222.317 | 438.644 | 79s | 233s |
+| iOS18.2, before → after | 225.867 | 115.853 | 99s | 53s |
+
+Times include build, setup/admission, selected tests and shutdown. One baseline iPad runner launch required its
+existing permitted retry before any test started; that attempt is retained. The first default pair was faster
+after the change, the reverse-order pair slower: these samples do **not** establish a wall-time gain. The directly
+observed reduction is consistent in every pair:
+
+| Positive event | Baseline owned UI clones | Candidate owned UI clones |
+| --- | ---: | ---: |
+| App build starts | 1 booted phone | 0 |
+| iPad tests start (including any retry) | 2: idle phone and iPad | 1: iPad |
+
+The original #54 draft is closed; this follow-up changes no shard or test assignment. Resource residency now
+matches the existing serial execution budget. Normal concurrent scheduling retains its early boot and overlap.
+Raw logs/result bundles, event snapshots, driver and validated `summary.json` are retained under
+`~/coordination/evidence/scw-ios-d82-serial/local-comparison/`. Earlier rented-Mac attempts are retained separately:
+the full harness had one120s timeout under severe contention (the same case passed on rerun), and native UI
+admission failed closed after10min at0% idle CPU. No bound was changed.
