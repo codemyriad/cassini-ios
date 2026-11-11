@@ -23,7 +23,7 @@ public struct BulkImportService: Sendable {
                     imported: @escaping @Sendable (ImportOutcome) async -> Void = { _ in }) async -> BulkImportReport {
         var report = BulkImportReport()
         var done = 0, total = urls.count
-        for url in urls {
+        filesLoop: for url in urls {
             let before = done
             var units = 1
             defer { done = before + units }
@@ -45,7 +45,7 @@ public struct BulkImportService: Sendable {
                     units = max(1, archive.entries.count)
                     total += units - 1
                     guard archive.entries.contains(where: { $0.isFile && !$0.isMetadata && ArchiveAudio.supports($0.name) }) else {
-                        report.summary.unsupported += archive.entries.count
+                        report.summary.unsupported += archive.entries.filter { !$0.isDirectory }.count
                         throw ZIPFailure.empty
                     }
                     let budget = ArchiveWork.Budget(limits.expandedBytes)
@@ -53,6 +53,7 @@ public struct BulkImportService: Sendable {
                         try Task.checkCancellation()
                         await progress(.init(done: done + 1, total: total))
                         defer { done += 1 }
+                        if entry.isDirectory { continue }
                         guard entry.isFile && !entry.isMetadata && ArchiveAudio.supports(entry.name) else { report.summary.unsupported += 1; continue }
                         guard entry.expandedBytes <= memberLimit else { report.summary.failed += 1; continue }
                         let staged = folder.appendingPathComponent(UUID().uuidString + ".tmp")
@@ -72,20 +73,42 @@ public struct BulkImportService: Sendable {
                             let outcome = try await importFile(staged, entry.name)
                             report.summary.add(outcome)
                             await imported(outcome)
+                            if case .rejected(.noSpace(let needed)) = outcome {
+                                report.storageFailure = .noSpace(bytesNeeded: needed); break filesLoop
+                            }
                         } catch is CancellationError { throw CancellationError() }
                         catch ZIPFailure.tooLarge { throw ZIPFailure.tooLarge }
-                        catch { report.summary.failed += 1 }
+                        catch {
+                            report.summary.failed += 1
+                            if let failure = Self.storageFailure(error, bytes: Int64(entry.expandedBytes)) {
+                                report.storageFailure = failure; break filesLoop
+                            }
+                        }
                     }
                 } else {
                     let outcome = try await importFile(url, nil)
                     report.summary.add(outcome)
                     await imported(outcome)
+                    if case .rejected(.noSpace(let needed)) = outcome {
+                        report.storageFailure = .noSpace(bytesNeeded: needed); break filesLoop
+                    }
                 }
             } catch is CancellationError { report.cancelled = true; break }
-            catch let failure as ZIPFailure { report.archives.append(failure); report.summary.failed += 1 }
-            catch { report.summary.failed += 1 }
+            catch let failure as ZIPFailure { if !report.archives.contains(failure) { report.archives.append(failure) } }
+            catch {
+                report.summary.failed += 1
+                if let failure = Self.storageFailure(error, bytes: 0) { report.storageFailure = failure; break }
+            }
         }
         report.cancelled = report.cancelled || Task.isCancelled
         return report
     }
+    private static func storageFailure(_ error: any Error, bytes: Int64) -> ImportFailureKind? {
+        if case .noSpace(let needed) = error as? FileImportError { return .noSpace(bytesNeeded: needed) }
+        if (error as? CocoaError)?.code == .fileWriteOutOfSpace || (error as? POSIXError)?.code == .ENOSPC {
+            return .noSpace(bytesNeeded: bytes + Limits.minFreeImportBytes)
+        }
+        return nil
+    }
+
 }

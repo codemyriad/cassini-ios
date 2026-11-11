@@ -77,6 +77,7 @@ import CassiniNotebook
         XCTAssertEqual(harness.graph.library.notes, before, "Export cannot edit or replace the notes being backed up")
         let item = harness.graph.exports.shareItem(url)
         item.onComplete?()
+        await harness.graph.exports.waitForDiscards()
         XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
         XCTAssertEqual(try Data(contentsOf: store.audioURL(for: raw)), wav)
     }
@@ -107,6 +108,8 @@ import CassiniNotebook
             let id = try XCTUnwrap(outcome?.noteID)
             originals[id] = try Data(contentsOf: input)
         }
+        let rawOutcome = await harness.graph.imports.importFile(source, opensNote: false).value
+        originals[try XCTUnwrap(rawOutcome?.noteID)] = wav
         let before = harness.graph.library.notes
         let metadata = try Dictionary(uniqueKeysWithValues: before.map { note in
             (note.id, try Data(contentsOf: store.directory(for: note.id).appendingPathComponent("note.json")))
@@ -131,14 +134,15 @@ import CassiniNotebook
         let task = try XCTUnwrap(batch.task)
         await task.value
         let report = try XCTUnwrap(batch.report)
-        XCTAssertEqual(report.summary.duplicates, 2)
+        XCTAssertEqual(report.summary.duplicates, 3)
         XCTAssertEqual(report.summary.imported, 0)
         XCTAssertEqual(report.summary.failed, 0)
-        XCTAssertEqual(harness.graph.library.notes.count, 2)
+        XCTAssertEqual(harness.graph.library.notes.count, 3)
         harness.graph.exports.discard(archive)
+        await harness.graph.exports.waitForDiscards()
 
         // A local edit needs a new portable snapshot, while the stored original and metadata stay read-only.
-        let editedID = try XCTUnwrap(before.first?.id)
+        let editedID = try XCTUnwrap(before.first { $0.origin == .importedDocument }?.id)
         await harness.graph.library.commit(editedID) { note in
             let original = note.transcript[0]
             let revised = original.revised(text: "English locally edited words", speakerID: original.speakerID, speakers: note.speakers ?? [])
@@ -158,6 +162,29 @@ import CassiniNotebook
         XCTAssertEqual(try Data(contentsOf: store.originalAudioURL(for: editedNote)), originals[editedID])
         XCTAssertEqual(try Data(contentsOf: metadataURL), editedMetadata)
         harness.graph.exports.discard(changed)
+        await harness.graph.exports.waitForDiscards()
+    }
+
+    func testBatchStartClearsStaleFailureButCancelledPickerDoesNotAndNoSpaceIsSpecific() async throws {
+        let harness = TestGraph(audio: FakeAudioProcessing())
+        defer { harness.tearDown() }
+        _ = await harness.graph.start()
+        let imports = harness.graph.imports
+        imports.tracker.recordFailure(.cannotOpen, displayName: "Old English file")
+        imports.start([])
+        XCTAssertEqual(imports.tracker.failure?.kind, .cannotOpen)
+        let source = harness.root.appendingPathComponent("English.wav")
+        try wav.write(to: source)
+        let storage = try XCTUnwrap(harness.graph.environment.storage as? FakeStorage)
+        storage.set(availableBytes: 0)
+        imports.start([source])
+        XCTAssertNil(imports.tracker.failure)
+        let batch = try XCTUnwrap(imports.batches.last)
+        let task = try XCTUnwrap(batch.task)
+        await task.value
+        guard case .noSpace = imports.tracker.failure?.kind else { return XCTFail("The localized storage-full notice must survive batch aggregation") }
+        XCTAssertNotNil(batch.report?.storageFailure)
+        XCTAssertTrue(harness.graph.library.notes.isEmpty)
     }
 
     func testMissingSelectionIsNotSilentlyOmitted() async throws {
@@ -191,6 +218,7 @@ import CassiniNotebook
             try zip.read(try XCTUnwrap(zip.entries.first), remainingBytes: 20 << 30) { bytes.append($0) }
             XCTAssertEqual(bytes, original)
             harness.graph.exports.discard(url)
+            await harness.graph.exports.waitForDiscards()
         }
     }
 }

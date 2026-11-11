@@ -109,6 +109,69 @@ private actor BulkProgressTrace {
         #expect(try Data(contentsOf: source) == bytes)
     }
 
+    @Test func runtimeBombsRefuseArchiveAndNeverImportTheFollowingGoodMember() async throws {
+        for padded in [false, true] {
+            let sandbox = try BulkSandbox()
+            let zip = sandbox.folder.appendingPathComponent("bomb.zip")
+            try ZIPAgyFixture.write([ZIPAgyFixture.bomb(padded: padded, forgedSize: !padded), .init("Good.wav", Data(ImportFixtures.wav))], to: zip)
+            let report = await sandbox.service().run([zip])
+            #expect(report.archives == [.tooLarge])
+            #expect(report.summary.imported == 0)
+            #expect(report.summary.failed == 0)
+            #expect(await sandbox.notes.all().isEmpty)
+            #expect(try sandbox.scratchContents().isEmpty)
+        }
+    }
+    @Test func directoriesDoNotCountAsUnsupportedAndArchiveErrorsAreNotFailedFiles() async throws {
+        let sandbox = try BulkSandbox()
+        let zip = sandbox.folder.appendingPathComponent("Finder.zip")
+        try ZIPAgyFixture.write([.init("Meetings/", Data()), .init("__MACOSX/", Data()),
+                                .init("__MACOSX/._English.wav", Data("AppleDouble".utf8)),
+                                .init("Meetings/English.wav", Data(ImportFixtures.wav))], to: zip)
+        let report = await sandbox.service().run([zip])
+        #expect(report.summary.imported == 1)
+        #expect(report.summary.unsupported == 1)
+        #expect(report.summary.failed == 0)
+        try ZIPAgyFixture.write([.init("__MACOSX/", Data()), .init("__MACOSX/._English.wav", Data("AppleDouble".utf8))], to: zip)
+        let metadataOnly = await sandbox.service().run([zip])
+        #expect(metadataOnly.archives == [.empty])
+        #expect(metadataOnly.summary.unsupported == 1)
+        #expect(metadataOnly.summary.failed == 0)
+        let empty = try sandbox.archive([])
+        let failures = await sandbox.service().run([empty, empty])
+        #expect(failures.archives == [.empty])
+        #expect(failures.archiveFailures == [.empty])
+        #expect(failures.summary.failed == 0)
+        var model = BulkImportReport(); model.archives = [.empty, .damaged, .empty]
+        #expect(model.archiveFailures == [.empty, .damaged])
+    }
+    @Test func storageFullIsPreservedAndStopsTheBatch() async throws {
+        let sandbox = try BulkSandbox()
+        let zip = try sandbox.archive([("English.wav", Data(ImportFixtures.wav))])
+        sandbox.storage.set(availableBytes: 0)
+        let report = await sandbox.service().run([zip, zip])
+        guard case .noSpace = report.storageFailure else { Issue.record("Storage-full must retain its specific notice"); return }
+        #expect(report.summary.failed == 1)
+        #expect(try sandbox.scratchContents().isEmpty)
+        #expect(await sandbox.notes.all().isEmpty)
+        sandbox.storage.set(availableBytes: 64 << 30)
+        let memberStorageFailure = BulkImportService(files: CoordinatedFileImporter(storage: sandbox.storage), scratch: sandbox.scratch) { _, _ in
+            .rejected(.noSpace(bytesNeeded: 111))
+        }
+        let memberReport = await memberStorageFailure.run([zip, zip])
+        #expect(memberReport.storageFailure == .noSpace(bytesNeeded: 111))
+        #expect(memberReport.summary.failed == 1)
+        #expect(try sandbox.scratchContents().isEmpty)
+    }
+    @Test func exportSelectionOmitsLiveAndTrashedNotesButKeepsOpaqueStoredDocuments() {
+        let normal = Note(title: "English finished")
+        var live = Note(title: "English recording"); live.audio = .live
+        var trashed = Note(title: "English trashed"); trashed.trashedAt = Date()
+        var opaque = Note(title: "English future document"); opaque.audio = .unplayable(.unsupportedFormat)
+        #expect(ArchiveSelection.ids([normal, live, trashed, opaque]) == [normal.id, opaque.id])
+        #expect(ArchiveSelection.ids([live]).isEmpty)
+    }
+
     @Test func unsafeLaterMemberRefusesWholeArchiveBeforeFirstImport() async throws {
         let sandbox = try BulkSandbox()
         let zip = try sandbox.archive([("First.wav", Data(ImportFixtures.wav)), ("aa_notes.wav", Data(ImportFixtures.wav))])

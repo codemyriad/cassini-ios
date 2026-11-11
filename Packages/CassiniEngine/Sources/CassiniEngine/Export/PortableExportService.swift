@@ -66,13 +66,13 @@ public struct PortableExportService: Sendable {
             let state = source?.state
             if let state, PortableTranscript.untrustedStates.contains(state), note.holdsOnlyImportedVersions {
                 try Task.checkCancellation()
-                try FileManager.default.copyItem(at: original, to: output)
+                _ = try await BulkExportService.copyOriginal(original, to: output)
                 return output
             }
             let verified = state == .ok
             var variants = verified ? Self.keptVariants(of: note) : [:]
             let runs = provenance.records(note.id)
-            let audit = verified ? Self.attributionAudit(of: note, original: original) : nil
+            let audit = verified ? try await Self.attributionAudit(of: note, original: original) : nil
             var versions = Self.versionsToSeal(of: note)
             var current = note.versions?.first { $0.id == note.selectedVersionID }
                 ?? TranscriptVersion(kind: .editedTranscript, segments: note.transcript, speakers: note.speakers ?? [])
@@ -143,11 +143,13 @@ public struct PortableExportService: Sendable {
 
     /// The verified source document's `provenance.attribution`, which describes its own variants; nil when no version
     /// re-attributes one of its variants. The source was verified already, so only its tags are read again.
-    private static func attributionAudit(of note: Note, original: URL) -> JSONObject? {
+    private static func attributionAudit(of note: Note, original: URL) async throws -> JSONObject? {
         guard let versions = note.versions else { return nil }
         let imported = Set(versions.filter { $0.portableID != nil }.map(\.id))
         guard versions.contains(where: { $0.attributedFrom.map(imported.contains) ?? false }) else { return nil }
-        return CassiniDocument.read(original, verify: false).manifest?["provenance"]?.object?["attribution"]?.object
+        return try await CancellableFileWork.run {
+            CassiniDocument.read(original, verify: false).manifest?["provenance"]?.object?["attribution"]?.object
+        }
     }
 
     /// Seals `note` into `target`; `source` is the document at `opus` when it has been read already.

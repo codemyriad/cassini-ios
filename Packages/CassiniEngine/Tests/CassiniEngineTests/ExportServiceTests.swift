@@ -39,7 +39,7 @@ struct ExportServiceTests {
         let copy = try await service.copyAudio(note.id)
         #expect(copy.lastPathComponent == "Delivery_ Thursday_.m4a")
         #expect(try Data(contentsOf: copy) == Data([7, 8, 9]))
-        service.discard(copy)
+        await service.discard(copy).value
         let words = [Word("S1", 0, 300, "So,"), Word("S1", 400, 700, "the"), Word("S1", 800, 1100, "delivery"),
                      Word("S1", 1200, 1500, "slips?"), Word("S2", 1800, 2100, "Yes,"), Word("S2", 2200, 2500, "a"),
                      Word("S2", 2600, 2900, "Thursday.")]
@@ -54,7 +54,7 @@ struct ExportServiceTests {
             let url = try await service.exportTranscript(note.id, format: format, texts: texts)
             #expect(url.lastPathComponent == "Delivery_ Thursday_.\(format.fileExtension)")
             #expect(try Data(contentsOf: url) == Data(text.utf8), "\(format)")
-            service.discard(url)
+            await service.discard(url).value
             #expect(!FileManager.default.fileExists(atPath: url.deletingLastPathComponent().path))
         }
         #expect(!FileManager.default.fileExists(atPath: service.folder.path), "tmp/Exports is cleaned")
@@ -71,13 +71,13 @@ struct ExportServiceTests {
         #expect(copy.lastPathComponent == "Solo audio.mp3")
         #expect(try Data(contentsOf: copy) == Data([1, 2, 3]))
         #expect(copy != audio, "the note's own file is never shared in place")
-        service.discard(copy)
+        await service.discard(copy).value
         #expect(FileManager.default.fileExists(atPath: audio.path))
 
         await #expect(throws: ExportError.notAvailable(.afterTranscription)) {
             try await service.exportTranscript(note.id, format: .text, texts: texts)
         }
-        service.discard(audio)
+        await service.discard(audio).value
         #expect(try Data(contentsOf: audio) == Data([1, 2, 3]), "discard never touches a note's own files")
         #expect(!FileManager.default.fileExists(atPath: service.folder.path))
     }
@@ -147,11 +147,11 @@ struct ExportServiceTests {
         try await notes.save(note)
         let first = try await service.exportTranscript(note.id, format: .text, texts: texts)
         let second = try service.newFolder()
-        service.discard(first)
-        service.discard(first)
+        await service.discard(first).value
+        await service.discard(first).value
         #expect(!FileManager.default.fileExists(atPath: first.deletingLastPathComponent().path))
         #expect(FileManager.default.fileExists(atPath: second.path), "an export still being made keeps its folder")
-        service.discardFolder(second)
+        await service.discardFolder(second).value
         #expect(!FileManager.default.fileExists(atPath: service.folder.path))
     }
 }

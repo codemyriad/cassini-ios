@@ -39,6 +39,7 @@ import CassiniNotebook
     /// Files picked in the Library: each becomes a note in the list, as on Android; nothing opens.
     func start(_ urls: [URL]) {
         guard !urls.isEmpty else { return }
+        tracker.dismissFailure()
         guard let files, let service else { for url in urls { importFile(url, opensNote: false) }; return }
         let batch = ImportBatch(total: urls.count)
         batches.append(batch)
@@ -57,8 +58,9 @@ import CassiniNotebook
                 let pending = await finish(outcome, opensNote: false, offersConsent: false)
                 await MainActor.run { if batch.pendingConsent == nil { batch.pendingConsent = pending } }
             })
+            if let failure = batch.report?.storageFailure { tracker.recordFailure(failure, displayName: fallback) }
             batch.task = nil
-            if batch.report?.cancelled == false, let pending = batch.pendingConsent { router.offerModelDownload(for: pending) }
+            if batch.report?.cancelled == false, batch.report?.storageFailure == nil, let pending = batch.pendingConsent { router.offerModelDownload(for: pending) }
         }
     }
 

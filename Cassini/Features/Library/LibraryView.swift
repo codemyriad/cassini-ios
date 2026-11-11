@@ -31,6 +31,7 @@ struct LibraryView: View {
     var body: some View {
         @Bindable var model = model
         let content = model.content
+        let exportable = Set(ArchiveSelection.ids(library.notes))
         ScrollView {
             LazyVStack(alignment: .leading, spacing: Spacing.row) {
                 header.padding(.bottom, 8)
@@ -41,14 +42,14 @@ struct LibraryView: View {
                     // The banners say when there are no notes, no matches or no library; the Starred filter has its own.
                     if content.emptyState == .noStarred { NoStarredState().padding(.top, 8) }
                     if let results = content.results {
-                        ForEach(results) { row($0, day: $0.day ?? .today) }
+                        ForEach(results) { row($0, day: $0.day ?? .today, exportable: exportable.contains($0.id)) }
                     } else {
                         ForEach(content.sections) { section in
                             Text(LibraryFormat(calendar: calendar).day(section.key).uppercased())
                                 .font(.caption.weight(.semibold)).tracking(1.6).foregroundStyle(Color.muted)
                                 .accessibilityAddTraits(.isHeader)
                                 .padding(.top, 14)
-                            ForEach(section.rows) { row($0, day: section.key) }
+                            ForEach(section.rows) { row($0, day: section.key, exportable: exportable.contains($0.id)) }
                         }
                     }
                 }
@@ -82,6 +83,10 @@ struct LibraryView: View {
         .onAppear(perform: restoreSceneState)
         .environment(\.editMode, $editMode)
         .onChange(of: editMode) { _, mode in if !mode.isEditing { selectedNotes.removeAll() } }
+        .onChange(of: exportable) { _, eligible in
+            selectedNotes.formIntersection(eligible)
+            if eligible.isEmpty { editMode = .inactive }
+        }
         .shareSheet(item: $archiveExport.shareItem)
         .onChange(of: model.query) { _, query in if restoresSceneState { savedQuery = query } }
         .onChange(of: model.favoritesOnly) { _, only in if restoresSceneState { savedFavoritesOnly = only } }
@@ -137,12 +142,12 @@ struct LibraryView: View {
                 filterButton(LibraryCopy.all, selected: !model.favoritesOnly) { model.favoritesOnly = false }
                 filterButton(LibraryCopy.starred, symbol: "star", selected: model.favoritesOnly) { model.favoritesOnly = true }
                 Spacer(minLength: 0)
-                if library.notes.contains(where: { $0.trashedAt == nil }) {
+                if library.notes.contains(where: ArchiveSelection.isExportable) {
                     EditButton().buttonStyle(ArchiveSelectionButtonStyle())
                         .accessibilityIdentifier("selectNotesForExport")
                     Menu {
                         Button(BulkTransferCopy.all) { exportArchive(selected: false) }
-                        if !selectedNotes.isEmpty { Button(BulkTransferCopy.selected) { exportArchive(selected: true) } }
+                        if !selectedNotes.isDisjoint(with: ArchiveSelection.ids(library.notes)) { Button(BulkTransferCopy.selected) { exportArchive(selected: true) } }
                     } label: {
                         Image(systemName: "square.and.arrow.up")
                             .frame(minWidth: HitTarget.minimum, minHeight: HitTarget.minimum)
@@ -196,9 +201,9 @@ struct LibraryView: View {
         }.buttonStyle(.plain).accessibilityAddTraits(selected ? .isSelected : [])
     }
 
-    private func row(_ row: LibraryRow, day: DayKey) -> some View {
+    private func row(_ row: LibraryRow, day: DayKey, exportable: Bool) -> some View {
         HStack {
-            if editMode.isEditing {
+            if editMode.isEditing && exportable {
                 Button {
                     if !selectedNotes.insert(row.id).inserted { selectedNotes.remove(row.id) }
                 } label: { Image(systemName: selectedNotes.contains(row.id) ? "checkmark.circle.fill" : "circle").frame(minWidth: 44, minHeight: 44) }
@@ -219,7 +224,7 @@ struct LibraryView: View {
     }
 
     private func exportArchive(selected: Bool) {
-        let ids = library.notes.filter { $0.trashedAt == nil && (!selected || selectedNotes.contains($0.id)) }.map(\.id)
+        let ids = library.notes.filter { ArchiveSelection.isExportable($0) && (!selected || selectedNotes.contains($0.id)) }.map(\.id)
         archiveExport.start(ids, exports: exports, errors: errors)
     }
 

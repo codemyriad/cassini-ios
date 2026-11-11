@@ -22,6 +22,11 @@ public struct BulkImportReport: Sendable {
     public var summary = ImportSummary()
     public var cancelled = false
     public var archives: [ZIPFailure] = []
+    public var storageFailure: ImportFailureKind?
+    public var archiveFailures: [ZIPFailure] {
+        var seen: Set<ZIPFailure> = []
+        return archives.filter { seen.insert($0).inserted }
+    }
     public init() {}
 }
 
@@ -92,4 +97,9 @@ public struct ArchiveNames: Sendable {
         nextSuffix[key] = n
         return name
     }
+}
+
+public enum ArchiveSelection {
+    public static func isExportable(_ note: Note) -> Bool { note.trashedAt == nil && !note.isRecording }
+    public static func ids(_ notes: [Note]) -> [UUID] { notes.filter(isExportable).map(\.id) }
 }

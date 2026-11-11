@@ -57,6 +57,10 @@ import CryptoKit
                     #expect(result == Data("English sample".utf8))
                 } catch { Issue.record("EOCD sentinel at offset \(field) must use ZIP64: \(error)") }
             }
+            var allSentinels = original
+            for offset in 4..<20 { allSentinels[end + offset] = 0xff }
+            try allSentinels.write(to: url)
+            #expect(try ZIPArchive(url: url).entries.count == 1)
             var multipleDisks = original
             multipleDisks[zip64 + 16] = 1
             try multipleDisks.write(to: url)
@@ -102,7 +106,7 @@ import CryptoKit
         }
     }
 
-    @Test(arguments: ["../English.wav", "/English.wav", "C:/English.wav", "folder/../English.wav", "folder\\English.wav"])
+    @Test(arguments: ["../English.wav", "/English.wav", "C:/English.wav", "folder/../English.wav", "folder\\..\\English.wav", "\\\\server\\English.wav"])
     func pathsAreRefusedBeforeExtraction(_ path: String) throws {
         #expect(throws: ZIPFailure.unsafePaths) { try ZIPArchive.checkPath(path) }
     }

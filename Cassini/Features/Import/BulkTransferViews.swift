@@ -12,7 +12,7 @@ struct ImportBatchesView: View {
                     if report.cancelled { Text(BulkTransferCopy.cancelled) }
                     let summary = BulkTransferCopy.summary(report.summary)
                     if !summary.isEmpty { Text(summary).accessibilityIdentifier("bulkImportSummary") }
-                    ForEach(Array(report.archives.enumerated()), id: \.offset) { _, failure in Text(BulkTransferCopy.archive(failure)) }
+                    ForEach(Array(report.archiveFailures.enumerated()), id: \.offset) { _, failure in Text(BulkTransferCopy.archive(failure)) }
                     Button(BulkTransferCopy.done) { imports.batches.removeAll { $0.id == batch.id } }
                     #if DEBUG
                     UITestStateMarker(identifier: "bulkImportCompleted", value: batch.id.uuidString)
@@ -48,7 +48,7 @@ struct ImportBatchesView: View {
                 pending = nil
                 completedCount = ids.count
             } catch is CancellationError {} catch { errors.present(ExportCopy.notSaved) }
-            if let pending { exports.discard(pending) }
+            if let pending { exports.discard(pending); await exports.waitForDiscards() }
             progress = nil; task = nil
         }
     }

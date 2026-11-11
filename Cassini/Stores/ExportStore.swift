@@ -10,6 +10,7 @@ import CassiniNotebook
     @ObservationIgnored private let service: ExportService?
     @ObservationIgnored private let portable: PortableExportService?
     @ObservationIgnored private let texts: ExportTexts
+    @ObservationIgnored private var discardTask: Task<Void, Never>?
     @ObservationIgnored private let ready: @MainActor () async -> Void
 
     /// `texts` are the localized lines of every export (`ExportCopy.texts`); the sealed document labels passages without
@@ -54,13 +55,20 @@ import CassiniNotebook
             return try await portable.export(note, original: original, playable: audio, into: folder,
                                              filename: ExportNames.stem(note.title))
         } catch {
-            service.discardFolder(folder)
+            await service.discardFolder(folder).value
             throw error
         }
     }
 
     /// Removes an export once the share sheet is done with it.
-    func discard(_ url: URL) { service?.discard(url) }
+    func discard(_ url: URL) {
+        guard let service else { return }
+        let previous = discardTask
+        let current = service.discard(url)
+        discardTask = Task { await previous?.value; await current.value }
+    }
+    /// Event fence for callers that need all share-sheet/cancel cleanup to have finished.
+    func waitForDiscards() async { await discardTask?.value }
 
     /// The share sheet's item for the export at `url`, removed once the sheet is dismissed.
     func shareItem(_ url: URL) -> ShareItem { ShareItem(url: url) { [weak self] in self?.discard(url) } }

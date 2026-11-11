@@ -2,11 +2,14 @@
 
 The existing multi-file import picker also accepts ZIP. Importing an archive uses the same digest-deduplicating
 importer as individual audio/Cassini files. A completed member stays in the Library if the transfer is
-cancelled. The summary omits zero counts and reports imported, duplicate, unsupported and failed files. Nested
+cancelled. The summary omits zero counts and reports imported, duplicate, unsupported and failed files. Directories count toward
+archive safety limits but never toward unsupported-file counters. Whole-archive failures have one specific message,
+without also counting a failed file; repeated identical messages are deduplicated. Storage-full errors use the existing
+localized storage notice, and a new nonempty batch clears the preceding import error. Nested
 archives, directories, symlinks and Finder metadata (`__MACOSX` / `._` sidecars) are ignored; they are never
 opened as files or followed as paths.
 
-Library's native Edit control selects notes. Export All as ZIP includes every live Library note, independently
+Library's native Edit control selects notes. Export All as ZIP includes every finished Library note, independently
 of search/Starred filters; Export Selected as ZIP appears only for a nonempty selection. The save/share sheet
 offers a completed archive, containing one file per selected note and no extra manifest. Existing portable
 export handles Cassini documents/versions/provenance. Clean imported documents remain byte-identical, even with
@@ -16,7 +19,11 @@ portable snapshot because iOS stores those edits beside the source; that snapsho
 replacing the source. Audio-only notes keep their original bytes and extension; unknown/unreadable Cassini
 documents keep their original bytes. Export names use the existing naming rule, with case-insensitive numeric
 collision suffixes. A missing/deleted/live-recording member fails the export atomically rather than being
-silently omitted. Single-note export remains unchanged.
+silently omitted. Single-note export formats remain unchanged.
+
+Active recordings are excluded from all/selected export and selection controls. A Library containing only a live
+recording offers no Edit/ZIP action. Trashing a selected note immediately prunes the selection. Share-sheet cleanup
+runs on a worker with an awaitable completion fence, so removing a large archive never blocks the main actor.
 
 Archive bounds follow cassini-ux main `4d577376f6360ed352fa75307f4dc47890ed9858`, D96:
 
@@ -25,8 +32,11 @@ Archive bounds follow cassini-ux main `4d577376f6360ed352fa75307f4dc47890ed9858`
   traversal paths and inconsistent/truncated directory records reject the whole archive. A damaged member header or CRC counts as one failed member; other valid members continue.
 - The existing 4 GiB single-file import limit also applies to members. An oversized member is counted as failed.
 - Stored and deflated payloads stream in 64 KiB chunks, with CRC, exact size and actual-byte budget checks.
-  Ignored/oversized members are not expanded. No archive path is passed to a filesystem write.
-- All six classic EOCD ZIP64 sentinels and harmless local/directory descriptor/encoding/option flag differences are accepted; encryption and path checks still apply independently to both headers. Stored ZIP64 output supports the full archive size limit. Payloads and the directory are each written once.
+  A false expanded size stops publication of extra bytes, while validation keeps draining so actual size/ratio
+  violations are refused as too large. The final ratio uses compressed bytes consumed through deflate end-of-stream,
+  excluding forged padding. Ignored/oversized members are not expanded. No archive path is passed to a filesystem write.
+- All six classic EOCD ZIP64 sentinels and harmless local/directory descriptor/encoding/option flag differences are accepted; encryption (including AES method99/extra0x9901) and path checks still apply independently to both headers. Relative
+  Windows separators normalize to `/`, valid POSIX colon names are accepted, and absolute/drive/parent paths are refused. Stored ZIP64 output supports the full archive size limit. Payloads and the directory are each written once.
   Partial exports and per-import UUID staging folders are removed on cancellation/failure; exports are also swept
   on next launch. Pending model-consent navigation waits until the import finishes so progress remains cancellable.
 
