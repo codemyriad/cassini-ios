@@ -5,8 +5,9 @@ import Testing
 /**
  * A fresh seal over an unverified or stale document keeps the manifest's private `x` data (desktop notes under
  * `x["gocassini.com"].notes`) and any top-level member a newer format defines, verbatim: SPEC "Private use" and "a
- * rewrite carries unrecognised members forward". It keeps the meeting (its id, `recordedAtLocal` and unknown members)
- * and the provenance members not tied to a transcript too. Nothing that describes the source's transcripts or audio
+ * rewrite carries unrecognised members forward". It keeps the meeting id and unknown members; the site-local label
+ * is kept for the same audio but dropped when the source is stale. It also keeps
+ * the provenance members not tied to a transcript. Nothing that describes the source's transcripts or audio
  * survives, since that is other audio or audio nobody checked.
  */
 @Suite struct CassiniDocumentCarryTests {
@@ -77,13 +78,20 @@ import Testing
                 sourceLocation: sourceLocation)
         let meeting = sealed.manifest?["meeting"]?.object, sourceMeeting = before.manifest?["meeting"]?.object
         #expect(meeting?["id"] == sourceMeeting?["id"], "the same packets keep the meeting", sourceLocation: sourceLocation)
-        #expect(meeting?.keys == sourceMeeting?.keys, sourceLocation: sourceLocation)
-        #expect(meeting?["recordedAtLocal"] == .string("2026-10-30T09:15:00"), sourceLocation: sourceLocation)
+        if state == .staleAudio {
+            #expect(meeting?.keys == sourceMeeting?.keys.filter { $0 != "recordedAtLocal" }, sourceLocation: sourceLocation)
+            #expect(meeting?["recordedAtLocal"] == nil, sourceLocation: sourceLocation)
+            #expect(comments(sealed) { $0 == "CASSINI_RECORDED_AT_LOCAL" }.isEmpty, sourceLocation: sourceLocation)
+        } else {
+            #expect(meeting?.keys == sourceMeeting?.keys, sourceLocation: sourceLocation)
+            #expect(meeting?["recordedAtLocal"] == .string("2026-10-30T09:15:00"), sourceLocation: sourceLocation)
+            #expect(comments(sealed) { $0 == "CASSINI_RECORDED_AT_LOCAL" } ==
+                    ["CASSINI_RECORDED_AT_LOCAL=2026-10-30T09:15:00"], sourceLocation: sourceLocation)
+        }
         #expect(meeting?["futureMeetingField"]?.serialized() == #"{"room":"Sala 2","seats":9007199254740993}"#,
                 sourceLocation: sourceLocation)
         #expect(meeting?["title"] == .string("Resealed"), sourceLocation: sourceLocation)
         #expect(meeting?["durationMs"] == sealed.manifest?["audio"]?.object?["durationMs"], sourceLocation: sourceLocation)
-        #expect(sealed.comments.contains("CASSINI_RECORDED_AT_LOCAL=2026-10-30T09:15:00"), sourceLocation: sourceLocation)
         let provenance = sealed.manifest?["provenance"]?.object
         #expect(provenance?["futureProvenanceField"]?.serialized() == JSON.object(try JSON.parseObject(Self.futureText)).serialized(),
                 sourceLocation: sourceLocation)

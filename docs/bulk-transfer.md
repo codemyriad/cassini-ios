@@ -15,10 +15,11 @@ offers a completed archive, containing one file per selected note and no extra m
 export handles Cassini documents/versions/provenance. Clean imported documents remain byte-identical, even with
 a missing/stale optional TITLE tag, so importing the ZIP detects the original digest. The stored audio/document
 and note.json are never written by bulk export. Actual local transcript/title/speaker edits require a private
-portable snapshot because iOS stores those edits beside the source; that snapshot includes the edits without
-replacing the source. Audio-only notes keep their original bytes and extension; unknown-format or
-wordless Cassini documents keep their original bytes. Broken metadata with local words is sealed into a valid
-portable snapshot, including local edits and speaker labels. Export names use the existing naming rule, with case-insensitive numeric
+portable snapshot for a verified document because iOS stores those edits beside the source; that snapshot includes
+those edits without replacing the source. Audio-only notes keep their original bytes and extension. Every non-OK
+Cassini document keeps its original bytes even when the note has local words, edits or renamed speakers: those
+changes cannot authenticate the original audio binding or recording start. Its on-device versions remain in the
+Library. Wordless Cassini documents also keep their original bytes. Export names use the existing naming rule, with case-insensitive numeric
 collision suffixes. A missing/deleted/live-recording member fails the export atomically rather than being
 silently omitted. Single-note export formats remain unchanged.
 

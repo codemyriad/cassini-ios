@@ -10,6 +10,10 @@ import CassiniNotebook
     public let events: AsyncStream<CaptureEvent>
     private let continuation: AsyncStream<CaptureEvent>.Continuation
     public var elapsed: TimeInterval = 0
+    /// A test supplies the microphone's position-zero instant after preparing its session.
+    public var recordedAt: Date?
+    /// Event gate for permission/session preparation, before the microphone starts writing.
+    public var beforeStart: (@MainActor () async -> Void)?
     /// The capture file's size; by default what 48 kHz 16-bit mono PCM writes in `elapsed`.
     public var fileBytesOverride: Int64?
     public private(set) var url: URL?
@@ -26,6 +30,7 @@ import CassiniNotebook
     public var fileBytes: Int64 { fileBytesOverride ?? Int64(elapsed * Double(RecordingPolicy.pcmBytesPerSecond)) }
 
     public func start(url: URL) async throws -> CaptureFormat {
+        await beforeStart?()
         if let startError { throw startError }
         starts += 1
         self.url = url

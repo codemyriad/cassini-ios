@@ -8,6 +8,51 @@ import CassiniEngineTesting
 /// Recording through the app graph: the Library's note mirror, the router, real CAF repair, inspection and M4A
 /// compression.
 @MainActor final class RecordingTests: XCTestCase {
+    /// D95 saves position zero through LibraryRecordingNotes/LibraryStore while the controller is starting.
+    /// The Library index and row projection must follow that mirror write and the subsequent active state.
+    func testPositionZeroCommitKeepsTheActiveRecordingRowInSyncWithItsCard() async throws {
+        let test = TestGraph(transcriber: FakeTranscriber(.returns([], total: 1), status: .unsupported),
+                             audio: FakeAudioProcessing(duration: 2, opensAnyFile: true))
+        defer { test.tearDown() }
+        let graph = test.graph
+        await graph.start()
+        await graph.recording.start()
+        await waitUntil { graph.recording.state.isActive }
+        await graph.recording.controller.settle()
+        await graph.library.settle()
+        await graph.libraryScreen.settle()
+        let id = try XCTUnwrap(graph.recording.state.noteID)
+        let mirrored = try XCTUnwrap(graph.library.note(id))
+        let row = try XCTUnwrap(graph.libraryScreen.content.sections.flatMap(\.rows).first { $0.id == id })
+        let card = try XCTUnwrap(graph.libraryScreen.recordingCard)
+        XCTAssertEqual(card.noteID, id)
+        XCTAssertEqual(row.status, .recording)
+        XCTAssertTrue(row.isRecording)
+        XCTAssertEqual(mirrored.audio, .live)
+        XCTAssertNotNil(mirrored.meetingTime.instant)
+        XCTAssertEqual(row.meetingTime, mirrored.meetingTime)
+        let store = try XCTUnwrap(graph.library.noteStore)
+        let storedNote = await store.note(id)
+        let stored = try XCTUnwrap(storedNote)
+        XCTAssertEqual(stored.meetingTime, mirrored.meetingTime)
+        let persisted = try XCTUnwrap(try NoteRepository(root: test.root).load().notes.first { $0.id == id })
+        XCTAssertEqual(persisted.meetingTime, mirrored.meetingTime)
+        XCTAssertEqual(persisted.audio, .live)
+
+        graph.recording.controller.pause()
+        graph.recording.controller.resume()
+        await graph.libraryScreen.settle()
+        let resumed = try XCTUnwrap(graph.libraryScreen.content.sections.flatMap(\.rows).first { $0.id == id })
+        XCTAssertEqual(resumed.status, .recording)
+        XCTAssertTrue(resumed.isRecording)
+        XCTAssertEqual(resumed.meetingTime, mirrored.meetingTime)
+
+        graph.recording.screen.finish()
+        await waitUntil { !graph.recording.state.inProgress }
+        await graph.recording.controller.settle()
+        await graph.library.settle()
+    }
+
     func testUnavailableSpeechFinishesAudioOnlyWithoutAQueueOrConsentScreen() async throws {
         for consented in [false, true] {
             let test = TestGraph(transcriber: FakeTranscriber(.returns([], total: 1), status: .unsupported))

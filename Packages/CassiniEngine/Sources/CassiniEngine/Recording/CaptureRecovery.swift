@@ -14,7 +14,7 @@ public struct CaptureRecovery: Sendable {
     public static let corruptPrefix = NoteRepository.metadataFilename + ".corrupt-"
     /// The files a recording leaves, in the order a rebuilt note prefers them.
     static let recordingFiles = [RecordingController.captureFilename, RecordingController.compressedFilename]
-    static let audioExtensions: Set<String> = ["caf", "m4a", "wav", "aif", "aiff", "mp3", "aac", "flac"]
+    static let audioExtensions: Set<String> = ["caf", "m4a", "wav", "aif", "aiff", "mp3", "aac", "flac", "opus"]
 
     private let audio: any AudioProcessing
     private let repairer: any CaptureRepairing
@@ -55,7 +55,29 @@ public struct CaptureRecovery: Sendable {
             let createdAt = (try? url.resourceValues(forKeys: [.creationDateKey]).creationDate) ?? now
             var note = Note(id: id, title: recoveredTitle(createdAt), createdAt: createdAt, audioFilename: audioFile)
             note.origin = .recovered
-            apply(await finish(url), to: &note)
+            // Filesystem creation is a sorting fallback, never proof of recording position zero.
+            note.meetingTime = .unknown
+            let original = folder.appendingPathComponent(ImportService.documentFilename)
+            let documentURL = fileManager.fileExists(atPath: original.path) ? original : url
+            if let portable = PortableTranscript.read(from: documentURL) {
+                let playback = folder.appendingPathComponent(ImportService.playbackFilename)
+                var importedAudio = ImportedAudio(filename: documentURL.lastPathComponent, duration: portable.duration ?? 0,
+                                                   state: .unplayable(.unsupportedFormat))
+                let hadPlayback = fileManager.fileExists(atPath: playback.path)
+                do {
+                    if !hadPlayback { try await audio.decodeOpus(documentURL, to: playback) }
+                    let summary = try await audio.inspect(playback)
+                    importedAudio = ImportedAudio(filename: ImportService.playbackFilename,
+                        originalFilename: documentURL.lastPathComponent, duration: summary.duration, waveform: summary.waveform)
+                } catch {
+                    if !hadPlayback { try? fileManager.removeItem(at: playback) }
+                }
+                note = ImportedNote.make(id: id, displayName: nil, fallbackTitle: recoveredTitle(createdAt),
+                    sha256: "", importedAt: createdAt, audio: importedAudio, document: portable)
+                note.sourceSha256 = nil
+            } else {
+                apply(await finish(url), to: &note)
+            }
             do {
                 try repository.save(note)
                 rebuilt.append(RecoveredRecording(noteID: id, createdAt: createdAt, recoveredAt: now, duration: note.duration))

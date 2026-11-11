@@ -583,25 +583,15 @@ stricter or looser than the spec.
   import:
   - **Verified:** every variant stays, and the note's versions are added beside them, with the note's title and
     speaker names.
-  - **Stale or unverified, nothing new on the device:** the export is the document itself, byte for byte, like
-    Android's Save a copy. Its variants, provenance, `x` data and honest state all survive. Renamed speakers and a
-    renamed title are not written, as on Android, whose relabel and retitle need a verified document. The note screen
-    keeps such a note read-only anyway, so only the title can change.
-  - **Stale or unverified, with versions made on the device (Transcribe again on a stale document):** a fresh seal
-    over the same audio that holds only those versions. The note is read-only otherwise, so no edit, merge or rename
-    gets here, and an unverified document cannot take a new version at all. The newest version is the default, even
-    when the note shows an imported version. The imported variants are not sealed again, because the audio does not
-    vouch for them; the note still shows them, and no provenance record names them. What the source manifest holds
-    apart from its transcripts and audio is carried verbatim (D53.2 Q3, SPEC "Extensibility"): `x` (desktop notes
-    under `x["gocassini.com"]`), any top-level member the schema does not define, the `meeting` with its id,
-    `recordedAtLocal` and unknown members (only the title, `createdAtUtc` and `durationMs` are written afresh), and
-    the `provenance` members other than `speechToText`, `displayTranscript`, `meetingSummary`, `attribution` and
-    `wordTimings`. Its integrity, audio, speakers, transcripts, readable transcripts, summary, attachments and
-    `CASSINI_*` tags are not carried; foreign and `X_*` tags are. The speakers are rebuilt from the new words, so
-    unknown members of the source's speaker entries are lost. `CassiniDocument.create(…, carrying:)` does the
-    carrying, and Android's has no such parameter yet.
-  - **Broken, newer-format or plain audio:** a fresh seal with only the foreign tags, since there is no manifest to
-    keep.
+  - **Any non-OK Cassini document:** the export is the original document itself, byte for byte, even after
+    Transcribe again, local editing or a merge added on-device versions. Its original meeting time, integrity,
+    variants, provenance, private data and honest trust state all survive. No timestamp repair or re-signing occurs;
+    local words cannot authenticate the source's audio binding or recording start. Local versions remain available
+    in the note, but are not inserted into a non-OK portable original during export. The low-level
+    `CassiniDocument.create(…, carrying:)` API remains available to explicit callers; app exports do not use it to
+    repair a non-OK original.
+  - **Plain audio:** a fresh seal with the note's words. A trustworthy own-recording start is written as
+    `recordedAtUtc` with its UTC mirror and DATE; unknown starts remain absent.
 - **Cross-app vectors** (parity report risk 6). The files of coordination `ux-draft/cross-app-vectors`, which every
   Cassini app must open the same way, are copied byte for byte into `CassiniEngineTests/Resources/cross-app-vectors`
   with `expected.json`, each pinned by its SHA-256 (a file's pin is `SHA256.json`'s). `CrossAppVectorTests` checks
@@ -1037,3 +1027,7 @@ and queue rebuild. Low live memory is checked at admission/load/window and can r
 hardware/locale/assets probe remains separate. The physical measurement did not include downloaded speaker models.
 Settings and the first Whistle result use the coordinator's dismissible Parakeet suggestion only when the device
 passes capability, memory and disk checks; its size comes from the speech-only pinned download plan.
+
+### Meeting time (D95)
+
+iOS follows the shared recordedAtUtc/offset DATE/local-label reader order. Invalid optional UTC values fall through without hiding words. Known meeting times sort by displayed calendar fields and resolved instant, then stable identity; unknown dates form the last group, ordered by creation only within that group. Local labels stay as written. The Library uses the shared “Date unknown” heading for sighted and VoiceOver users; individual rows, Note subtitles, Document info and text exports omit a repeated unknown-date label (the Note subtitle keeps duration). Date filters use recorded instants or the written calendar day of a local label, without inventing a zone. Legacy imported metadata is backfilled once using only checked manifest headers; warm catalogue loads never decode original transcript payloads. See [format pin](format-pin.md).

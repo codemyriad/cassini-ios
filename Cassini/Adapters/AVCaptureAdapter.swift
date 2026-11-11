@@ -50,6 +50,7 @@ extension AVAudioRecorder: CaptureRecorder {}
     private let continuation: AsyncStream<CaptureEvent>.Continuation
     private let session: CaptureSession
     private let makeRecorder: @MainActor (URL) throws -> any CaptureRecorder
+    private(set) var recordedAt: Date?
     private var recorder: (any CaptureRecorder)?
     private var timer: Timer?
     private var observers: [NSObjectProtocol] = []
@@ -104,6 +105,8 @@ extension AVAudioRecorder: CaptureRecorder {}
                 capture.delegate = nil; capture.stop()
                 throw AudioError.startFailed
             }
+            // record() can spend time preparing hardware; anchor to the actual audio position after it succeeds.
+            recordedAt = Date().addingTimeInterval(-max(0, capture.currentTime))
             recorder = capture; isPaused = false
             let meterTimer = Timer(timeInterval: 0.1, repeats: true) { [weak self] _ in
                 MainActor.assumeIsolated { self?.tick() }

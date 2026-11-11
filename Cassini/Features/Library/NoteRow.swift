@@ -69,8 +69,9 @@ struct NoteRow: View {
                     .lineLimit(2).accessibilityIdentifier("rowPreview").passive()
             }
             FlowLayout(spacing: 8) {
-                Text(row.day.map { format.dayTime($0, row.createdAt) } ?? format.time(row.createdAt))
-                    .font(.caption).foregroundStyle(Color.muted).passive()
+                if let meetingTime = format.meetingTime(row) {
+                    Text(meetingTime).font(.caption).foregroundStyle(Color.muted).passive()
+                }
                 RowChip(status: row.status).passive()
                 suffix
                 if row.bookmarkCount > 0 {

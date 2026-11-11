@@ -172,12 +172,14 @@ public struct NoteSubtitle: Hashable, Sendable {
     /// current one.
     public var day: DayKey
     public var createdAt: Date
+    public var meetingTime: MeetingTime = .unknown
     public var duration: TimeInterval
 
     /// Nil in reading mode, whose header has the search and the chips instead.
     public static func of(_ note: Note, mode: NoteMode, now: Date, calendar: Calendar) -> NoteSubtitle? {
         guard mode != .reading else { return nil }
-        return NoteSubtitle(day: DayGroups.key(note.createdAt, now: now, calendar: calendar), createdAt: note.createdAt,
+        return NoteSubtitle(day: note.meetingTime.day(in: calendar).map { DayGroups.key($0, now: now, calendar: calendar) } ?? .undated,
+                            createdAt: note.createdAt, meetingTime: note.meetingTime,
                             duration: note.duration)
     }
 }

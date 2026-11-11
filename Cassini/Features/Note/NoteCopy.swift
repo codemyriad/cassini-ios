@@ -32,9 +32,14 @@ enum NoteCopy {
     /// "Today, 10:02 · 48:13", "Monday 5 Oct, 10:02 · 48:13": the day as the Library heads it (`DateLabels.day`).
     static func subtitle(_ subtitle: NoteSubtitle, calendar: Calendar) -> String {
         let dates = DateLabels(calendar: calendar)
-        let day = dates.day(subtitle.day), time = dates.time(subtitle.createdAt)
-        return String(localized: "\(day), \(time) · \(TimeText.clock(subtitle.duration))", table: "Note",
-                      comment: "The Note screen's subtitle: day, time of day and duration (Today, 10:02 · 48:13)")
+        switch subtitle.meetingTime {
+        case .instant(let instant):
+            let day = dates.day(subtitle.day), time = dates.time(instant)
+            return String(localized: "\(day), \(time) · \(TimeText.clock(subtitle.duration))", table: "Note",
+                          comment: "The Note screen's subtitle: day, time of day and duration (Today, 10:02 · 48:13)")
+        case .local(let text): return "\(text) · \(TimeText.clock(subtitle.duration))"
+        case .unknown: return TimeText.clock(subtitle.duration)
+        }
     }
 
     // MARK: Read-only and dialogs

@@ -12,7 +12,6 @@ struct LibraryView: View {
     @Environment(LibraryStore.self) private var library
     @Environment(Router.self) private var router
     @Environment(ErrorPresenter.self) private var errors
-    @Environment(ExportStore.self) private var exports
     @Environment(\.dynamicTypeSize) private var dynamicType
     @Environment(\.calendar) private var calendar
     @Environment(\.restoresSceneState) private var restoresSceneState
@@ -142,21 +141,7 @@ struct LibraryView: View {
                 filterButton(LibraryCopy.all, selected: !model.favoritesOnly) { model.favoritesOnly = false }
                 filterButton(LibraryCopy.starred, symbol: "star", selected: model.favoritesOnly) { model.favoritesOnly = true }
                 Spacer(minLength: 0)
-                if library.notes.contains(where: ArchiveSelection.isExportable) {
-                    EditButton().buttonStyle(ArchiveSelectionButtonStyle())
-                        .accessibilityIdentifier("selectNotesForExport")
-                    Menu {
-                        Button(BulkTransferCopy.all) { exportArchive(selected: false) }
-                        if !selectedNotes.isDisjoint(with: ArchiveSelection.ids(library.notes)) { Button(BulkTransferCopy.selected) { exportArchive(selected: true) } }
-                    } label: {
-                        Image(systemName: "square.and.arrow.up")
-                            .frame(minWidth: HitTarget.minimum, minHeight: HitTarget.minimum)
-                            .contentShape(Rectangle())
-                    }
-                    .accessibilityLabel(BulkTransferCopy.all)
-                    .accessibilityIdentifier("libraryArchiveMenu")
-                    .disabled(archiveExport.progress != nil)
-                }
+                ArchiveExportControls(selectedNotes: $selectedNotes, archiveExport: archiveExport)
             }.font(.subheadline)
             if model.isSearching {
                 Menu {
@@ -223,10 +208,6 @@ struct LibraryView: View {
         }
     }
 
-    private func exportArchive(selected: Bool) {
-        let ids = library.notes.filter { ArchiveSelection.isExportable($0) && (!selected || selectedNotes.contains($0.id)) }.map(\.id)
-        archiveExport.start(ids, exports: exports, errors: errors)
-    }
 
     /// The presented confirmation's action; the model clears the dialog.
     private func confirm(_ dialog: LibraryDialog) { Task { await model.confirm(dialog) } }
@@ -281,9 +262,3 @@ private extension ToolbarContent {
 }
 
 /// Native Edit/Done keeps its system localization, with a full target inside the button label.
-private struct ArchiveSelectionButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label.frame(minWidth: HitTarget.minimum, minHeight: HitTarget.minimum)
-            .contentShape(Rectangle()).opacity(configuration.isPressed ? 0.6 : 1)
-    }
-}

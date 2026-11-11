@@ -16,6 +16,8 @@ public struct PortableTranscript: Hashable, Sendable {
     public let warnings: [String]
     /// `meeting.title`; empty when the manifest has none.
     public let title: String
+    /// File creation time, only a sorting fallback.
+    public let meetingTime: MeetingTime
     /// `meeting.createdAtUtc`.
     public let createdAt: Date?
     /// `meeting.durationMs`, in seconds.
@@ -58,6 +60,7 @@ public struct PortableTranscript: Hashable, Sendable {
         let meeting = document.manifest?["meeting"]?.object
         meetingID = meeting?["id"]?.string.flatMap { $0.isEmpty ? nil : $0 }
         title = document.title
+        meetingTime = MeetingTime.read(document)
         createdAt = meeting?["createdAtUtc"]?.string.flatMap(Self.instant)
         duration = (try? meeting?.number("durationMs")).map { Double($0) / 1000 }
         var unavailable: [String: String] = [:]
@@ -183,6 +186,7 @@ extension PortableTranscript {
         if newLabels[ExportTranscript.unassignedSpeaker] == nil { newLabels[ExportTranscript.unassignedSpeaker] = unassignedLabel }
         return try CassiniDocument.create(opus, transcript: transcript, title: note.title, processing: processing,
                                           existing: existing, speakerLabels: newLabels, carrying: carried,
+                                          recordedAt: (note.origin == .recorded || note.origin == .recovered) ? note.meetingTime.instant : nil,
                                           target: destination).defaultId
     }
 

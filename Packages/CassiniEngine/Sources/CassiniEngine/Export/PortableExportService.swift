@@ -9,13 +9,10 @@ import CassiniNotebook
 /// The audio is the imported Ogg Opus when the note has one, else the playable file encoded to Opus. What the export
 /// keeps of an imported document depends on how that document reads now, verified once per export:
 /// - `ok`: every variant stays, with the note's title and speaker names.
-/// - `unverified` or `staleAudio`, with nothing made on this device (`Note.holdsOnlyImportedVersions`): the export is
-///   the document itself, byte for byte, as Android's Save a copy is. Its variants, provenance, private data and
-///   honest state all survive.
-/// - `unverified` or `staleAudio` with versions made here: a fresh seal of only those versions over the same audio,
-///   carrying the source manifest's private `x` data, unknown members and meeting verbatim. The imported variants
-///   are not sealed again, since the audio does not vouch for them; the note still shows them.
-/// - anything else: a fresh seal that keeps only the foreign tags.
+/// - Any non-OK Cassini document: copy the original byte for byte, including after Transcribe again has added
+///   local versions. Neither a new transcript nor a local edit can vouch for the source's meeting time,
+///   provenance or audio binding. The source's variants, private data and honest trust state all survive.
+/// - Plain audio: make a fresh seal over its audio and the note's local transcript.
 ///
 /// Intermediate files go in `<folder>/work/`, which is removed afterwards, so no title can collide with them. The
 /// source is never changed.
@@ -34,7 +31,8 @@ public struct PortableExportService: Sendable {
     }
 
     /// D96 backup: clean imported documents and raw/opaque audio keep their exact bytes, so re-import deduplicates.
-    /// Local transcript/title/speaker changes still need a complete portable snapshot; the source is never written.
+    /// Local transcript/title/speaker changes need a snapshot only for a verified original. Non-OK documents
+    /// retain their exact bytes even with local versions, so an archive cannot silently re-sign untrusted metadata.
     public func archiveSnapshot(_ note: Note, original: URL, playable: URL, into folder: URL) async throws -> URL {
         var originalBytes = ArchiveContents.preservesOriginal(note)
         if !originalBytes, note.document != nil {
@@ -59,17 +57,16 @@ public struct PortableExportService: Sendable {
             var source: CassiniDocument?
             if (try? ImportClassifier.sniff(fileAt: original)) == .oggOpus {
                 source = try await Self.read(original)
+                if let state = source?.state, state != .ok, state != .plainAudio {
+                    try Task.checkCancellation()
+                    _ = try await BulkExportService.copyOriginal(original, to: output)
+                    return output
+                }
             } else {
                 opus = work.appendingPathComponent("encoded.opus")
                 try await audio.encodeOpus(playable, to: opus)
             }
-            let state = source?.state
-            if let state, PortableTranscript.untrustedStates.contains(state), note.holdsOnlyImportedVersions {
-                try Task.checkCancellation()
-                _ = try await BulkExportService.copyOriginal(original, to: output)
-                return output
-            }
-            let verified = state == .ok
+            let verified = source?.state == .ok
             var variants = verified ? Self.keptVariants(of: note) : [:]
             let runs = provenance.records(note.id)
             let audit = verified ? try await Self.attributionAudit(of: note, original: original) : nil

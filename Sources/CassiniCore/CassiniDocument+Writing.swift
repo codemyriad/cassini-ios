@@ -5,12 +5,15 @@ extension CassiniDocument {
     /**
      * Adds a variant while retaining existing descriptors, bodies, extensions and unrelated tags. Without [existing],
      * a fresh seal carries [source]'s private and unknown manifest members, its meeting id and its meeting and
-     * provenance members not tied to its transcripts; see [seal].
+     * provenance members not tied to its transcripts; see [seal]. `recordedAt` is the trustworthy instant at
+     * playback position zero. It fills an absent recordedAtUtc on fresh, existing or carried manifests; an existing
+     * UTC start over matching audio is never overwritten; a stale source’s UTC/local fields are discarded first. An unknown start stays absent, and no local recording-site label is inferred
+     * from the machine clock.
      */
     public static func create(_ audioBytes: [UInt8], transcript: Transcript, title: String, processing: JSONObject,
                               existing: CassiniDocument? = nil, speakerLabels: [String: String] = [:],
-                              carrying source: CassiniDocument? = nil) throws -> [UInt8] {
-        let (comments, digest) = try seal(OggOpus.scan(ArraySource(audioBytes)), transcript, title, processing, existing, speakerLabels, source)
+                              carrying source: CassiniDocument? = nil, recordedAt: Date? = nil) throws -> [UInt8] {
+        let (comments, digest) = try seal(OggOpus.scan(ArraySource(audioBytes)), transcript, title, processing, existing, speakerLabels, source, recordedAt)
         let out = ArraySink()
         try check(try OggOpus.rewrite(ArraySource(audioBytes), tags: comments.packet, to: out).digest() == digest, "Audio changed while sealing")
         try verify(read(out.bytes), transcript)
@@ -20,9 +23,9 @@ extension CassiniDocument {
     /** Streams [audio] into [target] behind the new tags and verifies the written file from disk; nothing is left on failure. */
     @discardableResult
     public static func create(_ audio: URL, transcript: Transcript, title: String, processing: JSONObject, existing: CassiniDocument?,
-                              speakerLabels: [String: String], carrying source: CassiniDocument? = nil,
+                              speakerLabels: [String: String], carrying source: CassiniDocument? = nil, recordedAt: Date? = nil,
                               target: URL) throws -> CassiniDocument {
-        let (comments, digest) = try seal(OggOpus.scan(audio), transcript, title, processing, existing, speakerLabels, source)
+        let (comments, digest) = try seal(OggOpus.scan(audio), transcript, title, processing, existing, speakerLabels, source, recordedAt)
         do {
             try writeWithTags(audio, comments, digest, target)
             let sealed = read(target)
@@ -84,11 +87,13 @@ extension CassiniDocument {
      * exactly that manifest, those other comments and every variant body of [existing]. Nothing is left at [target] on
      * failure.
      */
-    static func rewriteManifest(_ source: URL, existing: CassiniDocument, manifest: JSONObject, title: String? = nil,
+    static func rewriteManifest(_ source: URL, existing: CassiniDocument, manifest input: JSONObject, title: String? = nil,
                                         target: URL) throws -> CassiniDocument {
+        let manifest = try canonicalizingTimestamps(input)
         let digest = try manifest.object("integrity").string("opusAudioSha256")
         var kept = Comments(text: existing.comments, opaque: existing.opaqueComments)
         if let title { kept = kept.titled(title) }
+        kept = kept.dated(meeting: try manifest.object("meeting"), source: existing)
         let comments = kept.deriving(try copies(of: manifest) + manifestTags(manifest))
         do {
             try writeWithTags(source, comments, digest, target)
@@ -126,10 +131,15 @@ extension CassiniDocument {
     /**
      * The `meeting` a fresh seal starts from: [source]'s, verbatim and in its order, when it has an id. A fresh seal
      * covers the same audio packets, so it is a tag rewrite and keeps the meeting's id (SPEC `meeting.id`) along with
-     * `recordedAtLocal` and every member this build does not know; it then sets [resealedMeetingMembers] itself.
+     * every member this build does not know; it then sets [resealedMeetingMembers] itself. Recording-time metadata is
+     * retained only while the source has not been shown to describe different audio (`staleAudio`).
      */
     public static func carriedMeeting(of source: CassiniDocument?) -> JSONObject? {
-        guard let meeting = source?.manifest?["meeting"]?.object, meeting["id"]?.string?.isEmpty == false else { return nil }
+        guard var meeting = source?.manifest?["meeting"]?.object, meeting["id"]?.string?.isEmpty == false else { return nil }
+        if source?.state == .staleAudio {
+            meeting["recordedAtUtc"] = nil
+            meeting["recordedAtLocal"] = nil
+        }
         return meeting
     }
 
@@ -164,7 +174,7 @@ extension CassiniDocument {
      */
     static func seal(_ stream: OggOpus.Info, _ transcript: Transcript, _ title: String, _ processing: JSONObject,
                      _ existing: CassiniDocument?, _ speakerLabels: [String: String],
-                     _ source: CassiniDocument? = nil) throws -> (comments: Comments, digest: String) {
+                     _ source: CassiniDocument? = nil, _ recordedAt: Date? = nil) throws -> (comments: Comments, digest: String) {
         let digest = try stream.digest()
         try check(existing == nil || existing!.state == .ok, "Never rebind stale transcripts to different audio")
         try check(existing == nil || source == nil, "A seal beside a document keeps its manifest; it carries nothing else")
@@ -185,6 +195,14 @@ extension CassiniDocument {
             ("integrity", .object(JSONObject([("matchPolicy", .string(matchPolicy)), ("opusAudioSha256", .string(digest))] + shape))),
             ("speakers", .array([])), ("transcripts", .array([])),
         ])
+        manifest = try canonicalizingTimestamps(manifest)
+        // A caller's trustworthy start can repair a legacy own document without rebinding its
+        // meeting id or audio. An existing UTC start stays authoritative while its source audio still matches.
+        if let recordedAt, var recordedMeeting = manifest["meeting"]?.object,
+           recordedMeeting["recordedAtUtc"] == nil {
+            recordedMeeting["recordedAtUtc"] = .string(instantText(recordedAt))
+            manifest["meeting"] = .object(recordedMeeting)
+        }
         var descriptors = try manifest.array("transcripts")
         let id = descriptors.isEmpty ? "words" : "words-" + UUID().uuidString.lowercased().prefix(8)
         descriptors = descriptors.map { d in
@@ -230,6 +248,7 @@ extension CassiniDocument {
             comments = Comments(text: foreign.text, opaque: foreign.opaque)
         }
         comments = comments.titled(try manifest.object("meeting").string("title"))
+        comments = comments.dated(meeting: try manifest.object("meeting"), source: existing ?? source)
         comments = comments.deriving(try copies(of: manifest) + bodyTags.filter { !isDerived(tagName($0)) } + manifestTags(manifest))
         return (comments, digest)
     }

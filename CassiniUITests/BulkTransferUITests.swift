@@ -45,7 +45,14 @@ final class BulkTransferUITests: XCTestCase {
         app.buttons["Library"].tap()
         XCTAssertTrue(app.buttons["activeRecordingCard"].waitForExistence(within: 15))
         app.buttons["libraryArchiveMenu"].tap()
-        app.collectionViews.buttons["Export All as ZIP…"].tapWhenSettled()
+        let export = app.collectionViews.buttons["Export All as ZIP…"]
+        XCTAssertTrue(export.waitForExistence(within: 15))
+        let card = app.buttons["activeRecordingCard"]
+        let previous = card.label
+        XCTAssertTrue(card.wait(until: NSPredicate(format: "label != %@", previous), within: 15),
+                      "The open menu survives an actual capture-clock update")
+        XCTAssertTrue(export.exists)
+        export.tapWhenSettled()
         XCTAssertTrue(app.otherElements["ActivityListView"].waitForExistence(within: 15))
         closeShareSheet(app)
         XCTAssertTrue(app.staticTexts["zipExportCompleted"].waitForExistence(within: 15))

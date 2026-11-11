@@ -12,12 +12,19 @@ struct DateLabels {
     /// "Today", "Yesterday", "Monday 5 Oct", "5 Oct 2025".
     func day(_ key: DayKey) -> String {
         switch key {
+        case .undated: return Self.unknownDate()
         case .today: return LibraryCopy.today
         case .yesterday: return LibraryCopy.yesterday
         case .date(let day, let withYear):
             guard let date = day.start(in: calendar) else { return "" }
             return formatted(date, withYear ? "d MMM yyyy" : "EEEE d MMM").capitalized(firstLetterIn: locale)
         }
+    }
+
+    /// Shared `library.group.unknownDate`; a section remains named for sighted and VoiceOver users.
+    static func unknownDate(bundle: Bundle = .main) -> String {
+        String(localized: "Date unknown", table: "Library", bundle: bundle,
+               comment: "Shared catalog library.group.unknownDate: Library section for an unknown meeting date")
     }
 
     /// "9:41 AM", "09:41".

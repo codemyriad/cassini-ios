@@ -243,9 +243,9 @@ import CassiniNotebook
         var note = note
         if asStored { for entry in unsaved[note.id] ?? [] { entry.change(&note) } }
         if let index = notes.firstIndex(where: { $0.id == note.id }) {
-            if notes[index].createdAt == note.createdAt { notes[index] = note; return }
+            if notes[index].sortDate == note.sortDate { notes[index] = note; return }
             notes.remove(at: index)
         }
-        notes.insert(note, at: notes.firstIndex { $0.createdAt < note.createdAt } ?? notes.endIndex)
+        notes.insert(note, at: notes.firstIndex { $0.sortDate < note.sortDate } ?? notes.endIndex)
     }
 }
