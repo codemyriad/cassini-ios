@@ -208,12 +208,19 @@ struct NoteSectionView: View {
                                dismissed: model.screen.dismissed, speechInstallBytes: installBytes.speech,
                                speakersInstallBytes: installBytes.speakers,
                                speechUnavailableText: processing.models.speechUnavailability == .model ? NoteCopy.speechUnavailable : nil,
-                               speakerModelsMissing: speakerModelsMissing)
+                               speakerModelsMissing: speakerModelsMissing, speakerModelsInstalling: speakerModelsInstalling)
     }
 
     private var speakerModelsMissing: Bool {
         switch processing.models.status(of: .speakers) {
         case .notDownloaded, .failed: true
+        default: false
+        }
+    }
+
+    private var speakerModelsInstalling: Bool {
+        switch processing.models.status(of: .speakers) {
+        case .downloading, .checking: true
         default: false
         }
     }

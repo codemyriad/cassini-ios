@@ -48,9 +48,10 @@ public enum NoteBanners {
                              requiredFreeBytes: (job?.kind == .speakersOnly ? facts.speakersInstallBytes
                                                  : facts.speechInstallBytes) ?? downloadFreeBytes,
                              noNewVersion: note.refusesNewVersion)
-        if facts.speakerModelsMissing {
+        if facts.speakerModelsMissing || facts.speakerModelsInstalling {
             for index in jobBanners.indices where jobBanners[index].kind == .txOneVoice {
                 jobBanners[index].actions = ReadOnlyReason.of(note, job: job) == nil ? [.download] : []
+                if facts.speakerModelsInstalling { jobBanners[index].disabledActions.insert(.download) }
             }
         }
         specs += jobBanners
