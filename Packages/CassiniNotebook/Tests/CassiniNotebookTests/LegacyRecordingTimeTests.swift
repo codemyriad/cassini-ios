@@ -84,7 +84,7 @@ struct LegacyRecordingTimeTests {
         #expect(ambiguous.origin == .recorded, "The old origin heuristic alone cannot distinguish this filename")
         #expect(ambiguous.meetingTime == .unknown)
         for extra in [#", "meetingTime":{"unknown":{}}"#, #", "meetingTime":null"#,
-                      #", "sourceSha256":"imported-audio-digest"#, #", "originalAudioFilename":"source.m4a"#] {
+                      #", "sourceSha256":"imported-audio-digest""#, #", "originalAudioFilename":"source.m4a""#] {
             let note = try JSONDecoder().decode(Note.self, from: legacy(schema: 2, filename: "audio.m4a", extra: extra))
             #expect(note.meetingTime == .unknown)
         }
