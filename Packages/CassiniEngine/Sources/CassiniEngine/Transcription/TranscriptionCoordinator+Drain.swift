@@ -3,8 +3,8 @@ import CassiniNotebook
 
 /// The drain loop: one job at a time in queue order, in the background time it holds, and the system's Stop.
 ///
-/// Touches: `drainTask`, `rerun`, `background`, `backgroundProgress`, `systemStopWrites` and
-/// `systemStops` (main actor); `active` and
+/// Touches: `drainTask`, `rerun`, `background`, `backgroundProgress`, `systemStopWrites`,
+/// `systemStops` and `unresolvedSystemStops` (main actor); `active` and
 /// the outcome writes inside `lock`'s section; the running job only through `setRunning`, the hold through `setHold`.
 extension TranscriptionCoordinator {
     /// Starts the drain loop, or makes the running one look at the queue again before it ends.
@@ -99,6 +99,9 @@ extension TranscriptionCoordinator {
         await current.events?.value
         await lock.run {
             await record(current, outcome)
+            if unresolvedSystemStops.contains(current.noteID), await parts.jobs.job(current.noteID)?.state != .running {
+                unresolvedSystemStops.remove(current.noteID)
+            }
             // The jobs first: while `active` is set, Trash reads the job from it, and after, from `state.jobs`.
             await refresh()
             active = nil
@@ -195,6 +198,12 @@ extension TranscriptionCoordinator {
                     await markPaused(current.noteID, .system)
                     await mirror(current.noteID)
                     await refresh()
+                }
+                // Still stored as running, by this run or by one whose outcome could not be stored: the stop is not
+                // resolved until an outcome is. A new run of the same note is running for its own reasons.
+                if active === current || active?.noteID != current.noteID,
+                   await parts.jobs.job(current.noteID)?.state == .running {
+                    unresolvedSystemStops.insert(current.noteID)
                 }
                 systemStopWrites[id] = nil
             }

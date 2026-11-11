@@ -122,6 +122,8 @@ import CassiniNotebook
     var sectionWaiting: Int { coordinator.lock.waiting }
     /// An activation has claimed the resume of the system's pause and is queueing the jobs again.
     var activationClaimed: Bool { coordinator.resumingSystemPause }
+    /// A system stop's pause write has not run to its end yet.
+    var systemStopPending: Bool { !coordinator.systemStopWrites.isEmpty }
 
     func tearDown() {
         try? FileManager.default.removeItem(at: root)

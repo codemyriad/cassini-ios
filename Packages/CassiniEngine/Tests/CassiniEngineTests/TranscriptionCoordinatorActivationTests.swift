@@ -417,6 +417,72 @@ extension TranscriptionCoordinatorTests {
             #expect(next.runner.runs.map(\.noteID) == [b, a])
         }
 
+        /// Round-4 review of #101: the system stop's pause of A cannot be saved (`jobs.json` cannot be written), so A
+        /// is still stored as running. The activation must not take that for "nothing paused" and clear the hold: once
+        /// the queue can be written again, the old run's own outcome stores A as paused by the system, and only the
+        /// hold makes an activation resume it. Returns once that outcome is stored.
+        private func pauseWriteFailedThenOldRunEnded(_ h: QueueHarness) async throws -> UUID {
+            try await h.start()
+            let a = try await h.note("A")
+            await h.coordinator.transcribe(a)
+            let run = try await h.run(0)
+            run.pauseOnStop = false
+            h.checkpoints.save(a, .saved(doneMs: 28_000, totalMs: 60_000, words: 40))
+            let manager = FileManager.default
+            try manager.setAttributes([.posixPermissions: 0o555], ofItemAtPath: h.root.path)
+            defer { try? manager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: h.root.path) }
+            h.coordinator.setVisible(false)
+            h.background.expireAll()
+            try await h.waitUntil("the system stop's pause write ran") { !h.systemStopPending }
+            #expect(await h.job(a)?.state == .running, "the pause could not be saved")
+
+            h.coordinator.setVisible(true)
+            #expect(await h.coordinator.resumeSystemPause(onActivationOf: .iOS18) == [])
+            #expect(h.settings.queueHold == .system, "the hold stays while A's system stop is not stored")
+            try manager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: h.root.path)
+            run.finish(.paused(.system))
+            await h.coordinator.waitForJob(of: a)
+            let job = try #require(await h.job(a))
+            #expect(job.state == .paused && job.pauseReason == .system, "the old run's outcome is stored")
+            try await h.settle()
+            return a
+        }
+
+        @Test func aPauseWriteThatFailsKeepsTheHoldUntilTheJobsOutcomeIsStored() async throws {
+            let h = try QueueHarness(); defer { h.tearDown() }
+            let a = try await pauseWriteFailedThenOldRunEnded(h)
+            try #require(h.settings.queueHold == .system, "the stored hold still says that A waits for an activation")
+            #expect(h.runner.runs.count == 1)
+
+            #expect(await h.coordinator.resumeSystemPause(onActivationOf: .iOS18) == [a])
+            let again = try await h.run(1)
+            #expect(again.noteID == a)
+            #expect(again.job.doneMs == 28_000, "from its checkpoint")
+            again.finish(.done)
+            await h.coordinator.awaitIdle()
+            #expect(await h.jobs.all().isEmpty)
+            #expect(h.runner.runs.count == 2)
+            #expect(h.settings.queueHold == nil)
+        }
+
+        @Test func aPauseWriteThatFailsLeavesTheResumeForTheNextLaunch() async throws {
+            let h = try QueueHarness(); defer { h.tearDown() }
+            let a = try await pauseWriteFailedThenOldRunEnded(h)
+
+            let next = try QueueHarness.snapshot(of: h)
+            defer { next.tearDown() }
+            try await next.start(visible: true)
+            let storedHold = next.settings.queueHold
+            let resumedOnLaunch = await next.coordinator.resumeSystemPause(onActivationOf: .iOS18)
+            try #require(resumedOnLaunch == [a], "the next launch resumes A (stored hold: \(String(describing: storedHold)))")
+            let resumed = try await next.run(0)
+            #expect(resumed.job.doneMs == 28_000, "from its checkpoint")
+            resumed.finish(.done)
+            await next.coordinator.awaitIdle()
+            #expect(await next.jobs.all().isEmpty)
+            #expect(next.runner.runs.count == 1)
+        }
+
         /// A job that cannot be queued again without the model download's consent: it waits as "Ready to transcribe",
         /// and the system hold is cleared so the rest of the queue goes on.
         @Test func aResumeThatNeedsConsentClearsTheHoldAndLeavesTheJobReady() async throws {

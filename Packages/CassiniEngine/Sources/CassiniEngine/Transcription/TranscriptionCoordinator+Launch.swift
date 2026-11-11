@@ -81,6 +81,8 @@ extension TranscriptionCoordinator {
     /// again; one that cannot be (no consent, refused) stays as that leaves it, and the hold is cleared all the same.
     /// Only when the queue cannot be written (its save failed, or `jobs.json` takes no writes in this run) does the
     /// hold stay, with the job paused by the system, so a later activation resumes it once the queue can be written.
+    /// The same holds for a system stop whose pause could not be stored: its job is still stored as running, and the
+    /// hold stays until the job's run stores an outcome, so a later activation resumes it.
     ///
     /// The hold and the paused jobs are read in one serial section that runs only once every system stop's pause is
     /// written, so a job iOS just stopped is read as paused, never as running. That section claims the resume in
@@ -103,7 +105,9 @@ extension TranscriptionCoordinator {
                 paused = jobs
                     .filter { $0.state == .paused && $0.pauseReason == .system && !trashed.contains($0.noteID) }
                     .sorted { $0.seq < $1.seq }
-                if paused.isEmpty { continueQueue() } else { resumingSystemPause = true }
+                // A system stop whose pause could not be stored leaves its job stored as running: no hold is cleared
+                // for it until its outcome is stored.
+                if !paused.isEmpty { resumingSystemPause = true } else if unresolvedSystemStops.isEmpty { continueQueue() }
                 stopsWhenRead = systemStops
                 return true
             }
@@ -133,7 +137,9 @@ extension TranscriptionCoordinator {
         resumingSystemPause = false
         // A job that could not be saved as queued again keeps the hold, so the next activation, or the next launch's,
         // tries again.
-        if !unsaved, settings.queueHold == .system, systemStops == stopsWhenRead { continueQueue() }
+        if !unsaved, unresolvedSystemStops.isEmpty, settings.queueHold == .system, systemStops == stopsWhenRead {
+            continueQueue()
+        }
         return resumed
     }
 
