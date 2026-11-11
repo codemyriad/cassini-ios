@@ -54,7 +54,11 @@ public struct BulkImportService: Sendable {
                                 do {
                                     try archive.read(entry, remainingBytes: budget.remaining, check: cancel.check,
                                                      observed: budget.observed) { _ in }
-                                } catch ZIPFailure.entry { /* A corrupt member may still have good siblings. */ }
+                                } catch ZIPFailure.entry {
+                                    // A directory's stream must prove it is empty; unreadable bytes cannot be
+                                    // silently ignored. Corrupt ordinary files may still have good siblings.
+                                    if entry.isDirectory { throw ZIPFailure.damaged }
+                                }
                             }
                         }
                         return archive

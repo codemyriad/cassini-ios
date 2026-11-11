@@ -104,12 +104,18 @@ public struct ZIPArchive: Sendable {
                 String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(0x0400)) // CP437
             guard var name = String(data: rawName, encoding: encoding) else { throw ZIPFailure.damaged }
             try Self.checkPath(name)
+            let decodedName = name
+            var unicodeName: String?
             var metadata = Self.isFinderMetadata(name)
+            var directory = Self.isDirectoryPath(name)
             if let unicode = try Self.extra(0x7075, in: extra), unicode.count >= 5, unicode[0] == 1 {
                 let crc = rawName.withUnsafeBytes { UInt32(CZlib.crc32(0, $0.bindMemory(to: UInt8.self).baseAddress, uInt(rawName.count))) }
                 if unicode.z32(1) == crc {
                     guard let path = String(data: unicode.dropFirst(5), encoding: .utf8) else { throw ZIPFailure.damaged }
                     try Self.checkPath(path)
+                    unicodeName = path
+                    directory = directory || Self.isDirectoryPath(path)
+                    metadata = metadata || Self.isFinderMetadata(path)
                     if flags & 0x800 == 0 { name = path }
                 }
             }
@@ -136,10 +142,16 @@ public struct ZIPArchive: Sendable {
             // Security facts in local headers are checked for every member before import. A broken individual
             // member is retained as unreadable, so one corrupt header does not discard other good notes.
             let payload = try Self.payload(file, at: offset, before: start, method: header.z16(10),
-                                           name: rawName, packed: packed)
+                                           name: rawName, decodedName: decodedName, unicodeName: unicodeName, packed: packed)
             let mode = (header.z32(38) >> 16) & 0xf000
             let normalized = name.replacingOccurrences(of: "\\", with: "/")
-            let directory = normalized.hasSuffix("/") || mode == 0x4000
+            directory = directory || mode == 0x4000 || header.z32(38) & 0x10 != 0
+            // Directories carry no expanded data. Deflated empty directories have a small stream that
+            // preflight still drains: a forged zero size must not hide a payload in an ignored member.
+            if directory {
+                guard unpacked == 0, header.z32(16) == 0, payload != nil,
+                      (header.z16(10) == 0 && packed == 0) || header.z16(10) == 8 else { throw ZIPFailure.damaged }
+            }
             let regular = !directory && mode != 0xa000
             // Only the first 512 title characters can affect the import's 200-character title. Keep the extension.
             let base = String(normalized.split(separator: "/", omittingEmptySubsequences: false).last ?? "")
@@ -158,7 +170,8 @@ public struct ZIPArchive: Sendable {
     @discardableResult public func read(_ entry: Entry, remainingBytes: UInt64, check: () throws -> Void = {},
                                        observed: (Int) throws -> Void = { _ in },
                                        consume: (Data) throws -> Void) throws -> UInt64 {
-        guard entry.readable else { throw ZIPFailure.entry }
+        let memberFailure: ZIPFailure = entry.isDirectory ? .damaged : .entry
+        guard entry.readable else { throw memberFailure }
         let input = try FileHandle(forReadingFrom: url)
         defer { try? input.close() }
         try input.seek(toOffset: entry.offset)
@@ -169,6 +182,7 @@ public struct ZIPArchive: Sendable {
             guard UInt64(data.count) <= remainingBytes - bytes else { throw ZIPFailure.tooLarge }
             bytes += UInt64(data.count)
             try observed(data.count)
+            if entry.isDirectory { throw ZIPFailure.damaged }
             if entry.method != 0 { try Self.checkRatio(bytes, entry.compressedBytes, ratio) }
             checksum = data.withUnsafeBytes { UInt32(CZlib.crc32(uLong(checksum), $0.bindMemory(to: UInt8.self).baseAddress, uInt(data.count))) }
             // A forged expanded size does not stop validation/accounting of the rest of the stream.
@@ -179,19 +193,26 @@ public struct ZIPArchive: Sendable {
             while left > 0 {
                 try check()
                 let data = try input.read(upToCount: Int(min(UInt64(Self.chunkBytes), left))) ?? Data()
-                guard !data.isEmpty else { throw ZIPFailure.entry }
+                guard !data.isEmpty else { throw memberFailure }
                 left -= UInt64(data.count)
                 try emit(data)
             }
         } else if entry.method == 8 {
             var stream = z_stream()
-            guard inflateInit2_(&stream, -15, zlibVersion(), Int32(MemoryLayout<z_stream>.size)) == Z_OK else { throw ZIPFailure.entry }
+            guard inflateInit2_(&stream, -15, zlibVersion(), Int32(MemoryLayout<z_stream>.size)) == Z_OK else { throw memberFailure }
             defer { inflateEnd(&stream) }
+            // A corrupt/truncated stream still owes its consumed-input ratio check. Padding that inflate
+            // never consumed cannot make an already expanded bomb into an ordinary corrupt member.
+            func malformedDeflate() throws -> Never {
+                try check()
+                try Self.checkRatio(bytes, UInt64(stream.total_in), ratio)
+                throw memberFailure
+            }
             var ended = false
             while left > 0 && !ended {
                 try check()
                 let data = try input.read(upToCount: Int(min(UInt64(Self.chunkBytes), left))) ?? Data()
-                guard !data.isEmpty else { throw ZIPFailure.entry }
+                guard !data.isEmpty else { try malformedDeflate() }
                 left -= UInt64(data.count)
                 try data.withUnsafeBytes { raw in
                     stream.next_in = UnsafeMutablePointer(mutating: raw.bindMemory(to: UInt8.self).baseAddress)
@@ -210,14 +231,14 @@ public struct ZIPArchive: Sendable {
                         // A full output buffer can consume exactly the last input byte. The next inflate
                         // needs another input chunk; Z_BUF_ERROR here means starvation, not corruption.
                         if rc == Z_BUF_ERROR && stream.avail_in == 0 && produced == 0 { break }
-                        guard rc == Z_OK, produced > 0 || stream.avail_in < before else { throw ZIPFailure.entry }
+                        guard rc == Z_OK, produced > 0 || stream.avail_in < before else { try malformedDeflate() }
                     } while stream.avail_in > 0 || stream.avail_out == 0
                 }
             }
-            if ended { try Self.checkRatio(bytes, UInt64(stream.total_in), ratio) }
-            guard ended, left == 0, stream.avail_in == 0 else { throw ZIPFailure.entry }
-        } else { throw ZIPFailure.entry }
-        guard bytes == entry.expandedBytes, checksum == entry.checksum else { throw ZIPFailure.entry }
+            try Self.checkRatio(bytes, UInt64(stream.total_in), ratio)
+            guard ended, left == 0, stream.avail_in == 0 else { throw memberFailure }
+        } else { throw memberFailure }
+        guard bytes == entry.expandedBytes, checksum == entry.checksum else { throw memberFailure }
         return bytes
     }
 
@@ -228,43 +249,66 @@ public struct ZIPArchive: Sendable {
         guard !normalized.isEmpty, !normalized.hasPrefix("/"), !normalized.contains("\0"), !drive,
               !normalized.split(separator: "/").contains("..") else { throw ZIPFailure.unsafePaths }
     }
+    private static func isDirectoryPath(_ name: String) -> Bool {
+        name.hasSuffix("/") || name.hasSuffix("\\")
+    }
     private static func isFinderMetadata(_ name: String) -> Bool {
         let components = name.replacingOccurrences(of: "\\", with: "/").split(separator: "/")
         return components.contains("__MACOSX") || components.last?.hasPrefix("._") == true
     }
     private static func payload(_ file: FileHandle, at offset: UInt64, before start: UInt64,
-                                method: UInt16, name: Data, packed: UInt64) throws -> UInt64? {
-        do {
-            guard offset <= start, start - offset >= 30 else { return nil }
-            let local = try zipRead(file, at: offset, count: 30)
-            guard local.z32(0) == 0x04034b50 else { return nil }
-            if local.z16(6) & 0x2041 != 0 || local.z16(8) == 99 { throw ZIPFailure.encrypted }
-            let names = Int(local.z16(26)), extras = Int(local.z16(28))
-            guard UInt64(names + extras) <= start - offset - 30 else { return nil }
-            let raw = try zipRead(file, at: offset + 30, count: names)
-            let encoding = local.z16(6) & 0x800 != 0 ? String.Encoding.utf8 :
-                String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(0x0400))
-            guard let localName = String(data: raw, encoding: encoding) else { return nil }
-            try checkPath(localName)
-            let extra = try zipRead(file, at: offset + 30 + UInt64(names), count: extras)
-            if try Self.extra(0x9901, in: extra) != nil { throw ZIPFailure.encrypted }
-            if let unicode = try Self.extra(0x7075, in: extra), unicode.count >= 5, unicode[0] == 1 {
-                let crc = raw.withUnsafeBytes { UInt32(CZlib.crc32(0, $0.bindMemory(to: UInt8.self).baseAddress, uInt(raw.count))) }
-                if unicode.z32(1) == crc {
-                    guard let path = String(data: unicode.dropFirst(5), encoding: .utf8) else { return nil }
-                    try checkPath(path)
-                }
+                                method: UInt16, name: Data, decodedName: String, unicodeName: String?, packed: UInt64) throws -> UInt64? {
+        guard offset <= start, start - offset >= 30 else { return nil }
+        let local: Data
+        do { local = try zipRead(file, at: offset, count: 30) } catch { return nil }
+        guard local.z32(0) == 0x04034b50 else { return nil }
+        if local.z16(6) & 0x2041 != 0 || local.z16(8) == 99 { throw ZIPFailure.encrypted }
+        let names = Int(local.z16(26)), extras = Int(local.z16(28))
+        guard UInt64(names) <= start - offset - 30 else { throw ZIPFailure.damaged }
+        let raw = try zipRead(file, at: offset + 30, count: names)
+        let encoding = local.z16(6) & 0x800 != 0 ? String.Encoding.utf8 :
+            String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(0x0400))
+        guard let localName = String(data: raw, encoding: encoding) else { throw ZIPFailure.damaged }
+        try checkPath(localName)
+        let extraOffset = offset + 30 + UInt64(names)
+        let available = Int(min(UInt64(extras), start - extraOffset))
+        let extra = try zipRead(file, at: extraOffset, count: available)
+        let localUnicode = try localExtraPath(extra, name: raw, truncated: available != extras)
+        // Raw/decoded names and Unicode path annotations must agree, including their presence. This also
+        // prevents either header from changing directory/Finder classification. Harmless flags may differ.
+        guard local.z16(8) == method, raw == name, localName == decodedName, localUnicode == unicodeName else {
+            throw ZIPFailure.damaged
+        }
+        let payload = extraOffset + UInt64(extras)
+        guard packed <= start - payload else { return nil }
+        return payload
+    }
+
+    /// One pass, deferring structural faults until every reachable security field has been inspected.
+    private static func localExtraPath(_ data: Data, name: Data, truncated: Bool) throws -> String? {
+        let crc = name.withUnsafeBytes { UInt32(CZlib.crc32(0, $0.bindMemory(to: UInt8.self).baseAddress, uInt(name.count))) }
+        var cursor = 0, damaged = truncated
+        var seen: Set<UInt16> = []
+        var path: String?
+        while cursor < data.count {
+            guard data.count - cursor >= 2 else { damaged = true; break }
+            let id = data.z16(cursor)
+            if id == 0x9901 { throw ZIPFailure.encrypted }
+            guard data.count - cursor >= 4 else { damaged = true; break }
+            let count = Int(data.z16(cursor + 2)), available = data.count - cursor - 4
+            let field = Data(data[(cursor + 4)..<(cursor + 4 + min(count, available))])
+            if !seen.insert(id).inserted { damaged = true }
+            if id == 0x7075, field.count >= 5, field[0] == 1, field.z32(1) == crc {
+                if let candidate = String(data: field.dropFirst(5), encoding: .utf8) {
+                    try checkPath(candidate)
+                    path = candidate
+                } else { damaged = true }
             }
-            // The directory supplies CRC/sizes. Writers can differ on descriptor, encoding and option flags;
-            // encryption and both path spellings were independently checked above.
-            guard local.z16(8) == method, raw == name else { return nil }
-            let payload = offset + 30 + UInt64(names + extras)
-            guard packed <= start - payload else { return nil }
-            return payload
-        } catch let failure as ZIPFailure {
-            if failure == .unsafePaths || failure == .encrypted { throw failure }
-            return nil
-        } catch { return nil }
+            guard count <= available else { damaged = true; break }
+            cursor += 4 + count
+        }
+        if damaged { throw ZIPFailure.damaged }
+        return path
     }
     static func checkRatio(_ expanded: UInt64, _ compressed: UInt64, _ ratio: UInt64) throws {
         guard expanded == 0 || (ratio > 0 && compressed > 0 && (expanded - 1) / ratio < compressed) else {

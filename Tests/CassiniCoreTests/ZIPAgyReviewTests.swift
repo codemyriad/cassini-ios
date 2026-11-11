@@ -23,6 +23,51 @@ enum ZIPAgyFixture {
         if forgedSize { member.size = 1 }
         return member
     }
+    static func mixedCompressibility() throws -> Member {
+        var bytes = Data(repeating: 0, count: 500_000), seed: UInt32 = 17
+        for _ in 0..<16_000 {
+            seed = seed &* 1_664_525 &+ 1_013_904_223
+            bytes.append(UInt8(truncatingIfNeeded: seed >> 24))
+        }
+        var member = Member("Mixed.wav", bytes), stream = z_stream()
+        guard deflateInit2_(&stream, Z_DEFAULT_COMPRESSION, Z_DEFLATED, -15, 8, Z_DEFAULT_STRATEGY,
+                            zlibVersion(), Int32(MemoryLayout<z_stream>.size)) == Z_OK else { throw ZIPFailure.entry }
+        defer { deflateEnd(&stream) }
+        var packed = Data(count: Int(compressBound(uLong(bytes.count))))
+        let rc = bytes.withUnsafeBytes { input in
+            packed.withUnsafeMutableBytes { output in
+                stream.next_in = UnsafeMutablePointer(mutating: input.bindMemory(to: UInt8.self).baseAddress)
+                stream.avail_in = uInt(input.count)
+                stream.next_out = output.bindMemory(to: UInt8.self).baseAddress
+                stream.avail_out = uInt(output.count)
+                return deflate(&stream, Z_FINISH)
+            }
+        }
+        guard rc == Z_STREAM_END else { throw ZIPFailure.entry }
+        member.method = 8; member.packed = Data(packed.prefix(Int(stream.total_out)))
+        return member
+    }
+    /// Measures the fixture independently of ZIPArchive's ratio checks.
+    static func hasOverLimitPrefix(_ member: Member) throws -> Bool {
+        var stream = z_stream(), exceeded = false
+        guard inflateInit2_(&stream, -15, zlibVersion(), Int32(MemoryLayout<z_stream>.size)) == Z_OK else { throw ZIPFailure.entry }
+        defer { inflateEnd(&stream) }
+        try member.packed.withUnsafeBytes { input in
+            stream.next_in = UnsafeMutablePointer(mutating: input.bindMemory(to: UInt8.self).baseAddress)
+            stream.avail_in = uInt(input.count)
+            while true {
+                var output = Data(count: ZIPArchive.chunkBytes)
+                let rc = output.withUnsafeMutableBytes { buffer in
+                    stream.next_out = buffer.bindMemory(to: UInt8.self).baseAddress; stream.avail_out = uInt(buffer.count)
+                    return inflate(&stream, Z_NO_FLUSH)
+                }
+                if rc != Z_STREAM_END && stream.total_in > 0 && stream.total_out > 100 * stream.total_in { exceeded = true }
+                if rc == Z_STREAM_END { break }
+                guard rc == Z_OK else { throw ZIPFailure.entry }
+            }
+        }
+        return exceeded
+    }
     static func write(_ members: [Member], to url: URL) throws {
         var body = Data(), directory = Data()
         for member in members {
@@ -59,6 +104,52 @@ import Testing
             }
         }
     }
+    @Test func mixedCompressibilityIsJudgedByTheCompleteStreamNotItsHighlyCompressiblePrefix() throws {
+        try withTemporaryDirectory { folder in
+            let member = try ZIPAgyFixture.mixedCompressibility()
+            #expect(member.body.count < member.packed.count * 100)
+            #expect(try ZIPAgyFixture.hasOverLimitPrefix(member), "An intermediate prefix must actually exceed 100:1")
+            let url = folder.appendingPathComponent("mixed.zip")
+            try ZIPAgyFixture.write([member], to: url)
+            let zip = try ZIPArchive(url: url)
+            var output = Data()
+            let count = try zip.read(zip.entries[0], remainingBytes: UInt64(member.body.count)) { output.append($0) }
+            #expect(count == member.body.count)
+            #expect(output == member.body)
+        }
+    }
+
+    @Test func prematureEOFStillChecksConsumedRatioBeforeReportingCorruption() throws {
+        try withTemporaryDirectory { folder in
+            var member = ZIPAgyFixture.Member("Bomb.wav", Data(repeating: 65, count: 200_000))
+            member.method = 8; member.size = 1
+            let prefix = Data(base64Encoded: "7MExAQAAAMKgbOtfygz+QAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAArwEAAP//")!
+            member.packed = prefix + Data(count: 10_000 - prefix.count)
+            let url = folder.appendingPathComponent("truncated.zip")
+            try ZIPAgyFixture.write([member], to: url)
+            let zip = try ZIPArchive(url: url)
+            let handle = try FileHandle(forWritingTo: url)
+            try handle.truncate(atOffset: zip.entries[0].offset + UInt64(prefix.count)); try handle.close()
+            var observed = 0
+            #expect(throws: ZIPFailure.tooLarge) {
+                try zip.read(zip.entries[0], remainingBytes: 1_000_000, observed: { observed += $0 }) { _ in }
+            }
+            #expect(observed == 200_000, "The unfinished deflate prefix must expand before EOF")
+        }
+    }
+
+    @Test func unreadableDirectoryStreamsAreDamagedForDirectReadersToo() throws {
+        try withTemporaryDirectory { folder in
+            let url = folder.appendingPathComponent("directory.zip")
+            for packed in [Data([7]), Data([3, 0, 0])] {
+                var member = ZIPAgyFixture.Member("Folder/", Data()); member.method = 8; member.packed = packed
+                try ZIPAgyFixture.write([member], to: url)
+                let zip = try ZIPArchive(url: url)
+                #expect(throws: ZIPFailure.damaged) { try zip.read(zip.entries[0], remainingBytes: 100) { _ in } }
+            }
+        }
+    }
+
     @Test func forgedExpandedSizeKeepsDrainingIntoTheGlobalBudgetWithoutPublishingExcess() throws {
         try withTemporaryDirectory { folder in
             let url = folder.appendingPathComponent("forged.zip")
