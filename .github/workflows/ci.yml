@@ -34,6 +34,9 @@ on:
       - 'scripts/run-in-gui.py'
       - 'scripts/test-run-in-gui.py'
       - 'scripts/test-ci-runner-selection.py'
+      - 'scripts/*testflight*'
+      - 'scripts/launchd/**'
+      - '.github/workflows/daily-testflight.yml'
       - '.github/workflows/ci.yml'
   push:
     branches: [main]
@@ -67,6 +70,7 @@ jobs:
         working-directory: cassini-ios
         run: |
           python3 scripts/test-ci-runner-selection.py
+          python3 scripts/test-daily-testflight.py
           python3 scripts/test-test-events.py
           python3 scripts/test-swift-test-product.py
           python3 scripts/test-check-embedded-minos.py

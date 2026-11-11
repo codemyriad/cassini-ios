@@ -1,0 +1,88 @@
+# Unattended internal TestFlight
+
+The approved slots are **09:00, 14:00 and 20:00 Europe/Berlin**, including daylight saving time.
+The drmeyers LaunchAgent wakes hourly at minute zero; the controller checks the named Berlin zone before doing work.
+`workflow_dispatch` uses the same controller on the exclusive `cassini-ios-release-drmeyers` runner label.
+Neither route signs on the rented Mac/pool runners. Both controller and archive worker reject a different hostname.
+No scheduler or runner is installed merely by merging this PR.
+
+Existing manual archive/export, GUI/keychain, Apple upload/processing and internal `cassini` group are reused.
+The added pipeline selects current `main`, requires the newest exact-head main CI run to be successful, and reports
+unchanged/red/pending main as a skip. After archive it checks main/CI again before upload. A private local mutex
+serializes calendar/manual calls; only archive/export hold `~/.cassini-heavy.lock`. Resource/keychain checks happen
+inside that lock. A locked keychain fails with the exact Keychain Access unlock instruction; no identity is changed.
+
+Build numbers are allocated from the current marketing version's Apple builds and durable local reservations.
+Both app and extension receive the number as a build setting; no version PR or tracked source edit is needed.
+Merged PR titles since the last successful TestFlight source become English TestFlight “What’s New” notes.
+The first successful release needs an accurate seed commit from the last verified manual upload. Empty/over4000
+character notes fail before upload instead of silently omitting titles.
+
+Export is **Internal**, `testFlightInternalTestingOnly=true`. Archive/export signatures, both bundle versions,
+certificate continuity, memory entitlement, Whistle pins/runtime identity and embedded minimum OS are checked.
+The controller validates the IPA hash again before upload. No App Store submission, public release, external group,
+tester membership, production metadata, key import/unlock or signing identity edit is implemented.
+
+Apple processing uses `altool --build-status --wait`, bounded by an outer hang guard. No sleep/poll loop or upload
+retry is implemented. Before upload, durable intent is written; ambiguous interruption never resubmits that build.
+The next invocation can finish the existing upload after Apple processing. State advances only after Apple confirms
+VALID/unexpired, INTERNAL_ONLY, IN_BETA_TESTING and the existing group's automatic access, and beta notes are written.
+If a prior intent has no identifiable Apple build, inspect its retained upload log before manually reconciling state;
+never clear intent merely to retry an upload. Failed archive numbers remain reserved; later numbers may have gaps.
+
+## Activation on drmeyers after review/merge
+
+Use a dedicated clean **main** clone (not an agent feature worktree) at
+`~/dev/cassini-ios-daily-host`. Keep the existing GUI tmux session available (`~/bin/gui-tmux.command` in the
+logged-in Terminal). Retain the existing private `.p8` under `~/.appstoreconnect/private_keys/` and issuer file
+`~/.appstoreconnect/issuer-id.txt`; credentials are never copied to Actions or another Mac.
+
+Create private config `~/.config/cassini/ios-daily-release.json` (0600), using absolute paths:
+
+```json
+{
+  "source": "/Users/silvio/dev/cassini-ios-daily-host",
+  "state_dir": "/Users/silvio/.local/state/cassini-ios-daily",
+  "output_root": "/Volumes/DrMeyers2/cassini-ios-daily",
+  "notification_file": "/Users/silvio/dev/cassini-coordination/DAILY-TEST-RELEASES-IOS.log",
+  "initial_release_head": "<40-character source SHA of the last verified TestFlight>",
+  "development_certificate_sha256": "<SHA256 of the existing archive leaf certificate>",
+  "distribution_certificate_sha256": "<SHA256 of the existing exported app leaf certificate>"
+}
+```
+
+Use the known successful archive/export for certificate baselines; do not trust a newly produced identity.
+Do not fabricate the source seed from the latest main commit. State and upload intent stay internal/durable when
+USB storage is absent; build outputs, Swift/Whistle/package/module caches, GUI temporary files and logs stay external.
+A stale `/Volumes/DrMeyers2` directory is refused. Archives/results are retained for diagnosis; monitor external free
+space and remove only this pipeline's own obsolete build outputs after preserving required evidence.
+
+Render `scripts/launchd/io.codemyriad.cassini.daily-testflight.plist` by replacing `__CONTROL__` with the dedicated
+clone's absolute path and `__HOME__` with the home path, then place it in `~/Library/LaunchAgents/`. Validate it with
+`plutil -lint`, then load it using `launchctl bootstrap gui/$(id -u) <plist>`. The hourly wake follows Berlin slots in
+Python independently of the host's configured time zone; it does not use an elapsed-time timer. The shell wrapper
+fast-forwards only this dedicated clean main clone before running the current committed controller.
+
+For manual dispatch, register a drmeyers-only Actions runner with label `cassini-ios-release-drmeyers`; this exclusive
+label is intentionally absent from general pool selectors. Restrict its runner group to this repository/workflow.
+Keep its service in the logged-in user context with Homebrew tools on PATH. Do not attach this label to any rented Mac.
+Manual workflow runs accept only `workflow_dispatch` on canonical `refs/heads/main`; the checkout explicitly uses main.
+Local manual equivalent: `/usr/bin/python3 scripts/daily-testflight.py --manual --config <private-config>`.
+
+Failures append **`[iOS] daily test release failed: <cause>`** to the coordination inbox and scheduler/Actions logs;
+skips and successful build/version/source are logged too. The inbox is a delivery surface for the coordinator to
+watch; it is not email/Slack/PR comments. Config/bootstrap failures also go to LaunchAgent stderr in that same inbox.
+No live launchd job, signing runner, notification watcher or upload has been activated by the implementation PR.
+
+## Validation
+
+`/usr/bin/python3 scripts/test-daily-testflight.py` tests DST slots, newest exact-head CI, version-specific numbering,
+failed reservations, durable intent before upload, no duplicate on an ambiguous upload, resumed finalization,
+internal-only guards, JWT redaction and scheduler/workflow routing without network, signing, GUI or simulators.
+`test-ci-runner-selection.py` retains the general CI trust matrix and separately checks every signing-event/ref/repo
+combination. CI runs both. Real unattended signing remains an activation check on drmeyers after merge/configuration;
+this PR does not claim a TestFlight upload was performed.
+
+Apple references: [internal-only build audience](https://developer.apple.com/documentation/appstoreconnectapi/buildaudiencetype),
+[beta build notes](https://developer.apple.com/documentation/appstoreconnectapi/beta-build-localizations),
+[existing group attributes](https://developer.apple.com/documentation/appstoreconnectapi/get-v1-betagroups).
