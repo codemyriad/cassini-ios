@@ -11,3 +11,9 @@ No shared catalog or contract was edited.
 English `Date unknown`, Italian `Data sconosciuta`, French `Date inconnue`, Spanish `Fecha desconocida`,
 Brazilian Portuguese and European Portuguese `Data desconhecida`. The source entry is a plain heading,
 without count placeholders or plural transformations.
+
+D96 bulk transfer copy is pinned to cassini-ux `4d577376f6360ed352fa75307f4dc47890ed9858`,
+`strings/strings.json` (SHA-256 `7b059577a6e4a5d692ccb5c745916bc790e9e0fe7c77c5572fb64fda80f0f7b3`).
+`BulkTransfer.xcstrings` vendors `import.*`, `export.zip.*`, `common.cancel` and `common.done`, with all six locales
+and the catalog plural forms. Placeholder names map to positional integer format arguments. D14 values above remain
+unchanged; no shared source was edited.
