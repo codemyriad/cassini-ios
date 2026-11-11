@@ -483,6 +483,42 @@ extension TranscriptionCoordinatorTests {
             #expect(next.runner.runs.count == 1)
         }
 
+        /// Review of #108: neither the system stop's pause of A nor its old run's outcome can be saved, so A's stop
+        /// stays unresolved. Once the queue can be written again the person deletes A for good. Nothing is left to
+        /// recover, so the next activation clears the hold and starts B, once.
+        @Test func aDeletedNotesUnresolvedStopNoLongerKeepsTheHold() async throws {
+            let h = try QueueHarness(); defer { h.tearDown() }
+            try await h.start()
+            let a = try await h.note("A"), b = try await h.note("B")
+            await h.coordinator.transcribe(a)
+            await h.coordinator.transcribe(b)
+            let run = try await h.run(0)
+            run.pauseOnStop = false
+            h.checkpoints.save(a, .saved(doneMs: 28_000, totalMs: 60_000, words: 40))
+            let manager = FileManager.default
+            try manager.setAttributes([.posixPermissions: 0o555], ofItemAtPath: h.root.path)
+            defer { try? manager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: h.root.path) }
+            h.coordinator.setVisible(false)
+            h.background.expireAll()
+            try await h.waitUntil("the system stop's pause write ran") { !h.systemStopPending }
+            run.finish(.paused(.system))
+            await h.coordinator.waitForJob(of: a)
+            #expect(await h.job(a)?.state == .running, "neither write could be saved")
+            try manager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: h.root.path)
+
+            await h.coordinator.forget(a)
+            #expect(await h.job(a) == nil)
+            h.coordinator.setVisible(true)
+            #expect(await h.coordinator.resumeSystemPause(onActivationOf: .iOS18) == [])
+            try #require(h.settings.queueHold == nil, "A's stop no longer needs the hold")
+            let next = try await h.run(1)
+            #expect(next.noteID == b)
+            next.finish(.done)
+            await h.coordinator.awaitIdle()
+            #expect(await h.jobs.all().isEmpty)
+            #expect(h.runner.runs.map(\.noteID) == [a, b])
+        }
+
         /// A job that cannot be queued again without the model download's consent: it waits as "Ready to transcribe",
         /// and the system hold is cleared so the rest of the queue goes on.
         @Test func aResumeThatNeedsConsentClearsTheHoldAndLeavesTheJobReady() async throws {

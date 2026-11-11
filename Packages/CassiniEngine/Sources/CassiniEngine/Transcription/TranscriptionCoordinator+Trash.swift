@@ -3,8 +3,8 @@ import CassiniNotebook
 
 /// The queue around Recently Deleted: a note that goes there, comes back, or is deleted for good.
 ///
-/// Touches: `trashed` (through `markTrashed`, and removed on Restore and delete), `active` to stop its job, and the
-/// queue writes inside `lock`'s section.
+/// Touches: `trashed` (through `markTrashed`, and removed on Restore and delete), `active` to stop its job,
+/// `unresolvedSystemStops` (a deleted note's is dropped), and the queue writes inside `lock`'s section.
 extension TranscriptionCoordinator {
     /// Before a note goes to Recently Deleted: a running job stops and keeps its progress, a queued job leaves the
     /// queue (its `work/` stays for Restore), any other job stays. Returns what the note should remember for Restore.
@@ -60,6 +60,8 @@ extension TranscriptionCoordinator {
         await cancel(noteID, discard: false)
         await lock.run {
             await write { try await $0.remove(noteID) }
+            // Its job is gone: a system stop of it has nothing left to recover.
+            if await parts.jobs.job(noteID) == nil { unresolvedSystemStops.remove(noteID) }
             await refresh()
         }
         trashed.remove(noteID)

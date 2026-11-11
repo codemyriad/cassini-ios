@@ -67,7 +67,7 @@ on a device, and not checked for the standalone download.
   Resume, and the hold is cleared all the same, so it never keeps the rest of the queue waiting. When the queue itself
   cannot be written (a full disk, or a `jobs.json` that takes no writes in this run), the job stays paused by the
   system and the hold stays, so the next activation, or the next launch's, resumes it once the queue can be written. The same goes for a system stop whose pause cannot be saved: the job
-  stays stored as running, and the hold stays until the job's run has stored its outcome. On iOS 26 nothing changes: there the system's pause can be the person's
+  stays stored as running, and the hold stays until the job's run has stored its outcome or the job is gone (deleted). On iOS 26 nothing changes: there the system's pause can be the person's
   Stop in the system's progress, so it waits for Resume. Android has no such rule (its system pause comes only from the
   rare `onTimeout`, and waits for Resume); this is a proposal, decision 5 below.
 - **Standalone model download** (Settings, the model download screen). When the time ends it stops and shows "iOS
@@ -159,7 +159,7 @@ follows it and ends editing on a line break (`LibrarySearchEdit`), which holds f
   person's, not on the iOS 26 facts, after a kill, an activation before the system stop's pause is written, two
   activations at once or back to back, a system stop or the person's Stop during the activation, a kill during it, a
   resume that needs consent or is refused, a resume that cannot be saved, and a system stop whose pause cannot be saved,
-  each then resumed in the same run and after a relaunch) and `ActivationResumeTests` (hosted, from the checkpoint). By hand on the iOS 18.2 simulator the same day: coming back
+  each then resumed in the same run and after a relaunch, and such a stop's note deleted for good) and `ActivationResumeTests` (hosted, from the checkpoint). By hand on the iOS 18.2 simulator the same day: coming back
   after the expiry the job ran again from 00:25 with no tap, and a launch after a kill while suspended resumed it and
   finished it with the checkpoint's words.
 - Not yet: the finite background path on a device, the standalone download's stop, and any run on an A12 or A10 on
