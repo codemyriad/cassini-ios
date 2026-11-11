@@ -74,6 +74,9 @@ public final class LibraryScreenModel {
     public var dialog: LibraryDialog?
     /// The speaker models are installed (Transcribe again says "Speaker names carry over.").
     public private(set) var speakerModelsReady = false
+    /// The start of the local day the rows were built for, observed, so the view reads the rows again (the date
+    /// filters, the sections and the relative dates) when `clockChanged()` finds a new day.
+    private var day: Date
 
     @ObservationIgnored public var onEffect: (@MainActor (LibraryEffect) -> Void)?
     @ObservationIgnored let ports: Ports
@@ -94,6 +97,7 @@ public final class LibraryScreenModel {
     }
 
     public init(ports: Ports) {
+        day = ports.calendar.startOfDay(for: ports.clock.now)
         self.ports = ports
         observeNotes()
     }
@@ -107,6 +111,7 @@ public final class LibraryScreenModel {
         let context = RowContext(processing: processing, recording: ports.recording())
         let loading = ports.loading(), unavailable = ports.unavailable()
         let live = favoritesOnly ? index.entries.filter(\.note.isFavorite) : index.entries
+        _ = day // a new local day rebuilds the sections, the relative dates and the date filter
         let audioOnly = index.entries.contains { $0.note.status == .audioOnly && $0.note.transcript.isEmpty }
         var facts = LibraryFacts(loading: loading, liveNotes: index.entries.count, audioOnly: audioOnly,
                                  unavailable: unavailable)
@@ -244,6 +249,13 @@ public final class LibraryScreenModel {
         if dialog == .rename(id) { dialog = nil }
         if note(id)?.title != cleaned { ports.update(id) { $0.title = cleaned } }
         return true
+    }
+
+    /// The app became active or the system says the day or the clock changed: a new local day redraws the rows,
+    /// even with the query and the notes unchanged (a search left open across midnight). The same day changes nothing.
+    public func clockChanged() {
+        let today = ports.calendar.startOfDay(for: ports.clock.now)
+        if today != day { day = today }
     }
 
     /// Asks whether the speaker models are installed, for Transcribe again's "Speaker names carry over."

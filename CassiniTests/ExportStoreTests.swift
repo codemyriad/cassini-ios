@@ -21,6 +21,7 @@ import CassiniEngine
         XCTAssertEqual(plainSpaces(try String(contentsOf: url, encoding: .utf8)),
                        "Meeting: Monday\nOct 8, 2026, 3:10 PM · 01:05 · 2 speakers\n\n[00:01] Giulia\nHello\n\n[00:03] Speaker 2\nGood evening\n")
         test.graph.exports.discard(url)
+        await test.graph.exports.waitForDiscards()
         XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
         XCTAssertFalse(FileManager.default.fileExists(atPath: test.graph.environment.exports.path))
     }
@@ -82,6 +83,7 @@ import CassiniEngine
         let dismissed = try XCTUnwrap(session.dismiss(current: nil))
         dismissed.onComplete?()
         dismissed.onComplete?()
+        await test.graph.exports.waitForDiscards()
 
         XCTAssertEqual(dismissed.id, item.id)
         XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))

@@ -39,6 +39,8 @@ import CassiniEngineTesting
     /// What the system offers (`LivePlatform`, or the iOS 18 facts of a UI-test launch).
     var platform: PlatformFacts
     var launch = LaunchOptions()
+    /// Where the system's time changes arrive (`UIApplication.significantTimeChangeNotification`); tests post their own.
+    var timeChanges = NotificationCenter.default
     /// Where exports wait for the share sheet; the launch sweep empties it.
     var exports = URL.temporaryDirectory.appendingPathComponent("Exports", isDirectory: true)
     /// Where the pinned models (Parakeet Ultra, Silero VAD) are installed, excluded from backups.

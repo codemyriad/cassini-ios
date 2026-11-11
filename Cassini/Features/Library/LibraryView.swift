@@ -12,6 +12,7 @@ struct LibraryView: View {
     @Environment(LibraryStore.self) private var library
     @Environment(Router.self) private var router
     @Environment(ErrorPresenter.self) private var errors
+    @Environment(ExportStore.self) private var exports
     @Environment(\.dynamicTypeSize) private var dynamicType
     @Environment(\.calendar) private var calendar
     @Environment(\.restoresSceneState) private var restoresSceneState
@@ -23,10 +24,14 @@ struct LibraryView: View {
     @State private var importing = false
     @State private var restored = false
     @State private var dialogRestored = false
+    @State private var editMode: EditMode = .inactive
+    @State private var selectedNotes: Set<UUID> = []
+    @State private var archiveExport = ArchiveExportModel()
 
     var body: some View {
         @Bindable var model = model
         let content = model.content
+        let exportable = Set(ArchiveSelection.ids(library.notes))
         ScrollView {
             LazyVStack(alignment: .leading, spacing: Spacing.row) {
                 header.padding(.bottom, 8)
@@ -37,14 +42,14 @@ struct LibraryView: View {
                     // The banners say when there are no notes, no matches or no library; the Starred filter has its own.
                     if content.emptyState == .noStarred { NoStarredState().padding(.top, 8) }
                     if let results = content.results {
-                        ForEach(results) { row($0, day: $0.day ?? .today) }
+                        ForEach(results) { row($0, day: $0.day ?? .today, exportable: exportable.contains($0.id)) }
                     } else {
                         ForEach(content.sections) { section in
                             Text(LibraryFormat(calendar: calendar).day(section.key).uppercased())
                                 .font(.caption.weight(.semibold)).tracking(1.6).foregroundStyle(Color.muted)
                                 .accessibilityAddTraits(.isHeader)
                                 .padding(.top, 14)
-                            ForEach(section.rows) { row($0, day: section.key) }
+                            ForEach(section.rows) { row($0, day: section.key, exportable: exportable.contains($0.id)) }
                         }
                     }
                 }
@@ -76,6 +81,13 @@ struct LibraryView: View {
             }
         }
         .onAppear(perform: restoreSceneState)
+        .environment(\.editMode, $editMode)
+        .onChange(of: editMode) { _, mode in if !mode.isEditing { selectedNotes.removeAll() } }
+        .onChange(of: exportable) { _, eligible in
+            selectedNotes.formIntersection(eligible)
+            if eligible.isEmpty { editMode = .inactive }
+        }
+        .shareSheet(item: $archiveExport.shareItem)
         .onChange(of: model.query) { _, query in if restoresSceneState { savedQuery = query } }
         .onChange(of: model.favoritesOnly) { _, only in if restoresSceneState { savedFavoritesOnly = only } }
         .onChange(of: model.dialog) { _, dialog in
@@ -118,6 +130,8 @@ struct LibraryView: View {
                    onAction: { spec, action in notices.perform(action, on: spec) { importing = true } },
                    onDismiss: notices.dismiss)
         LibraryActivity()
+        ImportBatchesView()
+        ArchiveExportProgressView(model: archiveExport)
     }
 
     /// All and Starred (an iOS extra), with the number of notes shown.
@@ -127,8 +141,23 @@ struct LibraryView: View {
             HStack {
                 filterButton(LibraryCopy.all, selected: !model.favoritesOnly) { model.favoritesOnly = false }
                 filterButton(LibraryCopy.starred, symbol: "star", selected: model.favoritesOnly) { model.favoritesOnly = true }
-                Spacer()
-            }
+                Spacer(minLength: 0)
+                if library.notes.contains(where: ArchiveSelection.isExportable) {
+                    EditButton().buttonStyle(ArchiveSelectionButtonStyle())
+                        .accessibilityIdentifier("selectNotesForExport")
+                    Menu {
+                        Button(BulkTransferCopy.all) { exportArchive(selected: false) }
+                        if !selectedNotes.isDisjoint(with: ArchiveSelection.ids(library.notes)) { Button(BulkTransferCopy.selected) { exportArchive(selected: true) } }
+                    } label: {
+                        Image(systemName: "square.and.arrow.up")
+                            .frame(minWidth: HitTarget.minimum, minHeight: HitTarget.minimum)
+                            .contentShape(Rectangle())
+                    }
+                    .accessibilityLabel(BulkTransferCopy.all)
+                    .accessibilityIdentifier("libraryArchiveMenu")
+                    .disabled(archiveExport.progress != nil)
+                }
+            }.font(.subheadline)
             if model.isSearching {
                 Menu {
                     ForEach(SearchDate.allCases, id: \.self) { date in
@@ -172,16 +201,31 @@ struct LibraryView: View {
         }.buttonStyle(.plain).accessibilityAddTraits(selected ? .isSelected : [])
     }
 
-    private func row(_ row: LibraryRow, day: DayKey) -> some View {
-        NoteRow(row: row, day: day, selected: router.selectedNoteID == row.id) { action in
+    private func row(_ row: LibraryRow, day: DayKey, exportable: Bool) -> some View {
+        HStack {
+            if editMode.isEditing && exportable {
+                Button {
+                    if !selectedNotes.insert(row.id).inserted { selectedNotes.remove(row.id) }
+                } label: { Image(systemName: selectedNotes.contains(row.id) ? "checkmark.circle.fill" : "circle").frame(minWidth: 44, minHeight: 44) }
+                .accessibilityLabel(row.title)
+                .accessibilityIdentifier("selectArchiveNote-\(row.id)")
+                .accessibilityAddTraits(selectedNotes.contains(row.id) ? [.isSelected] : [])
+            }
+            NoteRow(row: row, day: day, selected: router.selectedNoteID == row.id) { action in
             switch action {
             case .open: model.open(row.id)
             case .resume: Task { await model.resume(row.id) }
             case .rename: Task { await model.perform(.rename, on: row.id) }
             case .trash: Task { await model.perform(.moveToTrash, on: row.id) }
             }
+            }
+            .contextMenu { NoteActionsMenu(noteID: row.id) }
         }
-        .contextMenu { NoteActionsMenu(noteID: row.id) }
+    }
+
+    private func exportArchive(selected: Bool) {
+        let ids = library.notes.filter { ArchiveSelection.isExportable($0) && (!selected || selectedNotes.contains($0.id)) }.map(\.id)
+        archiveExport.start(ids, exports: exports, errors: errors)
     }
 
     /// The presented confirmation's action; the model clears the dialog.
@@ -233,5 +277,13 @@ private extension ToolbarContent {
     /// Keeps the item out of iOS 26's shared glass background; earlier systems draw no background behind bar items.
     @ToolbarContentBuilder func sharedBackgroundHidden() -> some ToolbarContent {
         if #available(iOS 26.0, *) { sharedBackgroundVisibility(.hidden) } else { self }
+    }
+}
+
+/// Native Edit/Done keeps its system localization, with a full target inside the button label.
+private struct ArchiveSelectionButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label.frame(minWidth: HitTarget.minimum, minHeight: HitTarget.minimum)
+            .contentShape(Rectangle()).opacity(configuration.isPressed ? 0.6 : 1)
     }
 }

@@ -15,6 +15,8 @@ public enum SearchDate: CaseIterable, Hashable, Sendable {
         let today = calendar.startOfDay(for: now)
         guard let start = calendar.date(byAdding: .day, value: 1 - days, to: today),
               let end = calendar.date(byAdding: .day, value: 1, to: today) else { return nil }
-        return DateInterval(start: start, end: end)
+        // Some local days begin at 01:00 when DST skips midnight. Calendar day addition preserves that hour,
+        // so normalize both destination days rather than extending tomorrow or trimming the range's first day.
+        return DateInterval(start: calendar.startOfDay(for: start), end: calendar.startOfDay(for: end))
     }
 }
