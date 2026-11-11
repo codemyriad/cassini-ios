@@ -27,7 +27,33 @@ private final class GatedOggFile: ByteSource {
     }
 }
 
+/// Executes the submitted job before enqueue returns, reproducing a fast worker starting before the parent
+/// can register a later cancellation handler. Production still uses its GCD task executor.
+private final class CancelAtEnqueue: TaskExecutor, @unchecked Sendable {
+    let cancel: @Sendable () -> Void
+    init(_ cancel: @escaping @Sendable () -> Void) { self.cancel = cancel }
+    func enqueue(_ job: consuming ExecutorJob) {
+        cancel()
+        UnownedJob(job).runSynchronously(on: asUnownedTaskExecutor())
+    }
+}
+
 @Suite(.timeLimit(.minutes(1))) struct FileWorkCancellationTests {
+    @Test func cancellationAtEnqueuePreventsTheOperationFromStarting() async throws {
+        let parent = Mutex<Task<Int, any Error>?>(nil)
+        let ran = Mutex(false)
+        let start = AsyncStream<Void>.makeStream()
+        let executor = CancelAtEnqueue { parent.withLock { $0 }?.cancel() }
+        let task = Task {
+            for await _ in start.stream { break }
+            return try await CancellableFileWork.run(executor: executor) { ran.withLock { $0 = true }; return 1 }
+        }
+        parent.withLock { $0 = task }
+        start.continuation.yield(()); start.continuation.finish()
+        await #expect(throws: CancellationError.self) { try await task.value }
+        #expect(!ran.withLock { $0 }, "Cancellation at submission must reach the child before its operation starts")
+    }
+
     @Test func cancelStopsActualOggFileReadsBeforeASecondChunk() async throws {
         let folder = URL.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
