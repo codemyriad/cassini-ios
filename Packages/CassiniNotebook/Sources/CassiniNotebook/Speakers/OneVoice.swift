@@ -26,6 +26,14 @@ extension Array where Element == NoteSpeaker {
 }
 
 extension Note {
+    /// Words left in one voice when speaker analysis was skipped (for example, declined model consent), or failed.
+    /// An empty speaker result has its own notice. Without an explicit failure, named/linked speakers do not acquire
+    /// a new prompt; explicit failures retain their existing retry path even after a manual name was given.
+    public var canDownloadSpeakerAnalysis: Bool {
+        guard !transcript.isEmpty, speakerAnalysisFailure != .empty else { return false }
+        return speakerAnalysisFailure != nil || (speakers ?? []).isOneVoice
+    }
+
     /// `segments` with every passage spoken by `voice`.
     public static func oneVoice(_ segments: [TranscriptSegment], _ voice: NoteSpeaker) -> [TranscriptSegment] {
         segments.map { segment in

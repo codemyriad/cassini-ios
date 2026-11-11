@@ -147,6 +147,74 @@ import CassiniNotebook
         #expect(!NoteBanners.oneVoice(empty), "one voice needs a transcript")
     }
 
+    @Test func missingSpeakerModelsOfferTheirDownloadWithoutRepeatingSpeech() throws {
+        var note = transcribed
+        note.speakerAnalysisFailure = .speakers
+        let facts = NoteBannerFacts(speakerModelsMissing: true)
+        let banner = try #require(banners(note, facts: facts).first)
+        #expect(banner.kind == .txOneVoice)
+        #expect(banner.actions == [.download])
+        var screen = NoteScreenState()
+        #expect(screen.bannerAction(.download, note: note, job: nil) == .transcribe(.speakersOnly))
+        #expect(banners(note, job: job(.queued), facts: facts).isEmpty)
+        #expect(screen.bannerAction(.download, note: note, job: job(.queued)) == nil)
+        #expect(screen.bannerAction(.download, note: plain, job: nil) == nil)
+        #expect(banners(note).first?.actions == [.transcribeAgain], "Installed models keep the existing retry")
+        let installing = try #require(banners(note, facts: NoteBannerFacts(speakerModelsInstalling: true)).first)
+        #expect(installing.actions == [.download])
+        #expect(installing.disabledActions == [.download], "Installing models must not switch back to repeating speech")
+        note.document = DocumentInfo(state: .unverified)
+        #expect(banners(note, facts: facts).first { $0.kind == .txOneVoice }?.actions == [])
+        #expect(screen.bannerAction(.download, note: note, job: nil) == nil)
+    }
+
+    @Test func speakerDownloadWaitsForAvailabilityAndTracksEachInstallState() throws {
+        var note = transcribed
+        note.speakerAnalysisFailure = .speakers
+        let cases: [(ModelPartStatus?, Bool, Bool)] = [
+            (nil, false, true), (.checking, false, true), (.downloading(0.5), false, true),
+            (.notDownloaded, true, false), (.failed(.fileCheckFailed), true, false),
+            (.ready, false, false), (.unsupported, false, false)]
+        for (status, missing, installing) in cases {
+            let state = NoteBanners.speakerDownloadState(status)
+            #expect(state.missing == missing)
+            #expect(state.installing == installing)
+            let banner = try #require(banners(note, facts: NoteBannerFacts(
+                speakerModelsMissing: state.missing, speakerModelsInstalling: state.installing)).first)
+            #expect(banner.actions == (missing || installing ? [.download] : [.transcribeAgain]))
+            #expect(banner.disabledActions == (installing ? [.download] : []))
+        }
+    }
+
+    @Test func skippedAnalysisOffersDownloadAndPendingConsentKeepsItsEntryPoint() throws {
+        var note = transcribed
+        note.speakers = [NoteSpeaker.oneVoice(prefix: "run_")]
+        note.speakerAnalysisFailure = nil
+        let facts = NoteBannerFacts(speakerModelsMissing: true)
+        #expect(banners(note, facts: facts).first?.actions == [.download])
+        var screen = NoteScreenState()
+        #expect(screen.bannerAction(.download, note: note, job: nil) == .transcribe(.speakersOnly))
+        var waiting = job(.needsConsent)
+        waiting.kind = .speakersOnly
+        #expect(banners(note, job: waiting, facts: facts).first?.actions == [.download])
+        #expect(screen.bannerAction(.download, note: note, job: waiting) == .transcribe(.speakersOnly))
+        note.speakers?[0].name = "Alex"
+        #expect(banners(note, facts: facts).isEmpty, "Naming alone does not introduce a new offer")
+        #expect(banners(note, job: waiting, facts: facts).first?.actions == [.download], "Explicit pending intent survives naming")
+        #expect(screen.bannerAction(.download, note: note, job: waiting) == .transcribe(.speakersOnly))
+        waiting.kind = .transcribeAgain
+        #expect(banners(note, job: waiting, facts: facts).isEmpty)
+        #expect(screen.bannerAction(.download, note: note, job: waiting) == nil)
+        note.speakers = [NoteSpeaker.oneVoice(prefix: "a_"), NoteSpeaker.oneVoice(prefix: "b_")]
+        #expect(!note.canDownloadSpeakerAnalysis)
+        note.speakers = [NoteSpeaker.oneVoice(prefix: "a_")]
+        note.speakers?[0].match = .confirmed(voice: UUID(), score: 1)
+        #expect(!note.canDownloadSpeakerAnalysis)
+        note.speakers = [NoteSpeaker.oneVoice(prefix: "a_")]
+        note.speakerAnalysisFailure = .empty
+        #expect(!note.canDownloadSpeakerAnalysis)
+    }
+
     /// iOS: a speaker step that found nobody is no one-voice banner, but its own notice.
     @Test func noSpeakersIsNotOneVoice() {
         var note = transcribed

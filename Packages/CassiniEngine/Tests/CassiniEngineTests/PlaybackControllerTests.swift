@@ -40,15 +40,8 @@ import CassiniNotebook
 
     private var milliseconds: Int { Int((controller.state.position * 1000).rounded()) }
 
-    private func waitFor(_ what: String, _ condition: @MainActor () -> Bool) async throws {
-        let deadline = ContinuousClock.now + .seconds(30) // An upper bound for a busy machine.
-        while !condition() {
-            guard ContinuousClock.now < deadline else {
-                Issue.record("Timed out waiting for \(what)")
-                throw CancellationError()
-            }
-            try await Task.sleep(for: .milliseconds(2))
-        }
+    private func waitFor(_ what: String, _ condition: @escaping @MainActor @Sendable () -> Bool) async throws {
+        try await waitForObserved(what, condition)
     }
 
     // ports: PlaybackControllerTest#thePositionIsSavedEveryFiveSecondsAndFinallyOnPauseAndLeave
