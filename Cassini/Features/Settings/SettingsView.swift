@@ -3,7 +3,7 @@ import CassiniEngine
 import CassiniNotebook
 
 /// Settings: App language, Transcription, the banners (notifications off, saved voices unreadable), On-device models, Speakers, Privacy, Your
-/// library and About, in that order.
+/// library, Moving and backup, and About, in that order.
 struct SettingsView: View {
     @Environment(ProcessingStore.self) private var processing
     @Environment(SettingsStore.self) private var settings
@@ -123,6 +123,7 @@ private struct SettingsForm: View {
             }
             PrivacySection(model: model)
             LibrarySection(totals: model.library)
+            BackupSection(open: model.openBackupInfo)
             Section {
                 AboutCard(version: model.version, openNotices: model.openLicenses)
             } header: {
@@ -259,6 +260,29 @@ private struct LibrarySection: View {
             Text("Your library", tableName: "Settings").foregroundStyle(Color.muted)
         } footer: {
             Text("Notes in Recently Deleted are not counted. They are deleted for good after 30 days.", tableName: "Settings").foregroundStyle(Color.muted)
+        }
+    }
+}
+
+/// "Moving and backup": notes follow the user's own iOS backup settings, said in plain words, with a row to the full
+/// explanation. Explanation only; nothing here changes what is backed up. DRAFT wording, see `BackupDraftCopy`.
+private struct BackupSection: View {
+    let open: () -> Void
+
+    var body: some View {
+        Section {
+            Text(verbatim: BackupDraftCopy.body).foregroundStyle(Color.ink).fixedSize(horizontal: false, vertical: true)
+            Button(action: open) {
+                HStack {
+                    Text(verbatim: BackupDraftCopy.learnMore).foregroundStyle(Color.ink)
+                    Spacer(minLength: 8)
+                    Image(systemName: "chevron.forward").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
+                }
+                .contentShape(Rectangle())
+            }
+            .accessibilityIdentifier("backupInfoRow")
+        } header: {
+            Text(verbatim: BackupDraftCopy.heading).foregroundStyle(Color.muted)
         }
     }
 }

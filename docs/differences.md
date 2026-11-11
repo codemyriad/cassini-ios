@@ -769,6 +769,11 @@ These features exist only on iOS. They were kept by decision.
 - **Settings sections** for Transcription (the speech language on Apple Speech devices, and "Transcribe after
   recording or import", on by default), Speakers (identify speakers, name strong matches automatically) and Your
   library (counts and duration). Turning automatic transcription off makes every finish and import audio only.
+- **Moving and backup** in Settings (draft wording, [backup-explainer-draft.md](backup-explainer-draft.md)): an
+  explanation, with no switch, that notes follow the user's own iOS backups (iCloud, a computer, a new iPhone), how to
+  keep an iCloud backup private or leave Cassini out, that saved voices and models stay behind, and Export All as ZIP.
+  Android has no such section yet; D97 plans a different one (a transfer switch). What is excluded from backup is
+  unchanged.
 - **Notices that exist only on iOS:** REC_INPUT_LOST, REC_COMPRESSION_FAILED, NOTES_UNREADABLE ("2 notes can't be
   read"), DL_PIN_UNAVAILABLE ("Model not available": the model host no longer offers the pinned model; update Cassini;
   no Retry, closable), "No speakers were detected" and "This audio can't be played" (a playback error at run time).

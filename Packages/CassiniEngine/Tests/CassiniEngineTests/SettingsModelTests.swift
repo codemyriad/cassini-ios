@@ -117,6 +117,13 @@ import CassiniNotebook
         #expect(effects.list.isEmpty, "Downloading, Checking files and Pending rows are not buttons")
     }
 
+    /// iOS extra: Moving and backup's Learn more opens the explanation, and only that.
+    @Test func learnMoreOpensTheBackupExplanation() async {
+        let model = await model()
+        model.openBackupInfo()
+        #expect(effects.list == [.open(.backupInfo)])
+    }
+
     // ports: SettingsViewModelTest#theRowsOpenTheirScreensAndTurnOnOpensTheNotificationSettings
     @Test func theRowsOpenTheirScreensAndTurnOnOpensTheNotificationSettings() async {
         let model = await model()
