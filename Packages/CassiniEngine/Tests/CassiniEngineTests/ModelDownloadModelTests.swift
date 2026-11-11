@@ -19,7 +19,11 @@ import CassiniNotebook
         var downloads: [[ModelPart]] = []
         var language: String? = "it-IT"
 
-        func plan(for noteID: UUID?) async -> ModelDownloadPlan { plan }
+        var requested: [(UUID?, ModelPart?)] = []
+        func plan(for noteID: UUID?, part: ModelPart?) async -> ModelDownloadPlan {
+            requested.append((noteID, part))
+            return plan
+        }
         func speechLanguage() -> String? { language }
         func usableBytes() async -> Int64 { usable }
         func recordConsent(for parts: [ModelPart]) { consents.append(parts) }
@@ -111,6 +115,40 @@ import CassiniNotebook
         #expect(ports.downloads == [[.speakers]])
         #expect(ports.transcribed.isEmpty)
         #expect(effects.list == [.close])
+    }
+
+    @Test(arguments: ModelPart.allCases)
+    func eachSettingsRowKeepsItsPartWhenThePlanIsReadAgain(_ part: ModelPart) async {
+        let expected: [ModelPart] = part == .speech ? [.speech] : [.speakers]
+        ports.plan = ModelDownloadPlan(missing: expected, speakersInstallBytes: 54_000_000)
+        let model = ModelDownloadModel(noteID: nil, ports: ports, part: part)
+        await model.load()
+        await model.download()
+        #expect(ports.requested.count == 2)
+        #expect(ports.requested.allSatisfy { $0.0 == nil && $0.1 == part })
+        #expect(ports.consents == [expected])
+        #expect(ports.downloads == [expected])
+        #expect(ports.transcribed.isEmpty)
+        if part != .speech { #expect(model.speechLanguage == nil) }
+    }
+
+    @Test(arguments: ModelPart.allCases)
+    func aRequestedStandalonePartExcludesOtherMissingParts(_ part: ModelPart) {
+        let plan = ModelDownloadPlan.plan(speech: .notDownloaded, speakers: .notDownloaded, forNote: false,
+            identifySpeakers: true, speakersInstallBytes: 54_000_000, requestedPart: part)
+        let expected: [ModelPart] = part == .speech ? [.speech] : [.speakers]
+        #expect(plan.missing == expected)
+        #expect(plan.requiredFreeBytes == (part == .speech ? ModelDownloadPlan.speechInstallBytes : 54_000_000))
+    }
+
+    @Test func aStandaloneSelectionCannotReplaceTheNotesPinnedPlan() async {
+        let model = ModelDownloadModel(noteID: Self.note, ports: ports, part: .speech)
+        await model.load()
+        #expect(ports.requested.first?.0 == Self.note)
+        #expect(ports.requested.first?.1 == nil)
+        let plan = ModelDownloadPlan.plan(speech: .notDownloaded, speakers: .notDownloaded, forNote: true,
+            identifySpeakers: true, speakersInstallBytes: 54_000_000, requestedPart: .speech)
+        #expect(plan.missing == [.speech, .speakers])
     }
 
     // ports: ModelDownloadViewModelTest#notEnoughSpaceShowsTheBannerAndRecordsNoConsentUntilRetryFits
