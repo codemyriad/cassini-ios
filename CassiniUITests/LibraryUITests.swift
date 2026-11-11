@@ -256,11 +256,13 @@ final class LibraryUITests: XCTestCase {
         let last = row(app, "Thoughts from the morning walk")
         // Up to the end of the list: once the last row is built, until a swipe no longer moves it.
         var previous = CGRect.null
-        list(app).scroll(attempts: 20, fast: true) {
+        // This is a trip to the end, so fling further than the row-targeted swipes use.
+        let reachedBottom = list(app).scroll(attempts: 20, velocity: XCUIGestureVelocity(rawValue: 3_000)) {
             guard last.exists else { return false }
             defer { previous = last.frame }
             return last.frame == previous
         }
+        XCTAssertTrue(reachedBottom, "The last row must stop moving at the end of the list")
         XCTAssertTrue(last.waitForExistence(within: 5))
         let record = app.buttons["recordButton"]
         XCTAssertLessThanOrEqual(last.frame.maxY, record.frame.minY, "row \(last.frame) under the bar \(record.frame)")
