@@ -42,11 +42,6 @@ import CassiniEngine
                     if phase == .active, graph.startup.isReady { Task { _ = try? await graph.trash.purgeExpired() } }
                     if phase == .background { graph.enterBackground() }
                 }
-                // Midnight, a time zone or DST change while open (iOS posts it on the main thread); activation covers a day
-                // that changed while the app was away.
-                .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in
-                    graph.libraryScreen.clockChanged()
-                }
                 // A new graph (a UI-test relaunch inside the app) starts every screen, task and observer afresh.
                 .id(ObjectIdentifier(graph))
         }

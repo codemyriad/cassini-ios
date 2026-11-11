@@ -22,6 +22,9 @@ import CassiniNotebook
     /// What the Settings screen reads.
     let settingsPorts: SettingsAdapter
     let libraryScreen: LibraryScreenModel
+    /// Midnight or a DST change while Cassini is open redraws the Library (activation covers a day that changed
+    /// while it was away, in `becameActive()`).
+    private let timeChangeObserver: NotificationObserver
     /// Builds each Note screen's model.
     let noteScreens: NoteScreens
     /// Set once `start()` has returned to the app.
@@ -67,6 +70,10 @@ import CassiniNotebook
         libraryScreen = Self.libraryScreen(environment: environment, library: library, processing: processing,
                                            recording: recording, trash: trash)
         libraryScreen.connect(router: router, errors: errors)
+        timeChangeObserver = NotificationObserver(center: environment.timeChanges,
+                                                  name: UIApplication.significantTimeChangeNotification) { [weak libraryScreen] in
+            libraryScreen?.clockChanged()
+        }
         noteScreens = Self.noteScreens(library: library, voices: voices, processing: processing, playback: playback,
                                        recording: recording, exports: exports, trash: trash, router: router, errors: errors,
                                        settings: settings)
@@ -302,4 +309,20 @@ extension View {
 /// Whether the launch work is done; UI-test launches show it (`launchFinished`).
 @MainActor @Observable final class LaunchFinished {
     var value = false
+}
+
+/// A block observer removed when its owner goes, so an app graph replaced by a UI-test relaunch stops hearing it.
+final class NotificationObserver: @unchecked Sendable {
+    private let center: NotificationCenter
+    private let token: any NSObjectProtocol
+
+    /// `action` runs on the main actor; iOS posts the system notifications this observes on the main thread.
+    init(center: NotificationCenter, name: Notification.Name, action: @escaping @MainActor () -> Void) {
+        self.center = center
+        token = center.addObserver(forName: name, object: nil, queue: .main) { _ in
+            MainActor.assumeIsolated { action() }
+        }
+    }
+
+    deinit { center.removeObserver(token) }
 }
