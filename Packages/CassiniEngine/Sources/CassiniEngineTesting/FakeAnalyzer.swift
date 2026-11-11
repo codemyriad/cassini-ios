@@ -8,6 +8,7 @@ import CassiniNotebook
 /// A speaker analyzer that returns a fixed analysis, optionally after the test lets it go. With `engines` a Parakeet
 /// run streams its speakers through them.
 public final class FakeAnalyzer: SpeakerAnalyzing {
+    let installRecorder: FakeModelInstallRecorder?
     private let analysis: SpeakerAnalysis
     private let identity: String?
     private let engines: (any SpeakerEngines)?
@@ -18,7 +19,8 @@ public final class FakeAnalyzer: SpeakerAnalyzing {
 
     /// With `suspends`, every analysis waits for `resume()`. `modelIdentity` nil stands for missing models.
     public init(analysis: SpeakerAnalysis = SpeakerAnalysis(turns: [], prints: []), modelIdentity: String? = "fake-model",
-                suspends: Bool = false, engines: (any SpeakerEngines)? = nil, printsReady: Bool = true) {
+                suspends: Bool = false, engines: (any SpeakerEngines)? = nil, printsReady: Bool = true, installRecorder: FakeModelInstallRecorder? = nil) {
+        self.installRecorder = installRecorder
         self.analysis = analysis
         identity = modelIdentity
         self.engines = engines
