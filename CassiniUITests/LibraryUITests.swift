@@ -145,6 +145,17 @@ final class LibraryUITests: XCTestCase {
     }
 
     /// Search shows flat results with their day, says when nothing matches, and opens a note.
+    /// A note stored with the reason Whistle took its transcription shows the notice when it is opened after a
+    /// launch; a note without one does not.
+    @MainActor func testANoteWhistleTranscribedAfterParakeetCouldNotRunSaysSo() {
+        let app = launch(["--seed", "search"])
+        let notice = app.staticTexts["Parakeet Ultra couldn’t run on this device for this recording, so Whistle transcribed it."]
+        let review = row(app, "Notes from the design review")
+        XCTAssertTrue(review.waitForExistence(within: 15))
+        review.tap()
+        XCTAssertTrue(notice.waitForExistence(within: 15))
+    }
+
     @MainActor func testSearchShowsFlatResultsAndSaysWhenNothingMatches() {
         let app = launch(["--seed", "search"])
         XCTAssertTrue(app.staticTexts["TODAY"].exists, "day headers without a search")
