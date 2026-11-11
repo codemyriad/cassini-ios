@@ -15,7 +15,9 @@ that were not ported, with the reason for each.
 iOS follows the Mac and GNOME D14 date menu while searching: Any date, Today, Past 7 days and Past 30 days.
 The constrained ranges start at local midnight (today, six days ago or 29 days ago) and end just before tomorrow;
 calendar arithmetic preserves daylight-saving boundaries. They combine with the text query and Starred using AND.
-Clearing Search resets the transient date choice; it is not saved with scene state. Android currently has no date
+Clearing Search resets the transient date choice; it is not saved with scene state. Dates follow the stored Library
+date (`Note.createdAt`); an imported document without a recorded date already uses its import date on mobile,
+whereas desktop can retain an unknown date. Android currently has no date
 filter, so this is an iOS extra adopting the recorded shared decision. Named-speaker and Recorded by me filters
 remain absent on iOS. Copy is pinned in [shared-strings-pin.md](shared-strings-pin.md).
 
