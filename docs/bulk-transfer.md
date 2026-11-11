@@ -15,9 +15,9 @@ silently omitted. Single-note export remains unchanged.
 
 Archive bounds follow cassini-ux main `4d577376f6360ed352fa75307f4dc47890ed9858`, D96:
 
-- 2,000 directory entries, including ignored members; 20 GiB expanded bytes; maximum 100:1 compression ratio.
+- 2,000 directory entries, including ignored members; 20 GB (20,000,000,000) expanded bytes; maximum 100:1 compression ratio.
 - Every directory and local header is checked before importing any member: encrypted, absolute/parent/Windows
-  traversal paths and inconsistent/truncated directory records reject the whole archive.
+  traversal paths and inconsistent/truncated directory records reject the whole archive. A damaged member header or CRC counts as one failed member; other valid members continue.
 - The existing 4 GiB single-file import limit also applies to members. An oversized member is counted as failed.
 - Stored and deflated payloads stream in 64 KiB chunks, with CRC, exact size and actual-byte budget checks.
   Ignored/oversized members are not expanded. No archive path is passed to a filesystem write.

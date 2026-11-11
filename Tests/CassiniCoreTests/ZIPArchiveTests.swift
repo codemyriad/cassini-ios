@@ -145,7 +145,7 @@ import CryptoKit
     @Test func twoThousandEntriesAreAcceptedAndTheNextIsRefused() throws {
         try withTemporaryDirectory { folder in
             #expect(ZIPLimits().entries == 2_000)
-            #expect(ZIPLimits().expandedBytes == 20 << 30)
+            #expect(ZIPLimits().expandedBytes == 20_000_000_000)
             #expect(ZIPLimits().ratio == 100)
             let source = folder.appendingPathComponent("empty")
             try Data().write(to: source)

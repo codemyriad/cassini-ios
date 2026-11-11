@@ -195,15 +195,9 @@ public struct ImportService: Sendable {
         return nil
     }
 
-    /// Runs blocking file work (a sniff, a verification or a scan of up to 4 GiB) on its own queue rather than the
-    /// cooperative pool, checking for cancellation before and after it.
+    /// Runs local scans on a GCD task executor, forwarding cancellation into Ogg's chunk checks.
     private static func blocking<T: Sendable>(_ work: @escaping @Sendable () throws -> T) async throws -> T {
-        try Task.checkCancellation()
-        let value = try await withCheckedThrowingContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async { continuation.resume(with: Result(catching: work)) }
-        }
-        try Task.checkCancellation()
-        return value
+        try await CancellableFileWork.run(work)
     }
 
     private func move(_ staging: URL, to name: String, in folder: URL) throws -> URL {

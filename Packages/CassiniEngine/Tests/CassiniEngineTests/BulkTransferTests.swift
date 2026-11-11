@@ -117,18 +117,37 @@ private actor BulkProgressTrace {
         #expect(try sandbox.scratchContents().isEmpty)
     }
 
-    @Test func oneDamagedLocalMemberDoesNotDiscardOtherGoodNotes() async throws {
+    @Test func oneDamagedMemberDoesNotDiscardOtherGoodNotes() async throws {
+        for corruptPayload in [false, true] {
+            let sandbox = try BulkSandbox()
+            let zip = try sandbox.archive([("Broken.wav", Data(ImportFixtures.wav)), ("Good.mp3", Data(ImportFixtures.mp3))])
+            var data = try Data(contentsOf: zip)
+            if corruptPayload {
+                // Keep both headers/directory intact, but make the first member fail its declared CRC.
+                let payload = try #require(data.range(of: Data(ImportFixtures.wav)))
+                data[payload.upperBound - 1] ^= 1
+            } else {
+                data[0] = 0 // Only the first local header is damaged.
+            }
+            try data.write(to: zip)
+            let report = await sandbox.service().run([zip])
+            #expect(report.archives.isEmpty)
+            #expect(report.summary.failed == 1)
+            #expect(report.summary.imported == 1)
+            #expect(await sandbox.notes.all().first?.title == "Good")
+            #expect(try sandbox.scratchContents().isEmpty)
+        }
+    }
+
+    @Test func duplicateSelectionFailsBeforePreparingOrWritingAnyMember() async throws {
         let sandbox = try BulkSandbox()
-        let zip = try sandbox.archive([("Broken.wav", Data(ImportFixtures.wav)), ("Good.mp3", Data(ImportFixtures.mp3))])
-        var data = try Data(contentsOf: zip)
-        data[0] = 0 // Directory remains sound; only the first local header is damaged.
-        try data.write(to: zip)
-        let report = await sandbox.service().run([zip])
-        #expect(report.archives.isEmpty)
-        #expect(report.summary.failed == 1)
-        #expect(report.summary.imported == 1)
-        #expect(await sandbox.notes.all().first?.title == "Good")
-        #expect(try sandbox.scratchContents().isEmpty)
+        let note = Note(title: "English meeting")
+        let service = BulkExportService(folder: sandbox.scratch) { _, _ in
+            Issue.record("An invalid selection must fail before preparing notes")
+            throw ExportError.cannotSave
+        }
+        await #expect(throws: ExportError.noNote) { try await service.export([note, note]) }
+        #expect(!FileManager.default.fileExists(atPath: sandbox.scratch.path))
     }
 
     @Test func perMemberLimitSkipsOnlyThatMemberAndProgressSurvivesAnEmptyArchive() async throws {

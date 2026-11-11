@@ -7,7 +7,7 @@ public struct ZIPLimits: Sendable {
     public var entries: Int
     public var expandedBytes: UInt64
     public var ratio: UInt64
-    public init(entries: Int = 2_000, expandedBytes: UInt64 = 20 * 1024 * 1024 * 1024, ratio: UInt64 = 100) {
+    public init(entries: Int = 2_000, expandedBytes: UInt64 = 20_000_000_000, ratio: UInt64 = 100) {
         self.entries = entries; self.expandedBytes = expandedBytes; self.ratio = ratio
     }
 }
