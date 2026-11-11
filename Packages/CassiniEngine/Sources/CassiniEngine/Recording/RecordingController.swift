@@ -212,6 +212,9 @@ public final class RecordingController {
                                          elapsed: parts.capture.elapsed)
             active.space = policyCheck(elapsed: active.elapsed, at: url).space
             setState(.active(active))
+            let activity = activityState(state.activeRecording ?? active)
+            self.activity = activity
+            parts.liveActivity?.start(noteID: note.id, activity)
             // Publish the live controller before the timestamp's Library snapshot, so the row and card
             // observe one active capture rather than keeping a pre-active row projection.
             do {
@@ -219,13 +222,11 @@ public final class RecordingController {
                     throw CocoaError(.fileWriteUnknown)
                 }
             } catch {
+                endActivity()
                 _ = try? await parts.capture.stop()
                 throw error
             }
             if !typed.isEmpty { scheduleTitleWrite(for: note.id) }
-            let activity = activityState(state.activeRecording ?? active)
-            self.activity = activity
-            parts.liveActivity?.start(noteID: note.id, activity)
             startPolicy()
         } catch {
             if let created { try? await parts.notes.discard(created) }

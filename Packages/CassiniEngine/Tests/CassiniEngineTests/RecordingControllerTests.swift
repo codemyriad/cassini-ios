@@ -17,7 +17,9 @@ import CassiniNotebook
         #expect(h.controller.state == .ended(noteID: nil, outcome: .couldNotStart))
         #expect(h.capture.stops == 1)
         #expect(await h.store.all().isEmpty)
-        #expect(h.activity.started.isEmpty)
+        #expect(h.activity.started.count == 1)
+        #expect(h.activity.ends == 1)
+        #expect(!h.activity.isRunning)
         #expect(h.handoff.handedOff.isEmpty)
     }
 
