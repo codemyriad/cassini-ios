@@ -14,14 +14,8 @@ struct ProcessingBody<Top: View, Banners: View>: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var follow = DraftFollow()
     @State private var position = ScrollPosition(edge: .top)
-    @State private var atEnd = true
     @State private var areaHeight: CGFloat = 0
     @State private var topHeight: CGFloat = 0
-    #if DEBUG
-    @Environment(\.marksUITestLayout) private var marksTestLayout
-    @State private var layoutWaitingForEnd: Int?
-    @State private var layoutFinishedWords = 0
-    #endif
 
     var body: some View {
         // The fixed top takes its height, the gutter above it and the gap below it.
@@ -50,41 +44,32 @@ struct ProcessingBody<Top: View, Banners: View>: View {
                     .readableWidth()
                 }
                 .scrollPosition($position)
-                .onScrollGeometryChange(for: Bool.self) { geometry in
-                    DraftFollow.isAtEnd(offset: geometry.contentOffset.y + geometry.contentInsets.top,
-                                        visibleHeight: geometry.containerSize.height - geometry.contentInsets.top
-                                            - geometry.contentInsets.bottom,
-                                        contentHeight: geometry.contentSize.height)
-                } action: { _, end in
-                    atEnd = end
-                    #if DEBUG
-                    if marksTestLayout, end, let words = layoutWaitingForEnd {
-                        layoutFinishedWords = words
-                        layoutWaitingForEnd = nil
-                    }
-                    #endif
-                }
                 // Any draft change that makes the list taller (more words, or tentative words settling into longer
                 // text).
                 .onScrollGeometryChange(for: CGFloat.self) { $0.contentSize.height } action: { old, new in
                     if new > old { contentGrew(proxy) }
                 }
-                .onScrollPhaseChange { old, new in
+                .onScrollPhaseChange { old, new, context in
                     // A scroll the user made starts and ends; one Cassini made (to the end) leaves following as it was.
                     // While the user's scroll runs, new text does not scroll, so it never turns into Cassini's scroll.
                     if new == .interacting { follow.scrollBegan() }
-                    if new == .idle, old == .interacting || old == .decelerating { follow.scrollEnded(atEnd: atEnd) }
+                    if new == .idle, old == .interacting || old == .decelerating {
+                        // Decide from this scroll-end event, including its final geometry.
+                        let geometry = context.geometry
+                        follow.scrollEnded(atEnd: DraftFollow.isAtEnd(
+                            offset: geometry.contentOffset.y + geometry.contentInsets.top,
+                            visibleHeight: geometry.containerSize.height - geometry.contentInsets.top
+                                - geometry.contentInsets.bottom,
+                            contentHeight: geometry.contentSize.height))
+                    }
                 }
             }
         }
         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { areaHeight = $0 }
         #if DEBUG
         .overlay(alignment: .bottomLeading) {
-            if marksTestLayout {
-                Text(verbatim: " ").font(.system(size: 1)).opacity(0.01).allowsHitTesting(false)
-                    .accessibilityIdentifier("draftLayoutFinished")
-                    .accessibilityValue(Text(verbatim: String(layoutFinishedWords)))
-            }
+            UITestStateMarker(identifier: "draftFollow",
+                              value: "scrolling=\(follow.userScrolling),following=\(follow.followsNewText)")
         }
         #endif
     }
@@ -102,22 +87,7 @@ struct ProcessingBody<Top: View, Banners: View>: View {
     /// its top while the draft ran off the screen (likely because a position that already holds the bottom edge, set
     /// while the draft still fit, does not change). The reader's scroll to the end of the list acts on every call.
     private func contentGrew(_ proxy: ScrollViewProxy) {
-        #if DEBUG
-        let words = model.shownDraft?.words.count ?? 0
-        #endif
-        guard follow.followsNewText else {
-            #if DEBUG
-            if marksTestLayout { layoutFinishedWords = words; layoutWaitingForEnd = nil }
-            #endif
-            return
-        }
-        #if DEBUG
-        if marksTestLayout {
-            // A requested scroll completes when real scroll geometry reaches the end. If already
-            // there, no scroll animation is needed. A user drag makes atEnd false before new words.
-            if atEnd { layoutFinishedWords = words; layoutWaitingForEnd = nil } else { layoutWaitingForEnd = words }
-        }
-        #endif
+        guard follow.followsNewText else { return }
         withAnimation(reduceMotion ? nil : .default) {
             if #available(iOS 26.0, *) {
                 position.scrollTo(edge: .bottom)
