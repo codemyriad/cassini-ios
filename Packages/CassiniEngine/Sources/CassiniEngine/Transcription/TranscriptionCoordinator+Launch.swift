@@ -76,37 +76,47 @@ extension TranscriptionCoordinator {
     }
 
     /// Cassini came to the screen on `platform`: when `EnqueueRules.resumesOnActivation` allows it, each job the system
-    /// paused (oldest first) is queued again from its checkpoint as its Resume on the screen would queue it, and the
-    /// system hold is cleared so the queue continues. Jobs the person paused stay paused. Returns the notes it resumed.
+    /// paused (oldest first) is queued again from its checkpoint as its Resume on the screen would queue it, then the
+    /// system hold is cleared so the queue continues. Jobs the person paused stay paused. Returns the notes it queued
+    /// again; one that cannot be (no consent, refused) stays as that leaves it, and the hold is cleared all the same.
     ///
-    /// The hold and the paused jobs are read, and the hold cleared, in one serial section that runs only once every
-    /// system stop's pause is written: a job iOS just stopped is read as paused, never as running, and of two
-    /// activations only the first finds the hold. A system stop that comes after that section keeps its hold: the
-    /// resumed jobs are queued without clearing a hold, so they wait for the next activation.
+    /// The hold and the paused jobs are read in one serial section that runs only once every system stop's pause is
+    /// written, so a job iOS just stopped is read as paused, never as running. That section claims the resume in
+    /// memory, so of two activations only the first queues the jobs. The stored hold stays until every job is queued
+    /// again: a kill meanwhile leaves the hold and the paused jobs for the next launch to resume. It is then cleared
+    /// only when it is still the system hold this activation read: a system stop or the person's Stop meanwhile
+    /// keeps theirs, and the queued jobs wait for it.
     @discardableResult
     public func resumeSystemPause(onActivationOf platform: PlatformFacts) async -> [UUID] {
         await readiness.wait()
-        var paused: [Job]?
+        var paused: [Job] = []
+        var stopsWhenRead = 0
         while true {
             let decided: Bool = await lock.run {
                 let jobs = await parts.jobs.all()
                 // Checked after the read, with no wait from here on: a system stop or a Stop during the read counts.
                 guard systemStopWrites.isEmpty else { return false }
-                guard EnqueueRules.resumesOnActivation(settings.queueHold, platform: platform) else { return true }
+                guard !resumingSystemPause,
+                      EnqueueRules.resumesOnActivation(settings.queueHold, platform: platform) else { return true }
                 paused = jobs
                     .filter { $0.state == .paused && $0.pauseReason == .system && !trashed.contains($0.noteID) }
                     .sorted { $0.seq < $1.seq }
-                continueQueue()
+                if paused.isEmpty { continueQueue() } else { resumingSystemPause = true }
+                stopsWhenRead = systemStops
                 return true
             }
             if decided { break }
             // Each one removes itself at the end of its section, so these have not ended yet.
             for write in Array(systemStopWrites.values) { await write.value }
         }
+        guard !paused.isEmpty else { return [] }
         var resumed: [UUID] = []
-        for job in paused ?? [] {
+        for job in paused {
+            // Under the system hold: queued, not started, and no hold is cleared.
             if case .queued = await transcribe(job.noteID, kind: job.kind, origin: .automatic) { resumed.append(job.noteID) }
         }
+        resumingSystemPause = false
+        if settings.queueHold == .system, systemStops == stopsWhenRead { continueQueue() }
         return resumed
     }
 

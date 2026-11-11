@@ -120,6 +120,8 @@ import CassiniNotebook
     /// reached the queue's serial section behind one it keeps busy.
     var sectionBusy: Bool { coordinator.lock.isBusy }
     var sectionWaiting: Int { coordinator.lock.waiting }
+    /// An activation has claimed the resume of the system's pause and is queueing the jobs again.
+    var activationClaimed: Bool { coordinator.resumingSystemPause }
 
     func tearDown() {
         try? FileManager.default.removeItem(at: root)

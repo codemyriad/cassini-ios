@@ -3,7 +3,8 @@ import CassiniNotebook
 
 /// The drain loop: one job at a time in queue order, in the background time it holds, and the system's Stop.
 ///
-/// Touches: `drainTask`, `rerun`, `background`, `backgroundProgress` and `systemStopWrites` (main actor); `active` and
+/// Touches: `drainTask`, `rerun`, `background`, `backgroundProgress`, `systemStopWrites` and
+/// `systemStops` (main actor); `active` and
 /// the outcome writes inside `lock`'s section; the running job only through `setRunning`, the hold through `setHold`.
 extension TranscriptionCoordinator {
     /// Starts the drain loop, or makes the running one look at the queue again before it ends.
@@ -183,6 +184,7 @@ extension TranscriptionCoordinator {
         let current = active
         current?.stop.stop(.pause(.system))
         setHold(.system)
+        systemStops += 1
         guard let current else { return nil }
         // Registered before anything can run: an activation that sees the hold also sees that its pause is pending.
         let id = UUID()
