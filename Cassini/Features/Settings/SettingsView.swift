@@ -5,6 +5,11 @@ import CassiniNotebook
 /// Settings: App language, Transcription, the banners (notifications off, saved voices unreadable), On-device models, Speakers, Privacy, Your
 /// library and About, in that order.
 struct SettingsView: View {
+    @Environment(ProcessingStore.self) private var processing
+    @Environment(SettingsStore.self) private var settings
+    #if DEBUG
+    @Environment(\.modelInstallRecorder) private var installRecorder
+    #endif
     @Environment(SettingsAdapter.self) private var ports
     @Environment(Router.self) private var router
     @Environment(\.scenePhase) private var scenePhase
@@ -19,6 +24,25 @@ struct SettingsView: View {
         .paperListBackground()
         .overlay(alignment: .topLeading) {
             if loaded { UITestStateMarker(identifier: "settingsLoaded") }
+            #if DEBUG
+            if let recorder = installRecorder {
+                let installing = processing.models.isInstalling
+                let download = processing.models.download
+                let snapshot = recorder.snapshot
+                if !snapshot.requested.isEmpty {
+                    UITestStateMarker(identifier: "modelInstallRequested",
+                                      value: snapshot.requested.map(\.rawValue).joined(separator: ","))
+                    if !installing, download == nil, !snapshot.completed.isEmpty {
+                        let consent: [ModelPart] = (settings.downloadsAllowed ? [.speech] : [])
+                            + (settings.speakerDownloadsAllowed ? [.speakers] : [])
+                        UITestStateMarker(identifier: "modelInstallCompleted", value:
+                            "requested=\(snapshot.requested.map(\.rawValue).joined(separator: ","));"
+                            + "completed=\(snapshot.completed.map(\.rawValue).joined(separator: ","));"
+                            + "consented=\(consent.map(\.rawValue).joined(separator: ","))")
+                    }
+                }
+            }
+            #endif
         }
         .navigationTitle(Text("Settings", tableName: "Settings")).navigationBarTitleDisplayMode(.inline)
         .task {

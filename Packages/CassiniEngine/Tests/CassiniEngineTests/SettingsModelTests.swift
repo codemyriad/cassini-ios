@@ -107,7 +107,8 @@ import CassiniNotebook
         model.openModel(.speech)
         // A download that failed (or that iOS stopped) starts again from Model download.
         model.openModel(.speakers)
-        #expect(effects.list == Array(repeating: .open(.modelDownload(noteID: nil)), count: 2))
+        #expect(effects.list == [.open(.modelDownload(noteID: nil, part: .speech)),
+                                 .open(.modelDownload(noteID: nil, part: .speakers))])
 
         effects.list = []
         ports.modelStatuses = [.speech: .downloading(0.1), .speakers: .checking, .voices: .notDownloaded]

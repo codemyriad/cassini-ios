@@ -23,6 +23,7 @@ import CassiniEngineTesting
     var transcriptionUptimeMs: @Sendable () -> Int64 = TranscriptionJob.uptimeMs
     #if DEBUG
     var draftClock: PermitClock?
+    var modelInstallRecorder: FakeModelInstallRecorder?
     #endif
     var transcriber: any Transcribing
     var analyzer: any SpeakerAnalyzing
@@ -237,17 +238,18 @@ extension AppEnvironment {
         default:
             .returns(TestFixtures.transcribedSegments, total: TestFixtures.fixtureDuration)
         }
+        let installRecorder = FakeModelInstallRecorder()
         let draftClock = draftGrowing ? PermitClock(now: uiTestingNow) : nil
         let pacingClock: any AppClock = if let draftClock { draftClock } else { FakeClock(now: uiTestingNow) }
-        let transcriber = FakeTranscriber(script, status: status, recognizer: recognizer, clock: pacingClock)
+        let transcriber = FakeTranscriber(script, status: status, recognizer: recognizer, clock: pacingClock, installRecorder: installRecorder)
         // Without Apple speech the Apple slot holds the candidate that refuses every job.
         let unavailable: (any Transcribing)? = platform.appleSpeech ? nil : UnavailableSpeechTranscriber()
         // The recording seed tells the speakers apart, as a walk from recording to naming needs; the processing seed's
         // job has its speaker step ahead.
         let analyzer = switch seed {
-        case .recording, _ where speakersReady && !modelsMissing: FakeAnalyzer(analysis: TestFixtures.recordingAnalysis)
-        case .processing where !modelsMissing: FakeAnalyzer()
-        default: FakeAnalyzer(modelIdentity: nil)
+        case .recording, _ where speakersReady && !modelsMissing: FakeAnalyzer(analysis: TestFixtures.recordingAnalysis, installRecorder: installRecorder)
+        case .processing where !modelsMissing: FakeAnalyzer(installRecorder: installRecorder)
+        default: FakeAnalyzer(modelIdentity: nil, installRecorder: installRecorder)
         }
         var value = AppEnvironment(
             root: root, defaults: defaults, clock: FixedClock(now: uiTestingNow),
@@ -264,6 +266,7 @@ extension AppEnvironment {
             launch: LaunchOptions(seed: seed, openFixture: openFixture, restoresNavigation: false, marksLaunchFinished: true,
                                   token: token),
             models: root.appendingPathComponent("CassiniModels", isDirectory: true))
+        value.modelInstallRecorder = installRecorder
         value.draftClock = draftClock
         let pacingStart = uiTestingNow
         value.transcriptionUptimeMs = { Int64((pacingClock.now.timeIntervalSince(pacingStart) * 1_000).rounded()) }
@@ -274,8 +277,8 @@ extension AppEnvironment {
                 whistle: capability, parakeetLinked: true, platform: platform, physicalMemory: (bundledCapable ? 6 : 3) << 30,
                 availableMemory: { ParakeetMemory.beforeLoadBytes }, installed: { bundledVerified },
                 verified: { bundledVerified }, verify: { bundledVerified })
-            let parakeet = FakeTranscriber(script, status: bundledVerified ? .ready : .notDownloaded, recognizer: .parakeet, clock: pacingClock)
-            let legacy = unavailable ?? FakeTranscriber(script, recognizer: .appleSpeech, clock: pacingClock)
+            let parakeet = FakeTranscriber(script, status: bundledVerified ? .ready : .notDownloaded, recognizer: .parakeet, clock: pacingClock, installRecorder: installRecorder)
+            let legacy = unavailable ?? FakeTranscriber(script, recognizer: .appleSpeech, clock: pacingClock, installRecorder: installRecorder)
             let speech = RoutedTranscriber(legacy: legacy, candidates: [transcriber, parakeet]) { speechModels.selectedRecognizer() }
             value.transcriber = speech
             value.downloadTranscriber = bundledCapable ? parakeet : speech

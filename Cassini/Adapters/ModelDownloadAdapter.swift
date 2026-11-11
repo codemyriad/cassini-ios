@@ -28,7 +28,7 @@ import CassiniNotebook
 
     /// `ModelDownloadPlan.plan` over the speech model of the chosen language and the speaker models' status, for the
     /// note's job, with the sizes of what the catalog still has to install.
-    func plan(for noteID: UUID?) async -> ModelDownloadPlan {
+    func plan(for noteID: UUID?, part: ModelPart?) async -> ModelDownloadPlan {
         if speechOnly {
             let plan = ModelPlan(ModelPlan.of(root: models).missing.filter { $0.part == .speech })
             return ModelDownloadPlan(missing: plan.parts, requiredFreeBytes: plan.requiredFreeBytes,
@@ -50,7 +50,7 @@ import CassiniNotebook
                                       speakers: await analyzer.modelStatus(), forNote: noteID != nil,
                                       identifySpeakers: settings.identifySpeakers, speakersOnly: speakersOnly,
                                       speakersInstallBytes: analyzer.modelInstallBytes, speechInstallBytes: speech.assetInstallBytes,
-                                      recognizer: speech.recognizer, catalog: ModelPlan.of(root: models))
+                                      recognizer: speech.recognizer, catalog: ModelPlan.of(root: models), requestedPart: part)
     }
 
     func speechLanguage(for noteID: UUID?) async -> String? {

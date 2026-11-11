@@ -38,18 +38,24 @@ public struct ModelDownloadPlan: Hashable, Sendable {
 
     /// What the model download screen installs. The speech model counts unless it is ready or cannot be used for the
     /// language. The speaker models count when they are not ready and either a note's job tells speakers apart
-    /// (`identifySpeakers`) or there is no note: the standalone download from a Settings row installs every part that
-    /// is not ready, whatever the Speakers switch says. A note's speakers-only job (Identify speakers) needs the speaker
+    /// (`identifySpeakers`) or there is no note. A Settings row requests only its own install group, whatever the
+    /// Speakers switch says; a standalone entry without a requested part includes all missing parts. A note's speakers-only job (Identify speakers) needs the speaker
     /// models alone.
     ///
     /// `catalog` is what the catalog still has to install (`ModelPlan.of(root:)`): it gives each part's download, and
     /// on a Parakeet device (`recognizer`) the free space too. Without it a part shows no size.
     public static func plan(speech: ModelPartStatus, speakers: ModelPartStatus, forNote: Bool, identifySpeakers: Bool,
                             speakersOnly: Bool = false, speakersInstallBytes: Int64, speechInstallBytes: Int64 = Self.speechInstallBytes,
-                            recognizer: SpeechRecognizer = .appleSpeech, catalog: ModelPlan? = nil) -> ModelDownloadPlan {
+                            recognizer: SpeechRecognizer = .appleSpeech, catalog: ModelPlan? = nil,
+                            requestedPart: ModelPart? = nil) -> ModelDownloadPlan {
         var missing: [ModelPart] = []
-        if speech != .ready, speech != .unsupported, !speakersOnly { missing.append(.speech) }
-        if speakers != .ready, !forNote || identifySpeakers || speakersOnly { missing.append(.speakers) }
+        // A standalone row requests its own install group. Diarization and voice recognition
+        // share the speaker bundle, as the Settings voices row says.
+        let requested = forNote ? nil : requestedPart
+        if speech != .ready, speech != .unsupported, !speakersOnly,
+           requested == nil || requested == .speech { missing.append(.speech) }
+        if speakers != .ready, !forNote || identifySpeakers || speakersOnly,
+           requested == nil || requested != .speech { missing.append(.speakers) }
         var plan = ModelDownloadPlan(missing: missing, requiredFreeBytes:
             (missing.contains(.speech) ? speechInstallBytes : 0) + (missing.contains(.speakers) ? speakersInstallBytes : 0),
             speakersOnly: speakersOnly)
@@ -106,8 +112,8 @@ public struct ModelDownloadPlan: Hashable, Sendable {
 /// What the model download screen reads and changes. The app binds it to its stores; tests pass a fake.
 @MainActor public protocol ModelDownloadPorts: AnyObject {
     /// The missing parts and the free space their install needs. With a note, the parts its job uses; without one
-    /// (the standalone download from Settings), every part that is not ready.
-    func plan(for noteID: UUID?) async -> ModelDownloadPlan
+    /// a Settings row requests only its part (the voices row shares the speaker bundle); nil includes all missing parts.
+    func plan(for noteID: UUID?, part: ModelPart?) async -> ModelDownloadPlan
     /// The language the recognizer is set to hear (`SettingsStore.speechLanguage`, BCP 47) on a device that keeps
     /// Apple Speech; nil where the recognizer hears the language itself (Parakeet).
     func speechLanguage() -> String?
@@ -128,6 +134,7 @@ public struct ModelDownloadPlan: Hashable, Sendable {
 }
 
 extension ModelDownloadPorts {
+    public func plan(for noteID: UUID?) async -> ModelDownloadPlan { await plan(for: noteID, part: nil) }
     public func speechLanguage(for noteID: UUID?) async -> String? { speechLanguage() }
 }
 
@@ -150,6 +157,8 @@ public final class ModelDownloadModel {
     }
 
     public let noteID: UUID?
+    /// A standalone Settings row's requested part; note jobs retain their own pinned plan.
+    public let part: ModelPart?
     /// Nil until it is read, and when nothing is missing (the screen is never shown without parts).
     public private(set) var plan: ModelDownloadPlan?
     /// The primary button shows its spinner.
@@ -166,8 +175,9 @@ public final class ModelDownloadModel {
     @ObservationIgnored public var onEffect: (Effect) -> Void = { _ in }
     @ObservationIgnored private var closing = false
 
-    public init(noteID: UUID?, ports: any ModelDownloadPorts) {
+    public init(noteID: UUID?, ports: any ModelDownloadPorts, part: ModelPart? = nil) {
         self.noteID = noteID
+        self.part = noteID == nil ? part : nil
         self.ports = ports
     }
 
@@ -179,9 +189,9 @@ public final class ModelDownloadModel {
 
     /// Reads the plan once the screen is shown.
     public func load() async {
-        let plan = await ports.plan(for: noteID)
+        let plan = await ports.plan(for: noteID, part: part)
         if plan.isEmpty { await closeStale(); return }
-        if plan.speakersOnly { speechLanguage = nil }
+        if plan.speakersOnly || (!withNote && !plan.missing.contains(.speech)) { speechLanguage = nil }
         else { speechLanguage = await ports.speechLanguage(for: noteID) }
         self.plan = plan
     }
@@ -190,7 +200,7 @@ public final class ModelDownloadModel {
     public func download() async {
         guard !busy, !closing else { return }
         busy = true
-        let plan = await ports.plan(for: noteID)
+        let plan = await ports.plan(for: noteID, part: part)
         if plan.isEmpty { await closeStale(); return }
         self.plan = plan
         guard await ports.usableBytes() >= plan.requiredFreeBytes else {

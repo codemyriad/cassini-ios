@@ -32,7 +32,7 @@ public enum Route: Codable, Hashable, Sendable {
     case trash
     case licenses
     /// Consent for the model download, before transcribing `noteID` or on its own.
-    case modelDownload(noteID: UUID?)
+    case modelDownload(noteID: UUID?, part: ModelPart? = nil)
     /// D78: the speech-only upgrade advertised by the Parakeet suggestion.
     case parakeetDownload
 

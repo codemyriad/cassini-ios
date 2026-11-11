@@ -19,6 +19,7 @@ public struct FakeTranscriber: Transcribing {
         case fails(TranscriptionError)
     }
 
+    private let installRecorder: FakeModelInstallRecorder?
     private let clock: any AppClock
     public let script: Script
     private static let resultInterval = Duration.milliseconds(1_200)
@@ -28,7 +29,8 @@ public struct FakeTranscriber: Transcribing {
     public let recognizer: SpeechRecognizer
 
     public init(_ script: Script, status: ModelPartStatus = .ready, recognizer: SpeechRecognizer = .appleSpeech,
-                clock: any AppClock = SystemClock()) {
+                clock: any AppClock = SystemClock(), installRecorder: FakeModelInstallRecorder? = nil) {
+        self.installRecorder = installRecorder
         self.script = script; self.status = status; self.recognizer = recognizer; self.clock = clock
     }
 
@@ -87,7 +89,9 @@ public struct FakeTranscriber: Transcribing {
 
     /// Reports the download as done at once; nothing is installed, so `assetStatus` stays as it was.
     public func installAssets(locale: Locale, progress: @escaping @Sendable (InstallProgress) -> Void) async throws {
+        installRecorder?.request(.speech)
         progress(.downloading(1))
+        installRecorder?.complete(.speech)
     }
 }
 #endif
