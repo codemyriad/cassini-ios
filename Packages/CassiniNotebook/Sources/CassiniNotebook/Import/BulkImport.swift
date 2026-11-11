@@ -34,7 +34,7 @@ public enum ArchiveAudio {
 
 public enum ArchiveContents {
     public static func preservesOriginal(_ note: Note) -> Bool {
-        if let state = note.document?.state, state == .unknownFormat || state == .unreadable { return true }
+        if let state = note.document?.state, state == .unknownFormat || state == .unreadable || state == .invalidMetadata { return true }
         return note.document == nil && note.transcript.isEmpty && !(note.versions?.contains { !$0.segments.isEmpty } ?? false)
     }
 }

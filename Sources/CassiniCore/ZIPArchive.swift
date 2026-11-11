@@ -29,6 +29,7 @@ public struct ZIPArchive: Sendable {
         public let method: UInt16
         let offset: UInt64
         let checksum: UInt32
+        let readable: Bool
     }
     public let url: URL
     public let entries: [Entry]
@@ -85,13 +86,21 @@ public struct ZIPArchive: Sendable {
             guard UInt64(variable) <= directoryEnd - cursor - 46 else { throw ZIPFailure.damaged }
             let data = try zipRead(file, at: cursor + 46, count: nameSize + extraSize)
             let rawName = Data(data.prefix(nameSize))
+            let extra = Data(data.suffix(extraSize))
             let encoding = flags & 0x800 != 0 ? String.Encoding.utf8 :
                 String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(0x0400)) // CP437
-            guard let name = String(data: rawName, encoding: encoding) else { throw ZIPFailure.damaged }
+            guard var name = String(data: rawName, encoding: encoding) else { throw ZIPFailure.damaged }
             try Self.checkPath(name)
+            if let unicode = try Self.extra(0x7075, in: extra), unicode.count >= 5, unicode[0] == 1 {
+                let crc = rawName.withUnsafeBytes { UInt32(CZlib.crc32(0, $0.bindMemory(to: UInt8.self).baseAddress, uInt(rawName.count))) }
+                if unicode.z32(1) == crc {
+                    guard let path = String(data: unicode.dropFirst(5), encoding: .utf8) else { throw ZIPFailure.damaged }
+                    try Self.checkPath(path)
+                    if flags & 0x800 == 0 { name = path }
+                }
+            }
             var packed = UInt64(header.z32(20)), unpacked = UInt64(header.z32(24))
             var offset = UInt64(header.z32(42)), disk = UInt64(header.z16(34))
-            let extra = Data(data.suffix(extraSize))
             if packed == 0xffffffff || unpacked == 0xffffffff || offset == 0xffffffff || disk == 0xffff {
                 guard let zip64 = try Self.extra(1, in: extra) else { throw ZIPFailure.damaged }
                 var index = 0
@@ -108,19 +117,11 @@ public struct ZIPArchive: Sendable {
             guard disk == 0 else { throw ZIPFailure.damaged }
             guard unpacked <= limits.expandedBytes - expanded else { throw ZIPFailure.tooLarge }
             expanded += unpacked
-            try Self.checkRatio(unpacked, packed, limits.ratio)
-            // Validate every local header too, before the caller can import even the first member.
-            guard offset <= start, start - offset >= 30 else { throw ZIPFailure.damaged }
-            let local = try zipRead(file, at: offset, count: 30)
-            guard local.z32(0) == 0x04034b50 else { throw ZIPFailure.damaged }
-            if local.z16(6) & 0x2041 != 0 { throw ZIPFailure.encrypted }
-            guard local.z16(8) == header.z16(10), local.z16(6) == flags,
-                  local.z16(26) == header.z16(28) else { throw ZIPFailure.damaged }
-            let localExtra = UInt64(local.z16(26)) + UInt64(local.z16(28))
-            guard localExtra <= start - offset - 30 else { throw ZIPFailure.damaged }
-            guard try zipRead(file, at: offset + 30, count: nameSize) == rawName else { throw ZIPFailure.damaged }
-            let payload = offset + 30 + localExtra
-            guard packed <= start - payload else { throw ZIPFailure.damaged }
+            if header.z16(10) != 0 { try Self.checkRatio(unpacked, packed, limits.ratio) }
+            // Security facts in local headers are checked for every member before import. A broken individual
+            // member is retained as unreadable, so one corrupt header does not discard other good notes.
+            let payload = try Self.payload(file, at: offset, before: start, flags: flags, method: header.z16(10),
+                                           name: rawName, packed: packed)
             let mode = (header.z32(38) >> 16) & 0xf000
             let regular = !name.hasSuffix("/") && mode != 0xa000 && mode != 0x4000
             // Only the first 512 title characters can affect the import's 200-character title. Keep the extension.
@@ -128,7 +129,7 @@ public struct ZIPArchive: Sendable {
             let ext = (base as NSString).pathExtension
             let display = String((base as NSString).deletingPathExtension.prefix(512)) + (ext.isEmpty ? "" : "." + String(ext.prefix(32)))
             result.append(Entry(name: display, compressedBytes: packed, expandedBytes: unpacked, isFile: regular,
-                                method: header.z16(10), offset: payload, checksum: header.z32(16)))
+                                method: header.z16(10), offset: payload ?? 0, checksum: header.z32(16), readable: payload != nil))
             cursor += 46 + UInt64(variable)
         }
         guard cursor == directoryEnd else { throw ZIPFailure.damaged }
@@ -140,6 +141,7 @@ public struct ZIPArchive: Sendable {
     @discardableResult public func read(_ entry: Entry, remainingBytes: UInt64, check: () throws -> Void = {},
                                        observed: (Int) throws -> Void = { _ in },
                                        consume: (Data) throws -> Void) throws -> UInt64 {
+        guard entry.readable else { throw ZIPFailure.entry }
         let input = try FileHandle(forReadingFrom: url)
         defer { try? input.close() }
         try input.seek(toOffset: entry.offset)
@@ -202,6 +204,37 @@ public struct ZIPArchive: Sendable {
             throw ZIPFailure.unsafePaths
         }
     }
+    private static func payload(_ file: FileHandle, at offset: UInt64, before start: UInt64, flags: UInt16,
+                                method: UInt16, name: Data, packed: UInt64) throws -> UInt64? {
+        do {
+            guard offset <= start, start - offset >= 30 else { return nil }
+            let local = try zipRead(file, at: offset, count: 30)
+            guard local.z32(0) == 0x04034b50 else { return nil }
+            if local.z16(6) & 0x2041 != 0 { throw ZIPFailure.encrypted }
+            let names = Int(local.z16(26)), extras = Int(local.z16(28))
+            guard UInt64(names + extras) <= start - offset - 30 else { return nil }
+            let raw = try zipRead(file, at: offset + 30, count: names)
+            let encoding = local.z16(6) & 0x800 != 0 ? String.Encoding.utf8 :
+                String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(0x0400))
+            guard let localName = String(data: raw, encoding: encoding) else { return nil }
+            try checkPath(localName)
+            let extra = try zipRead(file, at: offset + 30 + UInt64(names), count: extras)
+            if let unicode = try Self.extra(0x7075, in: extra), unicode.count >= 5, unicode[0] == 1 {
+                let crc = raw.withUnsafeBytes { UInt32(CZlib.crc32(0, $0.bindMemory(to: UInt8.self).baseAddress, uInt(raw.count))) }
+                if unicode.z32(1) == crc {
+                    guard let path = String(data: unicode.dropFirst(5), encoding: .utf8) else { return nil }
+                    try checkPath(path)
+                }
+            }
+            guard local.z16(8) == method, local.z16(6) == flags, raw == name else { return nil }
+            let payload = offset + 30 + UInt64(names + extras)
+            guard packed <= start - payload else { return nil }
+            return payload
+        } catch let failure as ZIPFailure {
+            if failure == .unsafePaths || failure == .encrypted { throw failure }
+            return nil
+        } catch { return nil }
+    }
     static func checkRatio(_ expanded: UInt64, _ compressed: UInt64, _ ratio: UInt64) throws {
         guard expanded == 0 || (ratio > 0 && compressed > 0 && (expanded - 1) / ratio < compressed) else {
             throw ZIPFailure.tooLarge
@@ -209,14 +242,18 @@ public struct ZIPArchive: Sendable {
     }
     static func extra(_ id: UInt16, in data: Data) throws -> Data? {
         var p = 0
+        var found: Data?
         while p < data.count {
             guard data.count - p >= 4 else { throw ZIPFailure.damaged }
             let count = Int(data.z16(p + 2))
             guard count <= data.count - p - 4 else { throw ZIPFailure.damaged }
-            if data.z16(p) == id { return Data(data[(p + 4)..<(p + 4 + count)]) }
+            if data.z16(p) == id {
+                guard found == nil else { throw ZIPFailure.damaged }
+                found = Data(data[(p + 4)..<(p + 4 + count)])
+            }
             p += 4 + count
         }
-        return nil
+        return found
     }
 }
 

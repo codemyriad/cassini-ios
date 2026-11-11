@@ -28,10 +28,10 @@ private final class BulkSandbox: Sendable {
         }
         try writer.finish(); return url
     }
-    func service(limits: ZIPLimits = .init()) -> BulkImportService {
+    func service(limits: ZIPLimits = .init(), memberLimit: UInt64 = UInt64(Limits.maxImportBytes)) -> BulkImportService {
         let importer = ImportService(notes: notes, files: CoordinatedFileImporter(storage: storage), audio: audio,
                                      storage: storage, clock: FakeClock())
-        return BulkImportService(files: CoordinatedFileImporter(storage: storage), scratch: scratch, limits: limits) { url, name in
+        return BulkImportService(files: CoordinatedFileImporter(storage: storage), scratch: scratch, limits: limits, memberLimit: memberLimit) { url, name in
             try await importer.importFile(url, fallbackTitle: "Imported audio", displayName: name)
         }
     }
@@ -46,6 +46,11 @@ private final class BulkEvent: Sendable {
     init() { (stream, continuation) = AsyncStream.makeStream(bufferingPolicy: .bufferingNewest(1)) }
     func signal() { continuation.yield(()); continuation.finish() }
     func wait() async { for await _ in stream { return } }
+}
+
+private actor BulkProgressTrace {
+    var values: [TransferProgress] = []
+    func append(_ value: TransferProgress) { values.append(value) }
 }
 
 @Suite(.timeLimit(.minutes(1))) struct BulkTransferTests {
@@ -112,6 +117,65 @@ private final class BulkEvent: Sendable {
         #expect(try sandbox.scratchContents().isEmpty)
     }
 
+    @Test func oneDamagedLocalMemberDoesNotDiscardOtherGoodNotes() async throws {
+        let sandbox = try BulkSandbox()
+        let zip = try sandbox.archive([("Broken.wav", Data(ImportFixtures.wav)), ("Good.mp3", Data(ImportFixtures.mp3))])
+        var data = try Data(contentsOf: zip)
+        data[0] = 0 // Directory remains sound; only the first local header is damaged.
+        try data.write(to: zip)
+        let report = await sandbox.service().run([zip])
+        #expect(report.archives.isEmpty)
+        #expect(report.summary.failed == 1)
+        #expect(report.summary.imported == 1)
+        #expect(await sandbox.notes.all().first?.title == "Good")
+        #expect(try sandbox.scratchContents().isEmpty)
+    }
+
+    @Test func perMemberLimitSkipsOnlyThatMemberAndProgressSurvivesAnEmptyArchive() async throws {
+        let sandbox = try BulkSandbox()
+        let zip = try sandbox.archive([("Too big.wav", Data(ImportFixtures.wav)), ("README.txt", Data())])
+        let report = await sandbox.service(memberLimit: 1).run([zip])
+        #expect(report.archives.isEmpty)
+        #expect(report.summary.failed == 1)
+        #expect(report.summary.unsupported == 1)
+        #expect(await sandbox.notes.all().isEmpty)
+        #expect(sandbox.audio.inspections == 0)
+        let empty = try sandbox.archive([])
+        let plain = try sandbox.file("English.wav", Data(ImportFixtures.wav))
+        let trace = BulkProgressTrace()
+        let finished = await sandbox.service().run([empty, plain], progress: { await trace.append($0) })
+        #expect(finished.archives == [.empty])
+        #expect(finished.summary.imported == 1)
+        #expect(await trace.values.last == TransferProgress(done: 2, total: 2))
+        #expect(try sandbox.scratchContents().isEmpty)
+    }
+
+    @Test func longArchiveBaseNamesNeverBecomeFilesystemPaths() async throws {
+        let sandbox = try BulkSandbox()
+        let title = String(repeating: "English ", count: 45)
+        let zip = try sandbox.archive([(title + ".wav", Data(ImportFixtures.wav))])
+        let report = await sandbox.service().run([zip])
+        #expect(report.summary.imported == 1)
+        let note = try #require(await sandbox.notes.all().first)
+        #expect(note.title == ImportTitles.title(displayName: title + ".wav"))
+        #expect(note.audioFilename == "source.wav")
+        #expect(try sandbox.scratchContents().isEmpty)
+    }
+
+    @Test func exportFailureAfterAMemberRemovesEverythingAndNeverPublishesPartialZIP() async throws {
+        let sandbox = try BulkSandbox()
+        let source = try sandbox.file("original.wav", Data(ImportFixtures.wav))
+        let folder = sandbox.folder.appendingPathComponent("exports")
+        let first = Note(title: "English first"), missing = Note(title: "English missing")
+        let service = BulkExportService(folder: folder) { note, target in
+            if note.id == missing.id { throw ExportError.noNote }
+            return try await BulkExportService.copyOriginal(source, to: target.appendingPathComponent("original.wav"))
+        }
+        await #expect(throws: ExportError.noNote) { try await service.export([first, missing]) }
+        #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path).isEmpty)
+        #expect(try Data(contentsOf: source) == Data(ImportFixtures.wav))
+    }
+
     @Test func exportsEverySelectionMemberStoredAndResolvesNameCollisions() async throws {
         let sandbox = try BulkSandbox()
         var one = Note(title: "English meeting", audioFilename: "source.wav")
@@ -170,5 +234,8 @@ private final class BulkEvent: Sendable {
         var transcribed = Note(title: "English meeting")
         transcribed.transcript = [.init(text: "English fixture", start: 0, end: 1)]
         #expect(!ArchiveContents.preservesOriginal(transcribed))
+        var opaque = Note(title: "Newer document")
+        opaque.document = DocumentInfo(state: .unknownFormat)
+        #expect(ArchiveContents.preservesOriginal(opaque))
     }
 }

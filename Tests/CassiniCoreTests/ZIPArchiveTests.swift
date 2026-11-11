@@ -131,4 +131,84 @@ import CryptoKit
             #expect(checks == 3)
         }
     }
+
+    @Test func ratioBombAndUnicodePathAliasesAreRefused() throws {
+        try withTemporaryDirectory { folder in
+            let url = folder.appendingPathComponent("untrusted.zip")
+            try ZIPDeflateFixture.ratioBomb.write(to: url)
+            #expect(throws: ZIPFailure.tooLarge) { try ZIPArchive(url: url) }
+            try ZIPDeflateFixture.unicodeTraversal.write(to: url)
+            #expect(throws: ZIPFailure.unsafePaths) { try ZIPArchive(url: url) }
+        }
+    }
+
+    @Test func twoThousandEntriesAreAcceptedAndTheNextIsRefused() throws {
+        try withTemporaryDirectory { folder in
+            #expect(ZIPLimits().entries == 2_000)
+            #expect(ZIPLimits().expandedBytes == 20 << 30)
+            #expect(ZIPLimits().ratio == 100)
+            let source = folder.appendingPathComponent("empty")
+            try Data().write(to: source)
+            let url = folder.appendingPathComponent("many.zip")
+            let writer = try StoredZIPWriter(url: url)
+            for n in 0..<2_000 { try writer.add(file: source, name: "English-\(n).wav") }
+            #expect(throws: ZIPFailure.tooLarge) { try writer.add(file: source, name: "Excess.wav") }
+            try writer.finish()
+            #expect(try ZIPArchive(url: url).entries.count == 2_000)
+            var bytes = try Data(contentsOf: url)
+            let end = try #require(bytes.range(of: Data([0x50, 0x4b, 6, 6]))).lowerBound
+            var count = Data(); count.zip64(2_001)
+            bytes.replaceSubrange((end + 24)..<(end + 32), with: count)
+            bytes.replaceSubrange((end + 32)..<(end + 40), with: count)
+            try bytes.write(to: url)
+            #expect(throws: ZIPFailure.tooLarge) { try ZIPArchive(url: url) }
+        }
+    }
+
+    @Test func falseExpandedSizeCannotMakeExtraBytesReachTheConsumer() throws {
+        try withTemporaryDirectory { folder in
+            let url = try one(folder, bytes: Data(repeating: 7, count: 100))
+            var bytes = try Data(contentsOf: url)
+            let directory = try #require(bytes.range(of: Data([0x50, 0x4b, 1, 2]))).lowerBound
+            let extra = directory + 46 + Int(bytes.z16(directory + 28))
+            var size = Data(); size.zip64(1)
+            bytes.replaceSubrange((extra + 4)..<(extra + 12), with: size)
+            try bytes.write(to: url)
+            let archive = try ZIPArchive(url: url)
+            var delivered = 0, observed = 0
+            #expect(throws: ZIPFailure.entry) {
+                try archive.read(archive.entries[0], remainingBytes: 100, observed: { observed += $0 }) { delivered += $0.count }
+            }
+            #expect(observed == 100)
+            #expect(delivered == 0)
+        }
+    }
+
+    #if os(macOS)
+    @Test func pythonReadsTheStoredZIP64OutputAndVerifiesEveryCRC() async throws {
+        let folder = URL.temporaryDirectory.appendingPathComponent("zip-interop-" + UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let url = try one(folder)
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
+        process.arguments = ["-c", """
+        import sys,zipfile
+        with zipfile.ZipFile(sys.argv[1]) as z:
+            assert z.namelist()==['English.wav']
+            assert all(e.compress_type==zipfile.ZIP_STORED for e in z.infolist())
+            assert z.testzip() is None
+            assert z.read('English.wav')==b'English sample'
+        """, url.path]
+        let output = Pipe(); process.standardOutput = output; process.standardError = output
+        let rc: Int32 = try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                process.terminationHandler = { continuation.resume(returning: $0.terminationStatus) }
+                do { try process.run() } catch { continuation.resume(throwing: error) }
+            }
+        } onCancel: { if process.isRunning { process.terminate() } }
+        let message = String(data: output.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        #expect(rc == 0, "Python ZIP reader: \(message)")
+    }
+    #endif
 }

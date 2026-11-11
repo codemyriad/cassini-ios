@@ -10,10 +10,13 @@ public struct BulkImportService: Sendable {
     private let files: any FileImporting
     private let scratch: URL
     private let limits: ZIPLimits
+    private let memberLimit: UInt64
     private let importFile: ImportFile
 
-    public init(files: any FileImporting, scratch: URL, limits: ZIPLimits = .init(), importFile: @escaping ImportFile) {
+    public init(files: any FileImporting, scratch: URL, limits: ZIPLimits = .init(),
+                memberLimit: UInt64 = UInt64(Limits.maxImportBytes), importFile: @escaping ImportFile) {
         self.files = files; self.scratch = scratch; self.limits = limits; self.importFile = importFile
+        self.memberLimit = min(memberLimit, UInt64(Limits.maxImportBytes))
     }
 
     public func run(_ urls: [URL], progress: @escaping @Sendable (TransferProgress) async -> Void = { _ in },
@@ -51,7 +54,7 @@ public struct BulkImportService: Sendable {
                         await progress(.init(done: done + 1, total: total))
                         defer { done += 1 }
                         guard entry.isFile && ArchiveAudio.supports(entry.name) else { report.summary.unsupported += 1; continue }
-                        guard entry.expandedBytes <= UInt64(Limits.maxImportBytes) else { report.summary.failed += 1; continue }
+                        guard entry.expandedBytes <= memberLimit else { report.summary.failed += 1; continue }
                         let staged = folder.appendingPathComponent(UUID().uuidString + ".tmp")
                         defer { try? FileManager.default.removeItem(at: staged) }
                         do {

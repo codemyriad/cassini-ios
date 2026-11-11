@@ -14,6 +14,7 @@ public struct BulkExportService: Sendable {
     }
     public func export(_ notes: [Note], progress: @escaping @Sendable (TransferProgress) async -> Void = { _ in }) async throws -> URL {
         guard !notes.isEmpty else { throw ExportError.noNote }
+        guard Set(notes.map(\.id)).count == notes.count else { throw ExportError.noNote }
         guard notes.count <= limits.entries else { throw ZIPFailure.tooLarge }
         try Task.checkCancellation()
         let temporary = folder.appendingPathComponent(UUID().uuidString, isDirectory: true)
