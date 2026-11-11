@@ -35,6 +35,7 @@ public final class FileSource: ByteSource {
     }
     deinit { stream.close() }
     public func read(into buffer: UnsafeMutablePointer<UInt8>, count: Int) throws -> Int {
+        try Task.checkCancellation()
         let n = stream.read(buffer, maxLength: count)
         if n < 0 { throw stream.streamError ?? CocoaError(.fileReadUnknown, userInfo: [NSURLErrorKey: url]) }
         return n

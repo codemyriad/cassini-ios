@@ -10,15 +10,19 @@ import CassiniNotebook
     @ObservationIgnored private let service: ExportService?
     @ObservationIgnored private let portable: PortableExportService?
     @ObservationIgnored private let texts: ExportTexts
+    @ObservationIgnored private var discardTask: Task<Void, Never>?
     @ObservationIgnored private let ready: @MainActor () async -> Void
+    @ObservationIgnored private let audioReady: @MainActor () async -> Void
 
     /// `texts` are the localized lines of every export (`ExportCopy.texts`); the sealed document labels passages without
     /// a speaker with `texts.unassignedLabel`, as the transcript exports do. `ready` returns once the launch work has
-    /// run, so the launch sweep never removes an export being shared.
+    /// run, so the launch sweep never removes an export being shared. `audioReady` waits for pending recording
+    /// finalization before a bulk member resolves its current source path.
     init(library: LibraryStore, audio: any AudioProcessing, folder: URL, texts: ExportTexts,
-         ready: @escaping @MainActor () async -> Void) {
+         audioReady: @escaping @MainActor () async -> Void = {}, ready: @escaping @MainActor () async -> Void) {
         self.library = library
         self.ready = ready
+        self.audioReady = audioReady
         self.texts = texts
         service = library.noteStore.map { ExportService(notes: $0, folder: folder) }
         portable = library.noteStore.map {
@@ -54,17 +58,46 @@ import CassiniNotebook
             return try await portable.export(note, original: original, playable: audio, into: folder,
                                              filename: ExportNames.stem(note.title))
         } catch {
-            service.discardFolder(folder)
+            await service.discardFolder(folder).value
             throw error
         }
     }
 
     /// Removes an export once the share sheet is done with it.
-    func discard(_ url: URL) { service?.discard(url) }
+    func discard(_ url: URL) {
+        guard let service else { return }
+        let previous = discardTask
+        let current = service.discard(url)
+        discardTask = Task { await previous?.value; await current.value }
+    }
+    /// Event fence for callers that need all share-sheet/cancel cleanup to have finished.
+    func waitForDiscards() async { await discardTask?.value }
 
     /// The share sheet's item for the export at `url`, removed once the sheet is dismissed.
     func shareItem(_ url: URL) -> ShareItem { ShareItem(url: url) { [weak self] in self?.discard(url) } }
 
     /// The launch sweep: exports left from the last run and stale temporary files in the notes' directories.
     func sweep(now: Date) async { await service?.sweep(now: now) }
+
+    /// D96: the complete selection. Audio-only notes keep their original container unchanged.
+    func exportArchive(_ ids: [UUID], progress: @escaping @Sendable (TransferProgress) async -> Void) async throws -> URL {
+        await ready()
+        await library.settle()
+        guard let service, let portable else { throw ExportError.cannotSave }
+        let notes = ids.compactMap { library.note($0) }.filter(ArchiveSelection.isExportable)
+        guard notes.count == ids.count else { throw ExportError.noNote }
+        let batch = BulkExportService(folder: service.folder) { [library, portable, audioReady] selected, folder in
+            await audioReady()
+            try Task.checkCancellation()
+            let (note, original, audio) = try await MainActor.run {
+                guard let note = library.note(selected.id), ArchiveSelection.isExportable(note),
+                      let original = library.originalAudioURL(note), let audio = library.audioURL(note) else {
+                    throw ExportError.noNote
+                }
+                return (note, original, audio)
+            }
+            return try await portable.archiveSnapshot(note, original: original, playable: audio, into: folder)
+        }
+        return try await batch.export(notes, progress: progress)
+    }
 }

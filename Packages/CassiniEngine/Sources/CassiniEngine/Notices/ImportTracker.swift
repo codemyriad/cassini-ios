@@ -41,6 +41,11 @@ import CassiniNotebook
         }
     }
 
+    /// A batch's storage error uses the same localized notice as a single-file import.
+    public func recordFailure(_ kind: ImportFailureKind, displayName: String) {
+        failure = ImportFailureFact(displayName: displayName, kind: kind, at: clock.now)
+    }
+
     /// The user closed the import error.
     public func dismissFailure() { failure = nil }
 }

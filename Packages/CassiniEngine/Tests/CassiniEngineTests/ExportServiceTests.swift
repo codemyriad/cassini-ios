@@ -1,5 +1,6 @@
 import CassiniCore
 import Foundation
+import CassiniEngineTesting
 import Testing
 @testable import CassiniEngine
 @testable import CassiniNotebook
@@ -30,6 +31,49 @@ struct ExportServiceTests {
         return note
     }
 
+    @Test(arguments: [DocumentState.invalidMetadata, .unreadable])
+    func archivePreservesLocalWordsFromABrokenDocument(state: DocumentState) async throws {
+        defer { try? FileManager.default.removeItem(at: base) }
+        try FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
+        let bytes = try ImportFixtures.document("Old words", title: "Old title")
+        let comments = CassiniDocument.read(bytes).comments.map { $0.hasPrefix("CASSINI_PROFILE=") ? "CASSINI_PROFILE=other" : $0 }
+        let broken = Data(try OggOpus.mux(OggOpus.read(bytes), tags: CassiniDocument.tagsPacket(comments)))
+        let original = base.appendingPathComponent("broken.opus")
+        try broken.write(to: original)
+        #expect(CassiniDocument.read(original).state == .invalidMetadata)
+        var note = Note(title: "Edited local title", audioFilename: "broken.opus")
+        note.document = DocumentInfo(state: state)
+        note.origin = .importedDocument
+        note.transcript = [.init(text: "Edited local words", start: 0, end: 1, speakerID: "a")]
+        note.speakers = [.init(id: "a", name: "Edited speaker")]
+        note.saveCurrentVersion(.editedTranscript)
+        let output = try await PortableExportService(audio: FakeAudioProcessing(), provenance: FakeProvenance(), unassignedLabel: "Unknown speaker")
+            .archiveSnapshot(note, original: original, playable: original, into: base)
+        let document = CassiniDocument.read(output)
+        #expect(document.state == .ok)
+        #expect(document.title == note.title)
+        #expect(document.selected()?.transcript?.words.map(\.text) == ["Edited", "local", "words"])
+        #expect(document.speakerLabel("a") == "Edited speaker")
+        #expect(try Data(contentsOf: original) == broken)
+    }
+
+    @Test func archiveCopiesRenamedZeroWordDocumentWithoutSealing() async throws {
+        defer { try? FileManager.default.removeItem(at: base) }
+        try FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
+        let bytes = Data(try CassiniDocument.create(ImportFixtures.opus(packets: 100), transcript: Transcript([]),
+                                                  title: "Original title", processing: JSONObject()))
+        let original = base.appendingPathComponent("empty.opus")
+        try bytes.write(to: original)
+        #expect(CassiniDocument.read(original).state == .ok)
+        var note = Note(title: "Renamed title", audioFilename: "empty.opus")
+        note.document = DocumentInfo(state: .ok)
+        note.origin = .importedDocument
+        let output = try await PortableExportService(audio: FakeAudioProcessing(), provenance: FakeProvenance(), unassignedLabel: "Unknown speaker")
+            .archiveSnapshot(note, original: original, playable: original, into: base)
+        #expect(try Data(contentsOf: output) == bytes)
+        #expect(try Data(contentsOf: original) == bytes)
+    }
+
     // ports: DocumentRepositoryTest#exportsEqualTheExpectedBytes
     @Test func exportsEqualTheExpectedBytes() async throws {
         defer { try? FileManager.default.removeItem(at: base) }
@@ -39,7 +83,7 @@ struct ExportServiceTests {
         let copy = try await service.copyAudio(note.id)
         #expect(copy.lastPathComponent == "Delivery_ Thursday_.m4a")
         #expect(try Data(contentsOf: copy) == Data([7, 8, 9]))
-        service.discard(copy)
+        await service.discard(copy).value
         let words = [Word("S1", 0, 300, "So,"), Word("S1", 400, 700, "the"), Word("S1", 800, 1100, "delivery"),
                      Word("S1", 1200, 1500, "slips?"), Word("S2", 1800, 2100, "Yes,"), Word("S2", 2200, 2500, "a"),
                      Word("S2", 2600, 2900, "Thursday.")]
@@ -54,7 +98,7 @@ struct ExportServiceTests {
             let url = try await service.exportTranscript(note.id, format: format, texts: texts)
             #expect(url.lastPathComponent == "Delivery_ Thursday_.\(format.fileExtension)")
             #expect(try Data(contentsOf: url) == Data(text.utf8), "\(format)")
-            service.discard(url)
+            await service.discard(url).value
             #expect(!FileManager.default.fileExists(atPath: url.deletingLastPathComponent().path))
         }
         #expect(!FileManager.default.fileExists(atPath: service.folder.path), "tmp/Exports is cleaned")
@@ -71,13 +115,13 @@ struct ExportServiceTests {
         #expect(copy.lastPathComponent == "Solo audio.mp3")
         #expect(try Data(contentsOf: copy) == Data([1, 2, 3]))
         #expect(copy != audio, "the note's own file is never shared in place")
-        service.discard(copy)
+        await service.discard(copy).value
         #expect(FileManager.default.fileExists(atPath: audio.path))
 
         await #expect(throws: ExportError.notAvailable(.afterTranscription)) {
             try await service.exportTranscript(note.id, format: .text, texts: texts)
         }
-        service.discard(audio)
+        await service.discard(audio).value
         #expect(try Data(contentsOf: audio) == Data([1, 2, 3]), "discard never touches a note's own files")
         #expect(!FileManager.default.fileExists(atPath: service.folder.path))
     }
@@ -147,11 +191,11 @@ struct ExportServiceTests {
         try await notes.save(note)
         let first = try await service.exportTranscript(note.id, format: .text, texts: texts)
         let second = try service.newFolder()
-        service.discard(first)
-        service.discard(first)
+        await service.discard(first).value
+        await service.discard(first).value
         #expect(!FileManager.default.fileExists(atPath: first.deletingLastPathComponent().path))
         #expect(FileManager.default.fileExists(atPath: second.path), "an export still being made keeps its folder")
-        service.discardFolder(second)
+        await service.discardFolder(second).value
         #expect(!FileManager.default.fileExists(atPath: service.folder.path))
     }
 }

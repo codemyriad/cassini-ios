@@ -5,7 +5,15 @@ import COpusBridge
 
 /// Bounded-memory Ogg Opus conversion. Audio packets are decoded/encoded incrementally.
 public enum OpusAudio {
-    public static func decode(_ source: URL, to destination: URL) throws {
+    public static func decode(_ source: URL, to destination: URL, onChunk: (@Sendable () throws -> Void)? = nil) throws {
+        guard source.standardizedFileURL != destination.standardizedFileURL else { throw CocoaError(.fileWriteInvalidFileName) }
+        var created = false
+        do { try decode(source, to: destination, created: &created, onChunk: onChunk) }
+        catch { if created { try? FileManager.default.removeItem(at: destination) }; throw error }
+    }
+
+    private static func decode(_ source: URL, to destination: URL, created: inout Bool,
+                               onChunk: (@Sendable () throws -> Void)?) throws {
         let info = try OggOpus.scan(source)
         guard info.validFraming, info.head.count >= 19, info.head[18] == 0, (1...2).contains(info.channels), info.sampleCount > 0 else {
             throw CassiniError("Unsupported or damaged Opus stream")
@@ -16,6 +24,7 @@ public enum OpusAudio {
         defer { opus_decoder_destroy(decoder) }
         guard let format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 48_000, channels: AVAudioChannelCount(info.channels), interleaved: true) else { throw CassiniError("Cannot create audio format") }
         let file = try AVAudioFile(forWriting: destination, settings: format.settings, commonFormat: .pcmFormatFloat32, interleaved: true)
+        created = true
         let reader = OggOpus.Reader(try FileSource(source)); _ = try reader.headers()
         var pcm = [Float](repeating: 0, count: 5760 * info.channels)
         var skip = OggOpus.u16(info.head, 10), written: Int64 = 0
@@ -32,6 +41,8 @@ public enum OpusAudio {
             guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(count)), let output = buffer.floatChannelData?[0] else { throw CassiniError("Cannot allocate audio buffer") }
             buffer.frameLength = AVAudioFrameCount(count)
             for index in 0..<(count * info.channels) { output[index] = pcm[leading * info.channels + index] * gain }
+            try onChunk?()
+            try Task.checkCancellation()
             try file.write(from: buffer); written += Int64(count)
         }
         guard written == info.sampleCount else { throw CassiniError("Truncated Opus audio") }
@@ -40,10 +51,11 @@ public enum OpusAudio {
     /// Encodes `source` (any file AVFoundation reads) as 48 kHz mono Ogg Opus at `destination`. Every channel is mixed
     /// into the mono signal, so speech on one side of a stereo file is kept. Nothing is left at `destination` when it
     /// throws, a failure to write the end of the file included.
-    public static func encode(_ source: URL, to destination: URL) throws {
+    public static func encode(_ source: URL, to destination: URL, onChunk: (@Sendable () throws -> Void)? = nil) throws {
+        guard source.standardizedFileURL != destination.standardizedFileURL else { throw CocoaError(.fileWriteInvalidFileName) }
         let sink = try FileSink(destination)
         do {
-            try encode(source, into: sink)
+            try encode(source, into: sink, onChunk: onChunk)
             try sink.close()
         } catch {
             try? sink.close()
@@ -52,7 +64,7 @@ public enum OpusAudio {
         }
     }
 
-    private static func encode(_ source: URL, into sink: FileSink) throws {
+    private static func encode(_ source: URL, into sink: FileSink, onChunk: (@Sendable () throws -> Void)?) throws {
         let input = try AVAudioFile(forReading: source)
         guard let format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 48_000, channels: 1, interleaved: false),
               let converter = AVAudioConverter(from: input.processingFormat, to: format),
@@ -87,6 +99,8 @@ public enum OpusAudio {
             let count = Int(output.frameLength)
             ended = state == .endOfStream
             guard count > 0 else { if ended { break }; continue }
+            try onChunk?()
+            try Task.checkCancellation()
             samples += Int64(count)
             guard let pcm = output.floatChannelData?[0] else { throw CassiniError("Missing audio data") }
             for index in count..<960 { pcm[index] = 0 }
