@@ -191,8 +191,14 @@ struct VerificationGateTests {
         #expect(sealed.selected()?.transcript == transcript)
         #expect(sealed.title == "Resealed")
         #expect(comments(sealed) { $0.hasPrefix("CASSINI_TX_") && !$0.hasPrefix("CASSINI_TX_WORDS_PAYLOAD_") }.isEmpty)
-        let kept = sealed.comments.filter { !CassiniDocument.tagName($0).hasPrefix("CASSINI_") && CassiniDocument.tagName($0) != "TITLE" }
-        #expect(kept == foreign.filter { CassiniDocument.tagName($0) != "TITLE" })
+        let ordinary = { (comment: String) in
+            let name = CassiniDocument.tagName(comment)
+            return !name.hasPrefix("CASSINI_") && name != "TITLE" && name != "DATE"
+        }
+        #expect(sealed.comments.filter(ordinary) == foreign.filter(ordinary))
+        let created = try #require(sealed.manifest?["meeting"]?.object?["createdAtUtc"]?.string)
+        #expect(comments(sealed) { CassiniDocument.tagName($0) == "DATE" } == ["DATE=\(created)"])
+        #expect(sealed.manifest?["meeting"]?.object?["recordedAtUtc"] == nil)
     }
 }
 
