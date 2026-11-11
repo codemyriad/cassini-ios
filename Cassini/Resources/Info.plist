@@ -77,6 +77,7 @@
 			<key>LSItemContentTypes</key>
 			<array>
 				<string>public.audio</string>
+				<string>public.zip-archive</string>
 				<string>org.xiph.opus</string>
 			</array>
 			<key>LSHandlerRank</key>
