@@ -123,10 +123,41 @@ struct LibraryView: View {
     /// All and Starred (an iOS extra), with the number of notes shown.
     private var filters: some View {
         @Bindable var model = model
-        return HStack {
-            filterButton(LibraryCopy.all, selected: !model.favoritesOnly) { model.favoritesOnly = false }
-            filterButton(LibraryCopy.starred, symbol: "star", selected: model.favoritesOnly) { model.favoritesOnly = true }
-            Spacer()
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                filterButton(LibraryCopy.all, selected: !model.favoritesOnly) { model.favoritesOnly = false }
+                filterButton(LibraryCopy.starred, symbol: "star", selected: model.favoritesOnly) { model.favoritesOnly = true }
+                Spacer()
+            }
+            if model.isSearching {
+                Menu {
+                    ForEach(SearchDate.allCases, id: \.self) { date in
+                        Button {
+                            model.searchDate = date
+                        } label: {
+                            if model.searchDate == date { Label(dateTitle(date), systemImage: "checkmark") }
+                            else { Text(dateTitle(date)) }
+                        }
+                    }
+                } label: {
+                    Label(dateTitle(model.searchDate), systemImage: "calendar")
+                        .font(.subheadline.weight(.medium))
+                        .padding(.horizontal, 14).frame(minHeight: HitTarget.minimum)
+                        .foregroundStyle(model.searchDate == .any ? Color.muted : Color.paper)
+                        .background(model.searchDate == .any ? Color.clear : Color.ink, in: Capsule())
+                        .overlay(Capsule().stroke(Color.muted.opacity(0.3), lineWidth: 1))
+                }
+                .accessibilityIdentifier("librarySearchDate")
+            }
+        }
+    }
+
+    private func dateTitle(_ date: SearchDate) -> String {
+        switch date {
+        case .any: LibraryCopy.anyDate
+        case .today: LibraryCopy.today
+        case .week: LibraryCopy.pastWeek
+        case .month: LibraryCopy.pastMonth
         }
     }
 

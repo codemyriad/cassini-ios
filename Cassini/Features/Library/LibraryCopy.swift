@@ -15,6 +15,9 @@ enum LibraryCopy {
     static let searchPlaceholderShort = String(localized: "Search", table: "Library",
                                                comment: "Library search field placeholder where no longer one fits on one line")
     static let clearSearch = String(localized: "Clear search", table: "Library", comment: "Library search field clear button")
+    static let anyDate = String(localized: "Any date", table: "Library", comment: "D14 search date filter: no date constraint")
+    static let pastWeek = String(localized: "Past 7 days", table: "Library", comment: "D14: today and six preceding local calendar days")
+    static let pastMonth = String(localized: "Past 30 days", table: "Library", comment: "D14: today and 29 preceding local calendar days")
     static let privacy = String(localized: "Transcribed on this device. Audio never leaves it.", table: "Library",
                                 comment: "Library line under the search field")
     static let dismissNotice = String(localized: "Dismiss notice", table: "Library", comment: "VoiceOver label of a notice's close button")
