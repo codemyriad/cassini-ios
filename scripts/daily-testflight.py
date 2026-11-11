@@ -15,6 +15,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
+import unicodedata
 from zoneinfo import ZoneInfo
 
 REPOSITORY = 'codemyriad/cassini-ios'
@@ -57,10 +58,58 @@ def gh(endpoint, **parameters):
     return json.loads(command(args))
 
 
+def eligible_main_run(run, head):
+    return (run.get('head_sha') == head and run.get('head_branch') == 'main'
+            and (run.get('head_repository') or {}).get('full_name') == REPOSITORY
+            and run.get('event') in ('push', 'workflow_dispatch'))
+
+
 def green(runs, head):
-    # API supplies newest run first; an older successful attempt cannot mask a newer red/pending one.
-    return bool(runs and runs[0]['head_sha'] == head and runs[0]['status'] == 'completed'
-                and runs[0]['conclusion'] == 'success')
+    # Newest eligible run wins; a PR merge-ref run cannot approve or block main.
+    run = next((run for run in runs if eligible_main_run(run, head)), None)
+    return bool(run and run.get('status') == 'completed' and run.get('conclusion') == 'success')
+
+
+def main_ci_green(head):
+    page = 1
+    while True:
+        runs = gh(f'repos/{REPOSITORY}/actions/workflows/ci.yml/runs', branch='main',
+                  head_sha=head, per_page=100, page=page)['workflow_runs']
+        if any(eligible_main_run(run, head) for run in runs):
+            return green(runs, head)
+        if len(runs) < 100:
+            return False
+        page += 1
+
+
+def testflight_notes(text, limit=4000):
+    # TestFlight receives plain safe text; retain verbatim titles separately for audit.
+    clean = []
+    for char in text:
+        category = unicodedata.category(char)
+        if char == '\n' or char in ('\u200c', '\u200d'):
+            clean.append(char)
+        elif category in ('Cc', 'Cf', 'Cs'):
+            clean.append(' ')
+        else:
+            clean.append({'<': '‹', '>': '›'}.get(char, char))
+    clean = ''.join(clean)
+    units = lambda value: len(value.encode('utf-16-le')) // 2
+    if units(clean) <= limit:
+        return clean
+    suffix = '\n…'
+    budget = limit - units(suffix)
+    if budget < 0:
+        raise ValueError('TestFlight note limit cannot fit truncation marker')
+    output = []
+    used = 0
+    for char in clean:
+        width = units(char)
+        if used + width > budget:
+            break
+        output.append(char)
+        used += width
+    return ''.join(output) + suffix
 
 
 def next_build(builds, version, reserved):
@@ -154,7 +203,7 @@ class Apple:
         notes = self.request('/v1/builds/' + build['id'] + '/betaBuildLocalizations')['data']
         existing = next((n for n in notes if n['attributes']['locale'] == 'en-US'), None)
         data = {'type': 'betaBuildLocalizations',
-                'attributes': {'whatsNew': pending['notes']}}
+                'attributes': {'whatsNew': testflight_notes(pending['notes'])}}
         if existing:
             data['id'] = existing['id']
             self.request('/v1/betaBuildLocalizations/' + existing['id'], 'PATCH', {'data': data})
@@ -174,11 +223,10 @@ def release_notes(source, previous, head):
     for commit in commits.splitlines():
         for pr in gh(f'repos/{REPOSITORY}/commits/{commit}/pulls'):
             if pr.get('merged_at') and pr['base']['ref'] == 'main':
-                titles[pr['number']] = pr['title'].replace('\r', ' ').replace('\n', ' ')
+                titles[pr['number']] = pr['title']
     text = '\n'.join(f'- {title} (#{number})' for number, title in titles.items())
-    # Never silently truncate the promised PR-title notes.
-    if not text or len(text) > 4000:
-        raise RuntimeError('Merged-PR release notes are empty or exceed TestFlight 4000 characters; inspect before upload')
+    if not text:
+        raise RuntimeError('Merged-PR release notes are empty; inspect before upload')
     return text
 
 
@@ -222,9 +270,7 @@ def publish(config, state_path, source, apple=None):
     if head == previous:
         print('[iOS] daily test release skipped: main unchanged')
         return
-    runs = gh(f'repos/{REPOSITORY}/actions/workflows/ci.yml/runs', branch='main',
-              head_sha=head, per_page=1)['workflow_runs']
-    if not green(runs, head):
+    if not main_ci_green(head):
         print('[iOS] daily test release skipped: current main latest CI is not green')
         return
     apple = apple or Apple()
@@ -238,14 +284,18 @@ def publish(config, state_path, source, apple=None):
     if len(versions) != 1:
         raise RuntimeError('App and extension must have one marketing version')
     version = versions.pop()
-    notes = release_notes(source, previous, head)
+    raw_notes = release_notes(source, previous, head)
+    notes = testflight_notes(raw_notes)
     build = next_build(apple.builds(), version, state.get('reserved', {}))
     state.setdefault('reserved', {})[version] = int(build)
     save(state_path, state)  # Retain reservations after failures; never reuse a possibly uploaded number.
     context = dict(config, source=str(checkout), output=str(output), head=head, version=version, build=build,
                    key_path=str(apple.key_path), key_id=apple.key_id, issuer_id=apple.issuer_id)
     save(output/'context.json', context)
-    (output/'release-notes.txt').write_text(notes + '\n')
+    (output/'release-notes.txt').write_text(raw_notes + '\n', encoding='utf-8', errors='backslashreplace')
+    (output/'release-notes-testflight.txt').write_text(notes + '\n')
+    save(output/'release-plan.json', dict(head=head, version=version, build=build,
+        raw_notes=raw_notes, testflight_notes=notes))
     (output/'tmp').mkdir()
     gui_env = dict(os.environ, TMPDIR=str(output/'tmp') + '/', GUIRUN_TIMEOUT='14400')
     with (output/'archive-export.log').open('w') as log:
@@ -275,9 +325,7 @@ def publish(config, state_path, source, apple=None):
     command(['git', 'fetch', 'origin', 'main:refs/remotes/origin/main'], cwd=source)
     current = command(['git', 'rev-parse', 'origin/main'], cwd=source)
     canonical = gh(f'repos/{REPOSITORY}/git/ref/heads/main')['object']['sha']
-    runs = gh(f'repos/{REPOSITORY}/actions/workflows/ci.yml/runs', branch='main',
-              head_sha=current, per_page=1)['workflow_runs']
-    if current != head or canonical != head or not green(runs, current):
+    if current != head or canonical != head or not main_ci_green(current):
         print('[iOS] daily test release skipped: main changed or latest CI is no longer green after validation')
         return
     pending = dict(head=head, version=version, build=build, notes=notes, output=str(output))

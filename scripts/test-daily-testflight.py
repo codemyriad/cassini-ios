@@ -20,6 +20,11 @@ HEAD = 'a' * 40
 PREVIOUS = 'b' * 40
 
 
+def main_run(**changes):
+    return dict(dict(head_sha=HEAD, head_branch='main', head_repository={'full_name': daily.REPOSITORY},
+                     event='push', status='completed', conclusion='success'), **changes)
+
+
 def build(number, version='0.1.0'):
     return {'id': str(number), 'marketingVersion': version, 'attributes': {'version': str(number),
         'processingState': 'VALID', 'expired': False, 'buildAudienceType': 'INTERNAL_ONLY'}}
@@ -62,11 +67,49 @@ class ReleaseTests(unittest.TestCase):
         self.assertTrue(daily.scheduled(dt.datetime(2026, 10, 25, 8, tzinfo=dt.timezone.utc)))
 
     def test_latest_exact_head_ci_must_be_green(self):
-        good = dict(head_sha=HEAD, status='completed', conclusion='success')
+        good = main_run()
         self.assertTrue(daily.green([good], HEAD))
         for changes in [dict(head_sha=PREVIOUS), dict(status='in_progress'), dict(conclusion='failure')]:
-            self.assertFalse(daily.green([dict(good, **changes), good], HEAD))
+            self.assertFalse(daily.green([dict(good, **changes)], HEAD))
         self.assertFalse(daily.green([], HEAD))
+
+    def test_pr_and_fork_runs_neither_approve_red_main_nor_block_green_main(self):
+        invalid = [main_run(event='pull_request'), main_run(event='pull_request_target'),
+                   main_run(head_repository={'full_name': 'fork/cassini-ios'}),
+                   main_run(head_repository=None), main_run(head_branch='feature')]
+        for run in invalid:
+            self.assertFalse(daily.green([run, main_run(conclusion='failure')], HEAD))
+            self.assertTrue(daily.green([dict(run, conclusion='failure'), main_run()], HEAD))
+        self.assertFalse(daily.green([main_run(event='workflow_dispatch', status='in_progress'), main_run()], HEAD))
+        self.assertTrue(daily.green([main_run(event='workflow_dispatch'), main_run(conclusion='failure')], HEAD))
+
+    def test_main_ci_search_paginates_past_pr_runs_and_fails_closed_without_a_match(self):
+        excluded = [main_run(event='pull_request') for _ in range(100)]
+        with patch.object(daily, 'gh', side_effect=[{'workflow_runs': excluded},
+                                                  {'workflow_runs': [main_run(conclusion='failure')]}]) as api:
+            self.assertFalse(daily.main_ci_green(HEAD))
+            self.assertEqual([call.kwargs['page'] for call in api.call_args_list], [1, 2])
+        with patch.object(daily, 'gh', side_effect=[{'workflow_runs': excluded},
+                                                  {'workflow_runs': [main_run(event='workflow_dispatch')]}]):
+            self.assertTrue(daily.main_ci_green(HEAD))
+        with patch.object(daily, 'gh', return_value={'workflow_runs': [main_run(event='pull_request')]}):
+            self.assertFalse(daily.main_ci_green(HEAD))
+
+    def test_testflight_text_sanitizes_markup_controls_and_surrogates_but_keeps_unicode(self):
+        raw = 'Fix Flow<Settings> & voices 😀\x00\t\r\u202eevil\ud800\nNext line café'
+        clean = daily.testflight_notes(raw)
+        self.assertEqual(clean, 'Fix Flow‹Settings› & voices 😀    evil \nNext line café')
+        self.assertEqual(daily.testflight_notes(clean), clean)
+        self.assertEqual(daily.testflight_notes('Family 👩\u200d👩'), 'Family 👩\u200d👩')
+
+    def test_testflight_limit_counts_utf16_and_never_splits_a_supplementary_character(self):
+        exact = 'a' * 3998 + '😀'
+        self.assertEqual(daily.testflight_notes(exact), exact)
+        for raw in [exact + 'x', '😀' * 2001, 'a' * 3997 + '😀xx']:
+            clean = daily.testflight_notes(raw)
+            self.assertLessEqual(len(clean.encode('utf-16-le')) // 2, 4000)
+            self.assertTrue(clean.endswith('\n…'))
+            self.assertEqual(clean.encode('utf-16-le').decode('utf-16-le'), clean)
 
     def test_build_number_uses_current_version_and_keeps_failed_reservations(self):
         self.assertEqual(daily.next_build([build(11), build(900, '0.0.1')], '0.1.0', {}), '12')
@@ -85,13 +128,14 @@ class ReleaseTests(unittest.TestCase):
         self.config = dict(initial_release_head=PREVIOUS, output_root=str(self.root/'outputs'))
         self.apple = FakeApple()
         self.calls = []
-        self.ci = [dict(head_sha=HEAD, status='completed', conclusion='success')]
+        self.ci = [main_run()]
         self.canonical_head = HEAD
         self.worker_failure = False
         self.upload_failure = False
         self.mounted = True
         self.red_after_validation = False
         self.assert_upload_intent = True
+        self.raw_notes = '- An English improvement (#10)'
 
     def command(self, args, cwd=None):
         self.calls.append(args)
@@ -141,7 +185,7 @@ class ReleaseTests(unittest.TestCase):
     def publish(self):
         with patch.object(daily, 'command', self.command), \
              patch.object(daily, 'gh', self.gh), \
-             patch.object(daily, 'release_notes', return_value='- An English improvement (#10)'), \
+             patch.object(daily, 'release_notes', side_effect=lambda *a: self.raw_notes), \
              patch.object(daily.os.path, 'ismount', side_effect=lambda *_: self.mounted), \
              patch.object(daily.Path, 'is_relative_to', return_value=True), \
              patch.object(daily.subprocess, 'run', self.fake_run), contextlib.redirect_stdout(io.StringIO()):
@@ -167,6 +211,31 @@ class ReleaseTests(unittest.TestCase):
         self.assertEqual(len(self.apple.finished), 1)
         self.publish()
         self.assertEqual(self.apple.uploads, ['12'])
+
+    def test_publish_ignores_pr_ci_but_cannot_upload_when_real_main_is_red(self):
+        self.ci = [main_run(event='pull_request'), main_run(conclusion='failure')]
+        self.publish()
+        self.assertFalse(self.state.exists())
+        self.assertEqual(self.apple.uploads, [])
+        self.ci = [main_run(event='pull_request', conclusion='failure'), main_run()]
+        self.publish()
+        self.assertEqual(self.apple.uploads, ['12'])
+
+    def test_raw_release_artifacts_survive_while_testflight_receives_sanitized_bounded_text(self):
+        self.raw_notes = '- Fix Flow<English>\x1b\u202e\ud800 ' + '😀' * 2001
+        self.publish()
+        pending = self.apple.finished[0]
+        output = Path(pending['output'])
+        plan = json.loads((output/'release-plan.json').read_text())
+        self.assertEqual(plan['raw_notes'], self.raw_notes)
+        self.assertEqual((output/'release-notes.txt').read_text(),
+                         (self.raw_notes + '\n').encode('utf-8', errors='backslashreplace').decode('utf-8'))
+        self.assertEqual(plan['testflight_notes'], pending['notes'])
+        self.assertIn('Flow‹English›', pending['notes'])
+        self.assertNotIn('\x1b', pending['notes'])
+        self.assertNotIn('\u202e', pending['notes'])
+        self.assertLessEqual(len(pending['notes'].encode('utf-16-le')) // 2, 4000)
+        self.assertTrue(pending['notes'].endswith('\n…'))
 
     def test_failed_archive_keeps_reservation_but_no_upload_intent(self):
         self.worker_failure = True
@@ -309,10 +378,10 @@ class ReleaseTests(unittest.TestCase):
         with patch.object(apple, 'guard'), patch.object(apple, 'builds', return_value=[build(12)]), \
              patch.object(apple, 'request', side_effect=[
                  {'data': {'attributes': {'internalBuildState': 'IN_BETA_TESTING'}}}, {'data': []}, {}]) as request:
-            self.assertEqual(apple.finish(dict(build='12', version='0.1.0', notes='- English (#10)')), '12')
+            self.assertEqual(apple.finish(dict(build='12', version='0.1.0', notes='- English<Flow>\x00 (#10)')), '12')
             endpoint, method, payload = request.call_args.args
             self.assertEqual((endpoint, method), ('/v1/betaBuildLocalizations', 'POST'))
-            self.assertEqual(payload['data']['attributes'], {'locale': 'en-US', 'whatsNew': '- English (#10)'})
+            self.assertEqual(payload['data']['attributes'], {'locale': 'en-US', 'whatsNew': '- English‹Flow›  (#10)'})
             self.assertEqual(payload['data']['relationships']['build']['data']['id'], '12')
 
     def test_wrong_host_fails_with_a_one_line_coordinator_notification(self):

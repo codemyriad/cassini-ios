@@ -7,7 +7,7 @@ Neither route signs on the rented Mac/pool runners. Both controller and archive 
 No scheduler or runner is installed merely by merging this PR.
 
 Existing manual archive/export, GUI/keychain, Apple upload/processing and internal `cassini` group are reused.
-The added pipeline selects current `main`, requires the newest exact-head main CI run to be successful, and reports
+The added pipeline selects current `main`, requires the newest exact-head main CI run from this repository's push/workflow_dispatch events to be successful, and reports
 unchanged/red/pending main as a skip. After archive it checks main/CI again before upload. A private local mutex
 serializes calendar/manual calls; only archive/export hold `~/.cassini-heavy.lock`. Resource/keychain checks happen
 inside that lock. A locked keychain fails with the exact Keychain Access unlock instruction; no identity is changed.
@@ -15,8 +15,12 @@ inside that lock. A locked keychain fails with the exact Keychain Access unlock 
 Build numbers are allocated from the current marketing version's Apple builds and durable local reservations.
 Both app and extension receive the number as a build setting; no version PR or tracked source edit is needed.
 Merged PR titles since the last successful TestFlight source become English TestFlight “What’s New” notes.
-The first successful release needs an accurate seed commit from the last verified manual upload. Empty/over4000
-character notes fail before upload instead of silently omitting titles.
+The CI search paginates past PR/fork runs; neither a green PR merge ref nor a failed fork run approves or blocks main.
+Raw titles remain lossless in release-plan.json; release-notes.txt retains valid Unicode verbatim and escapes any
+unencodable lone surrogate. TestFlight text replaces angle brackets with
+‹/›, strips control/bidi/surrogate characters (keeping readable Unicode and emoji joiners), and is capped at4000
+UTF-16 units without splitting supplementary characters. Truncation is marked with an ellipsis; full raw notes remain
+in the artifacts. Sanitization is also applied when finalizing a pre-existing pending upload. The first successful release needs an accurate seed commit from the last verified manual upload. Empty notes fail before upload. Oversized sanitized notes retain the marked UTF-16 bound described above.
 
 Export is **Internal**, `testFlightInternalTestingOnly=true`. Archive/export signatures, both bundle versions,
 certificate continuity, memory entitlement, Whistle pins/runtime identity and embedded minimum OS are checked.
@@ -76,7 +80,7 @@ No live launchd job, signing runner, notification watcher or upload has been act
 
 ## Validation
 
-`/usr/bin/python3 scripts/test-daily-testflight.py` tests DST slots, newest exact-head CI, version-specific numbering,
+`/usr/bin/python3 scripts/test-daily-testflight.py` tests DST slots, paginated push/manual CI provenance (excluding PR/fork runs), sanitized Unicode/UTF-16 notes, version-specific numbering,
 failed reservations, durable intent before upload, no duplicate on an ambiguous upload, resumed finalization,
 internal-only guards, JWT redaction and scheduler/workflow routing without network, signing, GUI or simulators.
 `test-ci-runner-selection.py` retains the general CI trust matrix and separately checks every signing-event/ref/repo
