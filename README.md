@@ -161,6 +161,10 @@ TestFlight still need.
 
 [docs/differences.md](docs/differences.md) describes each difference in detail. In summary:
 
+- **Unknown meeting dates (D95).** The Library names the group with the shared “Date unknown” heading in all six
+  languages, including for VoiceOver. iOS omits the repeated unknown-date label from individual row metadata,
+  the Note subtitle and the Document info Recorded row; the Note subtitle keeps the duration. Android repeats
+  “Date unknown” on those surfaces. Neither app displays a document's sealing or import time as its recording date.
 - **Engines and thresholds.** D78 starts with bundled Whistle and promotes Parakeet Ultra after its pinned files
   are verified. Parakeet needs at least 5 GiB physical RAM (the existing provisional rule) and the normal runtime
   memory preflight; its download suggestion also checks the pinned install's actual disk requirement. Whistle's
@@ -457,3 +461,11 @@ the licences of the dependencies and the models, including every library of the 
 ONNX Runtime 1.27.1's own notices for the libraries inside it. Both show under Settings → Source code and notices. The
 portable format is specified in
 [cassini-format](https://github.com/codemyriad/cassini-format).
+
+### ZIP transfers (D96)
+
+The Library import picker accepts multiple audio/Cassini files and ZIP archives. Edit selects notes for Export
+Selected as ZIP; Export All as ZIP includes the whole live Library. Transfers show progress, support cancellation
+and retain already imported notes. The [archive rules and iOS differences](docs/bulk-transfer.md) cover limits,
+original-audio fallback, safe paths and cleanup. iOS uses its native picker/share sheet and AVFoundation audio
+support; Android-only container support is not added.

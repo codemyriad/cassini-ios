@@ -17,6 +17,8 @@ public struct CalendarDay: Hashable, Sendable {
 public enum DayKey: Hashable, Sendable {
     case today
     case yesterday
+    /// No usable meeting date is known. This group follows all resolved meeting days.
+    case undated
     case date(CalendarDay, withYear: Bool)
 }
 
@@ -24,7 +26,11 @@ public enum DayKey: Hashable, Sendable {
 public enum DayGroups {
     /// The day header of `date` seen at `now` in `calendar`'s zone. Calendar days, so a DST change never shifts a note.
     public static func key(_ date: Date, now: Date, calendar: Calendar) -> DayKey {
-        let day = Self.day(date, calendar), today = Self.day(now, calendar)
+        key(Self.day(date, calendar), now: now, calendar: calendar)
+    }
+
+    public static func key(_ day: CalendarDay, now: Date, calendar: Calendar) -> DayKey {
+        let today = Self.day(now, calendar)
         if day == today { return .today }
         if let yesterday = calendar.date(byAdding: .day, value: -1, to: calendar.startOfDay(for: now)),
            day == Self.day(yesterday, calendar) { return .yesterday }

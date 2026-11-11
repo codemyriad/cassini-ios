@@ -38,6 +38,41 @@ import CassiniEngineTesting
         XCTAssertEqual(row.preview?.text, "so the delivery slips to Thursday")
     }
 
+    /// A search left open across midnight, with the query, the filter and the notes unchanged: the system's time
+    /// change and the next activation each redraw it for the new local day (the app graph's wiring of
+    /// `LibraryScreenModel.clockChanged()`).
+    func testTheSystemTimeChangeAndActivationRedrawAnOpenSearchOnANewDay() async throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "UTC"))
+        let evening = try XCTUnwrap(calendar.date(bySettingHour: 23, minute: 50, second: 0, of: FakeClock().now))
+        let center = NotificationCenter()
+        let test = TestGraph(clock: FakeClock(now: evening), timeChanges: center); defer { test.tearDown() }
+        var note = Note(title: "English planning", createdAt: evening)
+        note.status = .ready
+        try NoteRepository(root: test.root).save(note)
+        await test.graph.start()
+        let model = test.graph.libraryScreen
+        model.query = "English"
+        model.searchDate = .today
+        await model.settle()
+        XCTAssertEqual(model.content.results?.map(\.id), [note.id])
+
+        test.clock.set(evening.addingTimeInterval(20 * 60))
+        var redrawn = expectation(description: "the time change redraws the open search")
+        withObservationTracking { _ = model.content } onChange: { [redrawn] in redrawn.fulfill() }
+        center.post(name: UIApplication.significantTimeChangeNotification, object: nil)
+        await fulfillment(of: [redrawn], timeout: 15)
+        XCTAssertEqual(model.content.results, [], "Today no longer holds yesterday's note")
+
+        test.clock.set(evening) // back to yesterday, as if the day changed while Cassini was away
+        redrawn = expectation(description: "activation redraws the open search")
+        withObservationTracking { _ = model.content } onChange: { [redrawn] in redrawn.fulfill() }
+        test.graph.becameActive()
+        await fulfillment(of: [redrawn], timeout: 15)
+        XCTAssertEqual(model.content.results?.map(\.id), [note.id])
+        XCTAssertEqual(model.query, "English")
+    }
+
     func testALibraryThatCannotBeOpenedSaysSo() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try Data().write(to: root) // a file where the library folder should be

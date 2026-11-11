@@ -57,7 +57,7 @@ public struct ExportService: Sendable {
                 filename = ExportNames.file(note.title, ext: format.fileExtension)
             }
         } catch { throw .cannotSave }
-        return try write(data, named: filename)
+        return try await write(data, named: filename)
     }
 
     /// "Share original audio": the note's original audio byte for byte, at `<folder>/<uuid>/<ExportNames.file(title)>`
@@ -74,7 +74,7 @@ public struct ExportService: Sendable {
             // A clone on APFS: no second copy of a long recording's bytes.
             try FileManager.default.copyItem(at: source, to: url)
         } catch {
-            discardFolder(target)
+            await discardFolder(target).value
             throw .cannotSave
         }
         return url
@@ -89,15 +89,20 @@ public struct ExportService: Sendable {
 
     /// Removes the export at `url` with its folder. Anything outside the exports folder, such as a note's own
     /// audio, is left alone. Discarding an export twice does nothing.
-    public func discard(_ url: URL) { discardFolder(url.deletingLastPathComponent()) }
+    @discardableResult public func discard(_ url: URL) -> Task<Void, Never> { discardFolder(url.deletingLastPathComponent()) }
 
     /// Removes one export's folder (from `newFolder`), then the exports folder once no other export is waiting in it.
-    public func discardFolder(_ exportFolder: URL) {
-        let exportFolder = exportFolder.standardizedFileURL
-        guard exportFolder.deletingLastPathComponent().path == folder.standardizedFileURL.path else { return }
-        try? FileManager.default.removeItem(at: exportFolder)
-        // rmdir removes only an empty folder, in one step: an export made meanwhile keeps the folder it is in.
-        _ = rmdir(folder.path)
+    @discardableResult public func discardFolder(_ exportFolder: URL) -> Task<Void, Never> {
+        let root = folder.standardizedFileURL
+        let target = exportFolder.standardizedFileURL
+        return Task(priority: .utility) {
+            guard target.deletingLastPathComponent().path == root.path else { return }
+            try? await CancellableFileWork.run(priority: .utility) {
+                try? FileManager.default.removeItem(at: target)
+                // Atomic: a newly created sibling keeps its parent.
+                _ = rmdir(root.path)
+            }
+        }
     }
 
     /// The launch sweep over the notes' directories and the exports folder (`Sweep`), with the notes that were
@@ -109,13 +114,13 @@ public struct ExportService: Sendable {
         return Sweep(notes: notes.root, exports: folder).run(known: Set(loaded), now: now)
     }
 
-    private func write(_ data: Data, named name: String) throws(ExportError) -> URL {
+    private func write(_ data: Data, named name: String) async throws(ExportError) -> URL {
         let target = try newFolder()
         let url = target.appendingPathComponent(name)
         do {
             try data.write(to: url, options: .atomic)
         } catch {
-            discardFolder(target)
+            await discardFolder(target).value
             throw .cannotSave
         }
         return url

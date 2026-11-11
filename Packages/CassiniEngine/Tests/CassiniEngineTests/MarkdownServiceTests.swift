@@ -56,7 +56,7 @@ struct MarkdownServiceTests {
         #expect(try Data(contentsOf: noteJSON) == storedJSON)
         let stored = await notes.note(note.id)
         #expect(stored == note)
-        service.discard(output)
+        await service.discard(output).value
         #expect(!FileManager.default.fileExists(atPath: output.path))
         #expect(try Data(contentsOf: original) == source)
     }

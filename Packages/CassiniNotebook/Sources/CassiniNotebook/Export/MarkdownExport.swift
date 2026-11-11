@@ -24,11 +24,11 @@ public struct MarkdownNote: Hashable, Sendable {
 /// Copy and formatting captured at export time, independently from the stored content (D47/D50.3).
 public struct MarkdownOptions: Sendable {
     public var copy: MarkdownCopy
-    public var dateLine: @Sendable (Date, Int64) -> String
+    public var dateLine: @Sendable (MeetingTime, Int64) -> String
     public var untitled: String
     public var unnamedSpeaker: @Sendable (Int) -> String
 
-    public init(copy: MarkdownCopy, dateLine: @escaping @Sendable (Date, Int64) -> String, untitled: String,
+    public init(copy: MarkdownCopy, dateLine: @escaping @Sendable (MeetingTime, Int64) -> String, untitled: String,
                 unnamedSpeaker: @escaping @Sendable (Int) -> String) {
         self.copy = copy; self.dateLine = dateLine; self.untitled = untitled; self.unnamedSpeaker = unnamedSpeaker
     }

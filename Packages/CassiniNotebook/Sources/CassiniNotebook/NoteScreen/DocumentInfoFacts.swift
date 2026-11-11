@@ -5,6 +5,7 @@ public struct DocumentInfoFacts: Hashable, Sendable {
     public var trust: DocumentTrust?
     public var title: String
     public var createdAt: Date
+    public var meetingTime: MeetingTime = .unknown
     public var duration: TimeInterval
     public var versions: Int
     public var speakers: Int
@@ -41,7 +42,7 @@ public struct DocumentInfoFacts: Hashable, Sendable {
         default: nil
         }
         return DocumentInfoFacts(
-            trust: DocumentTrust.of(note), title: note.title, createdAt: note.createdAt, duration: note.duration,
+            trust: DocumentTrust.of(note), title: note.title, createdAt: note.createdAt, meetingTime: note.meetingTime, duration: note.duration,
             versions: note.versionCount, speakers: speakers.count,
             language: TranscriptLanguage.known(note.language),
             processingMs: processing,

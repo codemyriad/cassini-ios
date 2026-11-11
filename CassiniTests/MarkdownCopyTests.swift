@@ -13,12 +13,12 @@ import CassiniNotebook
         XCTAssertEqual(copy.copy.transcriptHeading, "Transcription")
         XCTAssertEqual(copy.copy.speakersLine, "Intervenants\u{00A0}: {names}")
         XCTAssertEqual(copy.copy.notesHeading, "Notes")
-        XCTAssertEqual(copy.dateLine(date, 3_120_000), "mardi 27 octobre 2026, 9:00 AM · 52 min")
+        XCTAssertEqual(copy.dateLine(.instant(date), 3_120_000), "mardi 27 octobre 2026, 9:00 AM · 52 min")
         XCTAssertEqual(Locale.current, original, "Formatting never mutates the global locale")
     }
 
     func testActualResourcesResolveAllSixSharedCopiesAndArabicDurationDigits() throws {
-        // Literal shared catalog values at cassini-ux b86b7b0; this verifies the production Export table wiring.
+        // Literal shared catalog values pinned in markdown/UPSTREAM.json; this verifies production resource wiring.
         let cases: [(String, String, String, String, String, String, String)] = [
             ("en", "Speakers: {names}", "Transcript", "Notes", "(over {names})", "Untitled meeting", "under 1 min"),
             ("it", "Voci: {names}", "Trascrizione", "Note", "(in sovrapposizione con {names})", "Riunione senza titolo", "meno di 1 min"),
@@ -35,21 +35,34 @@ import CassiniNotebook
             XCTAssertEqual(options.copy.notesHeading, notes, language)
             XCTAssertEqual(options.copy.overLine, over, language)
             XCTAssertEqual(options.untitled, untitled, language)
-            XCTAssertTrue(options.dateLine(date, 1).hasSuffix(" · " + underMinute), language)
-            XCTAssertTrue(options.dateLine(date, 3_600_000).hasSuffix(" · ١ h ٠٠ min"), language)
-            XCTAssertTrue(options.dateLine(date, 3_780_000).hasSuffix(" · ١ h ٠٣ min"), language)
+            XCTAssertTrue(options.dateLine(.instant(date), 1).hasSuffix(" · " + underMinute), language)
+            XCTAssertTrue(options.dateLine(.instant(date), 3_600_000).hasSuffix(" · ١ h ٠٠ min"), language)
+            XCTAssertTrue(options.dateLine(.instant(date), 3_780_000).hasSuffix(" · ١ h ٠٣ min"), language)
         }
         XCTAssertEqual(Locale.current, original)
+    }
+
+    func testLocalAndUnknownMeetingTimesUseTheProductionAdapterWithoutAnInventedDate() throws {
+        let label = "2026-11-09T23:15:00"
+        for identifier in ["Pacific/Kiritimati", "America/New_York"] {
+            let options = ExportCopy.markdownOptions(uiLanguage: "fr", locale: Locale(identifier: "en_US"),
+                timeZone: try XCTUnwrap(TimeZone(identifier: identifier)))
+            XCTAssertEqual(options.dateLine(.local(label), 3_120_000), label + " · 52 min")
+            XCTAssertEqual(options.dateLine(.local(label), 0), label)
+            XCTAssertEqual(options.dateLine(.unknown, 3_120_000), "52 min")
+            XCTAssertEqual(options.dateLine(.unknown, 0), "")
+            XCTAssertEqual(options.dateLine(.unknown, 1), "moins d’1 min")
+        }
     }
 
     func testUnsupportedUiLanguageUsesEnglishAndBritishSpeakerListWithNumericRegionClock() throws {
         let zone = try XCTUnwrap(TimeZone(identifier: "Europe/Rome"))
         let fallback = ExportCopy.markdownOptions(uiLanguage: "de-DE", locale: Locale(identifier: "de_DE"), timeZone: zone)
         XCTAssertEqual(fallback.copy.transcriptHeading, "Transcript")
-        XCTAssertEqual(fallback.dateLine(date, 0), "Tuesday 27 October 2026, 09:00")
+        XCTAssertEqual(fallback.dateLine(.instant(date), 0), "Tuesday 27 October 2026, 09:00")
         XCTAssertEqual(fallback.copy.speakerList(["Ada", "Ben", "Chris"]), "Ada, Ben and Chris")
         let english = ExportCopy.markdownOptions(uiLanguage: "en", locale: Locale(identifier: "en_US"), timeZone: zone)
-        XCTAssertEqual(english.dateLine(date, 0), "Tuesday 27 October 2026, 9:00 AM")
+        XCTAssertEqual(english.dateLine(.instant(date), 0), "Tuesday 27 October 2026, 9:00 AM")
         XCTAssertEqual(english.copy.speakerList(["Ada", "Ben", "Chris"]), "Ada, Ben and Chris")
         XCTAssertEqual(english.unnamedSpeaker(2), "Speaker 2")
         let portuguese = ExportCopy.markdownOptions(uiLanguage: "pt-AO", locale: Locale(identifier: "en_GB"), timeZone: zone)

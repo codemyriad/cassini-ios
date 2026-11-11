@@ -130,7 +130,7 @@ final class LibraryUITests: XCTestCase {
         XCTAssertEqual(record.label, "Return to recording")
         let recordingRow = row(app, "Voice note 8 Oct, 09:41")
         XCTAssertTrue(recordingRow.waitForExistence(within: 5))
-        XCTAssertTrue(recordingRow.label.contains(", recording"), recordingRow.label)
+        XCTAssertTrue(waitFor(recordingRow, label: ", recording"), recordingRow.label)
         capture("Library while recording")
         record.tap()
         XCTAssertTrue(app.buttons["finishRecording"].waitForExistence(within: 5))

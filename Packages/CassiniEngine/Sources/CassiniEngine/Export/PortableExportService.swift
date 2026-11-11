@@ -9,13 +9,10 @@ import CassiniNotebook
 /// The audio is the imported Ogg Opus when the note has one, else the playable file encoded to Opus. What the export
 /// keeps of an imported document depends on how that document reads now, verified once per export:
 /// - `ok`: every variant stays, with the note's title and speaker names.
-/// - `unverified` or `staleAudio`, with nothing made on this device (`Note.holdsOnlyImportedVersions`): the export is
-///   the document itself, byte for byte, as Android's Save a copy is. Its variants, provenance, private data and
-///   honest state all survive.
-/// - `unverified` or `staleAudio` with versions made here: a fresh seal of only those versions over the same audio,
-///   carrying the source manifest's private `x` data, unknown members and meeting verbatim. The imported variants
-///   are not sealed again, since the audio does not vouch for them; the note still shows them.
-/// - anything else: a fresh seal that keeps only the foreign tags.
+/// - Any non-OK Cassini document: copy the original byte for byte, including after Transcribe again has added
+///   local versions. Neither a new transcript nor a local edit can vouch for the source's meeting time,
+///   provenance or audio binding. The source's variants, private data and honest trust state all survive.
+/// - Plain audio: make a fresh seal over its audio and the note's local transcript.
 ///
 /// Intermediate files go in `<folder>/work/`, which is removed afterwards, so no title can collide with them. The
 /// source is never changed.
@@ -33,6 +30,22 @@ public struct PortableExportService: Sendable {
         self.unassignedLabel = unassignedLabel
     }
 
+    /// D96 backup: clean imported documents and raw/opaque audio keep their exact bytes, so re-import deduplicates.
+    /// Local transcript/title/speaker changes need a snapshot only for a verified original. Non-OK documents
+    /// retain their exact bytes even with local versions, so an archive cannot silently re-sign untrusted metadata.
+    public func archiveSnapshot(_ note: Note, original: URL, playable: URL, into folder: URL) async throws -> URL {
+        var originalBytes = ArchiveContents.preservesOriginal(note)
+        if !originalBytes, note.document != nil {
+            let document = try await CancellableFileWork.run { PortableTranscript.read(from: original) }
+            if let document { originalBytes = ArchiveContents.matchesImportedDocument(note, document) }
+        }
+        if originalBytes {
+            let ext = original.pathExtension
+            return try await BulkExportService.copyOriginal(original, to: folder.appendingPathComponent("original" + (ext.isEmpty ? "" : "." + ext)))
+        }
+        return try await export(note, original: original, playable: playable, into: folder, filename: "document")
+    }
+
     /// The exported file, `<folder>/<filename>.opus`. Nothing it made stays in `folder` when it throws.
     public func export(_ note: Note, original: URL, playable: URL, into folder: URL, filename: String) async throws -> URL {
         let work = folder.appendingPathComponent("work", isDirectory: true)
@@ -43,21 +56,20 @@ public struct PortableExportService: Sendable {
             var opus = original
             var source: CassiniDocument?
             if (try? ImportClassifier.sniff(fileAt: original)) == .oggOpus {
-                source = await Self.read(original)
+                source = try await Self.read(original)
+                if let state = source?.state, state != .ok, state != .plainAudio {
+                    try Task.checkCancellation()
+                    _ = try await BulkExportService.copyOriginal(original, to: output)
+                    return output
+                }
             } else {
                 opus = work.appendingPathComponent("encoded.opus")
                 try await audio.encodeOpus(playable, to: opus)
             }
-            let state = source?.state
-            if let state, PortableTranscript.untrustedStates.contains(state), note.holdsOnlyImportedVersions {
-                try Task.checkCancellation()
-                try FileManager.default.copyItem(at: original, to: output)
-                return output
-            }
-            let verified = state == .ok
+            let verified = source?.state == .ok
             var variants = verified ? Self.keptVariants(of: note) : [:]
             let runs = provenance.records(note.id)
-            let audit = verified ? Self.attributionAudit(of: note, original: original) : nil
+            let audit = verified ? try await Self.attributionAudit(of: note, original: original) : nil
             var versions = Self.versionsToSeal(of: note)
             var current = note.versions?.first { $0.id == note.selectedVersionID }
                 ?? TranscriptVersion(kind: .editedTranscript, segments: note.transcript, speakers: note.speakers ?? [])
@@ -66,12 +78,15 @@ public struct PortableExportService: Sendable {
             current.language = note.language
             // An imported version is sealed again only over audio that vouches for it; otherwise the newest version
             // made here is the default.
-            if !verified, note.showsImportedVersion, let last = versions.popLast() { current = last }
+            if current.segments.isEmpty || (!verified && note.showsImportedVersion), let last = versions.popLast() { current = last }
             for (index, version) in versions.enumerated() {
                 try Task.checkCancellation()
                 let next = work.appendingPathComponent("version-\(index).opus")
                 variants[version.id] = try await seal(Self.showing(version, of: note), opus, next,
                                                       Self.record(version, runs, variants, note, audit), source)
+                // Each successor contains every preceding variant. Keeping old complete-audio copies would
+                // multiply scratch space by the version count for one note.
+                if opus != original { try FileManager.default.removeItem(at: opus) }
                 opus = next
                 source = nil
             }
@@ -125,25 +140,27 @@ public struct PortableExportService: Sendable {
 
     /// The verified source document's `provenance.attribution`, which describes its own variants; nil when no version
     /// re-attributes one of its variants. The source was verified already, so only its tags are read again.
-    private static func attributionAudit(of note: Note, original: URL) -> JSONObject? {
+    private static func attributionAudit(of note: Note, original: URL) async throws -> JSONObject? {
         guard let versions = note.versions else { return nil }
         let imported = Set(versions.filter { $0.portableID != nil }.map(\.id))
         guard versions.contains(where: { $0.attributedFrom.map(imported.contains) ?? false }) else { return nil }
-        return CassiniDocument.read(original, verify: false).manifest?["provenance"]?.object?["attribution"]?.object
+        return try await CancellableFileWork.run {
+            CassiniDocument.read(original, verify: false).manifest?["provenance"]?.object?["attribution"]?.object
+        }
     }
 
     /// Seals `note` into `target`; `source` is the document at `opus` when it has been read already.
     private func seal(_ note: Note, _ opus: URL, _ target: URL, _ processing: JSONObject,
                       _ source: CassiniDocument?) async throws -> String? {
         let unassignedLabel = unassignedLabel
-        return try await Task.detached(priority: .userInitiated) {
+        return try await CancellableFileWork.run {
             try PortableTranscript.export(note: note, opus: opus, destination: target, unassignedLabel: unassignedLabel,
                                           processing: processing, source: source)
-        }.value
+        }
     }
 
     /// The document at `url`, its audio verified.
-    private static func read(_ url: URL) async -> CassiniDocument {
-        await Task.detached(priority: .userInitiated) { CassiniDocument.read(url) }.value
+    private static func read(_ url: URL) async throws -> CassiniDocument {
+        try await CancellableFileWork.run { CassiniDocument.read(url) }
     }
 }

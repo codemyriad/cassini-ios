@@ -14,6 +14,9 @@ enum ExportCopy {
                               comment: "The body of a TXT export without words"),
             unassignedLabel: String(localized: "Unknown speaker", table: "Export",
                                     comment: "The label of passages no speaker was found for, in an export"),
+            meetingSubtitle: { meetingTime, durationMs, speakers in
+                subtitle(meetingTime: meetingTime, durationMs: durationMs, speakers: speakers, locale: locale, timeZone: timeZone)
+            },
             markdown: markdownOptions(uiLanguage: DefaultLabels.appLanguage, locale: locale, timeZone: timeZone))
     }
 
@@ -35,8 +38,8 @@ enum ExportCopy {
                 let formatter = ListFormatter()
                 formatter.locale = words
                 return formatter.string(from: names) ?? names.joined(separator: ", ")
-            }), dateLine: { createdAt, durationMs in
-                MarkdownDate.line(at: createdAt, timeZone: timeZone, uiLanguage: uiLanguage, formattingLocale: locale,
+            }), dateLine: { meetingTime, durationMs in
+                MarkdownDate.line(meetingTime: meetingTime, timeZone: timeZone, uiLanguage: uiLanguage, formattingLocale: locale,
                     duration: MarkdownDate.duration(durationMs, locale: locale, underMinute: under, minutes: minutes, hours: hours))
             }, untitled: String(localized: "Untitled meeting", table: "Export", bundle: bundle, locale: words),
             unnamedSpeaker: { DefaultLabels.placeholder($0, language: words.identifier.replacingOccurrences(of: "_", with: "-")) })
@@ -48,7 +51,18 @@ enum ExportCopy {
         let time = Date.FormatStyle(date: .omitted, time: .shortened, locale: locale, timeZone: timeZone)
         let day = String(localized: "\(createdAt.formatted(date)), \(createdAt.formatted(time))", table: "Export",
                          locale: locale, comment: "A date and a time of day: 8 Oct 2026, 15:10")
-        var parts = [day, ExportClock.clock(durationMs, durationMs: durationMs)]
+        return subtitleParts(day: day, durationMs: durationMs, speakers: speakers, locale: locale)
+    }
+
+    static func subtitle(meetingTime: MeetingTime, durationMs: Int64, speakers: Int, locale: Locale, timeZone: TimeZone) -> String {
+        if let instant = meetingTime.instant {
+            return subtitle(createdAt: instant, durationMs: durationMs, speakers: speakers, locale: locale, timeZone: timeZone)
+        }
+        return subtitleParts(day: meetingTime.localText, durationMs: durationMs, speakers: speakers, locale: locale)
+    }
+
+    private static func subtitleParts(day: String?, durationMs: Int64, speakers: Int, locale: Locale) -> String {
+        var parts = [day, ExportClock.clock(durationMs, durationMs: durationMs)].compactMap { $0 }
         if speakers >= 2 {
             parts.append(String(localized: "\(speakers) speakers", table: "Export", locale: locale,
                                 comment: "The number of speakers in a TXT export"))

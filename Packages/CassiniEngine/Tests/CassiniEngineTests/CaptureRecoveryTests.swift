@@ -1,4 +1,5 @@
 import Foundation
+import CassiniCore
 import Testing
 import CassiniEngine
 import CassiniEngineTesting
@@ -26,6 +27,88 @@ import CassiniNotebook
     }
 
     func file(_ store: NoteStore, _ id: UUID, _ name: String) -> URL { store.directory(for: id).appendingPathComponent(name) }
+
+    private func recordedDocument(at instant: Date) throws -> Data {
+        let words = [Word("S1", 0, 400, "English"), Word("S1", 500, 900, "meeting")]
+        return Data(try CassiniDocument.create(ImportFixtures.opus(packets: 50),
+            transcript: Transcript(words, language: "en"), title: "Recovered English meeting", processing: JSONObject(),
+            speakerLabels: ["S1": "Ada"], recordedAt: instant))
+    }
+
+    @Test(arguments: [false, true])
+    func portableRebuildKeepsRecordedTimeSourceAndPlayback(_ hadPlayback: Bool) async throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        let repository = try NoteRepository(root: root)
+        let id = UUID()
+        let folder = repository.directory(for: id)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let recordedAt = Date(timeIntervalSince1970: 1_791_451_920)
+        let source = folder.appendingPathComponent(ImportService.documentFilename)
+        let sourceBytes = try recordedDocument(at: recordedAt)
+        try sourceBytes.write(to: source)
+        let playback = folder.appendingPathComponent(ImportService.playbackFilename)
+        let playbackBytes = Data("caff-existing-playback".utf8)
+        if hadPlayback {
+            try playbackBytes.write(to: playback)
+            audio.failDecodes(with: CocoaError(.fileReadUnknown))
+        }
+
+        #expect(await recovery.rebuild(in: repository).map(\.noteID) == [id])
+        let rebuilt = try #require(try repository.load().notes.first)
+        #expect(rebuilt.meetingTime == .instant(recordedAt))
+        #expect(rebuilt.title == "Recovered English meeting")
+        #expect(rebuilt.origin == .importedDocument)
+        #expect(rebuilt.audioFilename == ImportService.playbackFilename)
+        #expect(rebuilt.originalAudioFilename == ImportService.documentFilename)
+        #expect(rebuilt.audio.isPlayable)
+        #expect(rebuilt.status == .ready)
+        #expect(rebuilt.text == "English meeting")
+        #expect(rebuilt.language == "en")
+        #expect(rebuilt.speakers?.first?.name == "Ada")
+        #expect(rebuilt.document?.state == .ok)
+        #expect(try Data(contentsOf: source) == sourceBytes)
+        #expect(try Data(contentsOf: playback) == (hadPlayback ? playbackBytes : Data("caff".utf8)))
+        let store = try NoteStore(root: root)
+        try await store.load()
+        #expect(await recovery.recover(in: store, activeNoteID: nil).isEmpty)
+        #expect(await store.note(id)?.meetingTime == .instant(recordedAt))
+        #expect(try Data(contentsOf: source) == sourceBytes)
+        #expect(try Data(contentsOf: playback) == (hadPlayback ? playbackBytes : Data("caff".utf8)))
+        #expect(repairer.urls.isEmpty, "Cassini document audio is never treated as an interrupted CAF capture")
+        #expect(await recovery.rebuild(in: repository).isEmpty, "Rebuild is idempotent")
+    }
+
+    @Test func corruptCatalogueWithUndecodablePortableAudioRetainsDocumentAndMeetingMetadata() async throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        let repository = try NoteRepository(root: root)
+        let id = UUID()
+        let folder = repository.directory(for: id)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let corrupt = Data("{not valid JSON".utf8)
+        try corrupt.write(to: folder.appendingPathComponent(NoteRepository.metadataFilename))
+        let recordedAt = Date(timeIntervalSince1970: 1_791_451_920)
+        let source = folder.appendingPathComponent(ImportService.documentFilename)
+        let sourceBytes = try recordedDocument(at: recordedAt)
+        try sourceBytes.write(to: source)
+        audio.failDecodes(with: CocoaError(.fileReadUnknown))
+
+        #expect(await recovery.rebuild(in: repository).map(\.noteID) == [id])
+        let rebuilt = try #require(try repository.load().notes.first)
+        #expect(rebuilt.meetingTime == .instant(recordedAt))
+        #expect(rebuilt.audioFilename == ImportService.documentFilename)
+        #expect(rebuilt.originalAudioFilename == nil)
+        #expect(rebuilt.audio == .unplayable(.unsupportedFormat))
+        #expect(rebuilt.origin == .importedDocument)
+        #expect(rebuilt.text == "English meeting")
+        #expect(rebuilt.document?.state == .ok)
+        #expect(try Data(contentsOf: source) == sourceBytes)
+        #expect(!FileManager.default.fileExists(atPath: folder.appendingPathComponent(ImportService.playbackFilename).path))
+        let backups = try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
+            .filter { $0.lastPathComponent.hasPrefix(CaptureRecovery.corruptPrefix) }
+        #expect(backups.count == 1)
+        #expect(try Data(contentsOf: #require(backups.first)) == corrupt)
+        #expect(repairer.urls.isEmpty)
+    }
 
     // ports: RecoveryRepositoryTest#aTruncatedOpusCaptureIsRepairedToPlainWithASaneDuration
     @Test func aLiveCaptureIsRepairedToPlainWithItsDuration() async throws {

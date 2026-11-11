@@ -9,6 +9,17 @@ public enum MarkdownDate {
         return Locale(identifier: ["it", "fr", "es"].contains(base) ? base : "en_GB")
     }
 
+    /// D95: unknown timestamps never borrow a seal/import date; local labels stay as written.
+    /// This is the same fallback as Android's NoteMarkdown: label and duration, or duration alone.
+    public static func line(meetingTime: MeetingTime, timeZone: TimeZone, uiLanguage: String,
+                            formattingLocale: Locale, is24Hour: Bool? = nil, duration: String? = nil) -> String {
+        if case .instant(let date) = meetingTime {
+            return line(at: date, timeZone: timeZone, uiLanguage: uiLanguage, formattingLocale: formattingLocale,
+                        is24Hour: is24Hour, duration: duration)
+        }
+        return [meetingTime.localText, duration].compactMap { $0 }.joined(separator: " · ")
+    }
+
     public static func line(at date: Date, timeZone: TimeZone, uiLanguage: String, formattingLocale: Locale,
                             is24Hour: Bool? = nil, duration: String? = nil) -> String {
         let words = DateFormatter()

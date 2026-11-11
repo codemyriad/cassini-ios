@@ -13,6 +13,8 @@ public enum TranscriptFormat: String, CaseIterable, Codable, Identifiable, Senda
 public struct ExportTexts: Sendable {
     /// The TXT subtitle line from the note's creation time, duration and number of speakers.
     public var subtitle: @Sendable (_ createdAt: Date, _ durationMs: Int64, _ speakers: Int) -> String
+    /// Formats a known instant, a zone-less label, or no date without inventing a meeting time.
+    public var meetingSubtitle: (@Sendable (MeetingTime, Int64, Int) -> String)?
     /// The TXT body of a transcript without words.
     public var emptyText: String
     /// The label of passages without a speaker.
@@ -20,8 +22,10 @@ public struct ExportTexts: Sendable {
     public var markdown: MarkdownOptions?
 
     public init(subtitle: @escaping @Sendable (Date, Int64, Int) -> String, emptyText: String, unassignedLabel: String,
+                meetingSubtitle: (@Sendable (MeetingTime, Int64, Int) -> String)? = nil,
                 markdown: MarkdownOptions? = nil) {
         self.subtitle = subtitle; self.emptyText = emptyText; self.unassignedLabel = unassignedLabel
+        self.meetingSubtitle = meetingSubtitle
         self.markdown = markdown
     }
 }
@@ -64,14 +68,22 @@ public enum TranscriptExports {
                     transcript.labels[speaker] = options.unnamedSpeaker(index + 1)
                 }
             }
-            text = MarkdownExport.write(transcript, dateLine: options.dateLine(note.createdAt, transcript.durationMs),
+            text = MarkdownExport.write(transcript, dateLine: options.dateLine(note.meetingTime, transcript.durationMs),
                                         copy: options.copy, notes: markdownNotes)
         case .json: return try JSONExport.data(note, version: version)
         case .subtitles: text = SrtWriter.write(transcript)
         case .webVTT: text = VttWriter.write(transcript)
         case .text:
             // Android counts the selected variant's distinct word speakers, the count that also labels the turns.
-            let subtitle = texts.subtitle(note.createdAt, transcript.durationMs, transcript.speakerCount)
+            let subtitle: String
+            if let render = texts.meetingSubtitle {
+                subtitle = render(note.meetingTime, transcript.durationMs, transcript.speakerCount)
+            } else if let instant = note.meetingTime.instant {
+                subtitle = texts.subtitle(instant, transcript.durationMs, transcript.speakerCount)
+            } else {
+                subtitle = [note.meetingTime.localText, ExportClock.clock(transcript.durationMs, durationMs: transcript.durationMs)]
+                    .compactMap { $0 }.joined(separator: " · ")
+            }
             text = TextExport.write(transcript, subtitle: subtitle, emptyText: texts.emptyText)
         }
         return Data(text.utf8)

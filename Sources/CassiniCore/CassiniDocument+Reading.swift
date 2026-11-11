@@ -9,7 +9,8 @@ extension CassiniDocument {
     }
 
     /** [reportsIOErrors] makes a file that cannot be opened or read [DocumentState.unreadable] instead of plain audio. */
-    static func read(verify: Bool, reportsIOErrors: Bool, open: () throws -> ByteSource) -> CassiniDocument {
+    static func read(verify: Bool, reportsIOErrors: Bool, decodeTranscripts: Bool = true,
+                     open: () throws -> ByteSource) -> CassiniDocument {
         // Audio corruption must not conceal an otherwise intact manifest/transcript.
         let head: [UInt8], tagPacket: [UInt8]
         do {
@@ -76,6 +77,9 @@ extension CassiniDocument {
             for (field, suffix) in fields where !sameBytes(tags[prefix + suffix], ref[field]?.text) {
                 warnings.append("tag-manifest-disagreement: \(prefix)\(suffix)")
             }
+            guard decodeTranscripts else {
+                return Variant(id: id, descriptor: descriptor, body: nil, transcript: nil)
+            }
             do {
                 // The format names the body; the media type is only a hint.
                 try check(ref.hasExactly(refKeys) && descriptor["format"] == .string(Transcript.format), "unsupported-transcript-format")
@@ -126,6 +130,8 @@ extension CassiniDocument {
         try nonempty(meeting, "id"); try nonempty(meeting, "title"); _ = try meeting.number("durationMs")
         let created = try meeting.string("createdAtUtc")
         try check(created.hasSuffix("Z") && parseInstant(created) != nil, "Invalid createdAtUtc")
+        // Optional meeting-time metadata is interpreted by readers, not load-bearing transcript
+        // schema. An unusable recordedAtUtc must allow DATE/local fallback without hiding words.
         let audio = try m.object("audio")
         try check(audio["container"] == .string("ogg") && audio["codec"] == .string("opus") && audio.number("sampleRate") == 48000, "Unsupported audio")
         try check((1...2).contains(audio.number("channels")), "Unsupported channel count")
@@ -160,15 +166,48 @@ extension CassiniDocument {
 
     static func nonempty(_ o: JSONObject, _ key: String) throws { try check(!(try o.string(key)).isEmpty, "Empty \(key)") }
 
-    static func parseInstant(_ text: String) -> Date? {
-        let fractional = ISO8601DateFormatter()
-        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return fractional.date(from: text) ?? ISO8601DateFormatter().date(from: text)
+    /// Offset-bearing RFC3339, shared by meeting-time readers and writers. Preserve legacy separator/case
+    /// compatibility and the pinned reference reader's microsecond precision when comparing instants.
+    public static func parseInstant(_ text: String) -> Date? {
+        let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let match = rfc3339Instant.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) else { return nil }
+        func part(_ index: Int) -> String? { Range(match.range(at: index), in: text).map { String(text[$0]) } }
+        guard let date = part(1), let clock = part(2), let zone = part(4) else { return nil }
+        let day = date.split(separator: "-").compactMap { Int($0) }
+        let time = clock.split(separator: ":").compactMap { Int($0) }
+        guard day.count == 3, time.count == 3,
+              (1...9999).contains(day[0]), (1...12).contains(day[1]),
+              (0...23).contains(time[0]), (0...59).contains(time[1]), (0...59).contains(time[2]) else { return nil }
+        // Foundation's ISO parser rolls February 30 and hour 24 into another day. Validate
+        // proleptic Gregorian components first so an impossible value can never outrank DATE.
+        let year = day[0]
+        let leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)
+        let monthDays = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+        guard (1...monthDays[day[1] - 1]).contains(day[2]) else { return nil }
+        var offsetSeconds = 0
+        if zone != "Z", zone != "z" {
+            let offset = zone.dropFirst().split(separator: ":").compactMap { Int($0) }
+            guard offset.count == 2, (0...23).contains(offset[0]), (0...59).contains(offset[1]) else { return nil }
+            offsetSeconds = (offset[0] * 3600 + offset[1] * 60) * (zone.hasPrefix("-") ? -1 : 1)
+        }
+        // Match cassini-format 32f37a6's pure reader: RFC3339 separators/offsets and microsecond precision.
+        let fraction = part(3).map { String($0.prefix(7)) } ?? ""
+        // Parse the validated local components as UTC, then apply the numeric offset ourselves.
+        // Foundation rejects valid RFC3339 offsets near 24 hours that the reference reader accepts.
+        let normalized = "\(date)T\(clock)\(fraction)Z"
+        let local = (try? Date(normalized, strategy: .iso8601))
+            ?? (try? Date(normalized, strategy: Date.ISO8601FormatStyle(includingFractionalSeconds: true)))
+        return local?.addingTimeInterval(-Double(offsetSeconds))
     }
-    static func now() -> String {
+
+    private static let rfc3339Instant = try! NSRegularExpression(
+        pattern: #"^([0-9]{4}-[0-9]{2}-[0-9]{2})[Tt ]([0-9]{2}:[0-9]{2}:[0-9]{2})(\.[0-9]+)?([Zz]|[+-][0-9]{2}:[0-9]{2})$"#)
+    static func now() -> String { instantText(Date()) }
+
+    static func instantText(_ date: Date) -> String {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter.string(from: Date())
+        return formatter.string(from: date)
     }
 
     static func decimal(_ value: String?) throws -> Int64 {

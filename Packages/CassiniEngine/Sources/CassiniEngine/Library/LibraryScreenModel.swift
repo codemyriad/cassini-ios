@@ -74,14 +74,20 @@ public final class LibraryScreenModel {
     public var dialog: LibraryDialog?
     /// The speaker models are installed (Transcribe again says "Speaker names carry over.").
     public private(set) var speakerModelsReady = false
+    /// The start of the local day the rows were built for, observed, so the view reads the rows again (the date
+    /// filters, the sections and the relative dates) when `clockChanged()` finds a new day.
+    private var day: Date
 
     @ObservationIgnored public var onEffect: (@MainActor (LibraryEffect) -> Void)?
     @ObservationIgnored let ports: Ports
     @ObservationIgnored private var index = LibraryIndex()
-    /// `index.revision`, observed, so the view reads the rows again when the notes change.
-    private var revision = 0
+    @ObservationIgnored private var indexedRevision = 0
+    /// A local observable dependency for every row input, including capture/job changes behind ports.
+    /// Views must not rely on transitive observation through those closures to refresh a retained row.
+    private(set) var presentationRevision = 0
     @ObservationIgnored private var pendingSearch: Task<Void, Never>?
     @ObservationIgnored private var pendingNotes: Task<Void, Never>?
+    @ObservationIgnored private var pendingContext: Task<Void, Never>?
     /// The last search's results: for `query` over the notes at `revision` of the index.
     private var found: Found?
     /// The search running off the main actor.
@@ -94,19 +100,22 @@ public final class LibraryScreenModel {
     }
 
     public init(ports: Ports) {
+        day = ports.calendar.startOfDay(for: ports.clock.now)
         self.ports = ports
         observeNotes()
+        observeContext()
     }
 
     /// Whether a query is open: the rows are the flat results.
     public var isSearching: Bool { !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
     public var content: LibraryContent {
-        _ = revision
+        _ = presentationRevision
         let processing = ports.processing(), now = ports.clock.now, calendar = ports.calendar
         let context = RowContext(processing: processing, recording: ports.recording())
         let loading = ports.loading(), unavailable = ports.unavailable()
         let live = favoritesOnly ? index.entries.filter(\.note.isFavorite) : index.entries
+        _ = day // a new local day rebuilds the sections, the relative dates and the date filter
         let audioOnly = index.entries.contains { $0.note.status == .audioOnly && $0.note.transcript.isEmpty }
         var facts = LibraryFacts(loading: loading, liveNotes: index.entries.count, audioOnly: audioOnly,
                                  unavailable: unavailable)
@@ -123,7 +132,9 @@ public final class LibraryScreenModel {
         let hits = current.filter {
             let note = $0.entry.note
             return (!favoritesOnly || note.isFavorite) &&
-                (interval.map { note.createdAt >= $0.start && note.createdAt < $0.end } ?? true)
+                (interval.map { range in
+                    note.meetingTime.isWithin(range, calendar: calendar)
+                } ?? true)
         }
         if found.query == searched {
             facts.query = searched
@@ -148,7 +159,7 @@ public final class LibraryScreenModel {
 
     /// What the long press on a row offers; nil for a note no longer in the Library.
     public func menu(_ id: UUID) -> LibraryRowMenu? {
-        _ = revision
+        _ = presentationRevision
         guard let note = index.entry(id)?.note else { return nil }
         let processing = ports.processing(), finishing = ports.finishing() == id
         return LibraryRowMenu(isFavorite: note.isFavorite, recording: note.isRecording && ports.recording().noteID == id,
@@ -246,12 +257,20 @@ public final class LibraryScreenModel {
         return true
     }
 
+    /// The app became active or the system says the day or the clock changed: a new local day redraws the rows,
+    /// even with the query and the notes unchanged (a search left open across midnight). The same day changes nothing.
+    public func clockChanged() {
+        let today = ports.calendar.startOfDay(for: ports.clock.now)
+        if today != day { day = today }
+    }
+
     /// Asks whether the speaker models are installed, for Transcribe again's "Speaker names carry over."
     public func refreshSpeakerModels() async { speakerModelsReady = await ports.speakerModelsReady() }
 
     /// Waits until the index has the latest notes and the search asked for last has answered (tests).
     public func settle() async {
-        while pendingNotes != nil || pendingSearch != nil || running != nil {
+        while pendingNotes != nil || pendingContext != nil || pendingSearch != nil || running != nil {
+            await pendingContext?.value
             await pendingNotes?.value
             await pendingSearch?.value
             await running?.task.value
@@ -283,14 +302,37 @@ private extension LibraryScreenModel {
             }
         }
         index.update(notes)
-        guard index.revision != revision else { return }
-        revision = index.revision
-        if !searched.isEmpty, found?.revision != revision { search() }
+        guard index.revision != indexedRevision else { return }
+        indexedRevision = index.revision
+        presentationRevision &+= 1
+        if !searched.isEmpty, found?.revision != indexedRevision { search() }
     }
 
     func notesChanged() {
         guard pendingNotes == nil else { return }
         pendingNotes = Task { @MainActor [weak self] in self?.observeNotes() }
+    }
+
+    /// Capture and queue state can change without a note write. Publish their changes through the
+    /// model's own observable revision, so lazy rows also refresh while another screen covers them.
+    func observeContext() {
+        pendingContext = nil
+        withObservationTracking {
+            _ = ports.processing()
+            _ = ports.recording()
+        } onChange: { [weak self] in
+            if Thread.isMainThread {
+                MainActor.assumeIsolated { self?.contextChanged() }
+            } else {
+                Task { @MainActor [weak self] in self?.contextChanged() }
+            }
+        }
+        presentationRevision &+= 1
+    }
+
+    func contextChanged() {
+        guard pendingContext == nil else { return }
+        pendingContext = Task { @MainActor [weak self] in self?.observeContext() }
     }
 
     /// Searches the notes for `searched` off the main actor, a thousand notes being more than a frame's work; the

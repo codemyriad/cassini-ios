@@ -1,11 +1,12 @@
 import AVFoundation
 import Foundation
+import CassiniCore
 
 public struct AudioInspection: Sendable {
     public let duration: Double
     public let waveform: [Float]
-    public static func inspect(_ url: URL) async throws -> AudioInspection {
-        try await Task.detached(priority: .utility) {
+    public static func inspect(_ url: URL, onWindow: (@Sendable () throws -> Void)? = nil) async throws -> AudioInspection {
+        try await CancellableFileWork.run(priority: .utility) {
             let file = try AVAudioFile(forReading: url)
             guard file.length > 0, file.processingFormat.sampleRate > 0 else { throw AudioError.empty }
             let duration = Double(file.length) / file.processingFormat.sampleRate
@@ -18,11 +19,13 @@ public struct AudioInspection: Sendable {
                 try Task.checkCancellation()
                 file.framePosition = min(file.length - 1, AVAudioFramePosition(Double(index) / Double(count) * Double(file.length)))
                 try file.read(into: buffer, frameCount: capacity)
+                try onWindow?()
+                try Task.checkCancellation()
                 guard let channel = buffer.floatChannelData?[0], buffer.frameLength > 0 else { levels.append(0.1); continue }
                 levels.append(min(1, max(0.04, acLevel(UnsafeBufferPointer(start: channel, count: Int(buffer.frameLength))) * 4)))
             }
             return AudioInspection(duration: duration, waveform: levels)
-        }.value
+        }
     }
 
     /// The RMS of `samples` with their mean taken off (D26.1): a microphone's DC offset is not sound.

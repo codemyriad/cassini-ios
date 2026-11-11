@@ -1,6 +1,6 @@
 {
   "repository": "https://github.com/codemyriad/cassini-ux",
-  "commit": "b86b7b0ecfa0984e313380578863f2f75fd652f1",
+  "commit": "7cdb069fb0b71953feeeb7a6805c63835f968540",
   "files": {
     "MARKDOWN.md": {
       "source": "vectors/export/MARKDOWN.md",
@@ -16,7 +16,7 @@
     },
     "strings.json": {
       "source": "strings/strings.json",
-      "source_sha256": "7b059577a6e4a5d692ccb5c745916bc790e9e0fe7c77c5572fb64fda80f0f7b3",
+      "source_sha256": "8b20048485bd928d2067806284c381ffb8033768ecf084387600517d0006690f",
       "selection": [
         "export.markdown.description",
         "export.markdown.label",
@@ -30,7 +30,7 @@
         "meeting.turn.over"
       ],
       "sha256": "21e0b4130ba6b75f1bdf943f582c87caf176fe8254ec48c5083a74750785d22c",
-      "source_commit": "4d577376f6360ed352fa75307f4dc47890ed9858"
+      "source_commit": "7cdb069fb0b71953feeeb7a6805c63835f968540"
     }
   }
 }

@@ -767,6 +767,47 @@
         }
       }
     },
+    "Date unknown": {
+      "comment": "Shared catalog library.group.unknownDate: heading for meetings without a known recording date (D95); cassini-ux 484c6048447381e04fd1d1133e7ae02c6c6d5e58",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Date unknown"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Data sconosciuta"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Date inconnue"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fecha desconocida"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Data desconhecida"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Data desconhecida"
+          }
+        }
+      }
+    },
     "Dismiss notice": {
       "comment": "VoiceOver label of a notice's close button",
       "extractionState": "manual",

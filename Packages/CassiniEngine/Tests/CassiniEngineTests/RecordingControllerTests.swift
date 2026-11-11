@@ -8,6 +8,57 @@ import CassiniNotebook
 @MainActor @Suite(.serialized) struct RecordingControllerTests {
     let floor = Limits.minRecordingFreeBytes
 
+    @Test func aFailedPositionZeroWriteStopsCaptureAndDiscardsTheUnstartedNote() async throws {
+        let h = try RecordingHarness()
+        defer { h.tearDown() }
+        h.notes.failUpdates = true
+        #expect(h.controller.start())
+        await h.controller.settle()
+        #expect(h.controller.state == .ended(noteID: nil, outcome: .couldNotStart))
+        #expect(h.capture.stops == 1)
+        #expect(await h.store.all().isEmpty)
+        #expect(h.activity.started.count == 1)
+        #expect(h.activity.ends == 1)
+        #expect(!h.activity.isRunning)
+        #expect(h.handoff.handedOff.isEmpty)
+    }
+
+    @Test func positionZeroIsPersistedAfterPreparationAndSurvivesPauseResume() async throws {
+        let h = try RecordingHarness()
+        defer { h.tearDown() }
+        let preparing = AsyncStream<Void>.makeStream()
+        let permission = AsyncStream<Void>.makeStream()
+        defer { preparing.continuation.finish(); permission.continuation.finish() }
+        h.capture.beforeStart = {
+            preparing.continuation.yield(())
+            for await _ in permission.stream { break }
+        }
+        let requestedAt = h.clock.now
+        #expect(h.controller.start())
+        for await _ in preparing.stream { break }
+        let waiting = try #require(await h.store.all().first)
+        #expect(waiting.createdAt == requestedAt)
+        #expect(waiting.meetingTime == .unknown, "Permission/session preparation has not established position zero")
+        h.clock.advance(by: .seconds(90))
+        let recordedAt = h.clock.now
+        h.capture.recordedAt = recordedAt
+        permission.continuation.yield(())
+        await h.controller.settle()
+        let active = try h.active
+        let saved = try #require(await h.note(active.noteID))
+        #expect(saved.createdAt == requestedAt, "Catalogue creation remains distinct from microphone start")
+        #expect(saved.meetingTime == .instant(recordedAt))
+        #expect(try NoteRepository(root: h.root).load().notes.first?.meetingTime == .instant(recordedAt),
+                "The actual start is durable, not an in-memory-only controller value")
+        h.controller.pause()
+        h.clock.advance(by: .seconds(300))
+        h.capture.recordedAt = h.clock.now
+        h.controller.resume()
+        await h.controller.settle()
+        #expect(await h.note(active.noteID)?.meetingTime == .instant(recordedAt), "Resume never moves position zero")
+        #expect(try NoteRepository(root: h.root).load().notes.first?.meetingTime == .instant(recordedAt))
+    }
+
     @Test(arguments: [JobFailure.model, .unsupportedLanguage], [false, true])
     func unavailableSpeechIsSealedAudioOnlyBeforeCompression(_ failure: JobFailure, _ consented: Bool) async throws {
         let consent = ModelConsent(unavailability: { _, _ in failure }) { _, _ in
@@ -455,6 +506,10 @@ import CassiniNotebook
     @Test func aSealThatCannotBeWrittenStillShowsAPlainNote() async throws {
         let h = try RecordingHarness(); defer { h.tearDown() }
         let active = try await h.startRecording()
+        // Active is published before the position-zero save. Fail the seal, not that startup write:
+        // wait for its operation to finish rather than relying on which actor resumes first (E1).
+        await h.controller.settle()
+        #expect(await h.note(active.noteID)?.meetingTime.instant != nil)
         h.capture.elapsed = 12
         h.notes.failUpdates = true
         h.controller.finish(title: "Standup")

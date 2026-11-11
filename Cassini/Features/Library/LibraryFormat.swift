@@ -20,11 +20,25 @@ struct LibraryFormat {
     /// "today 9:41 AM", for VoiceOver.
     func spokenDayTime(_ key: DayKey, _ date: Date) -> String {
         let day = switch key {
+        case .undated: ""
         case .today: LibraryCopy.todayInline
         case .yesterday: LibraryCopy.yesterdayInline
         case .date: self.day(key)
         }
         return LibraryCopy.spokenDayTime(day, time(date))
+    }
+
+    /// The meeting's own date only; never a seal/import/sorting fallback.
+    func meetingTime(_ row: LibraryRow, spoken: Bool = false, day: DayKey? = nil) -> String? {
+        switch row.meetingTime {
+        case .instant(let date):
+            if let key = day ?? row.day {
+                return spoken ? spokenDayTime(key, date) : dayTime(key, date)
+            }
+            return time(date)
+        case .local(let text): return text
+        case .unknown: return nil
+        }
     }
 
     /// "48 minutes, 13 seconds".
@@ -38,8 +52,9 @@ struct LibraryFormat {
     /// The row as one VoiceOver element: "title, spoken duration, day time, status[, suffix][, preview]". A suffix
     /// that is a button (Resume, Try again) is a named action instead.
     func rowLabel(_ row: LibraryRow, day: DayKey) -> String {
-        var parts = [row.title, spokenDuration(row.duration), spokenDayTime(row.day ?? day, row.createdAt),
-                     LibraryCopy.status(row.status).lowercased(with: locale)]
+        var parts = [row.title, spokenDuration(row.duration)]
+        if let date = meetingTime(row, spoken: true, day: row.day ?? day) { parts.append(date) }
+        parts.append(LibraryCopy.status(row.status).lowercased(with: locale))
         if row.status.suffix != .resume, row.status.suffix != .tryAgain, let suffix = LibraryCopy.suffix(row.status) {
             parts.append(suffix.trimmingCharacters(in: CharacterSet(charactersIn: "·").union(.whitespaces)).lowercased(with: locale))
         }
