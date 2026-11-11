@@ -134,5 +134,184 @@ extension TranscriptionCoordinatorTests {
             run.finish(.paused(.system))
             await first.coordinator.awaitIdle()
         }
+
+        // MARK: Activation and the system's Stop meeting
+
+        /// A runs with saved progress and iOS takes the background time back, but the pause of A is not written yet:
+        /// its write waits in the queue's serial section until the test calls `release`. The run of A has not ended
+        /// either, as when iOS suspends Cassini right after the handler.
+        private func systemStopInFlight(_ h: QueueHarness) async throws -> (a: UUID, run: FakeJobRun, release: () -> Void) {
+            try await h.start()
+            let a = try await h.note("A")
+            await h.coordinator.transcribe(a)
+            let run = try await h.run(0)
+            run.pauseOnStop = false
+            h.checkpoints.save(a, .saved(doneMs: 28_000, totalMs: 60_000, words: 40))
+            h.checkpoints.hold(a)
+            h.coordinator.setVisible(false)
+            h.background.expireAll()
+            #expect(h.settings.queueHold == .system)
+            try await h.waitUntil("the pause write holds the serial section") { h.sectionBusy }
+            #expect(await h.job(a)?.state == .running, "the pause is not written yet")
+            return (a, run, { h.checkpoints.release(a) })
+        }
+
+        /// Starts an activation and waits until it has either returned or waits behind the pause write.
+        private func activate(_ h: QueueHarness, _ platform: PlatformFacts, waiting: Int = 1) async throws -> Task<[UUID], Never> {
+            let returned = Flag()
+            let activation = Task { @MainActor in
+                defer { returned.raise() }
+                return await h.coordinator.resumeSystemPause(onActivationOf: platform)
+            }
+            try await h.waitUntil("the activation returned or waits for the pause") {
+                returned.raised || h.sectionWaiting >= waiting
+            }
+            return activation
+        }
+
+        /// Codex re-review of #73: the activation read A as running, found nothing paused and cleared the hold; the
+        /// late pause then left A paused by the system with no hold, which no later activation resumes.
+        @Test func anActivationBeforeTheSystemPauseIsWrittenResumesTheJobFromItsCheckpoint() async throws {
+            let h = try QueueHarness(); defer { h.tearDown() }
+            let (a, run, release) = try await systemStopInFlight(h)
+
+            h.coordinator.setVisible(true)
+            let activation = try await activate(h, .iOS18)
+            release()
+            run.finish(.paused(.system))
+            await h.coordinator.waitForJob(of: a)
+            let resumed = await activation.value
+
+            let job = try #require(await h.job(a))
+            #expect(h.settings.queueHold == nil)
+            try #require(job.state != .paused, "A must never stay paused by the system with no hold: no activation would resume it")
+            #expect(resumed == [a])
+            let again = try await h.run(1)
+            #expect(again.noteID == a)
+            #expect(again.job.doneMs == 28_000, "from its checkpoint")
+            again.finish(.done)
+            await h.coordinator.awaitIdle()
+            #expect(await h.jobs.all().isEmpty)
+            #expect(h.runner.runs.count == 2)
+        }
+
+        @Test func twoActivationsBeforeTheSystemPauseIsWrittenResumeTheJobOnce() async throws {
+            let h = try QueueHarness(); defer { h.tearDown() }
+            let (a, run, release) = try await systemStopInFlight(h)
+
+            h.coordinator.setVisible(true)
+            let first = try await activate(h, .iOS18)
+            let second = try await activate(h, .iOS18, waiting: 2)
+            release()
+            run.finish(.paused(.system))
+            await h.coordinator.waitForJob(of: a)
+            let results = [await first.value, await second.value]
+
+            let job = try #require(await h.job(a))
+            #expect(h.settings.queueHold == nil)
+            try #require(job.state != .paused, "A must never stay paused by the system with no hold")
+            #expect(results.filter { $0 == [a] }.count == 1, "one activation resumes A: \(results)")
+            let again = try await h.run(1)
+            #expect(again.noteID == a)
+            again.finish(.done)
+            await h.coordinator.awaitIdle()
+            #expect(await h.jobs.all().isEmpty)
+            #expect(h.runner.runs.count == 2)
+        }
+
+        @Test func onIOS26AnActivationBeforeTheSystemPauseIsWrittenKeepsTheHold() async throws {
+            let h = try QueueHarness(); defer { h.tearDown() }
+            let (a, run, release) = try await systemStopInFlight(h)
+
+            h.coordinator.setVisible(true)
+            let activation = try await activate(h, .iOS26)
+            release()
+            run.finish(.paused(.system))
+            await h.coordinator.waitForJob(of: a)
+            #expect(await activation.value == [])
+            await h.coordinator.awaitIdle()
+            try await h.settle()
+            #expect(h.settings.queueHold == .system)
+            let job = try #require(await h.job(a))
+            #expect(job.state == .paused && job.pauseReason == .system)
+            #expect(h.runner.runs.count == 1)
+        }
+
+        /// Claude re-review of #73: two quick activations both read the paused job; only one may resume it.
+        @Test func twoConcurrentActivationsResumeTheJobOnce() async throws {
+            let h = try QueueHarness(); defer { h.tearDown() }
+            let (a, b) = try await pausedBySystem(h)
+
+            h.coordinator.setVisible(true)
+            async let first = h.coordinator.resumeSystemPause(onActivationOf: .iOS18)
+            async let second = h.coordinator.resumeSystemPause(onActivationOf: .iOS18)
+            let results = await [first, second]
+            #expect(results.filter { $0 == [a] }.count == 1, "one activation resumes A: \(results)")
+            #expect(results.filter { $0 == [] }.count == 1)
+            try await h.run(1).finish(.done)
+            let again = try await h.run(2)
+            #expect(again.noteID == a)
+            again.finish(.done)
+            await h.coordinator.awaitIdle()
+            #expect(await h.jobs.all().isEmpty)
+            #expect(h.runner.runs.map(\.noteID) == [a, b, a])
+        }
+
+        @Test func backToBackActivationsResumeTheJobOnce() async throws {
+            let h = try QueueHarness(); defer { h.tearDown() }
+            let (a, b) = try await pausedBySystem(h)
+
+            h.coordinator.setVisible(true)
+            #expect(await h.coordinator.resumeSystemPause(onActivationOf: .iOS18) == [a])
+            #expect(await h.coordinator.resumeSystemPause(onActivationOf: .iOS18) == [])
+            try await h.run(1).finish(.done)
+            try await h.run(2).finish(.done)
+            await h.coordinator.awaitIdle()
+            #expect(await h.jobs.all().isEmpty)
+            #expect(h.runner.runs.map(\.noteID) == [a, b, a])
+        }
+
+        /// The mirror case: iOS takes the time back again while the activation waits for A's old run to end. The new
+        /// system hold stays, so A waits in the queue for the next activation instead of running without it.
+        @Test func aSystemStopDuringTheActivationKeepsItsHold() async throws {
+            let h = try QueueHarness(); defer { h.tearDown() }
+            try await h.start()
+            let a = try await h.note("A")
+            await h.coordinator.transcribe(a)
+            let run = try await h.run(0)
+            run.pauseOnStop = false
+            h.checkpoints.save(a, .saved(doneMs: 28_000, totalMs: 60_000, words: 40))
+            h.coordinator.setVisible(false)
+            h.background.expireAll()
+            try await h.waitUntil("A is paused by the system") { await h.job(a)?.pauseReason == .system }
+
+            h.coordinator.setVisible(true)
+            let activation = Task { await h.coordinator.resumeSystemPause(onActivationOf: .iOS18) }
+            try await h.waitUntil("the activation took the system hold") { h.settings.queueHold == nil }
+            h.coordinator.setVisible(false)
+            h.coordinator.systemStop()
+            run.finish(.paused(.system))
+            #expect(await activation.value == [a])
+            await h.coordinator.awaitIdle()
+            try await h.settle()
+            #expect(h.settings.queueHold == .system)
+            #expect(await h.job(a)?.state == .queued)
+            #expect(h.runner.runs.count == 1)
+
+            h.coordinator.setVisible(true)
+            #expect(await h.coordinator.resumeSystemPause(onActivationOf: .iOS18) == [])
+            let again = try await h.run(1)
+            #expect(again.job.doneMs == 28_000)
+            again.finish(.done)
+            await h.coordinator.awaitIdle()
+            #expect(await h.jobs.all().isEmpty)
+            #expect(h.runner.runs.count == 2)
+        }
     }
+}
+
+/// Raised once, read from the main actor.
+@MainActor private final class Flag {
+    private(set) var raised = false
+    func raise() { raised = true }
 }

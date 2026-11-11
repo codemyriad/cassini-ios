@@ -58,7 +58,10 @@ on a device, and not checked for the standalone download.
   iOS" is posted. On iOS 18 this happens to every transcription that is still running about 30 s after the person
   leaves the app. When Cassini comes back to the screen (or is launched again), the system's pause is resumed from the
   checkpoint without a tap, and the queue continues (`EnqueueRules.resumesOnActivation`); a pause or Stop of the
-  person's own stays until Resume or Continue. On iOS 26 nothing changes: there the system's pause can be the person's
+  person's own stays until Resume or Continue. Coming back first waits for the pause of a system stop that has not
+  been written yet, then reads the hold and the paused jobs and clears the hold in one serial step, so a job just
+  stopped is never read as still running and two quick activations resume it once; a system stop after that step keeps
+  its hold. On iOS 26 nothing changes: there the system's pause can be the person's
   Stop in the system's progress, so it waits for Resume. Android has no such rule (its system pause comes only from the
   rare `onTimeout`, and waits for Resume); this is a proposal, decision 5 below.
 - **Standalone model download** (Settings, the model download screen). When the time ends it stops and shows "iOS
@@ -147,7 +150,8 @@ follows it and ends editing on a line break (`LibrarySearchEdit`), which holds f
   10 minutes with its job going on.
 - The proposal that resumes the system's pause on coming back: `EnqueueRules.resumesOnActivation` (`swift test`,
   both platform facts and both holds), `TranscriptionCoordinatorTests.Activation` (only the system's pause, never the
-  person's, not on the iOS 26 facts, and after a kill) and `ActivationResumeTests` (hosted, from the checkpoint). By hand on the iOS 18.2 simulator the same day: coming back
+  person's, not on the iOS 26 facts, after a kill, an activation before the system stop's pause is written, two
+  activations at once or back to back, and a system stop during the activation) and `ActivationResumeTests` (hosted, from the checkpoint). By hand on the iOS 18.2 simulator the same day: coming back
   after the expiry the job ran again from 00:25 with no tap, and a launch after a kill while suspended resumed it and
   finished it with the checkpoint's words.
 - Not yet: the finite background path on a device, the standalone download's stop, and any run on an A12 or A10 on

@@ -89,6 +89,9 @@ public final class TranscriptionCoordinator {
     /// Notes waiting for their job to end on their way to Recently Deleted (`trash(_:then:)`); they cannot be queued
     /// meanwhile.
     @ObservationIgnored var trashing: Set<UUID> = []
+    /// The system stops whose pause write has not run yet (`systemStop`), each until the end of its serial section;
+    /// Cassini coming to the screen waits for them before it reads the queue.
+    @ObservationIgnored var systemStopWrites: [UUID: Task<Void, Never>] = [:]
     @ObservationIgnored let log = Logger(subsystem: "io.codemyriad.cassini", category: "queue")
 
     /// How an interrupted job ends: `discard` (Start over) drops its work, `keep` pauses it with its progress, and
