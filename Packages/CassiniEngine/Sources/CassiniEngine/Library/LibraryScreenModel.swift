@@ -74,15 +74,15 @@ public final class LibraryScreenModel {
     public var dialog: LibraryDialog?
     /// The speaker models are installed (Transcribe again says "Speaker names carry over.").
     public private(set) var speakerModelsReady = false
+    /// The start of the local day the rows were built for, observed, so the view reads the rows again (the date
+    /// filters, the sections and the relative dates) when `clockChanged()` finds a new day.
+    private var day: Date
 
     @ObservationIgnored public var onEffect: (@MainActor (LibraryEffect) -> Void)?
     @ObservationIgnored let ports: Ports
     @ObservationIgnored private var index = LibraryIndex()
     /// `index.revision`, observed, so the view reads the rows again when the notes change.
     private var revision = 0
-    /// The start of the local day the rows were built for, observed, so the view reads the rows again (the date
-    /// filters, the sections and the relative dates) when `clockChanged()` finds a new day.
-    private var day: Date
     @ObservationIgnored private var pendingSearch: Task<Void, Never>?
     @ObservationIgnored private var pendingNotes: Task<Void, Never>?
     /// The last search's results: for `query` over the notes at `revision` of the index.
@@ -97,8 +97,8 @@ public final class LibraryScreenModel {
     }
 
     public init(ports: Ports) {
-        self.ports = ports
         day = ports.calendar.startOfDay(for: ports.clock.now)
+        self.ports = ports
         observeNotes()
     }
 
@@ -107,11 +107,11 @@ public final class LibraryScreenModel {
 
     public var content: LibraryContent {
         _ = revision
-        _ = day
         let processing = ports.processing(), now = ports.clock.now, calendar = ports.calendar
         let context = RowContext(processing: processing, recording: ports.recording())
         let loading = ports.loading(), unavailable = ports.unavailable()
         let live = favoritesOnly ? index.entries.filter(\.note.isFavorite) : index.entries
+        _ = day // a new local day rebuilds the sections, the relative dates and the date filter
         let audioOnly = index.entries.contains { $0.note.status == .audioOnly && $0.note.transcript.isEmpty }
         var facts = LibraryFacts(loading: loading, liveNotes: index.entries.count, audioOnly: audioOnly,
                                  unavailable: unavailable)
