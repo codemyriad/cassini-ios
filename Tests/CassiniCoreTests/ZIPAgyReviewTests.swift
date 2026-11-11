@@ -23,6 +23,30 @@ enum ZIPAgyFixture {
         if forgedSize { member.size = 1 }
         return member
     }
+    static func mixedCompressibility() throws -> Member {
+        var bytes = Data(repeating: 0, count: 500_000), seed: UInt32 = 17
+        for _ in 0..<16_000 {
+            seed = seed &* 1_664_525 &+ 1_013_904_223
+            bytes.append(UInt8(truncatingIfNeeded: seed >> 24))
+        }
+        var member = Member("Mixed.wav", bytes), stream = z_stream()
+        guard deflateInit2_(&stream, Z_DEFAULT_COMPRESSION, Z_DEFLATED, -15, 8, Z_DEFAULT_STRATEGY,
+                            zlibVersion(), Int32(MemoryLayout<z_stream>.size)) == Z_OK else { throw ZIPFailure.entry }
+        defer { deflateEnd(&stream) }
+        var packed = Data(count: Int(compressBound(uLong(bytes.count))))
+        let rc = bytes.withUnsafeBytes { input in
+            packed.withUnsafeMutableBytes { output in
+                stream.next_in = UnsafeMutablePointer(mutating: input.bindMemory(to: UInt8.self).baseAddress)
+                stream.avail_in = uInt(input.count)
+                stream.next_out = output.bindMemory(to: UInt8.self).baseAddress
+                stream.avail_out = uInt(output.count)
+                return deflate(&stream, Z_FINISH)
+            }
+        }
+        guard rc == Z_STREAM_END else { throw ZIPFailure.entry }
+        member.method = 8; member.packed = Data(packed.prefix(Int(stream.total_out)))
+        return member
+    }
     static func write(_ members: [Member], to url: URL) throws {
         var body = Data(), directory = Data()
         for member in members {
@@ -59,6 +83,20 @@ import Testing
             }
         }
     }
+    @Test func mixedCompressibilityIsJudgedByTheCompleteStreamNotItsHighlyCompressiblePrefix() throws {
+        try withTemporaryDirectory { folder in
+            let member = try ZIPAgyFixture.mixedCompressibility()
+            #expect(member.body.count < member.packed.count * 100)
+            let url = folder.appendingPathComponent("mixed.zip")
+            try ZIPAgyFixture.write([member], to: url)
+            let zip = try ZIPArchive(url: url)
+            var output = Data()
+            let count = try zip.read(zip.entries[0], remainingBytes: UInt64(member.body.count)) { output.append($0) }
+            #expect(count == member.body.count)
+            #expect(output == member.body)
+        }
+    }
+
     @Test func forgedExpandedSizeKeepsDrainingIntoTheGlobalBudgetWithoutPublishingExcess() throws {
         try withTemporaryDirectory { folder in
             let url = folder.appendingPathComponent("forged.zip")

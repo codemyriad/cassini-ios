@@ -31,6 +31,28 @@ struct ExportServiceTests {
         return note
     }
 
+    @Test(arguments: [NoteStatus.queued, .failed])
+    func archiveKeepsStoredTranscriptWhileAnotherTranscriptionIsQueuedOrFailed(status: NoteStatus) async throws {
+        defer { try? FileManager.default.removeItem(at: base) }
+        try FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
+        var note = transcribedNote(); note.status = status
+        if status == .failed { note.failure = .audio }
+        let source = base.appendingPathComponent("source.m4a"), original = Data(ImportFixtures.m4a)
+        try original.write(to: source)
+        let portable = PortableExportService(audio: FakeAudioProcessing(), provenance: FakeProvenance(), unassignedLabel: "Unknown speaker")
+        let output = try await BulkExportService(folder: base.appendingPathComponent("exports")) { snapshot, work in
+            try await portable.archiveSnapshot(snapshot, original: source, playable: source, into: work)
+        }.export([note])
+        let zip = try ZIPArchive(url: output)
+        let entry = try #require(zip.entries.first)
+        #expect(entry.name.hasSuffix(".opus"))
+        var bytes = Data(); try zip.read(entry, remainingBytes: 1_000_000) { bytes.append($0) }
+        let document = CassiniDocument.read(Array(bytes))
+        #expect(document.state == .ok)
+        #expect(document.selected()?.transcript?.words == PortableTranscript.words(of: note))
+        #expect(try Data(contentsOf: source) == original)
+    }
+
     @Test(arguments: [DocumentState.invalidMetadata, .unreadable])
     func archivePreservesLocalWordsFromABrokenDocument(state: DocumentState) async throws {
         defer { try? FileManager.default.removeItem(at: base) }

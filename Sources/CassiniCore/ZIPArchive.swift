@@ -140,6 +140,9 @@ public struct ZIPArchive: Sendable {
             let mode = (header.z32(38) >> 16) & 0xf000
             let normalized = name.replacingOccurrences(of: "\\", with: "/")
             let directory = normalized.hasSuffix("/") || mode == 0x4000
+            // Directories carry no expanded data. Deflated empty directories have a small stream that
+            // preflight still drains: a forged zero size must not hide a payload in an ignored member.
+            if directory && (unpacked != 0 || (packed != 0 && header.z16(10) != 8)) { throw ZIPFailure.damaged }
             let regular = !directory && mode != 0xa000
             // Only the first 512 title characters can affect the import's 200-character title. Keep the extension.
             let base = String(normalized.split(separator: "/", omittingEmptySubsequences: false).last ?? "")
@@ -169,6 +172,7 @@ public struct ZIPArchive: Sendable {
             guard UInt64(data.count) <= remainingBytes - bytes else { throw ZIPFailure.tooLarge }
             bytes += UInt64(data.count)
             try observed(data.count)
+            if entry.isDirectory { throw ZIPFailure.damaged }
             if entry.method != 0 { try Self.checkRatio(bytes, entry.compressedBytes, ratio) }
             checksum = data.withUnsafeBytes { UInt32(CZlib.crc32(uLong(checksum), $0.bindMemory(to: UInt8.self).baseAddress, uInt(data.count))) }
             // A forged expanded size does not stop validation/accounting of the rest of the stream.
@@ -234,11 +238,15 @@ public struct ZIPArchive: Sendable {
     }
     private static func payload(_ file: FileHandle, at offset: UInt64, before start: UInt64,
                                 method: UInt16, name: Data, packed: UInt64) throws -> UInt64? {
+        guard offset <= start, start - offset >= 30 else { return nil }
+        let local: Data
+        do { local = try zipRead(file, at: offset, count: 30) } catch { return nil }
+        guard local.z32(0) == 0x04034b50 else { return nil }
+        if local.z16(6) & 0x2041 != 0 || local.z16(8) == 99 { throw ZIPFailure.encrypted }
+        // The extraction method is a security fact, unlike harmless descriptor/encoding/option flags.
+        // Refuse the archive here, before any good sibling can become a note.
+        guard local.z16(8) == method else { throw ZIPFailure.damaged }
         do {
-            guard offset <= start, start - offset >= 30 else { return nil }
-            let local = try zipRead(file, at: offset, count: 30)
-            guard local.z32(0) == 0x04034b50 else { return nil }
-            if local.z16(6) & 0x2041 != 0 || local.z16(8) == 99 { throw ZIPFailure.encrypted }
             let names = Int(local.z16(26)), extras = Int(local.z16(28))
             guard UInt64(names + extras) <= start - offset - 30 else { return nil }
             let raw = try zipRead(file, at: offset + 30, count: names)
@@ -257,7 +265,7 @@ public struct ZIPArchive: Sendable {
             }
             // The directory supplies CRC/sizes. Writers can differ on descriptor, encoding and option flags;
             // encryption and both path spellings were independently checked above.
-            guard local.z16(8) == method, raw == name else { return nil }
+            guard raw == name else { return nil }
             let payload = offset + 30 + UInt64(names + extras)
             guard packed <= start - payload else { return nil }
             return payload

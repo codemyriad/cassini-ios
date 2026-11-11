@@ -11,6 +11,7 @@ enum ZIPAgyFixture {
         var size: UInt32
         var method: UInt16 = 0
         var localMethod: UInt16?
+        var attributes: UInt32 = 0
         var extra = Data()
         var localExtra = Data()
         init(_ name: String, _ body: Data) { self.name = name; self.body = body; packed = body; size = UInt32(body.count) }
@@ -34,7 +35,7 @@ enum ZIPAgyFixture {
             directory.zip32(0x02014b50); directory.zip16(20); directory.zip16(20); directory.zip16(0x800); directory.zip16(member.method)
             directory.zip16(0); directory.zip16(0); directory.zip32(crc); directory.zip32(UInt32(member.packed.count)); directory.zip32(member.size)
             directory.zip16(UInt16(name.count)); directory.zip16(UInt16(member.extra.count)); directory.zip16(0)
-            directory.zip16(0); directory.zip16(0); directory.zip32(0); directory.zip32(offset); directory.append(name); directory.append(member.extra)
+            directory.zip16(0); directory.zip16(0); directory.zip32(member.attributes); directory.zip32(offset); directory.append(name); directory.append(member.extra)
         }
         let start = UInt32(body.count); body.append(directory)
         body.zip32(0x06054b50); body.zip16(0); body.zip16(0); body.zip16(UInt16(members.count)); body.zip16(UInt16(members.count))

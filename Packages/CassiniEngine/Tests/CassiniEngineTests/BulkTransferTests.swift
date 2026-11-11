@@ -53,6 +53,33 @@ private actor BulkProgressTrace {
     func append(_ value: TransferProgress) { values.append(value) }
 }
 
+/// Holds both imports after their early digest lookup, before their atomic insertion.
+private actor ConcurrentImportAudio: AudioProcessing {
+    let both = BulkEvent(), release = BulkEvent()
+    private var arrivals = 0
+    private let base = FakeAudioProcessing()
+    func inspect(_ url: URL) async throws -> AudioSummary {
+        arrivals += 1
+        if arrivals == 2 { both.signal() }
+        await release.wait()
+        return try await base.inspect(url)
+    }
+    func compress(_ source: URL, to destination: URL) async throws { try await base.compress(source, to: destination) }
+    func decodeOpus(_ source: URL, to destination: URL) async throws { try await base.decodeOpus(source, to: destination) }
+    func encodeOpus(_ source: URL, to destination: URL) async throws { try await base.encodeOpus(source, to: destination) }
+}
+
+private struct HeldArchiveCopy: FileImporting {
+    let base: CoordinatedFileImporter
+    let copied: BulkEvent, release: BulkEvent
+    func copy(from source: URL, to destination: URL, maxBytes: Int64, reserveBytes: Int64) async throws -> ImportedFile {
+        let result = try await base.copy(from: source, to: destination, maxBytes: maxBytes, reserveBytes: reserveBytes)
+        copied.signal()
+        await release.wait()
+        return result
+    }
+}
+
 @Suite(.timeLimit(.minutes(1))) struct BulkTransferTests {
     @Test func archiveUsesRealDigestDedupAndCountsIgnoredMembers() async throws {
         let sandbox = try BulkSandbox()
@@ -68,6 +95,92 @@ private actor BulkProgressTrace {
         let notes = await sandbox.notes.all()
         #expect(notes.count == 1)
         #expect(notes.first?.title == "English meeting")
+        #expect(try sandbox.scratchContents().isEmpty)
+    }
+
+    @Test func directoryPayloadsAndMethodMismatchesRefuseBeforePublishingAnyNote() async throws {
+        for kind in 0..<6 {
+            let sandbox = try BulkSandbox()
+            let zip = sandbox.folder.appendingPathComponent("refused.zip")
+            var bad = ZIPAgyFixture.Member("Folder/", Data([1]))
+            switch kind {
+            case 1:
+                bad = ZIPAgyFixture.bomb(padded: false); bad.name = "Folder/"; bad.size = 0
+            case 2:
+                bad.name = "Folder"; bad.attributes = 0x4000 << 16 // Unix directory without trailing slash
+            case 3:
+                bad = .init("Mismatch.wav", Data(ImportFixtures.wav)); bad.localMethod = 8
+            case 4:
+                bad = .init("README.txt", Data([1])); bad.method = 8; bad.localMethod = 0
+            case 5:
+                bad = .init("Folder/", Data()); bad.method = 8; bad.packed = Data([0xff])
+            default: break
+            }
+            try ZIPAgyFixture.write([.init("Good.wav", Data(ImportFixtures.wav)), bad], to: zip)
+            let calls = BulkProgressTrace()
+            let importer = BulkImportService(files: CoordinatedFileImporter(storage: sandbox.storage), scratch: sandbox.scratch) { _, _ in
+                // Calling the importer could publish an editable note; rollback afterward would be too late.
+                await calls.append(.init(done: 1, total: 1))
+                return .created(UUID())
+            }
+            let report = await importer.run([zip])
+            #expect(report.archives == [.damaged])
+            #expect(await calls.values.isEmpty)
+            #expect(report.summary == ImportSummary())
+            #expect(try sandbox.scratchContents().isEmpty)
+        }
+    }
+
+    @Test func singleAndBulkImportsRacingPastDigestLookupCreateOnlyOneNote() async throws {
+        let sandbox = try BulkSandbox(), audio = ConcurrentImportAudio()
+        let source = try sandbox.file("Single.wav", Data(ImportFixtures.wav))
+        let zip = try sandbox.archive([("Bulk.wav", Data(ImportFixtures.wav))])
+        let importer = ImportService(notes: sandbox.notes, files: CoordinatedFileImporter(storage: sandbox.storage),
+                                     audio: audio, storage: sandbox.storage, clock: FakeClock())
+        let batch = BulkImportService(files: CoordinatedFileImporter(storage: sandbox.storage), scratch: sandbox.scratch) { url, name in
+            try await importer.importFile(url, fallbackTitle: "Imported", displayName: name)
+        }
+        let single = Task { try await importer.importFile(source, fallbackTitle: "Single") }
+        let bulk = Task { await batch.run([zip]) }
+        await audio.both.wait()
+        #expect(await sandbox.notes.all().isEmpty)
+        audio.release.signal()
+        let result = try await single.value, report = await bulk.value
+        var combined = report.summary; combined.add(result)
+        #expect(combined.imported == 1 && combined.duplicates == 1 && combined.failed == 0)
+        #expect(report.archives.isEmpty)
+        #expect(await sandbox.notes.all().count == 1)
+        #expect(try sandbox.scratchContents().isEmpty)
+    }
+
+    @Test func lateArchiveRefusalNeverPublishesOrRollsBackAnIndependentEditableImport() async throws {
+        let sandbox = try BulkSandbox(), copied = BulkEvent(), release = BulkEvent()
+        let source = try sandbox.file("Single.wav", Data(ImportFixtures.wav))
+        let zip = sandbox.folder.appendingPathComponent("late-bomb.zip")
+        var bomb = ZIPAgyFixture.bomb(padded: false); bomb.name = "README.txt"
+        try ZIPAgyFixture.write([.init("Good.wav", Data(ImportFixtures.wav)), bomb], to: zip)
+        let importer = ImportService(notes: sandbox.notes, files: CoordinatedFileImporter(storage: sandbox.storage),
+                                     audio: sandbox.audio, storage: sandbox.storage, clock: FakeClock())
+        let exposed = BulkProgressTrace()
+        let batch = BulkImportService(files: HeldArchiveCopy(base: CoordinatedFileImporter(storage: sandbox.storage), copied: copied, release: release),
+                                      scratch: sandbox.scratch) { url, name in
+            await exposed.append(.init(done: 1, total: 1))
+            return try await importer.importFile(url, fallbackTitle: "Bulk", displayName: name)
+        }
+        let bulk = Task { await batch.run([zip]) }
+        await copied.wait()
+        let outcome = try await importer.importFile(source, fallbackTitle: "Single")
+        guard case .created(let id) = outcome else { Issue.record("Single import must create a note"); release.signal(); return }
+        var note = try #require(await sandbox.notes.note(id)); note.title = "User edit during ZIP import"
+        try await sandbox.notes.save(note)
+        let metadata = try Data(contentsOf: sandbox.notes.directory(for: id).appendingPathComponent("note.json"))
+        release.signal()
+        let report = await bulk.value
+        #expect(report.archives == [.tooLarge])
+        #expect(report.summary == ImportSummary())
+        #expect(await exposed.values.isEmpty)
+        #expect(await sandbox.notes.all() == [note])
+        #expect(try Data(contentsOf: sandbox.notes.directory(for: id).appendingPathComponent("note.json")) == metadata)
         #expect(try sandbox.scratchContents().isEmpty)
     }
 
@@ -116,7 +229,9 @@ private actor BulkProgressTrace {
             var bomb = ZIPAgyFixture.bomb(padded: padded, forgedSize: !padded)
             bomb.name = name
             try ZIPAgyFixture.write([.init("Good.wav", Data(ImportFixtures.wav)), bomb], to: zip)
-            let report = await sandbox.service().run([zip])
+            let published = BulkProgressTrace()
+            let report = await sandbox.service().run([zip], imported: { _ in await published.append(.init(done: 1, total: 1)) })
+            #expect(await published.values.isEmpty, "No note may be exposed and subsequently rolled back")
             #expect(report.archives == [.tooLarge])
             #expect(report.summary.imported == 0)
             #expect(report.summary.failed == 0)
@@ -142,7 +257,9 @@ private actor BulkProgressTrace {
     @Test func directoriesDoNotCountAsUnsupportedAndArchiveErrorsAreNotFailedFiles() async throws {
         let sandbox = try BulkSandbox()
         let zip = sandbox.folder.appendingPathComponent("Finder.zip")
-        try ZIPAgyFixture.write([.init("Meetings/", Data()), .init("__MACOSX/", Data()),
+        var emptyDeflated = ZIPAgyFixture.Member("Empty/", Data())
+        emptyDeflated.method = 8; emptyDeflated.packed = Data([3, 0])
+        try ZIPAgyFixture.write([emptyDeflated, .init("Meetings/", Data()), .init("__MACOSX/", Data()),
                                 .init("__MACOSX/._English.wav", Data("AppleDouble".utf8)),
                                 .init("Meetings/English.wav", Data(ImportFixtures.wav))], to: zip)
         let report = await sandbox.service().run([zip])
