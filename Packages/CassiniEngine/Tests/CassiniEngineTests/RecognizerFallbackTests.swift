@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 import Testing
 @testable import CassiniEngine
 import CassiniEngineTesting
@@ -32,10 +33,17 @@ import CassiniNotebook
             #expect(second.job.failure == nil)
             #expect(h.checkpoints.discarded.isEmpty && h.checkpoints.hasWork(id), "the hand-over deletes nothing")
             #expect(await h.notes.note(id)?.failure == nil)
+            #expect(await h.notes.note(id)?.fallbackFailure == failure, "the note says why Whistle has it")
             #expect(h.notifier.posted.isEmpty, "a run handed over has not failed")
 
             second.finish(.done)
             let third = try await h.run(2)
+            // The reason outlives the run and a relaunch: a second store reads it from the note's file.
+            #expect(await h.notes.note(id)?.fallbackFailure == failure)
+            let relaunched = try NoteStore(root: h.root)
+            try await relaunched.load()
+            #expect(await relaunched.note(id)?.fallbackFailure == failure)
+            #expect(await relaunched.note(later)?.fallbackFailure == nil)
             #expect(third.noteID == later)
             #expect(third.job.recognizer == "parakeet", "the fallback is for one note: the next keeps the selection")
             #expect(await h.job(id) == nil)
@@ -58,6 +66,7 @@ import CassiniNotebook
         let job = try #require(await h.job(id))
         #expect(job.state == .failed && job.failure == .memory && job.recognizer == "whistle")
         #expect(await h.notes.note(id)?.failure == .memory)
+        #expect(await h.notes.note(id)?.fallbackFailure == nil, "Whistle transcribed nothing")
         #expect(h.runner.runs.count == 2, "no third run")
         #expect(h.notifier.posted.map(\.noteID) == [id], "the failure is told once, when the note has failed")
     }
@@ -204,6 +213,7 @@ import CassiniNotebook
         let job = try #require(await h.job(id))
         #expect(job.state == .failed && job.failure == .memory && job.recognizer == "parakeet")
         #expect(await h.notes.note(id)?.failure == .memory)
+        #expect(await h.notes.note(id)?.fallbackFailure == nil)
         #expect(h.runner.runs.count == 1, "no Whistle run")
         #expect(h.notifier.posted.map(\.noteID) == [id], "the failure is told, as without a fallback")
     }
@@ -246,6 +256,77 @@ import CassiniNotebook
         #expect(await h.job(id)?.recognizer == "parakeet")
         #expect(asked.value == nil, "no fallback is chosen for a job that was asked to stop")
         #expect(h.runner.runs.count == 1)
+    }
+
+    /// A stop that arrives after the job is written for Whistle. The test holds the fallback choice open, starts
+    /// watching the coordinator's observed state, and lets the choice return; the next change of that state is the
+    /// read of the stored jobs that follows the write, and the Stop is pressed inside it, before the run is let go.
+    @Test func aStopAfterTheJobIsWrittenForWhistleUndoesTheHandOver() async throws {
+        let (entered, enter) = AsyncStream.makeStream(of: Void.self)
+        let (released, release) = AsyncStream.makeStream(of: Void.self)
+        let h = try QueueHarness(recognizer: "parakeet", fallbackRecognizer: { _, _ in
+            enter.yield()
+            for await _ in released { break }
+            return "whistle"
+        })
+        defer { h.tearDown() }
+        try await h.start(visible: false)
+        let id = try await h.note("English recording")
+        #expect(await h.coordinator.transcribe(id) == .queued(changed: true))
+        try await h.run(0).finish(.failed(.memory))
+        for await _ in entered { break }
+        #expect(await h.job(id)?.state == .running, "nothing is written while the fallback is chosen")
+        let pressed = Box<Bool>()
+        let coordinator = h.coordinator
+        withObservationTracking { _ = coordinator.state } onChange: {
+            MainActor.assumeIsolated { pressed.value = coordinator.stop(id) }
+        }
+        release.yield()
+        await h.coordinator.awaitIdle()
+        #expect(pressed.value == true, "the Stop came with the state that shows the job queued for Whistle")
+        let job = try #require(await h.job(id))
+        #expect(job.state == .failed && job.failure == .memory && job.recognizer == "parakeet")
+        #expect(await h.notes.note(id)?.failure == .memory)
+        #expect(await h.notes.note(id)?.fallbackFailure == nil)
+        #expect(h.runner.runs.count == 1, "no Whistle run")
+        #expect(h.notifier.posted.map(\.noteID) == [id])
+    }
+
+    /// The reason stays through a pause and Resume of the Whistle run and through a later Identify speakers; a new
+    /// transcription of the note ends it.
+    @Test func theReasonStaysThroughResumeAndSpeakersAndEndsWithANewTranscription() async throws {
+        let h = try QueueHarness(recognizer: "parakeet", fallbackRecognizer: Self.whistleAfterParakeet)
+        defer { h.tearDown() }
+        try await h.start(visible: false)
+        let id = try await h.note("English recording")
+        #expect(await h.coordinator.transcribe(id) == .queued(changed: true))
+        try await h.run(0).finish(.failed(.memory))
+        let whistle = try await h.run(1)
+        h.checkpoints.save(id, .saved(doneMs: 2_000, totalMs: 4_000, words: 5), recognizer: "whistle")
+        whistle.finish(.paused(.user))
+        await h.coordinator.awaitIdle()
+        #expect(await h.job(id)?.state == .paused)
+        #expect(await h.notes.note(id)?.fallbackFailure == .memory)
+
+        #expect(await h.coordinator.transcribe(id) == .queued(changed: true))
+        let resumed = try await h.run(2)
+        #expect(resumed.job.recognizer == "whistle")
+        #expect(await h.notes.note(id)?.fallbackFailure == .memory, "Resume continues the handed-over job")
+        resumed.finish(.done)
+        await h.coordinator.awaitIdle()
+
+        #expect(await h.coordinator.transcribe(id, kind: .speakersOnly) == .queued(changed: true))
+        try await h.run(3).finish(.failed(.speakers))
+        await h.coordinator.awaitIdle()
+        #expect(await h.notes.note(id)?.fallbackFailure == .memory, "the words are still Whistle's")
+        await h.coordinator.clearFailed(id)
+
+        #expect(await h.coordinator.transcribe(id) == .queued(changed: true))
+        let again = try await h.run(4)
+        #expect(again.job.recognizer == "parakeet")
+        #expect(await h.notes.note(id)?.fallbackFailure == nil, "a new transcription is not the hand-over's")
+        again.finish(.done)
+        await h.coordinator.awaitIdle()
     }
 
     private static func contents(of folder: URL) throws -> [String: Data] {

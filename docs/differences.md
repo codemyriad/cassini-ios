@@ -65,6 +65,10 @@ remain absent on iOS. Copy is pinned in [shared-strings-pin.md](shared-strings-p
     Nothing is deleted. A job that was asked to stop is not handed over, and a stop that arrives during the
     hand-over undoes it: the job fails with its own failure and no Whistle run starts. The recording, the note's
     earlier transcript and the model chosen in Settings are not touched, and a Whistle run that fails stays failed.
+    The note stores why (`Note.fallbackFailure`), and once Whistle's transcript is there the Note screen says
+    "Parakeet Ultra couldn’t run on this device for this recording, so Whistle transcribed it." (cassini-ux
+    `models.parakeetUltra.noteFallback`), also after a relaunch, through a pause and Resume of the Whistle run and
+    through a later Identify speakers; a failed Whistle run or a new transcription of the note ends it.
     A job stored before jobs named their recognizer keeps the device's choice under the old 5 GiB limit
     (`SpeechCapability.legacyJobsAreParakeets`), so on a 4 GB device it resumes with the recognizer that made its
     checkpoint. iOS only. Android pauses with

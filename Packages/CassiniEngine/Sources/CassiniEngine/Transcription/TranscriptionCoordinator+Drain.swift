@@ -182,8 +182,10 @@ extension TranscriptionCoordinator {
                 return handOver
             }
             await markFailed(id, failure)
+            await endFallback(current.job)
         case .downloadFailed(let download):
             await markFailed(id, .download(download.error))
+            await endFallback(current.job)
         case .needsConsent:
             await write { try await $0.transition(id, now: self.parts.clock.now) { $0.state = .needsConsent; $0.pauseReason = nil; $0.failure = nil } }
         case .cancelled:
@@ -213,6 +215,8 @@ extension TranscriptionCoordinator {
             }
         }
         guard (queued ?? nil)?.state == .queued else { return nil }
+        // The reason stays on the note, so the notice is there after the other recognizer's run and a relaunch.
+        await setFallbackFailure(id, failure)
         log.notice("A \(job.recognizer ?? "legacy", privacy: .public) run ended with \(failure.code, privacy: .public); queued again for \(recognizer, privacy: .public)")
         return HandOver(job: job, failure: failure)
     }
@@ -226,7 +230,23 @@ extension TranscriptionCoordinator {
                 job.state = .failed; job.failure = handOver.failure; job.pauseReason = nil
             }
         }
+        await setFallbackFailure(handOver.job.noteID, nil)
         log.notice("A stop came while \(handOver.job.noteID) was handed to another recognizer; the job failed as its run ended")
+    }
+
+    /// Writes why another recognizer took the note's job (`Note.fallbackFailure`), or nil when none did; no write when
+    /// the note already says so.
+    func setFallbackFailure(_ noteID: UUID, _ failure: JobFailure?) async {
+        guard let note = await parts.notes.note(noteID), note.fallbackFailure != failure else { return }
+        do { try await parts.notes.mutate(noteID) { $0.fallbackFailure = failure } } catch {
+            log.error("Cannot save why another recognizer took \(noteID): \(String(describing: error))")
+        }
+    }
+
+    /// A transcription of the note failed, or a new one begins: no transcript of a hand-over will follow, or the
+    /// next one is not its. A speakers-only job changes no words, so the note keeps what it says.
+    func endFallback(_ job: Job) async {
+        if job.kind != .speakersOnly { await setFallbackFailure(job.noteID, nil) }
     }
 
     static func isStop(_ outcome: JobOutcome) -> Bool {

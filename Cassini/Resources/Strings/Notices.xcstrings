@@ -3295,6 +3295,47 @@
         }
       }
     },
+    "Parakeet Ultra couldn’t run on this device for this recording, so Whistle transcribed it.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parakeet Ultra couldn’t run on this device for this recording, so Whistle transcribed it."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parakeet Ultra no pudo funcionar en este dispositivo para esta grabación, así que la transcribió Whistle."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parakeet Ultra n’a pas pu fonctionner sur cet appareil pour cet enregistrement : Whistle l’a donc transcrit."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non è stato possibile usare Parakeet Ultra su questo dispositivo per questa registrazione, quindi l’ha trascritta Whistle."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O Parakeet Ultra não pôde ser executado neste dispositivo para esta gravação, então o Whistle a transcreveu."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O Parakeet Ultra não pôde ser executado neste dispositivo para esta gravação, por isso foi o Whistle a transcrevê-la."
+          }
+        }
+      }
+    },
     "Paused at %@ of %@": {
       "extractionState": "manual",
       "localizations": {

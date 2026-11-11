@@ -26,6 +26,12 @@ struct NoteBannersView: View {
         if NoteBanners.noSpeakers(note, job: job) {
             NoticeCard(title: JobFailure.empty.speakerAnalysisMessage, symbol: "person.2.slash")
         }
+        if NoteBanners.transcribedByFallback(note, job: job) {
+            // cassini-ux `models.parakeetUltra.noteFallback`.
+            NoticeCard(title: String(localized: "Parakeet Ultra couldn’t run on this device for this recording, so Whistle transcribed it.",
+                                     table: "Notices"))
+                .accessibilityIdentifier("notice.parakeetFallback")
+        }
         if mode.hasPlayer { PlaybackFailedNotice(noteID: note.id) }
     }
 }
