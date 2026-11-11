@@ -168,7 +168,8 @@ struct ZipArchiveTests {
         try withTemporaryDirectory { folder in
             var fixture = ZIPFixture(); fixture.name = path
             #expect(throws: ZipArchiveError.unsafePaths) { try archive(fixture, in: folder) }
-            #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path) == ["input.zip"])
+            let remaining = try FileManager.default.contentsOfDirectory(atPath: folder.path)
+            #expect(remaining == ["input.zip"])
         }
     }
 
