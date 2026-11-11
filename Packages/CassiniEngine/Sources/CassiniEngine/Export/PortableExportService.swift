@@ -136,14 +136,16 @@ public struct PortableExportService: Sendable {
     private func seal(_ note: Note, _ opus: URL, _ target: URL, _ processing: JSONObject,
                       _ source: CassiniDocument?) async throws -> String? {
         let unassignedLabel = unassignedLabel
-        return try await Task.detached(priority: .userInitiated) {
+        let task = Task.detached(priority: .userInitiated) {
             try PortableTranscript.export(note: note, opus: opus, destination: target, unassignedLabel: unassignedLabel,
                                           processing: processing, source: source)
-        }.value
+        }
+        return try await withTaskCancellationHandler { try await task.value } onCancel: { task.cancel() }
     }
 
     /// The document at `url`, its audio verified.
     private static func read(_ url: URL) async -> CassiniDocument {
-        await Task.detached(priority: .userInitiated) { CassiniDocument.read(url) }.value
+        let task = Task.detached(priority: .userInitiated) { CassiniDocument.read(url) }
+        return await withTaskCancellationHandler { await task.value } onCancel: { task.cancel() }
     }
 }

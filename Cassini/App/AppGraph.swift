@@ -49,12 +49,14 @@ import CassiniNotebook
         recording = RecordingStore(.init(environment: environment, library: library, processing: processing,
                                          playback: playback, settings: settings, notices: noticeCenter, router: router,
                                          ready: { [startup] in _ = await startup.ready() }))
+        let importFiles = CoordinatedFileImporter(storage: environment.storage)
         let importService = library.noteStore.map {
-            ImportService(notes: $0, files: CoordinatedFileImporter(storage: environment.storage), audio: environment.audio,
+            ImportService(notes: $0, files: importFiles, audio: environment.audio,
                           storage: environment.storage, clock: environment.clock)
         }
         imports = ImportStore(service: importService, library: library, processing: processing, settings: settings,
-                              router: router, clock: environment.clock) { [startup] in _ = await startup.ready() }
+                              router: router, clock: environment.clock, files: importFiles,
+                              scratch: environment.exports.appendingPathComponent("Imports")) { [startup] in _ = await startup.ready() }
         trash = TrashService(.init(
             notes: library, queue: processing, voices: voices,
             host: AppTrashHost(recording: recording, playback: playback, router: router, settings: settings),

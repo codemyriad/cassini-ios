@@ -67,4 +67,24 @@ import CassiniNotebook
 
     /// The launch sweep: exports left from the last run and stale temporary files in the notes' directories.
     func sweep(now: Date) async { await service?.sweep(now: now) }
+
+    /// D96: the complete selection. Audio-only notes keep their original container unchanged.
+    func exportArchive(_ ids: [UUID], progress: @escaping @Sendable (TransferProgress) async -> Void) async throws -> URL {
+        await ready()
+        await library.settle()
+        guard let service, let portable else { throw ExportError.cannotSave }
+        let notes = ids.compactMap { library.note($0) }.filter { $0.trashedAt == nil }
+        guard notes.count == ids.count else { throw ExportError.noNote }
+        let batch = BulkExportService(folder: service.folder) { [library, portable] note, folder in
+            guard let original = await library.originalAudioURL(note), let audio = await library.audioURL(note) else {
+                throw ExportError.noNote
+            }
+            if !ArchiveContents.preservesOriginal(note) {
+                return try await portable.export(note, original: original, playable: audio, into: folder, filename: "document")
+            }
+            let ext = original.pathExtension
+            return try await BulkExportService.copyOriginal(original, to: folder.appendingPathComponent("original" + (ext.isEmpty ? "" : "." + ext)))
+        }
+        return try await batch.export(notes, progress: progress)
+    }
 }

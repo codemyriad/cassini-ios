@@ -1,0 +1,174 @@
+@testable import CassiniEngine
+import CassiniCore
+import CassiniNotebook
+import CassiniEngineTesting
+import Foundation
+import Testing
+
+private final class BulkSandbox: Sendable {
+    let folder = URL.temporaryDirectory.appendingPathComponent("bulk-test-" + UUID().uuidString)
+    let notes: NoteStore
+    let audio = FakeAudioProcessing()
+    let storage = FakeStorage()
+    init() throws {
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        notes = try NoteStore(root: folder.appendingPathComponent("notes"))
+    }
+    deinit { try? FileManager.default.removeItem(at: folder) }
+    var scratch: URL { folder.appendingPathComponent("scratch") }
+    func file(_ name: String, _ data: Data) throws -> URL {
+        let url = folder.appendingPathComponent(name); try data.write(to: url); return url
+    }
+    func archive(_ members: [(String, Data)]) throws -> URL {
+        let url = folder.appendingPathComponent(UUID().uuidString + ".zip")
+        let writer = try StoredZIPWriter(url: url)
+        for (i, member) in members.enumerated() {
+            let source = try file("input-\(i)", member.1)
+            try writer.add(file: source, name: member.0)
+        }
+        try writer.finish(); return url
+    }
+    func service(limits: ZIPLimits = .init()) -> BulkImportService {
+        let importer = ImportService(notes: notes, files: CoordinatedFileImporter(storage: storage), audio: audio,
+                                     storage: storage, clock: FakeClock())
+        return BulkImportService(files: CoordinatedFileImporter(storage: storage), scratch: scratch, limits: limits) { url, name in
+            try await importer.importFile(url, fallbackTitle: "Imported audio", displayName: name)
+        }
+    }
+    func scratchContents() throws -> [String] {
+        FileManager.default.fileExists(atPath: scratch.path) ? try FileManager.default.contentsOfDirectory(atPath: scratch.path) : []
+    }
+}
+
+private final class BulkEvent: Sendable {
+    private let stream: AsyncStream<Void>
+    private let continuation: AsyncStream<Void>.Continuation
+    init() { (stream, continuation) = AsyncStream.makeStream(bufferingPolicy: .bufferingNewest(1)) }
+    func signal() { continuation.yield(()); continuation.finish() }
+    func wait() async { for await _ in stream { return } }
+}
+
+@Suite(.timeLimit(.minutes(1))) struct BulkTransferTests {
+    @Test func archiveUsesRealDigestDedupAndCountsIgnoredMembers() async throws {
+        let sandbox = try BulkSandbox()
+        let bytes = Data(ImportFixtures.wav)
+        let zip = try sandbox.archive([("English meeting.wav", bytes), ("Same audio.wav", bytes),
+                                       ("README.txt", Data("English fixture".utf8)), ("nested.zip", Data())])
+        let report = await sandbox.service().run([zip])
+        #expect(report.summary.imported == 1)
+        #expect(report.summary.duplicates == 1)
+        #expect(report.summary.unsupported == 2)
+        #expect(report.summary.failed == 0)
+        #expect(report.archives.isEmpty)
+        let notes = await sandbox.notes.all()
+        #expect(notes.count == 1)
+        #expect(notes.first?.title == "English meeting")
+        #expect(try sandbox.scratchContents().isEmpty)
+    }
+
+    @Test func unsafeLaterMemberRefusesWholeArchiveBeforeFirstImport() async throws {
+        let sandbox = try BulkSandbox()
+        let zip = try sandbox.archive([("First.wav", Data(ImportFixtures.wav)), ("aa_notes.wav", Data(ImportFixtures.wav))])
+        var data = try Data(contentsOf: zip)
+        let safe = Data("aa_notes.wav".utf8), unsafe = Data("../notes.wav".utf8)
+        var offset = 0
+        while let range = data.range(of: safe, in: offset..<data.count) {
+            data.replaceSubrange(range, with: unsafe); offset = range.upperBound
+        }
+        try data.write(to: zip)
+        let report = await sandbox.service().run([zip])
+        #expect(report.archives == [.unsafePaths])
+        #expect(report.summary.imported == 0)
+        #expect(await sandbox.notes.all().isEmpty)
+        #expect(try sandbox.scratchContents().isEmpty)
+        #expect(!FileManager.default.fileExists(atPath: sandbox.folder.appendingPathComponent("notes.wav").path))
+    }
+
+    @Test func cancelAfterAnImportedMemberKeepsItAndRemovesAllStaging() async throws {
+        let sandbox = try BulkSandbox()
+        let zip = try sandbox.archive([("First.wav", Data(ImportFixtures.wav)), ("Second.mp3", Data(ImportFixtures.mp3))])
+        let committed = BulkEvent(), release = BulkEvent()
+        let task = Task {
+            await sandbox.service().run([zip], imported: { _ in committed.signal(); await release.wait() })
+        }
+        await committed.wait()
+        task.cancel(); release.signal()
+        let report = await task.value
+        #expect(report.cancelled)
+        #expect(report.summary.imported == 1)
+        #expect(await sandbox.notes.all().count == 1)
+        #expect(try sandbox.scratchContents().isEmpty)
+    }
+
+    @Test func directoryFailuresAndEmptyArchivesAreDistinct() async throws {
+        let sandbox = try BulkSandbox()
+        let zip = try sandbox.archive([("README.txt", Data("English fixture".utf8))])
+        let empty = await sandbox.service().run([zip])
+        #expect(empty.archives == [.empty]); #expect(empty.summary.unsupported == 1)
+        let limited = await sandbox.service(limits: ZIPLimits(entries: 0)).run([zip])
+        #expect(limited.archives == [.tooLarge])
+        let bad = try sandbox.file("broken.zip", Data("Not a ZIP".utf8))
+        #expect(await sandbox.service().run([bad]).archives == [.damaged])
+        #expect(try sandbox.scratchContents().isEmpty)
+    }
+
+    @Test func exportsEverySelectionMemberStoredAndResolvesNameCollisions() async throws {
+        let sandbox = try BulkSandbox()
+        var one = Note(title: "English meeting", audioFilename: "source.wav")
+        one.audio = .plain
+        let two = Note(title: "english MEETING", audioFilename: "source.wav")
+        let bytes = Data(ImportFixtures.wav)
+        let source = try sandbox.file("original.wav", bytes)
+        let exports = sandbox.folder.appendingPathComponent("exports")
+        let service = BulkExportService(folder: exports) { _, folder in
+            try await BulkExportService.copyOriginal(source, to: folder.appendingPathComponent("original.wav"))
+        }
+        let url = try await service.export([one, two])
+        let zip = try ZIPArchive(url: url)
+        #expect(zip.entries.map(\.name) == ["English meeting.wav", "english MEETING (2).wav"])
+        for entry in zip.entries {
+            #expect(entry.method == 0)
+            var data = Data()
+            try zip.read(entry, remainingBytes: 20 << 30) { data.append($0) }
+            #expect(data == bytes)
+        }
+        #expect(try FileManager.default.contentsOfDirectory(atPath: url.deletingLastPathComponent().path) == ["Cassini.zip"])
+        #expect(try Data(contentsOf: source) == bytes)
+    }
+
+    @Test func exportCancellationDuringPreparationRemovesPartialArchive() async throws {
+        let sandbox = try BulkSandbox()
+        let arrived = BulkEvent(), release = BulkEvent()
+        let folder = sandbox.folder.appendingPathComponent("exports")
+        let service = BulkExportService(folder: folder) { _, target in
+            arrived.signal(); await release.wait(); try Task.checkCancellation()
+            return target.appendingPathComponent("unused.wav")
+        }
+        let task = Task { try await service.export([Note(title: "English meeting")]) }
+        await arrived.wait(); task.cancel(); release.signal()
+        await #expect(throws: CancellationError.self) { try await task.value }
+        #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path).isEmpty)
+    }
+
+    @Test func cancellationReachesAlreadyExecutingBlockingWork() async throws {
+        let arrived = BulkEvent(), release = DispatchSemaphore(value: 0)
+        let task = Task {
+            try await ArchiveWork.run { cancel in
+                arrived.signal(); release.wait(); try cancel.check()
+            }
+        }
+        await arrived.wait(); task.cancel(); release.signal()
+        await #expect(throws: CancellationError.self) { try await task.value }
+    }
+
+    @Test func namingAndOriginalAudioPolicyHaveNoTranscriptSideEffects() {
+        var names = ArchiveNames()
+        #expect(names.next(title: "English", extension: "opus") == "English.opus")
+        #expect(names.next(title: "English (2)", extension: "opus") == "English (2).opus")
+        #expect(names.next(title: "ENGLISH", extension: "opus") == "ENGLISH (3).opus")
+        #expect(ArchiveContents.preservesOriginal(Note(title: "Audio only")))
+        var transcribed = Note(title: "English meeting")
+        transcribed.transcript = [.init(text: "English fixture", start: 0, end: 1)]
+        #expect(!ArchiveContents.preservesOriginal(transcribed))
+    }
+}

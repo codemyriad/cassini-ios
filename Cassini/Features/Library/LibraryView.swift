@@ -12,6 +12,7 @@ struct LibraryView: View {
     @Environment(LibraryStore.self) private var library
     @Environment(Router.self) private var router
     @Environment(ErrorPresenter.self) private var errors
+    @Environment(ExportStore.self) private var exports
     @Environment(\.dynamicTypeSize) private var dynamicType
     @Environment(\.calendar) private var calendar
     @Environment(\.restoresSceneState) private var restoresSceneState
@@ -23,6 +24,9 @@ struct LibraryView: View {
     @State private var importing = false
     @State private var restored = false
     @State private var dialogRestored = false
+    @State private var editMode: EditMode = .inactive
+    @State private var selectedNotes: Set<UUID> = []
+    @State private var archiveExport = ArchiveExportModel()
 
     var body: some View {
         @Bindable var model = model
@@ -76,6 +80,9 @@ struct LibraryView: View {
             }
         }
         .onAppear(perform: restoreSceneState)
+        .environment(\.editMode, $editMode)
+        .onChange(of: editMode) { _, mode in if !mode.isEditing { selectedNotes.removeAll() } }
+        .shareSheet(item: $archiveExport.shareItem)
         .onChange(of: model.query) { _, query in if restoresSceneState { savedQuery = query } }
         .onChange(of: model.favoritesOnly) { _, only in if restoresSceneState { savedFavoritesOnly = only } }
         .onChange(of: model.dialog) { _, dialog in
@@ -118,6 +125,8 @@ struct LibraryView: View {
                    onAction: { spec, action in notices.perform(action, on: spec) { importing = true } },
                    onDismiss: notices.dismiss)
         LibraryActivity()
+        ImportBatchesView()
+        ArchiveExportProgressView(model: archiveExport)
     }
 
     /// All and Starred (an iOS extra), with the number of notes shown.
@@ -128,6 +137,18 @@ struct LibraryView: View {
                 filterButton(LibraryCopy.all, selected: !model.favoritesOnly) { model.favoritesOnly = false }
                 filterButton(LibraryCopy.starred, symbol: "star", selected: model.favoritesOnly) { model.favoritesOnly = true }
                 Spacer()
+            }
+            if library.notes.contains(where: { $0.trashedAt == nil }) {
+                HStack {
+                    EditButton().accessibilityIdentifier("selectNotesForExport")
+                    Spacer()
+                    Menu {
+                        Button(BulkTransferCopy.all) { exportArchive(selected: false) }
+                        if !selectedNotes.isEmpty { Button(BulkTransferCopy.selected) { exportArchive(selected: true) } }
+                    } label: { Label(BulkTransferCopy.all, systemImage: "square.and.arrow.up") }
+                    .accessibilityIdentifier("libraryArchiveMenu")
+                    .disabled(archiveExport.progress != nil)
+                }.font(.subheadline)
             }
             if model.isSearching {
                 Menu {
@@ -173,15 +194,30 @@ struct LibraryView: View {
     }
 
     private func row(_ row: LibraryRow, day: DayKey) -> some View {
-        NoteRow(row: row, day: day, selected: router.selectedNoteID == row.id) { action in
+        HStack {
+            if editMode.isEditing {
+                Button {
+                    if !selectedNotes.insert(row.id).inserted { selectedNotes.remove(row.id) }
+                } label: { Image(systemName: selectedNotes.contains(row.id) ? "checkmark.circle.fill" : "circle").frame(minWidth: 44, minHeight: 44) }
+                .accessibilityLabel(row.title)
+                .accessibilityIdentifier("selectArchiveNote-\(row.id)")
+                .accessibilityAddTraits(selectedNotes.contains(row.id) ? [.isSelected] : [])
+            }
+            NoteRow(row: row, day: day, selected: router.selectedNoteID == row.id) { action in
             switch action {
             case .open: model.open(row.id)
             case .resume: Task { await model.resume(row.id) }
             case .rename: Task { await model.perform(.rename, on: row.id) }
             case .trash: Task { await model.perform(.moveToTrash, on: row.id) }
             }
+            }
+            .contextMenu { NoteActionsMenu(noteID: row.id) }
         }
-        .contextMenu { NoteActionsMenu(noteID: row.id) }
+    }
+
+    private func exportArchive(selected: Bool) {
+        let ids = library.notes.filter { $0.trashedAt == nil && (!selected || selectedNotes.contains($0.id)) }.map(\.id)
+        archiveExport.start(ids, exports: exports, errors: errors)
     }
 
     /// The presented confirmation's action; the model clears the dialog.
