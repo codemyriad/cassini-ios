@@ -1,0 +1,337 @@
+{
+  "entries": [
+    {
+      "id": "export.markdown.description",
+      "en": "The transcript as a text file, with speakers and times.",
+      "platforms": [
+        "gnome",
+        "mac"
+      ],
+      "role": "caption",
+      "boards": [
+        "Export",
+        "Export-mac"
+      ],
+      "milestone": "UX7a",
+      "status": "drawn",
+      "l10n": {
+        "it": {
+          "text": "La trascrizione come file di testo, con voci e tempi."
+        },
+        "fr": {
+          "text": "La transcription en fichier texte, avec les intervenants et les horodatages."
+        },
+        "es": {
+          "text": "La transcripción como archivo de texto, con hablantes y marcas de tiempo."
+        },
+        "pt-BR": {
+          "text": "A transcrição como arquivo de texto, com locutores e horários."
+        },
+        "pt-PT": {
+          "text": "A transcrição como ficheiro de texto, com oradores e tempos."
+        }
+      }
+    },
+    {
+      "id": "export.markdown.label",
+      "en": "Markdown",
+      "platforms": [
+        "gnome",
+        "mac"
+      ],
+      "role": "label",
+      "boards": [
+        "Export",
+        "Export-mac"
+      ],
+      "milestone": "UX7a",
+      "note": "Radio option 2, semibold. No size is shown.",
+      "status": "drawn",
+      "l10n": {
+        "it": {
+          "text": "Markdown"
+        },
+        "fr": {
+          "text": "Markdown"
+        },
+        "es": {
+          "text": "Markdown"
+        },
+        "pt-BR": {
+          "text": "Markdown"
+        },
+        "pt-PT": {
+          "text": "Markdown"
+        }
+      }
+    },
+    {
+      "id": "export.markdown.notesHeading",
+      "en": "Notes",
+      "platforms": [
+        "gnome",
+        "mac"
+      ],
+      "role": "heading",
+      "boards": [],
+      "milestone": "D50.2",
+      "note": "Coordinator (D50.2). Markdown export (S-5) level-2 heading before the notes (only when there are notes).",
+      "status": "harmony",
+      "l10n": {
+        "it": {
+          "text": "Note"
+        },
+        "fr": {
+          "text": "Notes"
+        },
+        "es": {
+          "text": "Notas"
+        },
+        "pt-BR": {
+          "text": "Notas"
+        },
+        "pt-PT": {
+          "text": "Notas"
+        }
+      }
+    },
+    {
+      "id": "export.markdown.speakersLine",
+      "en": "Speakers: {names}",
+      "platforms": [
+        "gnome",
+        "mac"
+      ],
+      "role": "line",
+      "boards": [],
+      "milestone": "D50.2",
+      "placeholders": {
+        "names": "comma-joined speaker names"
+      },
+      "note": "Coordinator (D50.2). Markdown export (S-5) line after the date; {names} is the comma-joined speaking speakers in first-speaking order, as stored.",
+      "status": "harmony",
+      "l10n": {
+        "it": {
+          "text": "Voci: {names}"
+        },
+        "fr": {
+          "text": "Intervenants : {names}"
+        },
+        "es": {
+          "text": "Hablantes: {names}"
+        },
+        "pt-BR": {
+          "text": "Locutores: {names}"
+        },
+        "pt-PT": {
+          "text": "Oradores: {names}"
+        }
+      }
+    },
+    {
+      "id": "export.markdown.transcriptHeading",
+      "en": "Transcript",
+      "platforms": [
+        "gnome",
+        "mac"
+      ],
+      "role": "heading",
+      "boards": [],
+      "milestone": "D50.2",
+      "note": "Coordinator (D50.2). Markdown export (S-5) level-2 heading before the turns.",
+      "status": "harmony",
+      "l10n": {
+        "it": {
+          "text": "Trascrizione"
+        },
+        "fr": {
+          "text": "Transcription"
+        },
+        "es": {
+          "text": "Transcripción"
+        },
+        "pt-BR": {
+          "text": "Transcrição"
+        },
+        "pt-PT": {
+          "text": "Transcrição"
+        }
+      }
+    },
+    {
+      "id": "format.meetingDuration.hours",
+      "en": "{h} h {mm} min",
+      "platforms": [
+        "gnome",
+        "mac"
+      ],
+      "role": "caption",
+      "boards": [
+        "Main",
+        "Library-mac"
+      ],
+      "milestone": "UX1a",
+      "placeholders": {
+        "h": "hours",
+        "mm": "minutes, zero-padded to 2"
+      },
+      "note": "REFERENCE ONLY (HARMONY 6). Sample: '1 h 03 min'.",
+      "status": "drawn",
+      "l10n": {
+        "it": {
+          "text": "{h} h {mm} min"
+        },
+        "fr": {
+          "text": "{h} h {mm} min"
+        },
+        "es": {
+          "text": "{h} h {mm} min"
+        },
+        "pt-BR": {
+          "text": "{h} h {mm} min"
+        },
+        "pt-PT": {
+          "text": "{h} h {mm} min"
+        }
+      }
+    },
+    {
+      "id": "format.meetingDuration.minutes",
+      "en": "{m} min",
+      "platforms": [
+        "gnome",
+        "mac"
+      ],
+      "role": "caption",
+      "boards": [
+        "Library-mac",
+        "LibraryReceived",
+        "LibraryReceived-mac",
+        "Main",
+        "Meeting",
+        "Meeting-mac",
+        "Search",
+        "Search-mac"
+      ],
+      "milestone": "UX1a",
+      "placeholders": {
+        "m": "whole minutes, floored"
+      },
+      "note": "REFERENCE ONLY (HARMONY 6, format-vectors meetingDuration). Sample: '52 min'.",
+      "status": "drawn",
+      "l10n": {
+        "it": {
+          "text": "{m} min"
+        },
+        "fr": {
+          "text": "{m} min"
+        },
+        "es": {
+          "text": "{m} min"
+        },
+        "pt-BR": {
+          "text": "{m} min"
+        },
+        "pt-PT": {
+          "text": "{m} min"
+        }
+      }
+    },
+    {
+      "id": "format.meetingDuration.underMinute",
+      "en": "under 1 min",
+      "platforms": [
+        "gnome",
+        "mac"
+      ],
+      "role": "caption",
+      "boards": [
+        "Main",
+        "Library-mac"
+      ],
+      "milestone": "UX1a",
+      "note": "REFERENCE ONLY (HARMONY 6). Not drawn.",
+      "status": "drawn",
+      "l10n": {
+        "it": {
+          "text": "meno di 1 min"
+        },
+        "fr": {
+          "text": "moins d’1 min"
+        },
+        "es": {
+          "text": "menos de 1 min"
+        },
+        "pt-BR": {
+          "text": "menos de 1 min"
+        },
+        "pt-PT": {
+          "text": "menos de 1 min"
+        }
+      }
+    },
+    {
+      "id": "library.untitled",
+      "en": "Untitled meeting",
+      "platforms": [
+        "gnome",
+        "mac"
+      ],
+      "role": "label",
+      "boards": [],
+      "milestone": "UX1b",
+      "status": "harmony",
+      "note": "D6 R6.1: final title fallback. Coordinator normalisation of an undrawn state.",
+      "l10n": {
+        "it": {
+          "text": "Riunione senza titolo"
+        },
+        "fr": {
+          "text": "Réunion sans titre"
+        },
+        "es": {
+          "text": "Reunión sin título"
+        },
+        "pt-BR": {
+          "text": "Reunião sem título"
+        },
+        "pt-PT": {
+          "text": "Reunião sem título"
+        }
+      }
+    },
+    {
+      "id": "meeting.turn.over",
+      "en": "(over {names})",
+      "platforms": [
+        "gnome",
+        "mac"
+      ],
+      "role": "label",
+      "boards": [
+        "Meeting",
+        "Meeting-mac"
+      ],
+      "milestone": "D55",
+      "note": "Coordinator (D55.1). After the speaker name and time in a turn header when another speaker's words overlap this turn by at least 150 ms. {names} is the overlapping speakers' labels, joined with \", \" as GNOME does.",
+      "status": "harmony",
+      "l10n": {
+        "it": {
+          "text": "(in sovrapposizione con {names})"
+        },
+        "fr": {
+          "text": "(en même temps que {names})"
+        },
+        "es": {
+          "text": "(a la vez que {names})"
+        },
+        "pt-BR": {
+          "text": "(ao mesmo tempo que {names})"
+        },
+        "pt-PT": {
+          "text": "(ao mesmo tempo que {names})"
+        }
+      }
+    }
+  ]
+}

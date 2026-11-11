@@ -21,6 +21,22 @@ whereas desktop can retain an unknown date. Android currently has no date
 filter, so this is an iOS extra adopting the recorded shared decision. Named-speaker and Recorded by me filters
 remain absent on iOS. Copy is pinned in [shared-strings-pin.md](shared-strings-pin.md).
 
+## Markdown export (D50.2 / D50.3 parity)
+
+Markdown joins the existing mobile transcript formats. It matches Android's S-5 layout over the shared D84
+paragraphs and inline replies, with speaking speakers in first-speaking order. Headings and date words follow the
+app language (English uses en-GB); time cycle and numeric formatting follow the formatting locale. Stored names,
+words and notes stay as stored, with S-5 escaping and whitespace normalization.
+
+Only the portable manifest's `x["gocassini.com"].notes` supplies personal notes; iOS bookmarks are separate. For an
+imported document, Markdown reads only headers off the UI actor, without rescanning audio or changing its trust.
+The selected transcript version supplies its own words, names and bounded-end flag. Markdown filenames follow
+S-5's 120-code-point/230-UTF-8-byte limit and hyphen replacement; other mobile formats retain their filename rules.
+Each export gets a unique temporary folder; the destination share provider handles filename collisions.
+
+The byte-exact S-5 cases, D84 row tests and catalog selection are pinned to cassini-ux in
+`Packages/CassiniNotebook/Tests/CassiniNotebookTests/Resources/markdown/UPSTREAM.json` at the same revision as Android.
+
 ## Engines and thresholds
 
 ### Speech recognition
