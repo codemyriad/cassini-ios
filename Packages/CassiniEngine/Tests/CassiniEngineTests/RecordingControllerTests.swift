@@ -506,6 +506,10 @@ import CassiniNotebook
     @Test func aSealThatCannotBeWrittenStillShowsAPlainNote() async throws {
         let h = try RecordingHarness(); defer { h.tearDown() }
         let active = try await h.startRecording()
+        // Active is published before the position-zero save. Fail the seal, not that startup write:
+        // wait for its operation to finish rather than relying on which actor resumes first (E1).
+        await h.controller.settle()
+        #expect(await h.note(active.noteID)?.meetingTime.instant != nil)
         h.capture.elapsed = 12
         h.notes.failUpdates = true
         h.controller.finish(title: "Standup")
