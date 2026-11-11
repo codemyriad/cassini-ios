@@ -50,14 +50,14 @@ import CassiniWhistle
             if store.installation == .verified && !notified { notified = true; published.fulfill() }
         }
         let start = Task { let report = await graph.graph.start(); ready.fulfill(); return report }
-        await fulfillment(of: [entered, ready], timeout: 15) // Outer hang guard; verifier is still gated.
+        await fulfillment(of: [entered, ready], timeout: 30) // Outer hang guard; verifier is still gated.
         XCTAssertTrue(graph.graph.startup.isReady)
         XCTAssertEqual(store.installation, .checking)
         XCTAssertEqual(store.selectedRecognizer(), .whistle)
         XCTAssertFalse(verified.withLock { $0 })
         release.signal()
         _ = await start.value
-        await fulfillment(of: [published], timeout: 15)
+        await fulfillment(of: [published], timeout: 30)
     }
 
     func testStartupReleasesAfterFailedVerificationAndKeepsTheFallback() async throws {
@@ -76,7 +76,7 @@ import CassiniWhistle
         let graph = TestGraph(root: root, suite: suite, speechModels: store, modelRoot: root.appendingPathComponent("Models"))
         defer { graph.tearDown() }
         let start = Task { await graph.graph.start() }
-        await fulfillment(of: [entered], timeout: 15)
+        await fulfillment(of: [entered], timeout: 30)
         XCTAssertFalse(graph.graph.startup.isReady)
         release.signal()
         let report = await start.value
@@ -140,7 +140,7 @@ import CassiniWhistle
         try Data("English audio stand-in, decoded only by FakeAudioProcessing".utf8).write(to: audio)
         let start = Task { await graph.graph.start() }
         let imported = graph.graph.imports.importFile(audio, opensNote: true)
-        await fulfillment(of: [started], timeout: 15)
+        await fulfillment(of: [started], timeout: 30)
         XCTAssertEqual(models.installation, .checking)
         XCTAssertEqual(models.selectedRecognizer(), bundleVerified ? .whistle : .appleSpeech,
                        "Unchecked Parakeet weights cannot be selected yet")

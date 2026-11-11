@@ -663,6 +663,18 @@ class OwnershipTests(unittest.TestCase):
         self.assertIn("shutting down ts-wt-b-iphone18-2, idle for 60 min", result.stdout)
         self.assertEqual([c for c in h.calls() if "shutdown" in c], [f"xcrun | simctl | shutdown | {udid(2)}"])
 
+    def test_idle_age_drains_a_large_process_listing_after_its_first_match(self):
+        h = Harness(self, WITH_18)
+        # A fresh clone has neither a lease nor an app directory: its launchd age is the fallback.
+        # More than a pipe buffer follows the match, as on a host running several simulator suites.
+        process = f"/sim/Devices/{udid(1)}/launchd_sim"
+        (h.stub / "processes").write_text(
+            f"00:42 {process}\n" + "00:01 /usr/bin/unrelated\n" * 100_000 + f"02:00 {process}\n")
+        result = h.shell(["idle_seconds"],
+                         f'ps() {{ cat "$STUB/processes"; }}\nidle_seconds {udid(1)}')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, "42\n", "the first matching launchd still supplies the age")
+
     # The clone-deletion part of reclaim_disk and clone_of as origin/main 712f8e4 has them (abridged: without the
     # erase of oversized clones and the package-cache cleanup): what another worktree's older copy runs.
     OLD = textwrap.dedent(r'''

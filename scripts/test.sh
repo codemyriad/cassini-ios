@@ -513,9 +513,10 @@ idle_seconds() {
     if [ -f "$leases/runtime/$udid" ]; then echo $(( now - $(stat -f %m "$leases/runtime/$udid") )); return; fi
     apps="$HOME/Library/Developer/CoreSimulator/Devices/$udid/data/Containers/Bundle/Application"
     if [ -d "$apps" ]; then echo $(( now - $(stat -f %m "$apps") )); return; fi
-    ps -Ao etime=,args= | awk -v u="Devices/$udid/" '$0 ~ /launchd_sim/ && index($0, u) {
+    # Keep draining after the first match: an early awk exit can give ps SIGPIPE on a large listing under pipefail.
+    ps -Ao etime=,args= | awk -v u="Devices/$udid/" '!found && $0 ~ /launchd_sim/ && index($0, u) {
         t = $1; d = 0; if (index(t, "-")) { split(t, a, "-"); d = a[1]; t = a[2] }
-        n = split(t, b, ":"); s = 0; for (i = 1; i <= n; i++) s = s * 60 + b[i]; print d * 86400 + s; found = 1; exit }
+        n = split(t, b, ":"); s = 0; for (i = 1; i <= n; i++) s = s * 60 + b[i]; print d * 86400 + s; found = 1 }
         END { if (!found) print 0 }'
 }
 
