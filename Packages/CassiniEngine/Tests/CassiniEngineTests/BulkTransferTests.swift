@@ -164,10 +164,10 @@ private struct HeldArchiveCopy: FileImporting {
             bad = ZIPAgyFixture.corruptTailBomb(); bad.name = "Folder"; bad.attributes = 0x10; bad.size = 0; bad.crc = 0
         case "rawSlashAlias", "rawBackslashAlias":
             bad = .init(kind == "rawSlashAlias" ? "Folder/" : "Folder\\", Data([1])); bad.flags = 0
-            bad.extra = ZIPAgyFixture.unicodePath(raw: bad.name, path: "Note.wav")
+            bad.extra = ZIPAgyFixture.unicodePath(raw: bad.name, path: "Note.wav"); bad.localExtra = bad.extra
         case "unicodeSlashAlias", "unicodeBackslashAlias":
             bad = .init("Note.wav", Data([1]))
-            bad.extra = ZIPAgyFixture.unicodePath(raw: bad.name, path: kind == "unicodeSlashAlias" ? "Folder/" : "Folder\\")
+            bad.extra = ZIPAgyFixture.unicodePath(raw: bad.name, path: kind == "unicodeSlashAlias" ? "Folder/" : "Folder\\"); bad.localExtra = bad.extra
         case "crc": bad.crc = 1
         case "lzma": bad.method = 14
         case "zstd": bad.method = 93
@@ -206,7 +206,7 @@ private struct HeldArchiveCopy: FileImporting {
     func unicodeMetadataAliasIsIgnoredWithEitherEncodingFlag(flags: UInt16) async throws {
         let sandbox = try BulkSandbox()
         var metadata = ZIPAgyFixture.Member("Alias.wav", Data([1])); metadata.flags = flags
-        metadata.extra = ZIPAgyFixture.unicodePath(raw: metadata.name, path: "__MACOSX/._Meeting.wav")
+        metadata.extra = ZIPAgyFixture.unicodePath(raw: metadata.name, path: "__MACOSX/._Meeting.wav"); metadata.localExtra = metadata.extra
         let zip = sandbox.folder.appendingPathComponent("metadata-alias.zip")
         try ZIPAgyFixture.write([.init("Good.wav", Data(ImportFixtures.wav)), metadata], to: zip)
         let report = await sandbox.service().run([zip])
@@ -225,6 +225,63 @@ private struct HeldArchiveCopy: FileImporting {
         #expect(report.archives.isEmpty)
         #expect(report.summary.imported == 1 && report.summary.failed == 1)
         #expect(await sandbox.notes.all().count == 1)
+        #expect(try sandbox.scratchContents().isEmpty)
+    }
+
+    @Test(arguments: ["name", "directory", "metadata", "unicode", "centralUnicode", "localUnicodeDirectory", "localUnicodeMetadata"])
+    func localHeaderDisagreementsRefuseBeforeAnyPublication(kind: String) async throws {
+        let sandbox = try BulkSandbox()
+        var member = ZIPAgyFixture.Member("Later.wav", Data(ImportFixtures.wav))
+        switch kind {
+        case "name": member.localName = "Other.wav"
+        case "directory": member.localName = "Folder/"
+        case "metadata": member.localName = "__MACOSX/Later.wav"
+        case "unicode":
+            member.extra = ZIPAgyFixture.unicodePath(raw: member.name, path: "Central.wav")
+            member.localExtra = ZIPAgyFixture.unicodePath(raw: member.name, path: "Local.wav")
+        case "centralUnicode": member.extra = ZIPAgyFixture.unicodePath(raw: member.name, path: member.name)
+        case "localUnicodeDirectory": member.localExtra = ZIPAgyFixture.unicodePath(raw: member.name, path: "Folder/")
+        case "localUnicodeMetadata": member.localExtra = ZIPAgyFixture.unicodePath(raw: member.name, path: "__MACOSX/._Later.wav")
+        default: Issue.record("Unknown local header fixture")
+        }
+        let zip = sandbox.folder.appendingPathComponent("disagreement.zip")
+        try ZIPAgyFixture.write([.init("Good.wav", Data(ImportFixtures.wav)), member], to: zip)
+        let calls = BulkProgressTrace()
+        let report = await sandbox.service().run([zip], imported: { _ in await calls.append(.init(done: 1, total: 1)) })
+        #expect(report.archives == [.damaged])
+        #expect(report.summary == ImportSummary())
+        #expect(await calls.values.isEmpty)
+        #expect(await sandbox.notes.all().isEmpty)
+        #expect(try sandbox.scratchContents().isEmpty)
+    }
+
+    @Test(arguments: ["aesDuplicate", "aesTruncated", "aesShort", "unsafeDuplicate", "unsafeTruncated", "unsafeTruncatedBody", "duplicate", "truncated"])
+    func localExtraSecurityRefusalsPrecedeStructuralErrors(kind: String) async throws {
+        let sandbox = try BulkSandbox()
+        var member = ZIPAgyFixture.Member("Later.wav", Data(ImportFixtures.wav))
+        let aes = Data([1, 0x99, 0, 0])
+        let safe = ZIPAgyFixture.unicodePath(raw: member.name, path: member.name)
+        let unsafeField = ZIPAgyFixture.unicodePath(raw: member.name, path: "../Outside.wav")
+        let expected: ZIPFailure
+        switch kind {
+        case "aesDuplicate": member.localExtra = aes + aes; expected = .encrypted
+        case "aesTruncated": member.localExtra = aes + Data([1]); expected = .encrypted
+        case "aesShort": member.localExtra = Data([1, 0x99]); expected = .encrypted
+        case "unsafeDuplicate": member.localExtra = safe + unsafeField; expected = .unsafePaths
+        case "unsafeTruncated": member.localExtra = unsafeField + Data([1]); expected = .unsafePaths
+        case "unsafeTruncatedBody":
+            member.localExtra = unsafeField; member.localExtra[2] &+= 1; expected = .unsafePaths
+        case "duplicate": member.localExtra = safe + safe; expected = .damaged
+        default: member.localExtra = Data([1]); expected = .damaged
+        }
+        let zip = sandbox.folder.appendingPathComponent("local-extra.zip")
+        try ZIPAgyFixture.write([.init("Good.wav", Data(ImportFixtures.wav)), member], to: zip)
+        let calls = BulkProgressTrace()
+        let report = await sandbox.service().run([zip], imported: { _ in await calls.append(.init(done: 1, total: 1)) })
+        #expect(report.archives == [expected])
+        #expect(report.summary == ImportSummary())
+        #expect(await calls.values.isEmpty)
+        #expect(await sandbox.notes.all().isEmpty)
         #expect(try sandbox.scratchContents().isEmpty)
     }
 
