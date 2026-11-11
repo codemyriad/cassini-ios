@@ -132,6 +132,74 @@ import CassiniNotebook
         #expect(model.searched == "", "clearing the field cancels the search waiting for its debounce")
     }
 
+    @Test func dateFiltersNarrowTextMatchesAndResetWhenSearchCloses() async throws {
+        let library = Library()
+        let today = library.add("English planning")
+        let week = library.add("English planning last week", minutesAgo: 3 * 24 * 60)
+        let month = library.add("English planning last month", minutesAgo: 20 * 24 * 60)
+        library.add("English planning older", minutesAgo: 31 * 24 * 60)
+        library.add("English planning tomorrow", minutesAgo: -24 * 60)
+        library.add("Unrelated title")
+        let model = library.model
+        model.query = "English"
+        await waitUntilSleeping(library.clock)
+        library.clock.release()
+        await model.settle()
+        model.searchDate = .month
+        #expect(model.content.results?.map(\.id) == [today, week, month])
+        model.searchDate = .week
+        #expect(model.content.results?.map(\.id) == [today, week])
+        model.searchDate = .today
+        #expect(model.content.results?.map(\.id) == [today])
+        let favorite = try #require(library.notes.firstIndex { $0.id == week })
+        library.notes[favorite].isFavorite = true
+        await model.settle()
+        model.favoritesOnly = true
+        #expect(model.content.results == [])
+        model.searchDate = .week
+        #expect(model.content.results?.map(\.id) == [week], "Date and Starred combine with AND")
+        model.query = " "
+        #expect(model.searchDate == .any)
+        #expect(model.content.results == nil, "Without text, keep the normal Library")
+        #expect(model.content.sections.flatMap(\.rows).map(\.id) == [week])
+        #expect(Library().model.searchDate == .any, "Date filters are not persisted")
+    }
+
+    @Test func dateFilterUsesInclusiveLocalStartAndExclusiveTomorrow() async throws {
+        let library = Library()
+        let now = library.clock.now
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try #require(TimeZone(identifier: "UTC"))
+        let midnight = calendar.startOfDay(for: now)
+        let start = try #require(calendar.date(byAdding: .day, value: -6, to: midnight))
+        let end = try #require(calendar.date(byAdding: .day, value: 1, to: midnight))
+        let atStart = library.add("English start", minutesAgo: now.timeIntervalSince(start) / 60)
+        library.add("English before", minutesAgo: now.timeIntervalSince(start.addingTimeInterval(-1)) / 60)
+        let beforeEnd = library.add("English end", minutesAgo: now.timeIntervalSince(end.addingTimeInterval(-1)) / 60)
+        library.add("English tomorrow", minutesAgo: now.timeIntervalSince(end) / 60)
+        let model = library.model
+        model.query = "English"
+        model.searchDate = .week
+        await waitUntilSleeping(library.clock)
+        library.clock.release()
+        await model.settle()
+        #expect(model.content.results?.map(\.id) == [beforeEnd, atStart])
+        model.searchDate = .any
+        #expect(model.content.results?.count == 4)
+    }
+
+    @Test func clearingBeforeDebounceAlsoClearsTheDateFilter() async {
+        let library = Library(), model = library.model
+        model.query = "English"
+        await waitUntilSleeping(library.clock)
+        model.searchDate = .week
+        model.query = ""
+        #expect(model.searchDate == .any)
+        library.clock.release()
+        await model.settle()
+        #expect(model.content.results == nil)
+    }
+
     // ports: LibraryViewModelTest#opensNotesWithTheQueryAndRecording
     @Test func opensNotesWithTheQueryAndRecording() async {
         let library = Library()

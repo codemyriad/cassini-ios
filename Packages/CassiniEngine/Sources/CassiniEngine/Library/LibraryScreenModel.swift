@@ -68,6 +68,8 @@ public final class LibraryScreenModel {
     public private(set) var searched = ""
     /// Only starred notes (an iOS extra).
     public var favoritesOnly = false
+    /// D14 search-only filter: transient, reset when the query closes, never scene-persisted.
+    public var searchDate: SearchDate = .any
     /// The confirmation or form open over the Library.
     public var dialog: LibraryDialog?
     /// The speaker models are installed (Transcribe again says "Speaker names carry over.").
@@ -117,7 +119,12 @@ public final class LibraryScreenModel {
         // note shows the last results, over the notes as they are now, until the search over them answers.
         guard let found else { return LibraryContent(loading: loading, results: [], facts: facts) }
         let current = found.revision == index.revision ? found.hits : index.current(found.hits, query: SearchQuery(found.query))
-        let hits = current.filter { !favoritesOnly || $0.entry.note.isFavorite }
+        let interval = searchDate.interval(now: now, calendar: calendar)
+        let hits = current.filter {
+            let note = $0.entry.note
+            return (!favoritesOnly || note.isFavorite) &&
+                (interval.map { note.createdAt >= $0.start && note.createdAt < $0.end } ?? true)
+        }
         if found.query == searched {
             facts.query = searched
             facts.results = hits.count
@@ -314,6 +321,7 @@ private extension LibraryScreenModel {
     func scheduleSearch() {
         pendingSearch?.cancel()
         let text = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        if text.isEmpty { searchDate = .any }
         guard text != searched else { pendingSearch = nil; return }
         guard !text.isEmpty else {
             searched = ""
