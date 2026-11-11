@@ -75,10 +75,10 @@ keychain, and with it an Apple Account signed in to Xcode, is not available.
 Since 2026-11-05 the team has a registered device, so archives are signed normally ("Uploads" below); the unsigned flow in this section is only for local checks.
 
 There is no runtime-free build any more: every iOS build links the sherpa-onnx runtime and picks Parakeet Ultra on a
-device with at least 5 GiB of memory. Parakeet Ultra needs `com.apple.developer.kernel.increased-memory-limit` on
+device with 4 GB of memory or more. Parakeet Ultra needs `com.apple.developer.kernel.increased-memory-limit` on
 devices with less headroom, and only a signed archive keeps that entitlement (below). So **do not upload an unsigned
 archive**: the flow below, which build 0.1.0 (2) used on 2026-10-29 before the runtime was linked, ships Ultra without
-the entitlement, leaving only the 5 GiB rule and the `os_proc_available_memory` check before each window between a
+the entitlement, leaving only the 4 GB rule and the `os_proc_available_memory` check before each window between a
 large recording and the memory limit. It stays here for local checks of the export (size, `nm -u`, entitlements).
 
 `xcodebuild archive` with automatic signing signs for development first, and a development profile needs at least one

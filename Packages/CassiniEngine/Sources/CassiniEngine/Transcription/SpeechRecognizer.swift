@@ -34,14 +34,26 @@ public enum SpeechRecognizer: String, Hashable, Sendable {
 /// Which recognizer this device gets (decision D2). Pure, so the rule is tested on the host; Apple eligibility is
 /// checked again for the requested locale at admission and execution.
 public enum SpeechCapability {
-    /// The least physical memory a device needs for Parakeet Ultra. **Provisional until the WP0 device gate:** on the
-    /// simulator one 28 s window peaked at 0.96 to 1.1 GiB (docs ultra-wp0-results, the Pixel 8 measured 1138 MiB), and
-    /// the gate asks for that peak to stay under about 70 % of the jetsam limit. 6 GB iPhones (which report a little
-    /// under 6 GiB) clear that with room; 4 GB ones are kept on Apple Speech until a device says otherwise.
-    public static let minimumPhysicalMemory: UInt64 = 5 << 30
+    /// The least physical memory a device must report for Parakeet Ultra: 3.25 GiB, which admits 4 GB devices and no
+    /// 3 GB one. Measured on devices on 2026-11-11 (iPhone 11, 12 and 13 and the 2022 iPad, all 4 GB): they report 3665
+    /// to 3854 MiB, iOS lets the app hold 2098 MiB (2867 on the iPad), and twelve full 28 s windows with both speaker
+    /// models loaded peaked at 1437 to 1535 MiB, at most 69 % of that. A 3 GB device cannot report more than 3072 MiB
+    /// and has not been measured.
+    public static let minimumPhysicalMemory: UInt64 = 13 << 28
 
     /// Whether a device with `physicalMemory` bytes can hold Ultra.
     public static func parakeetCapable(physicalMemory: UInt64) -> Bool { physicalMemory >= minimumPhysicalMemory }
+
+    /// The limit while jobs did not yet name their recognizer: 5 GiB. It is kept only to say which recognizer such a
+    /// job was given, and so made its saved progress with.
+    public static let legacyMinimumPhysicalMemory: UInt64 = 5 << 30
+
+    /// Whether a job stored without a recognizer is Parakeet's on a device with `physicalMemory` bytes: the choice the
+    /// device made when the job was stored, not today's. A 4 GB device, which gets Parakeet now, gave such a job to
+    /// Apple Speech; resuming it through Parakeet would refuse its saved progress (`CHECKPOINT_MISMATCH`).
+    public static func legacyJobsAreParakeets(physicalMemory: UInt64) -> Bool {
+        physicalMemory >= legacyMinimumPhysicalMemory
+    }
 
     /// A supported downloadable Apple model remains eligible, but cannot decode until its assets are installed.
     /// The caller must probe hardware, the equivalent locale and asset status; RAM alone cannot select Apple.
@@ -78,13 +90,15 @@ public enum ParakeetModels {
 }
 
 /// The memory check of a Parakeet run (plan WP4): `os_proc_available_memory()` before the model loads and before each
-/// window. Below the figure the run fails with `MEMORY` rather than be ended by iOS. **Provisional until the WP0 device
-/// gate**, from the simulator: a loaded recognizer holds about 570 MiB and a 28 s window peaks at about 1.1 GiB.
+/// window. Below the figure the run fails with `MEMORY` rather than be ended by iOS. The figures are from devices
+/// (2026-11-11, four 4 GB devices and a 6 GB one): the load and the first full 28 s window took 955 to 995 MiB, the
+/// next three windows 280 to 340 MiB more, and later windows nothing.
 public enum ParakeetMemory {
-    /// What the load and the first window need on top of what Cassini already holds.
-    public static let beforeLoadBytes: Int64 = 1_200 << 20
-    /// What one more window needs once the recognizer is loaded.
-    public static let beforeWindowBytes: Int64 = 640 << 20
+    /// What a run needs from before the load until its memory stops growing (1250 to 1335 MiB measured), so that a run
+    /// that starts also passes the check before its second window.
+    public static let beforeLoadBytes: Int64 = 1_450 << 20
+    /// What the windows after the first can still add once the recognizer is loaded (up to 340 MiB measured).
+    public static let beforeWindowBytes: Int64 = 400 << 20
 
     /// Whether `availableBytes` is enough for the next step; nil (the system does not tell, as on a Mac or the
     /// simulator) always is.
