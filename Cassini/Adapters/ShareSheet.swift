@@ -46,10 +46,33 @@ extension View {
 private struct ShareSheetPresenter: ViewModifier {
     @Binding var item: ShareItem?
     @State private var session = ShareSession()
+    #if DEBUG
+    @State private var completedDismissal: UUID?
+    #endif
 
     func body(content: Content) -> some View {
-        content.sheet(item: $item, onDismiss: { session.dismiss(current: item)?.onComplete?() }) { item in
-            ShareSheet(item: item).onAppear { session.present(item) }
-        }
+        content
+            .overlay(alignment: .topLeading) {
+                #if DEBUG
+                if let completedDismissal, item == nil {
+                    UITestStateMarker(identifier: "shareDismissalCompleted", value: completedDismissal.uuidString)
+                }
+                #endif
+            }
+            .sheet(item: $item, onDismiss: {
+                guard let dismissed = session.dismiss(current: item) else { return }
+                dismissed.onComplete?()
+                #if DEBUG
+                completedDismissal = dismissed.id
+                #endif
+            }) { item in
+                ShareSheet(item: item).onAppear {
+                    session.present(item)
+                    #if DEBUG
+                    // A later export must await its own dismissal, never a previous sheet's event.
+                    completedDismissal = nil
+                    #endif
+                }
+            }
     }
 }
