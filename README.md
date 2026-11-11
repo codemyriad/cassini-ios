@@ -111,7 +111,7 @@ records their exact revisions.
 - **Edit and versions.** You can edit a passage's text; its word timing is dropped, but its place in the audio is
   kept. Every transcription, merge and run of edits keeps the transcript from before it as a version you can go back
   to.
-- **Export** text, SRT or WebVTT subtitles, structured JSON, a copy of the original audio, or a portable Cassini
+- **Export** plain text, localized Markdown, SRT or WebVTT subtitles, structured JSON, a copy of the original audio, or a portable Cassini
   `.opus` document. The document keeps the source's verified transcripts, its private `x` data and its audio packets,
   adds the note's versions and speaker names, and records how each transcript was made. A stale or unverified source
   with nothing new on the device is shared as it is, without a renamed title; one transcribed again keeps only the new
@@ -192,7 +192,7 @@ TestFlight still need.
 - **Transcript rendering (D84).** The pure `CassiniNotebook.TurnModel` ports the gocassini viewer pipeline at
   `1111155cb0017b47c072a8662c54f28ad7c44223`: readable grouping, display-only timing repair, continuity-based
   turn reconstruction, inline interjections, competing-speaker labels and continuation headers. The sealed note,
-  live draft, reader, Library previews, search excerpts and text export use that projection. Canonical words and
+  live draft, reader, Library previews, search excerpts and text/Markdown export use that projection. Canonical words and
   timestamps stay unchanged; playback and editing keep the original word indices even when reading order differs.
   The six shared vectors in `CassiniNotebookTests/Resources/interjections` are copied unchanged from coordination
   and checked with `swift test --filter CassiniNotebookTests` (no simulator or e2e). This viewer contract supersedes
