@@ -87,6 +87,23 @@ struct RecordedMeetingTimeTests {
         #expect(loaded.sortDate == start)
     }
 
+    @Test func writtenLocalDayNeverMovesAcrossViewerZones() throws {
+        let label = MeetingTime.local("2026-11-09T00:15:00")
+        for zone in ["Pacific/Honolulu", "Pacific/Kiritimati"] {
+            var calendar = Calendar(identifier: .gregorian)
+            calendar.timeZone = try #require(TimeZone(identifier: zone))
+            #expect(label.instant == nil)
+            #expect(label.day(in: calendar) == CalendarDay(year: 2026, month: 11, day: 9))
+            let start = try #require(calendar.date(from: DateComponents(year: 2026, month: 11, day: 9)))
+            let end = try #require(calendar.date(byAdding: .day, value: 1, to: start))
+            #expect(label.isWithin(DateInterval(start: start, end: end), calendar: calendar))
+            #expect(!MeetingTime.local("2026-11-08T23:59:59").isWithin(DateInterval(start: start, end: end), calendar: calendar))
+            #expect(!MeetingTime.local("2026-11-10T00:00:00").isWithin(DateInterval(start: start, end: end), calendar: calendar))
+        }
+        #expect(MeetingTime.local("2026-02-29T12:00:00").day(in: Calendar(identifier: .gregorian)) == nil)
+        #expect(MeetingTime.local("2028-02-29T12:00:00").day(in: Calendar(identifier: .gregorian)) == CalendarDay(year: 2028, month: 2, day: 29))
+    }
+
     @Test func dateFallbackComparesInstantsAndKeepsZoneLessLabelAsWritten() {
         let m = JSONObject([("meeting", .object(JSONObject([("createdAtUtc", .string("2026-11-09T09:40:48Z")),
             ("recordedAtLocal", .string("2026-11-09T09:31:48"))])))])

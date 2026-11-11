@@ -124,7 +124,7 @@ public final class LibraryScreenModel {
             let note = $0.entry.note
             return (!favoritesOnly || note.isFavorite) &&
                 (interval.map { range in
-                    note.meetingTime.instant.map { $0 >= range.start && $0 < range.end } ?? false
+                    note.meetingTime.isWithin(range, calendar: calendar)
                 } ?? true)
         }
         if found.query == searched {

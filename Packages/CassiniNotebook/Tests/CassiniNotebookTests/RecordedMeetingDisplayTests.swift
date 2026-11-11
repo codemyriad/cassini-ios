@@ -28,7 +28,7 @@ struct RecordedMeetingDisplayTests {
         #expect(facts.meetingTime == .instant(recorded))
     }
 
-    @Test func unknownAndLocalTimesDoNotAcquireTheSortDateAndShareOneStableSection() {
+    @Test func unknownAndLocalTimesDoNotAcquireTheSortDateAndGroupByWrittenDay() {
         var unknown = Note(title: "Undated meeting", createdAt: sealed)
         unknown.meetingTime = .unknown
         var known = Note(title: "Dated meeting", createdAt: recorded)
@@ -37,12 +37,16 @@ struct RecordedMeetingDisplayTests {
         local.meetingTime = .local("2026-11-08T09:15:00")
         let sections = LibraryMapping.sections(LibraryIndex([unknown, known, local]).entries,
                                                context: RowContext(), now: recorded, calendar: calendar)
-        #expect(sections.map(\.key) == [.undated, .today])
-        #expect(sections[0].rows.map(\.meetingTime) == [.unknown, .local("2026-11-08T09:15:00")])
+        #expect(sections.count == 3)
+        #expect(sections[0].key == .undated)
+        #expect(sections[1].key == .today)
+        #expect(sections[2].key == DayGroups.key(CalendarDay(year: 2026, month: 11, day: 8), now: recorded, calendar: calendar))
+        #expect(sections[2].rows[0].meetingTime == .local("2026-11-08T09:15:00"))
         #expect(Set(sections.map(\.id)).count == sections.count)
         for note in [unknown, local] {
             let subtitle = NoteSubtitle.of(note, mode: .audioOnly, now: recorded, calendar: calendar)
-            #expect(subtitle?.day == .undated)
+            let expectedDay = note.meetingTime.day(in: calendar).map { DayGroups.key($0, now: recorded, calendar: calendar) } ?? .undated
+            #expect(subtitle?.day == expectedDay)
             #expect(subtitle?.meetingTime == note.meetingTime)
             #expect(DocumentInfoFacts.of(note, provenance: nil, fileBytes: nil, speechModels: [:]).meetingTime == note.meetingTime)
         }

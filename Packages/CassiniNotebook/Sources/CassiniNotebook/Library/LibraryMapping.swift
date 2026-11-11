@@ -238,7 +238,7 @@ public enum LibraryMapping {
         var sections: [DaySection] = []
         var sectionIndices: [DayKey: Int] = [:]
         for entry in entries {
-            let key = entry.note.meetingTime.instant.map { DayGroups.key($0, now: now, calendar: calendar) } ?? .undated
+            let key = entry.note.meetingTime.day(in: calendar).map { DayGroups.key($0, now: now, calendar: calendar) } ?? .undated
             if let index = sectionIndices[key] {
                 sections[index].rows.append(row(entry, context: context))
             } else {
@@ -256,7 +256,7 @@ public enum LibraryMapping {
         hits.map { found in
             let title = found.markedTitle
             let shownTitle = title.text.isEmpty || title.leadingEllipsis || title.trailingEllipsis ? nil : title
-            let hit = Hit(day: found.entry.note.meetingTime.instant.map { DayGroups.key($0, now: now, calendar: calendar) } ?? .undated,
+            let hit = Hit(day: found.entry.note.meetingTime.day(in: calendar).map { DayGroups.key($0, now: now, calendar: calendar) } ?? .undated,
                           title: shownTitle?.text, titleRanges: shownTitle?.ranges ?? [], snippet: found.markedSnippet)
             return row(found.entry, context: context, hit: hit)
         }

@@ -165,7 +165,7 @@ import CassiniNotebook
         #expect(Library().model.searchDate == .any, "Date filters are not persisted")
     }
 
-    @Test func dateFiltersUseMeetingInstantAndExcludeUnknownOrUnzonedTimes() async throws {
+    @Test func dateFiltersUseMeetingInstantOrWrittenLocalDayAndExcludeUnknownTimes() async throws {
         let library = Library()
         let today = library.add("English recorded today")
         let yesterday = library.add("English sealed today")
@@ -183,7 +183,7 @@ import CassiniNotebook
         await waitUntilSleeping(library.clock)
         library.clock.release()
         await model.settle()
-        #expect(model.content.results?.map(\.id) == [today], "Seal and catalogue dates do not establish a meeting date")
+        #expect(Set(model.content.results?.map(\.id) ?? []) == Set([today, local]), "Written local days are usable without inventing an instant; seal and catalogue dates are not")
         model.searchDate = .any
         #expect(Set(model.content.results?.map(\.id) ?? []) == Set([today, yesterday, unknown, local]))
     }

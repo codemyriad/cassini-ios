@@ -1037,4 +1037,4 @@ passes capability, memory and disk checks; its size comes from the speech-only p
 
 ### Meeting time (D95)
 
-iOS follows the shared recordedAtUtc/offset DATE/local-label reader order; createdAtUtc is only a sorting fallback. Local labels stay as written, and an unknown meeting time is omitted from rows, headers and text exports. Date filters require a known instant rather than assuming the viewer zone for a zone-less label. See [format pin](format-pin.md).
+iOS follows the shared recordedAtUtc/offset DATE/local-label reader order; createdAtUtc is only a sorting fallback. Local labels stay as written, and an unknown meeting time is omitted from rows, headers and text exports. Date filters use recorded instants or the written calendar day of a local label, without inventing a zone for the label. See [format pin](format-pin.md).

@@ -178,7 +178,7 @@ public struct NoteSubtitle: Hashable, Sendable {
     /// Nil in reading mode, whose header has the search and the chips instead.
     public static func of(_ note: Note, mode: NoteMode, now: Date, calendar: Calendar) -> NoteSubtitle? {
         guard mode != .reading else { return nil }
-        return NoteSubtitle(day: note.meetingTime.instant.map { DayGroups.key($0, now: now, calendar: calendar) } ?? .undated,
+        return NoteSubtitle(day: note.meetingTime.day(in: calendar).map { DayGroups.key($0, now: now, calendar: calendar) } ?? .undated,
                             createdAt: note.createdAt, meetingTime: note.meetingTime,
                             duration: note.duration)
     }
