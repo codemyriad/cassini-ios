@@ -64,7 +64,28 @@ the second job; with one runner the jobs queue and there is no latency benefit. 
 
 ## Controlled recipe comparison
 
-Pending measurement on the rented Mac: warm the package/build caches, then alternate the original serial recipe
-and the same seven scripts beside the package/build lane. A heavy-run slot encloses each measurement. Record every
-command exit and per-step elapsed time; use no elapsed-time assertions. This isolates scheduling from runner queue
-and checkout time; actual CI job results provide the end-to-end check.
+On the rented Mac (Xcode 27.0, 10 CPU cores, 32 GB), warm the package/build caches, then alternate the same seven
+scripts serialized before `fast`/`build`, and those scripts beside the package/build lane. Source stays at
+`a34b052` for every comparison. The former CI placed Whistle/GUI after `fast`; this comparator groups all seven
+harness scripts together. One `heavy-run` slot encloses the experiment; every command exit and elapsed time is
+recorded. All 42 command/total records are successful, including 45 runtime regressions in each of four runs.
+
+| Pair | Serial seconds | Overlapping seconds | Package + build lane in overlapping run |
+| --- | ---: | ---: | ---: |
+| 1 | 212.059 | 232.803 | 45.564 s |
+| 2 | 697.374 | 239.026 | 73.668 s |
+
+These samples do **not** establish a stable end-to-end speedup. Other compiler/emulator work drove sampled host
+load above 430; runtime harness duration alone varied from 153.670 to 606.382 s. The first pair was slower after
+overlapping, the second much faster. The measured scheduling effect is that the package/build lane completes
+while the independent harness is still running. No CPU savings or fixed latency gain is claimed.
+
+The first actual [two-job CI run](https://github.com/codemyriad/cassini-ios/actions/runs/42981112548) passed on
+`5721186`: harness job 280 s, package/build job 406 s, starts one second apart. The entire harness job overlaps the
+package/build job; their command intervals overlap for 254 s. This confirms the removed dependency in GitHub
+Actions. Runner queue time and contention can still dominate. Both jobs retain their failure behavior; a passing
+package job alone is insufficient to call the workflow green.
+
+Raw `measurements.json`, per-command logs, environment metadata, driver script and CI job metadata are retained
+with the profiling evidence. Final qualification uses current main (including #107) plus this workflow/docs change;
+the comparison above deliberately uses identical source on both sides.
