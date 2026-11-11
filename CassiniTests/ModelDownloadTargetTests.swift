@@ -22,7 +22,10 @@ import CassiniNotebook
     func testEachSettingsRowActuallyRequestsOnlyItsConsentedInstallGroup() async throws {
         for part in ModelPart.allCases {
             let requested = expectation(description: "\(part) installer received the request")
-            let recorder = FakeModelInstallRecorder(onRequest: { _ in requested.fulfill() })
+            let group: ModelPart = part == .speech ? .speech : .speakers
+            let recorder = FakeModelInstallRecorder(onRequest: { received in
+                if received == group { requested.fulfill() }
+            })
             let speech = FakeTranscriber(.returns([], total: 1), status: .notDownloaded, recognizer: .parakeet,
                                          installRecorder: recorder)
             let test = TestGraph(transcriber: speech, analyzer: FakeAnalyzer(modelIdentity: nil, installRecorder: recorder))
