@@ -5,7 +5,13 @@ public struct AudioInspection: Sendable {
     public let duration: Double
     public let waveform: [Float]
     public static func inspect(_ url: URL) async throws -> AudioInspection {
-        try await Task.detached(priority: .utility) {
+        try await inspect(url, onBuffer: {})
+    }
+
+    // An event seam for cancellation during actual AVFoundation work, without timing assumptions.
+    static func inspect(_ url: URL, onBuffer: @escaping @Sendable () throws -> Void) async throws -> AudioInspection {
+        let worker = Task.detached(priority: .utility) {
+            try Task.checkCancellation()
             let file = try AVAudioFile(forReading: url)
             guard file.length > 0, file.processingFormat.sampleRate > 0 else { throw AudioError.empty }
             let duration = Double(file.length) / file.processingFormat.sampleRate
@@ -18,11 +24,23 @@ public struct AudioInspection: Sendable {
                 try Task.checkCancellation()
                 file.framePosition = min(file.length - 1, AVAudioFramePosition(Double(index) / Double(count) * Double(file.length)))
                 try file.read(into: buffer, frameCount: capacity)
+                try onBuffer()
+                try Task.checkCancellation()
                 guard let channel = buffer.floatChannelData?[0], buffer.frameLength > 0 else { levels.append(0.1); continue }
                 levels.append(min(1, max(0.04, acLevel(UnsafeBufferPointer(start: channel, count: Int(buffer.frameLength))) * 4)))
             }
+            try Task.checkCancellation()
             return AudioInspection(duration: duration, waveform: levels)
-        }.value
+        }
+        return try await withTaskCancellationHandler {
+            do {
+                let result = try await worker.value
+                try Task.checkCancellation()
+                return result
+            } catch { try Task.checkCancellation(); throw error }
+        } onCancel: {
+            worker.cancel()
+        }
     }
 
     /// The RMS of `samples` with their mean taken off (D26.1): a microphone's DC offset is not sound.

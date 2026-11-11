@@ -82,7 +82,7 @@ records their exact revisions.
 - **Safe capture.** Audio is captured as 48 kHz PCM (CAF), which survives a crash, and compressed to M4A at Finish. If
   compression fails, the original stays playable. The recording stops and saves before storage runs out, with a
   warning about 15 minutes before. At launch, recordings that were interrupted are repaired and listed as recovered.
-- **Import** any audio format that iOS reads, plus Ogg Opus and Cassini `.opus` documents, from Files (several files
+- **Import** any audio format that iOS reads, plus Ogg Opus, Cassini `.opus` documents and ZIP archives, from Files (several files
   at once) or with "Open in Cassini" from another app. A file that is already in the library is not added twice. A
   Cassini document's verified transcripts are imported with it.
 - **Transcribe on the device** with the bundled Whistle model at once, or with Parakeet Ultra after a one-time download
@@ -116,6 +116,9 @@ records their exact revisions.
   adds the note's versions and speaker names, and records how each transcript was made. A stale or unverified source
   with nothing new on the device is shared as it is, without a renamed title; one transcribed again keeps only the new
   versions, beside the source's private data and meeting details.
+- **Several notes at once (D96).** Import ZIP entries through the normal content checks and digest deduplication;
+  export all or selected notes as one uncompressed ZIP, keeping original audio when no words are available.
+  Progress, cancellation and summaries use the shared catalog. [Archive rules and limits](docs/bulk-transfer.md).
 - **Recently Deleted.** Deleted notes stay for 30 days, with Undo right after the delete, and can be restored,
   deleted now, or emptied all at once. A permanent delete also removes that note's voice samples.
 - **Settings** for the app language (in the Settings app), the speech language (Apple Speech devices on iOS 26 or later only),

@@ -122,7 +122,7 @@ struct CaptureBar: View {
                     .font(.subheadline.weight(.semibold)).fixedSize().frame(minWidth: 88, minHeight: 52)
             }
         }
-        .accessibilityHint(unavailable ? LibraryCopy.unavailableTitle : "")
+        .accessibilityHint(unavailable ? LibraryCopy.unavailableTitle : BulkCopy.filter)
         .accessibilityIdentifier("importButton")
     }
 

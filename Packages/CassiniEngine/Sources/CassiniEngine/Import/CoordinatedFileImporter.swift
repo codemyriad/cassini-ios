@@ -79,9 +79,11 @@ private struct Copy {
     /// Rejects a known `size` over the cap and, with `space`, one the free space cannot hold with the reserve.
     func check(_ size: Int64?, space: Bool) throws {
         guard let size else { return }
+        guard size >= 0 else { throw FileImportError.cannotOpen }
         if size > maxBytes { throw FileImportError.tooLarge }
-        if space, storage.availableBytes(at: folder) < size + reserveBytes {
-            throw FileImportError.noSpace(bytesNeeded: size + reserveBytes)
+        let (needed, overflow) = size.addingReportingOverflow(reserveBytes)
+        if space, overflow || storage.availableBytes(at: folder) < needed {
+            throw FileImportError.noSpace(bytesNeeded: overflow ? Int64.max : needed)
         }
     }
 
@@ -113,10 +115,13 @@ private struct Copy {
                 throw lowSpace(size, total) ?? FileImportError.cannotOpen
             }
             guard !chunk.isEmpty else { break }
-            total += Int64(chunk.count)
+            let (next, overflow) = total.addingReportingOverflow(Int64(chunk.count))
+            guard !overflow else { throw FileImportError.tooLarge }
+            total = next
             if total > maxBytes { throw FileImportError.tooLarge }
             if total >= nextSpaceCheck {
-                nextSpaceCheck += CoordinatedFileImporter.spaceCheckBytes
+                nextSpaceCheck = total > Int64.max - CoordinatedFileImporter.spaceCheckBytes
+                    ? Int64.max : total + CoordinatedFileImporter.spaceCheckBytes
                 if let low = lowSpace(size, total) { throw low }
             }
             hasher.update(data: chunk)
@@ -130,7 +135,8 @@ private struct Copy {
     /// the reserve, as the check before the copy.
     private func lowSpace(_ size: Int64?, _ copied: Int64) -> FileImportError? {
         guard storage.availableBytes(at: folder) < reserveBytes else { return nil }
-        return .noSpace(bytesNeeded: max(size ?? copied, copied) + reserveBytes)
+        let (needed, overflow) = max(size ?? copied, copied).addingReportingOverflow(reserveBytes)
+        return .noSpace(bytesNeeded: overflow ? Int64.max : needed)
     }
 }
 

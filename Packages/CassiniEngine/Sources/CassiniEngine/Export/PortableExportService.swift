@@ -43,7 +43,7 @@ public struct PortableExportService: Sendable {
             var opus = original
             var source: CassiniDocument?
             if (try? ImportClassifier.sniff(fileAt: original)) == .oggOpus {
-                source = await Self.read(original)
+                source = try await Self.read(original)
             } else {
                 opus = work.appendingPathComponent("encoded.opus")
                 try await audio.encodeOpus(playable, to: opus)
@@ -136,14 +136,18 @@ public struct PortableExportService: Sendable {
     private func seal(_ note: Note, _ opus: URL, _ target: URL, _ processing: JSONObject,
                       _ source: CassiniDocument?) async throws -> String? {
         let unassignedLabel = unassignedLabel
-        return try await Task.detached(priority: .userInitiated) {
+        return try await BulkTransferIO.run {
             try PortableTranscript.export(note: note, opus: opus, destination: target, unassignedLabel: unassignedLabel,
                                           processing: processing, source: source)
-        }.value
+        }
     }
 
     /// The document at `url`, its audio verified.
-    private static func read(_ url: URL) async -> CassiniDocument {
-        await Task.detached(priority: .userInitiated) { CassiniDocument.read(url) }.value
+    private static func read(_ url: URL) async throws -> CassiniDocument {
+        try await BulkTransferIO.run {
+            let document = CassiniDocument.read(url)
+            try Task.checkCancellation()
+            return document
+        }
     }
 }

@@ -9,6 +9,12 @@ import CassiniNotebook
     @ObservationIgnored private let library: LibraryStore
     @ObservationIgnored private let service: ExportService?
     @ObservationIgnored private let portable: PortableExportService?
+    @ObservationIgnored private let bulk: BulkExportService?
+    @ObservationIgnored private var zipTask: Task<Void, Never>?
+    private(set) var zipProgress: BulkProgress?
+    private(set) var zipExported = 0
+    var zipShareItem: ShareItem?
+    var zipFailure: String?
     @ObservationIgnored private let texts: ExportTexts
     @ObservationIgnored private let ready: @MainActor () async -> Void
 
@@ -21,8 +27,12 @@ import CassiniNotebook
         self.ready = ready
         self.texts = texts
         service = library.noteStore.map { ExportService(notes: $0, folder: folder) }
-        portable = library.noteStore.map {
+        let portableService = library.noteStore.map {
             PortableExportService(audio: audio, provenance: ProvenanceFiles(notes: $0), unassignedLabel: texts.unassignedLabel)
+        }
+        portable = portableService
+        bulk = library.noteStore.flatMap { notes in
+            portableService.map { BulkExportService(notes: notes, portable: $0, folder: folder) }
         }
     }
 
@@ -58,6 +68,46 @@ import CassiniNotebook
             throw error
         }
     }
+
+    /// A single cancellable archive operation, shared through the existing sheet/cleanup path.
+    func exportZIP(_ ids: [UUID]) {
+        guard zipTask == nil, !ids.isEmpty else { return }
+        zipProgress = BulkProgress(completed: 0, total: ids.count)
+        zipExported = 0
+        zipFailure = nil
+        zipTask = Task {
+            defer { zipTask = nil; zipProgress = nil }
+            do {
+                await ready()
+                await library.settle()
+                try Task.checkCancellation()
+                guard let bulk else { throw ExportError.cannotSave }
+                for id in ids {
+                    try Task.checkCancellation()
+                    if let note = library.note(id), !note.transcript.isEmpty {
+                        guard await library.commit(id, { $0.saveCurrentVersion(.editedTranscript) }) != nil else {
+                            throw ExportError.cannotSave
+                        }
+                    }
+                }
+                let url = try await bulk.export(ids) { [weak self] completed, total in
+                    await self?.setZIPProgress(completed: completed, total: total)
+                }
+                if Task.isCancelled { discard(url); throw CancellationError() }
+                zipExported = ids.count
+                zipShareItem = shareItem(url)
+            } catch is CancellationError {
+                // The engine removes partial output; completed notes and their versions remain intact.
+            } catch { zipFailure = ExportCopy.notSaved }
+        }
+    }
+
+    private func setZIPProgress(completed: Int, total: Int) {
+        zipProgress = BulkProgress(completed: completed, total: total)
+    }
+
+    func cancelZIP() { zipTask?.cancel() }
+    func settleZIP() async { await zipTask?.value }
 
     /// Removes an export once the share sheet is done with it.
     func discard(_ url: URL) { service?.discard(url) }

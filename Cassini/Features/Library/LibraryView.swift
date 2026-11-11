@@ -9,6 +9,7 @@ struct LibraryView: View {
     @Environment(LibraryScreenModel.self) private var model
     @Environment(NoticesStore.self) private var notices
     @Environment(ImportStore.self) private var imports
+    @Environment(ExportStore.self) private var exports
     @Environment(LibraryStore.self) private var library
     @Environment(Router.self) private var router
     @Environment(ErrorPresenter.self) private var errors
@@ -21,11 +22,14 @@ struct LibraryView: View {
     @SceneStorage("library.dialog") private var savedDialog: Data?
     @State private var renameDraft: String?
     @State private var importing = false
+    @State private var choosingZIP = false
+    @State private var pendingZIP: [UUID]?
     @State private var restored = false
     @State private var dialogRestored = false
 
     var body: some View {
         @Bindable var model = model
+        @Bindable var exports = exports
         let content = model.content
         ScrollView {
             LazyVStack(alignment: .leading, spacing: Spacing.row) {
@@ -57,7 +61,10 @@ struct LibraryView: View {
         .overlay(alignment: .topLeading) { UITestInteractiveMarker(loaded: library.isLoaded && !content.loading) }
         .trashUndoSnackbar()
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            CaptureBar(unavailable: content.emptyState == .unavailable) { importing = true }
+            VStack(spacing: 8) {
+                BulkTransferStatus()
+                CaptureBar(unavailable: content.emptyState == .unavailable) { importing = true }
+            }
         }
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
@@ -69,6 +76,9 @@ struct LibraryView: View {
                     .accessibilityIdentifier("wordmark")
             }.sharedBackgroundHidden()
             ToolbarItemGroup(placement: .topBarTrailing) {
+                Button(LibraryCopy.export, systemImage: "square.and.arrow.up") { choosingZIP = true }
+                    .disabled(library.notes.allSatisfy { $0.trashedAt != nil } || exports.zipProgress != nil)
+                    .accessibilityIdentifier("libraryExportZIP")
                 Button(TrashCopy.title, systemImage: "trash") { router.show(.trash) }
                     .accessibilityIdentifier("recentlyDeletedButton")
                 Button(LibraryCopy.settings, systemImage: "slider.horizontal.3") { router.show(.settings) }
@@ -91,6 +101,18 @@ struct LibraryView: View {
             case .success(let urls): imports.start(urls)
             case .failure(let error): errors.present(error.localizedDescription)
             }
+        }
+        .shareSheet(item: $exports.zipShareItem)
+        .sheet(isPresented: $choosingZIP, onDismiss: {
+            if let ids = pendingZIP { pendingZIP = nil; exports.exportZIP(ids) }
+        }) {
+            BulkExportPicker(notes: library.notes.filter { $0.trashedAt == nil }) { ids in
+                pendingZIP = ids
+                choosingZIP = false
+            }
+        }
+        .onChange(of: exports.zipFailure) { _, failure in
+            if let failure { errors.present(failure) }
         }
         .sheet(item: renaming) { RenameNoteDialog(noteID: $0.id, draft: renameDraft) { renameDraft = $0 } }
         .alert(LibraryCopy.startOverTitle, isPresented: confirming(\.startOver), presenting: model.dialog) { dialog in

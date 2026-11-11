@@ -257,6 +257,7 @@ import CassiniNotebook
         // Unreadable saved voices delete nothing; the report keeps the failure and the trash its fact, with no alert.
         startup.register(.purge) { [trash] in try await trash.purgeExpired() }
         startup.register(.sweep) { [exports, clock = environment.clock] in await exports.sweep(now: clock.now) }
+        startup.register(.sweep) { [imports] in await imports.sweepBatchStaging() }
         // Model directories no pin reads (earlier builds' layouts, other revisions; D51, nothing is migrated). The
         // pinned revisions and their staging directories stay, so an install that started meanwhile is not touched.
         startup.register(.sweep) { [models = environment.models] in

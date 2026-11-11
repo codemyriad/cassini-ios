@@ -6,6 +6,7 @@ import COpusBridge
 /// Bounded-memory Ogg Opus conversion. Audio packets are decoded/encoded incrementally.
 public enum OpusAudio {
     public static func decode(_ source: URL, to destination: URL) throws {
+        try Task.checkCancellation()
         let info = try OggOpus.scan(source)
         guard info.validFraming, info.head.count >= 19, info.head[18] == 0, (1...2).contains(info.channels), info.sampleCount > 0 else {
             throw CassiniError("Unsupported or damaged Opus stream")
@@ -16,34 +17,43 @@ public enum OpusAudio {
         defer { opus_decoder_destroy(decoder) }
         guard let format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 48_000, channels: AVAudioChannelCount(info.channels), interleaved: true) else { throw CassiniError("Cannot create audio format") }
         let file = try AVAudioFile(forWriting: destination, settings: format.settings, commonFormat: .pcmFormatFloat32, interleaved: true)
-        let reader = OggOpus.Reader(try FileSource(source)); _ = try reader.headers()
-        var pcm = [Float](repeating: 0, count: 5760 * info.channels)
-        var skip = OggOpus.u16(info.head, 10), written: Int64 = 0
-        let gainValue = Int16(bitPattern: UInt16(OggOpus.u16(info.head, 16)))
-        let gain = pow(Float(10), Float(gainValue) / (20 * 256))
-        while let packet = try reader.packet() {
+        do {
+            let reader = OggOpus.Reader(try FileSource(source)); _ = try reader.headers()
+            var pcm = [Float](repeating: 0, count: 5760 * info.channels)
+            var skip = OggOpus.u16(info.head, 10), written: Int64 = 0
+            let gainValue = Int16(bitPattern: UInt16(OggOpus.u16(info.head, 16)))
+            let gain = pow(Float(10), Float(gainValue) / (20 * 256))
+            while let packet = try reader.packet() {
+                try Task.checkCancellation()
+                let frames = opus_decode_float(decoder, packet, Int32(packet.count), &pcm, 5760, 0)
+                guard frames >= 0 else { throw failure(frames) }
+                let leading = min(skip, Int(frames)); skip -= leading
+                let available = max(0, Int(frames) - leading)
+                let count = min(available, Int(max(0, info.sampleCount - written)))
+                guard count > 0 else { continue }
+                guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(count)), let output = buffer.floatChannelData?[0] else { throw CassiniError("Cannot allocate audio buffer") }
+                buffer.frameLength = AVAudioFrameCount(count)
+                for index in 0..<(count * info.channels) { output[index] = pcm[leading * info.channels + index] * gain }
+                try file.write(from: buffer); written += Int64(count)
+            }
+            guard written == info.sampleCount else { throw CassiniError("Truncated Opus audio") }
             try Task.checkCancellation()
-            let frames = opus_decode_float(decoder, packet, Int32(packet.count), &pcm, 5760, 0)
-            guard frames >= 0 else { throw failure(frames) }
-            let leading = min(skip, Int(frames)); skip -= leading
-            let available = max(0, Int(frames) - leading)
-            let count = min(available, Int(max(0, info.sampleCount - written)))
-            guard count > 0 else { continue }
-            guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(count)), let output = buffer.floatChannelData?[0] else { throw CassiniError("Cannot allocate audio buffer") }
-            buffer.frameLength = AVAudioFrameCount(count)
-            for index in 0..<(count * info.channels) { output[index] = pcm[leading * info.channels + index] * gain }
-            try file.write(from: buffer); written += Int64(count)
+        } catch {
+            try? FileManager.default.removeItem(at: destination)
+            throw error
         }
-        guard written == info.sampleCount else { throw CassiniError("Truncated Opus audio") }
     }
 
     /// Encodes `source` (any file AVFoundation reads) as 48 kHz mono Ogg Opus at `destination`. Every channel is mixed
     /// into the mono signal, so speech on one side of a stereo file is kept. Nothing is left at `destination` when it
     /// throws, a failure to write the end of the file included.
-    public static func encode(_ source: URL, to destination: URL) throws {
+    public static func encode(_ source: URL, to destination: URL,
+                              onChunk: @Sendable () throws -> Void = {}) throws {
+        try Task.checkCancellation()
         let sink = try FileSink(destination)
         do {
-            try encode(source, into: sink)
+            try encode(source, into: sink, onChunk: onChunk)
+            try Task.checkCancellation()
             try sink.close()
         } catch {
             try? sink.close()
@@ -52,7 +62,7 @@ public enum OpusAudio {
         }
     }
 
-    private static func encode(_ source: URL, into sink: FileSink) throws {
+    private static func encode(_ source: URL, into sink: FileSink, onChunk: @Sendable () throws -> Void) throws {
         let input = try AVAudioFile(forReading: source)
         guard let format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 48_000, channels: 1, interleaved: false),
               let converter = AVAudioConverter(from: input.processingFormat, to: format),
@@ -76,6 +86,7 @@ public enum OpusAudio {
             output.frameLength = 0
             let state = converter.convert(to: output, error: &conversionError) { requested, result in
                 do {
+                    try Task.checkCancellation()
                     guard input.framePosition < input.length else { result.pointee = .endOfStream; return nil }
                     try input.read(into: inputBuffer, frameCount: min(4096, requested, AVAudioFrameCount(input.length - input.framePosition)))
                     result.pointee = inputBuffer.frameLength == 0 ? .endOfStream : .haveData
@@ -93,6 +104,8 @@ public enum OpusAudio {
             let size = opus_encode_float(encoder, pcm, 960, &packet, Int32(packet.count))
             guard size > 0 else { throw failure(size) }
             try muxer.add(Array(packet.prefix(Int(size)))); encoded += 960
+            try onChunk()
+            try Task.checkCancellation()
         }
         guard samples > 0 else { throw CassiniError("Audio is empty") }
         let silence = [Float](repeating: 0, count: 960)
@@ -102,6 +115,7 @@ public enum OpusAudio {
             guard size > 0 else { throw failure(size) }
             try muxer.add(Array(packet.prefix(Int(size)))); encoded += 960
         }
+        try Task.checkCancellation()
         try muxer.finish(finalGranule: samples + Int64(preSkip))
     }
     private static func failure(_ code: Int32) -> CassiniError { CassiniError("Opus: \(String(cString: opus_strerror(code)))") }

@@ -31,10 +31,29 @@ public struct ImportService: Sendable {
         self.notes = notes; self.files = files; self.audio = audio; self.storage = storage; self.clock = clock
     }
 
+    public func importBatch(_ urls: [URL], fallbackTitle: String,
+                            onEvent: @escaping @Sendable (BulkImportEvent) async -> Void = { _ in }) async throws -> BulkImportSummary {
+        try await bulkImporter.importFiles(urls, fallbackTitle: fallbackTitle, onEvent: onEvent)
+    }
+
+    public func sweepBatchStaging() async { await bulkImporter.sweep() }
+
+    /// Signature/extension-less ZIP entries get the same platform audio probe as an ordinary file-picker import.
+    func canInspectAudio(_ url: URL) async throws -> Bool {
+        do { _ = try await audio.inspect(url); return true }
+        catch is CancellationError { throw CancellationError() }
+        catch { return false }
+    }
+
+    private var bulkImporter: BulkImportService {
+        BulkImportService(importer: self, files: files, storage: storage,
+                          folder: notes.root.appendingPathComponent(".bulk-imports", isDirectory: true))
+    }
+
     /// Imports `url` as a new note, in the language of the document's selected variant (none for plain audio);
     /// `fallbackTitle` names a file without a usable name. Throws only `CancellationError`, and then leaves nothing
     /// behind.
-    public func importFile(_ url: URL, fallbackTitle: String) async throws -> ImportOutcome {
+    public func importFile(_ url: URL, fallbackTitle: String, displayName: String? = nil) async throws -> ImportOutcome {
         let id = UUID()
         let folder = notes.directory(for: id)
         do {
@@ -44,7 +63,7 @@ public struct ImportService: Sendable {
         }
         let outcome: ImportOutcome
         do {
-            outcome = try await stage(url, as: id, in: folder, fallbackTitle: fallbackTitle)
+            outcome = try await stage(url, as: id, in: folder, fallbackTitle: fallbackTitle, displayName: displayName)
         } catch {
             await discard(id, folder)
             throw error
@@ -53,9 +72,9 @@ public struct ImportService: Sendable {
         return outcome
     }
 
-    private func stage(_ url: URL, as id: UUID, in folder: URL, fallbackTitle: String) async throws -> ImportOutcome {
+    private func stage(_ url: URL, as id: UUID, in folder: URL, fallbackTitle: String, displayName: String?) async throws -> ImportOutcome {
         let staging = folder.appendingPathComponent(Self.stagingFilename)
-        let copied: ImportedFile
+        var copied: ImportedFile
         do {
             copied = try await files.copy(from: url, to: staging, maxBytes: Limits.maxImportBytes,
                                           reserveBytes: Limits.minFreeImportBytes)
@@ -66,6 +85,7 @@ public struct ImportService: Sendable {
         } catch {
             return .rejected(.cannotOpen)
         }
+        if let displayName { copied.displayName = displayName }
         if let existing = await notes.liveNote(withSourceSha256: copied.sha256) { return .existing(existing.id) }
         try Task.checkCancellation()
         let staged: Staged
@@ -196,11 +216,9 @@ public struct ImportService: Sendable {
 
     /// Runs blocking file work (a sniff, a verification or a scan of up to 4 GiB) on its own queue rather than the
     /// cooperative pool, checking for cancellation before and after it.
-    private static func blocking<T: Sendable>(_ work: @escaping @Sendable () throws -> T) async throws -> T {
+    static func blocking<T: Sendable>(_ work: @escaping @Sendable () throws -> T) async throws -> T {
         try Task.checkCancellation()
-        let value = try await withCheckedThrowingContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async { continuation.resume(with: Result(catching: work)) }
-        }
+        let value = try await BulkTransferIO.run(work)
         try Task.checkCancellation()
         return value
     }
