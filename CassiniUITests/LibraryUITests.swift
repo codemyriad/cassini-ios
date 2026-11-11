@@ -172,6 +172,31 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(row(app, "Notes from the design review").exists)
     }
 
+    @MainActor func testSearchDateMenuNarrowsMatchesAndClearingResetsIt() {
+        let app = launch(["--seed", "search"])
+        let search = app.textFields["librarySearch"]
+        search.tap()
+        search.typeText("thurs\n")
+        let garden = row(app, "Garden plans for the spring")
+        XCTAssertTrue(garden.waitForExistence(within: 15))
+        let date = app.buttons["librarySearchDate"]
+        XCTAssertTrue(date.waitForExistence(within: 15))
+        date.tap()
+        app.buttons["Today"].tapWhenSettled()
+        XCTAssertTrue(garden.waitForNonExistence(within: 15))
+        XCTAssertTrue(row(app, "A quieter kind of productivity").exists)
+        date.tap()
+        app.buttons["Past 7 days"].tapWhenSettled()
+        XCTAssertTrue(garden.waitForExistence(within: 15))
+        app.buttons["Clear search"].tap()
+        XCTAssertTrue(app.staticTexts["TODAY"].waitForExistence(within: 15))
+        XCTAssertFalse(date.exists, "Date filters only narrow typed Search")
+        search.tap()
+        search.typeText("thurs\n")
+        XCTAssertTrue(garden.waitForExistence(within: 15))
+        XCTAssertTrue(date.label.contains("Any date"), "A new search has no remembered date filter")
+    }
+
     /// Search finds a spoken word of a note, a long press on the result opens its actions over the search, Move to
     /// Recently Deleted takes it out of the results, and Undo brings it back. The import half of Android's flow
     /// (ACTION_VIEW of a file) is the import flow's (WP12).
