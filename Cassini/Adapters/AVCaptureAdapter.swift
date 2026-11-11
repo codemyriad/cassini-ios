@@ -98,7 +98,6 @@ extension AVAudioRecorder: CaptureRecorder {}
             try await session.prepare()
             let capture = try makeRecorder(url)
             capture.isMeteringEnabled = true; capture.delegate = self
-            let start = Date()
             guard capture.record() else {
                 // A record() that fails can leave the recorder's audio queue running, and its input callback reads the
                 // recorder: released unstopped, the recorder ended the app (EXC_BAD_ACCESS in
@@ -106,7 +105,8 @@ extension AVAudioRecorder: CaptureRecorder {}
                 capture.delegate = nil; capture.stop()
                 throw AudioError.startFailed
             }
-            recordedAt = start
+            // record() can spend time preparing hardware; anchor to the actual audio position after it succeeds.
+            recordedAt = Date().addingTimeInterval(-max(0, capture.currentTime))
             recorder = capture; isPaused = false
             let meterTimer = Timer(timeInterval: 0.1, repeats: true) { [weak self] _ in
                 MainActor.assumeIsolated { self?.tick() }

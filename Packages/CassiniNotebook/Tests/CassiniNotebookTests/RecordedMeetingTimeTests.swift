@@ -30,6 +30,35 @@ struct RecordedMeetingTimeTests {
         #expect(try JSONDecoder().decode(Note.self, from: encoded).meetingTime == .instant(start))
     }
 
+    @Test func nineMinuteSealDelaySurvivesPortableExportAndReimport() throws {
+        let folder = try PortableFixtures.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let audio = try PortableFixtures.silence()
+        let transcript = Transcript([Word("a", 0, 20, "Hello")])
+        let recorded = "2026-11-09T09:31:48Z"
+        let sealed = "2026-11-09T09:40:48Z"
+        var source = CassiniDocument.read(try CassiniDocument.create(audio, transcript: transcript,
+            title: "English meeting", processing: JSONObject()))
+        var manifest = try #require(source.manifest)
+        var meeting = try manifest.object("meeting")
+        meeting["recordedAtUtc"] = .string(recorded)
+        meeting["createdAtUtc"] = .string(sealed)
+        manifest["meeting"] = .object(meeting)
+        source.manifest = manifest
+        let original = folder.appendingPathComponent("document.opus")
+        try Data(CassiniDocument.create(audio, transcript: transcript, title: "English meeting", processing: JSONObject(),
+                                       existing: source)).write(to: original)
+        let portable = try #require(PortableTranscript.read(from: original))
+        #expect(portable.createdAt == MeetingTime.parse(sealed))
+        let note = ImportedNote.make(id: UUID(), displayName: nil, fallbackTitle: "Import", sha256: "hash", importedAt: start,
+            audio: ImportedAudio(filename: "document.opus", duration: 1), document: portable)
+        let copy = folder.appendingPathComponent("copy.opus")
+        try PortableTranscript.export(note: note, opus: original, destination: copy, unassignedLabel: "Unknown speaker")
+        let reimported = try #require(PortableTranscript.read(from: copy))
+        #expect(reimported.createdAt == MeetingTime.parse(sealed))
+        #expect(reimported.meetingTime.instant == MeetingTime.parse(recorded))
+    }
+
     @Test func catalogueReloadReadsTheOriginalDocumentNotTheDecodedPlaybackFile() throws {
         let folder = try PortableFixtures.temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: folder) }
