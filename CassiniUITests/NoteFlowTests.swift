@@ -93,5 +93,9 @@ extension XCTestCase {
         XCTAssertTrue(close.waitForExistence(within: 30), file: file, line: line)
         close.tap()
         XCTAssertTrue(shareSheet.waitForNonExistence(within: 5), file: file, line: line)
+        // Accessibility content can disappear before the UIKit presentation finishes closing.
+        // Wait for this presentation's SwiftUI dismissal callback before tapping the note's next menu.
+        XCTAssertTrue(app.staticTexts["uiTestState-shareDismissalCompleted"].waitForExistence(within: 15),
+                      "the share presentation completed dismissal", file: file, line: line)
     }
 }

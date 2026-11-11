@@ -204,10 +204,12 @@ struct NoteSectionView: View {
 
     private var bannerFacts: NoteBannerFacts {
         let state = processing.state
+        let speakerDownload = NoteBanners.speakerDownloadState(processing.models.status(of: .speakers))
         return NoteBannerFacts(trustToggled: model.screen.trustToggled, queueHold: state.hold, waitingJobs: state.queue.count,
                                dismissed: model.screen.dismissed, speechInstallBytes: installBytes.speech,
                                speakersInstallBytes: installBytes.speakers,
-                               speechUnavailableText: processing.models.speechUnavailability == .model ? NoteCopy.speechUnavailable : nil)
+                               speechUnavailableText: processing.models.speechUnavailability == .model ? NoteCopy.speechUnavailable : nil,
+                               speakerModelsMissing: speakerDownload.missing, speakerModelsInstalling: speakerDownload.installing)
     }
 
     /// The free-space figures of a model download that failed for want of room: Parakeet's (nil keeps the estimate of
