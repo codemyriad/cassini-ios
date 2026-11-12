@@ -140,6 +140,12 @@ class ReleaseTests(unittest.TestCase):
         self.calls = []
         self.ci = [main_run()]
         self.canonical_head = HEAD
+        self.origin_head = HEAD
+        self.non_ancestor = set()
+        self.now = 0.0
+        self.sleeps = []
+        self.sleep_hook = None
+        self.after_validation_hook = None
         self.worker_failure = False
         self.upload_failure = False
         self.upload_stdout = json.dumps({'details': {'delivery-uuid': '12345678-1234-1234-1234-123456789abc'}})
@@ -154,10 +160,23 @@ class ReleaseTests(unittest.TestCase):
         self.fragment.write_text('kind: new\n---\nYou can now export a transcript.\n')
         self.fragment_hash = hashlib.sha256(self.fragment.read_bytes()).hexdigest()
 
+    def clock(self):
+        return self.now
+
+    def fake_sleep(self, seconds):
+        self.sleeps.append(seconds)
+        self.now += seconds
+        if self.sleep_hook is not None:
+            self.sleep_hook(seconds)
+
     def command(self, args, cwd=None):
         self.calls.append(args)
         if args[:3] == ['git', 'rev-parse', 'origin/main']:
-            return HEAD
+            return self.origin_head
+        if args[:3] == ['git', 'merge-base', '--is-ancestor']:
+            if (args[3], args[4]) in self.non_ancestor:
+                raise RuntimeError('git merge-base failed (exit 1); inspect retained run logs')
+            return ''
         if args[:3] == ['git', 'worktree', 'add']:
             checkout = Path(args[4])
             checkout.mkdir()
@@ -183,6 +202,8 @@ class ReleaseTests(unittest.TestCase):
                 ipa=str(ipa), bytes=ipa.stat().st_size, sha256=hashlib.sha256(ipa.read_bytes()).hexdigest()))
         if '--validate-app' in args and self.red_after_validation:
             self.ci[0]['conclusion'] = 'failure'
+        if '--validate-app' in args and self.after_validation_hook is not None:
+            self.after_validation_hook()
         if '--upload-app' in args:
             pending = json.loads(self.state.read_text())['pending']
             self.assertEqual(pending['head'], HEAD)  # intent must already be durable before the side effect
@@ -199,6 +220,7 @@ class ReleaseTests(unittest.TestCase):
         if endpoint.endswith('/git/ref/heads/main'):
             return {'object': {'sha': self.canonical_head}}
         self.assertNotIn('event', parameters)  # A newer manual red/pending CI run must not be hidden.
+        self.assertEqual(parameters.get('head_sha'), HEAD)
         return {'workflow_runs': self.ci}
 
     def publish(self):
@@ -208,7 +230,8 @@ class ReleaseTests(unittest.TestCase):
              patch.object(daily.os.path, 'ismount', side_effect=lambda *_: self.mounted), \
              patch.object(daily.Path, 'is_relative_to', return_value=True), \
              patch.object(daily.subprocess, 'run', self.fake_run), contextlib.redirect_stdout(io.StringIO()):
-            daily.publish(self.config, self.state, self.source, self.apple)
+            daily.publish(self.config, self.state, self.source, self.apple,
+                          clock=self.clock, sleep=self.fake_sleep)
 
     def test_unchanged_and_red_main_never_build_or_upload(self):
         daily.save(self.state, dict(head=HEAD))
@@ -247,15 +270,114 @@ class ReleaseTests(unittest.TestCase):
                         main_run(event='schedule', conclusion='cancelled')]:
             with self.subTest(status=nightly['status'], conclusion=nightly['conclusion']):
                 self.calls.clear()
+                self.now = 0.0
+                self.sleeps.clear()
                 self.ci = [nightly, main_run()]
                 self.publish()
                 self.assertFalse(self.state.exists())
                 self.assertFalse(any('worktree' in c for c in self.calls))
                 self.assertEqual(self.apple.uploads, [])
+                if nightly['status'] == 'completed':
+                    self.assertEqual(self.sleeps, [])
+                else:
+                    self.assertEqual(sum(self.sleeps), daily.CI_WAIT_SECONDS)
         # Conversely, a newer green nightly clears an older failed push on the same SHA.
         self.ci = [main_run(event='schedule'), main_run(conclusion='failure')]
         self.publish()
         self.assertEqual(self.apple.uploads, ['12'])
+
+    def test_slot_waits_bounded_for_in_progress_ci_and_publishes_when_green(self):
+        for event in ('push', 'workflow_dispatch', 'schedule'):
+            with self.subTest(event=event):
+                self.setUp()
+                self.ci = [main_run(event=event, status='queued', conclusion=None)]
+                transitions = [main_run(event=event, status='in_progress', conclusion=None),
+                               main_run(event=event, status='completed', conclusion='success')]
+
+                def advance(_seconds, transitions=transitions):
+                    if transitions:
+                        self.ci = [transitions.pop(0)]
+
+                self.sleep_hook = advance
+                self.publish()
+                self.assertEqual(self.sleeps, [30, 30])
+                self.assertEqual(self.apple.uploads, ['12'])
+                self.assertEqual(json.loads(self.state.read_text())['head'], HEAD)
+
+    def test_in_progress_ci_finishing_red_stops_immediately_without_uploading(self):
+        self.ci = [main_run(status='in_progress', conclusion=None)]
+        self.sleep_hook = lambda _seconds: setattr(
+            self, 'ci', [main_run(status='completed', conclusion='failure')])
+        self.publish()
+        self.assertEqual(self.sleeps, [30])
+        self.assertFalse(self.state.exists())
+        self.assertEqual(self.apple.uploads, [])
+
+    def test_wait_main_ci_green_clamps_final_sleep_at_deadline(self):
+        self.ci = [main_run(status='in_progress', conclusion=None)]
+        with patch.object(daily, 'gh', self.gh):
+            self.assertFalse(daily.wait_main_ci_green(HEAD, deadline=45.0,
+                                                     clock=self.clock, sleep=self.fake_sleep))
+        self.assertEqual(self.sleeps, [30, 15.0])
+        self.assertEqual(self.now, 45.0)
+
+    def test_main_fast_forwarding_during_archive_still_publishes_admitted_head(self):
+        newer = 'c' * 40
+
+        def advance_main_during_validation():
+            self.origin_head = newer
+            self.canonical_head = newer
+
+        self.after_validation_hook = advance_main_during_validation
+        self.publish()
+        state = json.loads(self.state.read_text())
+        self.assertEqual(self.apple.uploads, ['12'])
+        self.assertEqual(state['head'], HEAD)
+        self.assertNotEqual(state['head'], newer)
+        self.assertIn(['git', 'merge-base', '--is-ancestor', HEAD, newer], self.calls)
+
+    def test_post_validation_fetch_race_and_in_progress_ci_wait_still_publish_admitted_head(self):
+        newer = 'e' * 40
+        post_fetches = [0]
+        original_command = self.command
+
+        def racing_command(args, cwd=None):
+            if args[:3] == ['git', 'fetch', 'origin'] and any('--validate-app' in c for c in self.calls):
+                post_fetches[0] += 1
+                if post_fetches[0] == 2:
+                    self.origin_head = newer
+            return original_command(args, cwd=cwd)
+
+        def after_validation():
+            # Canonical GitHub main advances right after the first post-validation fetch,
+            # and a scheduled CI run on HEAD starts in_progress before finishing green.
+            self.canonical_head = newer
+            self.ci = [main_run(event='schedule', status='in_progress', conclusion=None), main_run()]
+            self.sleep_hook = lambda _s: setattr(
+                self, 'ci', [main_run(event='schedule', status='completed', conclusion='success'), main_run()])
+
+        self.command = racing_command
+        self.after_validation_hook = after_validation
+        self.publish()
+        self.assertEqual(post_fetches[0], 2)
+        self.assertEqual(self.sleeps, [30])
+        self.assertEqual(self.apple.uploads, ['12'])
+        self.assertEqual(json.loads(self.state.read_text())['head'], HEAD)
+
+    def test_rewritten_non_ancestor_main_after_validation_stops_before_upload_intent(self):
+        rewritten = 'd' * 40
+        self.non_ancestor.add((HEAD, rewritten))
+
+        def rewrite_main_during_validation():
+            self.origin_head = rewritten
+            self.canonical_head = rewritten
+
+        self.after_validation_hook = rewrite_main_during_validation
+        self.publish()
+        state = json.loads(self.state.read_text())
+        self.assertNotIn('head', state)
+        self.assertNotIn('pending', state)
+        self.assertEqual(self.apple.uploads, [])
 
     def test_developer_titles_stay_in_audit_and_fold_but_never_reach_testflight(self):
         self.raw_notes = '- Developer CI refactor (#10), D95 </details><script>bad</script>\x1b\u202e\ud800'

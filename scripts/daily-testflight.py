@@ -11,6 +11,7 @@ import platform
 import re
 import subprocess
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -31,6 +32,9 @@ APP = '6828353567'
 GROUP = '9f906eb9-750a-47be-957f-097af350dac1'
 ORIGIN = 'https://api.appstoreconnect.apple.com'
 SLOTS = (9, 14, 20)
+CI_WAIT_SECONDS = 45 * 60
+CI_POLL_SECONDS = 30
+MAX_CI_PAGES = 50
 
 
 def scheduled(now):
@@ -72,22 +76,58 @@ def eligible_main_run(run, head):
             and run.get('event') in ('push', 'workflow_dispatch', 'schedule'))
 
 
-def green(runs, head):
+def ci_state(runs, head):
     # Newest eligible run wins; a PR merge-ref run cannot approve or block main.
     run = next((run for run in runs if eligible_main_run(run, head)), None)
-    return bool(run and run.get('status') == 'completed' and run.get('conclusion') == 'success')
+    if not run:
+        return None
+    if run.get('status') != 'completed':
+        return 'pending'
+    return 'green' if run.get('conclusion') == 'success' else 'red'
+
+
+def green(runs, head):
+    return ci_state(runs, head) == 'green'
+
+
+def main_ci_state(head):
+    for page in range(1, MAX_CI_PAGES + 1):
+        runs = gh(f'repos/{REPOSITORY}/actions/workflows/ci.yml/runs', branch='main',
+                  head_sha=head, per_page=100, page=page)['workflow_runs']
+        state = ci_state(runs, head)
+        if state is not None:
+            return state
+        if len(runs) < 100:
+            return 'red'
+    return 'red'
 
 
 def main_ci_green(head):
-    page = 1
+    return main_ci_state(head) == 'green'
+
+
+def wait_main_ci_green(head, *, deadline=None, clock=time.monotonic, sleep=time.sleep):
+    end = (clock() + CI_WAIT_SECONDS) if deadline is None else deadline
     while True:
-        runs = gh(f'repos/{REPOSITORY}/actions/workflows/ci.yml/runs', branch='main',
-                  head_sha=head, per_page=100, page=page)['workflow_runs']
-        if any(eligible_main_run(run, head) for run in runs):
-            return green(runs, head)
-        if len(runs) < 100:
+        state = main_ci_state(head)
+        if state == 'green':
+            return True
+        if state != 'pending':
             return False
-        page += 1
+        remaining = end - clock()
+        if remaining <= 0:
+            return False
+        sleep(min(CI_POLL_SECONDS, remaining))
+
+
+def is_ancestor(source, older, newer):
+    if older == newer:
+        return True
+    try:
+        command(['git', 'merge-base', '--is-ancestor', older, newer], cwd=source)
+    except RuntimeError:
+        return False
+    return True
 
 
 def testflight_notes(text):
@@ -321,7 +361,7 @@ def record_release(state, pending, build_id):
     del state['pending']
 
 
-def publish(config, state_path, source, apple=None):
+def publish(config, state_path, source, apple=None, *, clock=time.monotonic, sleep=time.sleep):
     state = json.loads(state_path.read_text()) if state_path.exists() else {}
     if state.get('pending'):
         pending = state['pending']
@@ -346,7 +386,7 @@ def publish(config, state_path, source, apple=None):
     if head == previous:
         print('[iOS] daily test release skipped: main unchanged')
         return
-    if not main_ci_green(head):
+    if not wait_main_ci_green(head, clock=clock, sleep=sleep):
         print('[iOS] daily test release skipped: current main latest CI is not green')
         return
     apple = apple or Apple()
@@ -404,8 +444,12 @@ def publish(config, state_path, source, apple=None):
     command(['git', 'fetch', 'origin', 'main:refs/remotes/origin/main'], cwd=source)
     current = command(['git', 'rev-parse', 'origin/main'], cwd=source)
     canonical = gh(f'repos/{REPOSITORY}/git/ref/heads/main')['object']['sha']
-    if current != head or canonical != head or not main_ci_green(current):
-        print('[iOS] daily test release skipped: main changed or latest CI is no longer green after validation')
+    if current != canonical:
+        command(['git', 'fetch', 'origin', 'main:refs/remotes/origin/main'], cwd=source)
+        current = command(['git', 'rev-parse', 'origin/main'], cwd=source)
+    if (current != canonical or not is_ancestor(source, head, current)
+            or not wait_main_ci_green(head, clock=clock, sleep=sleep)):
+        print('[iOS] daily test release skipped: admitted commit left canonical main or its latest CI is no longer green after validation')
         return
     pending = dict(head=head, version=version, build=build, notes=notes, output=str(output),
                    fragments=fragment_hashes, notes_format=NOTES_FORMAT)
