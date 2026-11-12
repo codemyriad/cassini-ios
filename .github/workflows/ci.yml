@@ -11,7 +11,7 @@ name: CI
 
 on:
   pull_request:
-    paths: &code
+    paths:
       - 'Cassini/**'
       - 'CassiniActivity/**'
       - 'CassiniShared/**'
@@ -45,14 +45,22 @@ on:
       - '.github/workflows/simulator-gate.yml'
       - '.github/actionlint.yaml'
       - '.github/workflows/ci.yml'
+    types: [opened, synchronize, reopened, labeled]
   push:
     branches: [main]
+  schedule:
+    - cron: '53 2 * * *'
   workflow_dispatch:
 
-# A newer push to a PR cancels that PR's older run; a push to main or a manual run is never cancelled.
+# A newer push to a PR cancels that PR's older code-push run, while labeled runs use their own
+# non-cancelling group so opened/synchronize + labeled on the same head never leave CANCELLED jobs
+# (UNSTABLE check rollup); a push to main, nightly schedule, or manual run is never cancelled.
 concurrency:
-  group: ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || format('run-{0}', github.run_id) }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: ci-${{ github.event_name == 'pull_request' && (github.event.action == 'labeled' && format('pr-{0}-label-{1}', github.event.pull_request.number, github.run_id) || format('pr-{0}', github.event.pull_request.number)) || format('run-{0}', github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' && github.event.action != 'labeled' }}
+
+env:
+  CASSINI_PERF_GATE: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'full-ci')) && '1' || '' }}
 
 permissions:
   contents: read
@@ -62,6 +70,7 @@ jobs:
   # job removes the ~95 s serial prefix when a second runner is free. Each job keeps its own checkout and logs.
   harness:
     name: Harness regressions
+    if: ${{ github.event.action != 'labeled' || github.event.label.name == 'full-ci' }}
     # CM_MAC_RUNNER=cm-mac-m4 moves trusted runs (push, schedule, workflow_dispatch, or same-repo PR) to the
     # self-hosted Apple Silicon runners; fork PRs, unallowlisted events, and any other variable value keep xcode-27.
     runs-on: ${{ (github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)) && vars.CM_MAC_RUNNER == 'cm-mac-m4' && fromJSON('["self-hosted","macOS","ARM64","cm-mac-m4"]') || 'xcode-27' }}
@@ -98,15 +107,19 @@ jobs:
 
   fast-and-build:
     name: Package tests and build
+    if: ${{ github.event.action != 'labeled' || github.event.label.name == 'full-ci' }}
     # Xcode 27.0 (27A266a), the build drmeyers' gate uses. Hosted runners have Xcode 27 only on this preview image; the
     # GA macos-26 image's Xcode 26.6 (Swift 6.2) does not compile the package tests. Trusted runs with
     # CM_MAC_RUNNER=cm-mac-m4 use the self-hosted Apple Silicon runners; fork PRs and unset values keep xcode-27.
     runs-on: ${{ (github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)) && vars.CM_MAC_RUNNER == 'cm-mac-m4' && fromJSON('["self-hosted","macOS","ARM64","cm-mac-m4"]') || 'xcode-27' }}
-    # About 3x the measured run (6.3 min from a cold runner: package tests 3.9, build 2.0), so a hang frees the org's
-    # shared macOS slot.
-    timeout-minutes: 20
+    # About 3x the measured run (6.3 min from a cold runner: package tests 3.9, build 2.0; plus ~1.5 min hosted tests
+    # on nightly/full-ci), so a hang frees the org's shared macOS slot.
+    timeout-minutes: 30
     env:
       CASSINI_CONFORMANCE_REQUIRED: '1'
+      CASSINI_KEEP_SIMS: '0'
+      CASSINI_UI_WORKERS: '0'
+      CASSINI_LOCK_MINUTES: '15'
     steps:
       - uses: actions/checkout@v5
         with:
@@ -129,9 +142,24 @@ jobs:
       - name: String catalogs and package tests
         working-directory: cassini-ios
         run: scripts/test.sh fast
-      - name: Build for testing
+      - name: Build for testing (and hosted tests on nightly / full-ci)
         working-directory: cassini-ios
-        run: scripts/test.sh build
+        run: |
+          if [ "${CASSINI_PERF_GATE:-}" = "1" ]; then
+            runner_slug=$(printf '%s' "${RUNNER_NAME:-hosted}" | tr -cs 'A-Za-z0-9._-' '-' | sed 's/^-*//; s/-*$//')
+            prefix="ts-ci-perf-${runner_slug:-hosted}"
+            printf 'CASSINI_SIM_PREFIX=%s\n' "$prefix" >> "$GITHUB_ENV"
+            export CASSINI_SIM_PREFIX="$prefix"
+            scripts/test.sh clean
+            # scripts/test.sh app acquires ~/.cassini-heavy.lock itself via start_heavy/take_heavy_lock;
+            # wrapping in heavy-run without CASSINI_HEAVY_LOCK_HELD=1 would self-deadlock on the lock.
+            scripts/test.sh app
+            grep -E "^Test Case '-\[CassiniTests\.LibraryScreenTests testAThousandNotesFilterWithoutDroppingFrames\]' passed \(" DerivedData.noindex/test-logs/hosted.log
+            grep -F "(CASSINI_PERF_GATE=1)" DerivedData.noindex/test-logs/hosted.log
+          else
+            scripts/test.sh build
+          fi
+      # Upload failure logs before `scripts/test.sh clean` rotates DerivedData.noindex/test-logs to test-logs.previous.
       - uses: actions/upload-artifact@v5
         if: failure()
         continue-on-error: true
@@ -139,3 +167,7 @@ jobs:
           name: test-logs-${{ github.sha }}
           path: cassini-ios/DerivedData.noindex/test-logs
           retention-days: 14
+      - name: Remove only this run's simulator clones
+        if: always() && env.CASSINI_PERF_GATE == '1' && env.CASSINI_SIM_PREFIX != ''
+        working-directory: cassini-ios
+        run: scripts/test.sh clean
