@@ -21,8 +21,9 @@ final class ScreenshotTests: XCTestCase {
     // MARK: - iPhone, in the order of Android's README
 
     @MainActor func test01Library() throws {
-        let app = try launchPhone(["--seed", "search"])
-        XCTAssertTrue(row(app, "Notes from the design review").waitForExistence(within: 5))
+        let app = try launchPhone(["--seed", "processing"] + DeviceUnderTest.workingSpeech)
+        let running = row(app, "Weekly planning call")
+        XCTAssertTrue(running.wait(until: NSPredicate(format: "label CONTAINS ', transcribing'"), within: 15))
         capture("01-library")
     }
 
