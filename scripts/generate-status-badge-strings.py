@@ -43,7 +43,7 @@ def render(root=ROOT):
                         raise ValueError(f'New plural needs runtime count selection: {entry["id"]} {language}/{category}')
             locales[language] = {'stringUnit': {'state': 'translated', 'value': value}}
         strings[entry['id']] = {'comment': f'Generated from cassini-ux {pin["commit"]}, {entry["id"]}; named placeholders stay verbatim.',
-                                'localizations': locales}
+                                'extractionState': 'manual', 'localizations': locales}
     return (json.dumps({'sourceLanguage': 'en', 'strings': strings, 'version': '1.0'}, ensure_ascii=False, indent=2) + '\n').encode()
 
 

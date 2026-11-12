@@ -3,6 +3,7 @@
   "strings": {
     "meeting.interruptedAt": {
       "comment": "Generated from cassini-ux 793209cb3425bece7143178458fddd94b691e12d, meeting.interruptedAt; named placeholders stay verbatim.",
+      "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -44,6 +45,7 @@
     },
     "states.badge.importing": {
       "comment": "Generated from cassini-ux 793209cb3425bece7143178458fddd94b691e12d, states.badge.importing; named placeholders stay verbatim.",
+      "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -85,6 +87,7 @@
     },
     "states.badge.interrupted": {
       "comment": "Generated from cassini-ux 793209cb3425bece7143178458fddd94b691e12d, states.badge.interrupted; named placeholders stay verbatim.",
+      "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -126,6 +129,7 @@
     },
     "states.badge.needsAttention": {
       "comment": "Generated from cassini-ux 793209cb3425bece7143178458fddd94b691e12d, states.badge.needsAttention; named placeholders stay verbatim.",
+      "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -167,6 +171,7 @@
     },
     "states.badge.received": {
       "comment": "Generated from cassini-ux 793209cb3425bece7143178458fddd94b691e12d, states.badge.received; named placeholders stay verbatim.",
+      "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -208,6 +213,7 @@
     },
     "states.badge.recording": {
       "comment": "Generated from cassini-ux 793209cb3425bece7143178458fddd94b691e12d, states.badge.recording; named placeholders stay verbatim.",
+      "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -249,6 +255,7 @@
     },
     "states.badge.saving": {
       "comment": "Generated from cassini-ux 793209cb3425bece7143178458fddd94b691e12d, states.badge.saving; named placeholders stay verbatim.",
+      "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -290,6 +297,7 @@
     },
     "states.badge.transcribing": {
       "comment": "Generated from cassini-ux 793209cb3425bece7143178458fddd94b691e12d, states.badge.transcribing; named placeholders stay verbatim.",
+      "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -331,6 +339,7 @@
     },
     "states.badge.transcribing.noEta": {
       "comment": "Generated from cassini-ux 793209cb3425bece7143178458fddd94b691e12d, states.badge.transcribing.noEta; named placeholders stay verbatim.",
+      "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -372,6 +381,7 @@
     },
     "states.badge.transcribing.underMinute": {
       "comment": "Generated from cassini-ux 793209cb3425bece7143178458fddd94b691e12d, states.badge.transcribing.underMinute; named placeholders stay verbatim.",
+      "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {

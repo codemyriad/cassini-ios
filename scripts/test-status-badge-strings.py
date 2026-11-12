@@ -28,6 +28,7 @@ class BadgeStringGenerationTests(unittest.TestCase):
         self.assertEqual(set(output['strings']), generator.IDS)
         for key, entry in output['strings'].items():
             self.assertEqual(set(entry['localizations']), set(generator.LANGUAGES))
+            self.assertEqual(entry['extractionState'], 'manual')
         self.assertIn('{liveBadge}', output['strings']['states.badge.recording']['localizations']['en']['stringUnit']['value'])
         self.assertIn('{n}', output['strings']['states.badge.transcribing']['localizations']['fr']['stringUnit']['value'])
         self.assertIn('{position}', output['strings']['meeting.interruptedAt']['localizations']['it']['stringUnit']['value'])
