@@ -24,7 +24,9 @@ struct StatusBadgeGallery: View {
             VStack(alignment: .leading, spacing: 16) {
                 Text(verbatim: "Status badges").font(.title.weight(.semibold))
                 ForEach(Array(badges.enumerated()), id: \.offset) { index, badge in
-                    StatusBadgeView(badge: badge).accessibilityIdentifier("badge-gallery-\(index)")
+                    FlowLayout {
+                        StatusBadgeView(badge: badge).accessibilityIdentifier("badge-gallery-\(index)")
+                    }
                 }
                 Text(StatusBadges.interruptedAt(position: "00:41:12",
                                                 text: { StatusBadgeCopy.template($0, locale: locale) }))
