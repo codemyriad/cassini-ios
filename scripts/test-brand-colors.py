@@ -121,12 +121,31 @@ class BrandGenerationTests(unittest.TestCase):
                     'UIColor.magenta', 'UIColor.darkGray', 'CIColor.cyan', '.tint(.systemGray2)',
                     '.foregroundStyle(\n .red)', '.fill ( .blue )', 'UIColor . systemRed',
                     '.shadow(color: .purple, radius: 2)',
+                    '.foregroundStyle(isSelected ? .red : .blue)',
+                    '.background(active ? .green : .pink, in: Capsule())',
+                    'with: .color(fresh ? .recordingAccent : .red)',
+                    'text[range].foregroundColor = .red', 'let tint: Color = .red',
+                    'let tints: [Color] = [.red, .blue]', '.listRowBackground(.red)',
+                    '.activityBackgroundTint(.red)', '.keylineTint(.red)',
+                    'Color(uiColor: .secondarySystemGroupedBackground)', 'Color(uiColor: .label)',
+                    'Color(cgColor: existing)', 'Color(ciColor: existing)',
+                    'UIColor(dynamicProvider: provider)', 'UIColor { traits in .red }',
+                    'UIColor.init { traits in .green }', 'UIColor({ traits in .blue })',
+                    'UIColor(_colorLiteralRed: 1, green: 0, blue: 0, alpha: 1)',
+                    'CGColor(genericGrayGamma2_2Gray: 0.5, alpha: 1)',
+                    *('Color(uiColor: .' + name + ')' for name in (
+                        'systemMint', 'systemCyan', 'systemBackground', 'systemGroupedBackground', 'systemFill',
+                        'secondarySystemFill', 'tertiarySystemGroupedBackground', 'quaternarySystemFill',
+                        'quaternaryLabel', 'separator', 'opaqueSeparator', 'placeholderText', 'link')),
+                    'let link = "https://example.test"; let tint = Color.red',
+                    'let link = "cassini://example"; let tint: Color = .blue',
                     '#colorLiteral(red: 1, green: 0, blue: 0, alpha: 1)', 'let rgb = 0xFFEEDD', 'let hex = "#abcdef"')
         target = self.root / 'Cassini/NewView.swift'; target.parent.mkdir()
         for example in examples:
             with self.subTest(example=example):
                 target.write_text(example)
-                with self.assertRaisesRegex(ValueError, 'NewView.swift:1'):
+                line = 2 if example == '.foregroundStyle(\n .red)' else 1
+                with self.assertRaisesRegex(ValueError, f'NewView.swift:{line}'):
                     brand.check_literals(self.root)
         target.write_text('''
 .foregroundStyle(Color.ink.opacity(0.5))
@@ -134,8 +153,26 @@ class BrandGenerationTests(unittest.TestCase):
 let tint = SpeakerTint.blue
 switch tint { case .blue, .green, .red, .gray, .magenta: break }
 let component = DomainComponent.red
+let named = SpeakerNaming.ui(value).label
+let domainColor = palette[index].blue
+let optionalLabel = optional?.label
+let url = "https://example.test"
+/* Color.red /* UIColor.systemFill */ Color.blue */
+let action: OpenURLAction.Result = .systemAction
 ''')
         brand.check_literals(self.root)
+
+    def test_comment_handling_preserves_swift_strings_and_literal_line_numbers(self):
+        target = self.root / 'Cassini/NewView.swift'; target.parent.mkdir()
+        for literal in ('"https://example.test"', '#"https://example.test"#',
+                        '"""A quote " and https://example.test\ninside a multiline string"""',
+                        '##"https://example.test/\\##"quoted"##'):
+            with self.subTest(literal=literal):
+                source = '/* Color.red\n /* nested Color.blue */\n*/\nlet url = ' + literal + '; let color: Color = .red'
+                target.write_text(source)
+                expected_line = source.count('\n') + 1
+                with self.assertRaisesRegex(ValueError, f'NewView.swift:{expected_line}'):
+                    brand.check_literals(self.root)
 
 
 if __name__ == "__main__":
