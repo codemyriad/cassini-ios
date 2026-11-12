@@ -174,6 +174,19 @@ let action: OpenURLAction.Result = .systemAction
                 with self.assertRaisesRegex(ValueError, f'NewView.swift:{expected_line}'):
                     brand.check_literals(self.root)
 
+    def test_case_words_in_strings_and_where_conditions_cannot_hide_colours(self):
+        target = self.root / 'Cassini/NewView.swift'; target.parent.mkdir()
+        for example in ('let description = "case"; let tint = Color.red; let count: Int = 0',
+                        'let description = #"case"#; let tint = UIColor.systemFill; let count: Int = 0',
+                        'Text("case").foregroundStyle(.red); let count: Int = 0',
+                        'let description = """case\ntext"""; let tint = Color.red; let count: Int = 0',
+                        'switch mood { case .blue where tint == .red: break }',
+                        'switch mood { case .blue: break }; let hex = "#FF0000"'):
+            with self.subTest(example=example):
+                target.write_text(example)
+                with self.assertRaisesRegex(ValueError, f'NewView.swift:{example.count(chr(10)) + 1}'):
+                    brand.check_literals(self.root)
+
 
 if __name__ == "__main__":
     unittest.main()

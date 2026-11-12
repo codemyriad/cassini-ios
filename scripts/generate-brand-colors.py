@@ -129,8 +129,8 @@ LITERAL = re.compile(
     r"#[a-fA-F0-9]{6}(?:[a-fA-F0-9]{2})?\b|\b0x[a-fA-F0-9]{6,8}\b")
 
 
-def without_comments(source):
-    """Keep Swift strings (including raw/multiline) and line positions; blank nested comments."""
+def without_comments(source, *, keep_strings=True):
+    """Keep positions while blanking nested comments and, optionally, Swift raw/multiline strings."""
     string_start = re.compile(r'(#*)("""|")')
     parts, index = [], 0
     while index < len(source):
@@ -157,10 +157,23 @@ def without_comments(source):
                     else: index += 1
             else:
                 index += 1
-            parts.append(source[start:index])
+            part = source[start:index]
+            parts.append(part if keep_strings or not match else re.sub(r'[^\n]', ' ', part))
             continue
         parts.append(re.sub(r'[^\n]', ' ', source[start:index]))
     return ''.join(parts)
+
+
+def without_case_patterns(source):
+    code = list(without_comments(source))
+    # Find real case headers on a code-only mask. A quoted "case" must never consume subsequent code.
+    mask = without_comments(source, keep_strings=False)
+    for match in re.finditer(r"\bcase\b[^:{]*:", mask):
+        condition = re.search(r"\bwhere\b", match.group())
+        end = match.start() + condition.start() if condition else match.end()
+        for index in range(match.start(), end):
+            if code[index] != '\n': code[index] = ' '
+    return ''.join(code)
 
 
 def check_literals(root=ROOT):
@@ -169,9 +182,8 @@ def check_literals(root=ROOT):
         for path in sorted((root / directory).rglob("*.swift")):
             if path.relative_to(root).as_posix() == OUTPUT:
                 continue
-            code = without_comments(path.read_text())
             # Model enum patterns are not colour values; keep qualified uses such as SpeakerTint.blue too.
-            code = re.sub(r"\bcase\b[^:{]*:", lambda m: '\n' * m.group(0).count('\n'), code)
+            code = without_case_patterns(path.read_text())
             for match in LITERAL.finditer(code):
                 number = code.count("\n", 0, match.start()) + 1
                 failures.append(f"{path.relative_to(root)}:{number}: fixed colour outside generated table")
