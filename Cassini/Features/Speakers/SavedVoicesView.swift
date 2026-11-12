@@ -142,7 +142,7 @@ struct SavedVoicesView: View {
 /// A person: avatar, name, "14 notes · 22 min confirmed speech", the stale hint, and the options menu.
 private struct PersonRow: View {
     /// Saved-voice avatars cycle by list position, as on Android.
-    private static let tints: [Color] = [.speakerTints[1], .speakerTints[5], .toneWarn, .speakerTints[3]]
+    private static let tints = Color.savedVoiceTints
 
     let person: SavedVoiceSummary
     let index: Int

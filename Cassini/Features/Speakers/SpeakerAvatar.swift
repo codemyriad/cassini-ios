@@ -18,7 +18,7 @@ struct SpeakerAvatar: View {
     }
 
     static func tint(name: String, ordinal: Int) -> Color {
-        DefaultLabels.placeholderNumber(name) != nil ? .toneWarn : Color.speakerTints[ordinal % Color.speakerTints.count]
+        DefaultLabels.placeholderNumber(name) != nil ? .unnamedSpeakerTint : Color.speakerTints[ordinal % Color.speakerTints.count]
     }
 
     private var text: String {

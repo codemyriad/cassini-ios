@@ -122,6 +122,10 @@ extension Color {
     static let recordingFinish = record
     static let recordingLive = recordingAccent
 
+    /// Placeholder/saved-voice amber was the old warning hue; freeze it independently while L-14 stays OPEN.
+    static let unnamedSpeakerTint = Color(light: rgb(0.55, 0.35, 0.02), dark: rgb(0.98, 0.76, 0.36))
+    static let savedVoiceTints: [Color] = [.speakerTints[1], .speakerTints[5], .unnamedSpeakerTint, .speakerTints[3]]
+
     /// Speaker tints, assigned by first appearance in a transcript.
     static let speakerTints: [Color] = [
         Color(light: rgb(0.76, 0.22, 0.10), dark: rgb(1, 0.55, 0.40)),

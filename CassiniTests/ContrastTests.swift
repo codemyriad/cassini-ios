@@ -89,7 +89,7 @@ import CassiniNotebook
                 pairs.append(nonText("\(name) dot on \(name) tint over \(surface)", tone.color, on: color, tone.background))
             }
         }
-        for (index, tint) in Color.speakerTints.enumerated() {
+        for (index, tint) in (Color.speakerTints + [Color.unnamedSpeakerTint]).enumerated() {
             for (surface, color) in surfaces {
                 pairs.append(text("speaker tint \(index) on \(surface)", tint, on: color))
                 pairs.append(nonText("speaker tint \(index) avatar over \(surface)", tint, on: color, tint.opacity(0.14)))
