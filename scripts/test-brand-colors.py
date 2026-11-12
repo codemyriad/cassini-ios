@@ -119,6 +119,8 @@ class BrandGenerationTests(unittest.TestCase):
                     'CIColor(red: 1, green: 0, blue: 0)', 'CIColor.init(red: 1, green: 0, blue: 0)',
                     'CGColor(srgbRed: 1, green: 0, blue: 0, alpha: 1)', 'let c: CGColor = .init(srgbRed: 1, green: 0, blue: 0, alpha: 1)',
                     'UIColor.magenta', 'UIColor.darkGray', 'CIColor.cyan', '.tint(.systemGray2)',
+                    '.foregroundStyle(\n .red)', '.fill ( .blue )', 'UIColor . systemRed',
+                    '.shadow(color: .purple, radius: 2)',
                     '#colorLiteral(red: 1, green: 0, blue: 0, alpha: 1)', 'let rgb = 0xFFEEDD', 'let hex = "#abcdef"')
         target = self.root / 'Cassini/NewView.swift'; target.parent.mkdir()
         for example in examples:
