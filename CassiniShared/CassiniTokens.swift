@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// Draft canvas tokens from cassini-ux e4ae2217312370250a39ad83e047a186048e0a9e, brand/tokens.json; provenance is in Brand/UPSTREAM.json.
+/// Draft canvas tokens from cassini-ux e244ad6a830e4ef77d87fb452143f7100c767139, brand/tokens.json; provenance is in Brand/UPSTREAM.json.
 /// W1.1 installs these roles without activating them. Existing output remains in the compatibility block below;
-/// the separate W1 look-preview PR switches call sites. Proposed speaker/avatar roles are never loaded.
+/// the separate W1 look-preview PR switches call sites, including the now-decided speaker/avatar roles.
 enum CassiniTokens {
     enum Role: String, CaseIterable {
         case ground
@@ -24,8 +24,10 @@ enum CassiniTokens {
         case recordTint = "record-tint"
         case onRecord = "on-record"
         case error
+        case errorFill = "error-fill"
         case errorTint = "error-tint"
         case success
+        case successFill = "success-fill"
         case successTint = "success-tint"
         case warnInk = "warn-ink"
         case warnTint = "warn-tint"
@@ -33,6 +35,20 @@ enum CassiniTokens {
         case neutralTint = "neutral-tint"
         case highlight
         case highlightInk = "highlight-ink"
+        case speaker0 = "speaker-0"
+        case speaker1 = "speaker-1"
+        case speaker2 = "speaker-2"
+        case speaker3 = "speaker-3"
+        case speaker4 = "speaker-4"
+        case speaker5 = "speaker-5"
+        case speaker6 = "speaker-6"
+        case avatar0 = "avatar-0"
+        case avatar1 = "avatar-1"
+        case avatar2 = "avatar-2"
+        case avatar3 = "avatar-3"
+        case avatar4 = "avatar-4"
+        case avatar5 = "avatar-5"
+        case avatar6 = "avatar-6"
         case inverse
         case onInverse = "on-inverse"
         case inverseAccent = "inverse-accent"
@@ -49,7 +65,7 @@ enum CassiniTokens {
               let sheet = try? JSONDecoder().decode(Sheet.self, from: data) else {
             preconditionFailure("The pinned brand token resource is missing or invalid")
         }
-        return sheet.tokens.filter { ["decided", "placeholder"].contains($0.value.status) }
+        return sheet.tokens.filter { $0.value.status == "decided" }
     }()
 
     static func color(_ role: Role) -> Color {
@@ -69,7 +85,7 @@ enum CassiniTokens {
 }
 
 // Compatibility colours retain the exact pre-W1 floating-point values (not rounded hex values).
-// Kept app-local until the preview activates each role; speaker hues and Recording ground await L-14/L-08.
+// Kept app-local until the preview activates each role; Recording ground still awaits L-08.
 extension Color {
     static let paper = Color(light: rgb(0.975, 0.965, 0.941), dark: rgb(0.075, 0.085, 0.095))
     static let card = Color(light: .white, dark: rgb(0.12, 0.135, 0.145))

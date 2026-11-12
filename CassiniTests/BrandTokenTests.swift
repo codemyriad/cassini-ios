@@ -15,11 +15,13 @@ import CryptoKit
         let pinURL = try #require(bundle.url(forResource: "UPSTREAM", withExtension: "json"))
         let pin = try JSONDecoder().decode(Pin.self, from: Data(contentsOf: pinURL))
         #expect(pin.repository == "https://github.com/codemyriad/cassini-ux")
-        #expect(pin.path == "brand/tokens.json" && pin.commit.count == 40)
+        #expect(pin.path == "brand/tokens.json")
+        #expect(pin.commit == "e244ad6a830e4ef77d87fb452143f7100c767139")
         #expect(SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined() == pin.sha256)
         let sheet = try JSONDecoder().decode(Sheet.self, from: data)
-        let active = sheet.tokens.filter { ["decided", "placeholder"].contains($0.value.status) }
-        #expect(Set(CassiniTokens.Role.allCases.map(\.rawValue)) == Set(active.keys), "No missing roles or proposed hues")
+        let active = sheet.tokens.filter { $0.value.status == "decided" }
+        #expect(active.count == 49 && active.count == sheet.tokens.count, "All 49 pinned roles are decided")
+        #expect(Set(CassiniTokens.Role.allCases.map(\.rawValue)) == Set(active.keys), "No missing or extra decided roles")
         for role in CassiniTokens.Role.allCases {
             let value = try #require(active[role.rawValue])
             for (scheme, hex) in [(ColorScheme.light, value.light), (.dark, value.dark)] {
