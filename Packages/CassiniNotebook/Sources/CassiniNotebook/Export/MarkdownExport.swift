@@ -98,11 +98,13 @@ public enum MarkdownExport {
 
     /// S-5 suggestion only: unique export folders avoid app collisions; the share provider handles destination ones.
     public static func filename(_ title: String, untitled: String) -> String {
-        let replaced = String(String.UnicodeScalarView(title.unicodeScalars.map {
+        let replaced = title.unicodeScalars.map {
             $0 == "/" || $0 == "\\" || $0.value <= 0x1F || (0x7F...0x9F).contains($0.value) ? "-" : $0
-        })).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        // Foundation also trims U+200B; Android's whitespace trim preserves that stored format character.
+        let trimmed = replaced.drop(while: isWhitespace).reversed().drop(while: isWhitespace).reversed()
         var stem = "", count = 0, bytes = 0
-        for scalar in replaced.unicodeScalars {
+        for scalar in trimmed {
             let size = String(scalar).utf8.count
             guard count < 120, bytes + size <= 230 else { break }
             stem.unicodeScalars.append(scalar)

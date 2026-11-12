@@ -351,7 +351,7 @@ PATH="/path/to/pr-shots-venv/bin:$PATH" scripts/pr-shots.sh --base origin/main -
 ```
 
 The base is the merge base of that ref and the head worktree (`--head PATH` defaults to this checkout).
-Use a new output folder outside the worktree; commit changes and remove untracked files first. It renders each source's English screenshot set (currently 22 images) in light and dark,
+Use a new output folder outside the worktree; commit changes and remove untracked files first. It renders each source's English screenshot set (currently 26 images, including Note and Library export menus) in light and dark,
 using each source's capture tests, renderer and one private simulator pair. Legacy bases without manifest tooling
 receive only the head renderer/helper, preserving their capture tests. New reading shots start paused,
 so no pressed skip-button tint leaks into a capture. Each render takes `~/.cassini-heavy.lock` itself

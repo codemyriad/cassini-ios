@@ -73,6 +73,9 @@ struct MarkdownExportTests {
         #expect(MarkdownExport.filename(String(repeating: "😀", count: 121), untitled: "Untitled meeting") == String(repeating: "😀", count: 57) + ".md")
         let accents = String(repeating: "a\u{0301}", count: 61)
         #expect(MarkdownExport.filename(accents, untitled: "Untitled meeting").dropLast(3).unicodeScalars.count == 120)
+        let invisible = "\u{200B}Title\u{200B}"
+        #expect(Data(MarkdownExport.filename("\u{00A0}" + invisible + "\u{2003}", untitled: "Untitled meeting").utf8)
+                == Data((invisible + ".md").utf8), "Trim separators, preserving Android's stored zero-width scalars")
     }
 
     @Test func combiningScalarsAndWhitespaceMatchAndroidBytes() {

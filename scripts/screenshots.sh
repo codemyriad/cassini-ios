@@ -34,7 +34,7 @@ derived="$root/DerivedData.noindex"
 prefix="${CASSINI_SIM_PREFIX:-ts-$(basename "$root")}"
 iphone_type="${CASSINI_IPHONE:-iPhone 17}"
 ipad_type="${CASSINI_IPAD:-iPad Pro 13-inch (M5)}"
-# The shots ScreenshotTests takes in each appearance: test01Library to test09SavedVoices, and the two split views.
+# The shots ScreenshotTests takes in each appearance: test01Library to test11LibraryExport, and the two split views.
 iphone_shots=11 ipad_shots=2
 locale=en devices="iphone ipad" appearances="light dark" build=1 extra=() output=""
 usage() { awk 'NR > 1 && !/^#/ { exit } NR > 1' "$0" | sed 's/^# \{0,1\}//'; }
