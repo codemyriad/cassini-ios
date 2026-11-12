@@ -39,6 +39,7 @@ on:
       - 'scripts/screenshot-manifest.py'
       - 'scripts/screenshots.sh'
       - 'scripts/test-pr-shots-local.py'
+      - 'scripts/*status-badge*.py'
       - 'scripts/*testflight*'
       - 'scripts/launchd/**'
       - '.github/workflows/daily-testflight.yml'
@@ -82,6 +83,8 @@ jobs:
       - name: Test harness regressions
         working-directory: cassini-ios
         run: |
+          python3 scripts/generate-status-badge-strings.py --check
+          python3 scripts/test-status-badge-strings.py
           python3 scripts/test-ci-runner-selection.py
           python3 scripts/test-daily-testflight.py
           python3 scripts/test-testflight-archive.py

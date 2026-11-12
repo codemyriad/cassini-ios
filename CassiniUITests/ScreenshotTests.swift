@@ -146,6 +146,12 @@ final class ScreenshotTests: XCTestCase {
         capture(name)
     }
 
+    @MainActor func test12StatusBadges() throws {
+        let app = try launchPhone(["--badge-gallery"])
+        XCTAssertTrue(app.descendants(matching: .any)["badge-gallery-8"].waitForExistence(within: 15))
+        capture("12-status-badges")
+    }
+
     // MARK: - iPad
 
     @MainActor func testSplitViewLandscape() throws {
@@ -175,7 +181,9 @@ final class ScreenshotTests: XCTestCase {
         app.launchAndWait()
         // One wait for either screen: waiting for the Library first cost a fixture launch its whole limit.
         let search = app.textFields["librarySearch"], title = app.staticTexts["noteTitle"]
-        XCTAssertTrue(poll(within: max(15, uiWaitFloor)) { search.exists || title.exists })
+        XCTAssertTrue(poll(within: max(15, uiWaitFloor)) {
+            search.exists || title.exists || app.descendants(matching: .any)["badgeGallery"].exists
+        })
         return app
     }
 

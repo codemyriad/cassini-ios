@@ -5,6 +5,7 @@ import CassiniNotebook
 
 struct ImportBatchesView: View {
     @Environment(ImportStore.self) private var imports
+    @Environment(\.locale) private var locale
     var body: some View {
         ForEach(imports.batches) { batch in
             VStack(alignment: .leading, spacing: 8) {
@@ -18,6 +19,9 @@ struct ImportBatchesView: View {
                     UITestStateMarker(identifier: "bulkImportCompleted", value: batch.id.uuidString)
                     #endif
                 } else {
+                    if let badge = StatusBadges.entry(importing: true, text: { StatusBadgeCopy.template($0, locale: locale) }) {
+                        StatusBadgeView(badge: badge)
+                    }
                     ProgressView(BulkTransferCopy.importing(batch.progress))
                     Button(BulkTransferCopy.cancel, role: .cancel) { batch.cancel() }
                         .accessibilityIdentifier("cancelBulkImport")

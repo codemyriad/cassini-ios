@@ -54,7 +54,9 @@ struct LibraryFormat {
     func rowLabel(_ row: LibraryRow, day: DayKey) -> String {
         var parts = [row.title, spokenDuration(row.duration)]
         if let date = meetingTime(row, spoken: true, day: row.day ?? day) { parts.append(date) }
-        parts.append(LibraryCopy.status(row.status).lowercased(with: locale))
+        let status = RowBadge.presentation(row, text: { StatusBadgeCopy.template($0, locale: locale) })?.text
+            ?? LibraryCopy.status(row.status)
+        parts.append(status.lowercased(with: locale))
         if row.status.suffix != .resume, row.status.suffix != .tryAgain, let suffix = LibraryCopy.suffix(row.status) {
             parts.append(suffix.trimmingCharacters(in: CharacterSet(charactersIn: "·").union(.whitespaces)).lowercased(with: locale))
         }

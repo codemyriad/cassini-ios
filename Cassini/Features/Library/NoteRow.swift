@@ -72,7 +72,7 @@ struct NoteRow: View {
                 if let meetingTime = format.meetingTime(row) {
                     Text(meetingTime).font(.caption).foregroundStyle(Color.muted).passive()
                 }
-                RowChip(status: row.status).passive()
+                RowChip(row: row).passive()
                 suffix
                 if row.bookmarkCount > 0 {
                     Label { Text(row.bookmarkCount, format: .number) } icon: { Image(systemName: "bookmark.fill") }.font(.caption).foregroundStyle(Color.muted).passive()
@@ -112,9 +112,21 @@ struct NoteRow: View {
 
 /// The status chip: text in the status's tone on its tint, never colour alone.
 struct RowChip: View {
-    let status: LibraryRow.Status
+    let row: LibraryRow
+    @Environment(\.locale) private var locale
+
+    private var status: LibraryRow.Status { row.status }
 
     var body: some View {
+        if let badge = RowBadge.presentation(row, text: { StatusBadgeCopy.template($0, locale: locale) }) {
+            StatusBadgeView(badge: badge)
+        } else {
+            localBadge
+        }
+    }
+
+    /// The merged contract retains phone-specific applicability and does not invent their glyph mappings.
+    private var localBadge: some View {
         HStack(spacing: 5) {
             if case .recording = status { Circle().fill(tone.color).frame(width: 6, height: 6) }
             if case .transcribed = status { Image(systemName: "checkmark").font(.system(size: 9, weight: .bold)) }

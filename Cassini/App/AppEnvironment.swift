@@ -61,6 +61,9 @@ import CassiniEngineTesting
         var marksLaunchFinished = false
         /// What the `launchFinished` marker carries: the token of the UI-test relaunch that built this environment.
         var token = ""
+        #if DEBUG
+        var badgeGallery = false
+        #endif
     }
 
     enum OpenFixture: Equatable {
@@ -197,7 +200,7 @@ extension AppEnvironment {
     /// The environment of UI-test launch arguments. A relaunch inside the running app (`UITestRelaunch`) passes
     /// `inProcess` and its `token`.
     static func uiTesting(arguments: [String], inProcess: Bool = false, token: String = "") -> AppEnvironment {
-        uiTesting(reset: arguments.contains("--reset-test-data"), seed: seed(in: arguments),
+        var environment = uiTesting(reset: arguments.contains("--reset-test-data"), seed: seed(in: arguments),
                   openFixture: fixture(in: arguments), modelsMissing: arguments.contains("--models-missing"),
                   modelDownloading: arguments.contains("--model-downloading"),
                   draftGrowing: arguments.contains("--draft-growing"),
@@ -209,6 +212,8 @@ extension AppEnvironment {
                   bundledCapable: arguments.contains("--d78-capable"), bundledVerified: arguments.contains("--d78-verified"),
                   platform: arguments.contains("--ios18-platform") ? .iOS18 : LivePlatform.facts,
                   inProcess: inProcess, token: token)
+        environment.launch.badgeGallery = arguments.contains("--badge-gallery")
+        return environment
     }
 
     /// A separate library and preferences, a fixed clock and en_US formatting (or the region of `-AppleLocale`, for the

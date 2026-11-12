@@ -21,6 +21,7 @@ SHOTS = {
     "09-saved-voices": ("Saved voices", "SavedVoices", "test09SavedVoices", "voices"),
     "10-note-export": ("Note export menu", "NoteExport", "test10NoteExport", "reading"),
     "11-library-export": ("Library export menu", "LibraryExport", "test11LibraryExport", "reading"),
+    "12-status-badges": ("Status badges", "StatusBadges", "test12StatusBadges", "badge-gallery"),
     "01-split-landscape": ("Split view landscape", "Meeting", "testSplitViewLandscape", "reading"),
     "02-split-portrait": ("Split view portrait", "Meeting", "testSplitViewPortrait", "reading"),
 }
