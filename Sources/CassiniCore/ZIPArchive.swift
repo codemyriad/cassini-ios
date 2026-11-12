@@ -100,9 +100,7 @@ public struct ZIPArchive: Sendable {
             let rawName = Data(data.prefix(nameSize))
             let extra = Data(data.suffix(extraSize))
             if try Self.extra(0x9901, in: extra) != nil { throw ZIPFailure.encrypted }
-            let encoding = flags & 0x800 != 0 ? String.Encoding.utf8 :
-                String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(0x0400)) // CP437
-            guard var name = String(data: rawName, encoding: encoding) else { throw ZIPFailure.damaged }
+            var name = try Self.decodeName(rawName, flags: flags)
             try Self.checkPath(name)
             let decodedName = name
             var unicodeName: String?
@@ -242,6 +240,16 @@ public struct ZIPArchive: Sendable {
         return bytes
     }
 
+    /// macOS ditto writes UTF-8 names without bit 11. Prefer strict UTF-8 for unflagged names;
+    /// only undecodable legacy names use CP437. An explicit UTF-8 flag never permits that fallback.
+    private static func decodeName(_ raw: Data, flags: UInt16) throws -> String {
+        if let name = String(data: raw, encoding: .utf8) { return name }
+        guard flags & 0x800 == 0,
+              let name = String(data: raw, encoding: String.Encoding(rawValue:
+                CFStringConvertEncodingToNSStringEncoding(0x0400))) else { throw ZIPFailure.damaged }
+        return name
+    }
+
     static func checkPath(_ name: String) throws {
         let normalized = name.replacingOccurrences(of: "\\", with: "/")
         let prefix = Array(normalized.utf8.prefix(2))
@@ -266,9 +274,7 @@ public struct ZIPArchive: Sendable {
         let names = Int(local.z16(26)), extras = Int(local.z16(28))
         guard UInt64(names) <= start - offset - 30 else { throw ZIPFailure.damaged }
         let raw = try zipRead(file, at: offset + 30, count: names)
-        let encoding = local.z16(6) & 0x800 != 0 ? String.Encoding.utf8 :
-            String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(0x0400))
-        guard let localName = String(data: raw, encoding: encoding) else { throw ZIPFailure.damaged }
+        let localName = try decodeName(raw, flags: local.z16(6))
         try checkPath(localName)
         let extraOffset = offset + 30 + UInt64(names)
         let available = Int(min(UInt64(extras), start - extraOffset))
