@@ -2,12 +2,16 @@
 """Fast generator/pin/guard fault controls; no Swift compiler or simulator."""
 import hashlib
 import importlib.util
+import sys
 import json
 from pathlib import Path
 import shutil
 import tempfile
 import unittest
 from unittest.mock import patch
+
+# Fault controls must not dirty the source checkout with interpreter caches.
+sys.dont_write_bytecode = True
 
 ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location("brand", ROOT / "scripts/generate-brand-colors.py")

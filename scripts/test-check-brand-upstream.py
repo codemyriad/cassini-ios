@@ -2,12 +2,16 @@
 import hashlib
 import base64
 import importlib.util
+import sys
 import json
 from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
 from types import SimpleNamespace
+
+# Fault controls must not dirty the source checkout with interpreter caches.
+sys.dont_write_bytecode = True
 
 spec = importlib.util.spec_from_file_location('brand_upstream', Path(__file__).with_name('check-brand-upstream.py'))
 module = importlib.util.module_from_spec(spec)
