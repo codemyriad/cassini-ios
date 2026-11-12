@@ -29,8 +29,51 @@ import Testing
         #expect(SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined() ==
                 "273cb72f566c6d17dc77e308c76e8ef80b99f0cfb0a9c54a2786011e9087ed4f")
         let archive = try ZIPArchive(url: url)
-        #expect(archive.entries.filter { $0.isFile && !$0.isMetadata }.map(\.name) == ["Notes/café.opus"])
-        #expect(try read(archive, named: "Notes/café.opus") == Data("audio".utf8))
+        #expect(archive.entries.filter { $0.isFile && !$0.isMetadata }.map(\.name) == ["Notes/café.opus", "Notes/Meeting.opus"])
+        for name in ["Notes/café.opus", "Notes/Meeting.opus"] {
+            #expect(try read(archive, named: name) == Data("audio".utf8))
+        }
+    }
+
+    @Test func realDittoAndSevenZipArchivesPreserveEveryNameAndPayload() throws {
+        struct Receipt: Decodable {
+            struct Fixture: Decodable {
+                struct Member: Decodable {
+                    let name: String
+                    let is_directory: Bool
+                    let plaintext_ascii: String
+                    let plaintext_bytes: Int
+                    let plaintext_sha256: String
+                }
+                let file: String
+                let writer: String
+                let bytes: Int
+                let sha256: String
+                let members: [Member]
+            }
+            let fixtures: [Fixture]
+        }
+        func digest(_ data: Data) -> String { SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined() }
+        let manifest = try #require(Bundle.module.url(forResource: "writer-manifest", withExtension: "json", subdirectory: "zip"))
+        let receipt = try JSONDecoder().decode(Receipt.self, from: Data(contentsOf: manifest))
+        #expect(receipt.fixtures.map(\.writer) == ["ditto", "sevenzip"])
+        for fixture in receipt.fixtures {
+            let url = try #require(Bundle.module.url(forResource: fixture.file, withExtension: nil, subdirectory: "zip"))
+            let data = try Data(contentsOf: url)
+            #expect(data.count == fixture.bytes && digest(data) == fixture.sha256)
+            let archive = try ZIPArchive(url: url)
+            #expect(archive.entries.map(\.name) == fixture.members.map(\.name))
+            #expect(archive.entries.filter { $0.isFile }.map(\.name).contains("Notes/café.opus"))
+            #expect(archive.entries.count == fixture.members.count)
+            for (entry, expected) in zip(archive.entries, fixture.members) {
+                #expect(entry.isDirectory == expected.is_directory && !entry.isMetadata)
+                if !expected.is_directory {
+                    let plain = try read(archive, named: expected.name)
+                    #expect(plain == Data(expected.plaintext_ascii.utf8))
+                    #expect(plain.count == expected.plaintext_bytes && digest(plain) == expected.plaintext_sha256)
+                }
+            }
+        }
     }
 
     @Test func unflaggedNamesAcceptUTF8AndGenuineLegacyCP437() throws {
