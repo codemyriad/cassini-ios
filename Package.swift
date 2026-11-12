@@ -66,7 +66,7 @@ let package = Package(
         .target(name: "CassiniInference", dependencies: ["CassiniCore", "CassiniEngine", "CassiniNotebook", "CassiniWhistle", .product(name: "libzstd", package: "zstd")], path: "Packages/CassiniInference/Sources/CassiniInference"),
         .target(name: "CZlib", path: "Sources/CZlib", publicHeadersPath: ".", linkerSettings: [.linkedLibrary("z")]),
         .target(name: "CassiniCore", dependencies: ["CZlib"]),
-        .testTarget(name: "CassiniCoreTests", dependencies: ["CassiniCore"]),
+        .testTarget(name: "CassiniCoreTests", dependencies: ["CassiniCore"], resources: [.copy("Resources/zip")]),
         .target(name: "CassiniNotebook", dependencies: ["CassiniCore"], path: "Packages/CassiniNotebook/Sources/CassiniNotebook"),
         .testTarget(name: "CassiniNotebookTests", dependencies: ["CassiniNotebook", "CassiniCore"], path: "Packages/CassiniNotebook/Tests/CassiniNotebookTests",
                     resources: [.copy("Resources/export"), .copy("Resources/interjections"), .copy("Resources/markdown"), .copy("Resources/status-badges")]),
