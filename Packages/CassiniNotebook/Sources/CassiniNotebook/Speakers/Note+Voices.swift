@@ -234,7 +234,7 @@ extension Note {
             return speaker
         }.map { speaker -> NoteSpeaker in
             guard let label = labels[speaker.id]?.trimmingCharacters(in: .whitespacesAndNewlines),
-                  !label.isEmpty else {
+                  !DefaultLabels.isDefault(id: speaker.id, label: label) else {
                 return speaker
             }
             var named = speaker

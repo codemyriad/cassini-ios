@@ -186,18 +186,31 @@ struct SpeakerColourPersistenceTests {
 
     @Test func everyActualNamingProducerMarksPlaceholderLookingNamesAsNamed() {
         let voice = UUID()
-        for kind in 0..<4 {
+        for kind in 0..<3 {
             var note = note()
             let local: Set<UUID> = kind == 0 ? [voice] : []
             let confirmed: [UUID: VoiceMatchState] = kind == 1 ? [voice: .confirmed(voice: voice, score: 1)] : [:]
             note.applySpeakerAnalysis(turns: [.init(speakerID: "new", start: 0, end: 1.5)],
-                matches: kind == 3 ? [:] : ["new": .init(voiceID: voice, score: 1, automatic: true)],
+                matches: ["new": .init(voiceID: voice, score: 1, automatic: true)],
                 voiceNames: [voice: "Speaker 2"], localVoices: local, carriedLinks: confirmed, autoName: true,
-                stamp: .init(date: Date(timeIntervalSince1970: 1)), labels: kind == 3 ? ["new": "Speaker 2"] : [:])
+                stamp: .init(date: Date(timeIntervalSince1970: 1)))
             #expect(note.speaker("new")?.provenance == (kind == 2 ? .recognised : .user))
             #expect(note.speaker("new")?.name == "Speaker 2")
             #expect(NoteTranscripts.sealed(note).speakerTints["new"] != .stone)
         }
+    }
+
+    @Test func legacyDraftPlaceholderDoesNotReplaceAnAutomaticNameOrLink() {
+        var note = note()
+        let voice = UUID()
+        note.applySpeakerAnalysis(turns: [.init(speakerID: "new", start: 0, end: 1.5)],
+                                  matches: ["new": .init(voiceID: voice, score: 1, automatic: true)],
+                                  voiceNames: [voice: "Alex"], autoName: true,
+                                  stamp: .init(date: Date(timeIntervalSince1970: 1)), labels: ["new": "Speaker 1"])
+        #expect(note.speaker("new")?.name == "Alex")
+        #expect(note.speaker("new")?.linkedVoiceID == voice)
+        #expect(note.speaker("new")?.provenance == .recognised)
+        #expect(note.transcript.map(\.speaker) == ["Alex", "Alex", "Alex"])
     }
 
     @Test func missingSlotsUseEarliestTimedSpeechWithoutChangingCanonicalOrderOrNames() throws {
