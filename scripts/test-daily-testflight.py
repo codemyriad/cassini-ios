@@ -81,12 +81,21 @@ class ReleaseTests(unittest.TestCase):
     def test_pr_and_fork_runs_neither_approve_red_main_nor_block_green_main(self):
         invalid = [main_run(event='pull_request'), main_run(event='pull_request_target'),
                    main_run(head_repository={'full_name': 'fork/cassini-ios'}),
-                   main_run(head_repository=None), main_run(head_branch='feature')]
+                   main_run(head_repository=None), main_run(head_branch='feature'),
+                   main_run(event='schedule', head_repository={'full_name': 'fork/cassini-ios'}),
+                   main_run(event='schedule', head_repository=None),
+                   main_run(event='schedule', head_sha=PREVIOUS),
+                   main_run(event='schedule', head_branch='feature')]
         for run in invalid:
             self.assertFalse(daily.green([run, main_run(conclusion='failure')], HEAD))
             self.assertTrue(daily.green([dict(run, conclusion='failure'), main_run()], HEAD))
-        self.assertFalse(daily.green([main_run(event='workflow_dispatch', status='in_progress'), main_run()], HEAD))
-        self.assertTrue(daily.green([main_run(event='workflow_dispatch'), main_run(conclusion='failure')], HEAD))
+        for event in ('workflow_dispatch', 'schedule'):
+            for pending_or_failed in [dict(status='in_progress', conclusion=None),
+                                      dict(status='queued', conclusion=None),
+                                      dict(status='completed', conclusion='failure'),
+                                      dict(status='completed', conclusion='cancelled')]:
+                self.assertFalse(daily.green([main_run(event=event, **pending_or_failed), main_run()], HEAD))
+            self.assertTrue(daily.green([main_run(event=event), main_run(conclusion='failure')], HEAD))
 
     def test_main_ci_search_paginates_past_pr_runs_and_fails_closed_without_a_match(self):
         excluded = [main_run(event='pull_request') for _ in range(100)]
@@ -228,6 +237,23 @@ class ReleaseTests(unittest.TestCase):
         self.assertFalse(self.state.exists())
         self.assertEqual(self.apple.uploads, [])
         self.ci = [main_run(event='pull_request', conclusion='failure'), main_run()]
+        self.publish()
+        self.assertEqual(self.apple.uploads, ['12'])
+
+    def test_newer_failed_or_pending_scheduled_run_blocks_publication(self):
+        for nightly in [main_run(event='schedule', conclusion='failure'),
+                        main_run(event='schedule', status='in_progress', conclusion=None),
+                        main_run(event='schedule', status='queued', conclusion=None),
+                        main_run(event='schedule', conclusion='cancelled')]:
+            with self.subTest(status=nightly['status'], conclusion=nightly['conclusion']):
+                self.calls.clear()
+                self.ci = [nightly, main_run()]
+                self.publish()
+                self.assertFalse(self.state.exists())
+                self.assertFalse(any('worktree' in c for c in self.calls))
+                self.assertEqual(self.apple.uploads, [])
+        # Conversely, a newer green nightly clears an older failed push on the same SHA.
+        self.ci = [main_run(event='schedule'), main_run(conclusion='failure')]
         self.publish()
         self.assertEqual(self.apple.uploads, ['12'])
 
