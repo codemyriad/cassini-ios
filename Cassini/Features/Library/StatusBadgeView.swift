@@ -38,6 +38,7 @@ struct StatusBadgeView: View {
         case .dot:
             Circle().fill(ink).frame(width: Metrics.dot, height: Metrics.dot)
         case .spinner:
+            // Only the glyph has a fixed metric; the label keeps the user’s Dynamic Type size.
             ProgressView().tint(ink).dynamicTypeSize(.medium).scaleEffect(0.5)
                 .frame(width: Metrics.spinner, height: Metrics.spinner)
         case .alert:

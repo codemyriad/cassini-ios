@@ -11,6 +11,8 @@ final class StatusBadgeLayoutTests: XCTestCase {
         app.launchAndWait(fresh: true)
         XCTAssertTrue(app.descendants(matching: .any)["badgeGallery"].waitForExistence(within: 15))
         let window = app.windows.firstMatch.frame
+        let inset = app.descendants(matching: .any)["badgeGallery"].frame.minX - window.minX
+        let content = window.insetBy(dx: inset, dy: 0)
         let scroll = app.scrollViews.firstMatch
         let viewport = scroll.frame.intersection(window)
         for index in 0..<9 {
@@ -24,8 +26,8 @@ final class StatusBadgeLayoutTests: XCTestCase {
             }, "the complete badge \(index) is visible")
             if index == 0 { XCTAssertTrue(badge.label.hasPrefix("Enregistrement"), "the real French catalog is active") }
             XCTAssertGreaterThan(badge.frame.width, 0)
-            XCTAssertGreaterThanOrEqual(badge.frame.minX, window.minX - 1, "badge \(index) stays inside the left edge")
-            XCTAssertLessThanOrEqual(badge.frame.maxX, window.maxX + 1, "badge \(index) stays inside the right edge")
+            XCTAssertGreaterThanOrEqual(badge.frame.minX, content.minX - 1, "badge \(index) stays inside the left edge")
+            XCTAssertLessThanOrEqual(badge.frame.maxX, content.maxX + 1, "badge \(index) stays inside the right edge")
         }
         let image = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         image.name = "status-badges-fr-accessibilityXXXL"
