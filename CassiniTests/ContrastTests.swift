@@ -64,7 +64,7 @@ import CassiniNotebook
             text("recording secondary on recording background", .recordingSecondary, on: .recordingBackground),
             text("recording secondary on a recording chip (white 8 %)", .recordingSecondary, on: .recordingBackground, Color.white.opacity(0.08)),
             text("recording accent on recording background", .recordingAccent, on: .recordingBackground),
-            text("white on recording finish", .white, on: .recordingFinish),
+            text("label on recording finish", .onRecord, on: .recordingFinish),
             nonText("recording live dot on recording background", .recordingLive, on: .recordingBackground),
             nonText("info bar on its track", Tone.info.color, on: .paper, Tone.info.background, Tone.info.color.opacity(0.18)),
             text("ink on Name this speaker full warning tint", .ink, on: .paper, Color.warnTint),
@@ -73,7 +73,7 @@ import CassiniNotebook
             text("Live Activity title on its card", .white, on: RecordingActivityColors.background),
             text("Live Activity warning on its card", RecordingActivityColors.live, on: RecordingActivityColors.background),
             text("Live Activity Pause on its card", .white, on: RecordingActivityColors.background, RecordingActivityColors.button),
-            text("Live Activity Finish", .white, on: RecordingActivityColors.finish),
+            text("Live Activity Finish", .onRecord, on: RecordingActivityColors.finish),
             nonText("Live Activity live dot on its card", RecordingActivityColors.live, on: RecordingActivityColors.background),
             nonText("Live Activity paused ring on its card", RecordingActivityColors.secondary, on: RecordingActivityColors.background),
         ]

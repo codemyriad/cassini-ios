@@ -189,7 +189,7 @@ private struct RecordingControls: View {
             .accessibilityIdentifier("pauseResumeRecording")
             .frame(maxWidth: .infinity)
             LabelledCircle(label: Text("Finish", tableName: "Recording"), action: finish) {
-                RoundedRectangle(cornerRadius: 4).fill(.white).frame(width: 18, height: 18)
+                RoundedRectangle(cornerRadius: 4).fill(Color.onRecord).frame(width: 18, height: 18)
                     .frame(width: 56, height: 56).background(Color.recordingFinish, in: Circle())
             }
             .disabled(!capturing).opacity(capturing ? 1 : 0.38)

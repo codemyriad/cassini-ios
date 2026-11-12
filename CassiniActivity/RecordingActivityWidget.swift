@@ -125,7 +125,7 @@ private struct RecordingButtons: View {
                 Label { Text("Finish", tableName: "Recording") } icon: { Image(systemName: "stop.fill") }
                     .frame(maxWidth: .infinity)
             }
-            .tint(RecordingActivityColors.finish)
+            .tint(RecordingActivityColors.finish).foregroundStyle(Color.onRecord)
         }
         .buttonStyle(.borderedProminent)
         .tint(RecordingActivityColors.button)
