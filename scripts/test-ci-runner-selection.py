@@ -196,6 +196,13 @@ class CiRunnerSelectionTests(unittest.TestCase):
         self.assertNotIn("label-gate", ci_text)
         self.assertFalse((ROOT / "scripts/ci-label-gate.py").exists())
         self.assertIn("scripts/test.sh app", ci_text)
+        self.assertNotIn('"$HOME/bin/heavy-run"', ci_text)
+        self.assertIn("CASSINI_LOCK_MINUTES: '15'", ci_text)
+        self.assertIn('(CASSINI_PERF_GATE=1)" DerivedData.noindex/test-logs/hosted.log', ci_text)
+        self.assertLess(
+            ci_text.index("uses: actions/upload-artifact@v5"),
+            ci_text.index("- name: Remove only this run's simulator clones"),
+        )
 
         test_sh = (ROOT / "scripts/test.sh").read_text(encoding="utf-8")
         self.assertIn('export TEST_RUNNER_CASSINI_PERF_GATE="$CASSINI_PERF_GATE"', test_sh)

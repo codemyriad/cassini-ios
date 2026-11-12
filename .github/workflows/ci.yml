@@ -117,6 +117,7 @@ jobs:
       CASSINI_CONFORMANCE_REQUIRED: '1'
       CASSINI_KEEP_SIMS: '0'
       CASSINI_UI_WORKERS: '0'
+      CASSINI_LOCK_MINUTES: '15'
     steps:
       - uses: actions/checkout@v5
         with:
@@ -143,22 +144,20 @@ jobs:
         working-directory: cassini-ios
         run: |
           if [ "${CASSINI_PERF_GATE:-}" = "1" ]; then
-            prefix="ts-ci-perf-${RUNNER_NAME:-hosted}"
+            runner_slug=$(printf '%s' "${RUNNER_NAME:-hosted}" | tr -cs 'A-Za-z0-9._-' '-' | sed 's/^-*//; s/-*$//')
+            prefix="ts-ci-perf-${runner_slug:-hosted}"
             printf 'CASSINI_SIM_PREFIX=%s\n' "$prefix" >> "$GITHUB_ENV"
             export CASSINI_SIM_PREFIX="$prefix"
             scripts/test.sh clean
-            if [ -x "$HOME/bin/heavy-run" ]; then
-              "$HOME/bin/heavy-run" scripts/test.sh app
-            else
-              scripts/test.sh app
-            fi
+            # scripts/test.sh app acquires ~/.cassini-heavy.lock itself via start_heavy/take_heavy_lock;
+            # wrapping in heavy-run without CASSINI_HEAVY_LOCK_HELD=1 would self-deadlock on the lock.
+            scripts/test.sh app
+            grep -E "^Test Case '-\[CassiniTests\.LibraryScreenTests testAThousandNotesFilterWithoutDroppingFrames\]' passed \(" DerivedData.noindex/test-logs/hosted.log
+            grep -F "(CASSINI_PERF_GATE=1)" DerivedData.noindex/test-logs/hosted.log
           else
             scripts/test.sh build
           fi
-      - name: Remove only this run's simulator clones
-        if: always() && env.CASSINI_PERF_GATE == '1' && env.CASSINI_SIM_PREFIX != ''
-        working-directory: cassini-ios
-        run: scripts/test.sh clean
+      # Upload failure logs before `scripts/test.sh clean` rotates DerivedData.noindex/test-logs to test-logs.previous.
       - uses: actions/upload-artifact@v5
         if: failure()
         continue-on-error: true
@@ -166,3 +165,7 @@ jobs:
           name: test-logs-${{ github.sha }}
           path: cassini-ios/DerivedData.noindex/test-logs
           retention-days: 14
+      - name: Remove only this run's simulator clones
+        if: always() && env.CASSINI_PERF_GATE == '1' && env.CASSINI_SIM_PREFIX != ''
+        working-directory: cassini-ios
+        run: scripts/test.sh clean
