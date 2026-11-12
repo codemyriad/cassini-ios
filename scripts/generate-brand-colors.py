@@ -173,18 +173,67 @@ enum CassiniTokens {{
 # No source-file allowlist. Only the generated table is exempt; native chrome/artwork is not scanned.
 # Colour enum cases (e.g. SpeakerTint.blue) and model labels are not platform colour expressions.
 COLOR_TYPES = r"(?:Color|UIColor|CIColor|CGColor)"
-COLOR_COMPONENTS = r"(?:red|srgbRed|white|gray|hue|displayP3|\.sRGB|\.sRGBLinear|\.displayP3)"
+COLOR_COMPONENTS = r"(?:red|srgbRed|white|gray|hue|displayP3|\.sRGB|\.sRGBLinear|\.displayP3|uiColor|cgColor|ciColor|dynamicProvider|_colorLiteralRed|genericGrayGamma2_2Gray)"
 FIXED_NAMES = r"(?:red|blue|green|yellow|gray|grey|darkGray|lightGray|purple|pink|brown|cyan|magenta|mint|teal|indigo|white|black|clear|orange)"
+UIKIT_SYSTEM = (r"(?:system(?:Red|Blue|Green|Orange|Yellow|Purple|Pink|Brown|Teal|Indigo|Gray[0-9]*|Mint|Cyan|(?:Grouped)?Background|Fill)|"
+                r"(?:secondary|tertiary|quaternary)System\w+|label|secondaryLabel|tertiaryLabel|quaternaryLabel|"
+                r"separator|opaqueSeparator|placeholderText|link|darkText|lightText)")
 LITERAL = re.compile(
     # Explicit and inferred initializers: the component labels identify colour construction.
     rf"\b{COLOR_TYPES}(?:\s*\.\s*init)?\s*\(\s*{COLOR_COMPONENTS}\s*[:,]|"
     rf"\.init\s*\(\s*{COLOR_COMPONENTS}\s*[:,]|"
     r"#colorLiteral\s*\(|"
-    rf"\b{COLOR_TYPES}\s*\.\s*(?:system\w+|secondarySystem\w+|label|secondaryLabel|tertiaryLabel|{FIXED_NAMES})\b|"
-    r"\.(?:white|black|clear|orange|system(?:Red|Blue|Green|Orange|Yellow|Purple|Pink|Brown|Teal|Indigo|Gray[0-9]*))\b|"
-    rf"(?:foregroundStyle|foregroundColor|background|tint|fill|stroke|strokeBorder|color|{COLOR_TYPES})\s*\(\s*\.{FIXED_NAMES}\b|"
-    rf"\bcolor\s*:\s*\.{FIXED_NAMES}\b|"
+    rf"\b{COLOR_TYPES}\s*\.\s*(?:system\w+|{UIKIT_SYSTEM}|{FIXED_NAMES})\b|"
+    rf"(?<![.\w)\]?!\"'])\.(?:{FIXED_NAMES}|{UIKIT_SYSTEM})\b|"
+    r"\bUIColor\s*(?:\.\s*init\s*)?(?:\(\s*\{|\{)|"
     r"#[a-fA-F0-9]{6}(?:[a-fA-F0-9]{2})?\b|\b0x[a-fA-F0-9]{6,8}\b")
+
+
+def without_comments(source, *, keep_strings=True):
+    """Keep positions while blanking nested comments and, optionally, Swift raw/multiline strings."""
+    string_start = re.compile(r'(#*)("""|")')
+    parts, index = [], 0
+    while index < len(source):
+        start = index
+        if source.startswith('//', index):
+            end = source.find('\n', index)
+            index = len(source) if end < 0 else end
+        elif source.startswith('/*', index):
+            index += 2
+            depth = 1
+            while index < len(source) and depth:
+                if source.startswith('/*', index): depth += 1; index += 2
+                elif source.startswith('*/', index): depth -= 1; index += 2
+                else: index += 1
+        else:
+            match = string_start.match(source, index)
+            if match:
+                hashes, quotes = match.groups()
+                closing, escape = quotes + hashes, '\\' + hashes
+                index = match.end()
+                while index < len(source):
+                    if source.startswith(escape, index): index += len(escape) + 1
+                    elif source.startswith(closing, index): index += len(closing); break
+                    else: index += 1
+            else:
+                index += 1
+            part = source[start:index]
+            parts.append(part if keep_strings or not match else re.sub(r'[^\n]', ' ', part))
+            continue
+        parts.append(re.sub(r'[^\n]', ' ', source[start:index]))
+    return ''.join(parts)
+
+
+def without_case_patterns(source):
+    code = list(without_comments(source))
+    # Find real case headers on a code-only mask. A quoted "case" must never consume subsequent code.
+    mask = without_comments(source, keep_strings=False)
+    # Stop before where/assignment/statement boundaries too: enum declarations must not swallow
+    # a subsequent property, and a switch's where expression still contains ordinary runtime values.
+    for match in re.finditer(r"\bcase\b[^:;={}]*?(?=\bwhere\b|[:=])", mask):
+        for index in range(match.start(), match.end()):
+            if code[index] != '\n': code[index] = ' '
+    return ''.join(code)
 
 
 def check_literals(root=ROOT):
@@ -193,7 +242,8 @@ def check_literals(root=ROOT):
         for path in sorted((root / directory).rglob("*.swift")):
             if path.relative_to(root).as_posix() == OUTPUT:
                 continue
-            code = "\n".join(line.split("//", 1)[0] for line in path.read_text().splitlines())
+            # Model enum patterns are not colour values; keep qualified uses such as SpeakerTint.blue too.
+            code = without_case_patterns(path.read_text())
             for match in LITERAL.finditer(code):
                 number = code.count("\n", 0, match.start()) + 1
                 failures.append(f"{path.relative_to(root)}:{number}: fixed colour outside generated table")

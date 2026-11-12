@@ -143,15 +143,35 @@ class BrandGenerationTests(unittest.TestCase):
                     'Color.init(hue: 0, saturation: 1, brightness: 1)', 'Color.init(.sRGB, red: 1, green: 0, blue: 0)',
                     'CIColor(red: 1, green: 0, blue: 0)', 'CIColor.init(red: 1, green: 0, blue: 0)',
                     'CGColor(srgbRed: 1, green: 0, blue: 0, alpha: 1)', 'let c: CGColor = .init(srgbRed: 1, green: 0, blue: 0, alpha: 1)',
-                    'UIColor.magenta', 'UIColor.darkGray', 'CIColor.cyan', '.tint(.systemGray2)',
+                    'UIColor.magenta', 'UIColor.darkGray', 'UIColor.darkText', 'UIColor.lightText',
+                    'CIColor.cyan', '.tint(.systemGray2)',
                     '.foregroundStyle(\n .red)', '.fill ( .blue )', 'UIColor . systemRed',
                     '.shadow(color: .purple, radius: 2)',
+                    '.foregroundStyle(isSelected ? .red : .blue)',
+                    '.background(active ? .green : .pink, in: Capsule())',
+                    'with: .color(fresh ? .recordingAccent : .red)',
+                    'text[range].foregroundColor = .red', 'let tint: Color = .red',
+                    'let tints: [Color] = [.red, .blue]', '.listRowBackground(.red)',
+                    '.activityBackgroundTint(.red)', '.keylineTint(.red)',
+                    'Color(uiColor: .secondarySystemGroupedBackground)', 'Color(uiColor: .label)',
+                    'Color(cgColor: existing)', 'Color(ciColor: existing)',
+                    'UIColor(dynamicProvider: provider)', 'UIColor { traits in .red }',
+                    'UIColor.init { traits in .green }', 'UIColor({ traits in .blue })',
+                    'UIColor(_colorLiteralRed: 1, green: 0, blue: 0, alpha: 1)',
+                    'CGColor(genericGrayGamma2_2Gray: 0.5, alpha: 1)',
+                    *('Color(uiColor: .' + name + ')' for name in (
+                        'systemMint', 'systemCyan', 'systemBackground', 'systemGroupedBackground', 'systemFill',
+                        'secondarySystemFill', 'tertiarySystemGroupedBackground', 'quaternarySystemFill',
+                        'quaternaryLabel', 'separator', 'opaqueSeparator', 'placeholderText', 'link')),
+                    'let link = "https://example.test"; let tint = Color.red',
+                    'let link = "cassini://example"; let tint: Color = .blue',
                     '#colorLiteral(red: 1, green: 0, blue: 0, alpha: 1)', 'let rgb = 0xFFEEDD', 'let hex = "#abcdef"')
         target = self.root / 'Cassini/NewView.swift'; target.parent.mkdir()
         for example in examples:
             with self.subTest(example=example):
                 target.write_text(example)
-                with self.assertRaisesRegex(ValueError, 'NewView.swift:1'):
+                line = 2 if example == '.foregroundStyle(\n .red)' else 1
+                with self.assertRaisesRegex(ValueError, f'NewView.swift:{line}'):
                     brand.check_literals(self.root)
         target.write_text('''
 .foregroundStyle(Color.ink.opacity(0.5))
@@ -159,8 +179,42 @@ class BrandGenerationTests(unittest.TestCase):
 let tint = SpeakerTint.blue
 switch tint { case .blue, .green, .red, .gray, .magenta: break }
 let component = DomainComponent.red
+let named = SpeakerNaming.ui(value).label
+let domainColor = palette[index].blue
+let optionalLabel = optional?.label
+let url = "https://example.test"
+/* Color.red /* UIColor.systemFill */ Color.blue */
+let action: OpenURLAction.Result = .systemAction
 ''')
         brand.check_literals(self.root)
+
+    def test_comment_handling_preserves_swift_strings_and_literal_line_numbers(self):
+        target = self.root / 'Cassini/NewView.swift'; target.parent.mkdir()
+        for literal in ('"https://example.test"', '#"https://example.test"#',
+                        '"""A quote " and https://example.test\ninside a multiline string"""',
+                        '##"https://example.test/\\##"quoted"##'):
+            with self.subTest(literal=literal):
+                source = '/* Color.red\n /* nested Color.blue */\n*/\nlet url = ' + literal + '; let color: Color = .red'
+                target.write_text(source)
+                expected_line = source.count('\n') + 1
+                with self.assertRaisesRegex(ValueError, f'NewView.swift:{expected_line}'):
+                    brand.check_literals(self.root)
+
+    def test_case_words_in_strings_and_where_conditions_cannot_hide_colours(self):
+        target = self.root / 'Cassini/NewView.swift'; target.parent.mkdir()
+        for example in ('let description = "case"; let tint = Color.red; let count: Int = 0',
+                        'let description = #"case"#; let tint = UIColor.systemFill; let count: Int = 0',
+                        'Text("case").foregroundStyle(.red); let count: Int = 0',
+                        'let description = """case\ntext"""; let tint = Color.red; let count: Int = 0',
+                        'switch mood { case .blue where tint == .red: break }',
+                        'switch mood { case .blue: break }; let hex = "#FF0000"',
+                        'enum State: String { case idle="idle"; static let tint=Color.red; static let n:Int=0 }',
+                        'enum State: String {\ncase idle="idle"\nstatic let tint=Color.red; static let n:Int=0 }',
+                        'enum State: String { case idle; static let tint=UIColor.systemMint; static let n:Int=0 }'):
+            with self.subTest(example=example):
+                target.write_text(example)
+                with self.assertRaisesRegex(ValueError, f'NewView.swift:{example.count(chr(10)) + 1}'):
+                    brand.check_literals(self.root)
 
 
 if __name__ == "__main__":
