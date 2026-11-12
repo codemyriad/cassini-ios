@@ -342,6 +342,32 @@ subset. For a headless English gallery run, use
 The folder receives stable `light/01-library.png` through `light/09-saved-voices.png` names and
 `ipad/light/01-split-landscape.png`, `ipad/light/02-split-portrait.png`. Custom output runs retain other files in the
 chosen folder. Capture runs through `simctl` and XCTest; no Simulator window is needed.
+For local before/after PR renders, fetch main and run (outside any enclosing heavy lock):
+
+```sh
+python3.12 -m venv /path/to/pr-shots-venv
+/path/to/pr-shots-venv/bin/pip install --isolated Pillow==11.3.0
+PATH="/path/to/pr-shots-venv/bin:$PATH" scripts/pr-shots.sh --base origin/main --pr 125 --out /path/to/new/pr-render
+```
+
+The base is the merge base of that ref and the head worktree (`--head PATH` defaults to this checkout).
+Use a new output folder outside the worktree; commit changes and remove untracked files first. It renders each source's English screenshot set (currently 22 images) in light and dark,
+using each source's capture tests, renderer and one private simulator pair. Legacy bases without manifest tooling
+receive only the head renderer/helper, preserving their capture tests. New reading shots start paused,
+so no pressed skip-button tint leaks into a capture. Each render takes `~/.cassini-heavy.lock` itself
+(or `CASSINI_HEAVY_LOCK`); the wrapper removes only its temporary worktree and uniquely named clones.
+Output has `before/`, `after/`, per-side `shots.json`, capture/test logs (retained even on failure) and `render.json` with source SHAs and elapsed time.
+SIGHUP, SIGTERM and SIGINT stop the renderer; further signals are ignored until scoped cleanup finishes.
+`--output` disables lossy pngquant by default and records actual runtime/device, locale, seed, test and pixel size;
+the 1200-pixel downscale remains. Existing normal README renders keep their previous compression behavior.
+
+The canonical cassini-ux `pr-shots.py` is vendored from commit `5ca44dee12614990c833cc6f49017dac7e184ae8`.
+It adds `pr-shots/` using only its `diff` command; use your PR number with `--pr N`.
+`--render-only` skips that step and needs only Python's standard library. The wrapper uses `python3` from PATH.
+Before diffing it checks each screen has both appearances and probes the canvas against the scheme label
+(recording intentionally uses a dark canvas in both). CI runs those regressions and the canonical self-test.
+This wrapper never accesses GitHub or publishes; the coordinator alone uploads images and replaces PR blocks.
+
 `scripts/render-icon.swift` draws the app icon (`swift scripts/render-icon.swift` from the repository root).
 
 UI absence assertions wait for a completed screen or app decision, then inspect the same accessibility state immediately.
