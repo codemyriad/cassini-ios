@@ -15,8 +15,16 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
-import unicodedata
 from zoneinfo import ZoneInfo
+
+# The scheduled controller runs from the control clone and refuses to update a dirty one: importing the notes
+# module must not leave a __pycache__ folder beside it.
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from testflight_notes import (FALLBACK_NOTES, collect_fragments, github_release_body,
+                                render_test_notes, validate_test_notes)
+
+NOTES_FORMAT = 'user-fragments-v1'
 
 REPOSITORY = 'codemyriad/cassini-ios'
 APP = '6828353567'
@@ -82,34 +90,9 @@ def main_ci_green(head):
         page += 1
 
 
-def testflight_notes(text, limit=4000):
-    # TestFlight receives plain safe text; retain verbatim titles separately for audit.
-    clean = []
-    for char in text:
-        category = unicodedata.category(char)
-        if char == '\n' or char in ('\u200c', '\u200d'):
-            clean.append(char)
-        elif category in ('Cc', 'Cf', 'Cs'):
-            clean.append(' ')
-        else:
-            clean.append({'<': '‹', '>': '›'}.get(char, char))
-    clean = ''.join(clean)
-    units = lambda value: len(value.encode('utf-16-le')) // 2
-    if units(clean) <= limit:
-        return clean
-    suffix = '\n…'
-    budget = limit - units(suffix)
-    if budget < 0:
-        raise ValueError('TestFlight note limit cannot fit truncation marker')
-    output = []
-    used = 0
-    for char in clean:
-        width = units(char)
-        if used + width > budget:
-            break
-        output.append(char)
-        used += width
-    return ''.join(output) + suffix
+def testflight_notes(text):
+    # Persisted pending releases pass the same store boundary as fresh fragments.
+    return validate_test_notes(text)
 
 
 def next_build(builds, version, reserved):
@@ -220,11 +203,17 @@ def release_notes(source, previous, head):
     command(['git', 'merge-base', '--is-ancestor', previous, head], cwd=source)
     commits = command(['git', 'rev-list', '--reverse', '--first-parent', previous + '..' + head], cwd=source)
     titles = {}
+    direct = []
     for commit in commits.splitlines():
+        associated = False
         for pr in gh(f'repos/{REPOSITORY}/commits/{commit}/pulls'):
             if pr.get('merged_at') and pr['base']['ref'] == 'main':
                 titles[pr['number']] = pr['title']
-    text = '\n'.join(f'- {title} (#{number})' for number, title in titles.items())
+                associated = True
+        if not associated:
+            subject = command(['git', 'show', '-s', '--format=%s', commit], cwd=source)
+            direct.append(f'- {subject} ({commit[:12]})')
+    text = '\n'.join([*(f'- {title} (#{number})' for number, title in titles.items()), *direct])
     if not text:
         raise RuntimeError('Merged-PR release notes are empty; inspect before upload')
     return text
@@ -323,16 +312,27 @@ def external_output(path):
     return resolved
 
 
+def record_release(state, pending, build_id):
+    # Advance the ledger only after internal distribution and its notes are confirmed.
+    state.setdefault('published_fragments', {}).update(pending.get('fragments', {}))
+    state.update(head=pending['head'], version=pending['version'], build=pending['build'], build_id=build_id)
+    del state['pending']
+
+
 def publish(config, state_path, source, apple=None):
     state = json.loads(state_path.read_text()) if state_path.exists() else {}
     if state.get('pending'):
         pending = state['pending']
         external_output(Path(pending['output']))
+        if pending.get('notes_format') != NOTES_FORMAT:
+            # Older controllers persisted developer titles. Preserve the audit, never replay them into TestFlight.
+            pending['legacy_developer_notes'] = pending.get('notes', '')
+            pending.update(notes=FALLBACK_NOTES, notes_format=NOTES_FORMAT, fragments={})
+            save(state_path, state)
         apple = apple or Apple()
         wait_processing(apple, pending, Path(pending['output']))
         build_id = apple.finish(pending)  # Resume finalization only; never resubmit an ambiguous upload.
-        state.update(head=pending['head'], version=pending['version'], build=pending['build'], build_id=build_id)
-        del state['pending']
+        record_release(state, pending, build_id)
         save(state_path, state)
         print(f"[iOS] resumed TestFlight {state['version']} ({state['build']}) from {state['head']}")
     command(['git', 'fetch', 'origin', 'main:refs/remotes/origin/main'], cwd=source)
@@ -359,7 +359,9 @@ def publish(config, state_path, source, apple=None):
         raise RuntimeError('App and extension must have one marketing version')
     version = versions.pop()
     raw_notes = release_notes(source, previous, head)
-    notes = testflight_notes(raw_notes)
+    fragments = collect_fragments(checkout, state.get('published_fragments', {}))
+    fragment_hashes = {item['id']: item['sha256'] for item in fragments}
+    notes = render_test_notes(fragments)
     build = next_build(apple.builds(), version, state.get('reserved', {}))
     state.setdefault('reserved', {})[version] = int(build)
     save(state_path, state)  # Retain reservations after failures; never reuse a possibly uploaded number.
@@ -368,8 +370,9 @@ def publish(config, state_path, source, apple=None):
     save(output/'context.json', context)
     (output/'release-notes.txt').write_text(raw_notes + '\n', encoding='utf-8', errors='backslashreplace')
     (output/'release-notes-testflight.txt').write_text(notes + '\n')
+    (output/'release-notes-github.md').write_text(github_release_body(notes, raw_notes))
     save(output/'release-plan.json', dict(head=head, version=version, build=build,
-        raw_notes=raw_notes, testflight_notes=notes))
+        raw_notes=raw_notes, testflight_notes=notes, fragments=fragment_hashes, notes_format=NOTES_FORMAT))
     (output/'tmp').mkdir()
     gui_env = dict(os.environ, TMPDIR=str(output/'tmp') + '/', GUIRUN_TIMEOUT='14400')
     with (output/'archive-export.log').open('w') as log:
@@ -402,15 +405,15 @@ def publish(config, state_path, source, apple=None):
     if current != head or canonical != head or not main_ci_green(current):
         print('[iOS] daily test release skipped: main changed or latest CI is no longer green after validation')
         return
-    pending = dict(head=head, version=version, build=build, notes=notes, output=str(output))
+    pending = dict(head=head, version=version, build=build, notes=notes, output=str(output),
+                   fragments=fragment_hashes, notes_format=NOTES_FORMAT)
     state['pending'] = pending
     save(state_path, state)  # Durable upload intent BEFORE calling Apple; ambiguity never causes a duplicate.
     pending['delivery'] = upload(apple, artifact['ipa'], output)
     save(state_path, state)
     wait_processing(apple, pending, output)
     build_id = apple.finish(pending)
-    state.update(head=head, version=version, build=build, build_id=build_id)
-    del state['pending']
+    record_release(state, pending, build_id)
     save(state_path, state)
     print(f'[iOS] TestFlight {version} ({build}) released from {head}; internal cassini group')
 
