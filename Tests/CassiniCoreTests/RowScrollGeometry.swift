@@ -14,6 +14,10 @@ enum RowScrollGeometry {
         else if row.maxY > clear.maxY + epsilon { overflow = clear.maxY - row.maxY }
         else { return 0 }
         let limit = clear.height / 2 - 1
-        return max(-limit, min(limit, overflow))
+        // A tiny drag can be recognized as a row tap. Overshoot by at most the
+        // spare clearance, so crossing the drag threshold cannot hide the row.
+        let minimumDrag = min(32, clear.height - row.height)
+        let magnitude = min(limit, max(abs(overflow), minimumDrag))
+        return overflow < 0 ? -magnitude : magnitude
     }
 }

@@ -32,6 +32,21 @@ struct RowScrollGeometryTests {
         }
     }
 
+    @Test func shortCorrectionsCrossTheDragThresholdWithoutHidingTheRow() throws {
+        for row in [CGRect(x: 0, y: 86.3, width: 320, height: 140),
+                    CGRect(x: 0, y: 573.7, width: 320, height: 140)] {
+            let movement = try #require(RowScrollGeometry.correction(for: row, within: band))
+            #expect(abs(movement) == 32)
+            let placed = row.offsetBy(dx: 0, dy: movement)
+            #expect(placed.minY >= band.minY && placed.maxY <= band.maxY)
+            #expect(RowScrollGeometry.correction(for: placed, within: band) == 0)
+        }
+        let almostFull = CGRect(x: 0, y: 99, width: 320, height: 596)
+        let movement = try #require(RowScrollGeometry.correction(for: almostFull, within: band))
+        #expect(movement == 4, "Never overshoot the spare clearance")
+        #expect(RowScrollGeometry.correction(for: almostFull.offsetBy(dx: 0, dy: movement), within: band) == 0)
+    }
+
     @Test func impossibleGeometryFailsRatherThanDroppingTheClearanceRequirement() {
         #expect(RowScrollGeometry.correction(for: .zero, within: band) == nil)
         #expect(RowScrollGeometry.correction(for: band, within: .zero) == nil)
