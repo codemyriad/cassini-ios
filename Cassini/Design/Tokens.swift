@@ -5,7 +5,7 @@ import CassiniNotebook
 /// dark value, and every pair the screens draw meets WCAG AA in both (`ContrastTests`): 4.5:1 for text, 3:1 for large
 /// text and non-text.
 extension Color {
-    static let paper = Color(light: rgb(0.975, 0.965, 0.941), dark: rgb(0.075, 0.085, 0.095))
+    static let paper = Color(light: rgb(0.80, 0.90, 0.78), dark: rgb(0.16, 0.08, 0.18))
     static let card = Color(light: .white, dark: rgb(0.12, 0.135, 0.145))
     static let ink = Color(light: rgb(0.12, 0.17, 0.19), dark: rgb(0.95, 0.94, 0.91))
     static let muted = Color(light: rgb(0.34, 0.38, 0.40), dark: rgb(0.67, 0.71, 0.73))
