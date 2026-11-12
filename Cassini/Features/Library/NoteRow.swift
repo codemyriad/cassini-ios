@@ -41,9 +41,6 @@ struct NoteRow: View {
             if selected {
                 RoundedRectangle(cornerRadius: Radius.card).stroke(Color.ember.opacity(0.6), lineWidth: 1.5)
                     .allowsHitTesting(false)
-            } else if row.highlighted {
-                RoundedRectangle(cornerRadius: Radius.card).stroke(Tone.info.color.opacity(0.35), lineWidth: 1)
-                    .allowsHitTesting(false)
             }
         }
     }

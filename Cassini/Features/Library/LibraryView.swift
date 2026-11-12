@@ -2,8 +2,8 @@ import SwiftUI
 import CassiniEngine
 import CassiniNotebook
 
-/// The Library (board 00, features.md section 1): the wordmark, the search with the privacy line, the activity area
-/// (the banners, the recording card, the transcription banner), then the day sections or, while searching, the
+/// The Library (board 00, features.md section 1): the wordmark, search, the activity area
+/// (notices, the recording card and standalone model-install progress), then the day sections or, while searching, the
 /// flat results. Import audio and Record are pinned to the bottom.
 struct LibraryView: View {
     @Environment(LibraryScreenModel.self) private var model
@@ -123,7 +123,7 @@ struct LibraryView: View {
         }.padding(.top, 18)
     }
 
-    /// The banners (NoticeCenter's notices and the list's own states), the recording card and the transcription banner.
+    /// Notices and list states, recording and standalone model-install progress, and transfers.
     @ViewBuilder private var activity: some View {
         BannerList(specs: notices.library(model.content.facts),
                    onAction: { spec, action in notices.perform(action, on: spec) { importing = true } },

@@ -2,7 +2,7 @@ import SwiftUI
 import CassiniEngine
 import CassiniNotebook
 
-/// The activity area at the top of the Library: the recording card, then the transcription banner.
+/// The activity area at the top of the Library: the recording card and standalone model-install progress.
 struct LibraryActivity: View {
     @Environment(LibraryScreenModel.self) private var model
     @Environment(Router.self) private var router
@@ -11,7 +11,7 @@ struct LibraryActivity: View {
         if let card = model.recordingCard {
             RecordingCard(card: card) { router.presentRecording() }
         }
-        if let banner = model.progress {
+        if let banner = model.progress, banner.noteID == nil {
             ProgressBannerCard(banner: banner) { model.openProgress() }
         }
     }

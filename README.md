@@ -227,6 +227,11 @@ TestFlight still need.
   [Whistle/README.md](Whistle/README.md) and two AWS Device Farm runs on 2026-11-10 (iPhone 11 on iOS 18.6.2, iPhone
   15 on iOS 18.0); no A12 or A10 device on iOS 18 has run it. The transcription's background pause was checked by
   hand on the iOS 18.2 simulator (see [iOS 18](docs/ios18.md)); the download's stop was not.
+- **Phone Library placement (L-30; W2.4 subset).** iOS shows the running transcription in its row, without the
+  duplicate meeting progress card, running-row outline or general privacy line beneath search. This placement
+  adoption precedes Android and is independent of shared badge labels and ETA handling. The recording card and
+  standalone model-download/check card remain; the latter opens Settings. First-run privacy returns in W5.3,
+  whose phone hero still awaits the backups wording decision. See the [placement ledger](docs/differences.md#phone-library-placement-l-30-w24-subset).
 - **iOS extras.** Stars, bookmarks, playback speed, lock-screen controls, passage editing, JSON export, the Speakers
   list, the "Recently Deleted" name, "Forget all voice data", and Settings sections for transcription, speakers and
   your library.

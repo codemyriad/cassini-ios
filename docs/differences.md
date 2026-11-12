@@ -10,6 +10,23 @@ The sections follow the areas of the app: engines and thresholds, the storage mo
 iOS extras and the platform. [Android tests without an iOS port](#android-tests-without-an-ios-port) lists the tests
 that were not ported, with the reason for each.
 
+## Phone Library placement (L-30; W2.4 subset)
+
+iOS adopts the decided phone Library placement ahead of Android: a running transcription is identified in its own
+row, without a duplicate meeting progress card above the list or a running-row outline. Selection keeps its outline.
+The general privacy line beneath search is removed. This placement change is independent of the shared badge work;
+it retains the existing row labels and makes no new ETA conversion. Detailed progress and Stop remain in the note,
+and row actions still support removing queued notes and resuming stopped work.
+
+The recording card remains: removing it is proposed, not decided. A model download or check running without a note
+also retains its existing Library card and opens Settings. The canvas does not specify a replacement home for that
+standalone progress. Job-owned downloads remain accessible through their note; cancelling a standalone install
+still ends only its own wait, while the job's download cancellation remains separate. Queue behavior is unchanged.
+
+First-run privacy placement is deferred to W5.3. The phone hero is still open because its upload claim needs an
+answer for backups; this subset does not introduce the hero, move the privacy sentence into another screen, or
+change the existing Settings privacy wording.
+
 ## Search date filters (D14 parity)
 
 iOS follows the Mac and GNOME D14 date menu while searching: Any date, Today, Past 7 days and Past 30 days.
