@@ -19,6 +19,8 @@ SHOTS = {
     "07-search": ("Search", "Search", "test07Search", "search"),
     "08-recently-deleted": ("Recently deleted", "Trash", "test08RecentlyDeleted", "trash"),
     "09-saved-voices": ("Saved voices", "SavedVoices", "test09SavedVoices", "voices"),
+    "10-note-export": ("Note export menu", "NoteExport", "test10NoteExport", "reading"),
+    "11-library-export": ("Library export menu", "LibraryExport", "test11LibraryExport", "reading"),
     "01-split-landscape": ("Split view landscape", "Meeting", "testSplitViewLandscape", "reading"),
     "02-split-portrait": ("Split view portrait", "Meeting", "testSplitViewPortrait", "reading"),
 }

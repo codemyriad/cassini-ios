@@ -117,6 +117,34 @@ final class ScreenshotTests: XCTestCase {
         capture("09-saved-voices")
     }
 
+    @MainActor func test10NoteExport() throws {
+        let app = try launchPhone(["--seed", "reading", "--open-fixture", Self.fixture])
+        app.buttons["Share and more"].tap()
+        app.collectionViews.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Export transcript'")).firstMatch.tapWhenSettled()
+        captureExportMenu("10-note-export", app)
+    }
+
+    @MainActor func test11LibraryExport() throws {
+        let app = try launchPhone(["--seed", "reading"])
+        let note = row(app, "A quieter kind of productivity")
+        XCTAssertTrue(note.waitForExistence(within: 5))
+        note.press(forDuration: 1)
+        app.buttons["Export"].tapWhenSettled()
+        captureExportMenu("11-library-export", app)
+    }
+
+    @MainActor private func captureExportMenu(_ name: String, _ app: XCUIApplication) {
+        let item = app.buttons["Transcript as text"]
+        var last: CGRect?
+        XCTAssertTrue(poll(within: 15) {
+            guard item.exists && item.isHittable else { return false }
+            let frame = item.frame
+            defer { last = frame }
+            return frame == last
+        }, "the export submenu has settled")
+        capture(name)
+    }
+
     // MARK: - iPad
 
     @MainActor func testSplitViewLandscape() throws {
