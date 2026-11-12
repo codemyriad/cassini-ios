@@ -29,7 +29,10 @@ struct SpeakersView: View {
                         let speaking = stats.filter { $0.wordCount > 0 }
                         let spoken = Set(speaking.map(\.speakerID))
                         let order = speaking.map(\.speakerID) + (note.speakers ?? []).map(\.id).filter { !spoken.contains($0) }
-                        let tints = SpeakerTint.assign(order, speakers: note.speakers ?? [])
+                        let catalog = note.speakers ?? []
+                        let palette = catalog.contains { $0.colourIndex == nil }
+                            ? Note.assignColourIndices(catalog, order: SpeakerColourOrder.segments(note.transcript)) : catalog
+                        let tints = SpeakerTint.assign(order, speakers: palette)
                         ForEach(Array((note.speakers ?? []).enumerated()), id: \.element.id) { index, speaker in
                             let stat = stats.first { $0.speakerID == speaker.id }
                             Button { naming = SpeakerRef(id: speaker.id) } label: {
