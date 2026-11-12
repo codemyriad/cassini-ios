@@ -88,28 +88,26 @@ final class LibraryUITests: XCTestCase {
     /// Resume and Try again are inline buttons that queue the note again (the running job is frozen, so it waits).
     @MainActor func testResumeAndTryAgainQueueTheNote() {
         let app = launch(["--seed", "statuses"] + DeviceUnderTest.workingSpeech)
+        let paused = scrolledRow(app, "Paused standup")
+        XCTAssertTrue(paused.exists)
         let resume = app.buttons["Resume transcribing Paused standup"]
-        list(app).scroll(attempts: 4) { resume.exists && resume.isHittable }
         XCTAssertTrue(resume.waitForExistence(within: 10))
-        // The frame comes back through a floating-point transform: once on iOS 18.2 a 44 pt row read 43.99999999999997.
+        // A partially offscreen button can report hittable even when its centre is below the capture bar.
+        // Require the whole card to be visible, then tap once after the Library's interaction event.
         XCTAssertGreaterThanOrEqual(resume.frame.height, 44 - 0.001, "a 44 pt target")
-        XCTContext.runActivity(named: "Resume target before the single tap") { activity in
-            let interactive = app.staticTexts["uiTestState-libraryInteractive"].exists
-            let geometry = "interactive=\(interactive); resume=\(resume.frame); row=\(row(app, "Paused standup").frame); viewport=\(list(app).frame); record=\(app.buttons["recordButton"].frame)"
-            print(geometry)
-            let details = XCTAttachment(string: geometry)
-            details.lifetime = .keepAlways
-            activity.add(details)
-            let screenshot = XCTAttachment(screenshot: app.screenshot())
-            screenshot.lifetime = .keepAlways
-            activity.add(screenshot)
-        }
-        resume.tap()
-        XCTAssertTrue(waitFor(row(app, "Paused standup"), label: ", queued"), row(app, "Paused standup").label)
+        XCTAssertLessThanOrEqual(resume.frame.maxY, app.buttons["recordButton"].frame.minY)
+        XCTAssertTrue(resume.tapWhenInteractive(in: app) {
+            row(app, "Paused standup").exists && row(app, "Paused standup").label.contains(", queued")
+        }, row(app, "Paused standup").label)
+        let failed = scrolledRow(app, "Hallway conversation")
+        XCTAssertTrue(failed.exists)
         let tryAgain = app.buttons["Try transcribing Hallway conversation again"]
         XCTAssertTrue(tryAgain.waitForExistence(within: 5))
-        tryAgain.tap()
-        XCTAssertTrue(waitFor(row(app, "Hallway conversation"), label: ", queued"), row(app, "Hallway conversation").label)
+        XCTAssertGreaterThanOrEqual(tryAgain.frame.height, 44 - 0.001, "a 44 pt target")
+        XCTAssertLessThanOrEqual(tryAgain.frame.maxY, app.buttons["recordButton"].frame.minY)
+        XCTAssertTrue(tryAgain.tapWhenInteractive(in: app) {
+            row(app, "Hallway conversation").exists && row(app, "Hallway conversation").label.contains(", queued")
+        }, row(app, "Hallway conversation").label)
     }
 
     // ports: LibraryBehaviourTest#theControlsSendTheirEvents
