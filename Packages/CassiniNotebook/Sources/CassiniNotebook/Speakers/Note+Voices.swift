@@ -112,7 +112,7 @@ extension Note {
     private var carriedSpeakers: [NoteSpeaker] {
         let shown = speakers ?? []
         let named = shown.isOneVoice ? (versions ?? []).last(where: { !$0.speakers.isOneVoice })?.speakers ?? [] : shown
-        return named.filter { !DefaultLabels.isDefault(id: $0.id, label: $0.name) && !$0.match.isRejection }
+        return named.filter { $0.provenance != .unnamed && !$0.match.isRejection }
     }
 
     /// The saved voices the carried speakers are linked to (`carriedSpeakers`, `NoteSpeaker.linkedVoiceID`), each with
@@ -175,16 +175,35 @@ extension Note {
             return
         }
         let excluded = carriedExclusions(for: turns).merging(extra) { $0.union($1) }
-        let existing = Self.assignColourIndices(speakers ?? [], order: transcript.compactMap(\.speakerID))
-        let indices = Dictionary(existing.compactMap { speaker in speaker.colourIndex.map { (speaker.id, $0) } },
-                                 uniquingKeysWith: { first, _ in first })
-        var nextColour = (indices.values.max() ?? -1) + 1
+        backfillSpeakerColours()
+        let shown = speakers ?? []
+        // The undifferentiated one-voice bootstrap is replaced by the first real analysis, not a prior person
+        // reserving slot zero. Older identified voices may still provide identity on Transcribe again.
+        let replacesBootstrap = shown.isOneVoice && !shown.contains { order.contains($0.id) }
+        let existing = replacesBootstrap ? [] : shown
+        let carried = carriedSpeakers
+        let identityPool = existing + carried.filter { old in !existing.contains { $0.id == old.id } }
+        var knownByID = Dictionary(existing.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let matchedCounts = Dictionary(grouping: order.compactMap { id -> UUID? in
+            guard let match = matches[id], match.automatic else { return nil }
+            return match.voiceID
+        }, by: { $0 }).mapValues(\.count)
+        for id in order where knownByID[id] == nil {
+            guard let match = matches[id], match.automatic, matchedCounts[match.voiceID] == 1,
+                  !(excluded[id]?.contains(match.voiceID) ?? false) else { continue }
+            let candidates = identityPool.filter { $0.linkedVoiceID == match.voiceID && !order.contains($0.id) }
+            // A confirmed/automatic saved-voice link proves identity only when both sides are unique.
+            if candidates.count == 1 { knownByID[id] = candidates[0] }
+        }
+        let reserved = identityPool.compactMap(\.colourIndex)
+        var nextColour = (reserved.max() ?? -1) + 1
         let analyzed = order.enumerated().map { offset, id in
-            let colourIndex = indices[id] ?? nextColour
-            if indices[id] == nil { nextColour += 1 }
+            let known = knownByID[id]
+            let colourIndex = known?.colourIndex ?? nextColour
+            if known?.colourIndex == nil { nextColour += 1 }
             var speaker = NoteSpeaker(id: id, name: DefaultLabels.placeholder(offset + 1),
                                       colourIndex: colourIndex, provenance: .unnamed)
-            if let known = existing.first(where: { $0.id == id }) {
+            if let known {
                 speaker.name = known.name
                 speaker.provenance = known.provenance
             }

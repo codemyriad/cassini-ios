@@ -95,6 +95,72 @@ struct SpeakerColourPersistenceTests {
         #expect(note.speaker("a")?.colourIndex == 1)
         #expect(note.speaker("new")?.colourIndex == 3)
     }
+    @Test func firstRealAnalysisReplacesBootstrapSlotZeroAndKnownReanalysisPreservesIt() {
+        var note = note()
+        let bootstrap = NoteSpeaker.oneVoice(prefix: "run_", language: "en")
+        note.transcript = Note.oneVoice(note.transcript, bootstrap)
+        note.speakers = [bootstrap]
+        note.saveCurrentVersion(.transcription)
+        note.applySpeakerAnalysis(turns: [.init(speakerID: "real-a", start: 0, end: 0.5),
+                                          .init(speakerID: "real-b", start: 0.6, end: 1.5)],
+                                  matches: [:], voiceNames: [:], autoName: false,
+                                  stamp: .init(date: Date(timeIntervalSince1970: 1)))
+        #expect(note.speaker("real-a")?.colourIndex == 0)
+        #expect(note.speaker("real-b")?.colourIndex == 1)
+        note.renameSpeaker("real-a", name: "Speaker 1")
+        note.renameSpeaker("real-b", name: "Ben")
+        note.applySpeakerAnalysis(turns: [.init(speakerID: "real-b", start: 0, end: 0.5),
+                                          .init(speakerID: "real-a", start: 0.6, end: 1.5)],
+                                  matches: [:], voiceNames: [:], autoName: false,
+                                  stamp: .init(date: Date(timeIntervalSince1970: 2)))
+        #expect(note.speaker("real-a")?.colourIndex == 0)
+        #expect(note.speaker("real-a")?.provenance == .user)
+        #expect(note.speaker("real-b")?.colourIndex == 1)
+        #expect(NoteTranscripts.sealed(note).speakerTints == ["real-a": .blue, "real-b": .magenta])
+    }
+
+    @Test func uniqueAutomaticSavedVoiceIdentityCarriesTheSlotAcrossNewSpeakerIDs() {
+        for fromHistory in [false, true] {
+            var note = note()
+            let voice = UUID()
+            note.speakers?[1] = NoteSpeaker(id: "a", name: "Alex", match: .confirmed(voice: voice, score: 1), colourIndex: 8)
+            note.backfillSpeakerColours()
+            if fromHistory {
+                note.saveCurrentVersion(.transcription)
+                let bootstrap = NoteSpeaker.oneVoice(prefix: "again_", language: "en")
+                note.transcript = Note.oneVoice(note.transcript, bootstrap)
+                note.speakers = [bootstrap]
+            }
+            let links = note.carriedVoiceLinks
+            note.applySpeakerAnalysis(turns: [.init(speakerID: "new-a", start: 0, end: 0.5),
+                                              .init(speakerID: "new-person", start: 0.6, end: 1.5)],
+                                      matches: ["new-a": .init(voiceID: voice, score: 1, automatic: true)],
+                                      voiceNames: [voice: "Alex"], carriedLinks: links, autoName: false,
+                                      stamp: .init(date: Date(timeIntervalSince1970: 1)))
+            #expect(note.speaker("new-a")?.colourIndex == 8)
+            #expect(note.speaker("new-a")?.name == "Alex")
+            #expect(note.speaker("new-person")?.colourIndex == 11)
+        }
+    }
+
+    @Test func suggestedOrAmbiguousSavedVoiceIdentityDoesNotRecycleAStoredSlot() {
+        for automatic in [false, true] {
+            var note = note()
+            let voice = UUID()
+            note.speakers?[1] = NoteSpeaker(id: "a", name: "Alex", match: .confirmed(voice: voice, score: 1), colourIndex: 8)
+            if automatic {
+                note.speakers?[2] = NoteSpeaker(id: "b", name: "Ben", match: .confirmed(voice: voice, score: 1), colourIndex: 9)
+            }
+            note.backfillSpeakerColours()
+            let maximum = (note.speakers ?? []).compactMap(\.colourIndex).max() ?? -1
+            note.applySpeakerAnalysis(turns: [.init(speakerID: "new", start: 0, end: 1.5)],
+                                      matches: ["new": .init(voiceID: voice, score: 1, automatic: automatic)],
+                                      voiceNames: [voice: "Alex"], carriedLinks: note.carriedVoiceLinks, autoName: false,
+                                      stamp: .init(date: Date(timeIntervalSince1970: 1)))
+            #expect(note.speaker("new")?.colourIndex == maximum + 1)
+        }
+    }
+
     @Test func portableRoundTripKeepsGappedSlotsAndNamingRevealsTheSameSlot() throws {
         let folder = try PortableFixtures.temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: folder) }
