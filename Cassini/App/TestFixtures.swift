@@ -90,6 +90,7 @@ enum TestFixtures {
             // Sam is not named yet, and the saved voice "Sam Rivera" may be them: the note asks "Is this Sam Rivera?".
             let sam = try seedSuggestedVoice(root: store.root)
             main.speakers?[1].name = DefaultLabels.placeholder(2)
+            main.speakers?[1].provenance = .unnamed
             main.speakers?[1].match = .suggested(voice: sam, score: 0.78)
             main.refreshSpeakerLabels()
         case .voices:

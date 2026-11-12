@@ -7,6 +7,39 @@ import Testing
 @Suite struct NoteTranscriptsTests {
     typealias F = TranscriptFixtures
 
+    @Test func anIntentionallyUnnamedSuggestedFixtureShowsTheCardButALiteralUserNameDoesNot() throws {
+        let sam = F.voice("Sam Rivera")
+        for provenance in [NoteSpeaker.Provenance.unnamed, .user] {
+            var note = Note(title: "Speaker fixture")
+            note.transcript = [.init(text: "Hello", start: 0, end: 6, speakerID: "alex"),
+                               .init(text: "Welcome", start: 6, end: 14, speakerID: "sam"),
+                               .init(text: "Thanks", start: 14, end: 24, speakerID: "alex")]
+            note.speakers = [.init(id: "alex", name: "Alex", colourIndex: 0),
+                             .init(id: "sam", name: "Sam", colourIndex: 1)]
+            // Like the UI fixture, start with named Sam. Changing only text deliberately keeps .user.
+            note.speakers?[1].name = DefaultLabels.placeholder(2, language: "en")
+            #expect(note.speakers?[1].provenance == .user)
+            note.speakers?[1].provenance = provenance
+            note.speakers?[1].match = .suggested(voice: sam.id, score: 0.78)
+            note.refreshSpeakerLabels()
+            let reloaded = try JSONDecoder().decode(Note.self, from: JSONEncoder().encode(note))
+            let transcript = NoteTranscripts.sealed(reloaded, voices: [sam],
+                suggestions: SpeakerSuggestions.of(reloaded, voices: [sam]))
+            let cards = transcript.turns.flatMap(\.allSuggestions)
+            let shownNames = transcript.turns.flatMap { [$0.name] + $0.interjections.map(\.name) }
+            if provenance == .unnamed {
+                #expect(cards.count == 1)
+                #expect(cards.first?.speakerID == "sam" && cards.first?.voiceName == "Sam Rivera")
+                #expect(transcript.speakerTints["sam"] == .stone)
+                #expect(shownNames.contains(.placeholder(2, label: "Speaker 2")))
+            } else {
+                #expect(cards.isEmpty)
+                #expect(transcript.speakerTints["sam"] == .magenta)
+                #expect(shownNames.contains(.named("Speaker 2")))
+            }
+        }
+    }
+
     // ports: NoteTranscriptsTest#sealedTurnsFollowTheSpeakersWithTintsAndPlaceholders
     @Test func sealedTurnsFollowTheSpeakersWithTintsAndPlaceholders() {
         let transcript = NoteTranscripts.sealed(F.weeklySync)
