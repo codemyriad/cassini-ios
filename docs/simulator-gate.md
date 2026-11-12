@@ -13,10 +13,12 @@ self-hosted runner or checking out code. It never uses `pull_request_target`. Bo
 the workflow token has only contents-read permission and is not passed to test commands.
 
 This condition protects the normal workflow path, not a runner from a PR that edits workflow YAML to remove it or
-add another job. **Before enabling the new workflow on the public pool, confirm server-side fork exclusion** that
-PR code cannot change (for example an administratively enforced runner policy). Repository API access currently
-denies inspection of that policy; the draft stays blocked on coordinator confirmation. Existing CI's editable
-guards have the same limitation. Do not treat a passing guard truth-table test as proof of backend enforcement.
+add another job. The coordinator confirmed the repository's server-side Actions policy is
+`approval_policy=all_external_contributors`: no fork workflow starts on any runner until a maintainer approves it,
+including PRs that edit workflow YAML. Keep that approval boundary and never approve a fork for this pool. The job
+guard is the second layer: trusted events and a same-repository head are required; forks skip the job rather than
+falling back to another runner. A guard truth-table test alone is not proof of backend enforcement. Org runner-group
+settings could not be inspected with the available token; no new group/label or permission was created here.
 
 The app checkout is the immutable PR head SHA (the same source the legacy status tested), or the push/dispatch SHA.
 Full history supports the existing test script's change detection. Conformance vectors use the same pinned

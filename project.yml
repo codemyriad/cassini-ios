@@ -95,7 +95,7 @@ targets:
   CassiniUITests:
     type: bundle.ui-testing
     platform: iOS
-    sources: [CassiniUITests]
+    sources: [CassiniUITests, Tests/CassiniCoreTests/RowScrollGeometry.swift]
     dependencies:
       - target: Cassini
     settings:
