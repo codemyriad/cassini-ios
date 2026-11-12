@@ -21,6 +21,12 @@ final class RecordingTestClock: AppClock {
     }
     private final class Cancellation: Sendable { let value = Mutex(false) }
     private let state: Mutex<State>
+    private let observer = Mutex<(@Sendable (Duration) -> Void)?>(nil)
+    /// Signals actual sleep registration, so tests advance a debounce only once its task is waiting.
+    var onSleep: (@Sendable (Duration) -> Void)? {
+        get { observer.withLock { $0 } }
+        set { observer.withLock { $0 = newValue } }
+    }
 
     init(now: Date) { state = Mutex(State(origin: now)) }
     var now: Date { state.withLock { $0.origin.addingTimeInterval(Self.seconds($0.elapsed)) } }
@@ -46,6 +52,7 @@ final class RecordingTestClock: AppClock {
                     return false
                 }
                 if rejected { continuation.resume(throwing: CancellationError()) }
+                else { onSleep?(duration) }
             }
         } onCancel: {
             cancelled.value.withLock { $0 = true }

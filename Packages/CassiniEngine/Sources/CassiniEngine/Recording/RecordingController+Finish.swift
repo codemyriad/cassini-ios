@@ -8,12 +8,21 @@ import CassiniNotebook
 /// Touches: `policy`, `titleWrite` and `captureURL` (ended and cleared), `compressions`; the state only through
 /// `setState`, `setFinalizing` and `endActivity`.
 extension RecordingController {
-    func end(_ stop: Stop, title: String?) async {
-        guard let current = state.activeRecording else { return }
+    func end(_ stop: Stop, title: String?, recording admitted: ActiveRecording? = nil) async {
+        let current: ActiveRecording
+        if let admitted {
+            // A start may publish its active capture before its position-zero write fails. That failed start
+            // already stopped/discarded the capture; its queued Finish must not seal or stop it a second time.
+            guard state == .finishing(noteID: admitted.noteID) else { return }
+            current = admitted
+        } else {
+            guard let active = state.activeRecording else { return }
+            current = active
+            setState(.finishing(noteID: current.noteID))
+        }
         policy?.cancel(); policy = nil
         titleWrite?.cancel(); await titleWrite?.value; titleWrite = nil
         let id = current.noteID
-        setState(.finishing(noteID: id))
         let elapsed = parts.capture.elapsed
         let duration = (try? await parts.capture.stop().duration) ?? elapsed
         let url = captureURL
