@@ -17,6 +17,9 @@ import urllib.request
 import uuid
 from zoneinfo import ZoneInfo
 
+# The scheduled controller runs from the control clone and refuses to update a dirty one: importing the notes
+# module must not leave a __pycache__ folder beside it.
+sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from testflight_notes import (FALLBACK_NOTES, collect_fragments, github_release_body,
                                 render_test_notes, validate_test_notes)

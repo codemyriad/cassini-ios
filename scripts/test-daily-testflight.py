@@ -12,6 +12,7 @@ import json
 from pathlib import Path
 import plistlib
 import subprocess
+import sys
 import shutil
 import tempfile
 import unittest
@@ -620,6 +621,36 @@ class SchedulerTests(unittest.TestCase):
                 self.assertIn('--scheduled', argv)
                 self.assertEqual(command.call_args_list[3].args[0][:3], ['git', 'fetch', 'origin'])
                 os.set_inheritable(held.fileno(), False)
+
+    def test_starting_the_controller_leaves_a_real_control_clone_clean_for_its_own_check(self):
+        # A real clone on main with a real origin and no ignore rules. The controller is started as launchd starts
+        # it (a fresh interpreter, bytecode writing not turned off by the environment); then the real
+        # refresh_control runs its `git status --porcelain` check on what that start left behind.
+        scripts = Path(__file__).resolve().parent
+        origin, clone = self.root/'origin.git', self.root/'control'
+        git = lambda *args, cwd=None: subprocess.run(['git', *args], cwd=cwd, check=True, capture_output=True, text=True)
+        git('init', '--bare', '--initial-branch=main', str(origin))
+        git('clone', str(origin), str(clone))
+        (clone/'scripts').mkdir()
+        for name in ['daily-testflight.py', 'testflight_notes.py']:
+            shutil.copy(scripts/name, clone/'scripts'/name)
+        git('add', '-A', cwd=clone)
+        git('-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'Control clone', cwd=clone)
+        git('push', 'origin', 'HEAD:main', cwd=clone)
+        # Bytecode goes beside the module, as on a Python without a separate cache folder (Apple's keeps one
+        # outside the source tree, which would hide the problem on this Mac).
+        environment = {key: value for key, value in os.environ.items()
+                       if key not in ('PYTHONDONTWRITEBYTECODE', 'PYTHONPYCACHEPREFIX')}
+        started = subprocess.run([sys.executable, '-X', 'pycache_prefix=', 'scripts/daily-testflight.py', '--help'],
+                                 cwd=clone, env=environment, capture_output=True, text=True)
+        self.assertEqual(started.returncode, 0, started.stderr)
+        self.assertEqual(git('status', '--porcelain', '--ignored', cwd=clone).stdout, '')
+        driver = ('import importlib.util, sys; sys.dont_write_bytecode = True\n'
+                  'spec = importlib.util.spec_from_file_location("control", "scripts/daily-testflight.py")\n'
+                  'control = importlib.util.module_from_spec(spec); spec.loader.exec_module(control)\n'
+                  'control.refresh_control(dict(source="."), None, None)\n')
+        checked = subprocess.run([sys.executable, '-c', driver], cwd=clone, env=environment, capture_output=True, text=True)
+        self.assertEqual(checked.returncode, 0, checked.stderr)
 
     def test_launchd_stderr_inbox_does_not_duplicate_the_same_failure_line(self):
         inbox_path = self.root/'inbox'
