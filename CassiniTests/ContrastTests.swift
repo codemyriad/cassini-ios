@@ -59,7 +59,8 @@ import CassiniNotebook
             text("primary label on accent fill", .onAccent, on: .accentStrong),
             nonText("primary busy indicator on accent fill", .onAccent, on: .accentStrong),
             text("Record label on Record fill", .onRecord, on: .record),
-            text("destructive filled label", .ground, on: .error),
+            text("destructive filled label", .onRecord, on: .errorFill),
+            text("success filled label", .onRecord, on: .successFill),
             text("recording badge", .recordInk, on: .recordTint),
             text("recording text on recording background", .recordingText, on: .recordingBackground),
             text("recording secondary on recording background", .recordingSecondary, on: .recordingBackground),
@@ -93,7 +94,8 @@ import CassiniNotebook
         for (index, tint) in (Color.speakerTints + [Color.unnamedSpeakerTint]).enumerated() {
             for (surface, color) in surfaces {
                 pairs.append(text("speaker tint \(index) on \(surface)", tint, on: color))
-                pairs.append(nonText("speaker tint \(index) avatar over \(surface)", tint, on: color, tint.opacity(0.14)))
+                let wash = (Color.speakerWashes + [Color.unnamedSpeakerWash])[index]
+                pairs.append(text("speaker tint \(index) avatar over \(surface)", tint, on: color, wash))
             }
         }
         return pairs

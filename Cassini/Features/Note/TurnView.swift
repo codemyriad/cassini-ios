@@ -73,8 +73,6 @@ struct TurnView: View, Equatable {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var placeholder: Bool { !turn.name.isNamed }
-
     @ViewBuilder private var paragraph: some View {
         let text = Text(attributed)
             .font(.system(.body)).lineSpacing(7)
@@ -142,7 +140,7 @@ struct TurnView: View, Equatable {
             ? turn.linkedText(activeWord: activeIndex, scheme: Self.scheme)
             : AttributedString(turn.text)
         // Use per-run foregrounds: a paragraph-wide link tint would color named chips like an unnamed host.
-        result.foregroundColor = style == .draft || placeholder ? Color.muted : Color.ink
+        result.foregroundColor = style == .draft ? Color.muted : Color.ink
         let characters = result.characters
         func range(_ offsets: Range<Int>) -> Range<AttributedString.Index>? {
             guard offsets.lowerBound >= 0, offsets.upperBound <= characters.count else { return nil }
@@ -152,8 +150,8 @@ struct TurnView: View, Equatable {
         // The full chip tint includes its internal spaces; active-word colors are applied after every decoration.
         for chip in turn.interjections {
             if let span = range(chip.textRange) {
-                result[span].foregroundColor = chip.name.isNamed ? Color.ink : Color.muted
-                result[span].backgroundColor = chip.crosstalk ? Color.warnTint : chip.tint.color.opacity(0.12)
+                result[span].foregroundColor = Color.ink
+                result[span].backgroundColor = chip.crosstalk ? Color.warnTint : chip.tint.wash
             }
             if let name = range(chip.nameRange) {
                 result[name].foregroundColor = chip.tint.color

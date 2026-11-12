@@ -142,7 +142,7 @@ struct SavedVoicesView: View {
 /// A person: avatar, name, "14 notes · 22 min confirmed speech", the stale hint, and the options menu.
 private struct PersonRow: View {
     /// Saved-voice avatars cycle by list position, as on Android.
-    private static let tints = Color.savedVoiceTints
+    private static let tints = Color.speakerTints
 
     let person: SavedVoiceSummary
     let index: Int
@@ -151,7 +151,8 @@ private struct PersonRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            SpeakerAvatar(name: person.name, tint: Self.tints[index % Self.tints.count])
+            SpeakerAvatar(name: person.name, tint: Self.tints[index % Self.tints.count],
+                          wash: Color.speakerWashes[index % Color.speakerWashes.count])
             VStack(alignment: .leading, spacing: 2) {
                 Text(person.name).font(.body.weight(.medium)).foregroundStyle(Color.ink)
                 Text(SpeakersCopy.meta(notes: person.notes, seconds: person.confirmedSeconds)).font(.caption).foregroundStyle(Color.muted)

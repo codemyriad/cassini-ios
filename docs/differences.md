@@ -876,7 +876,9 @@ These features exist only on iOS. They were kept by decision.
 
 - **Palette (W1 draft preview).** The pinned Cassini sheet supplies Linen/light and Saturn-night/dark, teal actions
   and highlights, and separate Record/error/status roles. Values load from `CassiniShared/Brand/tokens.json` in the
-  app and widget. Speaker hues remain unchanged pending L-14; Recording retains its forced-dark ground pending L-08.
+  app and widget. The six speaker colours and stone for unnamed speakers follow L-14, with token avatar/chip washes.
+  Existing first-speaking assignment remains; mapping to file colourIndex is not adopted pending confirmation.
+  Recording retains its forced-dark ground pending L-08.
   Fonts are system sans with Dynamic Type and tabular times. Card title/meta use headline/footnote (17/13 at default).
   `BrandTokenTests` checks the pin, both appearances and the native accent asset. `ContrastTests` follows Android's
   `ContrastTest`. It checks every

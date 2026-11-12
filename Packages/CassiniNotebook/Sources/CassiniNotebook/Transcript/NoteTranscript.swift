@@ -214,7 +214,7 @@ public enum NoteTranscripts {
         let cards = Dictionary(suggestions.map { ($0.speakerID, $0) }, uniquingKeysWith: { first, _ in first })
         var suggested = Set<String>()
         return build(words, endsBoundedByAudio: !note.transcript.isEmpty && note.transcript.allSatisfy { $0.wordEndsBoundedByAudio == true }) { speaker, first in
-            guard let speaker else { return Template(name: .unknown, tint: .amber) }
+            guard let speaker else { return Template(name: .unknown, tint: .stone) }
             let name = names[speaker] ?? unlabeled(1)
             var auto = false
             if case .auto(let voice, _) = speakers[speaker]?.match, case .named(let label) = name,
@@ -222,7 +222,7 @@ public enum NoteTranscripts {
                 auto = NameMatch.same(label, voiceName)
             }
             let suggestion = first && !name.isNamed && suggested.insert(speaker).inserted ? cards[speaker] : nil
-            return Template(name: name, tint: tints[speaker] ?? .amber, auto: auto, suggestion: suggestion)
+            return Template(name: name, tint: tints[speaker] ?? .stone, auto: auto, suggestion: suggestion)
         }
     }
 
@@ -242,9 +242,9 @@ public enum NoteTranscripts {
         for (ordinal, id) in order.enumerated() { names[id] = name(label: labels[id], id: id, ordinal: ordinal) }
         let tints = SpeakerTint.assign(order) { names[$0]?.isNamed != true }
         let built = build(transcriptWords) { speaker, _ in
-            guard let speaker else { return Template(name: .unknown, tint: .amber) }
+            guard let speaker else { return Template(name: .unknown, tint: .stone) }
             let name = names[speaker] ?? unlabeled(1)
-            return Template(name: name, tint: tints[speaker] ?? .amber, auto: automatic.contains(speaker) && name.isNamed)
+            return Template(name: name, tint: tints[speaker] ?? .stone, auto: automatic.contains(speaker) && name.isNamed)
         }
         let cards = Dictionary(suggestions.map { ($0.speakerID, $0) }, uniquingKeysWith: { first, _ in first })
         var placedSpeakers = Set<String>()

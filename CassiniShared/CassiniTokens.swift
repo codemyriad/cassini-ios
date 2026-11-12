@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Draft canvas tokens from cassini-ux e4ae2217312370250a39ad83e047a186048e0a9e, brand/tokens.json; provenance is in Brand/UPSTREAM.json.
-/// W1 draft preview activates decided roles and the explicit Record placeholder. Proposed hues are never loaded.
+/// Draft canvas tokens from cassini-ux e244ad6a830e4ef77d87fb452143f7100c767139, brand/tokens.json; provenance is in Brand/UPSTREAM.json.
+/// W1 draft preview activates the decided palette. File colourIndex mapping remains outside this preview.
 enum CassiniTokens {
     enum Role: String, CaseIterable {
         case ground
@@ -23,8 +23,10 @@ enum CassiniTokens {
         case recordTint = "record-tint"
         case onRecord = "on-record"
         case error
+        case errorFill = "error-fill"
         case errorTint = "error-tint"
         case success
+        case successFill = "success-fill"
         case successTint = "success-tint"
         case warnInk = "warn-ink"
         case warnTint = "warn-tint"
@@ -32,6 +34,20 @@ enum CassiniTokens {
         case neutralTint = "neutral-tint"
         case highlight
         case highlightInk = "highlight-ink"
+        case speaker0 = "speaker-0"
+        case speaker1 = "speaker-1"
+        case speaker2 = "speaker-2"
+        case speaker3 = "speaker-3"
+        case speaker4 = "speaker-4"
+        case speaker5 = "speaker-5"
+        case speaker6 = "speaker-6"
+        case avatar0 = "avatar-0"
+        case avatar1 = "avatar-1"
+        case avatar2 = "avatar-2"
+        case avatar3 = "avatar-3"
+        case avatar4 = "avatar-4"
+        case avatar5 = "avatar-5"
+        case avatar6 = "avatar-6"
         case inverse
         case onInverse = "on-inverse"
         case inverseAccent = "inverse-accent"
@@ -48,7 +64,7 @@ enum CassiniTokens {
               let sheet = try? JSONDecoder().decode(Sheet.self, from: data) else {
             preconditionFailure("The pinned brand token resource is missing or invalid")
         }
-        return sheet.tokens.filter { ["decided", "placeholder"].contains($0.value.status) }
+        return sheet.tokens.filter { $0.value.status == "decided" }
     }()
 
     static func color(_ role: Role, forcedDark: Bool = false) -> Color {
@@ -67,7 +83,7 @@ enum CassiniTokens {
     }
 }
 
-// App roles and widget roles share this sheet. L-14 speaker hues and L-08 Recording ground stay app-local.
+// App and widget roles share the decided sheet. Forced-dark Recording ground still awaits L-08.
 extension Color {
     static let ground = CassiniTokens.color(.ground)
     static let surface = CassiniTokens.color(.surface)
@@ -87,6 +103,8 @@ extension Color {
     static let recordInk = CassiniTokens.color(.recordInk)
     static let recordTint = CassiniTokens.color(.recordTint)
     static let onRecord = CassiniTokens.color(.onRecord)
+    static let errorFill = CassiniTokens.color(.errorFill)
+    static let successFill = CassiniTokens.color(.successFill)
     static let error = CassiniTokens.color(.error)
     static let errorTint = CassiniTokens.color(.errorTint)
     static let success = CassiniTokens.color(.success)
@@ -122,23 +140,10 @@ extension Color {
     static let recordingFinish = record
     static let recordingLive = recordingAccent
 
-    /// Placeholder/saved-voice amber was the old warning hue; freeze it independently while L-14 stays OPEN.
-    static let unnamedSpeakerTint = Color(light: rgb(0.55, 0.35, 0.02), dark: rgb(0.98, 0.76, 0.36))
-    static let savedVoiceTints: [Color] = [.speakerTints[1], .speakerTints[5], .unnamedSpeakerTint, .speakerTints[3]]
-
-    /// Speaker tints, assigned by first appearance in a transcript.
-    static let speakerTints: [Color] = [
-        Color(light: rgb(0.76, 0.22, 0.10), dark: rgb(1, 0.55, 0.40)),
-        Color(light: rgb(0.10, 0.40, 0.62), dark: rgb(0.48, 0.72, 0.95)),
-        Color(light: rgb(0.20, 0.45, 0.22), dark: rgb(0.52, 0.82, 0.55)),
-        Color(light: rgb(0.48, 0.27, 0.62), dark: rgb(0.78, 0.62, 0.95)),
-        Color(light: rgb(0.60, 0.38, 0.02), dark: rgb(0.98, 0.76, 0.36)),
-        Color(light: rgb(0.05, 0.45, 0.47), dark: rgb(0.40, 0.82, 0.84)),
-    ]
-
-    private static func rgb(_ red: CGFloat, _ green: CGFloat, _ blue: CGFloat) -> UIColor {
-        UIColor(red: red, green: green, blue: blue, alpha: 1)
-    }
+    static let unnamedSpeakerTint = CassiniTokens.color(.speaker0)
+    static let unnamedSpeakerWash = CassiniTokens.color(.avatar0)
+    static let speakerTints: [Color] = [CassiniTokens.Role.speaker1, .speaker2, .speaker3, .speaker4, .speaker5, .speaker6].map { CassiniTokens.color($0) }
+    static let speakerWashes: [Color] = [CassiniTokens.Role.avatar1, .avatar2, .avatar3, .avatar4, .avatar5, .avatar6].map { CassiniTokens.color($0) }
 
     init(light: UIColor, dark: UIColor) {
         self.init(uiColor: UIColor { $0.userInterfaceStyle == .dark ? dark : light })

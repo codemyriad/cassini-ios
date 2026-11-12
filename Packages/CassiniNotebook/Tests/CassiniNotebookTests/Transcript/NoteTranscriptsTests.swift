@@ -16,7 +16,7 @@ import Testing
         #expect(turns[0].name == .named("Giulia"))
         #expect(turns[1].name == .placeholder(2, label: "Speaker 2"))
         // Placeholders are amber and take no slot: Giulia blue, Paolo teal.
-        #expect(turns.map(\.tint) == [.blue, .amber, .teal, .blue])
+        #expect(turns.map(\.tint) == [.vermilion, .stone, .brown, .vermilion])
         #expect(turns[0].text == "Hello everyone.")
         #expect(turns[0].words[1].start == 0.5)
         #expect(transcript.speakers == ["a", "b", "c"])
@@ -55,7 +55,7 @@ import Testing
         let turns = NoteTranscripts.sealed(note, voices: [paolo]).turns
         #expect(!turns[2].auto)
         #expect(turns[1].name == .unknown)
-        #expect(turns[1].tint == .amber)
+        #expect(turns[1].tint == .stone)
     }
 
     // ports: NoteTranscriptsTest#theActiveWordIsTheLastWordThatStarted
@@ -99,7 +99,7 @@ import Testing
         let draft = NoteTranscripts.draft(words, tentativeFromMs: 3_600)
         let turns = draft.turns
         #expect(turns.map(\.name) == [1, 2, 3, 1].map { .placeholder($0, label: "Speaker \($0)") })
-        #expect(turns.allSatisfy { $0.tint == .amber && !$0.auto && $0.suggestion == nil })
+        #expect(turns.allSatisfy { $0.tint == .stone && !$0.auto && $0.suggestion == nil })
         #expect(turns[3].unsettledFrom == 1, "so ends after 3.6 s")
         #expect(turns[0].unsettledFrom == nil)
         #expect(draft.activeWord(at: 3.1) == WordRef(turnID: "w4", index: 0))
@@ -171,7 +171,7 @@ extension NoteTranscriptsTests {
         #expect(row.allSuggestions.map(\.speakerID) == ["ben"])
         #expect(row.allSuggestions.first?.start == 3.05)
         #expect(row.interjections.first?.name == .placeholder(2, label: "Speaker 2"))
-        #expect(row.interjections.first?.tint == .amber)
+        #expect(row.interjections.first?.tint == .stone)
         let ben = try #require(NamingInput.of(note, speakerID: "ben", print: nil, voices: [voice],
                                               voicesReadOnly: false, voiceModelReady: false))
         let ada = try #require(NamingInput.of(note, speakerID: "ada", print: nil, voices: [voice],
@@ -183,7 +183,7 @@ extension NoteTranscriptsTests {
         let named = NoteTranscripts.sealed(note, voices: [voice], suggestions: SpeakerSuggestions.of(note, voices: [voice]))
         #expect(named.turns[0].allSuggestions.isEmpty)
         #expect(named.speakers == ["ada", "ben"])
-        #expect(named.turns[0].interjections.first?.tint == .teal)
+        #expect(named.turns[0].interjections.first?.tint == .brown)
     }
 
     @Test func aRepeatedChipSpeakerGetsOneSealedCardAndItsLatestDraftCard() throws {

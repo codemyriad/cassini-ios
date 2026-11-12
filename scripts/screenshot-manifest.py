@@ -21,6 +21,11 @@ SHOTS = {
     "09-saved-voices": ("Saved voices", "SavedVoices", "test09SavedVoices", "voices"),
     "10-note-export": ("Note export menu", "NoteExport", "test10NoteExport", "reading"),
     "11-library-export": ("Library export menu", "LibraryExport", "test11LibraryExport", "reading"),
+    "12-delete-dialog": ("Delete confirmation", "DeleteDialog", "test12DeleteDialog", "trash"),
+    "13-error-line": ("Transcription error", "ErrorLine", "test13ErrorLine", "brandSpeakers"),
+    "14-success-badge": ("Transcribed success badge", "SuccessBadge", "test14SuccessBadge", "brandSpeakers"),
+    "15-seven-speaker-meeting": ("Seven-speaker meeting", "Meeting", "test15SevenSpeakerMeeting", "brandSpeakers"),
+    "16-seven-speaker-colours": ("Seven speaker colours", "Speakers", "test16SevenSpeakerColours", "brandSpeakers"),
     "01-split-landscape": ("Split view landscape", "Meeting", "testSplitViewLandscape", "reading"),
     "02-split-portrait": ("Split view portrait", "Meeting", "testSplitViewPortrait", "reading"),
 }
