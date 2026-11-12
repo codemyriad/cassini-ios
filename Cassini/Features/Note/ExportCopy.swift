@@ -16,7 +16,33 @@ enum ExportCopy {
                                     comment: "The label of passages no speaker was found for, in an export"),
             meetingSubtitle: { meetingTime, durationMs, speakers in
                 subtitle(meetingTime: meetingTime, durationMs: durationMs, speakers: speakers, locale: locale, timeZone: timeZone)
-            })
+            },
+            markdown: markdownOptions(uiLanguage: DefaultLabels.appLanguage, locale: locale, timeZone: timeZone))
+    }
+
+    static func markdownOptions(uiLanguage: String, locale: Locale, timeZone: TimeZone) -> MarkdownOptions {
+        let words = MarkdownDate.uiLocale(uiLanguage)
+        // String's locale formats values; resource lookup still uses its bundle's language. Resolve that separately.
+        let language = Bundle.preferredLocalizations(from: Bundle.main.localizations,
+            forPreferences: [words.identifier.replacingOccurrences(of: "_", with: "-")]).first ?? "en"
+        let bundle = Bundle.main.path(forResource: language, ofType: "lproj").flatMap(Bundle.init(path:)) ?? Bundle.main
+        let under = String(localized: "under 1 min", table: "Export", bundle: bundle, locale: words)
+        let minutes = String(localized: "{m} min", table: "Export", bundle: bundle, locale: words)
+        let hours = String(localized: "{h} h {mm} min", table: "Export", bundle: bundle, locale: words)
+        return MarkdownOptions(copy: MarkdownCopy(
+            speakersLine: String(localized: "Speakers: {names}", table: "Export", bundle: bundle, locale: words),
+            transcriptHeading: String(localized: "Transcript", table: "Export", bundle: bundle, locale: words),
+            notesHeading: String(localized: "Notes", table: "Export", bundle: bundle, locale: words),
+            overLine: String(localized: "(over {names})", table: "Export", bundle: bundle, locale: words),
+            speakerList: { names in
+                let formatter = ListFormatter()
+                formatter.locale = words
+                return formatter.string(from: names) ?? names.joined(separator: ", ")
+            }), dateLine: { meetingTime, durationMs in
+                MarkdownDate.line(meetingTime: meetingTime, timeZone: timeZone, uiLanguage: uiLanguage, formattingLocale: locale,
+                    duration: MarkdownDate.duration(durationMs, locale: locale, underMinute: under, minutes: minutes, hours: hours))
+            }, untitled: String(localized: "Untitled meeting", table: "Export", bundle: bundle, locale: words),
+            unnamedSpeaker: { DefaultLabels.placeholder($0, language: words.identifier.replacingOccurrences(of: "_", with: "-")) })
     }
 
     /// The TXT subtitle line: "Oct 8, 2026, 3:10 PM · 23:50 · 3 speakers"; the speakers part from 2 on.
@@ -47,6 +73,7 @@ enum ExportCopy {
     /// The menu item of `format`.
     static func title(_ format: TranscriptFormat) -> String {
         switch format {
+        case .markdown: String(localized: "Markdown", table: "Export")
         case .text: String(localized: "Transcript as text", table: "Export")
         case .subtitles: String(localized: "Subtitles · .srt", table: "Export", comment: "SubRip subtitles, for most video players")
         case .webVTT: String(localized: "Subtitles · .vtt", table: "Export", comment: "WebVTT subtitles, for web players")

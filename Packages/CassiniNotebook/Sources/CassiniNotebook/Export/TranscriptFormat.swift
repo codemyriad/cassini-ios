@@ -3,7 +3,7 @@ import Foundation
 
 /// The transcript exports of features.md section 6, and the iOS-only JSON.
 public enum TranscriptFormat: String, CaseIterable, Codable, Identifiable, Sendable {
-    case text = "txt", subtitles = "srt", webVTT = "vtt", json = "json"
+    case text = "txt", markdown = "md", subtitles = "srt", webVTT = "vtt", json = "json"
 
     public var id: String { rawValue }
     public var fileExtension: String { rawValue }
@@ -19,11 +19,14 @@ public struct ExportTexts: Sendable {
     public var emptyText: String
     /// The label of passages without a speaker.
     public var unassignedLabel: String
+    public var markdown: MarkdownOptions?
 
     public init(subtitle: @escaping @Sendable (Date, Int64, Int) -> String, emptyText: String, unassignedLabel: String,
-                meetingSubtitle: (@Sendable (MeetingTime, Int64, Int) -> String)? = nil) {
+                meetingSubtitle: (@Sendable (MeetingTime, Int64, Int) -> String)? = nil,
+                markdown: MarkdownOptions? = nil) {
         self.subtitle = subtitle; self.emptyText = emptyText; self.unassignedLabel = unassignedLabel
         self.meetingSubtitle = meetingSubtitle
+        self.markdown = markdown
     }
 }
 
@@ -50,10 +53,23 @@ public enum TranscriptExports {
 
     /// The bytes of `note`'s transcript (or `version`'s) in `format`: UTF-8 without BOM, `\n` line endings.
     public static func data(_ note: Note, format: TranscriptFormat, version: TranscriptVersion? = nil,
-                            texts: ExportTexts) throws -> Data {
-        let transcript = ExportTranscript(note: note, version: version, unassignedLabel: texts.unassignedLabel)
+                            texts: ExportTexts, markdownNotes: [MarkdownNote] = []) throws -> Data {
+        var transcript = ExportTranscript(note: note, version: version, unassignedLabel: texts.unassignedLabel)
         let text: String
         switch format {
+        case .markdown:
+            guard let options = texts.markdown else { throw MarkdownExport.OptionsRequired() }
+            var seen = Set<String>()
+            let speakers = transcript.words.compactMap { seen.insert($0.speaker).inserted ? $0.speaker : nil }
+            for (index, speaker) in speakers.enumerated() {
+                let label = transcript.labels[speaker]
+                if label.flatMap(DefaultLabels.placeholderNumber) == nil,
+                   label.map({ DefaultLabels.isDefault(id: speaker, label: $0) }) ?? true {
+                    transcript.labels[speaker] = options.unnamedSpeaker(index + 1)
+                }
+            }
+            text = MarkdownExport.write(transcript, dateLine: options.dateLine(note.meetingTime, transcript.durationMs),
+                                        copy: options.copy, notes: markdownNotes)
         case .json: return try JSONExport.data(note, version: version)
         case .subtitles: text = SrtWriter.write(transcript)
         case .webVTT: text = VttWriter.write(transcript)

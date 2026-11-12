@@ -1,0 +1,36 @@
+{
+  "repository": "https://github.com/codemyriad/cassini-ux",
+  "commit": "7cdb069fb0b71953feeeb7a6805c63835f968540",
+  "files": {
+    "MARKDOWN.md": {
+      "source": "vectors/export/MARKDOWN.md",
+      "sha256": "15d0ab1b00a94ecb4b81eccec48a370fe9cdb3e2a332d98a35770817092545c7"
+    },
+    "markdown-cases.json": {
+      "source": "vectors/export/markdown-cases.json",
+      "sha256": "f9ce458f68f1a33421ecdd53b4df086a10b215896a158794d2077cca3356c089"
+    },
+    "budget-review.md": {
+      "source": "vectors/export/budget-review.md",
+      "sha256": "a25e0ee9bd9f49d2184b8a6705aaa80aa9550a79e5f5d80099d5dcfcab289f67"
+    },
+    "strings.json": {
+      "source": "strings/strings.json",
+      "source_sha256": "8b20048485bd928d2067806284c381ffb8033768ecf084387600517d0006690f",
+      "selection": [
+        "export.markdown.description",
+        "export.markdown.label",
+        "export.markdown.notesHeading",
+        "export.markdown.speakersLine",
+        "export.markdown.transcriptHeading",
+        "format.meetingDuration.hours",
+        "format.meetingDuration.minutes",
+        "format.meetingDuration.underMinute",
+        "library.untitled",
+        "meeting.turn.over"
+      ],
+      "sha256": "21e0b4130ba6b75f1bdf943f582c87caf176fe8254ec48c5083a74750785d22c",
+      "source_commit": "7cdb069fb0b71953feeeb7a6805c63835f968540"
+    }
+  }
+}

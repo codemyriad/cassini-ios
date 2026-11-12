@@ -7,7 +7,7 @@ extension ExportTranscript {
     public static let unassignedSpeaker = "unassigned"
 
     /// The export of `note`'s current transcript, or of `version` when one is given. Labels are the speakers' names
-    /// as the note shows them; passages without a speaker (`unassignedSpeaker`) are labelled `unassignedLabel`.
+    /// as the note shows them; `unassignedLabel` is used only when no stored unassigned-speaker label exists.
     ///
     /// A timed word whose text holds several words gives one word per part, each with the word's range. A passage
     /// without word timing (one edited by hand) gives one word per part too, its span shared out among them
@@ -16,7 +16,7 @@ extension ExportTranscript {
         let segments = version?.segments ?? note.transcript
         let speakers = version?.speakers ?? note.speakers ?? []
         var labels = Dictionary(speakers.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
-        labels[Self.unassignedSpeaker] = unassignedLabel
+        if labels[Self.unassignedSpeaker] == nil { labels[Self.unassignedSpeaker] = unassignedLabel }
         self.init(title: note.title, durationMs: Self.ms(note.duration), words: segments.flatMap(Self.words), labels: labels,
                   endsBoundedByAudio: !segments.isEmpty && segments.allSatisfy { $0.wordEndsBoundedByAudio == true })
     }

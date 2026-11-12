@@ -113,7 +113,7 @@ records their exact revisions.
 - **Edit and versions.** You can edit a passage's text; its word timing is dropped, but its place in the audio is
   kept. Every transcription, merge and run of edits keeps the transcript from before it as a version you can go back
   to.
-- **Export** text, SRT or WebVTT subtitles, structured JSON, a copy of the original audio, or a portable Cassini
+- **Export** plain text, localized Markdown, SRT or WebVTT subtitles, structured JSON, a copy of the original audio, or a portable Cassini
   `.opus` document. The document keeps the source's verified transcripts, its private `x` data and its audio packets,
   adds the note's versions and speaker names, and records how each transcript was made. A stale or unverified source
   with nothing new on the device is shared as it is, without a renamed title; one transcribed again keeps only the new
@@ -201,7 +201,7 @@ TestFlight still need.
 - **Transcript rendering (D84).** The pure `CassiniNotebook.TurnModel` ports the gocassini viewer pipeline at
   `1111155cb0017b47c072a8662c54f28ad7c44223`: readable grouping, display-only timing repair, continuity-based
   turn reconstruction, inline interjections, competing-speaker labels and continuation headers. The sealed note,
-  live draft, reader, Library previews, search excerpts and text export use that projection. Canonical words and
+  live draft, reader, Library previews, search excerpts and text/Markdown export use that projection. Canonical words and
   timestamps stay unchanged; playback and editing keep the original word indices even when reading order differs.
   The six shared vectors in `CassiniNotebookTests/Resources/interjections` are copied unchanged from coordination
   and checked with `swift test --filter CassiniNotebookTests` (no simulator or e2e). This viewer contract supersedes
@@ -351,7 +351,7 @@ PATH="/path/to/pr-shots-venv/bin:$PATH" scripts/pr-shots.sh --base origin/main -
 ```
 
 The base is the merge base of that ref and the head worktree (`--head PATH` defaults to this checkout).
-Use a new output folder outside the worktree; commit changes and remove untracked files first. It renders each source's English screenshot set (currently 22 images) in light and dark,
+Use a new output folder outside the worktree; commit changes and remove untracked files first. It renders each source's English screenshot set (currently 26 images, including Note and Library export menus) in light and dark,
 using each source's capture tests, renderer and one private simulator pair. Legacy bases without manifest tooling
 receive only the head renderer/helper, preserving their capture tests. New reading shots start paused,
 so no pressed skip-button tint leaks into a capture. Each render takes `~/.cassini-heavy.lock` itself

@@ -7,4 +7,4 @@ Reader regressions load vectors 027, 028 and 029: authoritative UTC start, a DAT
 
 Live capture stores position-zero time after microphone permission/session preparation. Export writes `recordedAtUtc`, its mirror and DATE from that start; imported files retain their original start metadata. Catalogue loading reads portable headers without hashing audio or rewriting user files. Rebuilding a missing catalogue reads portable metadata rather than treating filesystem creation as recording start.
 
-Markdown is a separate draft (#112), paused for D95. Before it lands its date adapter must consume `Note.meetingTime` and omit unknown dates, preserving zone-less labels.
+Markdown consumes `Note.meetingTime`: it formats known instants, preserves zone-less labels, and omits unknown dates. It never substitutes a seal, import or catalogue timestamp. Pure and production-adapter tests cover all three states.

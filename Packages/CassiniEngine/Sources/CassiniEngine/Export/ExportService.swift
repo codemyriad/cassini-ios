@@ -36,8 +36,28 @@ public struct ExportService: Sendable {
             version = match
         }
         let data: Data
-        do { data = try TranscriptExports.data(note, format: format, version: version, texts: texts) } catch { throw .cannotSave }
-        return try await write(data, named: ExportNames.file(note.title, ext: format.fileExtension))
+        let filename: String
+        do {
+            if format == .markdown {
+                guard let options = texts.markdown else { throw ExportError.cannotSave }
+                let original = notes.originalAudioURL(for: note), selected = version
+                // Metadata only: do not scan/hash a multi-hour audio file or render it on the UI actor.
+                data = try await Task.detached(priority: .userInitiated) {
+                    var personal: [MarkdownNote] = []
+                    if note.document != nil {
+                        let source = CassiniDocument.readMetadataChecked(original)
+                        guard let manifest = source.manifest else { throw ExportError.cannotSave }
+                        personal = MarkdownExport.notes(in: manifest)
+                    }
+                    return try TranscriptExports.data(note, format: format, version: selected, texts: texts, markdownNotes: personal)
+                }.value
+                filename = MarkdownExport.filename(note.title, untitled: options.untitled)
+            } else {
+                data = try TranscriptExports.data(note, format: format, version: version, texts: texts)
+                filename = ExportNames.file(note.title, ext: format.fileExtension)
+            }
+        } catch { throw .cannotSave }
+        return try await write(data, named: filename)
     }
 
     /// "Share original audio": the note's original audio byte for byte, at `<folder>/<uuid>/<ExportNames.file(title)>`
