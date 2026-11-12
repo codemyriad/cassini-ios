@@ -121,6 +121,10 @@ import CassiniNotebook
         let run = try await h.run(0)
         run.pauseOnStop = false
         defer { run.finish(.paused(.user)) }
+        // claim() starts the worker before awaiting the note mirror and publishing state.jobs. A download event
+        // alone can arrive during that gap, while the observed job still says queued. Establish the full claim
+        // before testing that Stop preserves it in the same calling turn.
+        try await h.waitUntil("the claimed job is published") { h.coordinator.state.jobs[id]?.state == .running }
         run.send(.downloading(nil))
         try await h.waitUntil("the download can be cancelled") { h.coordinator.state.running?.phase == .downloading(nil) }
 
