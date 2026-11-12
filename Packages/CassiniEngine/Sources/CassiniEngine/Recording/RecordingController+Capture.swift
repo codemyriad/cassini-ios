@@ -17,7 +17,7 @@ extension RecordingController {
                 guard !Task.isCancelled, let self else { return }
                 if tick() {
                     // A new operation: the end cancels this loop.
-                    serialized { await self.end(.space, title: nil) }
+                    requestEnd(.space, title: nil)
                     return
                 }
                 // The strong reference ends with this iteration, before the next sleep.
@@ -61,7 +61,7 @@ extension RecordingController {
             setState(.active(active))
             publishActivity()
         case .failed, .mediaReset:
-            serialized { await self.end(.microphone, title: nil) }
+            requestEnd(.microphone, title: nil)
         }
     }
 
