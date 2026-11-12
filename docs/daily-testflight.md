@@ -75,6 +75,14 @@ fetch/fast-forward. When it updates itself, it execs the current controller with
 file descriptor, so no manual release can enter during deployment. Non-slot hours and busy release slots do not
 touch the clone or shared refs. The private lock-transfer CLI options are implementation details, not operator flags.
 
+The LaunchAgent enters `run-in-gui.py` first. An Aqua LaunchAgent by itself does not inherit Terminal's removable-
+volume permission: the controller creates external outputs before the archive worker starts. The existing GUI tmux
+server must therefore supply Terminal's approved context to the whole scheduled controller. No new permission or
+signing identity is created. `CASSINI_RELEASE_STDERR_RELAY=1` applies only inside this launchd bridge: stderr is
+forwarded to the coordinator inbox, so the controller does not append the same failure a second time. Direct manual
+runs keep their normal notification path. Prove activation by starting a no-upload audit through launchd itself;
+a shell/guirun-only dry run cannot establish the LaunchAgent's volume access.
+
 For manual dispatch, register a drmeyers-only Actions runner with label `cassini-ios-release-drmeyers`; this exclusive
 label is intentionally absent from general pool selectors. Restrict its runner group to this repository/workflow.
 Keep its service in the logged-in user context with Homebrew tools on PATH. Do not attach this label to any rented Mac.
