@@ -62,7 +62,7 @@ struct PlaybackBar: View {
                 playback.seek(target)
                 dragging = nil
             }
-            .tint(.ember)
+            .tint(.accent)
         }
         .frame(height: 44)
         .accessibilityElement(children: .ignore)

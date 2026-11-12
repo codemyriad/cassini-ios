@@ -117,7 +117,7 @@ struct LibraryView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(dynamicType.isAccessibilitySize ? LibraryCopy.headlineLarge : LibraryCopy.headline)
-                .font(.system(.largeTitle, design: .serif)).tracking(-1).foregroundStyle(Color.ink)
+                .font(.system(.largeTitle)).foregroundStyle(Color.ink)
                 .accessibilityAddTraits(.isHeader)
             if !dynamicType.isAccessibilitySize { Text(LibraryCopy.subheadline).font(.subheadline).foregroundStyle(Color.muted) }
         }.padding(.top, 18)

@@ -8,6 +8,15 @@ import CryptoKit
     private struct Value: Decodable { let light: String; let dark: String; let status: String }
     private struct Sheet: Decodable { let tokens: [String: Value] }
 
+    @Test func systemAccentAssetMatchesThePinnedRoleInBothModes() {
+        for scheme in [ColorScheme.light, .dark] {
+            let asset = ContrastTests.resolved(Color("AccentColor", bundle: CassiniTokens.bundle), scheme)
+            let role = ContrastTests.resolved(CassiniTokens.color(.accent), scheme)
+            #expect(abs(asset.red - role.red) < 0.0001 && abs(asset.green - role.green) < 0.0001
+                && abs(asset.blue - role.blue) < 0.0001 && asset.opacity == role.opacity)
+        }
+    }
+
     @Test func vendoredFileMatchesItsPinAndEveryActiveRoleInBothModes() throws {
         let bundle = CassiniTokens.bundle
         let file = try #require(bundle.url(forResource: "tokens", withExtension: "json"))

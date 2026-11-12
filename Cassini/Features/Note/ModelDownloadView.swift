@@ -49,7 +49,7 @@ private struct ModelDownloadContent: View {
                 VStack(alignment: .leading, spacing: 20) {
                     OrbitMark(size: 56)
                     Text("Transcribe on this device", tableName: "Transcription")
-                        .font(.system(.largeTitle, design: .serif)).foregroundStyle(Color.ink)
+                        .font(.system(.largeTitle)).foregroundStyle(Color.ink)
                         .accessibilityAddTraits(.isHeader)
                     intro(total: plan.totalDownloadBytes).font(.title3).foregroundStyle(Color.muted)
                     VStack(spacing: 0) {
@@ -78,7 +78,7 @@ private struct ModelDownloadContent: View {
                     Button(action: model.openSources) {
                         Text("Where the models come from · Privacy", tableName: "Transcription")
                     }
-                    .font(.subheadline.weight(.medium)).tint(.ember)
+                    .font(.subheadline.weight(.medium)).tint(.accent)
                     .frame(minHeight: HitTarget.minimum)
                 }
                 .padding(.top, 8).padding(.bottom, 16)

@@ -53,7 +53,7 @@ struct NameSpeakerSheet: View {
                 }
             }
         }
-        .tint(.ember)
+        .tint(.accent)
         .task { await model.open(draft: draft, sheet: handle) }
         .onDisappear { playback.stopSample() }
         .alert(SpeakersCopy.couldNotSave, isPresented: Binding(get: { model.failure != nil }, set: { if !$0 { model.failure = nil } })) {
@@ -128,9 +128,9 @@ struct NameSpeakerSheet: View {
             Button { send(.playSample) } label: {
                 Image(systemName: sampling ? "stop.fill" : "play.fill")
                     .frame(width: HitTarget.minimum, height: HitTarget.minimum)
-                    .background(Color.ember.opacity(0.12), in: Circle())
+                    .background(Color.accentTint, in: Circle())
             }
-            .buttonStyle(.plain).foregroundStyle(Color.ember)
+            .buttonStyle(.plain).foregroundStyle(Color.accentInk)
             .disabled(!ui.canSample || !playback.owns(noteID))
             .accessibilityLabel(sampling ? SpeakersCopy.stopSample : SpeakersCopy.playSample)
         }
@@ -159,7 +159,7 @@ struct NameSpeakerSheet: View {
             Button(yes.0) { send(yes.1) }.accessibilityIdentifier("questionYes")
             Button(no.0) { send(no.1) }.accessibilityIdentifier("questionNo")
         }
-        .listRowBackground(Color.toneWarn.opacity(pulse ? 0.3 : 0.1))
+        .listRowBackground(Color.warnTint.opacity(pulse ? 1 : 0.6))
     }
 
     private func voiceRows(_ ui: NameSheetUI) -> some View {
@@ -173,7 +173,7 @@ struct NameSpeakerSheet: View {
                             Text(SpeakersCopy.likely).font(.caption.weight(.medium)).foregroundStyle(Color.toneOK)
                                 .padding(.horizontal, 8).padding(.vertical, 3).background(Tone.ok.background, in: Capsule())
                         }
-                        if state?.boundVoiceID == row.id { Image(systemName: "checkmark").foregroundStyle(Color.ember) }
+                        if state?.boundVoiceID == row.id { Image(systemName: "checkmark").foregroundStyle(Color.accentInk) }
                     }.frame(minHeight: HitTarget.minimum)
                 }
                 .accessibilityAddTraits(state?.boundVoiceID == row.id ? .isSelected : [])

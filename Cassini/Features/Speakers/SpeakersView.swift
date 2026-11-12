@@ -64,7 +64,7 @@ struct SpeakersView: View {
                 Button(SpeakersCopy.analyzeAgain) { Task { await model.identifySpeakers() } }
             } message: { Text(SpeakersCopy.analyzeAgainBody) }
         }
-        .tint(.ember)
+        .tint(.accent)
     }
 }
 
@@ -92,7 +92,7 @@ private struct SpeakerRow: View {
                 }
                 Text(SpeakersCopy.speaksFor(speakingTime)).font(.caption).foregroundStyle(Color.muted)
                 if case .suggested(let id, _) = speaker.match, let voice = voices.voice(id) {
-                    Text(SpeakersCopy.mightBe(voice.name)).font(.caption).foregroundStyle(Color.ember)
+                    Text(SpeakersCopy.mightBe(voice.name)).font(.caption).foregroundStyle(Color.accentInk)
                 }
             }
             Spacer()

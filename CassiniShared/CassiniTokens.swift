@@ -1,8 +1,7 @@
 import SwiftUI
 
 /// Draft canvas tokens from cassini-ux e4ae2217312370250a39ad83e047a186048e0a9e, brand/tokens.json; provenance is in Brand/UPSTREAM.json.
-/// W1.1 installs these roles without activating them. Existing output remains in the compatibility block below;
-/// the separate W1 look-preview PR switches call sites. Proposed speaker/avatar roles are never loaded.
+/// W1 draft preview activates decided roles and the explicit Record placeholder. Proposed hues are never loaded.
 enum CassiniTokens {
     enum Role: String, CaseIterable {
         case ground
@@ -52,9 +51,9 @@ enum CassiniTokens {
         return sheet.tokens.filter { ["decided", "placeholder"].contains($0.value.status) }
     }()
 
-    static func color(_ role: Role) -> Color {
+    static func color(_ role: Role, forcedDark: Bool = false) -> Color {
         guard let pair = values[role.rawValue] else { preconditionFailure("Missing brand role: \(role)") }
-        return Color(light: rgba(pair.light), dark: rgba(pair.dark))
+        return Color(light: rgba(forcedDark ? pair.dark : pair.light), dark: rgba(pair.dark))
     }
 
     private static func rgba(_ hex: String) -> UIColor {
@@ -68,35 +67,60 @@ enum CassiniTokens {
     }
 }
 
-// Compatibility colours retain the exact pre-W1 floating-point values (not rounded hex values).
-// Kept app-local until the preview activates each role; speaker hues and Recording ground await L-14/L-08.
+// App roles and widget roles share this sheet. L-14 speaker hues and L-08 Recording ground stay app-local.
 extension Color {
-    static let paper = Color(light: rgb(0.975, 0.965, 0.941), dark: rgb(0.075, 0.085, 0.095))
-    static let card = Color(light: .white, dark: rgb(0.12, 0.135, 0.145))
-    static let ink = Color(light: rgb(0.12, 0.17, 0.19), dark: rgb(0.95, 0.94, 0.91))
-    static let muted = Color(light: rgb(0.34, 0.38, 0.40), dark: rgb(0.67, 0.71, 0.73))
-    /// Lighter than `muted`, still readable: the words of a draft that may change.
-    static let faint = Color(light: rgb(0.40, 0.44, 0.46), dark: rgb(0.56, 0.60, 0.62))
-    static let ember = Color(light: rgb(0.72, 0.21, 0.095), dark: rgb(1, 0.49, 0.32))
-    /// Ember as a fill under white text (the primary button): the dark ember is too light for it.
-    static let emberFill = Color(light: rgb(0.72, 0.21, 0.095), dark: rgb(0.78, 0.24, 0.12))
+    static let ground = CassiniTokens.color(.ground)
+    static let surface = CassiniTokens.color(.surface)
+    static let sunken = CassiniTokens.color(.sunken)
+    static let raised = CassiniTokens.color(.raised)
+    static let line = CassiniTokens.color(.line)
+    static let lineSoft = CassiniTokens.color(.lineSoft)
+    static let ink = CassiniTokens.color(.ink)
+    static let ink2 = CassiniTokens.color(.ink2)
+    static let ink3 = CassiniTokens.color(.ink3)
+    static let accent = CassiniTokens.color(.accent)
+    static let accentStrong = CassiniTokens.color(.accentStrong)
+    static let onAccent = CassiniTokens.color(.onAccent)
+    static let accentInk = CassiniTokens.color(.accentInk)
+    static let accentTint = CassiniTokens.color(.accentTint)
+    static let record = CassiniTokens.color(.record)
+    static let recordInk = CassiniTokens.color(.recordInk)
+    static let recordTint = CassiniTokens.color(.recordTint)
+    static let onRecord = CassiniTokens.color(.onRecord)
+    static let error = CassiniTokens.color(.error)
+    static let errorTint = CassiniTokens.color(.errorTint)
+    static let success = CassiniTokens.color(.success)
+    static let successTint = CassiniTokens.color(.successTint)
+    static let warnInk = CassiniTokens.color(.warnInk)
+    static let warnTint = CassiniTokens.color(.warnTint)
+    static let neutralInk = CassiniTokens.color(.neutralInk)
+    static let neutralTint = CassiniTokens.color(.neutralTint)
+    static let highlight = CassiniTokens.color(.highlight)
+    static let highlightInk = CassiniTokens.color(.highlightInk)
+    static let inverse = CassiniTokens.color(.inverse)
+    static let onInverse = CassiniTokens.color(.onInverse)
+    static let inverseAccent = CassiniTokens.color(.inverseAccent)
+    static let scrim = CassiniTokens.color(.scrim)
+    static let shadow = CassiniTokens.color(.shadow)
 
-    /// The Recording screen is always dark.
+    static let paper = ground
+    static let card = surface
+    static let muted = ink2
+    static let faint = ink3
+    static let processing = accent
+    static let toneOK = success
+    static let toneInfo = accentInk
+    static let toneWarn = warnInk
+    static let toneError = error
+    static let tonePlain = neutralInk
+
+    // Forced-dark Recording stays on its existing ground until L-08 is decided.
     static let recordingBackground = Color(red: 0.075, green: 0.12, blue: 0.14)
     static let recordingText = Color.white
-    /// Captions and the paused state on the Recording screen and the Library's recording card.
     static let recordingSecondary = Color.white.opacity(0.62)
-    static let recordingAccent = Color(red: 0.98, green: 0.49, blue: 0.30)
-    static let recordingFinish = Color(red: 0.78, green: 0.24, blue: 0.12)
-    static let recordingLive = Color.orange
-    static let processing = Color(light: rgb(0.10, 0.36, 0.70), dark: rgb(0.45, 0.66, 1))
-
-    /// Tone tints: text and icons in a tone; their backgrounds use `Tone.background`.
-    static let toneOK = Color(light: rgb(0.13, 0.40, 0.35), dark: rgb(0.40, 0.80, 0.72))
-    static let toneInfo = processing
-    static let toneWarn = Color(light: rgb(0.55, 0.35, 0.02), dark: rgb(0.98, 0.76, 0.36))
-    static let toneError = ember
-    static let tonePlain = muted
+    static let recordingAccent = recordInk
+    static let recordingFinish = record
+    static let recordingLive = recordInk
 
     /// Speaker tints, assigned by first appearance in a transcript.
     static let speakerTints: [Color] = [
@@ -118,11 +142,9 @@ extension Color {
 }
 
 extension Color {
-    /// The snackbar is ink on paper turned around; its action keeps at least 4.5:1 on it in both appearances.
-    static let snackbarBackground = Color.ink
-    static let snackbarText = Color.paper
-    static let snackbarAction = Color(light: UIColor(red: 1, green: 0.62, blue: 0.48, alpha: 1),
-                                      dark: UIColor(red: 0.62, green: 0.16, blue: 0.05, alpha: 1))
+    static let snackbarBackground = inverse
+    static let snackbarText = onInverse
+    static let snackbarAction = inverseAccent
 }
 
 
@@ -130,8 +152,8 @@ extension Color {
 /// dark, whatever the appearance.
 enum RecordingActivityColors {
     static let background = Color(red: 0.075, green: 0.12, blue: 0.14)
-    static let live = Color(red: 0.98, green: 0.49, blue: 0.30)
-    static let finish = Color(red: 0.78, green: 0.24, blue: 0.12)
+    static let live = CassiniTokens.color(.recordInk, forcedDark: true)
+    static let finish = Color.record
     /// The "Recording" caption and the paused dot's ring.
     static let secondary = Color.white.opacity(0.7)
     /// Pause and Resume.

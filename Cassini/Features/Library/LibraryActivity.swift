@@ -25,16 +25,16 @@ struct RecordingCard: View {
     var body: some View {
         Button(action: open) {
             HStack(spacing: 14) {
-                Image(systemName: card.paused ? "pause.circle" : "waveform.circle.fill").font(.title).foregroundStyle(Color.recordingAccent)
+                Image(systemName: card.paused ? "pause.circle" : "waveform.circle.fill").font(.title).foregroundStyle(Color.recordInk)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(LibraryCopy.recordingCard(card.title, paused: card.paused)).font(.headline).lineLimit(1)
-                    Text(LibraryCopy.tapToReturn).font(.caption).foregroundStyle(Color.recordingSecondary)
+                    Text(LibraryCopy.tapToReturn).font(.caption).foregroundStyle(Color.muted)
                 }
                 Spacer(minLength: 8)
                 Text(TimeText.clock(card.elapsed)).font(.body.monospacedDigit())
             }
-            .foregroundStyle(Color.recordingText).padding(18)
-            .background(Color.recordingBackground, in: RoundedRectangle(cornerRadius: Radius.card))
+            .foregroundStyle(Color.ink).padding(18)
+            .background(Color.surface, in: RoundedRectangle(cornerRadius: Radius.card))
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
@@ -135,7 +135,7 @@ struct CaptureBar: View {
                 Label(LibraryCopy.record, systemImage: "mic.fill").fixedSize()
             }
         }
-        .buttonStyle(PrimaryButtonStyle())
+        .buttonStyle(RecordButtonStyle())
         .disabled(recording.isBusy)
         .accessibilityLabel(active == nil ? LibraryCopy.recordDescription : LibraryCopy.returnToRecording)
         .accessibilityHint(unavailable ? LibraryCopy.unavailableTitle : "")

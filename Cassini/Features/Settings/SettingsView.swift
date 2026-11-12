@@ -251,7 +251,7 @@ private struct LibrarySection: View {
                 Text("Recordings", tableName: "Settings")
             }
             LabeledContent {
-                Text(verbatim: TimeText.clock(totals.duration))
+                Text(verbatim: TimeText.clock(totals.duration)).monospacedDigit()
             } label: {
                 Text("Audio duration", tableName: "Settings")
             }
@@ -308,7 +308,7 @@ private struct AboutCard: View {
             HStack(spacing: 4) {
                 Text("Free software under GPLv3.", tableName: "Settings").foregroundStyle(Color.muted)
                 Button(action: openNotices) { Text("Source code and notices", tableName: "Settings").underline() }
-                    .tint(.ember).buttonStyle(.borderless)
+                    .tint(.accent).buttonStyle(.borderless)
             }
             .font(.subheadline)
         }

@@ -12,7 +12,7 @@ struct NoteHeader: View {
         let _ = RenderProbe.rendered("header")
         #endif
         VStack(alignment: .leading, spacing: 8) {
-            Text(note.title).font(.system(.largeTitle, design: .serif)).tracking(-0.7).foregroundStyle(Color.ink)
+            Text(note.title).font(.system(.largeTitle)).foregroundStyle(Color.ink)
                 .textSelection(.enabled).accessibilityAddTraits(.isHeader).accessibilityIdentifier("noteTitle")
             if let subtitle {
                 Text(NoteCopy.subtitle(subtitle, calendar: calendar))

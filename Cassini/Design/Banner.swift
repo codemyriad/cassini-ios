@@ -44,7 +44,7 @@ struct Banner: View {
             ZStack {
                 if style == .onDark { shape.fill(Color.card) }
                 shape.fill(tone.background)
-                if spec.kind.tone == .plain { shape.strokeBorder(Color.muted.opacity(0.25)) }
+                if spec.kind.tone == .plain { shape.strokeBorder(Color.line) }
             }
         }
         // The dark Recording screen keeps the light tones.

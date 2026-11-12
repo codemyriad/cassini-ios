@@ -27,13 +27,13 @@ struct SuggestionCard: View {
             Text(SpeakersCopy.suggestion(suggestion.voiceName)).font(.body).foregroundStyle(Color.ink)
             HStack(spacing: 10) {
                 Button(SpeakersCopy.yes(suggestion.voiceName)) { answer(yes: true) }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.borderedProminent).foregroundStyle(Color.onAccent)
                     .accessibilityIdentifier("suggestionYes")
                 Button(SpeakersCopy.not(suggestion.voiceName)) { answer(yes: false) }
                     .buttonStyle(.bordered)
                     .accessibilityIdentifier("suggestionNo")
             }
-            .tint(.ember)
+            .tint(.accentStrong)
             .disabled(busy)
         }
         .padding(16)

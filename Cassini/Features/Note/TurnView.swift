@@ -77,7 +77,7 @@ struct TurnView: View, Equatable {
 
     @ViewBuilder private var paragraph: some View {
         let text = Text(attributed)
-            .font(.system(.body, design: .serif)).lineSpacing(7)
+            .font(.system(.body)).lineSpacing(7)
             .frame(maxWidth: .infinity, alignment: .leading)
             .fixedSize(horizontal: false, vertical: true)
             .onGeometryChange(for: CGRect.self) { $0.frame(in: .scrollView) } action: { frame in
@@ -153,11 +153,11 @@ struct TurnView: View, Equatable {
         for chip in turn.interjections {
             if let span = range(chip.textRange) {
                 result[span].foregroundColor = chip.name.isNamed ? Color.ink : Color.muted
-                result[span].backgroundColor = chip.crosstalk ? Color.toneWarn.opacity(0.22) : chip.tint.color.opacity(0.12)
+                result[span].backgroundColor = chip.crosstalk ? Color.warnTint : chip.tint.color.opacity(0.12)
             }
             if let name = range(chip.nameRange) {
                 result[name].foregroundColor = chip.tint.color
-                result[name].font = .system(.body, design: .serif, weight: .semibold)
+                result[name].font = .system(.body, weight: .semibold)
             }
         }
         switch style {
@@ -169,14 +169,15 @@ struct TurnView: View, Equatable {
         }
         for match in matches {
             guard let hit = range(match) else { continue }
-            result[hit].backgroundColor = Color.toneWarn.opacity(0.22)
-            if match == currentMatch { result[hit].font = .system(.body, design: .serif, weight: .semibold) }
+            result[hit].backgroundColor = Color.highlight
+            result[hit].foregroundColor = Color.highlightInk
+            if match == currentMatch { result[hit].font = .system(.body, weight: .semibold) }
         }
         if style == .reading, let activeIndex, turn.words.indices.contains(activeIndex),
            let word = range(turn.range(ofWord: activeIndex)) {
-            // The active word is drawn inverted. It carries no link, whose tint would win over its colour.
-            result[word].foregroundColor = Color.paper
-            result[word].backgroundColor = Color.ember
+            // A teal wash keeps ink text. Active words carry no link, whose tint would win over it.
+            result[word].foregroundColor = Color.highlightInk
+            result[word].backgroundColor = Color.highlight
         }
         return result
     }
