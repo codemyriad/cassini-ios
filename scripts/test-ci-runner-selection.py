@@ -96,7 +96,14 @@ def select_runner(
 class CiRunnerSelectionTests(unittest.TestCase):
     def test_every_runs_on_is_a_hosted_image_or_the_guarded_selector(self):
         seen = list(job_runs_on_values())
-        self.assertEqual([(wf, job) for wf, job, _ in seen], [("ci.yml", "harness"), ("ci.yml", "fast-and-build"), ("daily-testflight.yml", "testflight")])
+        self.assertEqual(
+            [(wf, job) for wf, job, _ in seen],
+            [
+                ("ci.yml", "harness"),
+                ("ci.yml", "fast-and-build"),
+                ("daily-testflight.yml", "testflight"),
+            ],
+        )
         for wf, job, value in seen:
             with self.subTest(workflow=wf, job=job):
                 if (wf, job) == ("daily-testflight.yml", "testflight"):
@@ -120,7 +127,7 @@ class CiRunnerSelectionTests(unittest.TestCase):
     def test_selector_routes_only_allowlisted_trusted_events_to_self_hosted(self):
         for wf, job, value in job_runs_on_values():
             if wf != "ci.yml":
-                continue  # Dedicated signing workflow has its stricter event/ref/repository check below.
+                continue  # Dedicated signing workflow is checked above.
             where = f"{wf}:{job}"
             for event_name, head_repo in (
                 ("push", None),
@@ -181,6 +188,162 @@ class CiRunnerSelectionTests(unittest.TestCase):
                         ),
                         "xcode-27",
                     )
+
+    def test_perf_gate_schedule_and_labeled_isolation_contract(self):
+        ci_text = (WORKFLOWS / "ci.yml").read_text(encoding="utf-8")
+        self.assertIn("cron: '53 2 * * *'", ci_text)
+        self.assertIn("types: [opened, synchronize, reopened, labeled]", ci_text)
+        self.assertNotIn("label-gate", ci_text)
+        self.assertFalse((ROOT / "scripts/ci-label-gate.py").exists())
+        self.assertIn("scripts/test.sh app", ci_text)
+
+        test_sh = (ROOT / "scripts/test.sh").read_text(encoding="utf-8")
+        self.assertIn('export TEST_RUNNER_CASSINI_PERF_GATE="$CASSINI_PERF_GATE"', test_sh)
+        self.assertIn("unset TEST_RUNNER_CASSINI_PERF_GATE", test_sh)
+
+        group_expr = re.search(r"(?m)^  group: ci-\$\{\{ (.+) \}\}$", ci_text).group(1)
+        cancel_expr = re.search(r"(?m)^  cancel-in-progress: \$\{\{ (.+) \}\}$", ci_text).group(1)
+        perf_expr = re.search(r"(?m)^  CASSINI_PERF_GATE: \$\{\{ (.+) \}\}$", ci_text).group(1)
+
+        def parse_jobs(text: str) -> dict[str, tuple[list[str], str]]:
+            body = text.split("\njobs:\n", 1)[1]
+            jobs: dict[str, tuple[list[str], str]] = {}
+            for block in re.split(r"\n(?=  [A-Za-z0-9_-]+:\n)", "\n" + body):
+                job_match = re.match(r"\s*([A-Za-z0-9_-]+):\n", block)
+                if not job_match:
+                    continue
+                needs: list[str] = []
+                if needs_match := re.search(r"(?m)^    needs:\s*(.+)$", block):
+                    raw = needs_match.group(1).strip()
+                    if raw.startswith("[") and raw.endswith("]"):
+                        needs = [item.strip() for item in raw[1:-1].split(",") if item.strip()]
+                    else:
+                        needs = [raw]
+                cond = "success()"
+                if if_match := re.search(r"(?m)^    if:\s*(.+)$", block):
+                    raw_if = if_match.group(1).strip().removeprefix("${{").removesuffix("}}").strip()
+                    has_status_fn = bool(re.search(r"\b(?:always|cancelled|failure|success)\s*\(", raw_if))
+                    cond = raw_if if has_status_fn else f"success() && ({raw_if})"
+                jobs[job_match.group(1)] = (needs, cond)
+            return jobs
+
+        def eval_gha(expr: str, *, event_name: str, action: str = "", added_label: str = "",
+                     labels: tuple[str, ...] = (), pr_number: int = 123, run_id: int = 999,
+                     needs_results: dict[str, str] | None = None):
+            py_expr = expr.replace("&&", " and ").replace("||", " or ")
+            py_expr = re.sub(r"!(?!=)", "not ", py_expr)
+            py_expr = py_expr.replace("github.event.pull_request.labels.*.name", "pr_label_names")
+            pr = (
+                SimpleNamespace(number=pr_number)
+                if event_name == "pull_request"
+                else _NULL
+            )
+            label_obj = SimpleNamespace(name=_CIString(added_label)) if added_label else _NULL
+            event = SimpleNamespace(
+                action=_CIString(action) if action else _NULL,
+                label=label_obj,
+                pull_request=pr,
+            )
+            github = SimpleNamespace(
+                event_name=_CIString(event_name),
+                run_id=run_id,
+                event=event if event_name == "pull_request" else _NULL,
+            )
+            needs_ns = SimpleNamespace(
+                **{k.replace("-", "_"): SimpleNamespace(result=_CIString(v)) for k, v in (needs_results or {}).items()}
+            )
+            py_expr = re.sub(
+                r"needs\.([A-Za-z0-9_-]+)\.result",
+                lambda m: f"needs.{m.group(1).replace('-', '_')}.result",
+                py_expr,
+            )
+
+            def contains(haystack, needle):
+                if haystack is _NULL:
+                    return False
+                return any(_CIString(item) == needle for item in haystack)
+
+            env = {
+                "github": github,
+                "needs": needs_ns,
+                "pr_label_names": tuple(_CIString(lbl) for lbl in labels) if event_name == "pull_request" else _NULL,
+                "contains": contains,
+                "format": lambda fmt, *args: fmt.format(*args),
+                "always": lambda: True,
+                "cancelled": lambda: False,
+                "failure": lambda: any(v == "failure" for v in (needs_results or {}).values()),
+                "success": lambda: all(v == "success" for v in (needs_results or {}).values()),
+            }
+            return eval(py_expr, {"__builtins__": {}}, env)
+
+        def simulate_dag(jobs: dict[str, tuple[list[str], str]], **ctx) -> set[str]:
+            results: dict[str, str] = {}
+            for job_id, (needs, cond) in jobs.items():
+                need_map = {n: results[n] for n in needs}
+                active = bool(eval_gha(cond, needs_results=need_map, **ctx))
+                results[job_id] = "success" if active else "skipped"
+            return {job_id for job_id, res in results.items() if res == "success"}
+
+        ci_jobs = parse_jobs(ci_text)
+        self.assertEqual(set(ci_jobs), {"harness", "fast-and-build"})
+
+        # Regression: prove the simulator catches skipped-ancestor bugs (Android #192 class).
+        broken_dag = {
+            "gate": ([], "success() && (github.event_name == 'pull_request' && github.event.action == 'labeled')"),
+            "downstream": (["gate"], "success() && (github.event_name == 'push' || github.event_name == 'pull_request')"),
+        }
+        self.assertEqual(simulate_dag(broken_dag, event_name="push"), set())
+
+        # 1. Unlabeled PR (opened / synchronize / reopened)
+        for action in ("opened", "synchronize", "reopened"):
+            self.assertEqual(
+                simulate_dag(ci_jobs, event_name="pull_request", action=action),
+                {"harness", "fast-and-build"},
+            )
+            self.assertEqual("ci-" + eval_gha(group_expr, event_name="pull_request", action=action), "ci-pr-123")
+            self.assertTrue(bool(eval_gha(cancel_expr, event_name="pull_request", action=action)))
+            self.assertEqual(eval_gha(perf_expr, event_name="pull_request", action=action), "")
+
+        # 2. Labeled PR with full-ci: isolated non-cancelling group, full DAG runs, CASSINI_PERF_GATE == '1'
+        self.assertEqual(
+            simulate_dag(
+                ci_jobs,
+                event_name="pull_request",
+                action="labeled",
+                added_label="full-ci",
+                labels=("full-ci",),
+            ),
+            {"harness", "fast-and-build"},
+        )
+        self.assertEqual(
+            "ci-" + eval_gha(group_expr, event_name="pull_request", action="labeled", added_label="full-ci", run_id=777),
+            "ci-pr-123-label-777",
+        )
+        self.assertFalse(bool(eval_gha(cancel_expr, event_name="pull_request", action="labeled", added_label="full-ci")))
+        self.assertEqual(
+            eval_gha(perf_expr, event_name="pull_request", action="labeled", added_label="full-ci", labels=("full-ci",)),
+            "1",
+        )
+
+        # 3. Labeled PR with unrelated label: isolated non-cancelling group, zero jobs run
+        self.assertEqual(
+            simulate_dag(
+                ci_jobs,
+                event_name="pull_request",
+                action="labeled",
+                added_label="docs",
+                labels=("docs",),
+            ),
+            set(),
+        )
+        self.assertFalse(bool(eval_gha(cancel_expr, event_name="pull_request", action="labeled", added_label="docs")))
+
+        # 4. Push to main, nightly schedule, and workflow_dispatch: full DAG runs, never cancelled
+        for event_name, expected_perf in (("push", ""), ("schedule", "1"), ("workflow_dispatch", "1")):
+            self.assertEqual(simulate_dag(ci_jobs, event_name=event_name), {"harness", "fast-and-build"})
+            self.assertEqual("ci-" + eval_gha(group_expr, event_name=event_name, run_id=555), "ci-run-555")
+            self.assertFalse(bool(eval_gha(cancel_expr, event_name=event_name)))
+            self.assertEqual(eval_gha(perf_expr, event_name=event_name), expected_perf)
 
 
 if __name__ == "__main__":
