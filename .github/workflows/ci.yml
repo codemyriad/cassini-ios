@@ -34,6 +34,10 @@ on:
       - 'scripts/run-in-gui.py'
       - 'scripts/test-run-in-gui.py'
       - 'scripts/test-ci-runner-selection.py'
+      - 'scripts/pr-shots*'
+      - 'scripts/screenshot-manifest.py'
+      - 'scripts/screenshots.sh'
+      - 'scripts/test-pr-shots-local.py'
       - '.github/workflows/ci.yml'
   push:
     branches: [main]

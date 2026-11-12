@@ -36,14 +36,14 @@ def inventory(out, files, locale, region):
         scheme = relative.parts[-2]
         if scheme not in ("light", "dark"):
             raise ValueError(f"unknown appearance: {relative}")
-        label, board, test, seed = SHOTS[file.stem]
+        label, board, test, seed = SHOTS.get(file.stem, (file.stem[3:].replace('-', ' ').capitalize(), None, None, None))
         data = file.read_bytes()[:24]
         if data[:8] != b"\x89PNG\r\n\x1a\n" or data[12:16] != b"IHDR" or len(data) != 24:
             raise ValueError(f"not a PNG: {relative}")
         width, height = struct.unpack(">II", data[16:24])
         rows.append(dict(path=relative.as_posix(), file=relative.as_posix(), screen=file.stem[3:], label=label, board=board,
                          scheme=scheme, lang=locale, device=device, locale=region, seed=seed,
-                         test=f"CassiniUITests/ScreenshotTests/{test}", pixel_width=width, pixel_height=height))
+                         test=f"CassiniUITests/ScreenshotTests/{test}" if test else None, pixel_width=width, pixel_height=height))
     keys = [(r["screen"], r["scheme"], r["lang"], r["device"]) for r in rows]
     if not rows or len(keys) != len(set(keys)):
         raise ValueError("empty or duplicate screenshot inventory")

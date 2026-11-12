@@ -346,11 +346,13 @@ PATH="/path/to/pr-shots-venv/bin:$PATH" scripts/pr-shots.sh --base origin/main -
 ```
 
 The base is the merge base of that ref and the head worktree (`--head PATH` defaults to this checkout).
-Use a new output folder outside the worktree; commit changes and remove untracked files first. It renders all 22 existing English screenshots on each side, light and dark,
-using the head's renderer/capture tests and one private simulator pair. Reading shots start paused,
-so no pressed skip-button tint leaks into a capture. Each render takes `~/.scw-heavy.lock` itself
+Use a new output folder outside the worktree; commit changes and remove untracked files first. It renders each source's English screenshot set (currently 22 images) in light and dark,
+using each source's capture tests, renderer and one private simulator pair. Legacy bases without manifest tooling
+receive only the head renderer/helper, preserving their capture tests. New reading shots start paused,
+so no pressed skip-button tint leaks into a capture. Each render takes `~/.cassini-heavy.lock` itself
 (or `CASSINI_HEAVY_LOCK`); the wrapper removes only its temporary worktree and uniquely named clones.
 Output has `before/`, `after/`, per-side `shots.json`, capture/test logs (retained even on failure) and `render.json` with source SHAs and elapsed time.
+SIGHUP, SIGTERM and SIGINT stop the renderer; further signals are ignored until scoped cleanup finishes.
 `--output` disables lossy pngquant by default and records actual runtime/device, locale, seed, test and pixel size;
 the 1200-pixel downscale remains. Existing normal README renders keep their previous compression behavior.
 

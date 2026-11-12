@@ -14,6 +14,19 @@ import time
 import uuid
 
 
+CANCEL_SIGNALS = tuple(getattr(signal, name) for name in ('SIGHUP', 'SIGTERM', 'SIGINT') if hasattr(signal, name))
+
+
+def ignore_cancellation():
+    for number in CANCEL_SIGNALS:
+        signal.signal(number, signal.SIG_IGN)
+
+
+def cancel(number, frame):
+    ignore_cancellation()  # A second signal must not interrupt child termination or cleanup.
+    sys.exit(128 + number)
+
+
 def git(root, *args):
     return subprocess.check_output(["git", "-C", str(root), *args], text=True).strip()
 
@@ -71,8 +84,7 @@ def render(head, base_ref, out, diff_tool=None, pr=None, repo="codemyriad/cassin
     out.mkdir(parents=True, exist_ok=False)
     session = uuid.uuid4().hex
     env = dict(os.environ, CASSINI_SIM_PREFIX="ts-prshots-" + session[:12], CASSINI_SHOTS_QUANTIZE="0",
-               CASSINI_SHOTS_RUN_ID=session, CASSINI_SHOTS_RENDERER_SHA=sha,
-               CASSINI_HEAVY_LOCK=os.environ.get("CASSINI_HEAVY_LOCK", str(Path.home() / ".scw-heavy.lock")))
+               CASSINI_SHOTS_RUN_ID=session)
     # Each screenshots.sh owns the host lock itself; never acquire a second non-reentrant lock here.
     env.pop("CASSINI_HEAVY_LOCK_HELD", None)
     started = time.monotonic()
@@ -80,15 +92,18 @@ def render(head, base_ref, out, diff_tool=None, pr=None, repo="codemyriad/cassin
         base = Path(temporary) / "base"
         try:
             subprocess.run(["git", "-C", str(head), "worktree", "add", "--detach", str(base), base_sha], check=True)
-            for name in ("scripts/screenshots.sh", "scripts/screenshot-manifest.py", "CassiniUITests/ScreenshotTests.swift"):
-                shutil.copy2(head / name, base / name)
+            overlay = not (base / 'scripts/screenshot-manifest.py').is_file()
+            if overlay:  # Bootstrap legacy bases; never replace their capture tests/navigation helpers.
+                for name in ("scripts/screenshots.sh", "scripts/screenshot-manifest.py"):
+                    shutil.copy2(head / name, base / name)
             manifests = {}
             for side, tree in (("after", head), ("before", base)):
                 print(f"Rendering {side}: {sha if side == 'after' else base_sha}", flush=True)
                 with (out / f"{side}.log").open("w") as log:
                     try:
                         run_render([str(tree / "scripts/screenshots.sh"), "--output", str(out / side)], cwd=tree,
-                                   env=env, stdout=log, stderr=subprocess.STDOUT)
+                                   env=dict(env, CASSINI_SHOTS_RENDERER_SHA=sha if side == 'after' or overlay else base_sha),
+                                   stdout=log, stderr=subprocess.STDOUT)
                     finally:
                         diagnostics = out / "logs" / side
                         diagnostics.mkdir(parents=True, exist_ok=True)
@@ -121,6 +136,7 @@ def render(head, base_ref, out, diff_tool=None, pr=None, repo="codemyriad/cassin
                 subprocess.run(command, check=True)
                 report["diff"] = "pr-shots"
         finally:
+            ignore_cancellation()
             # Only the private worktree/unique simulator prefix created by this invocation is removed.
             try:
                 subprocess.run([str(head / "scripts/test.sh"), "clean"], cwd=head, env=env, check=True)
@@ -148,5 +164,6 @@ def main():
 
 
 if __name__ == "__main__":
-    signal.signal(signal.SIGTERM, lambda number, frame: sys.exit(128 + number))
+    for number in CANCEL_SIGNALS:
+        signal.signal(number, cancel)
     main()

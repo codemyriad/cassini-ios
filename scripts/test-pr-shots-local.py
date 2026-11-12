@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """Local render lifecycle/manifest regressions. Fake renderers, real git worktrees; no simulators."""
 import importlib.util
+import contextlib
 import hashlib
+import fnmatch
 import json
 import os
+import re
 from pathlib import Path
 import signal
 import shutil
@@ -14,6 +17,7 @@ import tempfile
 import time
 import unittest
 
+sys.dont_write_bytecode = True
 ROOT = Path(__file__).resolve().parent.parent
 
 def module(name, file):
@@ -25,22 +29,26 @@ manifest = module("manifest", "screenshot-manifest.py")
 local = module("local", "pr-shots-local.py")
 events = module("events", "test-events.py")
 RENDER = '''#!/usr/bin/env python3
-import json,os,sys,subprocess,signal,struct,zlib
+import json,os,sys,subprocess,signal,struct,zlib,re,importlib.util
 from pathlib import Path
+sys.dont_write_bytecode=True
 out=Path(sys.argv[sys.argv.index('--output')+1]);out.mkdir(parents=True)
 sha=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
-assert (Path.cwd()/'CassiniUITests/ScreenshotTests.swift').read_text()=='// head capture'
+capture=(Path.cwd()/'CassiniUITests/ScreenshotTests.swift').read_text()
+assert (Path.cwd()/'navigation.txt').read_text() in capture
 logs=Path.cwd()/'DerivedData.noindex/screenshots';logs.mkdir(parents=True,exist_ok=True)
 (logs/'fixture.log').write_text('renderer diagnostic')
 if os.environ.get('WAIT_RENDER'):
- Path(os.environ['READY']).touch();signal.pause()
+ Path(os.environ['READY']).write_text(str(os.getpid()));signal.pause()
 if sha==os.environ.get('FAIL_SHA'):sys.exit(7)
-m=dict(source_sha=sha,xcode='fixture Xcode',image_version='fixture OS',devices=dict(prefix=os.environ['CASSINI_SIM_PREFIX']),quantize=os.environ['CASSINI_SHOTS_QUANTIZE'])
-m['shots']=[]
-for scheme,level in [('light',255),('dark',0)]:
- def chunk(tag,data):return struct.pack('>I',len(data))+tag+data+struct.pack('>I',zlib.crc32(tag+data))
- file=out/(scheme+'.png');file.write_bytes(bytes.fromhex('89504e470d0a1a0a')+chunk(b'IHDR',struct.pack('>IIBBBBB',10,10,8,2,0,0,0))+chunk(b'IDAT',zlib.compress((b'\\x00'+bytes([level])*30)*10))+chunk(b'IEND',b''))
- m['shots'].append(dict(path=file.name,screen='library',lang='en',device='iphone',scheme=scheme))
+m=dict(source_sha=sha,renderer_sha=os.environ['CASSINI_SHOTS_RENDERER_SHA'],capture=capture,lock=os.environ.get('CASSINI_HEAVY_LOCK') or str(Path.home()/'.cassini-heavy.lock'),xcode='fixture Xcode',image_version='fixture OS',devices=dict(prefix=os.environ['CASSINI_SIM_PREFIX']),quantize=os.environ['CASSINI_SHOTS_QUANTIZE'])
+files=[]
+for name in re.findall(r'// shot ([a-z0-9-]+)',capture):
+ for scheme,level in [('light',255),('dark',0)]:
+  def chunk(tag,data):return struct.pack('>I',len(data))+tag+data+struct.pack('>I',zlib.crc32(tag+data))
+  file=out/scheme/(name+'.png');file.parent.mkdir(exist_ok=True);file.write_bytes(bytes.fromhex('89504e470d0a1a0a')+chunk(b'IHDR',struct.pack('>IIBBBBB',10,10,8,2,0,0,0))+chunk(b'IDAT',zlib.compress((b'\\x00'+bytes([level])*30)*10))+chunk(b'IEND',b''));files.append(file)
+spec=importlib.util.spec_from_file_location('manifest',Path.cwd()/'scripts/screenshot-manifest.py');helper=importlib.util.module_from_spec(spec);spec.loader.exec_module(helper)
+m['shots']=helper.inventory(out,files,'en','en_US')
 (out/'shots.json').write_text(json.dumps(m))
 if os.environ.get('CHANGE_HEAD'):(Path.cwd()/'untracked-ui.swift').touch()
 '''
@@ -48,6 +56,8 @@ CLEAN = '''#!/usr/bin/env python3
 import os,sys
 from pathlib import Path
 assert sys.argv[1:]==['clean']
+if os.environ.get('WAIT_CLEAN'):
+ Path(os.environ['CLEAN_READY']).touch();assert sys.stdin.buffer.read(1)==b'x'
 Path(os.environ['CLEAN_LOG']).write_text(os.environ['CASSINI_SIM_PREFIX'])
 sys.exit(3 if os.environ.get('FAIL_CLEAN') else 0)
 '''
@@ -62,21 +72,34 @@ class RenderTests(unittest.TestCase):
         self.git("config", "user.name", "Fixture"); self.git("config", "user.email", "fixture@example.invalid")
         (self.repo / '.gitignore').write_text('DerivedData.noindex/\n')
         scripts = self.repo / "scripts"; scripts.mkdir()
-        for name, source in (("screenshots.sh", "#!/bin/sh\nexit 99\n"), ("test.sh", CLEAN), ("screenshot-manifest.py", "# fixture\n")):
+        for name, source in (("screenshots.sh", RENDER), ("test.sh", CLEAN), ("screenshot-manifest.py", (ROOT/'scripts/screenshot-manifest.py').read_text())):
             file = scripts / name; file.write_text(source); file.chmod(0o755)
         captures = self.repo / 'CassiniUITests'; captures.mkdir()
-        (captures / 'ScreenshotTests.swift').write_text('// base capture')
+        (captures / 'ScreenshotTests.swift').write_text('// base capture old navigation\n// shot 01-library')
+        (self.repo/'navigation.txt').write_text('old navigation')
         self.git("add", "."); self.git("commit", "-qm", "base")
         (scripts / "screenshots.sh").write_text(RENDER)
-        (captures / 'ScreenshotTests.swift').write_text('// head capture')
+        (captures / 'ScreenshotTests.swift').write_text('// head capture new navigation\n// shot 01-library')
+        (self.repo/'navigation.txt').write_text('new navigation')
         self.git("commit", "-qam", "head")
-        self.env = dict(os.environ, CLEAN_LOG=str(self.root / "clean"), READY=str(self.root / "ready"))
+        self.env = dict(os.environ, CLEAN_LOG=str(self.root / "clean"), READY=str(self.root / "ready"), CLEAN_READY=str(self.root/'clean-ready'))
         self.env.pop("CASSINI_HEAVY_LOCK_HELD", None)
+        self.env.pop('CASSINI_HEAVY_LOCK', None)
         self.command = [sys.executable, str(ROOT / "scripts/pr-shots-local.py"), "--head", str(self.repo),
                         "--base", "HEAD~1", "--out", str(self.root / "output")]
 
     def git(self, *args):
         return subprocess.check_output(["git", "-C", str(self.repo), *args], text=True).strip()
+
+    def tearDown(self):
+        self.remove_private_worktrees()
+
+    def remove_private_worktrees(self):
+        # Fault controls can kill the wrapper before it removes its private registration.
+        for line in self.git('worktree','list','--porcelain').splitlines():
+            if line.startswith('worktree ') and Path(line[9:]).resolve()!=self.repo.resolve():
+                path=Path(line[9:]);self.assertTrue(path.parent.name.startswith('cassini-prshots-'))
+                self.git('worktree','remove','--force','--force',str(path));shutil.rmtree(path.parent,ignore_errors=True)
 
     def check_cleanup(self):
         self.assertEqual(self.git("worktree", "list", "--porcelain").count("worktree "), 1)
@@ -85,15 +108,48 @@ class RenderTests(unittest.TestCase):
     def run_tool(self):
         return subprocess.run(self.command, env=self.env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=60)
 
-    def test_pair_uses_head_renderer_and_same_devices_with_accurate_shas(self):
+    def test_pair_preserves_each_sources_capture_and_renderer_with_same_devices(self):
         result = self.run_tool(); self.assertEqual(result.returncode, 0, result.stdout)
         out = self.root / "output"
         before = json.loads((out / "before/shots.json").read_text()); after = json.loads((out / "after/shots.json").read_text())
         self.assertEqual(before['source_sha'], self.git('rev-parse', 'HEAD~1'))
         self.assertEqual(after['source_sha'], self.git('rev-parse', 'HEAD'))
         self.assertEqual(before['devices'], after['devices']); self.assertEqual(before['quantize'], '0')
+        self.assertIn('old navigation',before['capture']); self.assertIn('new navigation',after['capture'])
+        self.assertEqual(before['renderer_sha'],before['source_sha']); self.assertEqual(after['renderer_sha'],after['source_sha'])
         self.assertIn('pending canonical', json.loads((out / 'render.json').read_text())['diff'])
         self.check_cleanup()
+
+    def test_default_repo_lock_and_explicit_host_override(self):
+        for override in (None, str(self.root/'host.lock')):
+            if override: self.env['CASSINI_HEAVY_LOCK'] = override
+            result=self.run_tool(); self.assertEqual(result.returncode,0,result.stdout)
+            for side in ('before','after'):
+                self.assertEqual(json.loads((self.root/'output'/side/'shots.json').read_text())['lock'],override or str(Path.home()/'.cassini-heavy.lock'))
+            self.check_cleanup(); shutil.rmtree(self.root/'output')
+
+    def test_legacy_base_gets_only_missing_tools(self):
+        self.git('rm','scripts/screenshot-manifest.py'); self.git('commit','-qm','legacy base')
+        shutil.copy2(ROOT/'scripts/screenshot-manifest.py',self.repo/'scripts/screenshot-manifest.py')
+        self.git('add','.'); self.git('commit','-qm','add manifest tooling')
+        result=self.run_tool(); self.assertEqual(result.returncode,0,result.stdout)
+        before=json.loads((self.root/'output/before/shots.json').read_text())
+        self.assertEqual(before['renderer_sha'],self.git('rev-parse','HEAD'))
+        self.check_cleanup()
+
+    def test_real_canonical_diff_preserves_old_navigation_and_reports_added_shots(self):
+        shutil.copy2(ROOT/'scripts/pr-shots.py',self.repo/'scripts/pr-shots.py')
+        file=self.repo/'CassiniUITests/ScreenshotTests.swift';file.write_text(file.read_text()+'\n// shot 10-first-run')
+        self.git('add','.'); self.git('commit','-qm','new navigation and shot')
+        self.command[self.command.index('--base')+1]='HEAD~2'
+        self.command += ['--pr','125']
+        result=self.run_tool(); self.assertEqual(result.returncode,0,result.stdout)
+        out=self.root/'output'
+        self.assertEqual({r['screen'] for r in json.loads((out/'before/shots.json').read_text())['shots']},{'library'})
+        self.assertEqual({r['screen'] for r in json.loads((out/'after/shots.json').read_text())['shots']},{'library','first-run'})
+        rows=json.loads((out/'pr-shots/changes.json').read_text())['rows'];self.assertEqual(len(rows),4)
+        self.assertTrue(all(r['status']==('added' if r['screen']=='first-run' else 'unchanged') for r in rows))
+        self.assertIn('First run',(out/'pr-shots/block.md').read_text());self.check_cleanup()
 
     def test_base_failure_preserves_logs_but_not_a_complete_report(self):
         self.env['FAIL_SHA'] = self.git('rev-parse', 'HEAD~1')
@@ -151,21 +207,39 @@ class RenderTests(unittest.TestCase):
         self.check_cleanup()
 
     def test_signal_ends_renderer_then_removes_private_worktree_and_clones(self):
-        self.env['WAIT_RENDER'] = '1'
-        with events.Events() as queue:
-            queue.file(self.root)
-            process = subprocess.Popen(self.command, env=self.env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            try:
-                while not (self.root / 'ready').exists():
-                    self.assertTrue(queue.until(time.monotonic() + 60), 'renderer readiness hang guard')
-                process.send_signal(signal.SIGTERM)
-                self.assertEqual(process.wait(timeout=60), 143)
-            finally:
-                if process.poll() is None: process.kill(); process.wait()
-        self.check_cleanup()
+        self.env.update(WAIT_RENDER='1',WAIT_CLEAN='1')
+        signals = (signal.SIGHUP, signal.SIGTERM, signal.SIGINT)
+        for number in signals:
+            with self.subTest(signal=number), events.Events() as queue:
+                queue.file(self.root)
+                process = subprocess.Popen(self.command, env=self.env, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                queue.process(process.pid)
+                try:
+                    for marker in ('ready','clean-ready'):
+                        while not (self.root/marker).exists():
+                            self.assertIsNone(process.poll());self.assertTrue(queue.until(time.monotonic()+60),'readiness hang guard')
+                        if marker=='ready': process.send_signal(number)
+                    with self.assertRaises(ProcessLookupError):os.kill(int((self.root/'ready').read_text()),0)
+                    for repeated in signals:process.send_signal(repeated)
+                    process.stdin.write(b'x');process.stdin.flush()
+                    self.assertEqual(process.wait(timeout=60),128+number)
+                    self.check_cleanup()
+                finally:
+                    if process.poll() is None: process.kill(); process.wait()
+                    process.stdin.close()
+                    if (self.root/'ready').exists():
+                        with contextlib.suppress(ProcessLookupError):os.killpg(int((self.root/'ready').read_text()),signal.SIGKILL)
+                    self.remove_private_worktrees();shutil.rmtree(self.root/'output',ignore_errors=True)
+                    for marker in ('ready','clean-ready'):(self.root/marker).unlink(missing_ok=True)
 
 
 class ManifestTests(unittest.TestCase):
+    def test_ci_paths_cover_all_screenshot_tools(self):
+        workflow=(ROOT/'.github/workflows/ci.yml').read_text().split('  push:')[0]
+        patterns=re.findall(r"^\s+- '([^']+)'",workflow,re.M)
+        for file in ('pr-shots.sh','pr-shots-local.py','pr-shots.py','screenshot-manifest.py','screenshots.sh','test-pr-shots-local.py'):
+            self.assertTrue(any(fnmatch.fnmatch('scripts/'+file,pattern) for pattern in patterns),file)
+
     def test_vendor_is_exact_pinned_shared_script_below_provenance_header(self):
         lines = (ROOT/'scripts/pr-shots.py').read_bytes().splitlines(keepends=True)
         self.assertIn(b'5ca44dee12614990c833cc6f49017dac7e184ae8', lines[1])
@@ -192,6 +266,9 @@ class ManifestTests(unittest.TestCase):
             row, = manifest.inventory(out, [file], 'en', 'en_US')
             self.assertEqual((row['screen'], row['scheme'], row['device'], row['board']), ('split-landscape', 'dark', 'ipad', 'Meeting'))
             self.assertEqual((row['pixel_width'], row['pixel_height']), (1200, 900))
+            legacy=file.with_name('10-old-board.png');legacy.write_bytes(file.read_bytes())
+            old,=manifest.inventory(out,[legacy],'en','en_US')
+            self.assertEqual(old['screen'],'old-board');self.assertIsNone(old['test'])
             with self.assertRaises(ValueError): manifest.inventory(out, [file, file], 'en', 'en_US')
             with self.assertRaises(ValueError): manifest.inventory(out / 'other', [file], 'en', 'en_US')
             file.write_bytes(b'not an image')
