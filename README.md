@@ -361,7 +361,7 @@ SIGHUP, SIGTERM and SIGINT stop the renderer; further signals are ignored until 
 `--output` disables lossy pngquant by default and records actual runtime/device, locale, seed, test and pixel size;
 the 1200-pixel downscale remains. Existing normal README renders keep their previous compression behavior.
 
-The canonical cassini-ux `pr-shots.py` is vendored from commit `5ca44dee12614990c833cc6f49017dac7e184ae8`.
+The canonical cassini-ux `pr-shots.py` is vendored from commit `afe3ba905880e7052dbcef425d204266153a2ae0`.
 It adds `pr-shots/` using only its `diff` command; use your PR number with `--pr N`.
 `--render-only` skips that step and needs only Python's standard library. The wrapper uses `python3` from PATH.
 Before diffing it checks each screen has both appearances and probes the canvas against the scheme label
