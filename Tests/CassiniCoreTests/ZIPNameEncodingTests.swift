@@ -29,8 +29,8 @@ import Testing
         #expect(SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined() ==
                 "273cb72f566c6d17dc77e308c76e8ef80b99f0cfb0a9c54a2786011e9087ed4f")
         let archive = try ZIPArchive(url: url)
-        #expect(archive.entries.filter { $0.isFile && !$0.isMetadata }.map(\.name) == ["Notes/café.opus", "Notes/Meeting.opus"])
-        for name in ["Notes/café.opus", "Notes/Meeting.opus"] {
+        #expect(archive.entries.filter { $0.isFile && !$0.isMetadata }.map(\.name) == ["café.opus", "Meeting.opus"])
+        for name in ["café.opus", "Meeting.opus"] {
             #expect(try read(archive, named: name) == Data("audio".utf8))
         }
     }
@@ -62,13 +62,15 @@ import Testing
             let data = try Data(contentsOf: url)
             #expect(data.count == fixture.bytes && digest(data) == fixture.sha256)
             let archive = try ZIPArchive(url: url)
-            #expect(archive.entries.map(\.name) == fixture.members.map(\.name))
-            #expect(archive.entries.filter { $0.isFile }.map(\.name).contains("Notes/café.opus"))
+            // ZIPArchive exposes import display basenames, never archive paths as disk paths.
+            let expectedNames = fixture.members.filter { !$0.is_directory }.map { String($0.name.split(separator: "/").last ?? "") }
+            #expect(archive.entries.filter { $0.isFile }.map(\.name) == expectedNames)
+            #expect(archive.entries.filter { $0.isFile }.map(\.name).contains("café.opus"))
             #expect(archive.entries.count == fixture.members.count)
             for (entry, expected) in zip(archive.entries, fixture.members) {
                 #expect(entry.isDirectory == expected.is_directory && !entry.isMetadata)
                 if !expected.is_directory {
-                    let plain = try read(archive, named: expected.name)
+                    let plain = try read(archive, named: String(expected.name.split(separator: "/").last ?? ""))
                     #expect(plain == Data(expected.plaintext_ascii.utf8))
                     #expect(plain.count == expected.plaintext_bytes && digest(plain) == expected.plaintext_sha256)
                 }
