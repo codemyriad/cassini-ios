@@ -122,7 +122,7 @@ private struct ModelDownloadActions: View {
             Button { Task { await model.download() } } label: {
                 ZStack {
                     primaryLabel.opacity(model.busy ? 0 : 1)
-                    if model.busy { ProgressView().tint(.white) }
+                    if model.busy { ProgressView().tint(.compatibilityWhite) }
                 }
             }
             .buttonStyle(PrimaryButtonStyle())

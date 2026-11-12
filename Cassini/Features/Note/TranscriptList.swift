@@ -110,7 +110,7 @@ struct FollowChip: View {
         .buttonStyle(.plain)
         .foregroundStyle(Color.paper)
         .background(Color.ink, in: Capsule())
-        .shadow(color: .black.opacity(0.15), radius: 8, y: 2)
+        .shadow(color: .compatibilityBlack.opacity(0.15), radius: 8, y: 2)
         .padding(.bottom, 16)
         .accessibilityIdentifier("followPlayback")
     }

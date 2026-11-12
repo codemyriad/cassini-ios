@@ -26,7 +26,7 @@ struct NoteRow: View {
         let format = LibraryFormat(calendar: calendar)
         ZStack {
             // The whole card is the row's button; the texts above it let taps through, the inline suffix does not.
-            Button { perform(.open) } label: { Color.clear.contentShape(Rectangle()) }
+            Button { perform(.open) } label: { Color.compatibilityClear.contentShape(Rectangle()) }
                 .buttonStyle(.plain)
                 .accessibilityLabel(format.rowLabel(row, day: day))
                 .accessibilityHint(LibraryCopy.openNote)
