@@ -441,16 +441,20 @@ def publish(config, state_path, source, apple=None, *, clock=time.monotonic, sle
     with (output/'validation.log').open('w') as log:
         subprocess.run(['xcrun', 'altool', '--validate-app', '-f', artifact['ipa'], '-t', 'ios', *apple.auth()],
                        stdout=log, stderr=subprocess.STDOUT, check=True, timeout=3600)
-    command(['git', 'fetch', 'origin', 'main:refs/remotes/origin/main'], cwd=source)
+    if not wait_main_ci_green(head, clock=clock, sleep=sleep):
+        print('[iOS] daily test release skipped: admitted commit left canonical main or its latest CI is no longer green after validation')
+        return
+    command(['git', 'fetch', 'origin', '+main:refs/remotes/origin/main'], cwd=source)
     current = command(['git', 'rev-parse', 'origin/main'], cwd=source)
     canonical = gh(f'repos/{REPOSITORY}/git/ref/heads/main')['object']['sha']
     if current != canonical:
-        command(['git', 'fetch', 'origin', 'main:refs/remotes/origin/main'], cwd=source)
+        command(['git', 'fetch', 'origin', '+main:refs/remotes/origin/main'], cwd=source)
         current = command(['git', 'rev-parse', 'origin/main'], cwd=source)
-    if (current != canonical or not is_ancestor(source, head, current)
-            or not wait_main_ci_green(head, clock=clock, sleep=sleep)):
+    if current != canonical or not is_ancestor(source, head, current) or not main_ci_green(head):
         print('[iOS] daily test release skipped: admitted commit left canonical main or its latest CI is no longer green after validation')
         return
+    if int(next_build(apple.builds(), version, {})) > int(build):
+        raise RuntimeError('Another upload consumed the next number during validation; no upload attempted')
     pending = dict(head=head, version=version, build=build, notes=notes, output=str(output),
                    fragments=fragment_hashes, notes_format=NOTES_FORMAT)
     state['pending'] = pending

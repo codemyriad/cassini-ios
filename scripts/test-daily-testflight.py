@@ -379,6 +379,29 @@ class ReleaseTests(unittest.TestCase):
         self.assertNotIn('pending', state)
         self.assertEqual(self.apple.uploads, [])
 
+    def test_main_rewritten_during_post_validation_ci_wait_stops_before_upload_intent(self):
+        rewritten = 'f' * 40
+        self.non_ancestor.add((HEAD, rewritten))
+
+        def start_post_validation_wait():
+            self.ci = [main_run(event='schedule', status='in_progress', conclusion=None), main_run()]
+
+            def rewrite_during_wait(_seconds):
+                self.origin_head = rewritten
+                self.canonical_head = rewritten
+                self.ci = [main_run(event='schedule', status='completed', conclusion='success'), main_run()]
+
+            self.sleep_hook = rewrite_during_wait
+
+        self.after_validation_hook = start_post_validation_wait
+        self.publish()
+        self.assertEqual(self.sleeps, [30])
+        state = json.loads(self.state.read_text())
+        self.assertNotIn('head', state)
+        self.assertNotIn('pending', state)
+        self.assertEqual(self.apple.uploads, [])
+        self.assertIn(['git', 'merge-base', '--is-ancestor', HEAD, rewritten], self.calls)
+
     def test_developer_titles_stay_in_audit_and_fold_but_never_reach_testflight(self):
         self.raw_notes = '- Developer CI refactor (#10), D95 </details><script>bad</script>\x1b\u202e\ud800'
         self.publish()
