@@ -190,6 +190,9 @@ step_end() {
 }
 summary() {
     local rc=$?
+    # EXIT traps also run in explicit subshells; $$ still names their outer Bash on macOS 3.2.
+    # Only the owning shell may end workers, post a status or release its host slot.
+    [ "${BASH_SUBSHELL:-0}" -eq 0 ] || return "$rc"
     # A swift test beside the build that has not been waited for (a failure stopped the run) ends here.
     if [ -n "${fast_pid:-}" ]; then pkill -P "$fast_pid" 2>/dev/null || true; kill "$fast_pid" 2>/dev/null || true; fi
     # A run stopped by a signal ends its own xcodebuild and shards before it lets go of the host lock.
@@ -271,11 +274,40 @@ post_status() {
     else echo "commit status not posted, see $logs/commit-status.log"; fi
 }
 
-# $1 and every process it started, deepest first, so none is left behind when its parent goes.
+# $1 and its descendants, deepest first, from one immutable process snapshot. Never walk the
+# collector or an ancestor: recursive pgrep used to discover its own command substitutions forever.
 process_tree() {
-    local child
-    for child in $(pgrep -P "$1" 2>/dev/null); do process_tree "$child"; done
-    echo "$1"
+    /usr/bin/python3 -I - "$1" <<'PYTREE'
+import os, subprocess, sys
+rows = subprocess.check_output(["/bin/ps", "-axo", "pid=,ppid="], text=True)
+parents = {}
+children = {}
+for row in rows.splitlines():
+    fields = row.split()
+    if len(fields) != 2:
+        continue
+    pid, parent = map(int, fields)
+    parents[pid] = parent
+    children.setdefault(parent, []).append(pid)
+protected = set()
+pid = os.getpid()
+while pid and pid not in protected:
+    protected.add(pid)
+    pid = parents.get(pid, 0)
+target = int(sys.argv[1])
+if target in protected or target not in parents:
+    sys.exit(0)
+stack = [(target, False)]
+seen = set()
+while stack:
+    pid, visited = stack.pop()
+    if visited:
+        print(pid)
+    elif pid not in protected and pid not in seen:
+        seen.add(pid)
+        stack.append((pid, True))
+        stack.extend((child, False) for child in sorted(children.get(pid, ()), reverse=True))
+PYTREE
 }
 
 # Ends the processes $2... with signal $1.
@@ -285,6 +317,7 @@ signal_all() { local sig="$1"; shift; for pid in "$@"; do kill -"$sig" "$pid" 2>
 end_tree() {
     local pid="$1" pids
     pids=$(process_tree "$pid")
+    [ -n "$pids" ] || return 0
     # shellcheck disable=SC2086
     signal_all TERM $pids
     /usr/bin/python3 -I "$root/scripts/test-events.py" watch "$pid" /dev/null 5 5 || true

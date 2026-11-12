@@ -346,6 +346,77 @@ class RuntimePickTests(unittest.TestCase):
 
 
 class FullRunTests(unittest.TestCase):
+    def test_subshell_exit_summary_has_no_owner_side_effects(self):
+        import shlex
+        h = Harness(self)
+        effects = h.stub / 'summary-effects'
+        code = f'''
+logs={shlex.quote(str(h.stub))}; failed_logs="$logs"
+tier=all; timings=""; started_all=$(date +%s)
+fast_pid=""; heavy_started=1; keep_sims=0; runtime_tag=""
+{function('summary')}
+end_own_processes() {{ echo workers >> {shlex.quote(str(effects))}; }}
+shutdown_clones() {{ echo clones >> {shlex.quote(str(effects))}; }}
+post_status() {{ echo status >> {shlex.quote(str(effects))}; }}
+release_heavy_lock() {{ echo release >> {shlex.quote(str(effects))}; }}
+# No real cleanup is installed: the old summary must fail safely, without walking its own collector.
+result=$(trap summary EXIT; exit 7)
+rc=$?
+printf 'rc=%s,result=%s\n' "$rc" "$result"
+'''
+        result = subprocess.run(['/bin/bash', '-c', code], capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), 'rc=7,result=')
+        self.assertFalse(effects.exists(), 'subshell posted status, released lock or cleaned owned resources')
+        self.assertFalse((h.stub / 'FAILED').exists(), 'subshell wrote the run verdict')
+
+    def test_process_tree_snapshot_is_postorder_and_excludes_collector_ancestors(self):
+        import select
+        import signal
+        import sys
+        ready_read, ready_write = os.pipe()
+        worker_code = textwrap.dedent(r'''
+            import os, signal, subprocess, sys
+            read, write = os.pipe()
+            child = subprocess.Popen([sys.executable, '-c',
+                "import os,signal,sys; os.write(int(sys.argv[1]), b'R'); signal.pause()", str(write)], pass_fds=(write,))
+            os.close(write)
+            if os.read(read, 1) != b'R': raise SystemExit('child not ready')
+            os.close(read)
+            os.write(int(sys.argv[1]), ('%s %s\n' % (os.getpid(), child.pid)).encode())
+            os.close(int(sys.argv[1]))
+            signal.pause()
+        ''')
+        worker = subprocess.Popen([sys.executable, '-c', worker_code, str(ready_write)],
+                                  pass_fds=(ready_write,), start_new_session=True)
+        os.close(ready_write)
+        try:
+            self.assertTrue(select.select([ready_read], [], [], 30)[0], 'worker and child never became ready')
+            worker_pid, child_pid = map(int, os.read(ready_read, 256).decode().split())
+            self.assertEqual(worker_pid, worker.pid)
+            code = function('process_tree') + '''
+# The old collector must fail safely, without recursively spawning pgrep for its own process.
+pgrep() { return 1; }
+process_tree "$1"
+echo SELF
+process_tree $$
+echo ANCESTOR
+process_tree $PPID
+'''
+            result = subprocess.run(['/bin/bash', '-c', code, 'tree-test', str(worker_pid)],
+                                    capture_output=True, text=True, timeout=30)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout.splitlines(), [str(child_pid), str(worker_pid), 'SELF', 'ANCESTOR'])
+        finally:
+            # Only this test's private session; no shared runner group is touched.
+            try:
+                if worker.poll() is None:
+                    try: os.killpg(worker.pid, signal.SIGKILL)
+                    except ProcessLookupError: pass
+            finally:
+                worker.wait(timeout=30)
+                os.close(ready_read)
+
     def test_cancel_under_an_external_host_slot_ends_own_worker_before_clone_cleanup(self):
         import select
         import shlex
