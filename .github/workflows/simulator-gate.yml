@@ -17,7 +17,8 @@ concurrency:
 jobs:
   simulator-gate:
     name: Full simulator gate (observational)
-    # Evaluate before runner allocation/checkout. Fork PRs never execute on this pool.
+    # Evaluate before runner allocation/checkout. Server-side fork exclusion is also
+    # required: a PR-editable condition cannot enforce policy for the runner pool.
     if: github.repository == 'codemyriad/cassini-ios' && ((github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || ((github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'))
     runs-on: [self-hosted, macOS, ARM64, cm-mac-m4]
     timeout-minutes: 90
@@ -29,8 +30,15 @@ jobs:
       CASSINI_UI_WORKERS: '0'
       CASSINI_UI_IPAD: '1'
       CASSINI_KEEP_SIMS: '0'
-      CASSINI_SIM_PREFIX: ci-ios-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
+      - name: Identify rented iOS runner
+        run: |
+          case "$RUNNER_NAME" in
+            scw*-ios-*) ;;
+            *) echo '::error::This gate must run on the rented iOS pool'; exit 1 ;;
+          esac
+          # Stable service ownership also recovers leftovers after a host crash.
+          printf 'CASSINI_SIM_PREFIX=ts-ci-ios-%s\n' "$RUNNER_NAME" >> "$GITHUB_ENV"
       - uses: actions/checkout@v5
         with:
           # Compare the same immutable PR head as the legacy status, not a moving branch.
@@ -57,13 +65,14 @@ jobs:
       - name: Complete gate without signing or status posting
         working-directory: cassini-ios
         run: |
+          scripts/test.sh clean
           if [ -x "$HOME/bin/heavy-run" ]; then
             "$HOME/bin/heavy-run" scripts/test.sh all
           else
             scripts/test.sh all
           fi
       - name: Remove only this run's simulator clones
-        if: always()
+        if: always() && env.CASSINI_SIM_PREFIX != ''
         working-directory: cassini-ios
         run: scripts/test.sh clean
       - uses: actions/upload-artifact@v5

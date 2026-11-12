@@ -187,7 +187,7 @@ summary() {
     # A swift test beside the build that has not been waited for (a failure stopped the run) ends here.
     if [ -n "${fast_pid:-}" ]; then pkill -P "$fast_pid" 2>/dev/null || true; kill "$fast_pid" 2>/dev/null || true; fi
     # A run stopped by a signal ends its own xcodebuild and shards before it lets go of the host lock.
-    [ -z "$lock_pid" ] || end_own_processes
+    [ "$heavy_started" != 1 ] || end_own_processes
     printf '\n%-34s %6s\n' "step" "time"
     printf '%s' "$timings"
     printf '%-34s %5ss\n' "total" "$(( $(date +%s) - started_all ))"

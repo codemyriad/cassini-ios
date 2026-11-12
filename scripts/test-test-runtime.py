@@ -346,6 +346,72 @@ class RuntimePickTests(unittest.TestCase):
 
 
 class FullRunTests(unittest.TestCase):
+    def test_cancel_under_an_external_host_slot_ends_own_worker_before_clone_cleanup(self):
+        import select
+        import shlex
+        import signal
+        import sys
+
+        h = Harness(self)
+        stopped = h.stub / 'worker-stopped'
+        cleaned = h.stub / 'clone-cleanup-order'
+        ready_read, ready_write = os.pipe()
+        worker = textwrap.dedent('''\
+            import os, signal, sys
+            from pathlib import Path
+            def stopped(_signal, _frame):
+                Path(sys.argv[1]).write_text('worker terminated')
+                raise SystemExit(0)
+            signal.signal(signal.SIGTERM, stopped)
+            os.write(int(sys.argv[2]), b'R')
+            signal.pause()
+        ''')
+        functions = '\n'.join(function(name) for name in (
+            'process_tree', 'signal_all', 'end_tree', 'end_own_processes', 'summary'))
+        code = f'''\
+root={shlex.quote(str(ROOT))}
+logs={shlex.quote(str(h.stub))}
+failed_logs="$logs"
+tier=all; timings=""; started_all=$(date +%s)
+lock_pid=""; fast_pid=""; runtime_tag=""
+heavy_started=1; keep_sims=0
+{functions}
+shutdown_clones() {{
+    if [ -f {shlex.quote(str(stopped))} ]; then
+        echo stopped-first > {shlex.quote(str(cleaned))}
+    else
+        echo worker-still-running > {shlex.quote(str(cleaned))}
+    fi
+}}
+post_status() {{ :; }}
+release_heavy_lock() {{ :; }}
+trap summary EXIT
+trap 'exit 143' TERM
+{shlex.join([sys.executable, '-c', worker, str(stopped), str(ready_write)])} &
+wait $!
+'''
+        process = subprocess.Popen(['/bin/bash', '-c', code], env=h.env(),
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, pass_fds=(ready_write,), start_new_session=True)
+        os.close(ready_write)
+        try:
+            # Readiness means the real worker has installed its handler, before the parent is cancelled.
+            self.assertTrue(select.select([ready_read], [], [], 30)[0], 'worker never signalled readiness')
+            self.assertEqual(os.read(ready_read, 1), b'R')
+            process.send_signal(signal.SIGTERM)  # Only the harness shell; no runner/group cleanup can mask the bug.
+            self.assertEqual(process.wait(timeout=30), 143)  # Process exit event; upper hang guard only.
+            self.assertTrue(stopped.exists(), 'external-slot cancellation left the owned worker running')
+            self.assertEqual(cleaned.read_text().strip(), 'stopped-first')
+        finally:
+            # This private session contains only the fixture, including an orphan left by the regression.
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            process.wait(timeout=30)
+            os.close(ready_read)
+            process.stdout.close()
+            process.stderr.close()
+
     def test_without_cassini_runtime_a_run_uses_the_names_and_files_it_always_did(self):
         h = Harness(self)
         (h.cache / "ui-test-durations.tsv").write_text("AlphaTests/testOne\t10.0\n")

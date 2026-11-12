@@ -12,6 +12,12 @@ pull requests. The job-level condition rejects forks, missing head metadata and 
 self-hosted runner or checking out code. It never uses `pull_request_target`. Both checkouts discard credentials;
 the workflow token has only contents-read permission and is not passed to test commands.
 
+This condition protects the normal workflow path, not a runner from a PR that edits workflow YAML to remove it or
+add another job. **Before enabling the new workflow on the public pool, confirm server-side fork exclusion** that
+PR code cannot change (for example an administratively enforced runner policy). Repository API access currently
+denies inspection of that policy; the draft stays blocked on coordinator confirmation. Existing CI's editable
+guards have the same limitation. Do not treat a passing guard truth-table test as proof of backend enforcement.
+
 The app checkout is the immutable PR head SHA (the same source the legacy status tested), or the push/dispatch SHA.
 Full history supports the existing test script's change detection. Conformance vectors use the same pinned
 cassini-format revision as ordinary CI. Xcode 27.0 is selected per process using `DEVELOPER_DIR`, without changing
@@ -27,8 +33,11 @@ and tells the test script the lock is held; otherwise the script acquires its no
 The existing resource-admission rules remain active. Runner slots share physical CPU/RAM; an idle runner service
 does not imply an idle machine.
 
-Simulator names include the workflow run ID and attempt, so concurrent services on one host cannot reuse a
-simulator. An always-run cleanup removes only that run's clones. Logs and result bundles from both runtime legs
+Simulator names include the registered runner name, so concurrent services on one host cannot reuse a simulator.
+Each service executes one job at a time. Initial and always-run cleanup remove only that service's clones; after
+a host crash, its next job cleans the same owned prefix rather than abandoning a new generation of clones.
+Cancellation ends this run's build/shard descendants even when a host slot was acquired outside the test script.
+Logs and result bundles from both runtime legs
 are uploaded on success or failure and retained for seven days, identified by run and attempt. Native step failure
 fails the job; no upload retry or test retry is added. Superseded PR runs cancel; main/manual runs do not cancel.
 `CASSINI_POST_STATUS=0` means this job cannot manufacture the legacy status; its token has no statuses-write scope.

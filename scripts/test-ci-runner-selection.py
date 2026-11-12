@@ -4,8 +4,12 @@
 from __future__ import annotations
 
 import json
+import os
 import pathlib
 import re
+import subprocess
+import tempfile
+import textwrap
 import unittest
 from types import SimpleNamespace
 
@@ -136,12 +140,33 @@ class CiRunnerSelectionTests(unittest.TestCase):
             self.assertIn(line, text)
         self.assertEqual(text.count("persist-credentials: false"), 2)
         self.assertIn("github.event.pull_request.head.sha || github.sha", text)
-        self.assertIn("CASSINI_SIM_PREFIX: ci-ios-${{ github.run_id }}-${{ github.run_attempt }}", text)
+        self.assertIn("printf 'CASSINI_SIM_PREFIX=ts-ci-ios-%s\\n'", text)
+        self.assertIn('"$RUNNER_NAME" >> "$GITHUB_ENV"', text)
+        self.assertIn("always() && env.CASSINI_SIM_PREFIX != ''", text)
+        self.assertEqual(text.count("scripts/test.sh clean"), 2)
         self.assertIn("scripts/test.sh all", text)
         self.assertNotIn("-only-testing", text)
         self.assertNotIn("CASSINI_IOS18_RUNTIME:", text)
         self.assertRegex(text, r"(?s)Remove only this run's simulator clones\n        if: always\(\).*?scripts/test.sh clean")
         self.assertRegex(text, r"(?s)actions/upload-artifact@v5\n        if: always\(\).*?test-logs\*")
+
+    def test_simulator_prefix_belongs_to_one_rented_runner_service(self):
+        text = (WORKFLOWS / "simulator-gate.yml").read_text()
+        block = re.search(r"Identify rented iOS runner\n        run: \|\n((?:          .*\n)+)", text).group(1)
+        script = textwrap.dedent(block)
+        with tempfile.TemporaryDirectory() as directory:
+            for runner in ["scw32-ios-1", "scw32-ios-2", "scw-m4-ios-1", "drmeyers", "scw32-mac-1", ""]:
+                target = pathlib.Path(directory) / "job-env"
+                target.unlink(missing_ok=True)
+                result = subprocess.run(["/bin/bash", "-e", "-c", script], capture_output=True, text=True,
+                                        env=dict(os.environ, RUNNER_NAME=runner, GITHUB_ENV=str(target)), timeout=30)
+                with self.subTest(runner=runner):
+                    if runner in ("scw32-ios-1", "scw32-ios-2", "scw-m4-ios-1"):
+                        self.assertEqual(result.returncode, 0, result.stderr)
+                        self.assertEqual(target.read_text(), f"CASSINI_SIM_PREFIX=ts-ci-ios-{runner}\n")
+                    else:
+                        self.assertNotEqual(result.returncode, 0)
+                        self.assertFalse(target.exists())
 
     def test_signing_job_only_accepts_main_manual_dispatch_in_the_canonical_repository(self):
         text = (WORKFLOWS / "daily-testflight.yml").read_text()
