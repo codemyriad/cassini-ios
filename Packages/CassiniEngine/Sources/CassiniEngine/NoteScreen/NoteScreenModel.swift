@@ -421,8 +421,11 @@ public final class NoteScreenModel {
         let stats = SpeakerStats.of(words: draft.words.map { Word($0.speaker, $0.startMs, $0.endMs, $0.text) })
         guard let stat = stats.first(where: { $0.speakerID == speakerID }) else { return nil }
         func label(_ stat: SpeakerStat) -> String { draft.labels[stat.speakerID] ?? DefaultLabels.placeholder(stat.ordinal + 1) }
+        let order = SpeakerColourOrder.earliest(draft.words, id: { $0.speaker }, start: { Double($0.startMs) })
+        let indices = Dictionary(uniqueKeysWithValues: order.enumerated().map { ($0.element, $0.offset) })
         let targets = stats.filter { $0.speakerID != speakerID && $0.wordCount > 0 }.map {
-            MergeTarget(speakerID: $0.speakerID, name: label($0), ordinal: $0.ordinal, speakingTime: $0.speakingTime)
+            MergeTarget(speakerID: $0.speakerID, name: label($0), ordinal: $0.ordinal, speakingTime: $0.speakingTime,
+                        colourIndex: indices[$0.speakerID])
         }
         let ready = await ports.speakerModelsReady()
         // A running job holds the audio: no sample plays until it stops.
@@ -430,7 +433,8 @@ public final class NoteScreenModel {
         return NamingInput(speakerID: speakerID, label: label(stat), ordinal: stat.ordinal, speakingTime: stat.speakingTime,
                            sample: stat.sample, print: nil, match: draftNames.match(speakerID),
                            voices: ports.savedVoices(), voicesReadOnly: ports.voicesReadOnly(), voiceModelReady: ready,
-                           mergeTargets: targets, canSample: canSample, draft: true, willHavePrint: ready)
+                           mergeTargets: targets, canSample: canSample, draft: true, willHavePrint: ready,
+                           colourIndex: indices[speakerID])
     }
 
     // MARK: Opening
