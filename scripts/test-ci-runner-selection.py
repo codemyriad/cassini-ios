@@ -98,6 +98,11 @@ def select_runner(
 
 
 class CiRunnerSelectionTests(unittest.TestCase):
+    def test_observational_gate_adds_no_automatic_cancellation(self):
+        text = (WORKFLOWS / "simulator-gate.yml").read_text()
+        self.assertNotIn("\nconcurrency:", text, "D20: no new pending-run eviction or automatic cancellation")
+        self.assertNotIn("cancel-in-progress", text)
+
     def test_every_runs_on_is_a_hosted_image_or_the_guarded_selector(self):
         seen = list(job_runs_on_values())
         self.assertEqual(
