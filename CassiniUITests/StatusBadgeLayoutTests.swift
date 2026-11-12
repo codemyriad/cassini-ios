@@ -15,7 +15,9 @@ final class StatusBadgeLayoutTests: XCTestCase {
         let viewport = scroll.frame.intersection(window)
         for index in 0..<9 {
             let badge = app.descendants(matching: .any)["badge-gallery-\(index)"]
-            XCTAssertTrue(badge.waitForExistence(within: 15))
+            guard badge.waitForExistence(within: 15) else {
+                XCTFail("The actual badge \(index) is missing"); return
+            }
             XCTAssertTrue(scroll.scroll(attempts: 12) {
                 guard badge.exists, !badge.frame.isEmpty else { return false }
                 return badge.frame.minY >= viewport.minY && badge.frame.maxY <= viewport.maxY
@@ -25,10 +27,10 @@ final class StatusBadgeLayoutTests: XCTestCase {
             XCTAssertGreaterThanOrEqual(badge.frame.minX, window.minX - 1, "badge \(index) stays inside the left edge")
             XCTAssertLessThanOrEqual(badge.frame.maxX, window.maxX + 1, "badge \(index) stays inside the right edge")
         }
-        try app.performAccessibilityAudit(for: .textClipped)
         let image = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         image.name = "status-badges-fr-accessibilityXXXL"
         image.lifetime = .keepAlways
         add(image)
+        try app.performAccessibilityAudit(for: .textClipped)
     }
 }

@@ -22,7 +22,7 @@ struct StatusBadgeGallery: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 Text(verbatim: "Status badges").font(.title.weight(.semibold))
-                ForEach(Array(badges.enumerated()), id: \.offset) { index, badge in
+                        ForEach(Array(badges.enumerated()), id: \.offset) { index, badge in
                     FlowLayout {
                         StatusBadgeView(badge: badge).accessibilityIdentifier("badge-gallery-\(index)")
                     }
@@ -32,7 +32,6 @@ struct StatusBadgeGallery: View {
                     .font(.caption).foregroundStyle(CassiniTokens.color(.ink2))
             }
             .frame(maxWidth: .infinity, alignment: .leading).padding(24)
-            .accessibilityIdentifier("badgeGallery")
         }
         .foregroundStyle(CassiniTokens.color(.ink))
         .background(CassiniTokens.color(.ground))
