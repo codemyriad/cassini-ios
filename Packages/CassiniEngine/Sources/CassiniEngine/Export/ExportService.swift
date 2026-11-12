@@ -45,7 +45,7 @@ public struct ExportService: Sendable {
                 data = try await Task.detached(priority: .userInitiated) {
                     var personal: [MarkdownNote] = []
                     if note.document != nil {
-                        let source = CassiniDocument.readChecked(original, verify: false)
+                        let source = CassiniDocument.readMetadataChecked(original)
                         guard let manifest = source.manifest else { throw ExportError.cannotSave }
                         personal = MarkdownExport.notes(in: manifest)
                     }

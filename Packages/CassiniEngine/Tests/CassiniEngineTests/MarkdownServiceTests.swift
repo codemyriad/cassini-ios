@@ -96,6 +96,68 @@ struct MarkdownServiceTests {
         #expect(stored == note, "Export does not select or change a version")
     }
 
+    @Test func importedUnassignedLabelAndRenameWinOverEnglishFallback() async throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = Data(try CassiniDocument.create(ImportFixtures.opus(),
+            transcript: Transcript([Word("unassigned", 0, 400, "Hello")], language: "it"),
+            title: "Stored label", processing: JSONObject(), speakerLabels: ["unassigned": "Voce sconosciuta"]))
+        var note = try await importForMarkdown(source)
+        let earlier = TranscriptVersion(kind: .previous, segments: note.transcript, speakers: note.speakers ?? [])
+        note.versions = (note.versions ?? []) + [earlier]
+        for label in ["Voce sconosciuta", "Mira"] {
+            if label == "Mira" { note.renameSpeaker("unassigned", name: label) }
+            try await notes.save(note)
+            let stored = try Data(contentsOf: notes.directory(for: note.id).appendingPathComponent("note.json"))
+            let output = try await service.exportTranscript(note.id, format: .markdown, texts: texts)
+            let text = try String(contentsOf: output, encoding: .utf8)
+            #expect(text.contains("Speakers: \(label)\n"))
+            #expect(text.contains("**\(label)** · 00:00:00\nHello\n"))
+            #expect(!text.contains("Unknown speaker"))
+            #expect(try Data(contentsOf: notes.originalAudioURL(for: note)) == source)
+            #expect(try Data(contentsOf: notes.directory(for: note.id).appendingPathComponent("note.json")) == stored)
+            #expect(await notes.note(note.id) == note)
+            await service.discard(output).value
+        }
+        let output = try await service.exportTranscript(note.id, format: .markdown, version: earlier.id, texts: texts)
+        let text = try String(contentsOf: output, encoding: .utf8)
+        #expect(text.contains("Speakers: Voce sconosciuta\n"), "The requested version keeps its own stored label")
+        #expect(!text.contains("Mira"))
+    }
+
+    @Test func storedTranscriptAndPersonalNotesExportWithOpaqueSourceWordPayloads() async throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = try ImportFixtures.documentWithPrivateData()
+        let note = try await importForMarkdown(Data(source))
+        let original = CassiniDocument.read(source)
+        let comments = original.comments.map { comment in
+            let name = comment.prefix { $0 != "=" }
+            return name.hasPrefix("CASSINI_TX_") && name.hasSuffix("_PAYLOAD_000") ? "\(name)=not-base64url!" : comment
+        }
+        let opaque = Data(try OggOpus.mux(OggOpus.read(source), tags: CassiniDocument.tagsPacket(comments)))
+        let file = notes.originalAudioURL(for: note)
+        try opaque.write(to: file)
+        let metadata = CassiniDocument.readMetadataChecked(file)
+        #expect(metadata.manifest == original.manifest)
+        #expect(metadata.variants.allSatisfy { $0.body == nil && $0.transcript == nil && $0.error == nil })
+        let output = try await service.exportTranscript(note.id, format: .markdown, texts: texts)
+        let text = try String(contentsOf: output, encoding: .utf8)
+        #expect(text.contains("second version"), "Words come from the stored selected transcript, not the source payload")
+        #expect(text.contains("Budget next week"), "Only the manifest supplies portable personal notes")
+        #expect(await notes.note(note.id) == note, "Header-only export does not change stored trust")
+        #expect(try Data(contentsOf: file) == opaque)
+    }
+
+    private func importForMarkdown(_ source: Data) async throws -> Note {
+        let portable = try #require(PortableTranscript(CassiniDocument.read(Array(source))))
+        let note = ImportedNote.make(id: UUID(), displayName: "source.opus", fallbackTitle: "Imported meeting",
+            sha256: "unused-test-digest", importedAt: Date(timeIntervalSince1970: 1_793_088_000),
+            audio: ImportedAudio(filename: "playback.caf", originalFilename: "source.opus", duration: ImportFixtures.duration),
+            document: portable)
+        try await notes.save(note)
+        try source.write(to: notes.originalAudioURL(for: note))
+        return note
+    }
+
     @Test func markdownUsesS5FilenameAndDisplayFallbackWithoutChangingOtherFormats() async throws {
         defer { try? FileManager.default.removeItem(at: root) }
         var note = Note(title: " A/B\\C ")
