@@ -7,7 +7,7 @@ import CassiniEngineTesting
 import CassiniNotebook
 
 /// The standalone model installs and the stored model status, over fake models.
-@MainActor @Suite struct ModelInstallsTests {
+@MainActor @Suite(.timeLimit(.minutes(1))) struct ModelInstallsTests {
     @Test func hardwareAndLocaleFailuresStayDistinctEvenWithTheSameAssetStatus() async {
         for failure in [JobFailure.model, .unsupportedLanguage] {
             let models = ModelInstalls(transcriber: FakeUnavailableTranscriber(failure), analyzer: FakeAnalyzer(), clock: FakeClock()) { "en-US" }
@@ -21,9 +21,10 @@ import CassiniNotebook
         let transcriber = LanguageTranscriber(["en-US": .notDownloaded], failsInstall: true)
         let installs = ModelInstalls(transcriber: transcriber, analyzer: ScriptedAnalyzer(status: .ready),
                                      clock: FakeClock()) { "en-US" }
+        defer { installs.cancel() }
         await installs.refresh()
         installs.install([.speech])
-        try await until { !installs.isInstalling }
+        try await until(installs) { !installs.isInstalling }
         #expect(installs.status(of: .speech) == .failed(.noConnection))
         transcriber.set("en-US", .unsupported)
         await installs.refresh()
@@ -46,9 +47,10 @@ import CassiniNotebook
         let transcriber = LanguageTranscriber(["en-US": status], failsInstall: true)
         let installs = ModelInstalls(transcriber: transcriber, analyzer: ScriptedAnalyzer(status: .ready),
                                      clock: FakeClock()) { "en-US" }
+        defer { installs.cancel() }
         // No cached status yet: the install discovers the new capability in its closing refresh.
         installs.install([.speech])
-        try await until { installs.installsEnded == 1 }
+        try await until(installs) { installs.installsEnded == 1 }
         #expect(installs.status(of: .speech) == status)
         #expect(installs.failures[.speech] == nil)
         #expect(installs.download == nil)
@@ -60,18 +62,20 @@ import CassiniNotebook
         let transcriber = LanguageTranscriber(["en-US": .unsupported])
         let analyzer = ScriptedAnalyzer(status: .notDownloaded, gated: true)
         let installs = ModelInstalls(transcriber: transcriber, analyzer: analyzer, clock: FakeClock()) { "en-US" }
+        defer { installs.cancel() }
         await installs.refresh()
         installs.install([.speech, .speakers])
-        try await until { analyzer.installs == 1 }
+        try await analyzer.waitForInstall(1)
         #expect(transcriber.installs == 0)
         analyzer.finish(with: nil, status: .ready)
-        try await until { !installs.isInstalling }
+        try await until(installs) { !installs.isInstalling }
         #expect(installs.download == nil)
     }
 
     @Test func aRefreshReadsEveryPartAndVoicesFollowTheSpeakerModels() async {
         let installs = ModelInstalls(transcriber: FakeTranscriber(.returns([], total: 0), status: .notDownloaded),
                                      analyzer: ScriptedAnalyzer(status: .ready), clock: FakeClock()) { "en-US" }
+        defer { installs.cancel() }
         #expect(installs.status(of: .speech) == nil, "nothing is shown before the first read")
         await installs.refresh()
         #expect(installs.status(of: .speech) == .notDownloaded)
@@ -84,18 +88,19 @@ import CassiniNotebook
         let analyzer = ScriptedAnalyzer(status: .notDownloaded, gated: true)
         let installs = ModelInstalls(transcriber: FakeTranscriber(.returns([], total: 0)), analyzer: analyzer,
                                      clock: FakeClock()) { "en-US" }
+        defer { installs.cancel() }
         await installs.refresh()
         installs.install([.speakers, .voices])
-        try await until { analyzer.installs == 1 }
+        try await analyzer.waitForInstall(1)
         installs.install([.speakers])
         #expect(installs.isInstalling)
         analyzer.report(0.4)
-        try await until { installs.status(of: .speakers) == .downloading(0.4) }
+        try await until(installs) { installs.status(of: .speakers) == .downloading(0.4) }
         #expect(installs.status(of: .voices) == .downloading(0.4), "one install serves both parts")
         #expect(installs.download == DownloadFact(part: .speakers, fraction: 0.4, at: FakeClock().now))
 
         analyzer.finish(with: nil, status: .ready)
-        try await until { !installs.isInstalling }
+        try await until(installs) { !installs.isInstalling }
         #expect(analyzer.installs == 1)
         #expect(installs.download == nil)
         #expect(installs.status(of: .speakers) == .ready)
@@ -106,11 +111,12 @@ import CassiniNotebook
         let analyzer = ScriptedAnalyzer(status: .notDownloaded, gated: true)
         let installs = ModelInstalls(transcriber: FakeTranscriber(.returns([], total: 0)), analyzer: analyzer,
                                      clock: FakeClock()) { "en-US" }
+        defer { installs.cancel() }
         await installs.refresh()
         installs.install([.speakers])
-        try await until { analyzer.installs == 1 }
+        try await analyzer.waitForInstall(1)
         analyzer.finish(with: .download(.notEnoughStorage, requiredFreeBytes: 55_000_000), status: .notDownloaded)
-        try await until { !installs.isInstalling }
+        try await until(installs) { !installs.isInstalling }
         #expect(installs.status(of: .speakers) == .failed(.notEnoughStorage))
         #expect(installs.download?.failure == .notEnoughStorage)
         #expect(installs.download?.requiredFreeBytes == 55_000_000)
@@ -119,9 +125,9 @@ import CassiniNotebook
 
         installs.install([.speakers])
         #expect(installs.status(of: .speakers) == .downloading(nil), "the next install clears it")
-        try await until { analyzer.installs == 2 }
+        try await analyzer.waitForInstall(2)
         analyzer.finish(with: nil, status: .ready)
-        try await until { !installs.isInstalling }
+        try await until(installs) { !installs.isInstalling }
         #expect(installs.status(of: .speakers) == .ready)
     }
 
@@ -129,12 +135,13 @@ import CassiniNotebook
         let analyzer = ScriptedAnalyzer(status: .notDownloaded, gated: true)
         let installs = ModelInstalls(transcriber: FakeTranscriber(.returns([], total: 0)), analyzer: analyzer,
                                      clock: FakeClock()) { "en-US" }
+        defer { installs.cancel() }
         await installs.refresh()
         installs.install([.speakers])
-        try await until { analyzer.isWaiting }
+        try await until(analyzer.events) { analyzer.isWaiting }
         #expect(analyzer.installs == 1)
         analyzer.finish(with: .download(.interrupted, requiredFreeBytes: 0), status: .notDownloaded)
-        try await until { installs.installsEnded == 1 }
+        try await until(installs) { installs.installsEnded == 1 }
         await installs.refresh()
         #expect(installs.status(of: .speakers) == .failed(.interrupted), "a missing model still needs its failure notice")
         #expect(installs.download?.failure == .interrupted)
@@ -155,11 +162,12 @@ import CassiniNotebook
         defer { job.end() }
         let installs = ModelInstalls(transcriber: FakeTranscriber(.returns([], total: 0)), analyzer: analyzer,
                                      clock: FakeClock(), job: job) { "en-US" }
+        defer { installs.cancel() }
         await installs.refresh()
         installs.install([.speakers])
-        try await until { analyzer.isWaiting }
+        try await until(analyzer.events) { analyzer.isWaiting }
         analyzer.finish(with: .download(.interrupted, requiredFreeBytes: 0), status: .notDownloaded)
-        try await until { installs.installsEnded == 1 }
+        try await until(installs) { installs.installsEnded == 1 }
         #expect(installs.download?.failure == .interrupted)
 
         let noteID = UUID()
@@ -168,11 +176,11 @@ import CassiniNotebook
         let progress = DownloadProgress(part: .speakers, doneBytes: 30, totalBytes: 100, verifying: false)
         job.apply(.downloading(progress))
         try #require(job.modelDownload == progress, "speaker preparation publishes without waiting for a ticker")
-        try await until { installs.downloadsFollowed == 1 }
+        try await until(installs) { installs.downloadsFollowed == 1 }
         analyzer.finish(with: nil, status: .ready)
         job.apply(.stageChanged(.speakers))
         #expect(job.modelDownload == nil, "leaving the download publishes immediately too")
-        try await until { installs.status(of: .speakers) == .ready && installs.download == nil }
+        try await until(installs) { installs.status(of: .speakers) == .ready && installs.download == nil }
         #expect(job.noteID == noteID, "the refresh must not need the job to end")
         #expect(installs.status(of: .voices) == .ready)
         #expect(installs.failures[.speakers] == nil)
@@ -183,13 +191,14 @@ import CassiniNotebook
         let analyzer = ScriptedAnalyzer(status: .notDownloaded, gated: true)
         let installs = ModelInstalls(transcriber: FakeTranscriber(.returns([], total: 0)), analyzer: analyzer,
                                      clock: FakeClock()) { "en-US" }
+        defer { installs.cancel() }
         await installs.refresh()
         installs.install([.speakers])
-        try await until { analyzer.isWaiting }
+        try await until(analyzer.events) { analyzer.isWaiting }
         #expect(analyzer.installs == 1)
         // The caller reports failure, but the files became ready before the closing refresh.
         analyzer.finish(with: .download(.interrupted, requiredFreeBytes: 0), status: .ready)
-        try await until { installs.installsEnded == 1 }
+        try await until(installs) { installs.installsEnded == 1 }
         #expect(installs.status(of: .speakers) == .ready)
         #expect(installs.status(of: .voices) == .ready)
         #expect(installs.failures[.speakers] == nil)
@@ -201,8 +210,9 @@ import CassiniNotebook
         let analyzer = ScriptedAnalyzer(status: .notDownloaded)
         let installs = ModelInstalls(transcriber: FakeTranscriber(.returns([], total: 0), status: .notDownloaded),
                                      analyzer: analyzer, clock: FakeClock()) { "it-IT" }
+        defer { installs.cancel() }
         installs.install([.speakers, .speech])
-        try await until { !installs.isInstalling }
+        try await until(installs) { !installs.isInstalling }
         #expect(analyzer.installs == 1)
         #expect(installs.download == nil)
         #expect(installs.stored.keys.count == 3, "the install ends with a refresh")
@@ -213,15 +223,16 @@ import CassiniNotebook
         let analyzer = ScriptedAnalyzer(status: .notDownloaded, gated: true)
         let transcriber = LanguageTranscriber(["en-US": .notDownloaded], gated: true)
         let installs = ModelInstalls(transcriber: transcriber, analyzer: analyzer, clock: FakeClock()) { "en-US" }
+        defer { installs.cancel() }
         installs.install([.speech])
-        try await until { transcriber.installs == 1 }
+        try await transcriber.waitForInstall(1)
         installs.install([.speech, .speakers])
         #expect(analyzer.installs == 0, "the second request waits for the first")
         transcriber.finish(status: .ready)
-        try await until { analyzer.installs == 1 }
+        try await analyzer.waitForInstall(1)
         #expect(installs.status(of: .speakers) == .downloading(nil))
         analyzer.finish(with: nil, status: .ready)
-        try await until { !installs.isInstalling }
+        try await until(installs) { !installs.isInstalling }
         #expect(transcriber.installs == 1, "nothing is fetched twice")
         #expect(analyzer.installs == 1)
         #expect(installs.status(of: .speech) == .ready)
@@ -231,26 +242,31 @@ import CassiniNotebook
     @Test func aFailedPartAskedForDuringTheClosingRefreshIsInstalledAgain() async throws {
         let analyzer = ScriptedAnalyzer(status: .notDownloaded)
         let transcriber = LanguageTranscriber(["en-US": .notDownloaded], gatedStatus: true, failsInstall: true)
+        defer { transcriber.openReads() }
         let installs = ModelInstalls(transcriber: transcriber, analyzer: analyzer, clock: FakeClock()) { "en-US" }
+        defer { installs.cancel() }
         installs.install([.speech, .speakers])
-        try await until { transcriber.waitingReads == 1 }
+        try await transcriber.waitForRead(1)
         #expect(analyzer.installs == 1, "the closing refresh runs")
         #expect(installs.status(of: .speech) == .failed(.noConnection), "the failed row can be tapped")
 
         installs.install([.speech])
-        try await until { transcriber.releaseReads(); return !installs.isInstalling }
+        transcriber.openReads()
+        try await until(installs) { !installs.isInstalling }
         #expect(transcriber.installs == 2, "the request was not lost")
         installs.install([.speech])
-        try await until { transcriber.releaseReads(); return !installs.isInstalling }
+        try await until(installs) { !installs.isInstalling }
         #expect(transcriber.installs == 3, "nor is any later one")
     }
 
     @Test func aFailedPartThatSucceedsWhenAskedForAgainEndsWithoutItsFailure() async throws {
         let analyzer = ScriptedAnalyzer(status: .notDownloaded)
         let transcriber = LanguageTranscriber(["en-US": .notDownloaded], gatedStatus: true, failsInstall: true)
+        defer { transcriber.openReads() }
         let installs = ModelInstalls(transcriber: transcriber, analyzer: analyzer, clock: FakeClock()) { "en-US" }
+        defer { installs.cancel() }
         installs.install([.speech])
-        try await until { transcriber.waitingReads == 1 }
+        try await transcriber.waitForRead(1)
         #expect(installs.download?.failure == .noConnection)
 
         transcriber.failsInstall = false
@@ -258,7 +274,8 @@ import CassiniNotebook
         installs.install([.speech])
         #expect(installs.download == DownloadFact(part: .speech, at: FakeClock().now), "the notice shows the new install")
         #expect(installs.status(of: .speech) == .downloading(nil), "and so does the row")
-        try await until { transcriber.releaseReads(); return !installs.isInstalling }
+        transcriber.openReads()
+        try await until(installs) { !installs.isInstalling }
         #expect(transcriber.installs == 2)
         #expect(installs.download == nil, "the earlier failure is not told")
         #expect(installs.status(of: .speech) == .ready)
@@ -267,15 +284,18 @@ import CassiniNotebook
     @Test func anotherPartAskedForDuringTheClosingRefreshIsInstalled() async throws {
         let analyzer = ScriptedAnalyzer(status: .notDownloaded)
         let transcriber = LanguageTranscriber(["en-US": .notDownloaded], gatedStatus: true)
+        defer { transcriber.openReads() }
         let installs = ModelInstalls(transcriber: transcriber, analyzer: analyzer, clock: FakeClock()) { "en-US" }
+        defer { installs.cancel() }
         installs.install([.speech])
-        try await until { transcriber.waitingReads == 1 }
+        try await transcriber.waitForRead(1)
         #expect(transcriber.installs == 1)
 
         installs.install([.speakers])
         #expect(installs.isInstalling)
-        try await until { transcriber.releaseReads(); return analyzer.installs == 1 }
-        try await until { transcriber.releaseReads(); return !installs.isInstalling }
+        transcriber.openReads()
+        try await analyzer.waitForInstall(1)
+        try await until(installs) { !installs.isInstalling }
         #expect(analyzer.installs == 1)
         #expect(transcriber.installs == 1)
     }
@@ -286,23 +306,24 @@ import CassiniNotebook
         let analyzer = ScriptedAnalyzer(status: .notDownloaded, gated: true)
         let installs = ModelInstalls(transcriber: FakeTranscriber(.returns([], total: 0), status: .notDownloaded),
                                      analyzer: analyzer, clock: FakeClock()) { "en-US" }
+        defer { installs.cancel() }
         await installs.refresh()
         installs.install([.speakers, .speech])
-        try await until { analyzer.installs == 1 }
+        try await analyzer.waitForInstall(1)
         installs.cancel()
         #expect(!installs.isInstalling)
         #expect(installs.download == nil)
-        try await until { analyzer.cancels == 1 }
+        try await until(analyzer.events) { analyzer.cancels == 1 }
         // The cancelled install ends by reading the models again.
-        try await until { installs.installsEnded == 1 }
+        try await until(installs) { installs.installsEnded == 1 }
         #expect(installs.failures.isEmpty)
         #expect(installs.status(of: .speakers) == .notDownloaded)
         #expect(installs.download == nil, "the cancelled install's end shows nothing")
 
         installs.install([.speakers])
-        try await until { analyzer.installs == 2 }
+        try await analyzer.waitForInstall(2)
         analyzer.finish(with: nil, status: .ready)
-        try await until { !installs.isInstalling }
+        try await until(installs) { !installs.isInstalling }
         #expect(installs.status(of: .speakers) == .ready)
     }
 
@@ -310,13 +331,14 @@ import CassiniNotebook
         let analyzer = ScriptedAnalyzer(status: .notDownloaded)
         let transcriber = LanguageTranscriber(["en-US": .notDownloaded], gated: true)
         let installs = ModelInstalls(transcriber: transcriber, analyzer: analyzer, clock: FakeClock()) { "en-US" }
+        defer { installs.cancel() }
         installs.install([.speech, .speakers])
-        try await until { transcriber.installs == 1 }
+        try await transcriber.waitForInstall(1)
         installs.cancel()
-        try await until { transcriber.cancelled }
+        try await until(transcriber.events) { transcriber.cancelled }
         // The cancelled install ends by reading the models again; nothing is installed after that read.
-        try await until { installs.status(of: .speech) == .notDownloaded }
-        try await until { installs.installsEnded == 1 }
+        try await until(installs) { installs.status(of: .speech) == .notDownloaded }
+        try await until(installs) { installs.installsEnded == 1 }
         #expect(analyzer.installs == 0, "the parts after the cancelled one are dropped")
         #expect(analyzer.cancels == 0, "the speaker models' install was not running")
         #expect(installs.failures.isEmpty)
@@ -328,16 +350,17 @@ import CassiniNotebook
         let transcriber = SharedInstallTranscriber()
         let installs = ModelInstalls(transcriber: transcriber, analyzer: ScriptedAnalyzer(status: .ready),
                                      clock: FakeClock()) { "en-US" }
+        defer { installs.cancel() }
         await installs.refresh()
         installs.install([.speech])
-        try await until { transcriber.installs == 1 }
+        try await transcriber.waitForInstall(1)
         transcriber.report(.downloading(0.3))
-        try await until { installs.status(of: .speech) == .downloading(0.3) }
+        try await until(installs) { installs.status(of: .speech) == .downloading(0.3) }
         transcriber.report(.checking)
-        try await until { installs.status(of: .speech) == .checking }
+        try await until(installs) { installs.status(of: .speech) == .checking }
         #expect(installs.download?.checking == true, "the download notice says so too")
         transcriber.finish(nil)
-        try await until { !installs.isInstalling }
+        try await until(installs) { !installs.isInstalling }
         #expect(installs.status(of: .speech) == .ready)
         #expect(transcriber.cancels == 0)
     }
@@ -350,6 +373,7 @@ import CassiniNotebook
         let installs = ModelInstalls(transcriber: transcriber, analyzer: ScriptedAnalyzer(status: .ready),
                                      clock: FakeClock(), background: background,
                                      backgroundTitle: { "Downloading models" }) { "en-US" }
+        defer { installs.cancel() }
         await installs.refresh()
         installs.install([.speech])
         #expect(background.activeCount == 1)
@@ -357,15 +381,16 @@ import CassiniNotebook
         #expect(background.subtitles.values.first == "They run on this device", "not the queue's subtitle")
         installs.install([.speakers])
         #expect(background.begunCount == 1, "one background time for the whole install")
-        try await until { transcriber.installs == 1 }
+        try await transcriber.waitForInstall(1)
         transcriber.finish(nil)
-        try await until { !installs.isInstalling }
+        try await until(installs) { !installs.isInstalling }
         #expect(background.activeCount == 0 && background.endedCount == 1)
 
         installs.install([.speech])
         #expect(background.activeCount == 1)
         installs.cancel()
         #expect(background.activeCount == 0, "a cancel gives the time back")
+        try await until(installs) { installs.installsEnded == 2 }
     }
 
     /// The background progress weighs each part by its download over the whole install, so it never goes back when
@@ -377,21 +402,22 @@ import CassiniNotebook
         let background = FakeBackgroundRunner()
         let installs = ModelInstalls(transcriber: transcriber, analyzer: analyzer, clock: FakeClock(),
                                      background: background) { "en-US" }
+        defer { installs.cancel() }
         await installs.refresh()
         installs.install([.speech, .speakers])
         let progress = try #require(background.progresses.values.first)
         var seen: [Int64] = []
-        try await until { transcriber.installs == 1 }
+        try await transcriber.waitForInstall(1)
         for fraction in [0.5, 1.0] {
             transcriber.report(.downloading(fraction))
-            try await until { installs.status(of: .speech) == .downloading(fraction) }
+            try await until(installs) { installs.status(of: .speech) == .downloading(fraction) }
             seen.append(progress.completedUnitCount)
         }
         transcriber.finish(nil)
-        try await until { analyzer.installs == 1 }
+        try await analyzer.waitForInstall(1)
         for fraction in [0.1, 0.5, 1.0] {
             analyzer.report(fraction)
-            try await until { installs.status(of: .speakers) == .downloading(fraction) }
+            try await until(installs) { installs.status(of: .speakers) == .downloading(fraction) }
             seen.append(progress.completedUnitCount)
         }
         #expect(seen == seen.sorted(), "never back: \(seen)")
@@ -399,7 +425,7 @@ import CassiniNotebook
         #expect(seen[2] > seen[1], "the speaker models go on from where Ultra ended: \(seen)")
         #expect(seen.last == 100)
         analyzer.finish(with: nil, status: .ready)
-        try await until { !installs.isInstalling }
+        try await until(installs) { !installs.isInstalling }
     }
 
     /// iOS takes the time back: the install stops, and the part in flight shows "Download stopped" (STOPPED_BY_SYSTEM)
@@ -410,22 +436,25 @@ import CassiniNotebook
         let background = FakeBackgroundRunner()
         let installs = ModelInstalls(transcriber: transcriber, analyzer: analyzer, clock: FakeClock(),
                                      background: background) { "en-US" }
+        defer { installs.cancel() }
         await installs.refresh()
         installs.install([.speech, .speakers])
-        try await until { transcriber.installs == 1 }
+        try await transcriber.waitForInstall(1)
         background.expireAll()
         #expect(!installs.isInstalling)
         #expect(installs.download?.failure == .stoppedBySystem)
         #expect(installs.download?.part == .speech)
         #expect(installs.status(of: .speech) == .failed(.stoppedBySystem))
-        try await until { transcriber.cancels == 1 && transcriber.ended }
-        try await until { installs.status(of: .speech) == .failed(.stoppedBySystem) }
+        try await until(transcriber.events) { transcriber.cancels == 1 && transcriber.ended }
+        try await until(installs) { installs.status(of: .speech) == .failed(.stoppedBySystem) }
         #expect(analyzer.installs == 0, "the parts after it are dropped")
         #expect(background.activeCount == 0)
 
         installs.install([.speech])
         #expect(installs.status(of: .speech) == .downloading(nil), "the next install clears it")
         #expect(background.activeCount == 1)
+        installs.cancel()
+        try await until(installs) { installs.installsEnded == 2 }
     }
 
     /// Cancel of Parakeet's download ends the standalone's wait on the shared install, as for the speaker models.
@@ -433,16 +462,17 @@ import CassiniNotebook
         let transcriber = SharedInstallTranscriber()
         let analyzer = ScriptedAnalyzer(status: .notDownloaded)
         let installs = ModelInstalls(transcriber: transcriber, analyzer: analyzer, clock: FakeClock()) { "en-US" }
+        defer { installs.cancel() }
         await installs.refresh()
         installs.install([.speech, .speakers])
-        try await until { transcriber.installs == 1 }
+        try await transcriber.waitForInstall(1)
         transcriber.report(.checking)
-        try await until { installs.status(of: .speech) == .checking }
+        try await until(installs) { installs.status(of: .speech) == .checking }
         installs.cancel()
         #expect(!installs.isInstalling)
-        try await until { transcriber.cancels == 1 }
+        try await until(transcriber.events) { transcriber.cancels == 1 }
         #expect(analyzer.cancels == 0, "the speaker models' install was not running")
-        try await until { transcriber.ended }
+        try await until(transcriber.events) { transcriber.ended }
         #expect(installs.failures.isEmpty)
         #expect(installs.download == nil)
         #expect(analyzer.installs == 0, "the parts after the cancelled one are dropped")
@@ -454,11 +484,12 @@ import CassiniNotebook
         let transcriber = SharedInstallTranscriber()
         let installs = ModelInstalls(transcriber: transcriber, analyzer: ScriptedAnalyzer(status: .ready),
                                      clock: FakeClock()) { "en-US" }
+        defer { installs.cancel() }
         await installs.refresh()
         installs.install([.speech])
-        try await until { transcriber.installs == 1 }
+        try await transcriber.waitForInstall(1)
         transcriber.finish(TranscriptionError.failed(.download(.notEnoughStorage)))
-        try await until { !installs.isInstalling }
+        try await until(installs) { !installs.isInstalling }
         #expect(installs.download?.failure == .notEnoughStorage)
         #expect(installs.download?.requiredFreeBytes == transcriber.assetInstallBytes)
         #expect(installs.speechInstallBytes == transcriber.assetInstallBytes)
@@ -468,15 +499,17 @@ import CassiniNotebook
     @Test func aRefreshAskedForDuringAnotherReadsAgainOnceItEnds() async throws {
         let analyzer = ScriptedAnalyzer(status: .notDownloaded)
         let transcriber = LanguageTranscriber(["en-US": .notDownloaded], gatedStatus: true)
+        defer { transcriber.openReads() }
         let installs = ModelInstalls(transcriber: transcriber, analyzer: analyzer, clock: FakeClock()) { "en-US" }
+        defer { installs.cancel() }
         let early = Task { await installs.refresh() }
-        try await until { transcriber.waitingReads == 1 }
+        try await transcriber.waitForRead(1)
         // The models change while the first read runs, before the second refresh is asked for.
         transcriber.set("en-US", .ready)
         analyzer.finish(with: nil, status: .ready)
         let late = Task { await installs.refresh() }
         transcriber.releaseReads()
-        try await until { transcriber.waitingReads == 1 }
+        try await transcriber.waitForRead(2)
         transcriber.releaseReads()
         await early.value
         await late.value
@@ -489,17 +522,18 @@ import CassiniNotebook
         let transcriber = LanguageTranscriber(["en-US": .ready, "it-IT": .notDownloaded], failsInstall: true)
         let installs = ModelInstalls(transcriber: transcriber, analyzer: ScriptedAnalyzer(status: .ready),
                                      clock: FakeClock()) { language.value }
+        defer { installs.cancel() }
         await installs.refresh()
         #expect(installs.status(of: .speech) == .ready)
 
         language.value = "it-IT"
-        try await until { installs.status(of: .speech) == .notDownloaded }
+        try await until(installs) { installs.status(of: .speech) == .notDownloaded }
         installs.install([.speech])
-        try await until { !installs.isInstalling }
+        try await until(installs) { !installs.isInstalling }
         #expect(installs.status(of: .speech) == .failed(.noConnection))
 
         language.value = "en-US"
-        try await until { installs.status(of: .speech) == .ready }
+        try await until(installs) { installs.status(of: .speech) == .ready }
         #expect(installs.download == nil, "the previous language's failed-download notice is obsolete")
         transcriber.set("en-US", .notDownloaded)
         await installs.refresh()
@@ -512,6 +546,7 @@ import CassiniNotebook
         let job = JobProgress()
         let installs = ModelInstalls(transcriber: FakeTranscriber(.returns([], total: 0)), analyzer: analyzer,
                                      clock: FakeClock(), job: job) { "en-US" }
+        defer { installs.cancel() }
         await installs.refresh()
         #expect(installs.statuses == [.speech: .ready, .speakers: .notDownloaded, .voices: .notDownloaded])
 
@@ -520,10 +555,10 @@ import CassiniNotebook
         #expect(installs.statuses == [.speech: .ready, .speakers: .downloading(0.3), .voices: .downloading(0.3)],
                 "recognising saved voices follows the speaker models' download")
         // The follower sees the download begin before it ends.
-        try await until { installs.downloadsFollowed == 1 }
+        try await until(installs) { installs.downloadsFollowed == 1 }
         analyzer.finish(with: nil, status: .ready)
         job.end()
-        try await until { installs.status(of: .speakers) == .ready }
+        try await until(installs) { installs.status(of: .speakers) == .ready }
         #expect(installs.statuses == [.speech: .ready, .speakers: .ready, .voices: .ready])
     }
 
@@ -564,6 +599,11 @@ private final class ScriptedAnalyzer: SpeakerAnalyzing {
     var installs: Int { state.withLock { $0.installs } }
     var cancels: Int { held.cancels }
     var isWaiting: Bool { held.isWaiting }
+    var events: ModelInstallTestEvents { held.events }
+
+    @MainActor func waitForInstall(_ count: Int) async throws {
+        try await until(events) { self.installs == count && (!self.gated || self.isWaiting) }
+    }
 
     func report(_ fraction: Double) { state.withLock { $0.progress }?(.downloading(fraction)) }
 
@@ -572,6 +612,7 @@ private final class ScriptedAnalyzer: SpeakerAnalyzing {
     func finish(with error: SpeakerAnalysisError?, status: ModelPartStatus) {
         state.withLock { $0.status = status }
         held.end(error)
+        events.signal()
     }
 
     func analyze(url: URL, words: [Word], allowDownload: Bool,
@@ -588,6 +629,7 @@ private final class ScriptedAnalyzer: SpeakerAnalyzing {
     /// installer does for a caller that leaves, and counts in `cancels`.
     func installModels(progress: @escaping @Sendable (InstallProgress) -> Void) async throws {
         state.withLock { $0.installs += 1; $0.progress = progress }
+        events.signal()
         guard gated else { return }
         try await held.wait()
     }
@@ -596,6 +638,7 @@ private final class ScriptedAnalyzer: SpeakerAnalyzing {
 /// An install the test holds: `wait()` returns when the test calls `end`, or throws `CancellationError` when its
 /// caller is cancelled, as the shared installer ends the wait of a caller that leaves; `cancels` counts those.
 private final class HeldInstall: Sendable {
+    let events = ModelInstallTestEvents()
     private struct State {
         var waiter: CheckedContinuation<Void, Error>?
         var cancelled = false
@@ -615,6 +658,7 @@ private final class HeldInstall: Sendable {
                     if !state.cancelled { state.waiter = continuation }
                     return state.cancelled
                 }
+                events.signal()
                 if cancelled { continuation.resume(throwing: CancellationError()) }
             }
         } onCancel: {
@@ -625,6 +669,7 @@ private final class HeldInstall: Sendable {
                 return state.waiter
             }
             waiter?.resume(throwing: CancellationError())
+            self.events.signal()
         }
     }
 
@@ -632,6 +677,7 @@ private final class HeldInstall: Sendable {
     func end(_ error: Error?) {
         let waiter = state.withLock { state in defer { state.waiter = nil }; return state.waiter }
         if let error { waiter?.resume(throwing: error) } else { waiter?.resume() }
+        events.signal()
     }
 }
 
@@ -647,15 +693,20 @@ private final class LanguageTranscriber: Transcribing {
     private struct State {
         var statuses: [String: ModelPartStatus]
         var installs = 0
+        var readyInstalls = 0
+        var endedInstalls = 0
         var cancelled = false
         var failsInstall: Bool
-        var finish: CheckedContinuation<Void, Never>?
-        var reads: [CheckedContinuation<Void, Never>] = []
+        var finish: AsyncStream<Void>.Continuation?
+        var reads: [UUID: AsyncStream<Void>.Continuation] = [:]
+        var readsEntered = 0
+        var readsOpen = false
     }
 
     private let state: Mutex<State>
     private let gated: Bool
     private let gatedStatus: Bool
+    let events = ModelInstallTestEvents()
 
     init(_ statuses: [String: ModelPartStatus], gated: Bool = false, gatedStatus: Bool = false, failsInstall: Bool = false) {
         state = Mutex(State(statuses: statuses, failsInstall: failsInstall))
@@ -665,6 +716,12 @@ private final class LanguageTranscriber: Transcribing {
     var installs: Int { state.withLock { $0.installs } }
     var waitingReads: Int { state.withLock { $0.reads.count } }
     var cancelled: Bool { state.withLock { $0.cancelled } }
+    @MainActor func waitForInstall(_ count: Int) async throws {
+        try await until(events) { self.state.withLock { $0.installs == count && $0.readyInstalls == count } }
+    }
+    @MainActor func waitForRead(_ count: Int) async throws {
+        try await until(events) { self.state.withLock { $0.readsEntered == count && $0.reads.count == 1 } }
+    }
     /// Whether the next installs fail with no connection.
     var failsInstall: Bool {
         get { state.withLock { $0.failsInstall } }
@@ -679,12 +736,32 @@ private final class LanguageTranscriber: Transcribing {
             defer { state.finish = nil }
             return state.finish
         }
-        waiter?.resume()
+        waiter?.yield(())
+        waiter?.finish()
+        events.signal()
     }
 
     func releaseReads() {
-        let reads = state.withLock { state in defer { state.reads = [] }; return state.reads }
-        for read in reads { read.resume() }
+        let reads = state.withLock { state in
+            let reads = Array(state.reads.values)
+            state.reads.removeAll()
+            return reads
+        }
+        for read in reads { read.yield(()); read.finish() }
+        events.signal()
+    }
+
+    /// Release this cohort and all later reads, atomically with registration. Unlike repeatedly releasing a batch
+    /// inside a polling predicate, a newly arriving closing refresh cannot get stranded after the last release.
+    func openReads() {
+        let reads = state.withLock { state in
+            state.readsOpen = true
+            let reads = Array(state.reads.values)
+            state.reads.removeAll()
+            return reads
+        }
+        for read in reads { read.yield(()); read.finish() }
+        events.signal()
     }
 
     func transcribe(_ request: TranscriptionRequest,
@@ -694,33 +771,52 @@ private final class LanguageTranscriber: Transcribing {
 
     func assetStatus(locale: Locale) async -> ModelPartStatus {
         let status = state.withLock { $0.statuses[locale.identifier(.bcp47)] ?? .unsupported }
-        if gatedStatus { await withCheckedContinuation { continuation in state.withLock { $0.reads.append(continuation) } } }
+        if gatedStatus {
+            let id = UUID()
+            let (values, release) = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
+            let waits = state.withLock { state in
+                state.readsEntered += 1
+                guard !state.readsOpen else { return false }
+                state.reads[id] = release
+                return true
+            }
+            events.signal()
+            if waits {
+                var iterator = values.makeAsyncIterator()
+                _ = await iterator.next()
+            }
+            state.withLock { _ = $0.reads.removeValue(forKey: id) }
+            release.finish()
+            events.signal()
+        }
         return status
     }
 
     func installAssets(locale: Locale, progress: @escaping @Sendable (InstallProgress) -> Void) async throws {
-        let fails = state.withLock { state in
+        let (number, fails) = state.withLock { state in
             state.installs += 1
-            return state.failsInstall
+            state.cancelled = false
+            if state.failsInstall || !gated { state.readyInstalls = state.installs }
+            return (state.installs, state.failsInstall)
+        }
+        events.signal()
+        defer {
+            state.withLock { $0.endedInstalls += 1 }
+            events.signal()
         }
         if fails { throw TranscriptionError.failed(.download(.noConnection)) }
         guard gated else { return }
-        await withTaskCancellationHandler {
-            await withCheckedContinuation { continuation in
-                let cancelled = state.withLock { state in
-                    if !state.cancelled { state.finish = continuation }
-                    return state.cancelled
-                }
-                if cancelled { continuation.resume() }
-            }
-        } onCancel: {
-            let waiter = state.withLock { state in
-                state.cancelled = true
-                defer { state.finish = nil }
-                return state.finish
-            }
-            waiter?.resume()
+        let (values, release) = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
+        state.withLock { $0.finish = release; $0.readyInstalls = number }
+        events.signal()
+        var iterator = values.makeAsyncIterator()
+        _ = await iterator.next()
+        state.withLock {
+            if Task.isCancelled { $0.cancelled = true }
+            $0.finish = nil
         }
+        release.finish()
+        events.signal()
         try Task.checkCancellation()
     }
 
@@ -745,6 +841,11 @@ private final class SharedInstallTranscriber: Transcribing {
     var installs: Int { state.withLock { $0.installs } }
     var cancels: Int { held.cancels }
     var ended: Bool { state.withLock { $0.ended } }
+    var events: ModelInstallTestEvents { held.events }
+
+    @MainActor func waitForInstall(_ count: Int) async throws {
+        try await until(events) { self.installs == count && self.held.isWaiting }
+    }
 
     func report(_ progress: InstallProgress) { state.withLock { $0.progress }?(progress) }
 
@@ -763,22 +864,10 @@ private final class SharedInstallTranscriber: Transcribing {
 
     func installAssets(locale: Locale, progress: @escaping @Sendable (InstallProgress) -> Void) async throws {
         state.withLock { $0.installs += 1; $0.progress = progress }
-        defer { state.withLock { $0.ended = true } }
+        events.signal()
+        defer { state.withLock { $0.ended = true }; events.signal() }
         try await held.wait()
     }
 
     func speechLanguages() async -> [SpeechLanguage] { [] }
-}
-
-/// Polls `condition` on the main actor until it holds, for at most 30 seconds: an upper bound for a busy machine (the
-/// package tests run beside the UI build), never a wait a passing run sees.
-@MainActor private func until(_ condition: @MainActor () -> Bool) async throws {
-    let deadline = ContinuousClock.now + .seconds(30)
-    while !condition() {
-        guard ContinuousClock.now < deadline else {
-            Issue.record("The condition never held")
-            return
-        }
-        try await Task.sleep(for: .milliseconds(5))
-    }
 }

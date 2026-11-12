@@ -52,9 +52,10 @@ import CassiniNotebook
     @ObservationIgnored private var speechFailureLanguage: String?
     @ObservationIgnored private var followers: [Task<Void, Never>] = []
     /// Standalone installs whose run has ended, a cancelled one's closing refresh included, and the running job's
-    /// model downloads the follower has seen begin: what a test waits on instead of sleeping.
-    @ObservationIgnored private(set) var installsEnded = 0
-    @ObservationIgnored private(set) var downloadsFollowed = 0
+    /// model downloads the follower has seen begin. Observable so tests can await the actual event without polling;
+    /// these internal diagnostics are not read by the UI.
+    private(set) var installsEnded = 0
+    private(set) var downloadsFollowed = 0
     @ObservationIgnored private let background: (any BackgroundRunner)?
     @ObservationIgnored private let backgroundTitle: @MainActor () -> String
     @ObservationIgnored private let backgroundSubtitle: @MainActor () -> String
