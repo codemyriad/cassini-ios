@@ -37,6 +37,10 @@ CI_POLL_SECONDS = 30
 MAX_CI_PAGES = 50
 
 
+# The internal states Apple passes through on its own on the way to IN_BETA_TESTING. Every other state is an error.
+WAITING_STATES = ('PROCESSING', 'READY_FOR_BETA_TESTING')
+
+
 class NotReadyYet(RuntimeError):
     """Apple has the upload but has not made it available to internal testers yet. Nothing failed: the upload
     intent stays, and the next hourly wake finishes it."""
@@ -226,8 +230,14 @@ class Apple:
         if attributes.get('buildAudienceType') != 'INTERNAL_ONLY':
             raise RuntimeError('Apple did not confirm INTERNAL_ONLY audience')
         detail = self.request('/v1/builds/' + build['id'] + '/buildBetaDetail')['data']['attributes']
-        if detail['internalBuildState'] != 'IN_BETA_TESTING':
-            raise NotReadyYet('Internal TestFlight testing is not ready')
+        internal = detail.get('internalBuildState')
+        if internal in WAITING_STATES:
+            raise NotReadyYet(f'Internal TestFlight testing is not ready ({internal})')
+        if internal != 'IN_BETA_TESTING':
+            # Missing export compliance, a processing exception, an expired build, a state this tool does not know:
+            # none of these resolves by waiting, so each wake reports it with Apple's own word for it.
+            raise RuntimeError(f'Internal TestFlight testing needs attention: Apple reports {internal}; '
+                               'the upload stays pending and no new build starts until this is resolved')
         notes = self.request('/v1/builds/' + build['id'] + '/betaBuildLocalizations')['data']
         existing = next((n for n in notes if n['attributes']['locale'] == 'en-US'), None)
         data = {'type': 'betaBuildLocalizations',
@@ -370,9 +380,11 @@ def pending_upload(state_path):
     return state_path.exists() and bool(json.loads(state_path.read_text()).get('pending'))
 
 
-def waiting_message(pending):
+def waiting_message(pending, error=None):
+    state = re.search(r'\(([A-Z_]+)\)$', str(error or ''))
+    state = f' (Apple reports {state.group(1)})' if state else ''
     return (f"[iOS] TestFlight {pending['version']} ({pending['build']}) from {pending['head']} is uploaded; "
-            'Apple has not made it available to internal testers yet. The hourly check finishes it; no new upload')
+            f'Apple has not made it available to internal testers yet{state}. The hourly check finishes it; no new upload')
 
 
 def finish_pending(state_path, apple=None):
@@ -393,8 +405,8 @@ def finish_pending(state_path, apple=None):
     wait_processing(apple, pending, Path(pending['output']))
     try:
         build_id = apple.finish(pending)  # Resume finalization only; never resubmit an ambiguous upload.
-    except NotReadyYet:
-        print(waiting_message(pending))
+    except NotReadyYet as error:
+        print(waiting_message(pending, error))
         return False
     record_release(state, pending, build_id)
     save(state_path, state)
@@ -493,8 +505,8 @@ def publish(config, state_path, source, apple=None, *, clock=time.monotonic, sle
     wait_processing(apple, pending, output)
     try:
         build_id = apple.finish(pending)
-    except NotReadyYet:
-        print(waiting_message(pending))
+    except NotReadyYet as error:
+        print(waiting_message(pending, error))
         return
     record_release(state, pending, build_id)
     save(state_path, state)
