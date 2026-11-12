@@ -105,13 +105,14 @@ final class LibraryUITests: XCTestCase {
     // ports: LibraryViewModelTest#theProgressBannerOpensTheRunningNoteOrSettings
     @MainActor func testTheControlsLeadWhereTheySay() {
         let app = launch(["--seed", "statuses"] + DeviceUnderTest.workingSpeech)
-        let banner = app.buttons["progressBanner"]
-        XCTAssertTrue(banner.waitForExistence(within: 15))
-        XCTAssertTrue(waitFor(banner, label: "Transcribing Weekly planning call"), banner.label)
-        XCTAssertTrue(waitFor(banner, label: "1 more in queue"), banner.label)
+        let running = row(app, "Weekly planning call")
+        XCTAssertTrue(waitFor(running, label: ", transcribing"), running.label)
+        XCTAssertFalse(app.buttons["progressBanner"].exists, "The running meeting is represented by its row")
+        XCTAssertTrue(waitFor(row(app, "Interview with the printer"), label: ", queued"), "The queued note remains represented")
+        XCTAssertEqual(app.buttons.matching(NSPredicate(format: "identifier == 'noteRow' AND label CONTAINS ', queued'")).count, 1)
         XCTAssertTrue(app.buttons["importButton"].isEnabled)
         XCTAssertEqual(app.buttons["recordButton"].label, "Record a new note")
-        banner.tap()
+        running.tap()
         XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 5))
         XCTAssertEqual(app.staticTexts["noteTitle"].label, "Weekly planning call")
     }
@@ -237,7 +238,7 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Record"].exists, "the LIB_EMPTY banner's own Record")
         XCTAssertTrue(app.buttons["Import"].exists, "and its own Import, as Android's banner")
         XCTAssertTrue(app.buttons["Import audio"].exists, "beside the capture bar's Import audio")
-        XCTAssertTrue(app.staticTexts["Transcribed on this device. Audio never leaves it."].exists)
+        XCTAssertFalse(app.staticTexts["Transcribed on this device. Audio never leaves it."].exists, "Privacy copy is not repeated under Library search")
         capture("Library empty")
     }
 

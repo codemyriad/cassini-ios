@@ -200,6 +200,8 @@ extension AppEnvironment {
         uiTesting(reset: arguments.contains("--reset-test-data"), seed: seed(in: arguments),
                   openFixture: fixture(in: arguments), modelsMissing: arguments.contains("--models-missing"),
                   modelDownloading: arguments.contains("--model-downloading"),
+                  heldModelInstall: arguments.contains("--held-model-install"),
+                  checkingModelInstall: arguments.contains("--checking-model-install"),
                   draftGrowing: arguments.contains("--draft-growing"),
                   speakersReady: arguments.contains("--speakers-ready"),
                   parakeet: arguments.contains("--parakeet"),
@@ -226,7 +228,8 @@ extension AppEnvironment {
     /// without Apple speech the default device has no recognizer that can run, so its transcriber refuses every job,
     /// and the background runner never asks for continued processing.
     static func uiTesting(reset: Bool, seed: Seed?, openFixture: OpenFixture? = nil,
-                          modelsMissing: Bool = false, modelDownloading: Bool = false, draftGrowing: Bool = false,
+                          modelsMissing: Bool = false, modelDownloading: Bool = false,
+                          heldModelInstall: Bool = false, checkingModelInstall: Bool = false, draftGrowing: Bool = false,
                           speakersReady: Bool = false, parakeet: Bool = false,
                           notificationsDenied: Bool = false, heldCapture: Bool = false, region: String? = nil,
                           speechFailure: String? = nil, bundledSpeech: Bool = false, bundledCapable: Bool = false, bundledVerified: Bool = false,
@@ -252,7 +255,9 @@ extension AppEnvironment {
         let installRecorder = FakeModelInstallRecorder()
         let draftClock = draftGrowing ? PermitClock(now: uiTestingNow) : nil
         let pacingClock: any AppClock = if let draftClock { draftClock } else { FakeClock(now: uiTestingNow) }
-        let transcriber = FakeTranscriber(script, status: status, recognizer: recognizer, clock: pacingClock, installRecorder: installRecorder)
+        let heldProgress: InstallProgress? = heldModelInstall ? (checkingModelInstall ? .checking : .downloading(0.46)) : nil
+        let transcriber = FakeTranscriber(script, status: status, recognizer: recognizer, clock: pacingClock,
+                                          installRecorder: installRecorder, heldInstallProgress: heldProgress)
         // Without Apple speech the Apple slot holds the candidate that refuses every job.
         let unavailable: (any Transcribing)? = platform.appleSpeech ? nil : UnavailableSpeechTranscriber()
         // The recording seed tells the speakers apart, as a walk from recording to naming needs; the processing seed's

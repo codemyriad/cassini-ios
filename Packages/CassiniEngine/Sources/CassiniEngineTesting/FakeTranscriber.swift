@@ -20,6 +20,7 @@ public struct FakeTranscriber: Transcribing {
     }
 
     private let installRecorder: FakeModelInstallRecorder?
+    private let heldInstallProgress: InstallProgress?
     private let clock: any AppClock
     public let script: Script
     private static let resultInterval = Duration.milliseconds(1_200)
@@ -29,7 +30,9 @@ public struct FakeTranscriber: Transcribing {
     public let recognizer: SpeechRecognizer
 
     public init(_ script: Script, status: ModelPartStatus = .ready, recognizer: SpeechRecognizer = .appleSpeech,
-                clock: any AppClock = SystemClock(), installRecorder: FakeModelInstallRecorder? = nil) {
+                clock: any AppClock = SystemClock(), installRecorder: FakeModelInstallRecorder? = nil,
+                heldInstallProgress: InstallProgress? = nil) {
+        self.heldInstallProgress = heldInstallProgress
         self.installRecorder = installRecorder
         self.script = script; self.status = status; self.recognizer = recognizer; self.clock = clock
     }
@@ -90,6 +93,14 @@ public struct FakeTranscriber: Transcribing {
     /// Reports the download as done at once; nothing is installed, so `assetStatus` stays as it was.
     public func installAssets(locale: Locale, progress: @escaping @Sendable (InstallProgress) -> Void) async throws {
         installRecorder?.request(.speech)
+        if let heldInstallProgress {
+            progress(heldInstallProgress)
+            // Cancellation is the event: no producer, deadline or fixed sleep advances this fixture.
+            let (stream, continuation) = AsyncStream<Void>.makeStream()
+            defer { continuation.finish() }
+            for await _ in stream {}
+            try Task.checkCancellation()
+        }
         progress(.downloading(1))
         installRecorder?.complete(.speech)
     }
