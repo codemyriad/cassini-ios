@@ -292,6 +292,8 @@ def refresh_control(config, arguments, lock):
 
 def notify_failure(message, inbox_path):
     print(message, file=sys.stderr)
+    if os.environ.get('CASSINI_RELEASE_STDERR_RELAY') == '1':
+        return  # The Aqua bridge forwards stderr to launchd's coordinator inbox.
     try:
         if os.path.samestat(os.fstat(sys.stderr.fileno()), inbox_path.stat()):
             return  # launchd already sent this exact line to the coordinator inbox.

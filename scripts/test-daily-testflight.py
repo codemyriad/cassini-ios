@@ -444,6 +444,9 @@ class ReleaseTests(unittest.TestCase):
         plist = plistlib.loads((scripts/'launchd/io.codemyriad.cassini.daily-testflight.plist').read_bytes())
         self.assertEqual(plist['StartCalendarInterval'], {'Minute': 0})
         self.assertNotIn('StartInterval', plist)
+        self.assertEqual(plist['ProgramArguments'], ['/usr/bin/python3', '__CONTROL__/scripts/run-in-gui.py',
+            '/usr/bin/env', 'DEVELOPER_DIR=/Applications/Xcode-27.0.0.app/Contents/Developer',
+            'CASSINI_RELEASE_STDERR_RELAY=1', '__CONTROL__/scripts/scheduled-testflight.sh'])
         workflow = (scripts.parent/'.github/workflows/daily-testflight.yml').read_text()
         self.assertIn("github.ref == 'refs/heads/main'", workflow)
         self.assertIn('[self-hosted, macOS, ARM64, cassini-ios-release-drmeyers]', workflow)
@@ -452,6 +455,15 @@ class ReleaseTests(unittest.TestCase):
 
 
 class SchedulerTests(unittest.TestCase):
+    def test_aqua_stderr_relay_is_the_single_coordinator_failure_delivery(self):
+        with tempfile.TemporaryDirectory() as directory:
+            inbox = Path(directory)/'inbox'
+            stream = io.StringIO()
+            with patch.dict(os.environ, CASSINI_RELEASE_STDERR_RELAY='1'), contextlib.redirect_stderr(stream):
+                daily.notify_failure('[iOS] daily test release failed: English fixture', inbox)
+            self.assertFalse(inbox.exists(), 'the bridge, not a second append, delivers stderr')
+            self.assertEqual(stream.getvalue(), '[iOS] daily test release failed: English fixture\n')
+
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
