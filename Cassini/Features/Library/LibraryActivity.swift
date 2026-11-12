@@ -130,7 +130,7 @@ struct CaptureBar: View {
         let active = recording.state.activeRecording
         return Button { Task { await recording.start() } } label: {
             if let active {
-                Label(LibraryCopy.recordingButton(TimeText.clock(active.elapsed)), systemImage: "waveform").fixedSize()
+                Label(LibraryCopy.recordingButton(TimeText.clock(active.elapsed)), systemImage: "waveform").monospacedDigit().fixedSize()
             } else {
                 Label(LibraryCopy.record, systemImage: "mic.fill").fixedSize()
             }

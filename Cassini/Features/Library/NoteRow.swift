@@ -118,7 +118,7 @@ struct RowChip: View {
         HStack(spacing: 5) {
             if case .recording = status { Circle().fill(colors.ink).frame(width: 6, height: 6) }
             if case .transcribed = status { Image(systemName: "checkmark").font(.system(size: 9, weight: .bold)) }
-            Text(LibraryCopy.status(status)).font(.footnote.weight(.medium))
+            Text(LibraryCopy.status(status)).font(.footnote.weight(.medium)).monospacedDigit()
         }
         .foregroundStyle(colors.ink).padding(.horizontal, 8).padding(.vertical, 4)
         .background(colors.tint, in: Capsule())

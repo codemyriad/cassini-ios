@@ -118,9 +118,9 @@ extension Color {
     static let recordingBackground = Color(red: 0.075, green: 0.12, blue: 0.14)
     static let recordingText = Color.white
     static let recordingSecondary = Color.white.opacity(0.62)
-    static let recordingAccent = recordInk
+    static let recordingAccent = CassiniTokens.color(.recordInk, forcedDark: true)
     static let recordingFinish = record
-    static let recordingLive = recordInk
+    static let recordingLive = recordingAccent
 
     /// Speaker tints, assigned by first appearance in a transcript.
     static let speakerTints: [Color] = [
@@ -151,7 +151,7 @@ extension Color {
 /// The Live Activity's colours, shared with the app so `ContrastTests` checks them: the Lock Screen card is always
 /// dark, whatever the appearance.
 enum RecordingActivityColors {
-    static let background = Color(red: 0.075, green: 0.12, blue: 0.14)
+    static let background = Color.recordingBackground
     static let live = CassiniTokens.color(.recordInk, forcedDark: true)
     static let finish = Color.record
     /// The "Recording" caption and the paused dot's ring.
