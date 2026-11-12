@@ -12,10 +12,15 @@ final class StatusBadgeLayoutTests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["badgeGallery"].waitForExistence(within: 15))
         let window = app.windows.firstMatch.frame
         let scroll = app.scrollViews.firstMatch
+        let viewport = scroll.frame.intersection(window)
         for index in 0..<9 {
             let badge = app.descendants(matching: .any)["badge-gallery-\(index)"]
             XCTAssertTrue(badge.waitForExistence(within: 15))
-            XCTAssertTrue(scroll.scroll(attempts: 12) { badge.exists && badge.isHittable }, "badge \(index) is visible")
+            XCTAssertTrue(scroll.scroll(attempts: 12) {
+                guard badge.exists, !badge.frame.isEmpty else { return false }
+                return badge.frame.minY >= viewport.minY && badge.frame.maxY <= viewport.maxY
+            }, "the complete badge \(index) is visible")
+            if index == 0 { XCTAssertTrue(badge.label.hasPrefix("Enregistrement"), "the real French catalog is active") }
             XCTAssertGreaterThan(badge.frame.width, 0)
             XCTAssertGreaterThanOrEqual(badge.frame.minX, window.minX - 1, "badge \(index) stays inside the left edge")
             XCTAssertLessThanOrEqual(badge.frame.maxX, window.maxX + 1, "badge \(index) stays inside the right edge")
