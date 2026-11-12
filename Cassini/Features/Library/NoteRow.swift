@@ -113,12 +113,11 @@ struct NoteRow: View {
 /// The status chip: text in the status's tone on its tint, never colour alone.
 struct RowChip: View {
     let row: LibraryRow
-    @Environment(\.locale) private var locale
 
     private var status: LibraryRow.Status { row.status }
 
     var body: some View {
-        if let badge = RowBadge.presentation(row, text: { StatusBadgeCopy.template($0, locale: locale) }) {
+        if let badge = RowBadge.presentation(row, text: { StatusBadgeCopy.template($0) }) {
             StatusBadgeView(badge: badge)
         } else {
             localBadge

@@ -4,10 +4,9 @@ import CassiniNotebook
 
 /// Synthetic screenshot fixture using the actual component and production selector; never a release route.
 struct StatusBadgeGallery: View {
-    @Environment(\.locale) private var locale
 
     private var badges: [BadgePresentation] {
-        let text: StatusBadges.Text = { StatusBadgeCopy.template($0, locale: locale) }
+        let text: StatusBadges.Text = { StatusBadgeCopy.template($0) }
         let meetings: [BadgeFields] = [
             .init(lifecycle: .recording, liveMs: 768_000), .init(lifecycle: .saving),
             .init(transcript: .running, etaMinutes: 4), .init(error: .init(action: "retry")),
@@ -29,7 +28,7 @@ struct StatusBadgeGallery: View {
                     }
                 }
                 Text(StatusBadges.interruptedAt(position: "00:41:12",
-                                                text: { StatusBadgeCopy.template($0, locale: locale) }))
+                                                text: { StatusBadgeCopy.template($0) }))
                     .font(.caption).foregroundStyle(CassiniTokens.color(.ink2))
             }
             .frame(maxWidth: .infinity, alignment: .leading).padding(24)
