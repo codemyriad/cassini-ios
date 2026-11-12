@@ -52,11 +52,11 @@ extension Note {
         // Oldest kept speech supplies a legacy identity's original slot, before later merges/reordering.
         if var history = versions {
             for index in history.indices {
-                history[index].speakers = fill(history[index].speakers, order: history[index].segments.compactMap(\.speakerID))
+                history[index].speakers = fill(history[index].speakers, order: SpeakerColourOrder.segments(history[index].segments))
             }
             versions = history
         }
-        if let catalog = speakers { speakers = fill(catalog, order: transcript.compactMap(\.speakerID)) }
+        if let catalog = speakers { speakers = fill(catalog, order: SpeakerColourOrder.segments(transcript)) }
     }
 
     /// Fill missing legacy slots once, preserving every existing assignment.

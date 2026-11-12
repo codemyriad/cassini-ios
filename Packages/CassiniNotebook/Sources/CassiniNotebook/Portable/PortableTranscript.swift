@@ -106,15 +106,22 @@ public struct PortableTranscript: Hashable, Sendable {
 
     /// Speakers in order of first appearance, named by the manifest's labels.
     private static func speakers(_ transcript: Transcript, _ document: CassiniDocument) -> [NoteSpeaker] {
+        let timedOrder = SpeakerColourOrder.earliest(transcript.words, id: { $0.speaker }, start: { Double($0.startMs) })
+        let fallback = Dictionary(uniqueKeysWithValues: timedOrder.enumerated().map { ($0.element, $0.offset) })
+        let roster = Dictionary((document.manifest?["speakers"]?.array ?? []).compactMap { value -> (String, JSONObject)? in
+            guard let entry = value.object, let id = entry["id"]?.string else { return nil }
+            return (id, entry)
+        }, uniquingKeysWith: { first, _ in first })
         var seen: Set<String> = []
         return transcript.words.compactMap { word in
             guard seen.insert(word.speaker).inserted else { return nil }
-            let entry = document.manifest?["speakers"]?.array?.compactMap(\.object)
-                .first { $0["id"]?.string == word.speaker }
+            let entry = roster[word.speaker]
             let index = entry.flatMap { try? $0.number("colourIndex") }.map { Int($0) }
+            let label = entry?["label"]?.string ?? word.speaker
             let provenance = (entry?["provenance"]?.string).flatMap { NoteSpeaker.Provenance(rawValue: $0) }
-            return NoteSpeaker(id: word.speaker, name: document.speakerLabel(word.speaker) ?? word.speaker,
-                               colourIndex: index ?? seen.count - 1, provenance: provenance)
+                ?? (DefaultLabels.isDefault(id: word.speaker, label: label) ? .unnamed : .source)
+            return NoteSpeaker(id: word.speaker, name: label,
+                               colourIndex: index ?? fallback[word.speaker], provenance: provenance)
         }
     }
 
@@ -162,7 +169,8 @@ extension PortableTranscript {
         let transcript = Transcript(words(of: note), language: note.language)
         guard !transcript.words.isEmpty else { throw PortableExportError.noTranscript }
         guard WordBodyBudget.fits(transcript.words, language: transcript.language) else { throw PortableExportError.tooLong }
-        let palette = Note.assignColourIndices(note.speakers ?? [], order: transcript.words.map(\.speaker))
+        let palette = Note.assignColourIndices(note.speakers ?? [], order: SpeakerColourOrder.earliest(transcript.words,
+            id: { $0.speaker }, start: { Double($0.startMs) }))
         let labels = Dictionary(palette.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
         let hints = Dictionary(palette.map { speaker -> (String, JSONObject) in
             var hint = JSONObject([("provenance", .string(speaker.provenance.rawValue))])

@@ -201,10 +201,14 @@ extension Note {
         }
         let reserved = identityPool.compactMap(\.colourIndex)
         var nextColour = (reserved.max() ?? -1) + 1
+        var coloursByID = knownByID.compactMapValues { $0.colourIndex }
+        for id in SpeakerColourOrder.segments(attributed) where coloursByID[id] == nil {
+            coloursByID[id] = nextColour
+            nextColour += 1
+        }
         let analyzed = order.enumerated().map { offset, id in
             let known = knownByID[id]
-            let colourIndex = known?.colourIndex ?? nextColour
-            if known?.colourIndex == nil { nextColour += 1 }
+            let colourIndex = coloursByID[id]
             var speaker = NoteSpeaker(id: id, name: DefaultLabels.placeholder(offset + 1),
                                       colourIndex: colourIndex, provenance: .unnamed)
             if let known {

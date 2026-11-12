@@ -92,12 +92,13 @@ public struct NamingInput: Hashable, Sendable {
     /// something. Remember works with a print of its own, or once the voiceprint model is installed (`voiceModelReady`).
     public static func of(_ note: Note, speakerID: String, print: SpeakerPrint?, voices: [SavedVoice],
                           voicesReadOnly: Bool, voiceModelReady: Bool) -> NamingInput? {
-        guard let index = note.speakers?.firstIndex(where: { $0.id == speakerID }),
-              let speaker = note.speakers?[index] else { return nil }
+        let palette = Note.assignColourIndices(note.speakers ?? [], order: SpeakerColourOrder.segments(note.transcript))
+        guard let index = palette.firstIndex(where: { $0.id == speakerID }) else { return nil }
+        let speaker = palette[index]
         let stats = SpeakerStats.of(note.transcript)
         let stat = stats.first { $0.speakerID == speakerID }
         let targets = stats.filter { $0.speakerID != speakerID && $0.wordCount > 0 }.compactMap { other -> MergeTarget? in
-            note.speaker(other.speakerID).map {
+            palette.first(where: { $0.id == other.speakerID }).map {
                 MergeTarget(speakerID: $0.id, name: $0.name, ordinal: other.ordinal, speakingTime: other.speakingTime,
                             colourIndex: $0.colourIndex, provenance: $0.provenance)
             }

@@ -200,6 +200,58 @@ struct SpeakerColourPersistenceTests {
         }
     }
 
+    @Test func missingSlotsUseEarliestTimedSpeechWithoutChangingCanonicalOrderOrNames() throws {
+        var note = Note(title: "Unsorted")
+        note.transcript = [.init(text: "A", start: 10, end: 11, speaker: "Alex", speakerID: "a"),
+                           .init(text: "B", start: 0, end: 1, speaker: "Ben", speakerID: "b")]
+        note.speakers = [.init(id: "a", name: "Alex"), .init(id: "b", name: "Ben")]
+        let original = note.transcript
+        let before = NoteTranscripts.sealed(note)
+        note.backfillSpeakerColours()
+        #expect(note.speaker("b")?.colourIndex == 0)
+        #expect(note.speaker("a")?.colourIndex == 1)
+        #expect(note.transcript == original)
+        #expect(NoteTranscripts.sealed(note).turns.map(\.id) == before.turns.map(\.id))
+        let input = try #require(NamingInput.of(note, speakerID: "a", print: nil, voices: [],
+                                               voicesReadOnly: false, voiceModelReady: false))
+        #expect(input.speakerTints == ["b": .blue, "a": .magenta])
+        note.renameSpeaker("b", name: "Speaker 2")
+        #expect(note.speaker("b")?.colourIndex == 0 && note.speaker("b")?.provenance == .user)
+        note.transcript.reverse()
+        note.backfillSpeakerColours()
+        #expect(note.speaker("a")?.colourIndex == 1)
+    }
+
+    @Test func overlapWordTimesDetermineSlotsAndStableTiesWithoutSortingWords() {
+        let segments: [TranscriptSegment] = [
+            .init(text: "A", start: 0, end: 20, speakerID: "a",
+                  words: [.init(text: "later", start: 10, end: 11), .init(text: "earlier", start: 4, end: 5)]),
+            .init(text: "B", start: 2, end: 3, speakerID: "b", words: [.init(text: "first", start: 2, end: 3)]),
+            .init(text: "C", start: 2, end: 3, speakerID: "c")]
+        #expect(SpeakerColourOrder.segments(segments) == ["b", "c", "a"])
+        var note = Note(title: "Bootstrap")
+        let bootstrap = NoteSpeaker.oneVoice(prefix: "run_", language: "en")
+        note.transcript = Note.oneVoice(segments, bootstrap)
+        note.speakers = [bootstrap]
+        note.applySpeakerAnalysis(turns: [.init(speakerID: "a", start: 4, end: 11),
+                                          .init(speakerID: "b", start: 2, end: 3)],
+                                  matches: [:], voiceNames: [:], autoName: false,
+                                  stamp: .init(date: Date(timeIntervalSince1970: 1)), attributed: Array(segments.prefix(2)))
+        #expect(note.speaker("b")?.colourIndex == 0)
+        #expect(note.speaker("a")?.colourIndex == 1)
+        #expect(note.transcript.map(\.id) == Array(segments.prefix(2)).map(\.id))
+        #expect(note.transcript.map(\.words) == Array(segments.prefix(2)).map(\.words))
+    }
+
+    @Test func portableFallbackUsesTimedSpeechWhileKeepingCanonicalWords() throws {
+        let words = [Word("a", 600, 900, "Later"), Word("b", 0, 500, "First")]
+        let bytes = try PortableFixtures.document(words, title: "Unsorted", labels: ["a": "Alex", "b": "Ben"])
+        let imported = try #require(PortableTranscript(CassiniDocument.read(bytes)))
+        #expect(imported.speakers.map(\.id) == ["a", "b"])
+        #expect(imported.speakers.map(\.colourIndex) == [1, 0])
+        #expect(imported.segments.map(\.text) == ["Later", "First"])
+    }
+
     @Test func portableRoundTripKeepsGappedSlotsAndNamingRevealsTheSameSlot() throws {
         let folder = try PortableFixtures.temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: folder) }
@@ -239,7 +291,7 @@ struct SpeakerColourPersistenceTests {
         let imported = try #require(PortableTranscript(CassiniDocument.read(bytes)))
         #expect(imported.state == .ok)
         #expect(imported.speakers.map(\.colourIndex) == [0, 1])
-        #expect(imported.speakers.map(\.provenance) == [.unnamed, .user])
+        #expect(imported.speakers.map(\.provenance) == [.unnamed, .source])
     }
 
 }

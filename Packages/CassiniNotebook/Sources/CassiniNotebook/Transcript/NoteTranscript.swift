@@ -218,9 +218,9 @@ public enum NoteTranscripts {
                 names[id] = name(label: speakers[id]?.name ?? labels[id], id: id, ordinal: ordinal)
             }
         }
-        let paletteSpeakers = order.map { id in
+        let paletteSpeakers = Note.assignColourIndices(order.map { id in
             speakers[id] ?? NoteSpeaker(id: id, name: labels[id] ?? id)
-        }
+        }, order: SpeakerColourOrder.words(words))
         let tints = SpeakerTint.assign(order, speakers: paletteSpeakers)
         let voiceNames = Dictionary(voices.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
         let cards = Dictionary(suggestions.map { ($0.speakerID, $0) }, uniquingKeysWith: { first, _ in first })
@@ -252,7 +252,7 @@ public enum NoteTranscripts {
         let order = orderOfAppearance(transcriptWords)
         var names: [String: SpeakerName] = [:]
         for (ordinal, id) in order.enumerated() { names[id] = name(label: labels[id], id: id, ordinal: ordinal) }
-        let tints = SpeakerTint.assign(order) { names[$0]?.isNamed != true }
+        let tints = SpeakerTint.assign(SpeakerColourOrder.words(transcriptWords)) { names[$0]?.isNamed != true }
         let built = build(transcriptWords) { speaker, _ in
             guard let speaker else { return Template(name: .unknown, tint: .stone) }
             let name = names[speaker] ?? unlabeled(1)

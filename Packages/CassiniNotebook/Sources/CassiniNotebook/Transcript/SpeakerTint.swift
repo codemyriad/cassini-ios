@@ -36,3 +36,32 @@ public enum SpeakerTint: CaseIterable, Hashable, Sendable {
         return result
     }
 }
+
+/// Colour allocation follows earliest timed speech; canonical transcript/render order stays untouched.
+public enum SpeakerColourOrder {
+    public static func earliest<S: Sequence>(_ values: S, id: (S.Element) -> String?,
+                                             start: (S.Element) -> Double) -> [String] {
+        var first: [String: (time: Double, position: Int)] = [:]
+        for (position, value) in values.enumerated() {
+            guard let speaker = id(value) else { continue }
+            let raw = start(value), time = raw.isFinite ? raw : .infinity
+            if let previous = first[speaker] {
+                if time < previous.time { first[speaker] = (time, previous.position) }
+            } else { first[speaker] = (time, position) }
+        }
+        return first.keys.sorted {
+            let a = first[$0]!, b = first[$1]!
+            return a.time != b.time ? a.time < b.time : a.position < b.position
+        }
+    }
+
+    public static func segments(_ segments: [TranscriptSegment]) -> [String] {
+        earliest(segments, id: { $0.speakerID }, start: { segment in
+            segment.words.lazy.map(\.start).filter(\.isFinite).min() ?? segment.start
+        })
+    }
+
+    public static func words(_ words: [TranscriptWord]) -> [String] {
+        earliest(words, id: { $0.speaker }, start: { $0.start })
+    }
+}
