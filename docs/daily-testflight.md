@@ -7,8 +7,8 @@ Neither route signs on the rented Mac/pool runners. Both controller and archive 
 No scheduler or runner is installed merely by merging this PR. Activation requires the coordinator’s explicit go-ahead.
 
 Existing manual archive/export, GUI/keychain, Apple upload/processing and internal `cassini` group are reused.
-The added pipeline selects current `main`, requires the newest exact-head main CI run from this repository's push/workflow_dispatch/schedule events to be successful, and reports
-unchanged/red/pending main as a skip. Every push to main and nightly schedule runs CI; only pull requests retain path filters. After archive it checks main/CI again before upload. A private local mutex
+The added pipeline admits current `main` at slot start, waits up to 45 minutes if the newest exact-head main CI run from this repository's push/workflow_dispatch/schedule events is still in progress, and reports
+unchanged, red, or timed-out main CI as a skip. Every push to main and nightly schedule runs CI; only pull requests retain path filters. After archive and validation it publishes the admitted SHA even if `main` fast-forwarded during the build, provided the admitted SHA remains an ancestor of canonical `main` and its latest CI is still green. A private local mutex
 serializes calendar/manual calls; only archive/export hold `~/.cassini-heavy.lock`. Resource/keychain checks happen
 inside that lock. A locked keychain fails with the exact Keychain Access unlock instruction; no identity is changed.
 
@@ -25,8 +25,7 @@ in the artifacts. Sanitization is also applied when finalizing a pre-existing pe
 Export is **Internal**, `testFlightInternalTestingOnly=true`. Archive/export signatures, both bundle versions,
 certificate continuity, memory entitlement, Whistle pins/runtime identity and embedded minimum OS are checked.
 The controller validates the IPA hash again before upload. Frozen archive checkouts verify their immutable HEAD
-and cleanliness, while the controller handles canonical-main freshness immediately before upload; shared remote
-ref updates cannot invalidate an otherwise unchanged archive checkout. No App Store submission, public release, external group,
+and cleanliness, while the controller verifies immediately before upload that the admitted SHA is still an ancestor of canonical `main` and its CI remains green; normal fast-forwards on `main` during archive or validation never discard a valid admitted build. No App Store submission, public release, external group,
 tester membership, production metadata, key import/unlock or signing identity edit is implemented.
 
 Apple processing uses `altool --build-status --wait`, bounded by an outer hang guard. No sleep/poll loop or upload
