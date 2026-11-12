@@ -61,7 +61,7 @@ def gh(endpoint, **parameters):
 def eligible_main_run(run, head):
     return (run.get('head_sha') == head and run.get('head_branch') == 'main'
             and (run.get('head_repository') or {}).get('full_name') == REPOSITORY
-            and run.get('event') in ('push', 'workflow_dispatch'))
+            and run.get('event') in ('push', 'workflow_dispatch', 'schedule'))
 
 
 def green(runs, head):
