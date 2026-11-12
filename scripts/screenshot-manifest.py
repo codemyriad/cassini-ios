@@ -65,7 +65,8 @@ def main():
             for device in ("iphone", "ipad"):
                 if entry["name"] == f"{a.prefix}-shots-{device}":
                     selected[device] = dict(udid=entry["udid"], type=entry["deviceTypeIdentifier"], runtime=runtime,
-                                           runtime_version=next(r["version"] for r in runtime_info if r["identifier"] == runtime))
+                                           runtime_version=next(r["version"] for r in runtime_info if r["identifier"] == runtime),
+                                           runtime_build=next(r["buildversion"] for r in runtime_info if r["identifier"] == runtime))
     manifest = dict(version=1, app="ios", source_sha=capture("git", "-C", str(root), "rev-parse", "HEAD"),
                     renderer_sha=os.environ.get("CASSINI_SHOTS_RENDERER_SHA"),
                     run_id=os.environ.get("CASSINI_SHOTS_RUN_ID"), runner_label=f"macOS-{platform.machine()}",

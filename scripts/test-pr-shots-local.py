@@ -28,6 +28,8 @@ from pathlib import Path
 out=Path(sys.argv[sys.argv.index('--output')+1]);out.mkdir(parents=True)
 sha=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
 assert (Path.cwd()/'CassiniUITests/ScreenshotTests.swift').read_text()=='// head capture'
+logs=Path.cwd()/'DerivedData.noindex/screenshots';logs.mkdir(parents=True,exist_ok=True)
+(logs/'fixture.log').write_text('renderer diagnostic')
 if os.environ.get('WAIT_RENDER'):
  Path(os.environ['READY']).touch();signal.pause()
 if sha==os.environ.get('FAIL_SHA'):sys.exit(7)
@@ -51,6 +53,7 @@ class RenderTests(unittest.TestCase):
         self.root = Path(self.temp.name); self.repo = self.root / "repo"
         self.repo.mkdir(); self.git("init", "-q")
         self.git("config", "user.name", "Fixture"); self.git("config", "user.email", "fixture@example.invalid")
+        (self.repo / '.gitignore').write_text('DerivedData.noindex/\n')
         scripts = self.repo / "scripts"; scripts.mkdir()
         for name, source in (("screenshots.sh", "#!/bin/sh\nexit 99\n"), ("test.sh", CLEAN), ("screenshot-manifest.py", "# fixture\n")):
             file = scripts / name; file.write_text(source); file.chmod(0o755)
@@ -89,6 +92,7 @@ class RenderTests(unittest.TestCase):
         self.env['FAIL_SHA'] = self.git('rev-parse', 'HEAD~1')
         self.assertNotEqual(self.run_tool().returncode, 0)
         self.assertTrue((self.root / 'output/before.log').exists())
+        self.assertEqual((self.root / 'output/logs/before/fixture.log').read_text(), 'renderer diagnostic')
         self.assertFalse((self.root / 'output/render.json').exists()); self.check_cleanup()
 
     def test_canonical_hook_invokes_only_diff(self):
@@ -124,6 +128,19 @@ class RenderTests(unittest.TestCase):
                 self.check_cleanup()
                 self.env.pop(reason)
                 shutil.rmtree(self.root / 'output')
+
+    def test_registered_worktree_is_removed_if_add_reports_failure(self):
+        binary = self.root / 'bin'; binary.mkdir(); real = shutil.which('git')
+        shim = binary / 'git'
+        shim.write_text('#!/usr/bin/env python3\nimport subprocess,sys\nrc=subprocess.call([' + repr(real) + ']+sys.argv[1:])\n'
+                        'if rc==0 and "worktree" in sys.argv and "add" in sys.argv:\n'
+                        ' subprocess.run([' + repr(real) + ',"-C",sys.argv[2],"worktree","lock",sys.argv[-2]],check=True)\n'
+                        ' sys.exit(7)\nsys.exit(rc)\n')
+        shim.chmod(0o755)
+        self.env['PATH'] = str(binary) + os.pathsep + os.environ['PATH']
+        self.assertNotEqual(self.run_tool().returncode, 0)
+        self.assertFalse((self.root / 'output/render.json').exists())
+        self.check_cleanup()
 
     def test_signal_ends_renderer_then_removes_private_worktree_and_clones(self):
         self.env['WAIT_RENDER'] = '1'
