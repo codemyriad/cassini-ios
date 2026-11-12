@@ -49,6 +49,14 @@ Archive bounds follow cassini-ux main `4d577376f6360ed352fa75307f4dc47890ed9858`
   Partial exports and per-import UUID staging folders are removed on cancellation/failure; exports are also swept
   on next launch. Pending model-consent navigation waits until the import finishes so progress remains cancellable.
 
+ZIP member names with the UTF-8 flag require valid UTF-8. Without that flag, iOS tries strict UTF-8 first,
+then CP437 when UTF-8 decoding fails, matching Android #193. An unflagged sequence valid in both encodings is
+interpreted as UTF-8. Valid Unicode-path annotations still apply; raw/decoded local/central identity and annotation
+presence checks remain strict. Unmodified synthetic-text fixtures from macOS ditto and official 7-Zip 26.06 for
+macOS verify filename and payload preservation, including unflagged UTF-8 from ditto. Tool versions, commands,
+hashes and header facts are recorded in [the fixture receipts](../Tests/CassiniCoreTests/Resources/zip/REAL-WRITERS.md).
+These are CLI writer captures, not Finder GUI, Windows Explorer, Windows 7-Zip or Android Files evidence.
+
 All archive I/O runs on worker queues, with cancellation checked per chunk; main-actor code only presents
 progress, summary and selection. Temporary import folders are below the existing launch-swept Exports root.
 Exported file URLs are published only after the ZIP directory is written and synchronized, and discarded when
