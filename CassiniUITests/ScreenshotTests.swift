@@ -26,12 +26,11 @@ final class ScreenshotTests: XCTestCase {
         capture("01-library")
     }
 
-    /// The fixture note with its word times (the reading seed), paused 10 seconds in: a word of Sam's passage is the
-    /// active one.
+    /// The fixture note with its word times (the reading seed), paused at the start with its first word active.
     @MainActor func test02ReadAndListen() throws {
         let app = try launchPhone(["--seed", "reading", "--open-fixture", Self.fixture])
         XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 10))
-        skipTenSeconds(app)
+        waitForInitialPosition(app)
         capture("02-read-and-listen")
     }
 
@@ -118,6 +117,35 @@ final class ScreenshotTests: XCTestCase {
         capture("09-saved-voices")
     }
 
+    @MainActor func test10NoteExport() throws {
+        let app = try launchPhone(["--seed", "reading", "--open-fixture", Self.fixture])
+        XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 10))
+        app.buttons["Share and more"].tap()
+        app.collectionViews.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Export transcript'")).firstMatch.tapWhenSettled()
+        captureExportMenu("10-note-export", app)
+    }
+
+    @MainActor func test11LibraryExport() throws {
+        let app = try launchPhone(["--seed", "reading"])
+        let note = row(app, "A quieter kind of productivity")
+        XCTAssertTrue(note.waitForExistence(within: 5))
+        note.press(forDuration: 1)
+        app.buttons["Export"].tapWhenSettled()
+        captureExportMenu("11-library-export", app)
+    }
+
+    @MainActor private func captureExportMenu(_ name: String, _ app: XCUIApplication) {
+        let item = app.buttons["Transcript as text"]
+        var last: CGRect?
+        XCTAssertTrue(poll(within: 15) {
+            guard item.exists && item.isHittable else { return false }
+            let frame = item.frame
+            defer { last = frame }
+            return frame == last
+        }, "the export submenu has settled")
+        capture(name)
+    }
+
     // MARK: - iPad
 
     @MainActor func testSplitViewLandscape() throws {
@@ -157,7 +185,7 @@ final class ScreenshotTests: XCTestCase {
         return launch(arguments)
     }
 
-    /// The fixture note beside the Library, whose reading seed fills the sidebar, paused 10 seconds in.
+    /// The fixture note beside the Library, whose reading seed fills the sidebar, paused at its start.
     @MainActor private func launchPad(orientation: UIDeviceOrientation) throws -> XCUIApplication {
         try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad, "an iPad screenshot")
         XCUIDevice.shared.orientation = orientation
@@ -165,16 +193,14 @@ final class ScreenshotTests: XCTestCase {
         let app = launch(["--seed", "reading", "--open-fixture", Self.fixture])
         XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 10))
         XCTAssertTrue(row(app, "Garden plans for the spring").waitForExistence(within: 5))
-        skipTenSeconds(app)
+        waitForInitialPosition(app)
         return app
     }
 
-    @MainActor private func skipTenSeconds(_ app: XCUIApplication) {
-        let forward = app.buttons["skipForward"]
-        XCTAssertTrue(forward.waitForExistence(within: 5))
-        forward.tap()
+    @MainActor private func waitForInitialPosition(_ app: XCUIApplication) {
+        // Capturing just after tapping skipForward caught its transient pressed tint. Use an untouched player.
         let position = app.descendants(matching: .any)["playbackPosition"]
-        XCTAssertTrue(position.wait(until: NSPredicate(format: "value BEGINSWITH %@", "00:10"), within: 5))
+        XCTAssertTrue(position.wait(until: NSPredicate(format: "value BEGINSWITH %@", "00:00"), within: 5))
     }
 
     @MainActor private func row(_ app: XCUIApplication, _ title: String) -> XCUIElement {

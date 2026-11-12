@@ -336,16 +336,24 @@ final class LibraryUITests: XCTestCase {
     /// Export in the long-press menu opens the note, which runs the export: the share sheet offers the subtitles.
     // ports: LibraryBehaviourTest#theSubtitleChooserExportsTheNote
     @MainActor func testTheActionsMenuExportOpensTheNoteWhichSharesTheSubtitles() {
+        assertActionsMenuShares("Subtitles · .vtt")
+    }
+
+    @MainActor func testTheActionsMenuMarkdownOpensTheNoteAndShares() {
+        assertActionsMenuShares("Markdown")
+    }
+
+    @MainActor private func assertActionsMenuShares(_ format: String) {
         let app = launch(["--seed", "statuses"])
         let note = scrolledRow(app, "A quieter kind of productivity")
         XCTAssertTrue(note.waitForExistence(within: 5))
         note.press(forDuration: 1)
         app.buttons["Export"].tapWhenSettled()
-        app.buttons["Subtitles · .vtt"].tapWhenSettled()
+        app.buttons[format].tapWhenSettled()
         XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 5))
         XCTAssertEqual(app.staticTexts["noteTitle"].label, "A quieter kind of productivity")
         let shareSheet = app.otherElements["ActivityListView"]
-        XCTAssertTrue(shareSheet.waitForExistence(within: 10), "the note shares the exported subtitles")
+        XCTAssertTrue(shareSheet.waitForExistence(within: 10), "the note shares the requested transcript format")
         // iOS 27 sometimes draws the sheet's Close in a floating bar outside the activity list, and the sheet's
         // contents come from another process a moment after the sheet itself: on a clone just booted, many seconds.
         let close = app.shareSheetCloseButton

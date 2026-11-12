@@ -29,17 +29,25 @@ struct LongExportTests {
         let words = Self.words(hours * Self.hourMs)
         let labels = Dictionary(uniqueKeysWithValues: (1...Self.speakers).map { ("\(Self.prefix)\($0)", "Speaker \($0)") })
         let long = ExportTranscript(title: "Conference day", durationMs: hours * Self.hourMs, words: words, labels: labels)
+        let markdownCopy = try MarkdownExportTests.copy("en")
 
-        let ((text, srt, vtt), elapsed) = try measureThreadCPU {
+        let ((text, markdown, srt, vtt), elapsed) = try measureThreadCPU {
             (TextExport.write(long, subtitle: "11 Oct 2026", emptyText: "No words"),
+             MarkdownExport.write(long, dateLine: "11 Oct 2026", copy: markdownCopy),
              SrtWriter.write(long), VttWriter.write(long))
         }
         #expect(elapsed < .seconds(30), "export writers used \(elapsed) of calling-thread CPU time")
-        for export in [text, srt, vtt] { expectExportShape(export) }
+        for export in [text, markdown, srt, vtt] { expectExportShape(export) }
         let last = try #require(words.last).text
         #expect(text.trimmingCharacters(in: .whitespacesAndNewlines).hasSuffix(last))
         #expect(srt.contains("10:59:"), "SRT clock past 10 h")
         #expect(vtt.contains("10:59:"), "VTT clock past 10 h")
         #expect(text.contains("10:"))
+        #expect(markdown.contains("10:59:"), "Markdown clock past 10 h")
+        let body = try #require(markdown.range(of: "## Transcript\n\n"))
+        let exportedWords = markdown[body.upperBound...].components(separatedBy: "\n\n").flatMap {
+            $0.split(separator: "\n").dropFirst().joined(separator: " ").split(whereSeparator: \.isWhitespace).map(String.init)
+        }
+        #expect(exportedWords == words.map(\.text), "Every word of the eleven-hour recording stays in order")
     }
 }

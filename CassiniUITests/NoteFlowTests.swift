@@ -12,7 +12,7 @@ import XCTest
 /// "Verified" is not checked here (an imported document's trust is, in `DocumentTrustTests`). The fixture's
 /// passages carry no word timings, so the tap is on the third passage and a UI-test seek marker checks its exact
 /// start independently of the advancing playback clock. The share sheet is a separate
-/// process, so the text, SRT, VTT and document exports are checked to reach it, and their bytes are covered by the
+/// process, so the text, Markdown, SRT, VTT and document exports are checked to reach it, and their bytes are covered by the
 /// export goldens in the packages (`ExportGoldenTests`, `ExportServiceTests`) rather than read back here.
 /// The fake hears the same words again on Transcribe again, which adds version 2 all the same, as on Android.
 final class NoteFlowTests: XCTestCase {
@@ -68,10 +68,10 @@ final class NoteFlowTests: XCTestCase {
         app.collectionViews.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Export transcript'")).firstMatch.tapWhenSettled()
         app.collectionViews.buttons["Transcript as text"].tapWhenSettled()
         closeShareSheet(app)
-        for subtitles in ["Subtitles · .srt", "Subtitles · .vtt"] {
+        for format in ["Markdown", "Subtitles · .srt", "Subtitles · .vtt"] {
             app.buttons["Share and more"].tap()
             app.collectionViews.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Export transcript'")).firstMatch.tapWhenSettled()
-            app.collectionViews.buttons[subtitles].tapWhenSettled()
+            app.collectionViews.buttons[format].tapWhenSettled()
             closeShareSheet(app)
         }
         app.buttons["Share and more"].tap()
