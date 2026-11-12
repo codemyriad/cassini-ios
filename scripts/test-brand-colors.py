@@ -118,7 +118,8 @@ class BrandGenerationTests(unittest.TestCase):
                     'Color.init(hue: 0, saturation: 1, brightness: 1)', 'Color.init(.sRGB, red: 1, green: 0, blue: 0)',
                     'CIColor(red: 1, green: 0, blue: 0)', 'CIColor.init(red: 1, green: 0, blue: 0)',
                     'CGColor(srgbRed: 1, green: 0, blue: 0, alpha: 1)', 'let c: CGColor = .init(srgbRed: 1, green: 0, blue: 0, alpha: 1)',
-                    'UIColor.magenta', 'UIColor.darkGray', 'CIColor.cyan', '.tint(.systemGray2)',
+                    'UIColor.magenta', 'UIColor.darkGray', 'UIColor.darkText', 'UIColor.lightText',
+                    'CIColor.cyan', '.tint(.systemGray2)',
                     '.foregroundStyle(\n .red)', '.fill ( .blue )', 'UIColor . systemRed',
                     '.shadow(color: .purple, radius: 2)',
                     '.foregroundStyle(isSelected ? .red : .blue)',
@@ -181,7 +182,10 @@ let action: OpenURLAction.Result = .systemAction
                         'Text("case").foregroundStyle(.red); let count: Int = 0',
                         'let description = """case\ntext"""; let tint = Color.red; let count: Int = 0',
                         'switch mood { case .blue where tint == .red: break }',
-                        'switch mood { case .blue: break }; let hex = "#FF0000"'):
+                        'switch mood { case .blue: break }; let hex = "#FF0000"',
+                        'enum State: String { case idle="idle"; static let tint=Color.red; static let n:Int=0 }',
+                        'enum State: String {\ncase idle="idle"\nstatic let tint=Color.red; static let n:Int=0 }',
+                        'enum State: String { case idle; static let tint=UIColor.systemMint; static let n:Int=0 }'):
             with self.subTest(example=example):
                 target.write_text(example)
                 with self.assertRaisesRegex(ValueError, f'NewView.swift:{example.count(chr(10)) + 1}'):

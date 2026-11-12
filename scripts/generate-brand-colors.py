@@ -117,7 +117,7 @@ COLOR_COMPONENTS = r"(?:red|srgbRed|white|gray|hue|displayP3|\.sRGB|\.sRGBLinear
 FIXED_NAMES = r"(?:red|blue|green|yellow|gray|grey|darkGray|lightGray|purple|pink|brown|cyan|magenta|mint|teal|indigo|white|black|clear|orange)"
 UIKIT_SYSTEM = (r"(?:system(?:Red|Blue|Green|Orange|Yellow|Purple|Pink|Brown|Teal|Indigo|Gray[0-9]*|Mint|Cyan|(?:Grouped)?Background|Fill)|"
                 r"(?:secondary|tertiary|quaternary)System\w+|label|secondaryLabel|tertiaryLabel|quaternaryLabel|"
-                r"separator|opaqueSeparator|placeholderText|link)")
+                r"separator|opaqueSeparator|placeholderText|link|darkText|lightText)")
 LITERAL = re.compile(
     # Explicit and inferred initializers: the component labels identify colour construction.
     rf"\b{COLOR_TYPES}(?:\s*\.\s*init)?\s*\(\s*{COLOR_COMPONENTS}\s*[:,]|"
@@ -168,10 +168,10 @@ def without_case_patterns(source):
     code = list(without_comments(source))
     # Find real case headers on a code-only mask. A quoted "case" must never consume subsequent code.
     mask = without_comments(source, keep_strings=False)
-    for match in re.finditer(r"\bcase\b[^:{]*:", mask):
-        condition = re.search(r"\bwhere\b", match.group())
-        end = match.start() + condition.start() if condition else match.end()
-        for index in range(match.start(), end):
+    # Stop before where/assignment/statement boundaries too: enum declarations must not swallow
+    # a subsequent property, and a switch's where expression still contains ordinary runtime values.
+    for match in re.finditer(r"\bcase\b[^:;={}]*?(?=\bwhere\b|[:=])", mask):
+        for index in range(match.start(), match.end()):
             if code[index] != '\n': code[index] = ' '
     return ''.join(code)
 
