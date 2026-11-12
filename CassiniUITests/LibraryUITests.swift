@@ -247,14 +247,14 @@ final class LibraryUITests: XCTestCase {
         let field = openRename(app, "Thoughts from the morning walk")
         let save = app.buttons["Save"]
         XCTAssertFalse(save.isEnabled, "nothing changed yet")
-        clear(field)
+        guard clear(field) else { return }
         XCTAssertTrue(app.staticTexts["Enter a title."].waitForExistence(within: 10),
                       "no blank-title message; the field holds \(String(describing: field.value))")
         XCTAssertFalse(save.isEnabled)
         field.typeText("  Thoughts from the morning walk ")
         XCTAssertTrue(field.waitForValue("  Thoughts from the morning walk "), "the field holds \(String(describing: field.value))")
         XCTAssertFalse(save.isEnabled, "the same title once trimmed")
-        clear(field)
+        guard clear(field) else { return }
         field.typeText("  Morning walk, final  ")
         XCTAssertTrue(field.waitForValue("  Morning walk, final  "), "the field holds \(String(describing: field.value))")
         XCTAssertFalse(app.staticTexts["Enter a title."].exists)
@@ -268,7 +268,7 @@ final class LibraryUITests: XCTestCase {
     @MainActor func testTheNoteRenameStopsAtTheTitleLimit() {
         let app = launch()
         let field = openRename(app, "Thoughts from the morning walk")
-        clear(field)
+        guard clear(field) else { return }
         let full = String(repeating: "a", count: 200)
         // Typed, not pasted: after a paste here the sheet's Save sometimes did not answer the next tap.
         field.typeText(full + "a")
@@ -356,9 +356,11 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(shareSheet.waitForExistence(within: 10), "the note shares the requested transcript format")
         // iOS 27 sometimes draws the sheet's Close in a floating bar outside the activity list, and the sheet's
         // contents come from another process a moment after the sheet itself: on a clone just booted, many seconds.
-        let close = app.shareSheetCloseButton
-        XCTAssertTrue(close.waitForExistence(within: 30))
-        close.tap()
+        guard let close = app.waitForShareSheetClose() else {
+            XCTFail("the share sheet exposes its Close button")
+            return
+        }
+        close.tapWhenSettled()
         XCTAssertTrue(shareSheet.waitForNonExistence(within: 5))
     }
 
@@ -381,11 +383,19 @@ final class LibraryUITests: XCTestCase {
         app.buttons["Rename"].tapWhenSettled()
         let field = app.textFields["renameField"]
         XCTAssertTrue(field.waitForExistence(within: 5))
+        // The field exists before iOS 18 has expanded the sheet and delivered keyboard focus.
+        // Sending deletes during that transition left a prefix in the failed full gate.
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(within: 5), "Rename has keyboard focus before editing")
         return field
     }
 
-    @MainActor private func clear(_ field: XCUIElement) {
+    @MainActor private func clear(_ field: XCUIElement) -> Bool {
         let count = (field.value as? String)?.count ?? 0
         field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: count + 2))
+        guard XCUIApplication().staticTexts["Enter a title."].waitForExistence(within: 10) else {
+            XCTFail("the blank-title state is visible before the next edit; the field holds \(String(describing: field.value))")
+            return false
+        }
+        return true
     }
 }

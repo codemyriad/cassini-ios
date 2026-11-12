@@ -33,7 +33,15 @@ retry is implemented. Upload stdout and stderr are logged separately; JSON is pa
 A delivery UUID in JSON is optional, with an explicit stderr Delivery UUID fallback. If neither is present after a
 successful upload, processing is awaited by app/version/build in the same run. No accepted upload fails merely
 because altool changed its optional JSON metadata shape. Before upload, durable intent is written; ambiguous interruption never resubmits that build.
-The next invocation can finish the existing upload after Apple processing. State advances only after Apple confirms
+The next invocation can finish the existing upload after Apple processing.
+Apple often reports a processed build as VALID some minutes before it is in internal testing: its internal state is
+still `PROCESSING` or `READY_FOR_BETA_TESTING`. Only those two states are a wait; any other state that is not
+`IN_BETA_TESTING` (missing export compliance, compliance review, a processing exception, expired, or one this tool
+does not know) is reported as a failure with Apple's word for it at every wake, and the upload stays pending until
+someone resolves it. A wait is not a failure:
+the slot logs that the build is uploaded and waiting, keeps the intent, and the hourly wake between slots finishes
+it (internal-testing check, then the notes) without fetching, updating the control clone, archiving or uploading.
+While an upload waits, no new build is started. State advances only after Apple confirms
 VALID/unexpired, INTERNAL_ONLY, IN_BETA_TESTING and the existing group's automatic access, and beta notes are written.
 If a prior intent has no identifiable Apple build, inspect its retained upload log before manually reconciling state;
 never clear intent merely to retry an upload. Failed archive numbers remain reserved; later numbers may have gaps.

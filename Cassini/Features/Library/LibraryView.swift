@@ -158,7 +158,7 @@ struct LibraryView: View {
                         .font(.subheadline.weight(.medium))
                         .padding(.horizontal, 14).frame(minHeight: HitTarget.minimum)
                         .foregroundStyle(model.searchDate == .any ? Color.muted : Color.paper)
-                        .background(model.searchDate == .any ? Color.clear : Color.ink, in: Capsule())
+                        .background(model.searchDate == .any ? Color.compatibilityClear : Color.ink, in: Capsule())
                         .overlay(Capsule().stroke(Color.muted.opacity(0.3), lineWidth: 1))
                 }
                 .accessibilityIdentifier("librarySearchDate")
@@ -181,7 +181,7 @@ struct LibraryView: View {
                 .font(.subheadline.weight(.medium)).fixedSize(horizontal: true, vertical: false)
                 .padding(.horizontal, 14).frame(minHeight: HitTarget.minimum)
                 .foregroundStyle(selected ? Color.paper : Color.muted)
-                .background(selected ? Color.ink : Color.clear, in: Capsule())
+                .background(selected ? Color.ink : Color.compatibilityClear, in: Capsule())
                 .contentShape(Capsule())
         }.buttonStyle(.plain).accessibilityAddTraits(selected ? .isSelected : [])
     }
