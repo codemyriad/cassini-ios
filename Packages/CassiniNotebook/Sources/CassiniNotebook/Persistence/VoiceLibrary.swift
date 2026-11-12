@@ -117,7 +117,10 @@ public final class VoiceLibrary {
         let next = problem == .damaged ? 0 : nextSaveSequence
         try DurableFile.write(VoiceCodec.encode(.init(voices: [], nextSaveSequence: next)), to: voicesFile)
         for url in try fileManager.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
-        where (url.lastPathComponent.hasPrefix("voices.json") && url != voicesFile) || noteID(of: url) != nil {
+        // Directory enumeration may canonicalise /var or another symlink while voicesFile retains its original URL.
+        // Compare the exact entry name, not URL identity, to keep the counter we just durably wrote.
+        where (url.lastPathComponent.hasPrefix("voices.json") && url.lastPathComponent != "voices.json")
+            || noteID(of: url) != nil {
             try fileManager.removeItem(at: url)
         }
         voices = []

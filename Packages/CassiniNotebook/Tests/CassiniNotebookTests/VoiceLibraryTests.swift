@@ -81,6 +81,24 @@ import Testing
         #expect(reopened.voices.first?.saveSequence == 2)
     }
 
+    @Test func forgettingThroughASymlinkKeepsTheCounterButNoVoiceEvidence() throws {
+        defer { cleanUp() }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let alias = root.appendingPathComponent("alias", isDirectory: true)
+        try FileManager.default.createSymbolicLink(atPath: alias.path, withDestinationPath: root.path)
+        let library = try VoiceLibrary(root: alias)
+        let original = F.voice("alex", "Alex")
+        try library.save([original])
+        try library.savePrints([F.print(F.axis(0))], noteID: UUID())
+        try library.forgetAll()
+        let state = try VoiceCodec.state(Data(contentsOf: voicesFile))
+        #expect(state.voices.isEmpty && state.nextSaveSequence == 1)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path) == ["voices.json"])
+        let reopened = try VoiceLibrary(root: root)
+        try reopened.save([F.voice("ben", "Ben")])
+        #expect(reopened.voices.first?.saveSequence == 1)
+    }
+
     // ports: VoiceRepositoryTest#aNewerPeopleFileStaysReadOnly
     @Test func aNewerVoicesFileStaysReadOnly() throws {
         defer { cleanUp() }
