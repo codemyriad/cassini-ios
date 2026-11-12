@@ -155,3 +155,15 @@ extension NoteStatus {
         }
     }
 }
+
+/// When a failed run may be given to another recognizer instead of failing: its recognizer could not get the memory it
+/// needs (`MEMORY`) or could not load its model (`MODEL`). Every other failure is about the recording, the language,
+/// the download or the person's choice, and a second recognizer would meet it too or must not override it.
+public enum RecognizerFallback {
+    public static func applies(to failure: JobFailure) -> Bool {
+        switch failure {
+        case .memory, .model: true
+        default: false
+        }
+    }
+}

@@ -99,9 +99,9 @@ import CassiniWhistle
     /// A device that cannot hold Parakeet gets Apple's adapter on iOS 26 and the candidate that refuses on iOS 18.
     func testASmallDeviceWithoutAppleSpeechGetsTheUnavailableCandidate() async {
         let models = PinnedModels(root: root, defaults: UserDefaults(suiteName: suite)!, storage: FileSystemStorageProbe())
-        XCTAssertEqual(isApple(AppEnvironment.speechTranscriber(models: models, physicalMemory: 4 << 30, platform: .iOS26)),
+        XCTAssertEqual(isApple(AppEnvironment.speechTranscriber(models: models, physicalMemory: 3 << 30, platform: .iOS26)),
                        LivePlatform.facts.appleSpeech, "Apple's adapter wherever the system has Apple speech")
-        let unavailable = AppEnvironment.speechTranscriber(models: models, physicalMemory: 4 << 30, platform: .iOS18)
+        let unavailable = AppEnvironment.speechTranscriber(models: models, physicalMemory: 3 << 30, platform: .iOS18)
         XCTAssertTrue(unavailable is UnavailableSpeechTranscriber)
         let failure = await unavailable.unavailability(locale: Locale(identifier: "en_US"))
         XCTAssertEqual(failure, .model)

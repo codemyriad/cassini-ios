@@ -96,14 +96,31 @@ def select_runner(
 class CiRunnerSelectionTests(unittest.TestCase):
     def test_every_runs_on_is_a_hosted_image_or_the_guarded_selector(self):
         seen = list(job_runs_on_values())
-        self.assertEqual([(wf, job) for wf, job, _ in seen], [("ci.yml", "harness"), ("ci.yml", "fast-and-build")])
+        self.assertEqual([(wf, job) for wf, job, _ in seen], [("ci.yml", "harness"), ("ci.yml", "fast-and-build"), ("daily-testflight.yml", "testflight")])
         for wf, job, value in seen:
             with self.subTest(workflow=wf, job=job):
-                self.assertTrue(HOSTED_IMAGE.match(value) or RUNNER_SELECTOR.match(value), value)
+                if (wf, job) == ("daily-testflight.yml", "testflight"):
+                    self.assertEqual(value, "[self-hosted, macOS, ARM64, cassini-ios-release-drmeyers]")
+                else:
+                    self.assertTrue(HOSTED_IMAGE.match(value) or RUNNER_SELECTOR.match(value), value)
                 self.assertNotIn("fromJSON(vars", value)
+
+    def test_signing_job_only_accepts_main_manual_dispatch_in_the_canonical_repository(self):
+        text = (WORKFLOWS / "daily-testflight.yml").read_text()
+        self.assertRegex(text, r"(?m)^on:\n  workflow_dispatch:\n")
+        guard = re.search(r"(?m)^    if: (.+)$", text).group(1).replace("&&", " and ")
+        for event in ["workflow_dispatch", "push", "schedule", "pull_request", "pull_request_target", "workflow_run"]:
+            for ref in ["refs/heads/main", "refs/heads/feature", "refs/pull/123/merge"]:
+                for repository in ["codemyriad/cassini-ios", "fork/cassini-ios"]:
+                    github = SimpleNamespace(event_name=event, ref=ref, repository=repository)
+                    actual = eval(guard, {"__builtins__": {}}, {"github": github})
+                    self.assertEqual(actual, event == "workflow_dispatch" and ref == "refs/heads/main"
+                                     and repository == "codemyriad/cassini-ios")
 
     def test_selector_routes_only_allowlisted_trusted_events_to_self_hosted(self):
         for wf, job, value in job_runs_on_values():
+            if wf != "ci.yml":
+                continue  # Dedicated signing workflow has its stricter event/ref/repository check below.
             where = f"{wf}:{job}"
             for event_name, head_repo in (
                 ("push", None),

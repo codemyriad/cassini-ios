@@ -35,16 +35,56 @@ import CassiniSherpa
                        "the job downloads Ultra with consent")
     }
 
+    /// What 4 GB devices report (3665 MiB an iPhone 13, 3854 MiB an iPhone 11) is enough for Ultra; what a 3 GB device
+    /// can report at most (3072 MiB) is not.
+    func testA4GBDeviceUsesUltraAndA3GBDeviceDoesNot() throws {
+        try XCTSkipUnless(SherpaRuntime.isLinked, "built without the native runtime")
+        for mebibytes in [3665, 3854] as [UInt64] {
+            XCTAssertEqual(AppEnvironment.speechTranscriber(models: models(), physicalMemory: mebibytes << 20, platform: .iOS18).recognizer,
+                           .parakeet, "\(mebibytes) MiB")
+        }
+        XCTAssertNotEqual(AppEnvironment.speechTranscriber(models: models(), physicalMemory: 3072 << 20, platform: .iOS18).recognizer, .parakeet)
+    }
+
     /// Over the system's own facts: Apple's adapter where the system has Apple speech, else the candidate in Apple's
     /// slot that refuses every job (iOS 18).
-    func testA4GBDeviceUsesTheCapabilityCheckedAppleCandidate() {
-        let transcriber = AppEnvironment.speechTranscriber(models: models(), physicalMemory: 4 << 30, platform: LivePlatform.facts)
+    func testA3GBDeviceUsesTheCapabilityCheckedAppleCandidate() {
+        let transcriber = AppEnvironment.speechTranscriber(models: models(), physicalMemory: 3 << 30, platform: LivePlatform.facts)
         XCTAssertEqual(transcriber.recognizer, .appleSpeech, "the adapter checks hardware, locale and assets before choosing Apple")
         if #available(iOS 26.0, *) {
             XCTAssertTrue(transcriber is AppleSpeechTranscriber)
         } else {
             XCTAssertTrue(transcriber is UnavailableSpeechTranscriber)
         }
+    }
+
+    /// An upgrade on a 4 GB device: a paused job stored before jobs named their recognizer, with the Apple Speech
+    /// checkpoint it made, still resolves to Apple's slot, the recognizer its checkpoint names, although new jobs on
+    /// the device now get Parakeet. On a 6 GB device such a job was and stays Parakeet's.
+    func testALegacyJobWithAnAppleCheckpointOnA4GBDeviceStaysApples() async throws {
+        try XCTSkipUnless(SherpaRuntime.isLinked, "built without the native runtime")
+        let notes = try NoteStore(root: root.appendingPathComponent("Notes", isDirectory: true))
+        try await TestFixtures.seed(.statuses, into: notes, now: AppEnvironment.uiTestingNow, recognizer: .appleSpeech)
+        let job = try XCTUnwrap(JobRepository(root: notes.root).load().first { $0.noteID == TestFixtures.pausedID })
+        XCTAssertNil(job.recognizer)
+        let checkpoint = try XCTUnwrap(CheckpointFiles(notes: notes).load(TestFixtures.pausedID))
+        XCTAssertEqual(SpeechRecognizer.fromCheckpoint(model: checkpoint.model), .appleSpeech)
+
+        func router(_ physicalMemory: UInt64) -> RoutedTranscriber {
+            let first = AppEnvironment.speechTranscriber(models: models(), physicalMemory: physicalMemory, platform: .iOS26)
+            let apple = AppEnvironment.appleSpeechCandidate(platform: .iOS26)
+            XCTAssertEqual(first.recognizer, .parakeet)
+            let legacy = AppEnvironment.legacySpeechTranscriber(first: first, apple: apple, physicalMemory: physicalMemory)
+            return RoutedTranscriber(legacy: legacy, candidates: [apple, first]) { .parakeet }
+        }
+        for mebibytes in [3665, 3854] as [UInt64] {
+            let speech = router(mebibytes << 20)
+            XCTAssertEqual(try speech.forJob(recognizer: job.recognizer).recognizer, .appleSpeech, "\(mebibytes) MiB")
+            XCTAssertEqual(try speech.forJob(recognizer: "parakeet").recognizer, .parakeet, "a new job")
+            let fallback = await SpeechFallback.recognizer(for: job, transcriber: speech)
+            XCTAssertNil(fallback, "not a Parakeet job: nothing takes it over")
+        }
+        XCTAssertEqual(try router(6 << 30).forJob(recognizer: job.recognizer).recognizer, .parakeet)
     }
 
     /// The speech download and the speaker models go through one installer: while Ultra downloads, the installer

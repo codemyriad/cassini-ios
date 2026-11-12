@@ -12,6 +12,7 @@ public final class FakeCheckpoints: JobCheckpoints {
         var work: Set<UUID> = []
         var discarded: [UUID] = []
         var held: Set<UUID> = []
+        var named: Set<UUID> = []
     }
     private let state = Mutex(State())
 
@@ -41,8 +42,16 @@ public final class FakeCheckpoints: JobCheckpoints {
         return state.withLock { $0.statuses[noteID] ?? .missing }
     }
 
+    /// The note's `work/` holds draft speaker names without saved progress.
+    public func addNames(_ noteID: UUID) { state.withLock { $0.named.insert(noteID); $0.work.insert(noteID) } }
+
+    public func holdsDraft(_ noteID: UUID) async -> Bool {
+        state.withLock { $0.statuses[noteID] != nil || $0.named.contains(noteID) }
+    }
+
     public func discard(_ noteID: UUID) async throws {
         state.withLock {
+            $0.named.remove(noteID)
             $0.statuses[noteID] = nil
             $0.languages[noteID] = nil
             $0.recognizers[noteID] = nil

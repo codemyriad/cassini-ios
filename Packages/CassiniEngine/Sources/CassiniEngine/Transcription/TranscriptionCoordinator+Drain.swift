@@ -97,19 +97,30 @@ extension TranscriptionCoordinator {
     func runOne(_ current: Active) async {
         let outcome = await current.run?.value ?? .failed(.unknown)
         await current.events?.value
+        var handOver: HandOver?
         await lock.run {
-            await record(current, outcome)
+            handOver = await record(current, outcome)
             if unresolvedSystemStops.contains(current.noteID), await parts.jobs.job(current.noteID)?.state != .running {
                 unresolvedSystemStops.remove(current.noteID)
             }
             // The jobs first: while `active` is set, Trash reads the job from it, and after, from `state.jobs`.
             await refresh()
+            // A stop that came while the job was handed over (a Stop, the system's, Recently Deleted) is for this
+            // job, whose run is over: the hand-over is undone, so no new run starts against it. Until `active` is
+            // cleared below, with no suspension after this check, every stop still reaches `current.stop`.
+            if let undone = handOver, current.stop.request != nil {
+                await undo(undone)
+                handOver = nil
+                await mirror(current.noteID)
+                await refresh()
+            }
             active = nil
             setRunning(nil)
             parts.progress?.end()
         }
         current.finished.signal()
-        await announce(current, outcome)
+        // A job handed to another recognizer has not ended: its result is announced when that run ends.
+        if handOver == nil { await announce(current, outcome) }
     }
 
     func apply(_ event: JobEvent, to current: Active, receivedAt: Int64? = nil) {
@@ -130,8 +141,16 @@ extension TranscriptionCoordinator {
         }
     }
 
-    /// Writes the job for `outcome`; runs inside the serial section.
-    func record(_ current: Active, _ outcome: JobOutcome) async {
+    /// A job queued again for another recognizer instead of failing: the job and the failure it would have had.
+    struct HandOver {
+        let job: Job
+        let failure: JobFailure
+    }
+
+    /// Writes the job for `outcome`; runs inside the serial section. Returns the hand-over when the job was queued
+    /// again for another recognizer instead of failing (`fallBack`).
+    @discardableResult
+    func record(_ current: Active, _ outcome: JobOutcome) async -> HandOver? {
         let id = current.noteID
         // One read: the mode does not change between the checks below.
         let cancel = current.cancel
@@ -139,7 +158,7 @@ extension TranscriptionCoordinator {
         if cancel == .discard, !sealed {
             await discardWork(id)
             await mirror(id)
-            return
+            return nil
         }
         if cancel == .restore, Self.isStop(outcome) {
             if case .saved = await parts.checkpoints.status(of: id) {
@@ -148,25 +167,86 @@ extension TranscriptionCoordinator {
                 await write { try await $0.remove(id) }
             }
             await mirror(id)
-            return
+            return nil
         }
         switch outcome {
         case .done, .adoptPending:
             await write { try await $0.remove(id) }
             await mirror(id, clearingFailure: true)
-            return
+            return nil
         case .paused(let reason):
             await markPaused(id, reason)
         case .failed(let failure):
+            if let handOver = await fallBack(current, after: failure) {
+                await mirror(id)
+                return handOver
+            }
             await markFailed(id, failure)
+            await endFallback(current.job)
         case .downloadFailed(let download):
             await markFailed(id, .download(download.error))
+            await endFallback(current.job)
         case .needsConsent:
             await write { try await $0.transition(id, now: self.parts.clock.now) { $0.state = .needsConsent; $0.pauseReason = nil; $0.failure = nil } }
         case .cancelled:
             await markPaused(id, cancel == .keep ? .user : .interrupted)
         }
         await mirror(id)
+        return nil
+    }
+
+    /// A run that its recognizer could not hold in memory or could not load goes back to the front of the queue for
+    /// the recognizer `Parts.fallbackRecognizer` names, from the start. Only a run that leaves nothing behind is handed
+    /// over: another recognizer cannot continue saved progress, and discarding `work/` would take the draft's
+    /// speaker names and merges with it, so a run with either fails as it is and keeps them for Try again. Nothing
+    /// is deleted here. A job already asked to stop is not handed over either; a stop that comes later, while the
+    /// fallback is chosen or the job is written, makes `runOne` undo the hand-over. Nil when the job fails as it is.
+    func fallBack(_ current: Active, after failure: JobFailure) async -> HandOver? {
+        let id = current.noteID
+        guard RecognizerFallback.applies(to: failure), current.cancel == nil, current.stop.request == nil,
+              let job = await parts.jobs.job(id), job.kind != .speakersOnly,
+              await !parts.checkpoints.holdsDraft(id),
+              let recognizer = await parts.fallbackRecognizer?(job, failure), recognizer != job.recognizer
+        else { return nil }
+        let queued = await write {
+            try await $0.transition(id, now: self.parts.clock.now) { job in
+                job.state = .queued; job.recognizer = recognizer; job.failure = nil; job.pauseReason = nil
+                job.doneMs = 0; job.totalMs = nil; job.words = 0
+            }
+        }
+        guard (queued ?? nil)?.state == .queued else { return nil }
+        // The reason stays on the note, so the notice is there after the other recognizer's run and a relaunch.
+        await setFallbackFailure(id, failure)
+        log.notice("A \(job.recognizer ?? "legacy", privacy: .public) run ended with \(failure.code, privacy: .public); queued again for \(recognizer, privacy: .public)")
+        return HandOver(job: job, failure: failure)
+    }
+
+    /// Takes a hand-over back: the job fails as its own run ended, with the recognizer and the numbers it had.
+    func undo(_ handOver: HandOver) async {
+        await write {
+            try await $0.transition(handOver.job.noteID, now: self.parts.clock.now) { job in
+                job.recognizer = handOver.job.recognizer
+                job.doneMs = handOver.job.doneMs; job.totalMs = handOver.job.totalMs; job.words = handOver.job.words
+                job.state = .failed; job.failure = handOver.failure; job.pauseReason = nil
+            }
+        }
+        await setFallbackFailure(handOver.job.noteID, nil)
+        log.notice("A stop came while \(handOver.job.noteID) was handed to another recognizer; the job failed as its run ended")
+    }
+
+    /// Writes why another recognizer took the note's job (`Note.fallbackFailure`), or nil when none did; no write when
+    /// the note already says so.
+    func setFallbackFailure(_ noteID: UUID, _ failure: JobFailure?) async {
+        guard let note = await parts.notes.note(noteID), note.fallbackFailure != failure else { return }
+        do { try await parts.notes.mutate(noteID) { $0.fallbackFailure = failure } } catch {
+            log.error("Cannot save why another recognizer took \(noteID): \(String(describing: error))")
+        }
+    }
+
+    /// A transcription of the note failed, or a new one begins: no transcript of a hand-over will follow, or the
+    /// next one is not its. A speakers-only job changes no words, so the note keeps what it says.
+    func endFallback(_ job: Job) async {
+        if job.kind != .speakersOnly { await setFallbackFailure(job.noteID, nil) }
     }
 
     static func isStop(_ outcome: JobOutcome) -> Bool {

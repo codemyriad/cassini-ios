@@ -23,11 +23,15 @@ public protocol JobCheckpoints: Sendable {
     /// progress or for a recognizer that is given none.
     func language(of noteID: UUID) async -> String?
     func recognizer(of noteID: UUID) async -> String?
+    /// Whether the note's `work/` holds something a person would lose with it: saved progress, readable or not, or
+    /// draft speaker names, merges or matches. Another recognizer takes a job over only without it (`fallBack`).
+    func holdsDraft(_ noteID: UUID) async -> Bool
 }
 
 extension JobCheckpoints {
     public func language(of noteID: UUID) async -> String? { nil }
     public func recognizer(of noteID: UUID) async -> String? { nil }
+    public func holdsDraft(_ noteID: UUID) async -> Bool { await status(of: noteID) != .missing }
 }
 
 extension Job {

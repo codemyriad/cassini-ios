@@ -33,6 +33,10 @@ public struct Note: Identifiable, Hashable, Sendable {
     public var previewText: String?
     public var failure: JobFailure?
     public var speakerAnalysisFailure: JobFailure?
+    /// Why another recognizer than the job's own took the note's transcription (`MEMORY` or `MODEL`: Parakeet Ultra
+    /// could not run, so Whistle did). Set when the job is handed over and kept with the transcript that run makes;
+    /// gone when that run fails or the person starts another transcription.
+    public var fallbackFailure: JobFailure?
     public var originalAudioFilename: String?
     public var speakers: [NoteSpeaker]?
     public var versions: [TranscriptVersion]?
@@ -56,7 +60,7 @@ extension Note: Codable {
     private enum CodingKeys: String, CodingKey {
         case schemaVersion, id, title, createdAt, meetingTime, audioFilename, duration, status, transcript, bookmarks, waveform
         case isFavorite, trashedAt, playbackPosition, language, audio, origin, document, sourceSha256, trashedJob
-        case previewText, failure, speakerAnalysisFailure, originalAudioFilename, speakers, versions, selectedVersionID
+        case previewText, failure, speakerAnalysisFailure, fallbackFailure, originalAudioFilename, speakers, versions, selectedVersionID
         // Schema 1 only.
         case failureMessage, playbackUnavailable, speakerAnalysisMessage
     }
@@ -87,6 +91,7 @@ extension Note: Codable {
         sourceSha256 = try c.decodeIfPresent(String.self, forKey: .sourceSha256)
         trashedJob = try c.decodeIfPresent(TrashedJob.self, forKey: .trashedJob)
         previewText = try c.decodeIfPresent(String.self, forKey: .previewText)
+        fallbackFailure = try c.decodeIfPresent(JobFailure.self, forKey: .fallbackFailure)
         if schema == 1 {
             try decodeSchemaOne(c)
         } else {
@@ -150,6 +155,7 @@ extension Note: Codable {
         try c.encodeIfPresent(previewText, forKey: .previewText)
         try c.encodeIfPresent(failure, forKey: .failure)
         try c.encodeIfPresent(speakerAnalysisFailure, forKey: .speakerAnalysisFailure)
+        try c.encodeIfPresent(fallbackFailure, forKey: .fallbackFailure)
         try c.encodeIfPresent(originalAudioFilename, forKey: .originalAudioFilename)
         try c.encodeIfPresent(speakers, forKey: .speakers)
         try c.encodeIfPresent(versions, forKey: .versions)

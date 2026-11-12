@@ -21,6 +21,12 @@ public enum NoteBanners {
     /// iOS: the speaker step found no speakers ("You can assign passages manually"); not a catalogue banner.
     public static func noSpeakers(_ note: Note, job: Job?) -> Bool { job == nil && note.speakerAnalysisFailure == .empty }
 
+    /// iOS: the note's transcript was made by Whistle because Parakeet Ultra could not run for this recording
+    /// (`Note.fallbackFailure`). Not while a job of the note waits, runs or has failed: the notice says "transcribed".
+    public static func transcribedByFallback(_ note: Note, job: Job?) -> Bool {
+        job == nil && note.fallbackFailure != nil && !note.transcript.isEmpty
+    }
+
     /// The speaker row is unknown until the asynchronous availability read publishes. Keep the download action
     /// disabled during that read, downloading and verification, instead of briefly offering speech transcription.
     public static func speakerDownloadState(_ status: ModelPartStatus?) -> (missing: Bool, installing: Bool) {
