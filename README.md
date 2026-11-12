@@ -500,3 +500,18 @@ Selected as ZIP; Export All as ZIP includes the whole live Library. Transfers sh
 and retain already imported notes. The [archive rules and iOS differences](docs/bulk-transfer.md) cover limits,
 original-audio fallback, safe paths and cleanup. iOS uses its native picker/share sheet and AVFoundation audio
 support; Android-only container support is not added.
+
+### Shared status badges
+
+The badge contract and fixtures are vendored from cassini-ux commit
+`793209cb3425bece7143178458fddd94b691e12d` under the Notebook test resources in
+`status-badges/`; `UPSTREAM.json` records every source hash. `StatusBadges` selects the shared
+kind, text, tint and glyph. `RowBadge` applies that contract to iOS recording, saving and
+transcribing rows; the other phone-specific statuses retain their existing applicability.
+
+`python3 scripts/generate-status-badge-strings.py` generates the compiled six-locale
+`StatusBadge.xcstrings` table. Run it with `--check` and run
+`python3 scripts/test-status-badge-strings.py` to reject pin, placeholder or generated-output
+drift. The app reads compiled localized strings, not JSON while rendering. An iOS job currently
+provides an ETA interval rather than a single minute count, so its badge uses the shared
+no-estimate wording; the detailed interval stays in the note.

@@ -15,7 +15,7 @@ import CassiniNotebook
                 #expect(ContrastTests.resolved(view.ink, scheme) == ContrastTests.resolved(CassiniTokens.color(ink), scheme))
                 if let fill {
                     #expect(ContrastTests.resolved(view.background, scheme) == ContrastTests.resolved(CassiniTokens.color(fill), scheme))
-                    #expect(ContrastTests.contrast(view.ink, on: [view.background, CassiniTokens.color(.ground)], scheme) >= 4.5)
+                    #expect(ContrastTests.contrast(view.ink, on: [CassiniTokens.color(.ground), view.background], scheme) >= 4.5)
                 } else {
                     #expect(ContrastTests.resolved(view.background, scheme).opacity == 0)
                     #expect(ContrastTests.contrast(view.ink, on: [CassiniTokens.color(.ground)], scheme) >= 4.5)
