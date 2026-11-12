@@ -17,7 +17,11 @@ import CassiniNotebook
         #expect(input.ordinal == 0)
         #expect(input.colourIndex == 1)
         #expect(input.mergeTargets.first { $0.speakerID == "early" }?.colourIndex == 0)
+        #expect(input.provenance == .unnamed)
+        #expect(input.speakerTints["late"] == .stone)
+        // A naming result carries explicit provenance as well as its label.
         input.label = "Alex"
+        input.provenance = .user
         #expect(input.speakerTints["late"] == .magenta)
         #expect(fake.runningDraft?.words.map(\.speaker) == ["late", "early"], "Presentation order is untouched")
     }
