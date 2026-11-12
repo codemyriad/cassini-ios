@@ -175,8 +175,19 @@ extension Note {
             return
         }
         let excluded = carriedExclusions(for: turns).merging(extra) { $0.union($1) }
+        let existing = Self.assignColourIndices(speakers ?? [], order: transcript.compactMap(\.speakerID))
+        let indices = Dictionary(existing.compactMap { speaker in speaker.colourIndex.map { (speaker.id, $0) } },
+                                 uniquingKeysWith: { first, _ in first })
+        var nextColour = (indices.values.max() ?? -1) + 1
         let analyzed = order.enumerated().map { offset, id in
-            var speaker = NoteSpeaker(id: id, name: DefaultLabels.placeholder(offset + 1))
+            let colourIndex = indices[id] ?? nextColour
+            if indices[id] == nil { nextColour += 1 }
+            var speaker = NoteSpeaker(id: id, name: DefaultLabels.placeholder(offset + 1),
+                                      colourIndex: colourIndex, provenance: .unnamed)
+            if let known = existing.first(where: { $0.id == id }) {
+                speaker.name = known.name
+                speaker.provenance = known.provenance
+            }
             speaker.excludedVoiceIDs = (excluded[id] ?? []).sorted { $0.uuidString < $1.uuidString }
             guard let match = matches[id], let name = voiceNames[match.voiceID], !speaker.excludedVoiceIDs.contains(match.voiceID)
             else { return speaker }
@@ -187,6 +198,7 @@ extension Note {
                 speaker.match = .confirmed(voice: match.voiceID, score: match.score)
             } else if match.automatic && (autoName || carriedLinks[match.voiceID] != nil) {
                 speaker.name = name
+                speaker.provenance = .recognised
                 speaker.match = .auto(voice: match.voiceID, score: match.score)
             } else {
                 speaker.match = .suggested(voice: match.voiceID, score: match.score)

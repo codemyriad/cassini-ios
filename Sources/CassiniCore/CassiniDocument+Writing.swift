@@ -12,8 +12,9 @@ extension CassiniDocument {
      */
     public static func create(_ audioBytes: [UInt8], transcript: Transcript, title: String, processing: JSONObject,
                               existing: CassiniDocument? = nil, speakerLabels: [String: String] = [:],
+                              speakerHints: [String: JSONObject] = [:],
                               carrying source: CassiniDocument? = nil, recordedAt: Date? = nil) throws -> [UInt8] {
-        let (comments, digest) = try seal(OggOpus.scan(ArraySource(audioBytes)), transcript, title, processing, existing, speakerLabels, source, recordedAt)
+        let (comments, digest) = try seal(OggOpus.scan(ArraySource(audioBytes)), transcript, title, processing, existing, speakerLabels, source, recordedAt, speakerHints)
         let out = ArraySink()
         try check(try OggOpus.rewrite(ArraySource(audioBytes), tags: comments.packet, to: out).digest() == digest, "Audio changed while sealing")
         try verify(read(out.bytes), transcript)
@@ -23,9 +24,10 @@ extension CassiniDocument {
     /** Streams [audio] into [target] behind the new tags and verifies the written file from disk; nothing is left on failure. */
     @discardableResult
     public static func create(_ audio: URL, transcript: Transcript, title: String, processing: JSONObject, existing: CassiniDocument?,
-                              speakerLabels: [String: String], carrying source: CassiniDocument? = nil, recordedAt: Date? = nil,
+                              speakerLabels: [String: String], speakerHints: [String: JSONObject] = [:],
+                              carrying source: CassiniDocument? = nil, recordedAt: Date? = nil,
                               target: URL) throws -> CassiniDocument {
-        let (comments, digest) = try seal(OggOpus.scan(audio), transcript, title, processing, existing, speakerLabels, source, recordedAt)
+        let (comments, digest) = try seal(OggOpus.scan(audio), transcript, title, processing, existing, speakerLabels, source, recordedAt, speakerHints)
         do {
             try writeWithTags(audio, comments, digest, target)
             let sealed = read(target)
@@ -174,7 +176,8 @@ extension CassiniDocument {
      */
     static func seal(_ stream: OggOpus.Info, _ transcript: Transcript, _ title: String, _ processing: JSONObject,
                      _ existing: CassiniDocument?, _ speakerLabels: [String: String],
-                     _ source: CassiniDocument? = nil, _ recordedAt: Date? = nil) throws -> (comments: Comments, digest: String) {
+                     _ source: CassiniDocument? = nil, _ recordedAt: Date? = nil,
+                     _ speakerHints: [String: JSONObject] = [:]) throws -> (comments: Comments, digest: String) {
         let digest = try stream.digest()
         try check(existing == nil || existing!.state == .ok, "Never rebind stale transcripts to different audio")
         try check(existing == nil || source == nil, "A seal beside a document keeps its manifest; it carries nothing else")
@@ -225,7 +228,14 @@ extension CassiniDocument {
             let label = speakerLabels.first { sameBytes($0.key, word.speaker) }?.value ?? word.speaker
             speakers.append(.object(JSONObject([("id", .string(word.speaker)), ("label", .string(label))])))
         }
-        manifest["speakers"] = .array(speakers)
+        // The portable speaker object is open: these optional display hints never alter identity or labels.
+        manifest["speakers"] = .array(speakers.map { entry in
+            guard var speaker = entry.object, let id = speaker["id"]?.string, let hints = speakerHints[id] else { return entry }
+            for key in ["colourIndex", "provenance"] {
+                if let value = hints[key] { speaker[key] = value }
+            }
+            return .object(speaker)
+        })
         var provenance = manifest["provenance"]?.object ?? JSONObject(carriedProvenance(of: source).map { ($0.key, $0.value) })
         var speech = provenance["speechToText"]?.object ?? JSONObject()
         speech[id] = .object(processing)

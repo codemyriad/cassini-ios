@@ -1,38 +1,38 @@
 import Foundation
 
-/// The colour of a speaker's label in the transcript (Android `SpeakerTint`). A placeholder speaker is always `stone`
-/// ("not named yet"). Named speakers cycle six decided palette roles in order of their first turn; placeholder
-/// speakers take no slot. The app maps each value to its colour.
+/// A fixed first-speech slot, revealed when the speaker is named (L-41).
 public enum SpeakerTint: CaseIterable, Hashable, Sendable {
-    case vermilion, brown, yellow, sky, green, plum, stone
+    case blue, magenta, cyan, orange, violet, slate, stone
 
-    /// The cycle of named speakers.
-    public static let namedCycle: [SpeakerTint] = [.vermilion, .brown, .yellow, .sky, .green, .plum]
+    public static let namedCycle: [SpeakerTint] = [.blue, .magenta, .cyan, .orange, .violet, .slate]
 
-    /// The tint of the named speaker at `namedIndex` (from 0) among the named speakers only.
-    public static func named(_ namedIndex: Int) -> SpeakerTint {
-        let count = namedCycle.count
-        return namedCycle[((namedIndex % count) + count) % count]
+    public static func named(_ colourIndex: Int) -> SpeakerTint {
+        namedCycle[((colourIndex % namedCycle.count) + namedCycle.count) % namedCycle.count]
     }
 
-    /// The tint of each speaker in `order` (speaker ids in order of their first turn). `isPlaceholder` tells a speaker
-    /// without a name.
+    public static func of(_ speaker: NoteSpeaker, fallbackIndex: Int = 0) -> SpeakerTint {
+        speaker.provenance == .unnamed ? .stone : named(speaker.colourIndex ?? fallbackIndex)
+    }
+
+    /// Legacy/draft fallback: unnamed speakers reserve their first-speech slot too.
     public static func assign(_ order: [String], isPlaceholder: (String) -> Bool) -> [String: SpeakerTint] {
         var result: [String: SpeakerTint] = [:]
-        var named = 0
         for id in order where result[id] == nil {
-            if isPlaceholder(id) {
-                result[id] = .stone
-            } else {
-                result[id] = Self.named(named)
-                named += 1
-            }
+            result[id] = isPlaceholder(id) ? .stone : named(result.count)
         }
         return result
     }
 
-    /// `assign` with display `labels`; a missing label is a placeholder (`DefaultLabels.isDefault`).
     public static func assign(_ order: [String], labels: [String: String]) -> [String: SpeakerTint] {
-        assign(order) { id in DefaultLabels.isDefault(id: id, label: labels[id] ?? id) }
+        assign(order) { DefaultLabels.isDefault(id: $0, label: labels[$0] ?? $0) }
+    }
+
+    public static func assign(_ order: [String], speakers: [NoteSpeaker]) -> [String: SpeakerTint] {
+        let stored = Dictionary(speakers.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        var result: [String: SpeakerTint] = [:]
+        for id in order where result[id] == nil {
+            result[id] = stored[id].map { of($0, fallbackIndex: result.count) } ?? .stone
+        }
+        return result
     }
 }

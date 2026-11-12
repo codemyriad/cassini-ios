@@ -58,7 +58,7 @@ import CassiniCore
         #expect(portable.language == "it")
         #expect(portable.duration == 1)
         #expect(portable.createdAt != nil)
-        #expect(portable.speakers == [NoteSpeaker(id: "S1", name: "Ada")])
+        #expect(portable.speakers == [NoteSpeaker(id: "S1", name: "Ada", colourIndex: 0)])
         let meetingID = try #require(portable.meetingID, "Document info shows the meeting id")
         #expect(meetingID.hasPrefix("mtg_"))
         #expect(portable.info == DocumentInfo(state: .ok, meetingID: meetingID))

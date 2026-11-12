@@ -15,8 +15,8 @@ import Testing
         #expect(turns.map(\.speakerID) == ["a", "b", "c", "a"])
         #expect(turns[0].name == .named("Giulia"))
         #expect(turns[1].name == .placeholder(2, label: "Speaker 2"))
-        // Placeholders are amber and take no slot: Giulia blue, Paolo teal.
-        #expect(turns.map(\.tint) == [.vermilion, .stone, .brown, .vermilion])
+        // Unnamed speakers hide their colour but reserve their first-speech slot.
+        #expect(turns.map(\.tint) == [.blue, .stone, .cyan, .blue])
         #expect(turns[0].text == "Hello everyone.")
         #expect(turns[0].words[1].start == 0.5)
         #expect(transcript.speakers == ["a", "b", "c"])
@@ -184,8 +184,8 @@ extension NoteTranscriptsTests {
         let named = NoteTranscripts.sealed(note, voices: [voice], suggestions: SpeakerSuggestions.of(note, voices: [voice]))
         #expect(named.turns[0].allSuggestions.isEmpty)
         #expect(named.speakers == ["ada", "ben"])
-        #expect(named.turns[0].interjections.first?.tint == .brown)
-        #expect(named.speakerTints["ben"] == .brown)
+        #expect(named.turns[0].interjections.first?.tint == .magenta)
+        #expect(named.speakerTints["ben"] == .magenta)
     }
 
     @Test func aRepeatedChipSpeakerGetsOneSealedCardAndItsLatestDraftCard() throws {

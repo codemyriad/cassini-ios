@@ -10,7 +10,7 @@ import Foundation
 extension NoteSpeaker {
     /// The one voice of the run whose speaker ids begin with `prefix`, labelled "Speaker 1" in `language`.
     public static func oneVoice(prefix: String, language: String = DefaultLabels.appLanguage) -> NoteSpeaker {
-        NoteSpeaker(id: prefix + "1", name: DefaultLabels.placeholder(1, language: language))
+        NoteSpeaker(id: prefix + "1", name: DefaultLabels.placeholder(1, language: language), colourIndex: 0, provenance: .unnamed)
     }
 }
 
@@ -20,7 +20,7 @@ extension Array where Element == NoteSpeaker {
     /// and excluding none. A speaker step that found a single unnamed voice gives the same shape and counts too.
     public var isOneVoice: Bool {
         guard let only = first else { return true }
-        return count == 1 && DefaultLabels.isDefault(id: only.id, label: only.name) && only.match == .unmatched
+        return count == 1 && only.provenance == .unnamed && only.match == .unmatched
             && only.excludedVoiceIDs.isEmpty
     }
 }

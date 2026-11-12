@@ -29,7 +29,47 @@ extension Note {
             }
         }
         speakers = catalog
+        backfillSpeakerColours()
         refreshSpeakerLabels()
+    }
+
+    /// Metadata-only upgrade for existing local notes and their kept versions.
+    public mutating func backfillSpeakerColours() {
+        let all = (speakers ?? []) + (versions ?? []).flatMap(\.speakers)
+        var assigned = Dictionary(all.compactMap { speaker in speaker.colourIndex.map { (speaker.id, $0) } },
+                                  uniquingKeysWith: { first, _ in first })
+        var next = (assigned.values.max() ?? -1) + 1
+        func fill(_ catalog: [NoteSpeaker], order: [String]) -> [NoteSpeaker] {
+            var result = catalog
+            var seen = Set<String>()
+            for id in order + catalog.map(\.id) where seen.insert(id).inserted {
+                guard let index = result.firstIndex(where: { $0.id == id }), result[index].colourIndex == nil else { continue }
+                if assigned[id] == nil { assigned[id] = next; next += 1 }
+                result[index].colourIndex = assigned[id]
+            }
+            return result
+        }
+        // Oldest kept speech supplies a legacy identity's original slot, before later merges/reordering.
+        if var history = versions {
+            for index in history.indices {
+                history[index].speakers = fill(history[index].speakers, order: history[index].segments.compactMap(\.speakerID))
+            }
+            versions = history
+        }
+        if let catalog = speakers { speakers = fill(catalog, order: transcript.compactMap(\.speakerID)) }
+    }
+
+    /// Fill missing legacy slots once, preserving every existing assignment.
+    public static func assignColourIndices(_ speakers: [NoteSpeaker], order: [String]) -> [NoteSpeaker] {
+        var result = speakers
+        var next = (speakers.compactMap(\.colourIndex).max() ?? -1) + 1
+        var seen = Set<String>()
+        for id in order + speakers.map(\.id) where seen.insert(id).inserted {
+            guard let index = result.firstIndex(where: { $0.id == id }), result[index].colourIndex == nil else { continue }
+            result[index].colourIndex = next
+            next += 1
+        }
+        return result
     }
 
     /// Writes each speaker's name onto its passages.
@@ -109,11 +149,12 @@ extension Note {
 
     /// Names a speaker, trimmed and cut to `Limits.nameMaxLength`; a blank name changes nothing.
     public mutating func renameSpeaker(_ id: String, name: String) {
+        backfillSpeakerColours()
         guard let index = speakers?.firstIndex(where: { $0.id == id }) else { return }
         let trimmed = String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(Limits.nameMaxLength))
         guard !trimmed.isEmpty else { return }
         changeShownSpeakers { note in
-            note.speakers?[index].name = trimmed; note.refreshSpeakerLabels()
+            note.speakers?[index].name = trimmed; note.speakers?[index].provenance = .user; note.refreshSpeakerLabels()
         }
     }
 
@@ -124,6 +165,7 @@ extension Note {
     public mutating func mergeSpeaker(_ source: String, into target: String, stamp: VersionStamp = VersionStamp(date: Date())) {
         guard source != target, speaker(source) != nil, let targetIndex = speakers?.firstIndex(where: { $0.id == target })
         else { return }
+        backfillSpeakerColours()
         let mergedFrom = shownVersionIndex.flatMap { versions?[$0].id } ?? stamp.before
         saveCurrentVersion(.beforeSpeakerMerge, id: stamp.before, date: stamp.date)
         for index in transcript.indices where transcript[index].speakerID == source { transcript[index].speakerID = target }
@@ -141,8 +183,12 @@ extension Note {
     }
 
     public mutating func addSpeaker(id: String, name: String) {
+        backfillSpeakerColours()
         let trimmed = String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(Limits.nameMaxLength))
         guard !trimmed.isEmpty, speaker(id) == nil else { return }
-        changeShownSpeakers { $0.speakers = ($0.speakers ?? []) + [NoteSpeaker(id: id, name: trimmed)] }
+        changeShownSpeakers {
+            let next = (($0.speakers ?? []).compactMap(\.colourIndex).max() ?? -1) + 1
+            $0.speakers = ($0.speakers ?? []) + [NoteSpeaker(id: id, name: trimmed, colourIndex: next, provenance: .user)]
+        }
     }
 }

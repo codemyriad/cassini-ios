@@ -32,12 +32,22 @@ public enum VoiceMatchState: Codable, Hashable, Sendable {
 }
 
 public struct NoteSpeaker: Identifiable, Hashable, Sendable {
+    public enum Provenance: String, Codable, Hashable, Sendable { case user, recognised, unnamed, source }
+    /// Assigned once in all-speaker first-speech order, including unnamed speakers.
+    public var colourIndex: Int?
+    public var provenance: Provenance
+
     public var id: String
-    public var name: String
+    public var name: String {
+        didSet { provenance = DefaultLabels.isDefault(id: id, label: name) ? .unnamed : .user }
+    }
     public var match: VoiceMatchState = .unmatched
     public var excludedVoiceIDs: [UUID] = []
-    public init(id: String, name: String, match: VoiceMatchState = .unmatched) {
+    public init(id: String, name: String, match: VoiceMatchState = .unmatched,
+                colourIndex: Int? = nil, provenance: Provenance? = nil) {
         self.id = id; self.name = name; self.match = match
+        self.colourIndex = colourIndex
+        self.provenance = provenance ?? (DefaultLabels.isDefault(id: id, label: name) ? .unnamed : .user)
     }
 
     /// The saved voice whose name this speaker carries: an automatic or a confirmed match.
@@ -59,7 +69,7 @@ public struct NoteSpeaker: Identifiable, Hashable, Sendable {
 
 extension NoteSpeaker: Codable {
     private enum CodingKeys: String, CodingKey {
-        case id, name, match, excludedVoiceIDs
+        case id, name, match, excludedVoiceIDs, colourIndex, provenance
         // Schema 1 kept the link and the suggestion as two optional ids.
         case voiceID, suggestedVoiceID
     }
@@ -68,6 +78,13 @@ extension NoteSpeaker: Codable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(String.self, forKey: .id)
         name = try container.decode(String.self, forKey: .name)
+        colourIndex = try container.decodeIfPresent(Int.self, forKey: .colourIndex)
+        if let colourIndex, !(0...9_007_199_254_740_991).contains(colourIndex) {
+            throw DecodingError.dataCorruptedError(forKey: .colourIndex, in: container,
+                                                   debugDescription: "Invalid speaker colour index")
+        }
+        provenance = try container.decodeIfPresent(Provenance.self, forKey: .provenance)
+            ?? (DefaultLabels.isDefault(id: id, label: name) ? .unnamed : .user)
         excludedVoiceIDs = try container.decodeIfPresent([UUID].self, forKey: .excludedVoiceIDs) ?? []
         if let match = try container.decodeIfPresent(VoiceMatchState.self, forKey: .match) {
             self.match = match
@@ -82,6 +99,8 @@ extension NoteSpeaker: Codable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(id, forKey: .id)
         try container.encode(name, forKey: .name)
+        try container.encodeIfPresent(colourIndex, forKey: .colourIndex)
+        try container.encode(provenance, forKey: .provenance)
         try container.encode(match, forKey: .match)
         try container.encode(excludedVoiceIDs, forKey: .excludedVoiceIDs)
     }

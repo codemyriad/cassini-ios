@@ -212,9 +212,16 @@ public enum NoteTranscripts {
                                 uniquingKeysWith: { first, _ in first })
         var names: [String: SpeakerName] = [:]
         for (ordinal, id) in order.enumerated() {
-            names[id] = name(label: speakers[id]?.name ?? labels[id], id: id, ordinal: ordinal)
+            if let speaker = speakers[id], speaker.provenance != .unnamed {
+                names[id] = .named(speaker.name)
+            } else {
+                names[id] = name(label: speakers[id]?.name ?? labels[id], id: id, ordinal: ordinal)
+            }
         }
-        let tints = SpeakerTint.assign(order) { names[$0]?.isNamed != true }
+        let paletteSpeakers = order.map { id in
+            speakers[id] ?? NoteSpeaker(id: id, name: labels[id] ?? id)
+        }
+        let tints = SpeakerTint.assign(order, speakers: paletteSpeakers)
         let voiceNames = Dictionary(voices.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
         let cards = Dictionary(suggestions.map { ($0.speakerID, $0) }, uniquingKeysWith: { first, _ in first })
         var suggested = Set<String>()
