@@ -175,7 +175,8 @@ struct DraftSection: View {
             draftKey = draft
             draftValue = NoteTranscripts.draft(draft.words, tentativeFromMs: draft.tentativeFromMs == .max ? nil : draft.tentativeFromMs,
                                                labels: draft.labels, automatic: draft.automatic,
-                                               suggestions: draft.suggestions)
+                                               suggestions: draft.suggestions, colourIndices: draft.colourIndices,
+                                               provenance: draft.provenance)
         }
         return draftValue
     }
