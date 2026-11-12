@@ -93,6 +93,17 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(resume.waitForExistence(within: 10))
         // The frame comes back through a floating-point transform: once on iOS 18.2 a 44 pt row read 43.99999999999997.
         XCTAssertGreaterThanOrEqual(resume.frame.height, 44 - 0.001, "a 44 pt target")
+        XCTContext.runActivity(named: "Resume target before the single tap") { activity in
+            let interactive = app.staticTexts["uiTestState-libraryInteractive"].exists
+            let geometry = "interactive=\(interactive); resume=\(resume.frame); row=\(row(app, "Paused standup").frame); viewport=\(list(app).frame); record=\(app.buttons["recordButton"].frame)"
+            print(geometry)
+            let details = XCTAttachment(string: geometry)
+            details.lifetime = .keepAlways
+            activity.add(details)
+            let screenshot = XCTAttachment(screenshot: app.screenshot())
+            screenshot.lifetime = .keepAlways
+            activity.add(screenshot)
+        }
         resume.tap()
         XCTAssertTrue(waitFor(row(app, "Paused standup"), label: ", queued"), row(app, "Paused standup").label)
         let tryAgain = app.buttons["Try transcribing Hallway conversation again"]
