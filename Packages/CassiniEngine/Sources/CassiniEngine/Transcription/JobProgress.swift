@@ -114,6 +114,9 @@ import CassiniNotebook
     }
 
     private func publish() {
+        // A sealed result can win after Stop was admitted. Keep its acknowledgment visible until `end` clears
+        // ownership, while still letting the tracker consume that outcome and its finalization measurement.
+        guard phase != .stopping else { return }
         if phase != tracker.phase { phase = tracker.phase }
     }
 

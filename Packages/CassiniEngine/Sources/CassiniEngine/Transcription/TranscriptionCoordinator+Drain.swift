@@ -125,6 +125,11 @@ extension TranscriptionCoordinator {
 
     func apply(_ event: JobEvent, to current: Active, receivedAt: Int64? = nil) {
         guard active === current, let running = state.running else { return }
+        // Failed outcomes may still be stopped during fallback hand-over. Only a sealed success wins admission.
+        switch event {
+        case .ended(.done), .ended(.adoptPending): current.hasSealedOutcome = true
+        default: break
+        }
         let updated = running.applying(event)
         setRunning(updated)
         parts.progress?.apply(event, receivedAt: receivedAt)

@@ -120,6 +120,8 @@ public final class TranscriptionCoordinator {
         let stop = StopSignal()
         let finished = OneShot()
         var cancel: CancelMode?
+        /// A delivered success has already sealed the transcript, even while the runner still owns its resources.
+        var hasSealedOutcome = false
         var run: Task<JobOutcome, Never>?
         var events: Task<Void, Never>?
 
@@ -170,18 +172,20 @@ public final class TranscriptionCoordinator {
         return outcome
     }
 
-    /// "Stop and keep progress" on the note that runs now. False when it does not run.
+    /// "Stop and keep progress" on the note that runs now. False when it does not run or has already sealed its
+    /// result. Acknowledges admission at once; the worker still owns its resources until its outcome is recorded.
     @discardableResult
     public func stop(_ noteID: UUID) -> Bool {
-        guard let current = active, current.noteID == noteID else { return false }
+        guard let current = active, current.noteID == noteID, !current.hasSealedOutcome else { return false }
         current.stop.stop(.pause(.user))
+        apply(.stopping, to: current)
         return true
     }
 
     /// Stop from outside the note: holds the queue, then stops the running note with its progress.
     public func stopAll() {
         setHold(.user)
-        active?.stop.stop(.pause(.user))
+        if let current = active { stop(current.noteID) }
     }
 
     /// Continue: clears the hold and starts the queue.
