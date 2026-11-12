@@ -379,6 +379,7 @@ struct DefaultsModelConsent: ModelConsentRecords, @unchecked Sendable {
 extension EnvironmentValues {
     #if DEBUG
     @Entry var marksUITestLayout = false
+    @Entry var showsBadgeGallery = false
     #endif
     /// The clock dates are shown against.
     @Entry var clock: any AppClock = SystemClock()

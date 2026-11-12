@@ -13,14 +13,14 @@ struct RootView: View {
     /// The split view's columns below iOS 26 (see `body`).
     @State private var columns: NavigationSplitViewVisibility = .all
     #if DEBUG
-    @Environment(AppGraph.self) private var graph
+    @Environment(\.showsBadgeGallery) private var showsBadgeGallery
     #endif
 
     var body: some View {
         @Bindable var router = router
         Group {
             #if DEBUG
-            if graph.environment.launch.badgeGallery { StatusBadgeGallery() } else { navigation }
+            if showsBadgeGallery { StatusBadgeGallery() } else { navigation }
             #else
             navigation
             #endif

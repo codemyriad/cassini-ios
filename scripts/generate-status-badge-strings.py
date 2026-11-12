@@ -58,7 +58,7 @@ def render_lookup(root=ROOT):
     for key in sorted(IDS):
         lines += [f'        case "{key}":',
                   f'            return String(localized: "{key}", table: "StatusBadge", bundle: bundle, locale: locale)']
-    lines += ['        default:', '            preconditionFailure("Unknown shared status badge key: \(id)")',
+    lines += ['        default:', r'            preconditionFailure("Unknown shared status badge key: \(id)")',
               '        }', '    }', '}', '']
     return '\n'.join(lines).encode()
 
