@@ -41,7 +41,7 @@ def inventory(out, files, locale, region):
         if data[:8] != b"\x89PNG\r\n\x1a\n" or data[12:16] != b"IHDR" or len(data) != 24:
             raise ValueError(f"not a PNG: {relative}")
         width, height = struct.unpack(">II", data[16:24])
-        rows.append(dict(file=relative.as_posix(), screen=file.stem[3:], label=label, board=board,
+        rows.append(dict(path=relative.as_posix(), file=relative.as_posix(), screen=file.stem[3:], label=label, board=board,
                          scheme=scheme, lang=locale, device=device, locale=region, seed=seed,
                          test=f"CassiniUITests/ScreenshotTests/{test}", pixel_width=width, pixel_height=height))
     keys = [(r["screen"], r["scheme"], r["lang"], r["device"]) for r in rows]

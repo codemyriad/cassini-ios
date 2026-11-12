@@ -344,8 +344,9 @@ scripts/pr-shots.sh --base origin/main --out /path/to/new/pr-render
 ```
 
 The base is the merge base of that ref and the head worktree (`--head PATH` defaults to this checkout).
-Commit tracked changes first. It renders all 22 existing English screenshots on each side, light and dark,
-using the head's renderer and one private simulator pair. Each render takes `~/.scw-heavy.lock` itself
+Use a new output folder outside the worktree; commit changes and remove untracked files first. It renders all 22 existing English screenshots on each side, light and dark,
+using the head's renderer/capture tests and one private simulator pair. Reading shots start paused,
+so no pressed skip-button tint leaks into a capture. Each render takes `~/.scw-heavy.lock` itself
 (or `CASSINI_HEAVY_LOCK`); the wrapper removes only its temporary worktree and uniquely named clones.
 Output has `before/`, `after/`, per-side `shots.json`, logs and `render.json` with source SHAs and elapsed time.
 `--output` disables lossy pngquant by default and records actual runtime/device, locale, seed, test and pixel size;
@@ -353,7 +354,7 @@ the 1200-pixel downscale remains. Existing normal README renders keep their prev
 
 The canonical cassini-ux `pr-shots.py` is owned by the shared-tool seat. Until it merges, this command produces
 renders/manifests only. Once available, `--diff-tool /path/to/pr-shots.py` (or a vendored `scripts/pr-shots.py`)
-adds `pr-shots/` using its `diff` command. Activate that tool's pinned Python/Pillow environment first;
+adds `pr-shots/` using its `diff` command when `--pr N` is supplied. `--render-only` skips that step. Activate that tool's pinned Python/Pillow environment first;
 the wrapper uses `python3` from PATH.
 This wrapper never accesses GitHub or publishes; the coordinator alone uploads images and replaces PR blocks.
 

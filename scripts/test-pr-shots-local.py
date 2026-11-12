@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import signal
+import shutil
 import struct
 import subprocess
 import sys
@@ -26,17 +27,20 @@ import json,os,sys,subprocess,signal
 from pathlib import Path
 out=Path(sys.argv[sys.argv.index('--output')+1]);out.mkdir(parents=True)
 sha=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
+assert (Path.cwd()/'CassiniUITests/ScreenshotTests.swift').read_text()=='// head capture'
 if os.environ.get('WAIT_RENDER'):
  Path(os.environ['READY']).touch();signal.pause()
 if sha==os.environ.get('FAIL_SHA'):sys.exit(7)
 m=dict(source_sha=sha,xcode='fixture Xcode',image_version='fixture OS',devices=dict(prefix=os.environ['CASSINI_SIM_PREFIX']),quantize=os.environ['CASSINI_SHOTS_QUANTIZE'])
 (out/'shots.json').write_text(json.dumps(m))
+if os.environ.get('CHANGE_HEAD'):(Path.cwd()/'untracked-ui.swift').touch()
 '''
 CLEAN = '''#!/usr/bin/env python3
 import os,sys
 from pathlib import Path
 assert sys.argv[1:]==['clean']
 Path(os.environ['CLEAN_LOG']).write_text(os.environ['CASSINI_SIM_PREFIX'])
+sys.exit(3 if os.environ.get('FAIL_CLEAN') else 0)
 '''
 
 
@@ -50,8 +54,11 @@ class RenderTests(unittest.TestCase):
         scripts = self.repo / "scripts"; scripts.mkdir()
         for name, source in (("screenshots.sh", "#!/bin/sh\nexit 99\n"), ("test.sh", CLEAN), ("screenshot-manifest.py", "# fixture\n")):
             file = scripts / name; file.write_text(source); file.chmod(0o755)
+        captures = self.repo / 'CassiniUITests'; captures.mkdir()
+        (captures / 'ScreenshotTests.swift').write_text('// base capture')
         self.git("add", "."); self.git("commit", "-qm", "base")
         (scripts / "screenshots.sh").write_text(RENDER)
+        (captures / 'ScreenshotTests.swift').write_text('// head capture')
         self.git("commit", "-qam", "head")
         self.env = dict(os.environ, CLEAN_LOG=str(self.root / "clean"), READY=str(self.root / "ready"))
         self.env.pop("CASSINI_HEAVY_LOCK_HELD", None)
@@ -87,11 +94,36 @@ class RenderTests(unittest.TestCase):
     def test_canonical_hook_invokes_only_diff(self):
         tool = self.root / 'canonical.py'
         tool.write_text("import json,sys\nfrom pathlib import Path\nassert sys.argv[1]=='diff'\nout=Path(sys.argv[sys.argv.index('--out')+1]);out.mkdir()\n(out/'changes.json').write_text(json.dumps(sys.argv[1:]))\n")
-        self.command += ['--diff-tool', str(tool)]
+        self.command += ['--diff-tool', str(tool), '--pr', '123']
         result = self.run_tool(); self.assertEqual(result.returncode, 0, result.stdout)
         args = json.loads((self.root / 'output/pr-shots/changes.json').read_text())
+        self.assertEqual(args[args.index('--pr')+1], '123'); self.assertIn('--before-sha', args)
         self.assertIn('--before-dir', args); self.assertIn('--after-dir', args); self.assertNotIn('publish', args)
         self.check_cleanup()
+
+    def test_bad_inputs_fail_before_rendering(self):
+        self.command += ['--diff-tool', str(self.root / 'missing.py')]
+        self.assertNotEqual(self.run_tool().returncode, 0)
+        self.assertFalse((self.root / 'output').exists())
+        self.command = self.command[:-2]
+        (self.repo / 'untracked-ui.swift').touch()
+        self.assertNotEqual(self.run_tool().returncode, 0)
+        self.assertFalse((self.root / 'output').exists())
+        (self.repo / 'untracked-ui.swift').unlink()
+        self.command[-1] = str(self.repo / 'generated')
+        self.assertNotEqual(self.run_tool().returncode, 0)
+        self.assertFalse((self.repo / 'generated').exists())
+        self.assertEqual(self.git('worktree', 'list', '--porcelain').count('worktree '), 1)
+
+    def test_cleanup_failure_or_source_change_cannot_publish_complete_report(self):
+        for reason in ('FAIL_CLEAN', 'CHANGE_HEAD'):
+            with self.subTest(reason=reason):
+                self.env[reason] = '1'
+                self.assertNotEqual(self.run_tool().returncode, 0)
+                self.assertFalse((self.root / 'output/render.json').exists())
+                self.check_cleanup()
+                self.env.pop(reason)
+                shutil.rmtree(self.root / 'output')
 
     def test_signal_ends_renderer_then_removes_private_worktree_and_clones(self):
         self.env['WAIT_RENDER'] = '1'

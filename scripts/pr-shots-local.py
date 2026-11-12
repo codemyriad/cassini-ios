@@ -36,14 +36,21 @@ def run_render(command, **kwargs):
         raise subprocess.CalledProcessError(code, command)
 
 
-def render(head, base_ref, out, diff_tool=None):
+def render(head, base_ref, out, diff_tool=None, pr=None, repo="codemyriad/cassini-ios", render_only=False):
     if os.environ.get("CASSINI_HEAVY_LOCK_HELD") == "1":
         raise ValueError("run outside the heavy lock; each screenshots.sh acquires it")
     head = head.resolve()
     sha = git(head, "rev-parse", "HEAD")
-    if git(head, "status", "--porcelain", "--untracked-files=no"):
-        raise ValueError("commit tracked changes before rendering: source SHAs must describe the UI")
+    if git(head, "status", "--porcelain"):
+        raise ValueError("commit changes and remove untracked files before rendering: source SHAs must describe the UI")
+    if out == head or head in out.parents:
+        raise ValueError("put the output folder outside the head worktree")
     base_sha = git(head, "merge-base", base_ref, sha)
+    tool = None if render_only else diff_tool or head / "scripts/pr-shots.py"
+    if diff_tool and not diff_tool.is_file():
+        raise FileNotFoundError(diff_tool)
+    if tool and tool.is_file() and (pr is None or pr < 1):
+        raise ValueError("--pr is required for the canonical diff (or use --render-only)")
     out.mkdir(parents=True, exist_ok=False)
     session = uuid.uuid4().hex
     env = dict(os.environ, CASSINI_SIM_PREFIX="ts-prshots-" + session[:12], CASSINI_SHOTS_QUANTIZE="0",
@@ -56,8 +63,8 @@ def render(head, base_ref, out, diff_tool=None):
         base = Path(temporary) / "base"
         subprocess.run(["git", "-C", str(head), "worktree", "add", "--detach", str(base), base_sha], check=True)
         try:
-            for name in ("screenshots.sh", "screenshot-manifest.py"):
-                shutil.copy2(head / "scripts" / name, base / "scripts" / name)
+            for name in ("scripts/screenshots.sh", "scripts/screenshot-manifest.py", "CassiniUITests/ScreenshotTests.swift"):
+                shutil.copy2(head / name, base / name)
             manifests = {}
             for side, tree in (("after", head), ("before", base)):
                 print(f"Rendering {side}: {sha if side == 'after' else base_sha}", flush=True)
@@ -71,22 +78,30 @@ def render(head, base_ref, out, diff_tool=None):
             for key in ("xcode", "image_version", "devices"):
                 if manifests["before"][key] != manifests["after"][key]:
                     raise ValueError(f"render environments differ: {key}")
+            if git(head, "rev-parse", "HEAD") != sha or git(head, "status", "--porcelain"):
+                raise ValueError("head changed during rendering; outputs are diagnostic only")
             report = dict(version=1, app="ios", base_sha=base_sha, head_sha=sha, run_id=session,
-                          elapsed_seconds=round(time.monotonic() - started, 3), diff="pending canonical pr-shots.py")
-            tool = diff_tool or head / "scripts/pr-shots.py"
-            if tool.is_file():
-                subprocess.run([sys.executable, "-I", str(tool), "diff", "--layout", "ios", "--before-dir",
-                                str(out / "before"), "--after-dir", str(out / "after"), "--out", str(out / "pr-shots")], check=True)
+                          repo=repo, pr=pr, diff="pending canonical pr-shots.py")
+            if tool and tool.is_file():
+                command = [sys.executable, "-I", str(tool), "diff", "--layout", "ios", "--repo", repo,
+                           "--pr", str(pr), "--before-dir", str(out / "before"), "--after-dir", str(out / "after"),
+                           "--out", str(out / "pr-shots")]
+                for side, source_sha in (("before", base_sha), ("after", sha)):
+                    m = manifests[side]
+                    versions = sorted({v["runtime_version"] for v in m["devices"].values() if isinstance(v, dict)})
+                    image = m["image_version"] + "; " + m["xcode"].replace("\n", "; ") + "; iOS " + ",".join(versions)
+                    command += [f"--{side}-sha", source_sha, f"--{side}-run", session,
+                                f"--{side}-runner", m.get("runner_label", "local"), f"--{side}-image", image]
+                subprocess.run(command, check=True)
                 report["diff"] = "pr-shots"
-            elif diff_tool:
-                raise FileNotFoundError(tool)
-            (out / "render.json").write_text(json.dumps(report, indent=2) + "\n")
         finally:
             # Only the private worktree/unique simulator prefix created by this invocation is removed.
             try:
                 subprocess.run([str(head / "scripts/test.sh"), "clean"], cwd=head, env=env, check=True)
             finally:
                 subprocess.run(["git", "-C", str(head), "worktree", "remove", "--force", str(base)], check=True)
+    report["elapsed_seconds"] = round(time.monotonic() - started, 3)
+    (out / "render.json").write_text(json.dumps(report, indent=2) + "\n")
     print(f"Render pair: {out}", flush=True)
 
 
@@ -95,9 +110,13 @@ def main():
     p.add_argument("--head", type=Path, default=Path(__file__).resolve().parent.parent, help="head worktree")
     p.add_argument("--base", default="origin/main", help="ref whose merge base with head is rendered")
     p.add_argument("--out", type=Path, required=True, help="new output folder")
-    p.add_argument("--diff-tool", type=Path, help="canonical tool, once merged; never publish")
+    p.add_argument("--pr", type=int, help="PR number, required only for canonical diff")
+    p.add_argument("--repo", default="codemyriad/cassini-ios")
+    mode = p.add_mutually_exclusive_group()
+    mode.add_argument("--diff-tool", type=Path, help="canonical tool, once merged; never publish")
+    mode.add_argument("--render-only", action="store_true", help="render without the optional canonical diff")
     a = p.parse_args()
-    render(a.head, a.base, a.out.resolve(), a.diff_tool.resolve() if a.diff_tool else None)
+    render(a.head, a.base, a.out.resolve(), a.diff_tool.resolve() if a.diff_tool else None, a.pr, a.repo, a.render_only)
 
 
 if __name__ == "__main__":
