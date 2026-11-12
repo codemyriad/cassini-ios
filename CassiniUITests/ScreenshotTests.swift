@@ -119,6 +119,7 @@ final class ScreenshotTests: XCTestCase {
 
     @MainActor func test10NoteExport() throws {
         let app = try launchPhone(["--seed", "reading", "--open-fixture", Self.fixture])
+        XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 10))
         app.buttons["Share and more"].tap()
         app.collectionViews.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Export transcript'")).firstMatch.tapWhenSettled()
         captureExportMenu("10-note-export", app)
