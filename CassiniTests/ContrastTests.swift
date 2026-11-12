@@ -57,6 +57,7 @@ import CassiniNotebook
             text("snackbar text on snackbar", .snackbarText, on: .snackbarBackground),
             text("snackbar action on snackbar", .snackbarAction, on: .snackbarBackground),
             text("primary label on accent fill", .onAccent, on: .accentStrong),
+            nonText("primary busy indicator on accent fill", .onAccent, on: .accentStrong),
             text("Record label on Record fill", .onRecord, on: .record),
             text("destructive filled label", .ground, on: .error),
             text("recording badge", .recordInk, on: .recordTint),
