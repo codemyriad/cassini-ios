@@ -39,7 +39,10 @@ public struct NoteSpeaker: Identifiable, Hashable, Sendable {
 
     public var id: String
     public var name: String {
-        didSet { provenance = DefaultLabels.isDefault(id: id, label: name) ? .unnamed : .user }
+        didSet {
+            // Explicit provenance is authoritative, including a person's literal name "Speaker 2".
+            if provenance == .unnamed, !DefaultLabels.isDefault(id: id, label: name) { provenance = .user }
+        }
     }
     public var match: VoiceMatchState = .unmatched
     public var excludedVoiceIDs: [UUID] = []

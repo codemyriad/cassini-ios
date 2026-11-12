@@ -31,11 +31,15 @@ extension Note {
 
     /// "Not <name>": the speaker is never matched to `voiceID` again.
     public mutating func rejectVoice(_ voiceID: UUID, for speakerID: String, restorePlaceholder: Bool) {
+        backfillSpeakerColours()
         guard let index = speakers?.firstIndex(where: { $0.id == speakerID }), let speaker = speakers?[index] else { return }
         changeShownSpeakers { note in
             if !speaker.excludedVoiceIDs.contains(voiceID) { note.speakers?[index].excludedVoiceIDs.append(voiceID) }
             note.speakers?[index].match = .rejected(voice: voiceID, score: speaker.match.score ?? 0)
-            if restorePlaceholder { note.speakers?[index].name = DefaultLabels.placeholder(index + 1) }
+            if restorePlaceholder {
+                note.speakers?[index].name = DefaultLabels.placeholder(index + 1)
+                note.speakers?[index].provenance = .unnamed
+            }
             note.refreshSpeakerLabels()
         }
     }
@@ -211,9 +215,10 @@ extension Note {
             guard let match = matches[id], let name = voiceNames[match.voiceID], !speaker.excludedVoiceIDs.contains(match.voiceID)
             else { return speaker }
             if localVoices.contains(match.voiceID) {
-                if match.automatic { speaker.name = name }
+                if match.automatic { speaker.name = name; speaker.provenance = .user }
             } else if match.automatic, case .confirmed = carriedLinks[match.voiceID] {
                 speaker.name = name
+                speaker.provenance = .user
                 speaker.match = .confirmed(voice: match.voiceID, score: match.score)
             } else if match.automatic && (autoName || carriedLinks[match.voiceID] != nil) {
                 speaker.name = name
@@ -225,11 +230,12 @@ extension Note {
             return speaker
         }.map { speaker -> NoteSpeaker in
             guard let label = labels[speaker.id]?.trimmingCharacters(in: .whitespacesAndNewlines),
-                  !DefaultLabels.isDefault(id: speaker.id, label: label) else {
+                  !label.isEmpty else {
                 return speaker
             }
             var named = speaker
             named.name = String(label.prefix(Limits.nameMaxLength))
+            named.provenance = .user
             if let voice = named.match.voiceID, !named.match.isRejection,
                !(voiceNames[voice].map { NameMatch.same($0, label) } ?? false) {
                 named.match = .unmatched

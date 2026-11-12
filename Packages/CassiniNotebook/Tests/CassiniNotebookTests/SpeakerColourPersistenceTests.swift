@@ -161,6 +161,45 @@ struct SpeakerColourPersistenceTests {
         }
     }
 
+    @Test func namedProvenanceSurvivesPlaceholderLookingRenameButExplicitRejectionHidesTheSlot() {
+        let voice = UUID()
+        for provenance in [NoteSpeaker.Provenance.user, .recognised, .source] {
+            var speaker = NoteSpeaker(id: "a", name: "Alex", colourIndex: 8, provenance: provenance)
+            speaker.name = "Speaker 2"
+            #expect(speaker.provenance == provenance)
+            #expect(SpeakerTint.of(speaker) == .cyan)
+        }
+        var note = note()
+        note.speakers?[1] = NoteSpeaker(id: "a", name: "Alex", match: .auto(voice: voice, score: 1),
+                                       colourIndex: 8, provenance: .recognised)
+        note.speakers?[1].name = "Speaker 2"
+        note.applySpeakerAnalysis(turns: [.init(speakerID: "a", start: 0, end: 1.5)],
+                                  matches: [:], voiceNames: [:], autoName: false,
+                                  stamp: .init(date: Date(timeIntervalSince1970: 1)))
+        #expect(note.speaker("a")?.provenance == .recognised)
+        #expect(NoteTranscripts.sealed(note).speakerTints["a"] == .cyan)
+        note.rejectVoice(voice, for: "a", restorePlaceholder: true)
+        #expect(note.speaker("a")?.provenance == .unnamed)
+        #expect(note.speaker("a")?.colourIndex == 8)
+        #expect(NoteTranscripts.sealed(note).speakerTints["a"] == .stone)
+    }
+
+    @Test func everyActualNamingProducerMarksPlaceholderLookingNamesAsNamed() {
+        let voice = UUID()
+        for kind in 0..<4 {
+            var note = note()
+            let local: Set<UUID> = kind == 0 ? [voice] : []
+            let confirmed: [UUID: VoiceMatchState] = kind == 1 ? [voice: .confirmed(voice: voice, score: 1)] : [:]
+            note.applySpeakerAnalysis(turns: [.init(speakerID: "new", start: 0, end: 1.5)],
+                matches: kind == 3 ? [:] : ["new": .init(voiceID: voice, score: 1, automatic: true)],
+                voiceNames: [voice: "Speaker 2"], localVoices: local, carriedLinks: confirmed, autoName: true,
+                stamp: .init(date: Date(timeIntervalSince1970: 1)), labels: kind == 3 ? ["new": "Speaker 2"] : [:])
+            #expect(note.speaker("new")?.provenance == (kind == 2 ? .recognised : .user))
+            #expect(note.speaker("new")?.name == "Speaker 2")
+            #expect(NoteTranscripts.sealed(note).speakerTints["new"] != .stone)
+        }
+    }
+
     @Test func portableRoundTripKeepsGappedSlotsAndNamingRevealsTheSameSlot() throws {
         let folder = try PortableFixtures.temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: folder) }
