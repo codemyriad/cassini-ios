@@ -1,0 +1,12 @@
+{
+  "mode": "plumbing-no-visual-change",
+  "baseline_commit": "f437a999d48b5489093e7d6b8326e32d7a00b69a",
+  "exception": "Temporary compatibility palette; replace with pinned brand roles in W1 preview.",
+  "sources": {
+    "Cassini/Design/Tokens.swift": "54b383ea3666ac10a1ce0de4ff4922150598459b2a2c99a8c2e45e0187b7818a",
+    "Cassini/Design/Snackbar.swift": "97ec59cd7213b4e218d99512056f6c33649643337887efd01bc554052bfe3188",
+    "CassiniShared/RecordingActivityColors.swift": "bcfac45a7885a419a19f75b3f93ef16a571cff01cd92730e65fccc08b65ab7d7",
+    "Cassini/Features/Library/NoteRow.swift": "54cbbf41228db20873e9df49796001af3df14172ae732c4ea025a95bb5217b74",
+    "Cassini/Resources/Assets.xcassets/AccentColor.colorset/Contents.json": "e5ed00dc199861b357684496e1634421339905252a1a52360049ec2794a8248e"
+  }
+}

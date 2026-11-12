@@ -71,6 +71,8 @@ final class ScreenshotTests: XCTestCase {
         let app = try launchPhone(["--seed", "library"])
         app.buttons["settingsButton"].tap()
         XCTAssertTrue(app.switches.firstMatch.waitForExistence(within: 5), "Settings shows")
+        XCTAssertTrue(app.staticTexts["uiTestState-settingsLoaded"].waitForExistence(within: 15),
+                      "Settings finishes loading model and language availability before capture")
         capture("05-settings")
     }
 

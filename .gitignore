@@ -34,3 +34,4 @@ docs/screenshots/pt-PT/
 .tools
 # Archives and exported .ipa files (docs/distribution.md).
 /build/
+__pycache__/

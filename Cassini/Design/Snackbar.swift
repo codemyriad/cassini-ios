@@ -23,16 +23,8 @@ struct Snackbar: View {
         .padding(.leading, 16).padding(.trailing, actionTitle == nil ? 16 : 6).padding(.vertical, 6)
         .frame(minHeight: 56)
         .background(Color.snackbarBackground, in: RoundedRectangle(cornerRadius: 14))
-        .shadow(color: .black.opacity(0.12), radius: 12, y: 4)
+        .shadow(color: Color.compatibilityBlack.opacity(0.12), radius: 12, y: 4)
         .accessibilityElement(children: .contain)
         .accessibilityActions { if let actionTitle { Button(actionTitle, action: action) } }
     }
-}
-
-extension Color {
-    /// The snackbar is ink on paper turned around; its action keeps at least 4.5:1 on it in both appearances.
-    static let snackbarBackground = Color.ink
-    static let snackbarText = Color.paper
-    static let snackbarAction = Color(light: UIColor(red: 1, green: 0.62, blue: 0.48, alpha: 1),
-                                      dark: UIColor(red: 0.62, green: 0.16, blue: 0.05, alpha: 1))
 }
