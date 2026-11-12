@@ -874,8 +874,12 @@ These features exist only on iOS. They were kept by decision.
 
 ### Look and accessibility
 
-- **Palette.** The warm iOS palette (paper, card, ink, muted, ember) stays the brand, with tone tints and speaker tints
-  added. Fonts are the system's, with Dynamic Type. `ContrastTests` follows Android's `ContrastTest`. It checks every
+- **Palette (W1 draft preview).** The pinned Cassini sheet supplies Linen/light and Saturn-night/dark, teal actions
+  and highlights, and separate Record/error/status roles. Values load from `CassiniShared/Brand/tokens.json` in the
+  app and widget. Speaker hues remain unchanged pending L-14; Recording retains its forced-dark ground pending L-08.
+  Fonts are system sans with Dynamic Type and tabular times. Card title/meta use headline/footnote (17/13 at default).
+  `BrandTokenTests` checks the pin, both appearances and the native accent asset. `ContrastTests` follows Android's
+  `ContrastTest`. It checks every
   pair a screen draws in light and dark (4.5:1 for text, 3:1 for large text and non-text), with tone tints composited
   over the surface under them.
 - **Wide windows.** One `ReadableWidth.content` of 560 pt, Android's `MaxContentWidth`, applies to every screen. On
