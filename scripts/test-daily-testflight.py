@@ -12,6 +12,8 @@ import json
 from pathlib import Path
 import plistlib
 import subprocess
+import sys
+import shutil
 import tempfile
 import unittest
 from unittest.mock import patch, mock_open
@@ -79,12 +81,21 @@ class ReleaseTests(unittest.TestCase):
     def test_pr_and_fork_runs_neither_approve_red_main_nor_block_green_main(self):
         invalid = [main_run(event='pull_request'), main_run(event='pull_request_target'),
                    main_run(head_repository={'full_name': 'fork/cassini-ios'}),
-                   main_run(head_repository=None), main_run(head_branch='feature')]
+                   main_run(head_repository=None), main_run(head_branch='feature'),
+                   main_run(event='schedule', head_repository={'full_name': 'fork/cassini-ios'}),
+                   main_run(event='schedule', head_repository=None),
+                   main_run(event='schedule', head_sha=PREVIOUS),
+                   main_run(event='schedule', head_branch='feature')]
         for run in invalid:
             self.assertFalse(daily.green([run, main_run(conclusion='failure')], HEAD))
             self.assertTrue(daily.green([dict(run, conclusion='failure'), main_run()], HEAD))
-        self.assertFalse(daily.green([main_run(event='workflow_dispatch', status='in_progress'), main_run()], HEAD))
-        self.assertTrue(daily.green([main_run(event='workflow_dispatch'), main_run(conclusion='failure')], HEAD))
+        for event in ('workflow_dispatch', 'schedule'):
+            for pending_or_failed in [dict(status='in_progress', conclusion=None),
+                                      dict(status='queued', conclusion=None),
+                                      dict(status='completed', conclusion='failure'),
+                                      dict(status='completed', conclusion='cancelled')]:
+                self.assertFalse(daily.green([main_run(event=event, **pending_or_failed), main_run()], HEAD))
+            self.assertTrue(daily.green([main_run(event=event), main_run(conclusion='failure')], HEAD))
 
     def test_main_ci_search_paginates_past_pr_runs_and_fails_closed_without_a_match(self):
         excluded = [main_run(event='pull_request') for _ in range(100)]
@@ -98,21 +109,17 @@ class ReleaseTests(unittest.TestCase):
         with patch.object(daily, 'gh', return_value={'workflow_runs': [main_run(event='pull_request')]}):
             self.assertFalse(daily.main_ci_green(HEAD))
 
-    def test_testflight_text_sanitizes_markup_controls_and_surrogates_but_keeps_unicode(self):
-        raw = 'Fix Flow<Settings> & voices 😀\x00\t\r\u202eevil\ud800\nNext line café'
-        clean = daily.testflight_notes(raw)
-        self.assertEqual(clean, 'Fix Flow‹Settings› & voices 😀    evil \nNext line café')
-        self.assertEqual(daily.testflight_notes(clean), clean)
-        self.assertEqual(daily.testflight_notes('Family 👩\u200d👩'), 'Family 👩\u200d👩')
+    def test_testflight_sink_rejects_developer_or_unsafe_text(self):
+        for raw in ['Developer title (#10)', 'D95: CI fixes', 'Fix <Settings>', 'Text\x00.', 'Text\u202e.', 'Source.swift']:
+            with self.subTest(raw=raw), self.assertRaises(ValueError):
+                daily.testflight_notes(raw)
+        self.assertEqual(daily.testflight_notes('Your notes keep their names. Café voices 😀.'),
+                         'Your notes keep their names. Café voices 😀.')
 
-    def test_testflight_limit_counts_utf16_and_never_splits_a_supplementary_character(self):
-        exact = 'a' * 3998 + '😀'
-        self.assertEqual(daily.testflight_notes(exact), exact)
-        for raw in [exact + 'x', '😀' * 2001, 'a' * 3997 + '😀xx']:
-            clean = daily.testflight_notes(raw)
-            self.assertLessEqual(len(clean.encode('utf-16-le')) // 2, 4000)
-            self.assertTrue(clean.endswith('\n…'))
-            self.assertEqual(clean.encode('utf-16-le').decode('utf-16-le'), clean)
+    def test_testflight_sink_rejects_overflow_instead_of_cutting_a_fragment(self):
+        self.assertEqual(daily.testflight_notes('a' * 497 + '😀'), 'a' * 497 + '😀')
+        for raw in ['a' * 498 + '😀', 'a' * 500]:
+            with self.assertRaises(ValueError): daily.testflight_notes(raw)
 
     def test_build_number_uses_current_version_and_keeps_failed_reservations(self):
         self.assertEqual(daily.next_build([build(11), build(900, '0.0.1')], '0.1.0', {}), '12')
@@ -140,7 +147,12 @@ class ReleaseTests(unittest.TestCase):
         self.mounted = True
         self.red_after_validation = False
         self.assert_upload_intent = True
-        self.raw_notes = '- An English improvement (#10)'
+        self.raw_notes = '- Developer title from CI (#10), D95'
+        directory = self.source/'release-notes.d'
+        directory.mkdir()
+        self.fragment = directory/'english-feature.md'
+        self.fragment.write_text('kind: new\n---\nYou can now export a transcript.\n')
+        self.fragment_hash = hashlib.sha256(self.fragment.read_bytes()).hexdigest()
 
     def command(self, args, cwd=None):
         self.calls.append(args)
@@ -149,6 +161,8 @@ class ReleaseTests(unittest.TestCase):
         if args[:3] == ['git', 'worktree', 'add']:
             checkout = Path(args[4])
             checkout.mkdir()
+            if (self.source/'release-notes.d').exists():
+                shutil.copytree(self.source/'release-notes.d', checkout/'release-notes.d')
             (checkout/'project.yml').write_text("MARKETING_VERSION: '0.1.0'\nMARKETING_VERSION: '0.1.0'\n")
         return ''
 
@@ -226,21 +240,96 @@ class ReleaseTests(unittest.TestCase):
         self.publish()
         self.assertEqual(self.apple.uploads, ['12'])
 
-    def test_raw_release_artifacts_survive_while_testflight_receives_sanitized_bounded_text(self):
-        self.raw_notes = '- Fix Flow<English>\x1b\u202e\ud800 ' + '😀' * 2001
+    def test_newer_failed_or_pending_scheduled_run_blocks_publication(self):
+        for nightly in [main_run(event='schedule', conclusion='failure'),
+                        main_run(event='schedule', status='in_progress', conclusion=None),
+                        main_run(event='schedule', status='queued', conclusion=None),
+                        main_run(event='schedule', conclusion='cancelled')]:
+            with self.subTest(status=nightly['status'], conclusion=nightly['conclusion']):
+                self.calls.clear()
+                self.ci = [nightly, main_run()]
+                self.publish()
+                self.assertFalse(self.state.exists())
+                self.assertFalse(any('worktree' in c for c in self.calls))
+                self.assertEqual(self.apple.uploads, [])
+        # Conversely, a newer green nightly clears an older failed push on the same SHA.
+        self.ci = [main_run(event='schedule'), main_run(conclusion='failure')]
+        self.publish()
+        self.assertEqual(self.apple.uploads, ['12'])
+
+    def test_developer_titles_stay_in_audit_and_fold_but_never_reach_testflight(self):
+        self.raw_notes = '- Developer CI refactor (#10), D95 </details><script>bad</script>\x1b\u202e\ud800'
         self.publish()
         pending = self.apple.finished[0]
         output = Path(pending['output'])
         plan = json.loads((output/'release-plan.json').read_text())
         self.assertEqual(plan['raw_notes'], self.raw_notes)
-        self.assertEqual((output/'release-notes.txt').read_text(),
-                         (self.raw_notes + '\n').encode('utf-8', errors='backslashreplace').decode('utf-8'))
-        self.assertEqual(plan['testflight_notes'], pending['notes'])
-        self.assertIn('Flow‹English›', pending['notes'])
-        self.assertNotIn('\x1b', pending['notes'])
-        self.assertNotIn('\u202e', pending['notes'])
-        self.assertLessEqual(len(pending['notes'].encode('utf-16-le')) // 2, 4000)
-        self.assertTrue(pending['notes'].endswith('\n…'))
+        self.assertEqual(plan['testflight_notes'], 'New: You can now export a transcript.')
+        self.assertEqual(pending['notes'], plan['testflight_notes'])
+        for forbidden in ['Developer', '#10', 'D95', 'CI', '<script>', 'refactor']:
+            self.assertNotIn(forbidden, pending['notes'])
+        self.assertIn('Developer CI refactor (#10)', (output/'release-notes.txt').read_text())
+        body = (output/'release-notes-github.md').read_text()
+        self.assertIn('<summary>Developer changelog</summary>', body)
+        self.assertIn('&lt;/details&gt;&lt;script&gt;', body)
+        self.assertEqual(body.count('</details>'), 1)
+        self.assertEqual(plan['fragments'], {'english-feature.md': self.fragment_hash})
+        self.assertEqual(json.loads(self.state.read_text())['published_fragments'], plan['fragments'])
+
+    def test_no_user_change_has_the_honest_fallback_and_still_keeps_developer_detail(self):
+        self.fragment.unlink()
+        self.publish()
+        self.assertEqual(self.apple.finished[0]['notes'], daily.FALLBACK_NOTES)
+        self.assertEqual(json.loads(self.state.read_text())['published_fragments'], {})
+
+    def test_invalid_user_fragment_fails_before_reserving_or_archiving(self):
+        self.fragment.write_text('kind: fixed\n---\nCI refactor for D95 (#123).\n')
+        with self.assertRaises(ValueError): self.publish()
+        self.assertFalse(self.state.exists())
+        self.assertEqual(self.apple.uploads, [])
+        self.assertFalse(any('run-in-gui.py' in str(c) for c in self.calls))
+
+    def test_overflow_is_summarized_and_all_covered_fragments_commit_together(self):
+        directory = self.source/'release-notes.d'
+        for index, area in enumerate(['exported', 'imported', 'shared', 'restored', 'downloaded', 'saved', 'selected', 'older']):
+            (directory/f'fix-{index}.md').write_text('kind: fixed\n---\n'
+                + f'Your {area} notes keep their original speaker names and recording dates.\n')
+        self.publish()
+        pending = self.apple.finished[0]
+        self.assertTrue(pending['notes'].endswith('and smaller fixes'))
+        self.assertIn('You can now export a transcript.', pending['notes'])
+        self.assertLess(len(pending['notes']), 500)
+        ledger = json.loads(self.state.read_text())['published_fragments']
+        self.assertEqual(len(ledger), 9)
+        self.assertEqual(ledger, pending['fragments'])
+
+    def test_failed_finalization_reloads_frozen_notes_and_only_then_advances_fragment_ledger(self):
+        original = self.apple.finish
+        with patch.object(self.apple, 'finish', side_effect=RuntimeError('not ready')):
+            with self.assertRaises(RuntimeError): self.publish()
+        before = json.loads(self.state.read_text())
+        self.assertNotIn('published_fragments', before)
+        self.fragment.write_text('kind: new\n---\nYou can now rename a transcript.\n')
+        self.apple.finish = original
+        self.publish()
+        self.assertEqual(self.apple.uploads, ['12'])
+        self.assertEqual(self.apple.finished[-1]['notes'], 'New: You can now export a transcript.')
+        self.assertEqual(json.loads(self.state.read_text())['published_fragments'],
+                         {'english-feature.md': self.fragment_hash})
+
+    def test_old_pending_developer_notes_are_migrated_without_a_second_upload(self):
+        original = self.apple.finish
+        with patch.object(self.apple, 'finish', side_effect=RuntimeError('not ready')):
+            with self.assertRaises(RuntimeError): self.publish()
+        state = json.loads(self.state.read_text())
+        del state['pending']['notes_format']
+        state['pending']['notes'] = 'CI developer title (#123), D95'
+        daily.save(self.state, state)
+        self.apple.finish = original
+        self.publish()
+        self.assertEqual(self.apple.uploads, ['12'])
+        self.assertEqual(self.apple.finished[-1]['notes'], daily.FALLBACK_NOTES)
+        self.assertEqual(self.apple.finished[-1]['legacy_developer_notes'], 'CI developer title (#123), D95')
 
     def test_failed_archive_keeps_reservation_but_no_upload_intent(self):
         self.worker_failure = True
@@ -365,6 +454,12 @@ class ReleaseTests(unittest.TestCase):
             notes = daily.release_notes(self.source, PREVIOUS, HEAD)
         self.assertEqual(notes, '- English improvement (#10)')
 
+    def test_developer_audit_also_includes_direct_main_commits(self):
+        with patch.object(daily, 'command', side_effect=['', 'c1', 'Improve a user-facing detail']), \
+             patch.object(daily, 'gh', return_value=[]):
+            self.assertEqual(daily.release_notes(self.source, PREVIOUS, HEAD),
+                             '- Improve a user-facing detail (c1)')
+
     def test_upload_json_is_parsed_from_stdout_only_with_noisy_stderr(self):
         self.upload_stderr = 'ContentDelivery { dictionary = value; }\ntrailing diagnostic after JSON'
         self.publish()
@@ -421,11 +516,20 @@ class ReleaseTests(unittest.TestCase):
         with patch.object(apple, 'guard'), patch.object(apple, 'builds', return_value=[build(12)]), \
              patch.object(apple, 'request', side_effect=[
                  {'data': {'attributes': {'internalBuildState': 'IN_BETA_TESTING'}}}, {'data': []}, {}]) as request:
-            self.assertEqual(apple.finish(dict(build='12', version='0.1.0', notes='- English<Flow>\x00 (#10)')), '12')
+            self.assertEqual(apple.finish(dict(build='12', version='0.1.0', notes='New: You can export your notes.')), '12')
             endpoint, method, payload = request.call_args.args
             self.assertEqual((endpoint, method), ('/v1/betaBuildLocalizations', 'POST'))
-            self.assertEqual(payload['data']['attributes'], {'locale': 'en-US', 'whatsNew': '- English‹Flow›  (#10)'})
+            self.assertEqual(payload['data']['attributes'], {'locale': 'en-US', 'whatsNew': 'New: You can export your notes.'})
             self.assertEqual(payload['data']['relationships']['build']['data']['id'], '12')
+
+    def test_persisted_developer_text_cannot_reach_the_beta_notes_write(self):
+        apple = daily.Apple.__new__(daily.Apple)
+        with patch.object(apple, 'guard'), patch.object(apple, 'builds', return_value=[build(12)]), \
+             patch.object(apple, 'request', side_effect=[
+                 {'data': {'attributes': {'internalBuildState': 'IN_BETA_TESTING'}}}, {'data': []}]) as request:
+            with self.assertRaises(ValueError):
+                apple.finish(dict(build='12', version='0.1.0', notes='CI developer title (#123), D95'))
+            self.assertTrue(all(len(call.args) == 1 for call in request.call_args_list))
 
     def test_wrong_host_fails_with_a_one_line_coordinator_notification(self):
         inbox = mock_open()
@@ -556,11 +660,56 @@ class SchedulerTests(unittest.TestCase):
                 self.assertEqual(command.call_args_list[3].args[0][:3], ['git', 'fetch', 'origin'])
                 os.set_inheritable(held.fileno(), False)
 
+    def test_starting_the_controller_leaves_a_real_control_clone_clean_for_its_own_check(self):
+        # A real clone on main with a real origin and no ignore rules. The controller is started as launchd starts
+        # it (a fresh interpreter, bytecode writing not turned off by the environment); then the real
+        # refresh_control runs its `git status --porcelain` check on what that start left behind.
+        scripts = Path(__file__).resolve().parent
+        origin, clone = self.root/'origin.git', self.root/'control'
+        git = lambda *args, cwd=None: subprocess.run(['git', *args], cwd=cwd, check=True, capture_output=True, text=True)
+        git('init', '--bare', '--initial-branch=main', str(origin))
+        git('clone', str(origin), str(clone))
+        (clone/'scripts').mkdir()
+        for name in ['daily-testflight.py', 'testflight_notes.py']:
+            shutil.copy(scripts/name, clone/'scripts'/name)
+        git('add', '-A', cwd=clone)
+        git('-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'Control clone', cwd=clone)
+        git('push', 'origin', 'HEAD:main', cwd=clone)
+        # Bytecode goes beside the module, as on a Python without a separate cache folder (Apple's keeps one
+        # outside the source tree, which would hide the problem on this Mac).
+        environment = {key: value for key, value in os.environ.items()
+                       if key not in ('PYTHONDONTWRITEBYTECODE', 'PYTHONPYCACHEPREFIX')}
+        started = subprocess.run([sys.executable, '-X', 'pycache_prefix=', 'scripts/daily-testflight.py', '--help'],
+                                 cwd=clone, env=environment, capture_output=True, text=True)
+        self.assertEqual(started.returncode, 0, started.stderr)
+        self.assertEqual(git('status', '--porcelain', '--ignored', cwd=clone).stdout, '')
+        driver = ('import importlib.util, sys; sys.dont_write_bytecode = True\n'
+                  'spec = importlib.util.spec_from_file_location("control", "scripts/daily-testflight.py")\n'
+                  'control = importlib.util.module_from_spec(spec); spec.loader.exec_module(control)\n'
+                  'control.refresh_control(dict(source="."), None, None)\n')
+        checked = subprocess.run([sys.executable, '-c', driver], cwd=clone, env=environment, capture_output=True, text=True)
+        self.assertEqual(checked.returncode, 0, checked.stderr)
+
     def test_launchd_stderr_inbox_does_not_duplicate_the_same_failure_line(self):
         inbox_path = self.root/'inbox'
         with inbox_path.open('w') as stream, contextlib.redirect_stderr(stream):
             daily.notify_failure('[iOS] daily test release failed: controlled fixture', inbox_path)
         self.assertEqual(inbox_path.read_text(), '[iOS] daily test release failed: controlled fixture\n')
+
+
+# CI runs this file; the fragment renderer's own tests and the repository's real fragments are checked with it, so
+# a fragment that could not be published fails the pull request that adds it.
+_NOTES_SPEC = importlib.util.spec_from_file_location('testflight_notes_tests', Path(__file__).with_name('test-testflight-notes.py'))
+_notes_tests = importlib.util.module_from_spec(_NOTES_SPEC)
+_NOTES_SPEC.loader.exec_module(_notes_tests)
+UserReleaseNotesTests = _notes_tests.UserReleaseNotesTests
+
+
+class RepositoryFragmentTests(unittest.TestCase):
+    def test_every_fragment_in_the_repository_can_be_published(self):
+        notes = _notes_tests.notes
+        text = notes.render_test_notes(notes.collect_fragments(Path(__file__).resolve().parent.parent, {}))
+        self.assertEqual(notes.validate_test_notes(text), text)
 
 
 if __name__ == '__main__':

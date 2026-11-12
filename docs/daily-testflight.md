@@ -7,8 +7,8 @@ Neither route signs on the rented Mac/pool runners. Both controller and archive 
 No scheduler or runner is installed merely by merging this PR. Activation requires the coordinator’s explicit go-ahead.
 
 Existing manual archive/export, GUI/keychain, Apple upload/processing and internal `cassini` group are reused.
-The added pipeline selects current `main`, requires the newest exact-head main CI run from this repository's push/workflow_dispatch events to be successful, and reports
-unchanged/red/pending main as a skip. Every push to main runs CI; only pull requests retain path filters. After archive it checks main/CI again before upload. A private local mutex
+The added pipeline selects current `main`, requires the newest exact-head main CI run from this repository's push/workflow_dispatch/schedule events to be successful, and reports
+unchanged/red/pending main as a skip. Every push to main and nightly schedule runs CI; only pull requests retain path filters. After archive it checks main/CI again before upload. A private local mutex
 serializes calendar/manual calls; only archive/export hold `~/.cassini-heavy.lock`. Resource/keychain checks happen
 inside that lock. A locked keychain fails with the exact Keychain Access unlock instruction; no identity is changed.
 
@@ -97,7 +97,7 @@ No live launchd job, signing runner, notification watcher or upload has been act
 
 ## Validation
 
-`/usr/bin/python3 scripts/test-daily-testflight.py` tests DST slots, paginated push/manual CI provenance (excluding PR/fork runs), sanitized Unicode/UTF-16 notes, version-specific numbering,
+`/usr/bin/python3 scripts/test-daily-testflight.py` tests DST slots, paginated push/manual/scheduled CI provenance (excluding PR/fork runs), sanitized Unicode/UTF-16 notes, version-specific numbering,
 failed reservations, durable intent before upload, no duplicate on an ambiguous upload, resumed finalization,
 internal-only guards, JWT redaction and scheduler/workflow routing without network, signing, GUI or simulators.
 `test-testflight-archive.py` uses real temporary linked Git worktrees to verify shared-ref advances are harmless

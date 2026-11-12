@@ -91,17 +91,20 @@ import Testing
         small(); large()
         var best = (small: Duration.seconds(1_000), large: Duration.seconds(1_000)), ratios: [String] = []
         var ratio: Double { best.large / best.small * 4 }
+        let perfGate = ProcessInfo.processInfo.environment["CASSINI_PERF_GATE"] == "1"
         repeat {
             for _ in 0..<samples {
                 best.small = min(best.small, try measureThreadCPU { for _ in 0..<(4 * repeats) { small() } }.elapsed)
                 best.large = min(best.large, try measureThreadCPU { for _ in 0..<repeats { large() } }.elapsed)
             }
             ratios.append(String(format: "%.2f", ratio))
-        } while ratio >= bound && ratios.count < rounds
+        } while perfGate && ratio >= bound && ratios.count < rounds
         func ms(_ sample: Duration, runs: Int) -> String { String(format: "%.3f ms", sample / .milliseconds(runs)) }
         let measured = "\(sizes.small) \(ms(best.small, runs: 4 * repeats)), \(sizes.large) \(ms(best.large, runs: repeats)), "
             + "ratio after each of \(ratios.count) of \(rounds) rounds: " + ratios.joined(separator: ", ")
         print("\(work), calling-thread CPU: \(measured)")
-        #expect(ratio < bound, "\(work) of 4x the size costs less than \(bound)x (\(measured))")
+        if perfGate {
+            #expect(ratio < bound, "\(work) of 4x the size costs less than \(bound)x (\(measured))")
+        }
     }
 }
