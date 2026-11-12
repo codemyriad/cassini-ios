@@ -112,12 +112,18 @@ enum CassiniTokens {{
 
 # No source-file allowlist. Only the generated table is exempt; native chrome/artwork is not scanned.
 # Colour enum cases (e.g. SpeakerTint.blue) and model labels are not platform colour expressions.
-LITERAL = re.compile(r"\b(?:Color|UIColor|CGColor)\s*\(\s*(?:red|white|gray|hue|displayP3|\.sRGB|\.displayP3)\s*[:,]|"
-                     r"\b(?:Color|UIColor)\.(?:system\w+|secondarySystem\w+|label|secondaryLabel|tertiaryLabel)\b|"
-                     r"\.(?:white|black|clear|orange|systemRed|systemBlue|systemGreen|systemOrange|systemYellow|systemPurple|systemPink|systemBrown|systemTeal|systemIndigo|systemGray)\b|"
-                     r"\b(?:Color|UIColor)\.(?:red|blue|green|yellow|gray|grey|purple|pink|brown|cyan|mint|teal|indigo)\b|"
-                     r"(?:foregroundStyle|foregroundColor|background|tint|fill|stroke|strokeBorder|color|Color|UIColor)\(\.(?:red|blue|green|yellow|gray|purple|pink|brown|cyan|mint|teal|indigo)\b|"
-                     r"#[a-fA-F0-9]{6}(?:[a-fA-F0-9]{2})?\b|\b0x[a-fA-F0-9]{6,8}\b")
+COLOR_TYPES = r"(?:Color|UIColor|CIColor|CGColor)"
+COLOR_COMPONENTS = r"(?:red|srgbRed|white|gray|hue|displayP3|\.sRGB|\.sRGBLinear|\.displayP3)"
+FIXED_NAMES = r"(?:red|blue|green|yellow|gray|grey|darkGray|lightGray|purple|pink|brown|cyan|magenta|mint|teal|indigo|white|black|clear|orange)"
+LITERAL = re.compile(
+    # Explicit and inferred initializers: the component labels identify colour construction.
+    rf"\b{COLOR_TYPES}(?:\s*\.\s*init)?\s*\(\s*{COLOR_COMPONENTS}\s*[:,]|"
+    rf"\.init\s*\(\s*{COLOR_COMPONENTS}\s*[:,]|"
+    r"#colorLiteral\s*\(|"
+    rf"\b{COLOR_TYPES}\.(?:system\w+|secondarySystem\w+|label|secondaryLabel|tertiaryLabel|{FIXED_NAMES})\b|"
+    r"\.(?:white|black|clear|orange|system(?:Red|Blue|Green|Orange|Yellow|Purple|Pink|Brown|Teal|Indigo|Gray[0-9]*))\b|"
+    rf"(?:foregroundStyle|foregroundColor|background|tint|fill|stroke|strokeBorder|color|{COLOR_TYPES})\(\.{FIXED_NAMES}\b|"
+    r"#[a-fA-F0-9]{6}(?:[a-fA-F0-9]{2})?\b|\b0x[a-fA-F0-9]{6,8}\b")
 
 
 def check_literals(root=ROOT):

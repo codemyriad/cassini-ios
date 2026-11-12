@@ -112,14 +112,27 @@ class BrandGenerationTests(unittest.TestCase):
 
     def test_guard_rejects_fixed_colours_in_new_files_without_allowlist(self):
         examples = ('Color(red: 1, green: 0, blue: 0)', 'Color(\nred: 1, green: 0, blue: 0)', '.foregroundStyle(.white)',
-                    'UIColor.systemRed', '.tint(.systemBlue)', 'Color.blue', 'Color(.red)', '.strokeBorder(.gray)', '.fill(.purple)', 'let rgb = 0xFFEEDD', 'let hex = "#abcdef"')
+                    'UIColor.systemRed', '.tint(.systemBlue)', 'Color.blue', 'Color(.red)', '.strokeBorder(.gray)', '.fill(.purple)',
+                    'Color.init(red: 1, green: 0, blue: 0)', 'let c: UIColor = .init(red: 1, green: 0, blue: 0)',
+                    'UIColor.init(white: 1, alpha: 1)', 'let c: CGColor = .init(gray: 0, alpha: 1)',
+                    'Color.init(hue: 0, saturation: 1, brightness: 1)', 'Color.init(.sRGB, red: 1, green: 0, blue: 0)',
+                    'CIColor(red: 1, green: 0, blue: 0)', 'CIColor.init(red: 1, green: 0, blue: 0)',
+                    'CGColor(srgbRed: 1, green: 0, blue: 0, alpha: 1)', 'let c: CGColor = .init(srgbRed: 1, green: 0, blue: 0, alpha: 1)',
+                    'UIColor.magenta', 'UIColor.darkGray', 'CIColor.cyan', '.tint(.systemGray2)',
+                    '#colorLiteral(red: 1, green: 0, blue: 0, alpha: 1)', 'let rgb = 0xFFEEDD', 'let hex = "#abcdef"')
         target = self.root / 'Cassini/NewView.swift'; target.parent.mkdir()
         for example in examples:
             with self.subTest(example=example):
                 target.write_text(example)
                 with self.assertRaisesRegex(ValueError, 'NewView.swift:1'):
                     brand.check_literals(self.root)
-        target.write_text('.foregroundStyle(Color.ink.opacity(0.5))\n// white #FFFFFF example')
+        target.write_text('''
+.foregroundStyle(Color.ink.opacity(0.5))
+// white #FFFFFF example
+let tint = SpeakerTint.blue
+switch tint { case .blue, .green, .red, .gray, .magenta: break }
+let component = DomainComponent.red
+''')
         brand.check_literals(self.root)
 
 
