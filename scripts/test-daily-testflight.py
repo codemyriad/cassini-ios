@@ -448,6 +448,49 @@ class ReleaseTests(unittest.TestCase):
         self.assertEqual(len(ledger), 9)
         self.assertEqual(ledger, pending['fragments'])
 
+    def finish_pending(self):
+        output = io.StringIO()
+        with patch.object(daily, 'command', self.command), patch.object(daily, 'gh', self.gh), \
+             patch.object(daily.os.path, 'ismount', side_effect=lambda *_: self.mounted), \
+             patch.object(daily.Path, 'is_relative_to', return_value=True), \
+             patch.object(daily.subprocess, 'run', self.fake_run), contextlib.redirect_stdout(output):
+            finished = daily.finish_pending(self.state, self.apple)
+        return finished, output.getvalue()
+
+    def test_an_upload_apple_has_not_opened_to_internal_testers_waits_and_the_hourly_check_finishes_it(self):
+        original = self.apple.finish
+        not_ready = daily.NotReadyYet('Internal TestFlight testing is not ready')
+        with patch.object(self.apple, 'finish', side_effect=not_ready):
+            self.publish()  # The slot: uploaded, Apple not ready. Not an error, and the intent stays.
+            waiting = json.loads(self.state.read_text())
+            self.assertEqual(waiting['pending']['build'], '12')
+            self.assertNotIn('head', waiting)
+            self.assertNotIn('published_fragments', waiting)
+            archives = sum('worktree' in call for call in self.calls)
+            # An hourly check while Apple is still not ready, then the next slot: nothing is fetched, archived or
+            # uploaded while that build waits.
+            self.calls.clear()
+            finished, said = self.finish_pending()
+            self.assertFalse(finished)
+            self.assertIn('TestFlight 0.1.0 (12)', said)
+            self.assertIn('no new upload', said)
+            self.assertNotIn('failed', said)
+            self.publish()
+            self.assertEqual([call for call in self.calls if call[0] == 'git'], [])
+            self.assertEqual(self.apple.uploads, ['12'])
+            self.assertEqual(json.loads(self.state.read_text())['pending'], waiting['pending'])
+        self.assertEqual(archives, 1)
+        self.apple.finish = original
+        finished, said = self.finish_pending()
+        self.assertTrue(finished)
+        self.assertIn('resumed TestFlight 0.1.0 (12)', said)
+        state = json.loads(self.state.read_text())
+        self.assertNotIn('pending', state)
+        self.assertEqual((state['head'], state['build']), (HEAD, '12'))
+        self.assertEqual(state['published_fragments'], {'english-feature.md': self.fragment_hash})
+        self.assertEqual(self.apple.uploads, ['12'])
+        self.assertEqual(self.finish_pending(), (True, ''), 'nothing pending: nothing to do')
+
     def test_failed_finalization_reloads_frozen_notes_and_only_then_advances_fragment_ledger(self):
         original = self.apple.finish
         with patch.object(self.apple, 'finish', side_effect=RuntimeError('not ready')):
@@ -734,6 +777,26 @@ class SchedulerTests(unittest.TestCase):
              patch.object(daily, 'publish') as publish, contextlib.redirect_stdout(io.StringIO()):
             result = daily.main()
         return result, command, refresh, publish
+
+    def test_between_slots_a_waiting_upload_is_finished_without_ref_or_release_work(self):
+        (self.state/'state.json').write_text(json.dumps(dict(pending=dict(version='0.1.0', build='12', head=HEAD))))
+        with patch.object(daily, 'finish_pending', return_value=True) as finish:
+            result, command, refresh, publish = self.invoke(in_slot=False)
+        self.assertEqual(result, 0)
+        finish.assert_called_once_with(self.state/'state.json')
+        command.assert_not_called()
+        refresh.assert_not_called()
+        publish.assert_not_called()
+
+    def test_between_slots_a_waiting_upload_is_left_alone_while_another_release_holds_the_mutex(self):
+        (self.state/'state.json').write_text(json.dumps(dict(pending=dict(version='0.1.0', build='12', head=HEAD))))
+        with (self.state/'release.lock').open('a') as held:
+            fcntl.flock(held, fcntl.LOCK_EX)
+            with patch.object(daily, 'finish_pending') as finish:
+                result, _, _, publish = self.invoke(in_slot=False)
+        self.assertEqual(result, 0)
+        finish.assert_not_called()
+        publish.assert_not_called()
 
     def test_non_slot_hour_performs_no_ref_or_release_work(self):
         result, command, refresh, publish = self.invoke(in_slot=False)

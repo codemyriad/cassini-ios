@@ -37,6 +37,11 @@ CI_POLL_SECONDS = 30
 MAX_CI_PAGES = 50
 
 
+class NotReadyYet(RuntimeError):
+    """Apple has the upload but has not made it available to internal testers yet. Nothing failed: the upload
+    intent stays, and the next hourly wake finishes it."""
+
+
 def scheduled(now):
     return now.astimezone(ZoneInfo('Europe/Berlin')).hour in SLOTS
 
@@ -222,7 +227,7 @@ class Apple:
             raise RuntimeError('Apple did not confirm INTERNAL_ONLY audience')
         detail = self.request('/v1/builds/' + build['id'] + '/buildBetaDetail')['data']['attributes']
         if detail['internalBuildState'] != 'IN_BETA_TESTING':
-            raise RuntimeError('Internal TestFlight testing is not ready')
+            raise NotReadyYet('Internal TestFlight testing is not ready')
         notes = self.request('/v1/builds/' + build['id'] + '/betaBuildLocalizations')['data']
         existing = next((n for n in notes if n['attributes']['locale'] == 'en-US'), None)
         data = {'type': 'betaBuildLocalizations',
@@ -361,22 +366,46 @@ def record_release(state, pending, build_id):
     del state['pending']
 
 
-def publish(config, state_path, source, apple=None, *, clock=time.monotonic, sleep=time.sleep):
+def pending_upload(state_path):
+    return state_path.exists() and bool(json.loads(state_path.read_text()).get('pending'))
+
+
+def waiting_message(pending):
+    return (f"[iOS] TestFlight {pending['version']} ({pending['build']}) from {pending['head']} is uploaded; "
+            'Apple has not made it available to internal testers yet. The hourly check finishes it; no new upload')
+
+
+def finish_pending(state_path, apple=None):
+    """Finishes an upload a previous run left pending: waits for Apple's processing, checks the build is in internal
+    testing and writes its notes. Never uploads. True when it finished one or none was pending; False when Apple is
+    not ready yet (the intent stays for the next wake)."""
     state = json.loads(state_path.read_text()) if state_path.exists() else {}
-    if state.get('pending'):
-        pending = state['pending']
-        external_output(Path(pending['output']))
-        if pending.get('notes_format') != NOTES_FORMAT:
-            # Older controllers persisted developer titles. Preserve the audit, never replay them into TestFlight.
-            pending['legacy_developer_notes'] = pending.get('notes', '')
-            pending.update(notes=FALLBACK_NOTES, notes_format=NOTES_FORMAT, fragments={})
-            save(state_path, state)
-        apple = apple or Apple()
-        wait_processing(apple, pending, Path(pending['output']))
-        build_id = apple.finish(pending)  # Resume finalization only; never resubmit an ambiguous upload.
-        record_release(state, pending, build_id)
+    if not state.get('pending'):
+        return True
+    pending = state['pending']
+    external_output(Path(pending['output']))
+    if pending.get('notes_format') != NOTES_FORMAT:
+        # Older controllers persisted developer titles. Preserve the audit, never replay them into TestFlight.
+        pending['legacy_developer_notes'] = pending.get('notes', '')
+        pending.update(notes=FALLBACK_NOTES, notes_format=NOTES_FORMAT, fragments={})
         save(state_path, state)
-        print(f"[iOS] resumed TestFlight {state['version']} ({state['build']}) from {state['head']}")
+    apple = apple or Apple()
+    wait_processing(apple, pending, Path(pending['output']))
+    try:
+        build_id = apple.finish(pending)  # Resume finalization only; never resubmit an ambiguous upload.
+    except NotReadyYet:
+        print(waiting_message(pending))
+        return False
+    record_release(state, pending, build_id)
+    save(state_path, state)
+    print(f"[iOS] resumed TestFlight {state['version']} ({state['build']}) from {state['head']}")
+    return True
+
+
+def publish(config, state_path, source, apple=None, *, clock=time.monotonic, sleep=time.sleep):
+    if not finish_pending(state_path, apple):
+        return  # One build at a time: nothing new is archived while an upload waits for Apple.
+    state = json.loads(state_path.read_text()) if state_path.exists() else {}
     command(['git', 'fetch', 'origin', 'main:refs/remotes/origin/main'], cwd=source)
     head = command(['git', 'rev-parse', 'origin/main'], cwd=source)
     if gh(f'repos/{REPOSITORY}/git/ref/heads/main')['object']['sha'] != head:
@@ -462,7 +491,11 @@ def publish(config, state_path, source, apple=None, *, clock=time.monotonic, sle
     pending['delivery'] = upload(apple, artifact['ipa'], output)
     save(state_path, state)
     wait_processing(apple, pending, output)
-    build_id = apple.finish(pending)
+    try:
+        build_id = apple.finish(pending)
+    except NotReadyYet:
+        print(waiting_message(pending))
+        return
     record_release(state, pending, build_id)
     save(state_path, state)
     print(f'[iOS] TestFlight {version} ({build}) released from {head}; internal cassini group')
@@ -481,13 +514,14 @@ def main():
     try:
         if platform.system() != 'Darwin' or platform.node().split('.')[0].lower() != 'drmeyers':
             raise RuntimeError('Signing is permitted only on drmeyers, never a rented/pool runner')
-        if args.scheduled and not scheduled(dt.datetime.now(dt.timezone.utc)):
-            print('[iOS] daily test release skipped: outside 09/14/20 Europe/Berlin slots')
-            return 0
+        in_slot = not args.scheduled or scheduled(dt.datetime.now(dt.timezone.utc))
         if args.config.stat().st_mode & 0o077:
             raise RuntimeError('Release config must be private (mode0600)')
         config = json.loads(args.config.read_text())
         state_dir = Path(config['state_dir']).expanduser()
+        if not in_slot and not pending_upload(state_dir/'state.json'):
+            print('[iOS] daily test release skipped: outside 09/14/20 Europe/Berlin slots')
+            return 0
         state_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
         lock_path = state_dir/'release.lock'
         if args.release_lock_fd is not None:
@@ -503,6 +537,11 @@ def main():
                 fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
             except BlockingIOError:
                 print('[iOS] daily test release skipped: another release is active')
+                return 0
+            if not in_slot:
+                # Between slots only an upload that waits for Apple is finished: no fetch, no update of the control
+                # clone, no archive and no upload.
+                finish_pending(state_dir/'state.json')
                 return 0
             if args.refresh_control:
                 if not args.scheduled:
