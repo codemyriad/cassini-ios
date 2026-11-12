@@ -243,8 +243,9 @@ final class LibraryUITests: XCTestCase {
         garden.press(forDuration: 1)
         app.buttons["Move to Recently Deleted"].tapWhenSettled()
         XCTAssertTrue(app.buttons["Undo"].waitForExistence(within: 5))
-        XCTAssertFalse(garden.exists, "a note in Recently Deleted is not a result")
+        // Undo is available before the asynchronous search results have rendered the removal.
         XCTAssertTrue(app.staticTexts["Nothing matches “tomatoe”"].waitForExistence(within: 5))
+        XCTAssertFalse(garden.exists, "a note in Recently Deleted is not a result")
         app.buttons["Undo"].tap()
         XCTAssertTrue(garden.waitForExistence(within: 5), "Undo brings the result back")
         XCTAssertEqual(search.value as? String, "tomatoe", "the search stays open")
