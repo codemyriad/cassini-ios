@@ -244,15 +244,24 @@ public enum NoteTranscripts {
     /// draft, whose words are all settled). Words without a speaker id (Apple Speech, or no speakers told apart) are
     /// one voice, "Speaker 1", as the job saves them (`NoteSpeaker.oneVoice`, D59), under `draftOneVoice`.
     public static func draft(_ words: [DraftWord], tentativeFromMs: Int64?, labels: [String: String] = [:],
-                             automatic: Set<String> = [], suggestions: [DraftSuggestion] = []) -> NoteTranscript {
+                             automatic: Set<String> = [], suggestions: [DraftSuggestion] = [], colourIndices: [String: Int] = [:],
+                             provenance: [String: NoteSpeaker.Provenance] = [:]) -> NoteTranscript {
         let transcriptWords = words.map {
             TranscriptWord(speaker: $0.speaker.isEmpty ? draftOneVoice : $0.speaker, start: Double($0.startMs) / 1000,
                            end: Double($0.endMs) / 1000, text: $0.text, lowConfidenceSpeaker: $0.lowConfidenceSpeaker == true)
         }
         let order = orderOfAppearance(transcriptWords)
         var names: [String: SpeakerName] = [:]
-        for (ordinal, id) in order.enumerated() { names[id] = name(label: labels[id], id: id, ordinal: ordinal) }
-        let tints = SpeakerTint.assign(SpeakerColourOrder.words(transcriptWords)) { names[$0]?.isNamed != true }
+        for (ordinal, id) in order.enumerated() {
+            names[id] = provenance[id].map { $0 == .unnamed ? unlabeled(ordinal + 1) : .named(labels[id] ?? id) }
+                ?? name(label: labels[id], id: id, ordinal: ordinal)
+        }
+        let fallback = Dictionary(uniqueKeysWithValues: SpeakerColourOrder.words(transcriptWords).enumerated().map { ($0.element, $0.offset) })
+        let palette = order.map { id in
+            NoteSpeaker(id: id, name: labels[id] ?? id, colourIndex: colourIndices[id] ?? fallback[id],
+                        provenance: provenance[id] ?? (names[id]?.isNamed == true ? .user : .unnamed))
+        }
+        let tints = SpeakerTint.assign(order, speakers: palette)
         let built = build(transcriptWords) { speaker, _ in
             guard let speaker else { return Template(name: .unknown, tint: .stone) }
             let name = names[speaker] ?? unlabeled(1)

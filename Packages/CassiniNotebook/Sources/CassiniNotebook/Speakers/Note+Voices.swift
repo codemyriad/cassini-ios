@@ -170,7 +170,8 @@ extension Note {
     public mutating func applySpeakerAnalysis(turns: [SpeakerTurn], matches: [String: VoiceMatch], voiceNames: [UUID: String],
                                               localVoices: Set<UUID> = [], carriedLinks: [UUID: VoiceMatchState] = [:],
                                               autoName: Bool, stamp: VersionStamp, attributed: [TranscriptSegment]? = nil,
-                                              excluded extra: [String: Set<UUID>] = [:], labels: [String: String] = [:]) {
+                                              excluded extra: [String: Set<UUID>] = [:], labels: [String: String] = [:],
+                                              colourIndices: [String: Int] = [:], explicitNames: Set<String> = []) {
         let attributed = attributed ?? SpeakerAttribution.assign(transcript, turns: turns)
         var order: [String] = []
         for segment in attributed { if let id = segment.speakerID, !order.contains(id) { order.append(id) } }
@@ -200,8 +201,9 @@ extension Note {
             if candidates.count == 1 { knownByID[id] = candidates[0] }
         }
         let reserved = identityPool.compactMap(\.colourIndex)
-        var nextColour = (reserved.max() ?? -1) + 1
+        var nextColour = max(reserved.max() ?? -1, colourIndices.values.max() ?? -1) + 1
         var coloursByID = knownByID.compactMapValues { $0.colourIndex }
+        for (id, index) in colourIndices where coloursByID[id] == nil { coloursByID[id] = index }
         for id in SpeakerColourOrder.segments(attributed) where coloursByID[id] == nil {
             coloursByID[id] = nextColour
             nextColour += 1
@@ -234,7 +236,7 @@ extension Note {
             return speaker
         }.map { speaker -> NoteSpeaker in
             guard let label = labels[speaker.id]?.trimmingCharacters(in: .whitespacesAndNewlines),
-                  !DefaultLabels.isDefault(id: speaker.id, label: label) else {
+                  explicitNames.contains(speaker.id) || !DefaultLabels.isDefault(id: speaker.id, label: label) else {
                 return speaker
             }
             var named = speaker
