@@ -61,16 +61,22 @@ def render(head, base_ref, out, diff_tool=None, pr=None, repo="codemyriad/cassin
     started = time.monotonic()
     with tempfile.TemporaryDirectory(prefix="cassini-prshots-") as temporary:
         base = Path(temporary) / "base"
-        subprocess.run(["git", "-C", str(head), "worktree", "add", "--detach", str(base), base_sha], check=True)
         try:
+            subprocess.run(["git", "-C", str(head), "worktree", "add", "--detach", str(base), base_sha], check=True)
             for name in ("scripts/screenshots.sh", "scripts/screenshot-manifest.py", "CassiniUITests/ScreenshotTests.swift"):
                 shutil.copy2(head / name, base / name)
             manifests = {}
             for side, tree in (("after", head), ("before", base)):
                 print(f"Rendering {side}: {sha if side == 'after' else base_sha}", flush=True)
                 with (out / f"{side}.log").open("w") as log:
-                    run_render([str(tree / "scripts/screenshots.sh"), "--output", str(out / side)], cwd=tree,
-                               env=env, stdout=log, stderr=subprocess.STDOUT)
+                    try:
+                        run_render([str(tree / "scripts/screenshots.sh"), "--output", str(out / side)], cwd=tree,
+                                   env=env, stdout=log, stderr=subprocess.STDOUT)
+                    finally:
+                        diagnostics = out / "logs" / side
+                        diagnostics.mkdir(parents=True, exist_ok=True)
+                        for file in (tree / "DerivedData.noindex/screenshots").glob("*.log"):
+                            shutil.copy2(file, diagnostics / file.name)
                 manifests[side] = json.loads((out / side / "shots.json").read_text())
                 expected = sha if side == "after" else base_sha
                 if manifests[side]["source_sha"] != expected:
@@ -99,7 +105,9 @@ def render(head, base_ref, out, diff_tool=None, pr=None, repo="codemyriad/cassin
             try:
                 subprocess.run([str(head / "scripts/test.sh"), "clean"], cwd=head, env=env, check=True)
             finally:
-                subprocess.run(["git", "-C", str(head), "worktree", "remove", "--force", str(base)], check=True)
+                records = git(head, "worktree", "list", "--porcelain").splitlines()
+                if any(line.startswith("worktree ") and Path(line[9:]).resolve() == base.resolve() for line in records):
+                    subprocess.run(["git", "-C", str(head), "worktree", "remove", "--force", "--force", str(base)], check=True)
     report["elapsed_seconds"] = round(time.monotonic() - started, 3)
     (out / "render.json").write_text(json.dumps(report, indent=2) + "\n")
     print(f"Render pair: {out}", flush=True)
