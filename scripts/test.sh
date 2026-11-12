@@ -146,6 +146,12 @@ ipad_type="${CASSINI_IPAD:-iPad Pro 13-inch (M5)}"
 keep_sims="${CASSINI_KEEP_SIMS:-$( { [ "$tier" = all ] || [ "$tier" = ios18 ] || [ -n "$runtime_tag" ]; } && echo 0 || echo 1 )}"
 # The whole gate fails, rather than skips, the format's conformance vectors when it cannot find them.
 [ "$tier" != all ] || export CASSINI_CONFORMANCE_REQUIRED="${CASSINI_CONFORMANCE_REQUIRED:-1}"
+# Forward nightly/full-ci performance gate into simulator test hosts as well as swift test.
+if [ -n "${CASSINI_PERF_GATE:-}" ]; then
+    export TEST_RUNNER_CASSINI_PERF_GATE="$CASSINI_PERF_GATE"
+else
+    unset TEST_RUNNER_CASSINI_PERF_GATE
+fi
 idle_minutes="${CASSINI_IDLE_MINUTES:-15}"
 leases="$cache/sim-leases"
 # A CASSINI_RUNTIME clone's lease lives one level down. A copy of this script from before CASSINI_RUNTIME does not
