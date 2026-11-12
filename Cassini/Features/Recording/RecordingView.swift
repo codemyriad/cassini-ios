@@ -144,7 +144,7 @@ private struct RecordingTitleField: View {
                 Image(systemName: "pencil").foregroundStyle(Color.recordingSecondary).accessibilityHidden(true)
             }
             .padding(.vertical, 4).padding(.bottom, 6)
-            .overlay(alignment: .bottom) { Rectangle().fill(.recordingLine).frame(height: 1) }
+            .overlay(alignment: .bottom) { Rectangle().fill(Color.recordingLine).frame(height: 1) }
         }
     }
 }
@@ -175,7 +175,7 @@ private struct RecordingControls: View {
         HStack(alignment: .center) {
             LabelledCircle(label: Text("Library", tableName: "Recording"), action: library) {
                 Image(systemName: "list.bullet").font(.title3).frame(width: 56, height: 56)
-                    .overlay(Circle().strokeBorder(.recordingLine, lineWidth: 1))
+                    .overlay(Circle().strokeBorder(Color.recordingLine, lineWidth: 1))
             }
             .frame(maxWidth: .infinity)
             Button(action: pauseOrResume) {
