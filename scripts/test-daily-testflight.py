@@ -3,6 +3,9 @@
 import datetime as dt
 import contextlib
 import io
+import os
+import fcntl
+from types import SimpleNamespace
 import hashlib
 import importlib.util
 import json
@@ -132,6 +135,8 @@ class ReleaseTests(unittest.TestCase):
         self.canonical_head = HEAD
         self.worker_failure = False
         self.upload_failure = False
+        self.upload_stdout = json.dumps({'details': {'delivery-uuid': '12345678-1234-1234-1234-123456789abc'}})
+        self.upload_stderr = ''
         self.mounted = True
         self.red_after_validation = False
         self.assert_upload_intent = True
@@ -171,7 +176,7 @@ class ReleaseTests(unittest.TestCase):
             if self.upload_failure:
                 raise RuntimeError('connection ended after upload started')
             self.apple.remote.append(build(pending['build']))
-            kwargs['stdout'].write(json.dumps({'details': {'delivery-uuid': 'delivery'}}))
+            return subprocess.CompletedProcess(args, 0, self.upload_stdout, self.upload_stderr)
         if '--build-status' in args:
             self.assertIn('--wait', args)
         return subprocess.CompletedProcess(args, 0)
@@ -360,6 +365,44 @@ class ReleaseTests(unittest.TestCase):
             notes = daily.release_notes(self.source, PREVIOUS, HEAD)
         self.assertEqual(notes, '- English improvement (#10)')
 
+    def test_upload_json_is_parsed_from_stdout_only_with_noisy_stderr(self):
+        self.upload_stderr = 'ContentDelivery { dictionary = value; }\ntrailing diagnostic after JSON'
+        self.publish()
+        pending = self.apple.finished[0]
+        self.assertEqual(pending['delivery'], '12345678-1234-1234-1234-123456789abc')
+        log = (Path(pending['output'])/'upload.log').read_text()
+        self.assertIn(self.upload_stdout, log)
+        self.assertIn(self.upload_stderr, log)
+        self.assertEqual(self.apple.uploads, ['12'])
+
+    def test_upload_app_without_details_finishes_in_same_run_via_stderr_or_build_query(self):
+        self.upload_stdout = json.dumps({'tool-version': '1', 'os-version': 'macOS', 'success-message': 'Upload succeeded'})
+        self.upload_stderr = 'ContentDelivery { log = metadata; }\nDelivery UUID: 12345678-1234-1234-1234-123456789abc'
+        self.publish()
+        self.assertEqual(self.apple.finished[0]['delivery'], '12345678-1234-1234-1234-123456789abc')
+        self.assertEqual(json.loads(self.state.read_text())['head'], HEAD)
+        self.assertEqual(self.apple.uploads, ['12'])
+
+    def test_successful_upload_without_any_json_or_uuid_uses_build_query_immediately(self):
+        self.upload_stdout = 'Upload succeeded (no machine-readable metadata)'
+        self.upload_stderr = 'ContentDelivery { log = metadata; }'
+        self.publish()
+        pending = self.apple.finished[0]
+        self.assertIsNone(pending['delivery'])
+        wait = next(c for c in self.calls if '--build-status' in c)
+        self.assertNotIn('--delivery-id', wait)
+        for field in ['--apple-id', '--bundle-version', '--bundle-short-version-string', '--wait']:
+            self.assertIn(field, wait)
+        self.assertEqual(json.loads(self.state.read_text())['head'], HEAD)
+        self.assertEqual(self.apple.uploads, ['12'])
+
+    def test_optional_upload_metadata_never_turns_success_into_a_parse_failure(self):
+        for stdout in ['{}', '{"details": null}', '{"details": []}', '{"details": {"delivery-uuid": "bad"}}',
+                       'prefix\n{"success-message":"Uploaded"}\ntrailing status', '{broken json']:
+            self.assertIsNone(daily.delivery_uuid(stdout, '{"details":{"delivery-uuid":"12345678-1234-1234-1234-123456789abc"}}'))
+        self.assertEqual(daily.delivery_uuid('prefix\n{"details":{"delivery-uuid":"12345678-1234-1234-1234-123456789abc"}}\nstatus', ''),
+                         '12345678-1234-1234-1234-123456789abc')
+
     def test_metadata_failure_keeps_intent_and_resume_does_not_reupload(self):
         original = self.apple.finish
         with patch.object(self.apple, 'finish', side_effect=RuntimeError('beta notes unavailable')):
@@ -406,6 +449,106 @@ class ReleaseTests(unittest.TestCase):
         self.assertIn('[self-hosted, macOS, ARM64, cassini-ios-release-drmeyers]', workflow)
         self.assertNotIn('cm-mac-m4', workflow.split('runs-on:')[1])
         self.assertIn('cancel-in-progress: false', workflow)
+
+
+class SchedulerTests(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+        self.state = self.root/'state'
+        self.state.mkdir()
+        self.config = self.root/'config.json'
+        self.config.write_text(json.dumps(dict(state_dir=str(self.state), source=str(self.root/'source'),
+                                              notification_file=str(self.root/'inbox'))))
+        self.config.chmod(0o600)
+
+    def invoke(self, in_slot=True, inherited=None):
+        arguments = ['daily-testflight.py', '--scheduled', '--refresh-control', '--config', str(self.config)]
+        if inherited is not None:
+            arguments += ['--release-lock-fd', str(inherited)]
+        with patch.object(daily.sys, 'argv', arguments), patch.object(daily.platform, 'node', return_value='drmeyers'), \
+             patch.object(daily.platform, 'system', return_value='Darwin'), patch.object(daily, 'scheduled', return_value=in_slot), \
+             patch.object(daily, 'command') as command, patch.object(daily, 'refresh_control') as refresh, \
+             patch.object(daily, 'publish') as publish, contextlib.redirect_stdout(io.StringIO()):
+            result = daily.main()
+        return result, command, refresh, publish
+
+    def test_non_slot_hour_performs_no_ref_or_release_work(self):
+        result, command, refresh, publish = self.invoke(in_slot=False)
+        self.assertEqual(result, 0)
+        command.assert_not_called()
+        refresh.assert_not_called()
+        publish.assert_not_called()
+
+    def test_active_manual_release_prevents_hourly_refresh_using_process_events(self):
+        for reexecute in (False, True):
+            with self.subTest(reexecute=reexecute):
+                ready_read, ready_write = os.pipe()
+                stop_read, stop_write = os.pipe()
+                code = "import fcntl,os,sys; f=open(sys.argv[1],'a'); fcntl.flock(f,fcntl.LOCK_EX); "
+                if reexecute:
+                    child = "import fcntl,os,sys; fcntl.flock(int(sys.argv[1]),fcntl.LOCK_EX|fcntl.LOCK_NB); os.write(int(sys.argv[2]),b'R'); os.read(int(sys.argv[3]),1)"
+                    code += ("os.set_inheritable(f.fileno(),True); os.set_inheritable(int(sys.argv[2]),True); "
+                             "os.set_inheritable(int(sys.argv[3]),True); "
+                             "os.execv(sys.executable,[sys.executable,'-c'," + repr(child)
+                             + ",str(f.fileno()),sys.argv[2],sys.argv[3]])")
+                else:
+                    code += "os.write(int(sys.argv[2]),b'R'); os.read(int(sys.argv[3]),1)"
+                process = subprocess.Popen([daily.sys.executable, '-c', code, str(self.state/'release.lock'),
+                                            str(ready_write), str(stop_read)], pass_fds=(ready_write, stop_read))
+                os.close(ready_write)
+                os.close(stop_read)
+                try:
+                    self.assertEqual(os.read(ready_read, 1), b'R')  # lock-acquired/exec-completed event
+                    result, command, refresh, publish = self.invoke()
+                    self.assertEqual(result, 0)
+                    command.assert_not_called()
+                    refresh.assert_not_called()
+                    publish.assert_not_called()
+                finally:
+                    os.write(stop_write, b'X')
+                    os.close(stop_write)
+                    os.close(ready_read)
+                    process.wait(timeout=30)  # outer hang guard only
+                self.assertEqual(process.returncode, 0)
+
+    def test_inherited_mutex_survives_controller_reexec_without_reacquiring_another_file(self):
+        with (self.state/'release.lock').open('a') as held:
+            fcntl.flock(held, fcntl.LOCK_EX)
+            inherited = os.dup(held.fileno())
+            result, command, refresh, publish = self.invoke(inherited=inherited)
+            self.assertEqual(result, 0)
+            command.assert_not_called()
+            self.assertEqual(refresh.call_count, 1)
+            self.assertEqual(publish.call_count, 1)
+            with self.assertRaises(OSError):
+                os.fstat(inherited)  # controller closed only its inherited descriptor on exit
+
+    def test_refresh_execs_updated_controller_with_the_same_locked_descriptor(self):
+        source = self.root/'source'
+        (source/'scripts').mkdir(parents=True)
+        script = source/'scripts/daily-testflight.py'
+        arguments = SimpleNamespace(config=self.config)
+        with (self.state/'release.lock').open('a') as held:
+            fcntl.flock(held, fcntl.LOCK_EX)
+            with patch.object(daily, '__file__', str(script)), \
+                 patch.object(daily, 'command', side_effect=['main', '', 'old', '', '', 'new']) as command, \
+                 patch.object(daily.os, 'execv') as execute:
+                daily.refresh_control(dict(source=str(source)), arguments, held)
+                self.assertTrue(os.get_inheritable(held.fileno()))
+                executable, argv = execute.call_args.args
+                self.assertEqual(executable, daily.sys.executable)
+                self.assertEqual(argv[-2:], ['--release-lock-fd', str(held.fileno())])
+                self.assertIn('--scheduled', argv)
+                self.assertEqual(command.call_args_list[3].args[0][:3], ['git', 'fetch', 'origin'])
+                os.set_inheritable(held.fileno(), False)
+
+    def test_launchd_stderr_inbox_does_not_duplicate_the_same_failure_line(self):
+        inbox_path = self.root/'inbox'
+        with inbox_path.open('w') as stream, contextlib.redirect_stderr(stream):
+            daily.notify_failure('[iOS] daily test release failed: controlled fixture', inbox_path)
+        self.assertEqual(inbox_path.read_text(), '[iOS] daily test release failed: controlled fixture\n')
 
 
 if __name__ == '__main__':

@@ -230,6 +230,80 @@ def release_notes(source, previous, head):
     return text
 
 
+def delivery_uuid(stdout, stderr):
+    # altool versions disagree on JSON shape; return code, not optional metadata, acknowledges upload.
+    decoder = json.JSONDecoder()
+    for position, char in enumerate(stdout):
+        if char != '{':
+            continue
+        try:
+            payload, _ = decoder.raw_decode(stdout[position:])
+        except ValueError:
+            continue
+        details = payload.get('details') if isinstance(payload, dict) else None
+        candidate = details.get('delivery-uuid') if isinstance(details, dict) else None
+        try:
+            return str(uuid.UUID(candidate))
+        except (ValueError, TypeError, AttributeError):
+            pass
+    for candidate in re.findall(r'Delivery UUID:\s*([0-9a-fA-F-]+)', stderr):
+        try:
+            return str(uuid.UUID(candidate))
+        except ValueError:
+            pass
+    return None  # wait_processing supports the app/version/build route in this same invocation.
+
+
+def upload(apple, ipa, output):
+    args = ['xcrun', 'altool', '--upload-app', '-f', ipa, '-t', 'ios',
+            *apple.auth(), '--output-format', 'json']
+    try:
+        result = subprocess.run(args, capture_output=True, text=True, timeout=3600)
+    except subprocess.TimeoutExpired as error:
+        def text(value):
+            return value.decode('utf-8', errors='replace') if isinstance(value, bytes) else (value or '')
+        (output/'upload.log').write_text('[stdout]\n' + text(error.stdout) + '\n[stderr]\n' + text(error.stderr))
+        raise
+    (output/'upload.log').write_text('[stdout]\n' + result.stdout + '\n[stderr]\n' + result.stderr)
+    if result.returncode:
+        raise RuntimeError(f'Apple upload failed (exit {result.returncode}); see {output / "upload.log"}')
+    return delivery_uuid(result.stdout, result.stderr)
+
+
+def refresh_control(config, arguments, lock):
+    # Called only after the Berlin slot check AND the shared release mutex.
+    source = Path(config['source']).expanduser().resolve()
+    if source != Path(__file__).resolve().parent.parent:
+        raise RuntimeError('Scheduled updates require the dedicated control clone containing this script')
+    if command(['git', 'symbolic-ref', '--short', 'HEAD'], cwd=source) != 'main':
+        raise RuntimeError('Scheduled control clone must be on main')
+    if command(['git', 'status', '--porcelain'], cwd=source):
+        raise RuntimeError('Scheduled control clone is dirty; refusing to change it')
+    before = command(['git', 'rev-parse', 'HEAD'], cwd=source)
+    command(['git', 'fetch', 'origin', 'main:refs/remotes/origin/main'], cwd=source)
+    command(['git', 'merge', '--ff-only', 'origin/main'], cwd=source)
+    if command(['git', 'rev-parse', 'HEAD'], cwd=source) != before:
+        # Keep the same flock across exec so a manual release cannot enter during deployment.
+        os.set_inheritable(lock.fileno(), True)
+        os.execv(sys.executable, [sys.executable, str(source/'scripts/daily-testflight.py'),
+            '--config', str(arguments.config.absolute()), '--scheduled', '--refresh-control',
+            '--release-lock-fd', str(lock.fileno())])
+
+
+def notify_failure(message, inbox_path):
+    print(message, file=sys.stderr)
+    try:
+        if os.path.samestat(os.fstat(sys.stderr.fileno()), inbox_path.stat()):
+            return  # launchd already sent this exact line to the coordinator inbox.
+    except (OSError, ValueError, AttributeError):
+        pass
+    try:
+        with inbox_path.open('a') as inbox:
+            inbox.write(message + '\n')
+    except OSError:
+        print('Coordinator inbox unavailable; failure is retained in scheduler/Actions log', file=sys.stderr)
+
+
 def wait_processing(apple, pending, output):
     args = ['xcrun', 'altool', '--build-status', '--wait', *apple.auth(), '--output-format', 'json']
     if pending.get('delivery'):
@@ -331,13 +405,7 @@ def publish(config, state_path, source, apple=None):
     pending = dict(head=head, version=version, build=build, notes=notes, output=str(output))
     state['pending'] = pending
     save(state_path, state)  # Durable upload intent BEFORE calling Apple; ambiguity never causes a duplicate.
-    with (output/'upload.log').open('w') as log:
-        subprocess.run(['xcrun', 'altool', '--upload-app', '-f', artifact['ipa'], '-t', 'ios',
-                       *apple.auth(), '--output-format', 'json'],
-                       stdout=log, stderr=subprocess.STDOUT, check=True, timeout=3600)
-    upload = (output/'upload.log').read_text()
-    delivery = json.loads(upload[upload.index('{'):])['details']['delivery-uuid']
-    pending['delivery'] = delivery
+    pending['delivery'] = upload(apple, artifact['ipa'], output)
     save(state_path, state)
     wait_processing(apple, pending, output)
     build_id = apple.finish(pending)
@@ -350,6 +418,8 @@ def publish(config, state_path, source, apple=None):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--config', type=Path, required=True)
+    parser.add_argument('--refresh-control', action='store_true', help=argparse.SUPPRESS)
+    parser.add_argument('--release-lock-fd', type=int, help=argparse.SUPPRESS)
     modes = parser.add_mutually_exclusive_group(required=True)
     modes.add_argument('--scheduled', action='store_true')
     modes.add_argument('--manual', action='store_true')
@@ -366,25 +436,33 @@ def main():
         config = json.loads(args.config.read_text())
         state_dir = Path(config['state_dir']).expanduser()
         state_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
-        with (state_dir/'release.lock').open('a') as lock:
+        lock_path = state_dir/'release.lock'
+        if args.release_lock_fd is not None:
+            if not args.scheduled or not args.refresh_control or not os.path.samestat(
+                    os.fstat(args.release_lock_fd), lock_path.stat()):
+                raise RuntimeError('Invalid inherited release mutex')
+            lock_stream = os.fdopen(args.release_lock_fd, 'a')
+            os.set_inheritable(lock_stream.fileno(), False)
+        else:
+            lock_stream = lock_path.open('a')
+        with lock_stream as lock:
             try:
                 fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
             except BlockingIOError:
                 print('[iOS] daily test release skipped: another release is active')
                 return 0
+            if args.refresh_control:
+                if not args.scheduled:
+                    raise RuntimeError('Only scheduled jobs refresh the control clone')
+                refresh_control(config, args, lock)
             publish(config, state_dir/'state.json', Path(config['source']).expanduser())
         return 0
     except Exception as error:
         # No exception output from Apple token generation is included; the token stays in memory.
         message = '[iOS] daily test release failed: ' + str(error).replace('\n', ' ')
-        print(message, file=sys.stderr)
         inbox_path = Path((config or {}).get('notification_file',
             str(Path.home()/'dev/cassini-coordination/DAILY-TEST-RELEASES-IOS.log'))).expanduser()
-        try:
-            with inbox_path.open('a') as inbox:
-                inbox.write(message + '\n')
-        except OSError:
-            print('Coordinator inbox unavailable; failure is retained in scheduler/Actions log', file=sys.stderr)
+        notify_failure(message, inbox_path)
         return 1
 
 

@@ -30,6 +30,14 @@ def sha256(path):
     return digest.hexdigest()
 
 
+def frozen_source(source, head):
+    # Linked worktrees share origin/main, which can advance during archive/export. The controller
+    # checks canonical main/CI freshness before upload; this worker protects only its immutable checkout.
+    actual = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=source, text=True).strip()
+    require(actual == head, 'Release source no longer equals the frozen main head')
+    require(not subprocess.check_output(['git', 'status', '--porcelain'], cwd=source), 'Release source is dirty')
+
+
 def admission(output):
     def swap():
         text = subprocess.check_output(['vm_stat'], text=True)
@@ -70,13 +78,7 @@ def main(arguments):
     require(key.is_file() and not key.stat().st_mode & 0o077, 'Existing ASC key is missing or not private')
     require(os.environ.get('CASSINI_SHERPA_LOCAL', '0') in ('', '0'), 'Local native-runtime overrides cannot be released')
 
-    def frozen_source():
-        for ref in ('HEAD', 'origin/main'):
-            value = subprocess.check_output(['git', 'rev-parse', ref], cwd=source, text=True).strip()
-            require(value == context['head'], 'Release source no longer equals the frozen main head')
-        require(not subprocess.check_output(['git', 'status', '--porcelain'], cwd=source), 'Release source is dirty')
-
-    frozen_source()
+    frozen_source(source, context['head'])
     admission(output)
     env = os.environ.copy()
     for name in ('tmp', 'cache', 'module-cache'):
@@ -171,7 +173,7 @@ def main(arguments):
     ipa = output / 'export/Cassini.ipa'
     run('inspect-export', ['ditto', '-x', '-k', str(ipa), str(output / 'export-inspection')], timeout=120)
     verify(output / 'export-inspection/Payload/Cassini.app', True)
-    frozen_source()
+    frozen_source(source, context['head'])
     artifact = {key: context[key] for key in ('head', 'version', 'build')}
     artifact.update(ipa=str(ipa), sha256=sha256(ipa), bytes=ipa.stat().st_size)
     temporary = output / 'artifact.json.tmp'
