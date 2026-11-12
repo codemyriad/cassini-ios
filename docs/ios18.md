@@ -18,7 +18,7 @@ The app reads the system once (`Cassini/App/LivePlatform.swift`) and passes the 
 | Apple speech (`SpeechAnalyzer`) | as before: the fallback candidate, checked per device and locale | none; its slot holds `UnavailableSpeechTranscriber`, which refuses every job |
 | Speech language in Settings | on devices that use Apple speech | never shown |
 | Whistle (bundled) | as before; the CPU features are read but not consulted | where the CPU reports FEAT_LSE and FEAT_LRCPC (`hw.optional.arm.*`) |
-| Parakeet Ultra (downloaded) | as before: at least 5 GiB of physical memory | the same rule |
+| Parakeet Ultra (downloaded) | on devices that report at least 3.25 GiB of physical memory (4 GB or more) | the same rule |
 | Background time for the queue and the standalone model download | `BGContinuedProcessingTask` when started from the screen | `beginBackgroundTask` only; `BGTaskScheduler` is never called |
 
 Whistle's other conditions are the same on both: an arm64 device, a verified bundle and at least 2 GiB of physical
@@ -36,10 +36,10 @@ The devices that stop at iOS 18 and cannot run iOS 26 (from Apple's support list
 | Device | Chip, memory | Engines on iOS 18 |
 |---|---|---|
 | iPhone XR | A12, 3 GB | Whistle only |
-| iPhone XS, XS Max | A12, 4 GB | Whistle only |
+| iPhone XS, XS Max | A12, 4 GB | Whistle, and Parakeet Ultra after its download. Parakeet has not been measured on an A12; a run that cannot get its memory before its first saved progress falls back to Whistle |
 | iPad (7th generation) | A10, 3 GB | none: the A10 lacks both CPU features and the memory for Parakeet. Recording, playback, search and export work; Transcribe is disabled |
 
-A newer device kept on iOS 18 follows the same rules: Whistle on every one (A12 or later), Parakeet from 5 GiB.
+A newer device kept on iOS 18 follows the same rules: Whistle on every one (A12 or later), Parakeet from 4 GB.
 
 The CPU rule is unit-tested with the A10's and the A12's values (`WhistleRequirementsTests`). That an app can read
 those `sysctl` keys on an iOS 18 device is shown on an iPhone 11 (A13, iOS 18.6.2) and an iPhone 15 (A16, iOS 18.0),

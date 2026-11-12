@@ -22,3 +22,8 @@ D50.2/D50.3 Markdown export copy and S-5 vectors are pinned to cassini-ux `7cdb0
 The selected Markdown entries remain byte-identical to Android's selected catalog; the full source catalog SHA-256
 is `8b20048485bd928d2067806284c381ffb8033768ecf084387600517d0006690f`. Per-file hashes and selected ids are recorded in
 `Packages/CassiniNotebook/Tests/CassiniNotebookTests/Resources/markdown/UPSTREAM.json`. No shared source was edited.
+
+The Whistle fallback notice (#117) is vendored from cassini-ux `7cdb069fb0b71953feeeb7a6805c63835f968540`,
+`strings/strings.json` (SHA-256 `8b20048485bd928d2067806284c381ffb8033768ecf084387600517d0006690f`): entry
+`models.parakeetUltra.noteFallback`, in `Notices.xcstrings` with all six locales, every value as in the catalog.
+The entries above stay at their pins; no shared source was edited.

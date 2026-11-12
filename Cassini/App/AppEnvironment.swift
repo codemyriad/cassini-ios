@@ -99,6 +99,14 @@ import CassiniEngineTesting
         return appleSpeechCandidate(platform: platform)
     }
 
+    /// The adapter of a job stored without a recognizer: the device's first one as it was when such jobs were stored
+    /// (`SpeechCapability.legacyJobsAreParakeets`), which on a 4 GB device is Apple's slot although `first` is now
+    /// Parakeet.
+    static func legacySpeechTranscriber(first: any Transcribing, apple: any Transcribing,
+                                        physicalMemory: UInt64 = ProcessInfo.processInfo.physicalMemory) -> any Transcribing {
+        first.recognizer == .parakeet && !SpeechCapability.legacyJobsAreParakeets(physicalMemory: physicalMemory) ? apple : first
+    }
+
     /// Apple's adapter where the facts say the system has Apple speech, else the candidate that refuses every job. The
     /// only place the app builds Apple's adapter: `LivePlatform.facts` has Apple speech exactly from iOS 26, and the
     /// availability check keeps facts made by hand (tests, the `--ios18-platform` launch) from reaching it below.
@@ -133,12 +141,13 @@ import CassiniEngineTesting
             whistle: whistleCapability, parakeetLinked: SherpaRuntime.isLinked, platform: platform)
         let models = PinnedModels(root: modelRoot, defaults: defaults, storage: storage,
             onInstallChange: { status in Task { @MainActor in AppEnvironment.modelInstallerChanged(status, speechModels: speechModels) } })
-        let legacy = speechTranscriber(models: models, defaults: defaults, platform: platform)
+        let first = speechTranscriber(models: models, defaults: defaults, platform: platform)
         let apple = appleSpeechCandidate(platform: platform)
+        let legacy = legacySpeechTranscriber(first: first, apple: apple)
         let whistle = WhistleTranscriber(acceptance: whistleCapability, memoryReport: InternalWhistle.writeReport,
             acceptanceProvider: { speechModels.whistleCapability })
         var candidates: [any Transcribing] = [apple, whistle]
-        if legacy.recognizer == .parakeet { candidates.append(legacy) }
+        if first.recognizer == .parakeet { candidates.append(first) }
         let speech = RoutedTranscriber(legacy: legacy, candidates: candidates) { speechModels.selectedRecognizer() }
         var value = AppEnvironment(
             root: root,
@@ -148,7 +157,7 @@ import CassiniEngineTesting
             playback: AVPlaybackAdapter(), audio: LocalAudioProcessing(), storage: storage,
             background: UIKitBackgroundRunner(platform: platform), notifier: UNNotifier(), platform: platform)
         value.speechModels = speechModels
-        value.downloadTranscriber = legacy.recognizer == .parakeet ? legacy : speech
+        value.downloadTranscriber = first.recognizer == .parakeet ? first : speech
         if laboratory {
             value.models = modelRoot
             value.exports = root.appendingPathComponent("Exports", isDirectory: true)

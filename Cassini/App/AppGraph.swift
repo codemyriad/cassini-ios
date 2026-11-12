@@ -131,7 +131,7 @@ import CassiniNotebook
             let job = TranscriptionJob(notes: notes, transcriber: environment.transcriber, analyzer: environment.analyzer,
                                        checkpoints: checkpoints, provenance: ProvenanceFiles(notes: notes),
                                        host: AppJobHost(settings: settings, voices: voices), clock: environment.clock,
-                                       drafts: drafts, uptimeMs: environment.transcriptionUptimeMs, diagnostics: environment.speechModels?.diagnostics(base: InternalWhistle.diagnostics) ?? InternalWhistle.diagnostics)
+                                       drafts: drafts, uptimeMs: environment.transcriptionUptimeMs, diagnostics: SpeechRunLog.diagnostics(base: environment.speechModels?.diagnostics(base: InternalWhistle.diagnostics) ?? InternalWhistle.diagnostics))
             let parts = TranscriptionCoordinator.Parts(
                 jobs: JobStore(repository: JobRepository(root: environment.root)), notes: notes, runner: job,
                 checkpoints: NoteWorkFolders(notes: notes, drafts: drafts),
@@ -150,7 +150,9 @@ import CassiniNotebook
                     }
                     return .recorded(settings: settings, speech: speech, speakers: environment.analyzer,
                         parakeetReady: { [models = environment.models] in ModelCatalog.parakeet.ready(in: models) })
-                }, eventUptimeMs: environment.launch.marksLaunchFinished ? environment.transcriptionUptimeMs : nil)
+                },
+                fallbackRecognizer: { job, _ in await SpeechFallback.recognizer(for: job, transcriber: environment.transcriber) },
+                eventUptimeMs: environment.launch.marksLaunchFinished ? environment.transcriptionUptimeMs : nil)
             return TranscriptionCoordinator(parts, settings: settings)
         }
         let models = ModelInstalls(transcriber: environment.downloadTranscriber ?? environment.transcriber, analyzer: environment.analyzer,

@@ -74,6 +74,7 @@ extension TranscriptionCoordinator {
             return .queued(changed: false)
         }
         trashed.remove(noteID)
+        await beginTranscription(noteID, kind: kind, replacing: existing)
         await mirror(noteID)
         await refresh()
         return .queued(changed: true)
@@ -93,10 +94,19 @@ extension TranscriptionCoordinator {
             await write { try await $0.transition(noteID, now: now) { $0.state = .needsConsent } }
         default:
             await write { try await $0.enqueue(noteID, kind: kind, language: language, now: now, waitingForConsent: true, recognizer: selected, replacingFailedRecognizer: adopts) }
+            await beginTranscription(noteID, kind: kind, replacing: existing)
         }
         await mirror(noteID)
         await refresh()
         return .needsConsent
+    }
+
+    /// A job the person asked for takes the place of `existing`. A Resume continues the job the note had, also one
+    /// handed to another recognizer; anything else is a new transcription, which ends the note's hand-over
+    /// (`Note.fallbackFailure`). A speakers-only job changes no words.
+    func beginTranscription(_ noteID: UUID, kind: JobKind, replacing existing: Job?) async {
+        guard kind != .speakersOnly, existing?.state != .paused, existing?.state != .needsConsent else { return }
+        await setFallbackFailure(noteID, nil)
     }
 
     /// Paused for `reason` with the numbers of the saved progress (none without it).

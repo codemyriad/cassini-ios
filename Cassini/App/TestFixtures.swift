@@ -104,10 +104,13 @@ enum TestFixtures {
         case .library, .recording, .voices, .speakers:
             break
         case .search, .reading:
+            // Whistle transcribed the review after Parakeet Ultra could not get its memory: its note says so.
+            var review = transcribed("Notes from the design review", at: now.addingTimeInterval(-9 * 86_400),
+                                     "The review agreed to keep the timeline focused and revisit the colours next week.")
+            review.fallbackFailure = .memory
             notes += [transcribed("Garden plans for the spring", at: now.addingTimeInterval(-3 * 86_400),
                                   "We could move the tomatoes to the sunny corner and leave Thursday free for planting."),
-                      transcribed("Notes from the design review", at: now.addingTimeInterval(-9 * 86_400),
-                                  "The review agreed to keep the timeline focused and revisit the colours next week.")]
+                      review]
         case .trash:
             var week = transcribed("Old interview draft", at: now.addingTimeInterval(-20 * 86_400), "An earlier take of the interview.")
             week.trashedAt = now.addingTimeInterval(-7 * 86_400)

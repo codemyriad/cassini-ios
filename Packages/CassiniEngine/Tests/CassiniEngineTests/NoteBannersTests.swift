@@ -225,6 +225,23 @@ import CassiniNotebook
         #expect(!NoteBanners.noSpeakers(note, job: job(.queued)))
     }
 
+    /// iOS: "Parakeet Ultra couldn’t run … so Whistle transcribed it." shows on a transcript made after a hand-over,
+    /// and not while a job of the note waits, runs or has failed, nor before there are words.
+    @Test func theFallbackNoticeShowsOnTheTranscriptAHandOverMade() {
+        var note = transcribed
+        #expect(!NoteBanners.transcribedByFallback(note, job: nil))
+        for failure in [JobFailure.memory, .model] {
+            note.fallbackFailure = failure
+            #expect(NoteBanners.transcribedByFallback(note, job: nil))
+            for state in [JobState.queued, .running, .paused, .failed] {
+                #expect(!NoteBanners.transcribedByFallback(note, job: job(state)), "\(state)")
+            }
+        }
+        var wordless = plain
+        wordless.fallbackFailure = .memory
+        #expect(!NoteBanners.transcribedByFallback(wordless, job: nil))
+    }
+
     @Test func aNoSpaceDownloadFailureNamesTheInstallsSize() throws {
         let failed = job(.failed, failure: .download(.notEnoughStorage))
         let banner = try #require(banners(plain, job: failed).first)

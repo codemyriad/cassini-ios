@@ -86,8 +86,10 @@ records their exact revisions.
   at once) or with "Open in Cassini" from another app. A file that is already in the library is not added twice. A
   Cassini document's verified transcripts are imported with it.
 - **Transcribe on the device** with the bundled Whistle model at once, or with Parakeet Ultra after a one-time download
-  of about 531 MB (Ultra, its speech detector and the speaker models, from Cassini's model host) on devices with at
-  least 5 GiB of memory. On iOS 26 or later, where neither Whistle nor a verified Parakeet can run, Cassini uses Apple's
+  of about 531 MB (Ultra, its speech detector and the speaker models, from Cassini's model host) on devices with
+  4 GB of memory or more (those that report at least 3.25 GiB). A Parakeet run that cannot get the memory it needs or
+  cannot load its model before it has saved any progress is run again with Whistle, for that note only; one that
+  has saved progress or speaker names fails and keeps them. On iOS 26 or later, where neither Whistle nor a verified Parakeet can run, Cassini uses Apple's
   `SpeechAnalyzer` after a model download for the speech language you choose; iOS 18 has no Apple speech, so a device
   that can run neither engine cannot transcribe there ([iOS 18](docs/ios18.md)). The queue is durable: jobs run one at a
   time and survive a relaunch. Progress is saved every 30 seconds of audio, so "Stop and keep progress", iOS taking the
@@ -166,8 +168,11 @@ TestFlight still need.
   the Note subtitle and the Document info Recorded row; the Note subtitle keeps the duration. Android repeats
   “Date unknown” on those surfaces. Neither app displays a document's sealing or import time as its recording date.
 - **Engines and thresholds.** D78 starts with bundled Whistle and promotes Parakeet Ultra after its pinned files
-  are verified. Parakeet needs at least 5 GiB physical RAM (the existing provisional rule) and the normal runtime
-  memory preflight; its download suggestion also checks the pinned install's actual disk requirement. Whistle's
+  are verified. Parakeet needs a device that reports at least 3.25 GiB of physical RAM (every 4 GB device and no 3 GB
+  one; Android asks for 4,000,000,000 bytes, which the 4 GB iPhone 12 and 13 do not report) and the normal runtime
+  memory preflight, whose figures were measured on four 4 GB devices on 2026-11-11. A Parakeet run that fails that
+  preflight or cannot load, and has no saved progress or draft speaker names, goes back to the front of the queue
+  for Whistle (iOS only: Android's run fails with `MEMORY`, as a run with saved progress does here); its download suggestion also checks the pinned install's actual disk requirement. Whistle's
   production pipeline and default-limit A12/3GB memory gate passed. On iOS 26 or later Apple Speech remains a
   separately checked fallback candidate when neither bundled nor verified downloaded speech is available; unsupported
   devices/locales are refused before queueing or download consent. On iOS 18 there is no Apple Speech: where Whistle
@@ -217,7 +222,7 @@ TestFlight still need.
   (the job pauses with its checkpoint, the download keeps its bytes), where Android keeps both running. The paused
   transcription resumes from its checkpoint when Cassini comes back to the screen (a proposal; Android's system pause
   waits for Resume); the download needs Try again. Whistle also needs Armv8.1 atomics and Armv8.3 RCpc, so the A10 iPad (7th generation) gets no
-  Whistle; with less than 5 GiB it gets no engine at all. The Whistle binary is built for iOS 27 and linked at 18.0
+  Whistle; with 3 GB it gets no engine at all. The Whistle binary is built for iOS 27 and linked at 18.0
   under the D75.2 exception as extended, which rests on the iOS 18.2 simulator evidence in
   [Whistle/README.md](Whistle/README.md) and two AWS Device Farm runs on 2026-11-10 (iPhone 11 on iOS 18.6.2, iPhone
   15 on iOS 18.0); no A12 or A10 device on iOS 18 has run it. The transcription's background pause was checked by

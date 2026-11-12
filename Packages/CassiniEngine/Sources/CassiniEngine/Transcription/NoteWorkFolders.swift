@@ -36,6 +36,18 @@ public struct NoteWorkFolders: JobCheckpoints {
         return SpeechRecognizer.fromCheckpoint(model: checkpoint.model)?.rawValue
     }
 
+    /// A checkpoint file, even one that cannot be read, or a `names.json` that says more than a fresh run's (which
+    /// holds only the Forget everyone generation). Without a names store, any `names.json` counts.
+    public func holdsDraft(_ noteID: UUID) async -> Bool {
+        if files.exists(noteID) { return true }
+        let names = files.directory(for: noteID).appendingPathComponent(DraftNamesStore.filename)
+        guard FileManager.default.fileExists(atPath: names.path) else { return false }
+        guard let drafts else { return true }
+        var draft = drafts.current(noteID)
+        draft.generation = 0
+        return draft != .empty
+    }
+
     public func discard(_ noteID: UUID) async throws {
         try files.discard(noteID)
         drafts?.release(noteID)

@@ -143,7 +143,7 @@ import CassiniNotebook
         #expect(facts.recognizer(platform: .iOS26) == .appleSpeech)
         facts.availableMemory = ParakeetMemory.beforeLoadBytes - 1
         #expect(facts.recognizer(platform: .iOS18) == .parakeet, "the run checks its headroom before it loads")
-        facts.physicalMemory = 4 << 30
+        facts.physicalMemory = 3 << 30
         #expect(facts.recognizer(platform: .iOS18) == nil)
         facts.physicalMemory = SpeechCapability.minimumPhysicalMemory
         facts.parakeetLinked = false
