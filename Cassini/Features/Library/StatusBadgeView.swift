@@ -38,7 +38,7 @@ struct StatusBadgeView: View {
         case .dot:
             Circle().fill(ink).frame(width: Metrics.dot, height: Metrics.dot)
         case .spinner:
-            ProgressView().tint(ink).scaleEffect(0.5)
+            ProgressView().tint(ink).dynamicTypeSize(.medium).scaleEffect(0.5)
                 .frame(width: Metrics.spinner, height: Metrics.spinner)
         case .alert:
             Image(systemName: "exclamationmark.triangle.fill")
