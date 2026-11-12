@@ -1,0 +1,75 @@
+# Observational for at least one day: this check does NOT replace drmeyers/test-all.
+name: Simulator gate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: simulator-gate-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || format('run-{0}', github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  simulator-gate:
+    name: Full simulator gate (observational)
+    # Evaluate before runner allocation/checkout. Fork PRs never execute on this pool.
+    if: github.repository == 'codemyriad/cassini-ios' && ((github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || ((github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'))
+    runs-on: [self-hosted, macOS, ARM64, cm-mac-m4]
+    timeout-minutes: 90
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
+      CASSINI_POST_STATUS: '0'
+      CASSINI_CONFORMANCE_REQUIRED: '1'
+      CASSINI_IOS18: full
+      CASSINI_UI_WORKERS: '0'
+      CASSINI_UI_IPAD: '1'
+      CASSINI_KEEP_SIMS: '0'
+      CASSINI_SIM_PREFIX: ci-ios-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # Compare the same immutable PR head as the legacy status, not a moving branch.
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+          path: cassini-ios
+      - uses: actions/checkout@v5
+        with:
+          repository: codemyriad/cassini-format
+          ref: 32f37a6200c88bdd4d23c1f44497f1761f3401da
+          persist-credentials: false
+          path: cassini-format
+      - name: Verify simulator runner
+        working-directory: cassini-ios
+        run: |
+          test -d "$DEVELOPER_DIR"
+          command -v xcodegen
+          xcodebuild -version
+          git rev-parse HEAD
+          xcrun simctl list runtimes
+          memory_pressure
+          vm_stat
+      - name: Complete gate without signing or status posting
+        working-directory: cassini-ios
+        run: |
+          if [ -x "$HOME/bin/heavy-run" ]; then
+            "$HOME/bin/heavy-run" scripts/test.sh all
+          else
+            scripts/test.sh all
+          fi
+      - name: Remove only this run's simulator clones
+        if: always()
+        working-directory: cassini-ios
+        run: scripts/test.sh clean
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: simulator-gate-${{ github.run_id }}-${{ github.run_attempt }}
+          path: cassini-ios/DerivedData.noindex/test-logs*
+          retention-days: 7
+          if-no-files-found: warn

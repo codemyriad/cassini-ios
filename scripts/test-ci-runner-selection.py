@@ -96,14 +96,52 @@ def select_runner(
 class CiRunnerSelectionTests(unittest.TestCase):
     def test_every_runs_on_is_a_hosted_image_or_the_guarded_selector(self):
         seen = list(job_runs_on_values())
-        self.assertEqual([(wf, job) for wf, job, _ in seen], [("ci.yml", "harness"), ("ci.yml", "fast-and-build"), ("daily-testflight.yml", "testflight")])
+        self.assertEqual([(wf, job) for wf, job, _ in seen], [("ci.yml", "harness"), ("ci.yml", "fast-and-build"), ("daily-testflight.yml", "testflight"), ("simulator-gate.yml", "simulator-gate")])
         for wf, job, value in seen:
             with self.subTest(workflow=wf, job=job):
                 if (wf, job) == ("daily-testflight.yml", "testflight"):
                     self.assertEqual(value, "[self-hosted, macOS, ARM64, cassini-ios-release-drmeyers]")
+                elif (wf, job) == ("simulator-gate.yml", "simulator-gate"):
+                    self.assertEqual(value, "[self-hosted, macOS, ARM64, cm-mac-m4]")
                 else:
                     self.assertTrue(HOSTED_IMAGE.match(value) or RUNNER_SELECTOR.match(value), value)
                 self.assertNotIn("fromJSON(vars", value)
+
+    def test_simulator_job_rejects_forks_and_untrusted_events_before_checkout(self):
+        text = (WORKFLOWS / "simulator-gate.yml").read_text()
+        guard = re.search(r"(?m)^    if: (.+)$", text).group(1).replace("&&", " and ").replace("||", " or ")
+        self.assertNotIn("pull_request_target:", text)
+        for event in ["push", "workflow_dispatch", "pull_request", "schedule", "pull_request_target", "workflow_run", "issue_comment"]:
+            for repo in ["codemyriad/cassini-ios", "fork/cassini-ios"]:
+                for head in ["codemyriad/cassini-ios", "fork/cassini-ios", "", None]:
+                    for ref in ["refs/heads/main", "refs/heads/feature", "refs/pull/123/merge"]:
+                        metadata = _NULL if head is None else SimpleNamespace(full_name=head)
+                        payload = SimpleNamespace(pull_request=SimpleNamespace(head=SimpleNamespace(repo=metadata)))
+                        github = SimpleNamespace(event_name=event, repository=repo, ref=ref,
+                                                 event=payload if event in ("pull_request", "pull_request_target") else _NULL)
+                        expected = repo == "codemyriad/cassini-ios" and (
+                            (event == "pull_request" and head == repo) or
+                            (event in ("push", "workflow_dispatch") and ref == "refs/heads/main"))
+                        with self.subTest(event=event, repo=repo, head=head, ref=ref):
+                            self.assertEqual(bool(eval(guard, {"__builtins__": {}}, {"github": github})), expected)
+
+    def test_simulator_gate_keeps_coverage_and_has_no_release_or_status_privileges(self):
+        text = (WORKFLOWS / "simulator-gate.yml").read_text()
+        self.assertRegex(text, r"(?m)^permissions:\n  contents: read\n")
+        for prohibited in ["secrets.", "GH_TOKEN:", "GITHUB_TOKEN:", "statuses: write", "id-token:",
+                           "altool", "testflight.py", "archive.py", "-allowProvisioningUpdates", "security ", "sudo "]:
+            self.assertNotIn(prohibited, text)
+        for line in ["CASSINI_POST_STATUS: '0'", "CASSINI_CONFORMANCE_REQUIRED: '1'", "CASSINI_IOS18: full",
+                     "CASSINI_UI_IPAD: '1'", "CASSINI_KEEP_SIMS: '0'", "fetch-depth: 0"]:
+            self.assertIn(line, text)
+        self.assertEqual(text.count("persist-credentials: false"), 2)
+        self.assertIn("github.event.pull_request.head.sha || github.sha", text)
+        self.assertIn("CASSINI_SIM_PREFIX: ci-ios-${{ github.run_id }}-${{ github.run_attempt }}", text)
+        self.assertIn("scripts/test.sh all", text)
+        self.assertNotIn("-only-testing", text)
+        self.assertNotIn("CASSINI_IOS18_RUNTIME:", text)
+        self.assertRegex(text, r"(?s)Remove only this run's simulator clones\n        if: always\(\).*?scripts/test.sh clean")
+        self.assertRegex(text, r"(?s)actions/upload-artifact@v5\n        if: always\(\).*?test-logs\*")
 
     def test_signing_job_only_accepts_main_manual_dispatch_in_the_canonical_repository(self):
         text = (WORKFLOWS / "daily-testflight.yml").read_text()

@@ -1,0 +1,4 @@
+self-hosted-runner:
+  labels:
+    - cm-mac-m4
+    - cassini-ios-release-drmeyers

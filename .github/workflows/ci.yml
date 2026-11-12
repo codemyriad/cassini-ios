@@ -2,8 +2,8 @@
 # and the network. It runs `scripts/test.sh fast` (the string catalogs and the Swift package tests, with the
 # conformance vectors required) and `scripts/test.sh build` (the app, its extension and the test bundles, built for the
 # iOS Simulator, then checked that no embedded binary needs a newer iOS than the app). The simulator tiers (hosted and
-# UI tests) stay local: the merge gate is the drmeyers/test-all status that `CASSINI_POST_STATUS=1 scripts/test.sh all`
-# posts (D66).
+# UI tests) also run in simulator-gate.yml as an observational check. The existing merge gate remains the
+# drmeyers/test-all status that `CASSINI_POST_STATUS=1 scripts/test.sh all` posts (D66), pending a day of comparison.
 #
 # Pull requests keep the code path filter. Every main push runs, including docs/tooling-only merges,
 # so unattended TestFlight always has an exact-head CI result to check.
@@ -38,6 +38,8 @@ on:
       - 'scripts/*testflight*'
       - 'scripts/launchd/**'
       - '.github/workflows/daily-testflight.yml'
+      - '.github/workflows/simulator-gate.yml'
+      - '.github/actionlint.yaml'
       - '.github/workflows/ci.yml'
   push:
     branches: [main]
