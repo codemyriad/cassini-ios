@@ -448,6 +448,50 @@ class ReleaseTests(unittest.TestCase):
         self.assertEqual(len(ledger), 9)
         self.assertEqual(ledger, pending['fragments'])
 
+    def finish_pending(self):
+        output = io.StringIO()
+        with patch.object(daily, 'command', self.command), patch.object(daily, 'gh', self.gh), \
+             patch.object(daily.os.path, 'ismount', side_effect=lambda *_: self.mounted), \
+             patch.object(daily.Path, 'is_relative_to', return_value=True), \
+             patch.object(daily.subprocess, 'run', self.fake_run), contextlib.redirect_stdout(output):
+            finished = daily.finish_pending(self.state, self.apple)
+        return finished, output.getvalue()
+
+    def test_an_upload_apple_has_not_opened_to_internal_testers_waits_and_the_hourly_check_finishes_it(self):
+        original = self.apple.finish
+        not_ready = daily.NotReadyYet('Internal TestFlight testing is not ready (PROCESSING)')
+        with patch.object(self.apple, 'finish', side_effect=not_ready):
+            self.publish()  # The slot: uploaded, Apple not ready. Not an error, and the intent stays.
+            waiting = json.loads(self.state.read_text())
+            self.assertEqual(waiting['pending']['build'], '12')
+            self.assertNotIn('head', waiting)
+            self.assertNotIn('published_fragments', waiting)
+            archives = sum('worktree' in call for call in self.calls)
+            # An hourly check while Apple is still not ready, then the next slot: nothing is fetched, archived or
+            # uploaded while that build waits.
+            self.calls.clear()
+            finished, said = self.finish_pending()
+            self.assertFalse(finished)
+            self.assertIn('TestFlight 0.1.0 (12)', said)
+            self.assertIn('no new upload', said)
+            self.assertIn('Apple reports PROCESSING', said)
+            self.assertNotIn('failed', said)
+            self.publish()
+            self.assertEqual([call for call in self.calls if call[0] == 'git'], [])
+            self.assertEqual(self.apple.uploads, ['12'])
+            self.assertEqual(json.loads(self.state.read_text())['pending'], waiting['pending'])
+        self.assertEqual(archives, 1)
+        self.apple.finish = original
+        finished, said = self.finish_pending()
+        self.assertTrue(finished)
+        self.assertIn('resumed TestFlight 0.1.0 (12)', said)
+        state = json.loads(self.state.read_text())
+        self.assertNotIn('pending', state)
+        self.assertEqual((state['head'], state['build']), (HEAD, '12'))
+        self.assertEqual(state['published_fragments'], {'english-feature.md': self.fragment_hash})
+        self.assertEqual(self.apple.uploads, ['12'])
+        self.assertEqual(self.finish_pending(), (True, ''), 'nothing pending: nothing to do')
+
     def test_failed_finalization_reloads_frozen_notes_and_only_then_advances_fragment_ledger(self):
         original = self.apple.finish
         with patch.object(self.apple, 'finish', side_effect=RuntimeError('not ready')):
@@ -667,6 +711,60 @@ class ReleaseTests(unittest.TestCase):
             self.assertEqual(payload['data']['attributes'], {'locale': 'en-US', 'whatsNew': 'New: You can export your notes.'})
             self.assertEqual(payload['data']['relationships']['build']['data']['id'], '12')
 
+    def apple_reporting(self, internal):
+        # The real Apple.finish over a processed, internal-only build whose internal state Apple reports as given.
+        apple = daily.Apple.__new__(daily.Apple)
+        detail = {'data': {'attributes': {} if internal is None else {'internalBuildState': internal}}}
+        return apple, [patch.object(apple, 'guard'), patch.object(apple, 'builds', return_value=[build(12)]),
+                       patch.object(apple, 'request', return_value=detail)]
+
+    def test_only_states_apple_leaves_on_its_own_are_a_wait_every_other_state_is_an_error_naming_it(self):
+        pending = dict(build='12', version='0.1.0', notes='New: You can export your notes.')
+        for internal in ['PROCESSING', 'READY_FOR_BETA_TESTING']:
+            apple, patches = self.apple_reporting(internal)
+            with self.subTest(internal=internal), patches[0], patches[1], patches[2] as request:
+                with self.assertRaises(daily.NotReadyYet) as raised:
+                    apple.finish(pending)
+                self.assertIn(internal, str(raised.exception))
+                self.assertTrue(all(len(call.args) == 1 for call in request.call_args_list), 'no write')
+        for internal in ['MISSING_EXPORT_COMPLIANCE', 'IN_EXPORT_COMPLIANCE_REVIEW', 'PROCESSING_EXCEPTION', 'EXPIRED',
+                         'A_STATE_APPLE_ADDS_LATER', None]:
+            apple, patches = self.apple_reporting(internal)
+            with self.subTest(internal=internal), patches[0], patches[1], patches[2] as request:
+                with self.assertRaises(RuntimeError) as raised:
+                    apple.finish(pending)
+                self.assertNotIsInstance(raised.exception, daily.NotReadyYet)
+                self.assertIn(f'Apple reports {internal}', str(raised.exception))
+                self.assertTrue(all(len(call.args) == 1 for call in request.call_args_list), 'no write')
+
+    def test_a_build_missing_export_compliance_fails_every_wake_and_keeps_its_intent(self):
+        # Through the real Apple.finish and the real main(): two hourly wakes between slots each end with a
+        # failure line that names Apple's state; neither says the build will finish by itself.
+        root = self.root
+        state_dir = root/'hourly-state'
+        state_dir.mkdir()
+        waiting = dict(pending=dict(version='0.1.0', build='12', head=HEAD, output=str(root), notes='New: You can export your notes.',
+                                    notes_format=daily.NOTES_FORMAT, fragments={}))
+        (state_dir/'state.json').write_text(json.dumps(waiting))
+        config = root/'hourly-config.json'
+        config.write_text(json.dumps(dict(state_dir=str(state_dir), source=str(self.source), notification_file=str(root/'inbox'))))
+        config.chmod(0o600)
+        apple, patches = self.apple_reporting('MISSING_EXPORT_COMPLIANCE')
+        for wake in (1, 2):
+            said, complained = io.StringIO(), io.StringIO()
+            with self.subTest(wake=wake), patches[0], patches[1], patches[2], \
+                 patch.object(daily, 'Apple', return_value=apple), patch.object(daily, 'wait_processing'), \
+                 patch.object(daily, 'external_output'), patch.object(daily, 'scheduled', return_value=False), \
+                 patch.object(daily.platform, 'node', return_value='drmeyers'), patch.object(daily.platform, 'system', return_value='Darwin'), \
+                 patch.object(daily.sys, 'argv', ['daily-testflight.py', '--scheduled', '--refresh-control', '--config', str(config)]), \
+                 contextlib.redirect_stdout(said), contextlib.redirect_stderr(complained):
+                self.assertEqual(daily.main(), 1)
+            self.assertIn('daily test release failed', complained.getvalue())
+            self.assertIn('Apple reports MISSING_EXPORT_COMPLIANCE', complained.getvalue())
+            self.assertNotIn('hourly check finishes it', said.getvalue() + complained.getvalue())
+            self.assertEqual(json.loads((state_dir/'state.json').read_text()), waiting)
+        self.assertEqual((root/'inbox').read_text().count('Apple reports MISSING_EXPORT_COMPLIANCE'), 2)
+
     def test_persisted_developer_text_cannot_reach_the_beta_notes_write(self):
         apple = daily.Apple.__new__(daily.Apple)
         with patch.object(apple, 'guard'), patch.object(apple, 'builds', return_value=[build(12)]), \
@@ -734,6 +832,26 @@ class SchedulerTests(unittest.TestCase):
              patch.object(daily, 'publish') as publish, contextlib.redirect_stdout(io.StringIO()):
             result = daily.main()
         return result, command, refresh, publish
+
+    def test_between_slots_a_waiting_upload_is_finished_without_ref_or_release_work(self):
+        (self.state/'state.json').write_text(json.dumps(dict(pending=dict(version='0.1.0', build='12', head=HEAD))))
+        with patch.object(daily, 'finish_pending', return_value=True) as finish:
+            result, command, refresh, publish = self.invoke(in_slot=False)
+        self.assertEqual(result, 0)
+        finish.assert_called_once_with(self.state/'state.json')
+        command.assert_not_called()
+        refresh.assert_not_called()
+        publish.assert_not_called()
+
+    def test_between_slots_a_waiting_upload_is_left_alone_while_another_release_holds_the_mutex(self):
+        (self.state/'state.json').write_text(json.dumps(dict(pending=dict(version='0.1.0', build='12', head=HEAD))))
+        with (self.state/'release.lock').open('a') as held:
+            fcntl.flock(held, fcntl.LOCK_EX)
+            with patch.object(daily, 'finish_pending') as finish:
+                result, _, _, publish = self.invoke(in_slot=False)
+        self.assertEqual(result, 0)
+        finish.assert_not_called()
+        publish.assert_not_called()
 
     def test_non_slot_hour_performs_no_ref_or_release_work(self):
         result, command, refresh, publish = self.invoke(in_slot=False)
