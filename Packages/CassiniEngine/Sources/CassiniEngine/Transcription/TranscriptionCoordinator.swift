@@ -66,6 +66,9 @@ public final class TranscriptionCoordinator {
     }
 
     public private(set) var state = ProcessingState()
+    /// The composed state, including changes requested by a synchronous observer of the previous publication.
+    @ObservationIgnored private var pendingState = ProcessingState()
+    @ObservationIgnored private var publishingState = false
     /// The launch repair has run and the queue may be read.
     public private(set) var isReady = false
     /// A drain loop runs: a job runs or is about to be claimed.
@@ -120,6 +123,10 @@ public final class TranscriptionCoordinator {
         let stop = StopSignal()
         let finished = OneShot()
         var cancel: CancelMode?
+        /// A delivered success has already sealed the transcript, even while the runner still owns its resources.
+        var hasSealedOutcome = false
+        /// Set before publication: repeated Stop from a willSet observer must not recursively acknowledge itself.
+        var hasAcknowledgedStop = false
         var run: Task<JobOutcome, Never>?
         var events: Task<Void, Never>?
 
@@ -132,6 +139,7 @@ public final class TranscriptionCoordinator {
         self.parts = parts
         self.settings = settings
         state.hold = settings.queueHold
+        pendingState = state
     }
 
     // MARK: Queue actions
@@ -170,18 +178,25 @@ public final class TranscriptionCoordinator {
         return outcome
     }
 
-    /// "Stop and keep progress" on the note that runs now. False when it does not run.
+    /// "Stop and keep progress" on the note that runs now. False when it does not run or has already sealed its
+    /// result. Acknowledges admission at once; the worker still owns its resources until its outcome is recorded.
     @discardableResult
     public func stop(_ noteID: UUID) -> Bool {
-        guard let current = active, current.noteID == noteID else { return false }
+        guard let current = active, current.noteID == noteID, !current.hasSealedOutcome else { return false }
         current.stop.stop(.pause(.user))
+        guard !current.hasAcknowledgedStop else { return true }
+        current.hasAcknowledgedStop = true
+        updateState { _ in }
+        // A new job can be stopped from its running snapshot's willSet, before its progress has begun. Do not
+        // acknowledge that Stop on the preceding note's progress; start() applies it after begin in that case.
+        if parts.progress?.noteID == current.noteID { parts.progress?.apply(.stopping) }
         return true
     }
 
     /// Stop from outside the note: holds the queue, then stops the running note with its progress.
     public func stopAll() {
         setHold(.user)
-        active?.stop.stop(.pause(.user))
+        if let current = active { stop(current.noteID) }
     }
 
     /// Continue: clears the hold and starts the queue.
@@ -269,27 +284,44 @@ public final class TranscriptionCoordinator {
     /// Reads the stored jobs into `state`: the jobs, the queue without the trashed notes, and the hold.
     func refresh() async {
         let all = await parts.jobs.all()
-        var next = state
-        next.jobs = Dictionary(uniqueKeysWithValues: all.map { ($0.noteID, $0) })
-        next.queue = all.filter { $0.state == .queued && !trashed.contains($0.noteID) }.map(\.noteID)
-        next.hold = settings.queueHold
-        if next != state { state = next }
+        updateState { next in
+            next.jobs = Dictionary(uniqueKeysWithValues: all.map { ($0.noteID, $0) })
+            next.queue = all.filter { $0.state == .queued && !trashed.contains($0.noteID) }.map(\.noteID)
+            next.hold = settings.queueHold
+        }
     }
 
     func setHold(_ hold: QueueHold?) {
         settings.queueHold = hold
-        state.hold = hold
+        updateState { $0.hold = hold }
     }
 
     /// The running job as the Note screen and the Library show it; nil once it ended.
     func setRunning(_ running: RunningJob?) {
-        if running != state.running { state.running = running }
+        updateState { $0.running = running }
     }
 
     /// The note went to Recently Deleted: its job never starts or counts as waiting from now on.
     func markTrashed(_ noteID: UUID) {
         trashed.insert(noteID)
-        state.queue.removeAll { $0 == noteID }
+        updateState { $0.queue.removeAll { $0 == noteID } }
+    }
+
+    /// Compose changes before notifying observers. Observation calls willSet before committing the value and
+    /// unregisters its one-shot callback only after that callback returns. A nested writer therefore updates the
+    /// pending value without notifying recursively; the outer writer publishes it before returning to its caller.
+    private func updateState(_ update: (inout ProcessingState) -> Void) {
+        update(&pendingState)
+        if let current = active, current.hasAcknowledgedStop, pendingState.running?.noteID == current.noteID {
+            pendingState.running?.phase = .stopping
+        }
+        guard !publishingState else { return }
+        publishingState = true
+        defer { publishingState = false }
+        while pendingState != state {
+            let next = pendingState
+            state = next
+        }
     }
 
     /// The launch repair has run: queue actions stop waiting, and a waiting queue starts when Cassini is on screen.

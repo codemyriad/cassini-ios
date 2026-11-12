@@ -5,6 +5,9 @@ extension RunningJob {
     /// The running job after `event`: its phase, and its overall progress where the event tells it. The progress never
     /// goes back within a run.
     public func applying(_ event: JobEvent) -> RunningJob {
+        // Events already in flight must not undo an admitted Stop. Checkpoint persistence is handled separately
+        // by the coordinator, and only the real outcome clears this running job.
+        guard phase != .stopping else { return self }
         var job = self
         switch event {
         case .waitingForPrevious:
