@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Local render lifecycle/manifest regressions. Fake renderers, real git worktrees; no simulators."""
 import importlib.util
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -21,9 +22,10 @@ def module(name, file):
     return result
 
 manifest = module("manifest", "screenshot-manifest.py")
+local = module("local", "pr-shots-local.py")
 events = module("events", "test-events.py")
 RENDER = '''#!/usr/bin/env python3
-import json,os,sys,subprocess,signal
+import json,os,sys,subprocess,signal,struct,zlib
 from pathlib import Path
 out=Path(sys.argv[sys.argv.index('--output')+1]);out.mkdir(parents=True)
 sha=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
@@ -34,6 +36,11 @@ if os.environ.get('WAIT_RENDER'):
  Path(os.environ['READY']).touch();signal.pause()
 if sha==os.environ.get('FAIL_SHA'):sys.exit(7)
 m=dict(source_sha=sha,xcode='fixture Xcode',image_version='fixture OS',devices=dict(prefix=os.environ['CASSINI_SIM_PREFIX']),quantize=os.environ['CASSINI_SHOTS_QUANTIZE'])
+m['shots']=[]
+for scheme,level in [('light',255),('dark',0)]:
+ def chunk(tag,data):return struct.pack('>I',len(data))+tag+data+struct.pack('>I',zlib.crc32(tag+data))
+ file=out/(scheme+'.png');file.write_bytes(bytes.fromhex('89504e470d0a1a0a')+chunk(b'IHDR',struct.pack('>IIBBBBB',10,10,8,2,0,0,0))+chunk(b'IDAT',zlib.compress((b'\\x00'+bytes([level])*30)*10))+chunk(b'IEND',b''))
+ m['shots'].append(dict(path=file.name,screen='library',lang='en',device='iphone',scheme=scheme))
 (out/'shots.json').write_text(json.dumps(m))
 if os.environ.get('CHANGE_HEAD'):(Path.cwd()/'untracked-ui.swift').touch()
 '''
@@ -101,7 +108,8 @@ class RenderTests(unittest.TestCase):
         self.command += ['--diff-tool', str(tool), '--pr', '123']
         result = self.run_tool(); self.assertEqual(result.returncode, 0, result.stdout)
         args = json.loads((self.root / 'output/pr-shots/changes.json').read_text())
-        self.assertEqual(args[args.index('--pr')+1], '123'); self.assertIn('--before-sha', args)
+        self.assertEqual(args[args.index('--pr')+1], '123'); self.assertIn('--base-sha', args)
+        self.assertIn('--head-sha', args); self.assertNotIn('--before-sha', args)
         self.assertIn('--before-dir', args); self.assertIn('--after-dir', args); self.assertNotIn('publish', args)
         self.check_cleanup()
 
@@ -158,6 +166,25 @@ class RenderTests(unittest.TestCase):
 
 
 class ManifestTests(unittest.TestCase):
+    def test_vendor_is_exact_pinned_shared_script_below_provenance_header(self):
+        lines = (ROOT/'scripts/pr-shots.py').read_bytes().splitlines(keepends=True)
+        self.assertIn(b'5ca44dee12614990c833cc6f49017dac7e184ae8', lines[1])
+        self.assertEqual(hashlib.sha256(lines[0]+b''.join(lines[2:])).hexdigest(),
+                         '769d2f2d872f9621c83858a633255093739b24e47c88f99c909de42108a27c42')
+
+    def test_missing_pair_and_dark_image_mislabelled_light_refuse(self):
+        from PIL import Image
+        with tempfile.TemporaryDirectory() as temp:
+            out = Path(temp)
+            rows = [dict(path=scheme+'.png', screen='library', lang='en', device='iphone', scheme=scheme)
+                    for scheme in ('light', 'dark')]
+            for row in rows:
+                Image.new('RGB', (10, 10), 'white' if row['scheme']=='light' else 'black').save(out/row['path'])
+            local.verify_schemes(out, rows)
+            with self.assertRaisesRegex(ValueError, 'light/dark pair'): local.verify_schemes(out, rows[:1])
+            Image.new('RGB', (10, 10), 'black').save(out/'light.png')
+            with self.assertRaisesRegex(ValueError, 'disagrees'): local.verify_schemes(out, rows)
+
     def test_rows_are_explicit_and_duplicate_or_outside_paths_refuse(self):
         with tempfile.TemporaryDirectory() as temp:
             out = Path(temp); file = out / 'ipad/dark/01-split-landscape.png'; file.parent.mkdir(parents=True)

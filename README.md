@@ -340,7 +340,9 @@ chosen folder. Capture runs through `simctl` and XCTest; no Simulator window is 
 For local before/after PR renders, fetch main and run (outside any enclosing heavy lock):
 
 ```sh
-scripts/pr-shots.sh --base origin/main --out /path/to/new/pr-render
+python3.12 -m venv /path/to/pr-shots-venv
+/path/to/pr-shots-venv/bin/pip install --isolated Pillow==11.3.0
+PATH="/path/to/pr-shots-venv/bin:$PATH" scripts/pr-shots.sh --base origin/main --pr 125 --out /path/to/new/pr-render
 ```
 
 The base is the merge base of that ref and the head worktree (`--head PATH` defaults to this checkout).
@@ -352,10 +354,11 @@ Output has `before/`, `after/`, per-side `shots.json`, capture/test logs (retain
 `--output` disables lossy pngquant by default and records actual runtime/device, locale, seed, test and pixel size;
 the 1200-pixel downscale remains. Existing normal README renders keep their previous compression behavior.
 
-The canonical cassini-ux `pr-shots.py` is owned by the shared-tool seat. Until it merges, this command produces
-renders/manifests only. Once available, `--diff-tool /path/to/pr-shots.py` (or a vendored `scripts/pr-shots.py`)
-adds `pr-shots/` using its `diff` command when `--pr N` is supplied. `--render-only` skips that step. Activate that tool's pinned Python/Pillow environment first;
-the wrapper uses `python3` from PATH.
+The canonical cassini-ux `pr-shots.py` is vendored from commit `5ca44dee12614990c833cc6f49017dac7e184ae8`.
+It adds `pr-shots/` using only its `diff` command; use your PR number with `--pr N`.
+`--render-only` skips that step and needs only Python's standard library. The wrapper uses `python3` from PATH.
+Before diffing it checks each screen has both appearances and probes the canvas against the scheme label
+(recording intentionally uses a dark canvas in both). CI runs those regressions and the canonical self-test.
 This wrapper never accesses GitHub or publishes; the coordinator alone uploads images and replaces PR blocks.
 
 `scripts/render-icon.swift` draws the app icon (`swift scripts/render-icon.swift` from the repository root).

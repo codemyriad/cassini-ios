@@ -18,6 +18,21 @@ def git(root, *args):
     return subprocess.check_output(["git", "-C", str(root), *args], text=True).strip()
 
 
+def verify_schemes(folder, rows):
+    from PIL import Image
+    pairs = {}
+    for row in rows:
+        pairs.setdefault((row['screen'], row['lang'], row['device']), set()).add(row['scheme'])
+        # Recording deliberately forces a dark canvas in both appearances.
+        if row['screen'] != 'recording':
+            with Image.open(folder / row['path']) as image:
+                rgb = image.convert('RGB').getpixel((8, 8))  # Unobscured canvas above the status bar.
+            if (sum(rgb) > 3 * 128) != (row['scheme'] == 'light'):
+                raise ValueError(f"appearance label disagrees with image: {row['path']}")
+    if not pairs or any(schemes != {'light', 'dark'} for schemes in pairs.values()):
+        raise ValueError('each screen/language/device needs a light/dark pair')
+
+
 def run_render(command, **kwargs):
     process = subprocess.Popen(command, start_new_session=True, **kwargs)
     try:
@@ -51,6 +66,8 @@ def render(head, base_ref, out, diff_tool=None, pr=None, repo="codemyriad/cassin
         raise FileNotFoundError(diff_tool)
     if tool and tool.is_file() and (pr is None or pr < 1):
         raise ValueError("--pr is required for the canonical diff (or use --render-only)")
+    if tool and tool.is_file():
+        from PIL import Image  # Fail before expensive rendering if the diff environment is missing.
     out.mkdir(parents=True, exist_ok=False)
     session = uuid.uuid4().hex
     env = dict(os.environ, CASSINI_SIM_PREFIX="ts-prshots-" + session[:12], CASSINI_SHOTS_QUANTIZE="0",
@@ -89,15 +106,18 @@ def render(head, base_ref, out, diff_tool=None, pr=None, repo="codemyriad/cassin
             report = dict(version=1, app="ios", base_sha=base_sha, head_sha=sha, run_id=session,
                           repo=repo, pr=pr, diff="pending canonical pr-shots.py")
             if tool and tool.is_file():
+                for side in ('before', 'after'):
+                    verify_schemes(out / side, manifests[side]['shots'])
                 command = [sys.executable, "-I", str(tool), "diff", "--layout", "ios", "--repo", repo,
                            "--pr", str(pr), "--before-dir", str(out / "before"), "--after-dir", str(out / "after"),
                            "--out", str(out / "pr-shots")]
                 for side, source_sha in (("before", base_sha), ("after", sha)):
+                    prefix = 'base' if side == 'before' else 'head'
                     m = manifests[side]
                     versions = sorted({v["runtime_version"] for v in m["devices"].values() if isinstance(v, dict)})
                     image = m["image_version"] + "; " + m["xcode"].replace("\n", "; ") + "; iOS " + ",".join(versions)
-                    command += [f"--{side}-sha", source_sha, f"--{side}-run", session,
-                                f"--{side}-runner", m.get("runner_label", "local"), f"--{side}-image", image]
+                    command += [f"--{prefix}-sha", source_sha, f"--{prefix}-run", session,
+                                f"--{prefix}-runner", m.get("runner_label", "local"), f"--{prefix}-image", image]
                 subprocess.run(command, check=True)
                 report["diff"] = "pr-shots"
         finally:
