@@ -28,11 +28,3 @@ struct Snackbar: View {
         .accessibilityActions { if let actionTitle { Button(actionTitle, action: action) } }
     }
 }
-
-extension Color {
-    /// The snackbar is ink on paper turned around; its action keeps at least 4.5:1 on it in both appearances.
-    static let snackbarBackground = Color.ink
-    static let snackbarText = Color.paper
-    static let snackbarAction = Color(light: UIColor(red: 1, green: 0.62, blue: 0.48, alpha: 1),
-                                      dark: UIColor(red: 0.62, green: 0.16, blue: 0.05, alpha: 1))
-}
