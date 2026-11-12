@@ -1,0 +1,27 @@
+name: Internal TestFlight
+on:
+  workflow_dispatch:
+# Calendar slots run locally on drmeyers via launchd, 09/14/20 Europe/Berlin, DST aware.
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+concurrency:
+  group: ios-internal-testflight
+  cancel-in-progress: false
+jobs:
+  testflight:
+    if: github.event_name == 'workflow_dispatch' && github.repository == 'codemyriad/cassini-ios' && github.ref == 'refs/heads/main'
+    # Exclusive drmeyers label; NEVER replace with cm-mac-m4, a rented Mac, or a hosted image.
+    runs-on: [self-hosted, macOS, ARM64, cassini-ios-release-drmeyers]
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Main-only internal TestFlight
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEVELOPER_DIR: /Applications/Xcode-27.0.0.app/Contents/Developer
+        run: /usr/bin/python3 scripts/daily-testflight.py --manual --config "$HOME/.config/cassini/ios-daily-release.json"
