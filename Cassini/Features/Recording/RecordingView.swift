@@ -36,7 +36,7 @@ struct RecordingView: View {
                     } label: {
                         Label { Text("Mark a moment", tableName: "Recording") } icon: { Image(systemName: "bookmark") }
                             .font(.subheadline).padding(.horizontal, 20).padding(.vertical, 12)
-                            .background(.recordingButtonWash, in: Capsule())
+                            .background(Color.recordingButtonWash, in: Capsule())
                     }
                     .disabled(!capturing).sensoryFeedback(.success, trigger: bookmarkFeedback).padding(.bottom, 24)
                     RecordingControls(isPaused: screen.phase == .paused, capturing: capturing,
@@ -96,7 +96,7 @@ private struct RecordingHeader: View {
         Button(action: minimise) {
             Image(systemName: "chevron.down").font(.headline)
                 .frame(width: HitTarget.minimum, height: HitTarget.minimum)
-                .background(.recordingButtonWash, in: Circle())
+                .background(Color.recordingButtonWash, in: Circle())
         }
         .accessibilityLabel(Text("Minimise to library (recording continues)", tableName: "Recording"))
     }
@@ -104,7 +104,7 @@ private struct RecordingHeader: View {
     private var formatLabel: some View {
         Text(RecordingCopy.format(format)).font(.caption.weight(.semibold)).monospacedDigit()
             .padding(.horizontal, 10).padding(.vertical, 6)
-            .background(.recordingButtonWash, in: Capsule())
+            .background(Color.recordingButtonWash, in: Capsule())
     }
 }
 
@@ -180,7 +180,7 @@ private struct RecordingControls: View {
             .frame(maxWidth: .infinity)
             Button(action: pauseOrResume) {
                 ZStack {
-                    Circle().fill(.recordingButtonWash).frame(width: 88, height: 88)
+                    Circle().fill(Color.recordingButtonWash).frame(width: 88, height: 88)
                     if isPaused { Circle().fill(Color.recordingLive).frame(width: 26, height: 26) } else { Image(systemName: "pause.fill").font(.system(size: 30)) }
                 }
             }
