@@ -35,6 +35,10 @@ on:
       - 'scripts/run-in-gui.py'
       - 'scripts/test-run-in-gui.py'
       - 'scripts/test-ci-runner-selection.py'
+      - 'scripts/pr-shots*'
+      - 'scripts/screenshot-manifest.py'
+      - 'scripts/screenshots.sh'
+      - 'scripts/test-pr-shots-local.py'
       - 'scripts/*testflight*'
       - 'scripts/launchd/**'
       - '.github/workflows/daily-testflight.yml'
@@ -74,6 +78,11 @@ jobs:
           python3 scripts/test-testflight-archive.py
           python3 scripts/test-test-events.py
           python3 scripts/test-swift-test-product.py
+          command -v python3.12 >/dev/null || brew install python@3.12
+          python3.12 -m venv "$RUNNER_TEMP/pr-shots-venv"
+          "$RUNNER_TEMP/pr-shots-venv/bin/pip" install --isolated Pillow==11.3.0
+          "$RUNNER_TEMP/pr-shots-venv/bin/python" -I scripts/pr-shots.py --self-test
+          "$RUNNER_TEMP/pr-shots-venv/bin/python" scripts/test-pr-shots-local.py
           python3 scripts/test-check-embedded-minos.py
           python3 scripts/test-test-runtime.py
       - name: Whistle pinned-input, SDK closure and runtime-export regressions

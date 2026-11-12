@@ -26,12 +26,11 @@ final class ScreenshotTests: XCTestCase {
         capture("01-library")
     }
 
-    /// The fixture note with its word times (the reading seed), paused 10 seconds in: a word of Sam's passage is the
-    /// active one.
+    /// The fixture note with its word times (the reading seed), paused at the start with its first word active.
     @MainActor func test02ReadAndListen() throws {
         let app = try launchPhone(["--seed", "reading", "--open-fixture", Self.fixture])
         XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 10))
-        skipTenSeconds(app)
+        waitForInitialPosition(app)
         capture("02-read-and-listen")
     }
 
@@ -157,7 +156,7 @@ final class ScreenshotTests: XCTestCase {
         return launch(arguments)
     }
 
-    /// The fixture note beside the Library, whose reading seed fills the sidebar, paused 10 seconds in.
+    /// The fixture note beside the Library, whose reading seed fills the sidebar, paused at its start.
     @MainActor private func launchPad(orientation: UIDeviceOrientation) throws -> XCUIApplication {
         try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad, "an iPad screenshot")
         XCUIDevice.shared.orientation = orientation
@@ -165,16 +164,14 @@ final class ScreenshotTests: XCTestCase {
         let app = launch(["--seed", "reading", "--open-fixture", Self.fixture])
         XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 10))
         XCTAssertTrue(row(app, "Garden plans for the spring").waitForExistence(within: 5))
-        skipTenSeconds(app)
+        waitForInitialPosition(app)
         return app
     }
 
-    @MainActor private func skipTenSeconds(_ app: XCUIApplication) {
-        let forward = app.buttons["skipForward"]
-        XCTAssertTrue(forward.waitForExistence(within: 5))
-        forward.tap()
+    @MainActor private func waitForInitialPosition(_ app: XCUIApplication) {
+        // Capturing just after tapping skipForward caught its transient pressed tint. Use an untouched player.
         let position = app.descendants(matching: .any)["playbackPosition"]
-        XCTAssertTrue(position.wait(until: NSPredicate(format: "value BEGINSWITH %@", "00:10"), within: 5))
+        XCTAssertTrue(position.wait(until: NSPredicate(format: "value BEGINSWITH %@", "00:00"), within: 5))
     }
 
     @MainActor private func row(_ app: XCUIApplication, _ title: String) -> XCUIElement {
