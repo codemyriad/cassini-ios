@@ -38,6 +38,8 @@ final class LibraryPlacementTests: XCTestCase {
         if checking { XCTAssertTrue(banner.label.contains("Checking files"), banner.label) }
         banner.tap()
         XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(within: 15), "The retained card opens Settings")
+        XCTAssertTrue(speech.wait(until: NSPredicate(format: "label CONTAINS %@", stage), within: 15),
+                      "The install stage survives navigation back to Settings")
         if !checking {
             let cancel = app.buttons["Cancel"].firstMatch
             XCTAssertTrue(cancel.waitForExistence(within: 15))
