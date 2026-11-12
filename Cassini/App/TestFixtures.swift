@@ -96,8 +96,8 @@ enum TestFixtures {
             notes = try seedSavedVoices(root: store.root, main: &main, now: now)
         case .brandSpeakers:
             // Six decided speaker slots plus the unnamed stone role, through real note/speaker views.
-            let names = ["Alex Morgan", "Sam Rivera", "Taylor Brooks", "Jordan Reed", "Casey Green", "Jamie Park",
-                         DefaultLabels.placeholder(7)]
+            let names = [DefaultLabels.placeholder(1), "Alex Morgan", "Sam Rivera", "Taylor Brooks", "Jordan Reed",
+                         "Casey Green", "Jamie Park"]
             main.title = "Community garden planning"
             main.bookmarks = []
             main.speakers = names.enumerated().map { NoteSpeaker(id: "brand-\($0.offset)", name: $0.element) }

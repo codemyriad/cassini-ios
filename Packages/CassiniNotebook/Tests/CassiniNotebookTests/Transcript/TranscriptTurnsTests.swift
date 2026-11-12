@@ -87,6 +87,34 @@ import Testing
         #expect(SpeakerTint.assign(["b", "a"], labels: labels)["a"] == .brown)
     }
 
+    @Test func unnamedFirstSpeakerDoesNotShiftNamingOrMergeAvatarSlots() throws {
+        let note = TranscriptFixtures.note([
+            .init("u", 0, 500, "Yes."), .init("a", 600, 1000, "Welcome."), .init("b", 1100, 1500, "Agreed.")
+        ], speakers: [.init(id: "u", name: "Speaker 1"), .init(id: "a", name: "Alex"), .init(id: "b", name: "Jamie")])
+        let transcript = NoteTranscripts.sealed(note)
+        #expect(transcript.speakerTints == ["u": .stone, "a": .vermilion, "b": .brown])
+        for id in ["u", "a", "b"] {
+            let input = try #require(NamingInput.of(note, speakerID: id, print: nil, voices: [],
+                                                   voicesReadOnly: false, voiceModelReady: false))
+            #expect(input.speakerTints == transcript.speakerTints)
+        }
+    }
+
+    @Test func draftAndRenamedInputsUseTheSameCurrentLabelAssignment() throws {
+        let input = NamingInput(speakerID: "a", label: "Alex", ordinal: 1,
+                                mergeTargets: [.init(speakerID: "u", name: "Speaker 1", ordinal: 0, speakingTime: 1),
+                                               .init(speakerID: "b", name: "Jamie", ordinal: 2, speakingTime: 1)], draft: true)
+        let draft = NoteTranscripts.draft([.init(speaker: "u", startMs: 0, endMs: 500, text: "Yes."),
+                                                  .init(speaker: "a", startMs: 600, endMs: 1000, text: "Welcome."),
+                                                  .init(speaker: "b", startMs: 1100, endMs: 1500, text: "Agreed.")],
+                                         tentativeFromMs: nil, labels: ["u": "Speaker 1", "a": "Alex", "b": "Jamie"])
+        #expect(input.speakerTints == draft.speakerTints)
+        var renamed = input
+        renamed.mergeTargets[0].name = "Morgan"
+        #expect(renamed.speakerTints == SpeakerTint.assign(["u", "a", "b"], labels: ["u": "Morgan", "a": "Alex", "b": "Jamie"]))
+        #expect(renamed.speakerTints != input.speakerTints, "Current labels participate in the palette key")
+    }
+
     // ports: SpeakerTintTest#theCycleWraps
     @Test func theCycleWraps() {
         #expect(SpeakerTint.named(0) == .vermilion)

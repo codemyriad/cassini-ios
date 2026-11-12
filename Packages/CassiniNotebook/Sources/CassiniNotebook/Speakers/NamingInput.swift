@@ -62,6 +62,15 @@ public struct NamingInput: Hashable, Sendable {
         self.draft = draft; self.willHavePrint = willHavePrint
     }
 
+    /// The same named-first-speaking slots used by transcript headers, including unnamed merge targets.
+    /// This is derived from the current labels so naming never leaves a stale avatar palette cached.
+    public var speakerTints: [String: SpeakerTint] {
+        let entries = [(speakerID, label, ordinal)] + mergeTargets.map { ($0.speakerID, $0.name, $0.ordinal) }
+        let order = entries.sorted { $0.2 != $1.2 ? $0.2 < $1.2 : $0.0 < $1.0 }.map { $0.0 }
+        let labels = Dictionary(entries.map { ($0.0, $0.1) }, uniquingKeysWith: { first, _ in first })
+        return SpeakerTint.assign(order, labels: labels)
+    }
+
     /// A print exists for the same-person question and the Remember switch.
     public var hasPrint: Bool { draft ? willHavePrint : print != nil }
 

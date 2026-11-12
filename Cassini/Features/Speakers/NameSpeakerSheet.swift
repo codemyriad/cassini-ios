@@ -49,7 +49,7 @@ struct NameSpeakerSheet: View {
             }
             .navigationDestination(isPresented: mergeShown) {
                 if let state, let merge = SpeakerNaming.mergeUI(state) {
-                    MergeSheet(merge: merge, sourceOrdinal: state.input.ordinal, send: send)
+                    MergeSheet(merge: merge, sourceOrdinal: state.input.ordinal, tints: state.input.speakerTints, send: send)
                 }
             }
         }
@@ -119,7 +119,7 @@ struct NameSpeakerSheet: View {
 
     private func header(_ ui: NameSheetUI) -> some View {
         HStack(spacing: 12) {
-            SpeakerAvatar(speaker: ui.label, ordinal: state?.input.ordinal ?? 0)
+            SpeakerAvatar(name: ui.label, tint: state?.input.speakerTints[speakerID] ?? .stone)
             VStack(alignment: .leading, spacing: 2) {
                 Text(shown(ui.label)).font(.headline).foregroundStyle(Color.ink).accessibilityAddTraits(.isHeader)
                 Text(SpeakersCopy.speaksFor(ui.speakingTime)).font(.caption).foregroundStyle(Color.muted)

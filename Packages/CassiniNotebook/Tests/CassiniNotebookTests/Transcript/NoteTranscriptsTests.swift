@@ -172,6 +172,7 @@ extension NoteTranscriptsTests {
         #expect(row.allSuggestions.first?.start == 3.05)
         #expect(row.interjections.first?.name == .placeholder(2, label: "Speaker 2"))
         #expect(row.interjections.first?.tint == .stone)
+        #expect(transcript.speakerTints["ben"] == .stone)
         let ben = try #require(NamingInput.of(note, speakerID: "ben", print: nil, voices: [voice],
                                               voicesReadOnly: false, voiceModelReady: false))
         let ada = try #require(NamingInput.of(note, speakerID: "ada", print: nil, voices: [voice],
@@ -184,6 +185,7 @@ extension NoteTranscriptsTests {
         #expect(named.turns[0].allSuggestions.isEmpty)
         #expect(named.speakers == ["ada", "ben"])
         #expect(named.turns[0].interjections.first?.tint == .brown)
+        #expect(named.speakerTints["ben"] == .brown)
     }
 
     @Test func aRepeatedChipSpeakerGetsOneSealedCardAndItsLatestDraftCard() throws {

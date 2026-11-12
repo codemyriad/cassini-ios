@@ -13,17 +13,9 @@ struct SpeakerAvatar: View {
         self.name = name; self.tint = tint; self.wash = wash; self.size = size
     }
 
-    /// A note's speaker: stone while it is a placeholder, else the tint of its place in the transcript.
-    init(speaker name: String, ordinal: Int, size: CGFloat = 40) {
-        self.init(name: name, tint: Self.tint(name: name, ordinal: ordinal), wash: Self.wash(name: name, ordinal: ordinal), size: size)
-    }
-
-    static func tint(name: String, ordinal: Int) -> Color {
-        DefaultLabels.placeholderNumber(name) != nil ? .unnamedSpeakerTint : Color.speakerTints[ordinal % Color.speakerTints.count]
-    }
-
-    static func wash(name: String, ordinal: Int) -> Color {
-        DefaultLabels.placeholderNumber(name) != nil ? .unnamedSpeakerWash : Color.speakerWashes[ordinal % Color.speakerWashes.count]
+    /// A note's speaker: use its canonical transcript/naming tint, never the all-speaker ordinal.
+    init(name: String, tint: SpeakerTint, size: CGFloat = 40) {
+        self.init(name: name, tint: tint.color, wash: tint.wash, size: size)
     }
 
     private var text: String {

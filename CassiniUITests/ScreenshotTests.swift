@@ -178,8 +178,8 @@ final class ScreenshotTests: XCTestCase {
         XCTAssertTrue(speakers.waitForExistence(within: 10))
         speakers.tapWhenSettled()
         XCTAssertTrue(app.buttons["speaker-brand-0"].waitForExistence(within: 5))
-        let unnamed = app.buttons["speaker-brand-6"]
-        XCTAssertTrue(app.scroll(attempts: 6) { unnamed.exists && unnamed.isHittable })
+        let last = app.buttons["speaker-brand-6"]
+        XCTAssertTrue(app.scroll(attempts: 6) { last.exists && last.isHittable })
         XCTAssertTrue(app.buttons["speaker-brand-0"].isHittable, "all seven speaker rows fit together")
         capture("16-seven-speaker-colours")
     }

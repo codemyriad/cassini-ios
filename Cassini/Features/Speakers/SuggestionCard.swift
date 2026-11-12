@@ -8,6 +8,7 @@ import CassiniNotebook
 struct SuggestionCard: View {
     let suggestion: SpeakerSuggestion
     let ordinal: Int
+    let tint: SpeakerTint
     let model: NoteScreenModel
     @State private var busy = false
 
@@ -15,7 +16,7 @@ struct SuggestionCard: View {
         VStack(alignment: .leading, spacing: 12) {
             Button { model.speakerTapped(suggestion.speakerID) } label: {
                 HStack(spacing: 10) {
-                    SpeakerAvatar(speaker: suggestion.label, ordinal: ordinal, size: 28)
+                    SpeakerAvatar(name: suggestion.label, tint: tint, size: 28)
                     Text(NoteCopy.speakerLabel(suggestion.label, id: suggestion.speakerID, ordinal: ordinal))
                         .font(.subheadline.weight(.semibold)).foregroundStyle(Color.ink)
                     Text(TimeText.clock(suggestion.start)).font(.caption.monospacedDigit()).foregroundStyle(Color.muted)

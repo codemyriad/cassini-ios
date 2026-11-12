@@ -1,6 +1,7 @@
 import SwiftUI
 import Testing
 import CryptoKit
+import CassiniNotebook
 @testable import Cassini
 
 @MainActor @Suite struct BrandTokenTests {
@@ -14,10 +15,10 @@ import CryptoKit
                 let slot = ordinal % 6 + 1
                 let expected = CassiniTokens.color(CassiniTokens.Role(rawValue: "speaker-\(slot)")!)
                 let wash = CassiniTokens.color(CassiniTokens.Role(rawValue: "avatar-\(slot)")!)
-                for (actual, reference) in [(SpeakerAvatar.tint(name: "Mira", ordinal: ordinal), expected),
-                                            (SpeakerAvatar.wash(name: "Mira", ordinal: ordinal), wash),
-                                            (SpeakerAvatar.tint(name: "Speaker 2", ordinal: ordinal), CassiniTokens.color(.speaker0)),
-                                            (SpeakerAvatar.wash(name: "Speaker 2", ordinal: ordinal), CassiniTokens.color(.avatar0))] {
+                for (actual, reference) in [(SpeakerAvatar(name: "Mira", tint: SpeakerTint.named(ordinal)).tint, expected),
+                                            (SpeakerAvatar(name: "Mira", tint: SpeakerTint.named(ordinal)).wash, wash),
+                                            (SpeakerAvatar(name: "Speaker 2", tint: SpeakerTint.stone).tint, CassiniTokens.color(.speaker0)),
+                                            (SpeakerAvatar(name: "Speaker 2", tint: SpeakerTint.stone).wash, CassiniTokens.color(.avatar0))] {
                     let a = ContrastTests.resolved(actual, scheme), b = ContrastTests.resolved(reference, scheme)
                     #expect(a.red == b.red && a.green == b.green && a.blue == b.blue && a.opacity == b.opacity)
                 }

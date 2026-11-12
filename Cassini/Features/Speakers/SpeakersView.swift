@@ -26,10 +26,15 @@ struct SpeakersView: View {
                     if let failure = note.speakerAnalysisFailure { Section { Text(failure.speakerAnalysisMessage).font(.callout) } }
                     Section {
                         let stats = SpeakerStats.of(note.transcript)
+                        let labels = Dictionary((note.speakers ?? []).map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
+                        let speaking = stats.filter { $0.wordCount > 0 }
+                        let spoken = Set(speaking.map(\.speakerID))
+                        let order = speaking.map(\.speakerID) + (note.speakers ?? []).map(\.id).filter { !spoken.contains($0) }
+                        let tints = SpeakerTint.assign(order, labels: labels)
                         ForEach(Array((note.speakers ?? []).enumerated()), id: \.element.id) { index, speaker in
                             let stat = stats.first { $0.speakerID == speaker.id }
                             Button { naming = SpeakerRef(id: speaker.id) } label: {
-                                SpeakerRow(speaker: speaker, ordinal: stat?.ordinal ?? index, speakingTime: stat?.speakingTime ?? 0)
+                                SpeakerRow(speaker: speaker, ordinal: stat?.ordinal ?? index, tint: tints[speaker.id] ?? .stone, speakingTime: stat?.speakingTime ?? 0)
                             }
                             .accessibilityIdentifier("speaker-\(speaker.id)")
                         }
@@ -76,12 +81,13 @@ struct SpeakerRef: Identifiable, Hashable {
 private struct SpeakerRow: View {
     let speaker: NoteSpeaker
     let ordinal: Int
+    let tint: SpeakerTint
     let speakingTime: Double
     @Environment(VoicesStore.self) private var voices
 
     var body: some View {
         HStack(spacing: 12) {
-            SpeakerAvatar(speaker: speaker.name, ordinal: ordinal)
+            SpeakerAvatar(name: speaker.name, tint: tint)
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
                     Text(NoteCopy.speakerLabel(speaker.name, id: speaker.id, ordinal: ordinal)).foregroundStyle(Color.ink)

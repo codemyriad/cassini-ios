@@ -113,6 +113,7 @@ public struct WordRef: Hashable, Sendable {
 /// word for the active word. Built once per transcript; the playback position only searches the index.
 public struct NoteTranscript: Hashable, Sendable {
     public let turns: [NoteTurn]
+    public let speakerTints: [String: SpeakerTint]
     private let starts: [TimeInterval]
     private let turnOf: [Int]
     private let inTurn: [Int]
@@ -124,12 +125,16 @@ public struct NoteTranscript: Hashable, Sendable {
         self.turns = turns
         var starts: [TimeInterval] = [], turnOf: [Int] = [], inTurn: [Int] = []
         var positions: [String: Int] = [:]
+        var speakerTints: [String: SpeakerTint] = [:]
         for (position, turn) in turns.enumerated() {
             positions[turn.id] = position
+            if let id = turn.speakerID { speakerTints[id] = turn.tint }
+            for chip in turn.interjections { if let id = chip.speakerID { speakerTints[id] = chip.tint } }
             for (index, word) in turn.words.enumerated() {
                 starts.append(word.start); turnOf.append(position); inTurn.append(index)
             }
         }
+        self.speakerTints = speakerTints
         // Reading order keeps each turn together; playback order remains chronological.
         // Equal starts retain canonical source order rather than the chips' display positions.
         let order = starts.indices.sorted {
