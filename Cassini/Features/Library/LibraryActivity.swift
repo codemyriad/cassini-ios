@@ -116,7 +116,7 @@ struct CaptureBar: View {
                 Label(LibraryCopy.importAudio, systemImage: "square.and.arrow.down")
                     .labelStyle(.iconOnly).font(.title3.weight(.semibold))
                     .frame(width: 52, height: 52)
-                    .background(Color.ink.opacity(0.06), in: Circle())
+                    .background(Color.ink.opacity(0.1), in: Circle())
             } else {
                 Label(LibraryCopy.importAudio, systemImage: "square.and.arrow.down")
                     .font(.subheadline.weight(.semibold)).fixedSize().frame(minWidth: 88, minHeight: 52)

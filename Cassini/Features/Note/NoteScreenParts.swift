@@ -121,7 +121,7 @@ struct DraftSection: View {
                     .foregroundStyle(Color.muted).accessibilityAddTraits(.isHeader)
                 if changing {
                     Text(NoteCopy.draftTag).font(.caption2.weight(.medium)).foregroundStyle(Color.muted)
-                        .padding(.horizontal, 8).padding(.vertical, 3).background(Color.ink.opacity(0.06), in: Capsule())
+                        .padding(.horizontal, 8).padding(.vertical, 3).background(Color.ink.opacity(0.1), in: Capsule())
                 }
             }
             TranscriptList(transcript: transcript, style: .draft, renamable: draft.namingOpen,

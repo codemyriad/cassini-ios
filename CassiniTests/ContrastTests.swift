@@ -33,7 +33,7 @@ import CassiniNotebook
     static let groupedRow = Color(uiColor: .secondarySystemGroupedBackground)
 
     static let tones: [(String, Tone)] = [("ok", .ok), ("info", .info), ("warn", .warn), ("error", .error), ("plain", .plain)]
-    static let surfaces: [(String, Color)] = [("paper", .paper), ("card", .card)]
+    static let surfaces: [(String, Color)] = [("paper", .paper), ("card", .card), ("meeting card", .cardRest)]
 
     /// One line per pair a screen draws.
     static let pairs: [Pair] = {
@@ -52,7 +52,7 @@ import CassiniNotebook
             text("accent on notice tint", .accentInk, on: .accentTint),
             text("processing on paper", .processing, on: .paper),
             text("paper on ink (selected filter)", .paper, on: .ink),
-            text("active word ink on teal", .highlightInk, on: .highlight),
+            text("active word ink on highlight", .highlightInk, on: .highlight),
             text("ink on a search match (warn 22 % on paper)", .ink, on: .paper, Color.highlight),
             text("snackbar text on snackbar", .snackbarText, on: .snackbarBackground),
             text("snackbar action on snackbar", .snackbarAction, on: .snackbarBackground),
@@ -64,7 +64,7 @@ import CassiniNotebook
             text("recording badge", .recordInk, on: .recordTint),
             text("recording text on recording background", .recordingText, on: .recordingBackground),
             text("recording secondary on recording background", .recordingSecondary, on: .recordingBackground),
-            text("recording secondary on recording control", .recordingSecondary, on: .recordingButtonWash),
+            text("recording secondary on recording control", .recordingSecondary, on: .recordingBackground, .recordingButtonWash),
             text("recording accent on recording background", .recordingAccent, on: .recordingBackground),
             text("label on recording finish", .onRecord, on: .recordingFinish),
             nonText("recording live dot on recording background", .recordingLive, on: .recordingBackground),

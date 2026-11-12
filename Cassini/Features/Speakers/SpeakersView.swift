@@ -26,11 +26,10 @@ struct SpeakersView: View {
                     if let failure = note.speakerAnalysisFailure { Section { Text(failure.speakerAnalysisMessage).font(.callout) } }
                     Section {
                         let stats = SpeakerStats.of(note.transcript)
-                        let labels = Dictionary((note.speakers ?? []).map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
                         let speaking = stats.filter { $0.wordCount > 0 }
                         let spoken = Set(speaking.map(\.speakerID))
                         let order = speaking.map(\.speakerID) + (note.speakers ?? []).map(\.id).filter { !spoken.contains($0) }
-                        let tints = SpeakerTint.assign(order, labels: labels)
+                        let tints = SpeakerTint.assign(order, speakers: note.speakers ?? [])
                         ForEach(Array((note.speakers ?? []).enumerated()), id: \.element.id) { index, speaker in
                             let stat = stats.first { $0.speakerID == speaker.id }
                             Button { naming = SpeakerRef(id: speaker.id) } label: {
@@ -93,7 +92,7 @@ private struct SpeakerRow: View {
                     Text(NoteCopy.speakerLabel(speaker.name, id: speaker.id, ordinal: ordinal)).foregroundStyle(Color.ink)
                     if case .auto(let id, _) = speaker.match, let voice = voices.voice(id), NameMatch.same(voice.name, speaker.name) {
                         Text(SpeakersCopy.auto).font(.caption2.weight(.semibold)).foregroundStyle(Color.toneInfo)
-                            .padding(.horizontal, 6).padding(.vertical, 2).background(Tone.info.background, in: Capsule())
+                            .padding(.horizontal, 6).padding(.vertical, 2).background(Color.ink.opacity(0.1), in: Capsule())
                     }
                 }
                 Text(SpeakersCopy.speaksFor(speakingTime)).font(.caption).foregroundStyle(Color.muted)

@@ -1,3 +1,3 @@
 kind: better
 ---
-Cassini has a teal accent, warm backgrounds in light mode and deep night blue in dark mode. Speaker names have six distinct colours, grey marks people not named yet, and meeting times are easier to read.
+Cassini has cool grey backgrounds and a navy accent in light mode. Speaker colours stay with each person when you name them or reorder Saved voices, and meeting times are easier to read.

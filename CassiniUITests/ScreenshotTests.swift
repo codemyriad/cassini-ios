@@ -173,7 +173,7 @@ final class ScreenshotTests: XCTestCase {
         capture("15-seven-speaker-meeting")
     }
 
-    /// The actual Speakers sheet makes all six named slots and the seventh unnamed avatar inspectable together.
+    /// The actual Speakers sheet shows an unnamed first speaker reserving slot zero, plus six named speakers.
     @MainActor func test16SevenSpeakerColours() throws {
         let app = try launchPhone(["--seed", "brandSpeakers", "--open-fixture", Self.fixture])
         let speakers = app.buttons["speakersButton"]

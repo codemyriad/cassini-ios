@@ -16,7 +16,7 @@ struct SearchField: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass").foregroundStyle(Color.muted).accessibilityHidden(true)
-                TextField(placeholder, text: $query, axis: .vertical)
+                TextField(placeholder, text: $query, prompt: Text(placeholder).foregroundStyle(Color.ink3), axis: .vertical)
                     .lineLimit(1...3)
                     .font(.body).autocorrectionDisabled().textInputAutocapitalization(.never)
                     .submitLabel(.search).focused($focused).onSubmit { focused = false }

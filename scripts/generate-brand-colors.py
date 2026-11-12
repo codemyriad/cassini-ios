@@ -61,7 +61,7 @@ PREVIEW_ALIASES = """
     static let recordingBackground = CassiniTokens.color(.ground, forcedDark: true)
     static let recordingText = CassiniTokens.color(.ink, forcedDark: true)
     static let recordingSecondary = CassiniTokens.color(.ink2, forcedDark: true)
-    static let recordingButtonWash = CassiniTokens.color(.neutralTint, forcedDark: true)
+    static let recordingButtonWash = CassiniTokens.color(.ink, forcedDark: true).opacity(0.1)
     static let recordingLine = CassiniTokens.color(.line, forcedDark: true)
     static let recordingAccent = CassiniTokens.color(.recordInk, forcedDark: true)
     static let recordingFinish = record
@@ -101,11 +101,17 @@ def render(root=ROOT):
         raise ValueError("unexpected brand pin source")
     if not re.fullmatch(r"[a-f0-9]{40}", pin.get("commit", "")) or pin.get("sha256") != digest:
         raise ValueError("brand pin/hash mismatch")
-    tokens = json.loads(raw)["tokens"]
-    active = {k: v for k, v in tokens.items() if v["status"] in ("decided", "placeholder")}
-    if len(active) != 49 or len(active) != len(tokens):
-        raise ValueError("expected all 49 decided brand roles")
-    for role, pair in active.items():
+    sheet = json.loads(raw)
+    tokens = sheet["tokens"]
+    active = {k: v for k, v in tokens.items() if v["status"] == "decided"}
+    if len(active) != 53 or len(active) != len(tokens):
+        raise ValueError("expected all 53 decided brand roles")
+    derived = sheet.get("derived", {})
+    if set(derived) != {"card-rest"} or derived["card-rest"]["status"] != "decided":
+        raise ValueError("expected decided card-rest derived role")
+    if any("check" in pair for pair in [*active.values(), *derived.values()]):
+        raise ValueError("brand roles must not retain provisional check marks")
+    for role, pair in {**active, **derived}.items():
         if not re.fullmatch(r"[a-z]+(?:-[a-z0-9]+)*", role):
             raise ValueError("invalid role name")
         for mode in ("light", "dark"):
@@ -128,6 +134,9 @@ enum CassiniTokens {{
     enum Role: String, CaseIterable {{
 {roles}
     }}
+    // Derived independently from the 53 token roles, byte-for-byte from the sheet's derived block.
+    static let cardRest = Color(light: rgba(0x{packed(derived['card-rest']['light'])}),
+                                dark: rgba(0x{packed(derived['card-rest']['dark'])}))
     private final class BundleAnchor: NSObject {{}}
     static let bundle = Bundle(for: BundleAnchor.self)
     private static let values: [Role: (UInt32, UInt32)] = [
@@ -146,7 +155,7 @@ enum CassiniTokens {{
 '''
     if not plumbing:
         aliases = "\n".join(f"    static let {role_name(role)} = CassiniTokens.color(.{role_name(role)})" for role in active)
-        swift = header + "extension Color {\n" + aliases + PREVIEW_ALIASES
+        swift = header + "extension Color {\n" + aliases + "\n    static let cardRest = CassiniTokens.cardRest" + PREVIEW_ALIASES
         colors = []
         for mode in ("light", "dark"):
             raw = active["accent"][mode].removeprefix("#")

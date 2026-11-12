@@ -35,7 +35,7 @@ struct NoteRow: View {
                 .accessibilityActions { accessibilityActions }
             content(format)
         }
-        .background(Color.surface,
+        .background(Color.cardRest,
                     in: RoundedRectangle(cornerRadius: Radius.card))
         .overlay {
             if selected {
@@ -130,7 +130,7 @@ struct RowChip: View {
         case .recording: (.recordInk, .recordTint)
         case .failed, .unplayable, .unreadable, .paused: (.warnInk, .warnTint)
         case .transcribed: (.success, .successTint)
-        case .transcribing, .queued, .newerFormat, .audioOnly: (.neutralInk, .neutralTint)
+        case .transcribing, .queued, .newerFormat, .audioOnly: (.neutralInk, Color.ink.opacity(0.1))
         }
     }
 }

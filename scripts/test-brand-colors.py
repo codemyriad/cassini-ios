@@ -38,6 +38,32 @@ class BrandGenerationTests(unittest.TestCase):
             self.assertEqual((ROOT / path).read_bytes(), generated, path)
         brand.check_literals(ROOT)
 
+    def test_all_53_roles_and_decided_card_rest_are_generated(self):
+        output = brand.render(self.root)[brand.OUTPUT].decode()
+        sheet = json.loads((self.root / brand.TOKEN).read_text())
+        self.assertEqual(len(sheet['tokens']), 53)
+        for name in ('sidebar', 'sidebar-mac', 'field', 'field-line'):
+            self.assertIn('case ' + brand.role_name(name) + ' = "' + name + '"', output)
+        self.assertIn('static let cardRest = Color(light: rgba(0xFAFAFBFF)', output)
+        self.assertIn('static let recordingButtonWash = CassiniTokens.color(.ink, forcedDark: true).opacity(0.1)', output)
+
+    def test_derived_drift_and_provisional_marks_fail_closed(self):
+        original = json.loads((ROOT / brand.TOKEN).read_text())
+        def repin(sheet):
+            raw = json.dumps(sheet).encode()
+            (self.root / brand.TOKEN).write_bytes(raw)
+            pin = json.loads((ROOT / brand.PIN).read_text()); pin['sha256'] = hashlib.sha256(raw).hexdigest()
+            (self.root / brand.PIN).write_text(json.dumps(pin))
+        import copy
+        sheet = copy.deepcopy(original); sheet['derived']['card-rest']['light'] = '#010203'
+        repin(sheet)
+        self.assertIn(b'0x010203FF', brand.render(self.root)[brand.OUTPUT])
+        for mutate in (lambda s: s['derived']['card-rest'].update(status='pending'),
+                       lambda s: s['tokens']['field'].update(check=['L-42']),
+                       lambda s: s['tokens']['field'].update(status='placeholder')):
+            sheet = copy.deepcopy(original); mutate(sheet); repin(sheet)
+            with self.assertRaises(ValueError): brand.render(self.root)
+
     def test_pin_hash_fault_is_rejected(self):
         pin = self.root / brand.PIN
         value = json.loads(pin.read_text()); value["sha256"] = "0" * 64
@@ -83,7 +109,7 @@ class BrandGenerationTests(unittest.TestCase):
             target = self.root / path; target.parent.mkdir(parents=True, exist_ok=True); target.write_bytes(data)
         brand.check_generated(self.root)
         generated = self.root / brand.OUTPUT
-        generated.write_bytes(generated.read_bytes().replace(b"0x007999FF", b"0x000000FF"))
+        generated.write_bytes(generated.read_bytes().replace(b"0x093351FF", b"0x000000FF"))
         with self.assertRaisesRegex(ValueError, "generated drift: CassiniShared/CassiniTokens.swift"):
             brand.check_generated(self.root)
 

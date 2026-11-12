@@ -173,7 +173,7 @@ struct TurnView: View, Equatable {
         }
         if style == .reading, let activeIndex, turn.words.indices.contains(activeIndex),
            let word = range(turn.range(ofWord: activeIndex)) {
-            // A teal wash keeps ink text. Active words carry no link, whose tint would win over it.
+            // The highlight wash keeps ink text. Active words carry no link, whose tint would win over it.
             result[word].foregroundColor = Color.highlightInk
             result[word].backgroundColor = Color.highlight
         }

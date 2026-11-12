@@ -90,7 +90,7 @@ private struct BannerButtonStyle: ButtonStyle {
             .foregroundStyle(filled ? Color.paper : Color.ink)
             .padding(.horizontal, 14).padding(.vertical, 7)
             .background {
-                if filled { Capsule().fill(Color.ink) } else { Capsule().strokeBorder(Color.ink.opacity(0.35)) }
+                if filled { Capsule().fill(Color.ink) } else { Capsule().fill(Color.ink.opacity(0.1)).overlay(Capsule().strokeBorder(Color.ink.opacity(0.35))) }
             }
             .opacity(configuration.isPressed ? 0.7 : 1)
             .frame(minHeight: HitTarget.minimum)

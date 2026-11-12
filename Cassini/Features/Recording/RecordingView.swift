@@ -137,7 +137,8 @@ private struct RecordingTitleField: View {
             Text("Title", tableName: "Recording").font(.footnote).foregroundStyle(Color.recordingSecondary).accessibilityHidden(true)
             HStack(spacing: 8) {
                 // Wraps rather than cutting a long title at large text sizes.
-                TextField(String(localized: "Title", table: "Recording"), text: $title, axis: .vertical)
+                TextField(String(localized: "Title", table: "Recording"), text: $title,
+                          prompt: Text("Title", tableName: "Recording").foregroundStyle(Color.ink3), axis: .vertical)
                     .lineLimit(1...3).font(.system(.title2)).focused($focused).submitLabel(.done)
                     .textInputAutocapitalization(.sentences).onSubmit { focused = false }
                     .accessibilityIdentifier("recordingTitle")

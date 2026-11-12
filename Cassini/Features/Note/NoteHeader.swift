@@ -45,7 +45,7 @@ struct NoteChipsRow: View {
                 Label(NoteCopy.version(version), systemImage: "clock.arrow.circlepath")
                     .font(.caption.weight(.medium)).foregroundStyle(Color.ink)
                     .padding(.horizontal, 10).padding(.vertical, 5)
-                    .background(Color.ink.opacity(0.06), in: Capsule())
+                    .background(Color.ink.opacity(0.1), in: Capsule())
             }
             .buttonStyle(.plain)
             .frame(minHeight: HitTarget.minimum)
@@ -56,7 +56,7 @@ struct NoteChipsRow: View {
             Label(NoteCopy.speakerCount(chips.speakers), systemImage: "person.2")
                 .font(.caption.weight(.medium)).foregroundStyle(Color.muted)
                 .padding(.horizontal, 10).padding(.vertical, 5)
-                .background(Color.ink.opacity(0.06), in: Capsule())
+                .background(Color.ink.opacity(0.1), in: Capsule())
         }
         .buttonStyle(.plain)
         .frame(minHeight: HitTarget.minimum)

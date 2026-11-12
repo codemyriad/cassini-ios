@@ -84,7 +84,7 @@ struct NameSpeakerSheet: View {
                     if let name = state?.name, name != text {
                         DispatchQueue.main.async { if nameField == text { nameField = name } }
                     }
-                })
+                }, prompt: Text(SpeakersCopy.nameField).foregroundStyle(Color.ink3))
                     .onAppear { nameField = ui.name }
                     .onChange(of: nameField) { _, text in
                         nameTyped(text)

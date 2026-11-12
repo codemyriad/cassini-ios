@@ -232,7 +232,7 @@ TestFlight still need.
   your library.
 - **Platform.** The app language is set in the Settings app. iOS has no system Back, so the back button carries the
   title of the screen below. The iPad has a split view. Rename is a sheet. Notifications are silent results with
-  hidden-preview text. The W1 preview reads the pinned Cassini palette (Linen/light, Saturn-night/dark) with system
+  hidden-preview text. The W1 preview reads the pinned Cassini palette (cool neutral grounds, navy light accent, and a blue/magenta/cyan/orange/violet/slate speaker cycle) with system
   sans fonts and Dynamic Type; contrast is checked by tests. Content width is
   capped at Android's 560 pt. The App Store build declares its privacy manifests, export compliance and memory
   entitlement.
