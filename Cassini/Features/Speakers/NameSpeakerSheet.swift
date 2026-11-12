@@ -159,7 +159,8 @@ struct NameSpeakerSheet: View {
             Button(yes.0) { send(yes.1) }.accessibilityIdentifier("questionYes")
             Button(no.0) { send(no.1) }.accessibilityIdentifier("questionNo")
         }
-        .listRowBackground(Color.warnTint.opacity(pulse ? 1 : 0.6))
+        // IOS-TOK-23: keep the existing pulse steps until Alex specifies a second warning tint.
+        .listRowBackground(Color.warnInk.opacity(pulse ? 0.3 : 0.1))
     }
 
     private func voiceRows(_ ui: NameSheetUI) -> some View {
