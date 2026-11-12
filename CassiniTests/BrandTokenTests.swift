@@ -25,6 +25,21 @@ import CryptoKit
         }
     }
 
+    @Test func forcedDarkRecordingUsesOnlyTheDarkBrandRolesInEitherAppearance() {
+        let pairs: [(Color, CassiniTokens.Role)] = [(.recordingBackground, .ground), (.recordingText, .ink),
+            (.recordingSecondary, .ink2), (.recordingButtonWash, .neutralTint), (.recordingLine, .line),
+            (.recordingAccent, .recordInk), (RecordingActivityColors.background, .ground),
+            (RecordingActivityColors.secondary, .ink2), (RecordingActivityColors.button, .neutralTint)]
+        for scheme in [ColorScheme.light, .dark] {
+            for (color, role) in pairs {
+                let actual = ContrastTests.resolved(color, scheme)
+                let expected = ContrastTests.resolved(CassiniTokens.color(role), .dark)
+                #expect(actual.red == expected.red && actual.green == expected.green
+                    && actual.blue == expected.blue && actual.opacity == expected.opacity)
+            }
+        }
+    }
+
     @Test func systemAccentAssetMatchesThePinnedRoleInBothModes() {
         for scheme in [ColorScheme.light, .dark] {
             let asset = ContrastTests.resolved(Color("AccentColor", bundle: CassiniTokens.bundle), scheme)

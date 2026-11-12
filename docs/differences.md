@@ -875,10 +875,11 @@ These features exist only on iOS. They were kept by decision.
 ### Look and accessibility
 
 - **Palette (W1 draft preview).** The pinned Cassini sheet supplies Linen/light and Saturn-night/dark, teal actions
-  and highlights, and separate Record/error/status roles. Values load from `CassiniShared/Brand/tokens.json` in the
-  app and widget. The six speaker colours and stone for unnamed speakers follow L-14, with token avatar/chip washes.
+  and highlights, and separate Record/error/status roles. `scripts/generate-brand-colors.py` turns `CassiniShared/Brand/tokens.json` into the app/widget role table
+  and native accent asset; CI checks both generated output and immutable upstream bytes. The six speaker colours and stone for unnamed speakers follow L-14, with token avatar/chip washes.
   Existing first-speaking assignment remains; mapping to file colourIndex is not adopted pending confirmation.
-  Recording retains its forced-dark ground pending L-08.
+  Recording retains the forced-dark policy pending L-08, using dark brand ground, ink, secondary ink and control washes.
+  Preview mode closes the plumbing-only HARMONY 10.1 compatibility exception: no legacy palette or fixed platform colours remain.
   Fonts are system sans with Dynamic Type and tabular times. Card title/meta use headline/footnote (17/13 at default).
   `BrandTokenTests` checks the pin, both appearances and the native accent asset. `ContrastTests` follows Android's
   `ContrastTest`. It checks every

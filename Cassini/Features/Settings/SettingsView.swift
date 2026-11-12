@@ -92,7 +92,7 @@ private struct SettingsForm: View {
                     BannerList(specs: banners, onAction: { spec, action in notices.perform(action, on: spec) },
                                onDismiss: notices.dismiss)
                 }
-                .listRowInsets(EdgeInsets()).listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets()).listRowBackground(Color.canvasClear)
             }
             if let speechModels = ports.speechModels {
                 if speechModels.shows(.settings) || speechModels.promotionVisible {
