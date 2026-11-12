@@ -31,6 +31,7 @@ public final class VoiceLibrary {
     public let folder: URL
     private let now: () -> Date
     public private(set) var voices: [SavedVoice] = []
+    private var nextSaveSequence = 0
     public private(set) var problem: VoiceProblem?
 
     /// Opens `<root>/PrivateVoices`, creating it when needed, and reads the saved voices.
@@ -61,8 +62,24 @@ public final class VoiceLibrary {
     public func save(_ values: [SavedVoice]) throws {
         refreshed()
         if let problem { throw VoiceLibraryError.readOnly(problem) }
-        try DurableFile.write(VoiceCodec.encode(values), to: voicesFile)
-        voices = values
+        guard Set(values.map(\.id)).count == values.count else { throw VoiceCodec.SaveOrderError.invalid }
+        let previous = Dictionary(uniqueKeysWithValues: voices.compactMap { voice in
+            voice.saveSequence.map { (voice.id, $0) }
+        })
+        var next = nextSaveSequence
+        var saved: [SavedVoice] = []
+        for voice in values {
+            if let sequence = previous[voice.id] { saved.append(voice.saved(at: sequence)) }
+            else {
+                guard next < Int.max else { throw VoiceCodec.SaveOrderError.exhausted }
+                saved.append(voice.saved(at: next))
+                next += 1
+            }
+        }
+        let state = VoiceCodec.State(voices: saved, nextSaveSequence: next)
+        try DurableFile.write(VoiceCodec.encode(state), to: voicesFile)
+        voices = saved
+        nextSaveSequence = next
     }
 
     /// The prints of every analysis of the note. A newer file reads as none and is kept; an unparseable one is set
@@ -89,17 +106,22 @@ public final class VoiceLibrary {
     /// Whether any note has prints on disk.
     public var hasEvidence: Bool { !noteFiles().isEmpty }
 
-    /// Forgets every saved voice and every print, and the copies of damaged files. Refused while `voices.json` is newer
+    /// Forgets every saved voice and every print, and the copies of damaged files. Keeps only the anonymous save-order
+    /// counter in an empty `voices.json`. Refused while `voices.json` is newer
     /// or unreadable.
     public func forgetAll() throws {
         refreshed()
         if let problem, problem != .damaged { throw VoiceLibraryError.readOnly(problem) }
         let fileManager = FileManager.default
+        // Keep only the non-identifying counter, so forgetting the final person never reuses their colour slot.
+        let next = problem == .damaged ? 0 : nextSaveSequence
+        try DurableFile.write(VoiceCodec.encode(.init(voices: [], nextSaveSequence: next)), to: voicesFile)
         for url in try fileManager.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
-        where url.lastPathComponent.hasPrefix("voices.json") || noteID(of: url) != nil {
+        where (url.lastPathComponent.hasPrefix("voices.json") && url != voicesFile) || noteID(of: url) != nil {
             try fileManager.removeItem(at: url)
         }
         voices = []
+        nextSaveSequence = next
         problem = nil
     }
 
@@ -142,6 +164,7 @@ public final class VoiceLibrary {
         let fileManager = FileManager.default
         guard fileManager.fileExists(atPath: voicesFile.path) else {
             voices = []
+            nextSaveSequence = 0
             problem = hasDamagedCopy ? .damaged : nil
             return
         }
@@ -153,7 +176,9 @@ public final class VoiceLibrary {
             return
         }
         do {
-            voices = try VoiceCodec.decode(data)
+            let state = try VoiceCodec.state(data)
+            voices = state.voices
+            nextSaveSequence = state.nextSaveSequence
             problem = hasDamagedCopy ? .damaged : nil
         } catch let error as UnsupportedVoiceFileVersion where error.newer {
             voices = []

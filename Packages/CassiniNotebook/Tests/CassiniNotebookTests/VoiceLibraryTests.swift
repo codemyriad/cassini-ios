@@ -25,8 +25,60 @@ import Testing
         try library().save(voices)
         let object = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: voicesFile)) as? [String: Any])
         #expect(object["version"] as? Int == 1)
-        #expect(try library().voices == voices)
+        #expect(try library().voices == voices.enumerated().map { $0.element.saved(at: $0.offset) })
         #expect(try library().problem == nil)
+    }
+
+    @Test func deletedSlotsAreNotReusedAfterAnEmptyListAndRelaunch() throws {
+        defer { cleanUp() }
+        let library = try library()
+        try library.save([F.voice("alex", "Alex"), F.voice("ben", "Ben")])
+        #expect(library.voices.map(\.saveSequence) == [0, 1])
+        try library.save(Array(library.voices.prefix(1)))
+        try library.save([])
+        let reopened = try self.library()
+        try reopened.save([F.voice("casey", "Casey")])
+        #expect(reopened.voices.first?.saveSequence == 2)
+        var renamed = try #require(reopened.voices.first)
+        renamed.name = "Zoe"
+        renamed.samples.append(VoiceSample(noteID: UUID(), print: F.print(F.axis(1))))
+        // A stale or replacement caller cannot change an already-saved person's immutable sequence.
+        try reopened.save([F.voice("devon", "Devon"), renamed.saved(at: 900)])
+        #expect(reopened.voices.map(\.saveSequence) == [3, 2])
+        #expect(try self.library().voices == reopened.voices)
+    }
+
+    @Test func legacySaveOrderSurvivesDeletingBeforeItsFirstWrite() throws {
+        defer { cleanUp() }
+        try write("""
+        {"version":1,"voices":[
+          {"id":"00000000-0000-0000-0000-000000000001","name":"Zoe","samples":[]},
+          {"id":"00000000-0000-0000-0000-000000000002","name":"Alex","samples":[]}
+        ]}
+        """, to: voicesFile)
+        let library = try library()
+        #expect(library.voices.map(\.saveSequence) == [0, 1])
+        try library.save(Array(library.voices.suffix(1)))
+        let reopened = try self.library()
+        try reopened.save(reopened.voices + [F.voice("ben", "Ben")])
+        #expect(reopened.voices.map(\.saveSequence) == [1, 2])
+    }
+
+    @Test func forgettingEveryoneRetainsOnlyTheAnonymousCounter() throws {
+        defer { cleanUp() }
+        let library = try library()
+        let voices = [F.voice("alex", "Alex"), F.voice("ben", "Ben")]
+        try library.save(voices)
+        try library.forgetAll()
+        let data = try Data(contentsOf: voicesFile)
+        let state = try VoiceCodec.state(data)
+        #expect(state.voices.isEmpty && state.nextSaveSequence == 2)
+        let text = String(decoding: data, as: UTF8.self)
+        #expect(!text.contains("Alex") && !text.contains("Ben"))
+        #expect(voices.allSatisfy { !text.contains($0.id.uuidString) })
+        let reopened = try self.library()
+        try reopened.save([F.voice("casey", "Casey")])
+        #expect(reopened.voices.first?.saveSequence == 2)
     }
 
     // ports: VoiceRepositoryTest#aNewerPeopleFileStaysReadOnly
@@ -84,7 +136,8 @@ import Testing
         try library.forgetAll()
         #expect(library.problem == nil)
         #expect(try self.library().problem == nil)
-        #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path).isEmpty)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path) == ["voices.json"])
+        #expect(try VoiceCodec.decode(Data(contentsOf: voicesFile)).isEmpty)
     }
 
     // ports: VoiceRepositoryTest#anUnreadablePeopleFileIsReadAgainAndAWriteErrorIsAnOutcome
@@ -132,7 +185,7 @@ import Testing
 
         #expect(library.voices.isEmpty)
         #expect(!library.hasEvidence)
-        #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path) == ["unrelated.txt"])
+        #expect(Set(try FileManager.default.contentsOfDirectory(atPath: folder.path)) == ["unrelated.txt", "voices.json"])
         #expect(try self.library().voices.isEmpty)
     }
 

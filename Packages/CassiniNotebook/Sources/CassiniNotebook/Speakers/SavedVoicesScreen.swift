@@ -9,6 +9,9 @@ public struct SavedVoiceSummary: Hashable, Sendable, Identifiable {
     public var stale: Bool
     public var id: UUID { voice.id }
     public var name: String { voice.name }
+    /// Saved order, independent of the current list's sort. Rendering cycles this through the six speaker roles.
+    public var saveSequence: Int { voice.saveSequence ?? 0 }
+    public var colourIndex: Int { saveSequence }
     public var confirmedSeconds: Double { voice.confirmedSpeech }
 }
 
@@ -20,9 +23,11 @@ public enum SavedVoiceList {
         for note in notes where note.trashedAt == nil {
             for voice in Set((note.speakers ?? []).compactMap(\.linkedVoiceID)) { counts[voice, default: 0] += 1 }
         }
-        return voices.map {
-            SavedVoiceSummary(voice: $0, notes: counts[$0.id] ?? 0,
-                              stale: VoiceStaleness.isStale($0, model: model, dimension: dimension))
+        return voices.enumerated().map { index, value in
+            // In-memory legacy/test callers get the same append-order migration as the persisted codec.
+            let voice = value.saveSequence == nil ? value.saved(at: index) : value
+            return SavedVoiceSummary(voice: voice, notes: counts[voice.id] ?? 0,
+                                     stale: VoiceStaleness.isStale(voice, model: model, dimension: dimension))
         }
             .sorted { a, b in
                 if a.notes != b.notes { return a.notes > b.notes }
