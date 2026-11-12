@@ -11,7 +11,7 @@ struct RecordingActivityWidget: Widget {
         ActivityConfiguration(for: RecordingActivityAttributes.self) { context in
             LockScreenRecording(state: context.state, noteID: context.attributes.noteID)
                 .activityBackgroundTint(RecordingActivityColors.background)
-                .activitySystemActionForegroundColor(.compatibilityWhite)
+                .activitySystemActionForegroundColor(Color.compatibilityWhite)
                 .widgetURL(RecordingLink.url)
         } dynamicIsland: { context in
             DynamicIsland {
@@ -54,10 +54,10 @@ private struct LockScreenRecording: View {
                 VStack(alignment: .leading, spacing: 2) {
                     (state.isPaused ? Text("Recording paused", tableName: "Recording") : Text("Recording", tableName: "Recording"))
                         .font(.caption.weight(.semibold)).foregroundStyle(RecordingActivityColors.secondary)
-                    Text(state.title).font(.headline).lineLimit(1).foregroundStyle(.compatibilityWhite)
+                    Text(state.title).font(.headline).lineLimit(1).foregroundStyle(Color.compatibilityWhite)
                 }
                 Spacer(minLength: 8)
-                RecordingTime(state: state).font(.title2.monospacedDigit()).foregroundStyle(.compatibilityWhite)
+                RecordingTime(state: state).font(.title2.monospacedDigit()).foregroundStyle(Color.compatibilityWhite)
             }
             if let warning = state.warning { WarningText(warning: warning) }
             RecordingButtons(isPaused: state.isPaused, noteID: noteID)
@@ -130,6 +130,6 @@ private struct RecordingButtons: View {
         .buttonStyle(.borderedProminent)
         .tint(RecordingActivityColors.button)
         .font(.subheadline.weight(.semibold))
-        .foregroundStyle(.compatibilityWhite)
+        .foregroundStyle(Color.compatibilityWhite)
     }
 }
