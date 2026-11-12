@@ -33,6 +33,23 @@ class BadgeStringGenerationTests(unittest.TestCase):
         self.assertIn('{n}', output['strings']['states.badge.transcribing']['localizations']['fr']['stringUnit']['value'])
         self.assertIn('{position}', output['strings']['meeting.interruptedAt']['localizations']['it']['stringUnit']['value'])
 
+    def test_generated_literal_calls_cover_every_key_and_both_outputs_reject_drift(self):
+        import re
+        generated = generator.render_lookup(self.root).decode()
+        keys = re.findall(r'String\(localized: "([^"]+)", table: "StatusBadge"', generated)
+        self.assertEqual(set(keys), generator.IDS)
+        self.assertEqual(len(keys), len(generator.IDS))
+        self.assertEqual(generated.encode(), (ROOT / generator.LOOKUP).read_bytes())
+        for path, expected in generator.outputs(self.root).items():
+            (self.root / path).parent.mkdir(parents=True, exist_ok=True)
+            (self.root / path).write_bytes(expected)
+        generator.check(self.root)
+        for path, expected in generator.outputs(self.root).items():
+            (self.root / path).write_bytes(expected + b' ')
+            try:
+                with self.assertRaisesRegex(ValueError, 'drift'): generator.check(self.root)
+            finally: (self.root / path).write_bytes(expected)
+
     def test_pin_rejects_changed_catalog_or_related_vector(self):
         for path in ('strings/strings.json', 'vectors/states/states-vectors.json', 'vectors/library-vectors/expected/main.json'):
             file = self.root / generator.SOURCE / path

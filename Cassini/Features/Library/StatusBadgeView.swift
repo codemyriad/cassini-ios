@@ -74,7 +74,6 @@ enum StatusBadgeCopy {
         let selected = Bundle.preferredLocalizations(from: Bundle.main.localizations,
             forPreferences: [language.replacingOccurrences(of: "_", with: "-")]).first ?? "en"
         let bundle = Bundle.main.path(forResource: selected, ofType: "lproj").flatMap(Bundle.init(path:)) ?? Bundle.main
-        return String(localized: String.LocalizationValue(stringLiteral: id), table: "StatusBadge", bundle: bundle,
-                      locale: Locale(identifier: language))
+        return StatusBadgeStrings.template(id, bundle: bundle, locale: Locale(identifier: language))
     }
 }

@@ -9,6 +9,7 @@ import re
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = Path('Packages/CassiniNotebook/Tests/CassiniNotebookTests/Resources/status-badges')
 OUTPUT = Path('Cassini/Resources/Strings/StatusBadge.xcstrings')
+LOOKUP = Path('Cassini/Features/Library/StatusBadgeStrings.swift')
 LANGUAGES = ('en', 'it', 'fr', 'es', 'pt-BR', 'pt-PT')
 IDS = {'states.badge.' + key for key in ('recording', 'importing', 'saving', 'transcribing', 'needsAttention',
        'interrupted', 'received', 'transcribing.noEta', 'transcribing.underMinute')} | {'meeting.interruptedAt'}
@@ -47,17 +48,43 @@ def render(root=ROOT):
     return (json.dumps({'sourceLanguage': 'en', 'strings': strings, 'version': '1.0'}, ensure_ascii=False, indent=2) + '\n').encode()
 
 
+def render_lookup(root=ROOT):
+    pin = json.loads((root / SOURCE / 'UPSTREAM.json').read_text())
+    lines = [f'// Generated from cassini-ux {pin["commit"]}; do not edit.',
+             'import Foundation', '', '/// Literal call sites keep Xcode extraction and the compiled catalog in agreement.',
+             'enum StatusBadgeStrings {',
+             '    static func template(_ id: String, bundle: Bundle, locale: Locale) -> String {',
+             '        switch id {']
+    for key in sorted(IDS):
+        lines += [f'        case "{key}":',
+                  f'            return String(localized: "{key}", table: "StatusBadge", bundle: bundle, locale: locale)']
+    lines += ['        default:', '            preconditionFailure("Unknown shared status badge key: \(id)")',
+              '        }', '    }', '}', '']
+    return '\n'.join(lines).encode()
+
+
+def outputs(root=ROOT):
+    # Validate every source and template before producing either generated output.
+    catalog = render(root)
+    return {OUTPUT: catalog, LOOKUP: render_lookup(root)}
+
+
+def check(root=ROOT):
+    for path, expected in outputs(root).items():
+        if not (root / path).exists() or (root / path).read_bytes() != expected:
+            raise ValueError(f'Generated {path.name} drift; run scripts/generate-status-badge-strings.py')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--check', action='store_true')
     args = parser.parse_args()
     try:
-        expected = render()
         if args.check:
-            if not (ROOT / OUTPUT).exists() or (ROOT / OUTPUT).read_bytes() != expected:
-                raise ValueError('Generated StatusBadge.xcstrings drift; run scripts/generate-status-badge-strings.py')
+            check()
         else:
-            (ROOT / OUTPUT).write_bytes(expected)
+            for path, expected in outputs().items():
+                (ROOT / path).write_bytes(expected)
     except (ValueError, KeyError, OSError) as error:
         parser.exit(1, str(error) + '\n')
 
