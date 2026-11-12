@@ -180,9 +180,10 @@ LITERAL = re.compile(
     rf"\b{COLOR_TYPES}(?:\s*\.\s*init)?\s*\(\s*{COLOR_COMPONENTS}\s*[:,]|"
     rf"\.init\s*\(\s*{COLOR_COMPONENTS}\s*[:,]|"
     r"#colorLiteral\s*\(|"
-    rf"\b{COLOR_TYPES}\.(?:system\w+|secondarySystem\w+|label|secondaryLabel|tertiaryLabel|{FIXED_NAMES})\b|"
+    rf"\b{COLOR_TYPES}\s*\.\s*(?:system\w+|secondarySystem\w+|label|secondaryLabel|tertiaryLabel|{FIXED_NAMES})\b|"
     r"\.(?:white|black|clear|orange|system(?:Red|Blue|Green|Orange|Yellow|Purple|Pink|Brown|Teal|Indigo|Gray[0-9]*))\b|"
-    rf"(?:foregroundStyle|foregroundColor|background|tint|fill|stroke|strokeBorder|color|{COLOR_TYPES})\(\.{FIXED_NAMES}\b|"
+    rf"(?:foregroundStyle|foregroundColor|background|tint|fill|stroke|strokeBorder|color|{COLOR_TYPES})\s*\(\s*\.{FIXED_NAMES}\b|"
+    rf"\bcolor\s*:\s*\.{FIXED_NAMES}\b|"
     r"#[a-fA-F0-9]{6}(?:[a-fA-F0-9]{2})?\b|\b0x[a-fA-F0-9]{6,8}\b")
 
 
