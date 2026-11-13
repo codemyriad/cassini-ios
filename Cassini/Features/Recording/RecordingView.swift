@@ -3,8 +3,8 @@ import CassiniEngine
 import CassiniNotebook
 
 /// The Recording screen, always dark on the night ground (L-08): the pinned header (back to all meetings, status,
-/// format), the title, the banner, the timer, waveform and hint in a scrolling middle, then Mark a moment and the
-/// pinned controls: All meetings on the left, Stop in the centre and Pause or Resume on the right (L-48, L-49). Before
+/// format), the title, the banner, the timer, waveform, hint and Mark a moment in a scrolling middle, then the pinned
+/// controls: All meetings on the left, Stop in the centre and Pause or Resume on the right (L-48, L-49). Before
 /// the capture runs and while it is saved, the caption says why and Stop, Pause and Mark a moment are disabled.
 struct RecordingView: View {
     @Environment(RecordingStore.self) private var recording
@@ -36,6 +36,15 @@ struct RecordingView: View {
                                 .multilineTextAlignment(.center).frame(maxWidth: 280)
                         }
                         Spacer(minLength: 16)
+                        Button {
+                            recording.addBookmark(); bookmarkFeedback += 1
+                        } label: {
+                            Label { Text("Mark a moment", tableName: "Recording") } icon: { Image(systemName: "bookmark") }
+                                .font(.subheadline).padding(.horizontal, 20).padding(.vertical, 12)
+                                .background(Color.recordingButtonWash, in: Capsule())
+                        }
+                        .disabled(!capturing).sensoryFeedback(.success, trigger: bookmarkFeedback)
+                        .padding(.bottom, 8)
                     }
                     .padding(.horizontal, 16)
                     .frame(maxWidth: ReadableWidth.content, minHeight: geometry.size.height)
@@ -43,19 +52,8 @@ struct RecordingView: View {
                 }
                 .scrollBounceBehavior(.basedOnSize)
             }
-            VStack(spacing: 20) {
-                Button {
-                    recording.addBookmark(); bookmarkFeedback += 1
-                } label: {
-                    Label { Text("Mark a moment", tableName: "Recording") } icon: { Image(systemName: "bookmark") }
-                        .font(.subheadline).padding(.horizontal, 20).padding(.vertical, 12)
-                        .frame(minHeight: HitTarget.minimum)
-                        .background(Color.recordingButtonWash, in: Capsule())
-                }
-                .disabled(!capturing).sensoryFeedback(.success, trigger: bookmarkFeedback)
-                RecordingControls(isPaused: screen.phase == .paused, capturing: capturing,
-                                  allMeetings: screen.minimise, pauseOrResume: screen.pauseOrResume, stop: screen.finish)
-            }
+            RecordingControls(isPaused: screen.phase == .paused, capturing: capturing,
+                              allMeetings: screen.minimise, pauseOrResume: screen.pauseOrResume, stop: screen.finish)
             .padding(.horizontal, 16).padding(.top, 12).padding(.bottom, 28)
         }
         .frame(maxWidth: ReadableWidth.content)
@@ -236,6 +234,7 @@ private struct SideControl<Glyph: View>: View {
                 glyph().frame(width: 52, height: 52)
                     .overlay(Circle().strokeBorder(Color.recordingLine, lineWidth: 1))
                 label.font(.footnote).foregroundStyle(Color.recordingSecondary).multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .contentShape(Rectangle())
         }

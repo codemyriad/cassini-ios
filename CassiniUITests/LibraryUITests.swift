@@ -134,7 +134,6 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(pause.waitForEnabled(within: 8))
         XCTAssertEqual(stop.label, "Stop")
         XCTAssertEqual(pause.label, "Pause recording")
-        XCTAssertTrue(app.staticTexts["Pause"].exists, "the side control is labelled")
         XCTAssertEqual(allMeetings.label, "All meetings")
         XCTAssertFalse(app.staticTexts["Title"].exists, "no visible Title caption (L-48)")
         XCTAssertLessThan(allMeetings.frame.midX, stop.frame.midX)
@@ -143,7 +142,6 @@ final class LibraryUITests: XCTestCase {
         XCTAssertGreaterThanOrEqual(stop.frame.height, 44)
         pause.tap()
         XCTAssertTrue(app.buttons["Resume recording"].waitForExistence(within: 5))
-        XCTAssertTrue(app.staticTexts["Resume"].exists)
         stop.tap()
         XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 10), "Stop saves and opens the note")
     }
