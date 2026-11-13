@@ -56,3 +56,11 @@ The iOS 18 combined accessibility audit has a separately documented baseline fai
 `SearchSpokenWordsTests` reproduces the search defects against the baseline and covers label-only matches, genuinely spoken names across a cached rename, inline-reply source mapping, a phrase crossing an inline label, paragraph-spanning snippets, and an eleven-hour transcript’s CPU scaling.
 
 The isolated worktree has no sibling cassini-format checkout. Validation therefore fetches the public `32f37a6200c88bdd4d23c1f44497f1761f3401da` vectors into the ignored build area and sets `CASSINI_CONFORMANCE` to that `spec/conformance` directory, with conformance required. The complete fast tier passes with independent schema validation enabled. The D84 integration check explicitly distinguishes labelled viewer text from spoken-only search text.
+
+## iOS 18 XCTest logging crash
+
+The full iOS 18.2 leg exposed two simulator-app crashes during ordinary accessibility queries, in the Versions/export flow and a fresh Settings launch. Both crash reports have the same stack: `_platform_strcmp` → `runtime_issue_os_log_fault_callback` in `XCTAutomationSupport` → `__LIBTRACE_CLIENT_QUARANTINED_DUE_TO_HIGH_LOGGING_VOLUME__`. Neither triggered stack contains app code. The failing run captured 123 MB of app-side XCTest query logs.
+
+Only actual iOS 18 UI-test app launches now set `OS_ACTIVITY_MODE=disable`. The two affected flows passed together; their app log fell from 10,871,488 bytes/177 query dumps at the default level to 248 bytes/no query dumps. The complete gate verifies sustained execution. The environment setting leaves production launches, hosted tests and iOS 26+ unchanged.
+
+This intentionally removes unified-log diagnostics, including logging-derived runtime-warning annotations, from the iOS 18 UI-test app process. Test assertions, accessibility audits, stdout/stderr and crash-report collection remain enabled. The test runner’s own logs remain available. [WebKit’s logging-mode reference](https://webkit.org/debugging-webkit/#logging) documents the process-level logging control.
