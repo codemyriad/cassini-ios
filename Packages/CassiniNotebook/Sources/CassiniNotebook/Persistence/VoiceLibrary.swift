@@ -106,25 +106,18 @@ public final class VoiceLibrary {
     /// Whether any note has prints on disk.
     public var hasEvidence: Bool { !noteFiles().isEmpty }
 
-    /// Forgets every saved voice and every print, and the copies of damaged files. Keeps only the anonymous save-order
-    /// counter in an empty `voices.json`. Refused while `voices.json` is newer
-    /// or unreadable.
+    /// Forgets every saved voice, every print and damaged copy, and the save-order history. Refused while
+    /// `voices.json` is newer or unreadable. Individual deletions through `save([])` keep their save-order counter.
     public func forgetAll() throws {
         refreshed()
         if let problem, problem != .damaged { throw VoiceLibraryError.readOnly(problem) }
         let fileManager = FileManager.default
-        // Keep only the non-identifying counter, so forgetting the final person never reuses their colour slot.
-        let next = problem == .damaged ? 0 : nextSaveSequence
-        try DurableFile.write(VoiceCodec.encode(.init(voices: [], nextSaveSequence: next)), to: voicesFile)
         for url in try fileManager.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
-        // Directory enumeration may canonicalise /var or another symlink while voicesFile retains its original URL.
-        // Compare the exact entry name, not URL identity, to keep the counter we just durably wrote.
-        where (url.lastPathComponent.hasPrefix("voices.json") && url.lastPathComponent != "voices.json")
-            || noteID(of: url) != nil {
+        where url.lastPathComponent.hasPrefix("voices.json") || noteID(of: url) != nil {
             try fileManager.removeItem(at: url)
         }
         voices = []
-        nextSaveSequence = next
+        nextSaveSequence = 0
         problem = nil
     }
 

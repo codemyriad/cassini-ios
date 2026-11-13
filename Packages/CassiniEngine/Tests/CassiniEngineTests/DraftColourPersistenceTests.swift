@@ -25,10 +25,11 @@ struct DraftColourPersistenceTests {
         let b = DraftWord(speaker: "b", startMs: 400, endMs: 500, text: "Third")
         store.observe(.windowDone(doneMs: 300, totalMs: 1000, words: [old, a]), noteID: id)
         let fresh = DraftNamesStore(root: root) { _ in folder }
-        #expect(fresh.current(id).colourIndices == ["old": maximum, "a": 1])
+        #expect(fresh.current(id).colourIndices == ["old": maximum, "a": 0])
         fresh.observe(.draft(words: [old, a, b], tentativeFromMs: 500), noteID: id)
         let final = DraftNamesStore(root: root) { _ in folder }.current(id)
-        #expect(final.colourIndices == ["old": maximum, "a": 1, "b": 2])
+        #expect(final.colourIndices == ["old": maximum, "a": 0, "b": 1])
+        #expect(Set(final.colourIndices.values).count == final.colourIndices.count)
         #expect(final.colourIndices.values.allSatisfy { (0...maximum).contains($0) })
         #expect(try JSONDecoder().decode(DraftNames.self, from: final.encoded()) == final)
     }

@@ -129,9 +129,9 @@ struct DraftSection: View {
                            suggestion: { turn in
                                guard draft.namingOpen, !turn.allSuggestions.isEmpty else { return nil }
                                return AnyView(VStack(spacing: 12) {
-                                   ForEach(turn.allSuggestions, id: \.speakerID) { suggestion in
-                                       let ordinal = transcript.speakers.firstIndex(of: suggestion.speakerID) ?? 0
-                                       SuggestionCard(suggestion: suggestion, ordinal: ordinal, tint: transcript.speakerTints[suggestion.speakerID] ?? .stone, model: model)
+                                   ForEach(turn.allSuggestions, id: \.byteSpeakerID) { suggestion in
+                                       let ordinal = transcript.speakers.firstIndex { Data($0.utf8) == Data(suggestion.speakerID.utf8) } ?? 0
+                                       SuggestionCard(suggestion: suggestion, ordinal: ordinal, tint: transcript.speakerTint(for: suggestion.speakerID) ?? .stone, model: model)
                                    }
                                })
                            })

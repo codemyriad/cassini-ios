@@ -38,6 +38,7 @@ public struct NoteSpeaker: Identifiable, Hashable, Sendable {
     public var provenance: Provenance
 
     public var id: String
+    public var byteID: Data { Data(id.utf8) }
     public var name: String {
         didSet {
             // Explicit provenance is authoritative, including a person's literal name "Speaker 2".

@@ -27,16 +27,16 @@ struct SpeakersView: View {
                     Section {
                         let stats = SpeakerStats.of(note.transcript)
                         let speaking = stats.filter { $0.wordCount > 0 }
-                        let spoken = Set(speaking.map(\.speakerID))
-                        let order = speaking.map(\.speakerID) + (note.speakers ?? []).map(\.id).filter { !spoken.contains($0) }
+                        let spoken = Set(speaking.map { Data($0.speakerID.utf8) })
+                        let order = speaking.map(\.speakerID) + (note.speakers ?? []).map(\.id).filter { !spoken.contains(Data($0.utf8)) }
                         let catalog = note.speakers ?? []
                         let palette = catalog.contains { $0.colourIndex == nil }
                             ? Note.assignColourIndices(catalog, order: SpeakerColourOrder.segments(note.transcript)) : catalog
-                        let tints = SpeakerTint.assign(order, speakers: palette)
-                        ForEach(Array((note.speakers ?? []).enumerated()), id: \.element.id) { index, speaker in
-                            let stat = stats.first { $0.speakerID == speaker.id }
+                        let tints = SpeakerTint.assignByID(order, speakers: palette)
+                        ForEach(Array((note.speakers ?? []).enumerated()), id: \.element.byteID) { index, speaker in
+                            let stat = stats.first { Data($0.speakerID.utf8) == speaker.byteID }
                             Button { naming = SpeakerRef(id: speaker.id) } label: {
-                                SpeakerRow(speaker: speaker, ordinal: stat?.ordinal ?? index, tint: tints[speaker.id] ?? .stone, speakingTime: stat?.speakingTime ?? 0)
+                                SpeakerRow(speaker: speaker, ordinal: stat?.ordinal ?? index, tint: tints[speaker.byteID] ?? .stone, speakingTime: stat?.speakingTime ?? 0)
                             }
                             .accessibilityIdentifier("speaker-\(speaker.id)")
                         }
@@ -61,7 +61,7 @@ struct SpeakersView: View {
             .paperListBackground()
             .navigationTitle(SpeakersCopy.speakersTitle).navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button(SpeakersCopy.done) { dismiss() } } }
-            .sheet(item: $naming) { NameSpeakerSheet(model: model.naming($0.id)) }
+            .sheet(item: $naming) { NameSpeakerSheet(model: model.naming($0.speakerID)) }
             .alert(SpeakersCopy.addSpeaker, isPresented: $adding) {
                 TextField(SpeakersCopy.nameField, text: $newName)
                 Button(SpeakersCopy.cancel, role: .cancel) {}
@@ -77,7 +77,11 @@ struct SpeakersView: View {
 
 /// A speaker id the naming sheet opens for.
 struct SpeakerRef: Identifiable, Hashable {
-    let id: String
+    let speakerID: String
+    var id: Data { Data(speakerID.utf8) }
+    init(id: String) { speakerID = id }
+    static func == (lhs: Self, rhs: Self) -> Bool { lhs.id == rhs.id }
+    func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }
 
 private struct SpeakerRow: View {

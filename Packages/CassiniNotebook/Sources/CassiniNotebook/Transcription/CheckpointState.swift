@@ -299,7 +299,7 @@ extension TranscriptSegment {
             group.removeAll(keepingCapacity: true)
         }
         for word in words {
-            if let previous = group.last, previous.speaker != word.speaker || group.count >= maxGroupWords
+            if let previous = group.last, Data(previous.speaker.utf8) != Data(word.speaker.utf8) || group.count >= maxGroupWords
                 || word.startMs - previous.endMs > maxGroupGapMs { flush() }
             group.append(word)
         }

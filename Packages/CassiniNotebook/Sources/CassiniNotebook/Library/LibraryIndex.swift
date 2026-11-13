@@ -19,7 +19,7 @@ public struct LibraryIndex: Sendable {
             preview = note.transcriptPreview.map {
                 Highlighted($0.text, leadingEllipsis: $0.leadingEllipsis, trailingEllipsis: $0.trailingEllipsis)
             } ?? LibraryMapping.storedPreview(note.previewText)
-            speakerCount = Set(note.transcript.compactMap { $0.speakerID ?? $0.speaker }).count
+            speakerCount = Set(note.transcript.compactMap { $0.speakerID ?? $0.speaker }.map { Data($0.utf8) }).count
             hasWords = note.transcript.contains { $0.text.contains { !$0.isWhitespace } }
         }
     }

@@ -28,31 +28,41 @@ public enum SpeakerTint: CaseIterable, Hashable, Sendable {
     }
 
     public static func assign(_ order: [String], speakers: [NoteSpeaker]) -> [String: SpeakerTint] {
-        let stored = Dictionary(speakers.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        var result: [String: SpeakerTint] = [:]
-        for id in order where result[id] == nil {
-            result[id] = stored[id].map { of($0, fallbackIndex: result.count) } ?? .stone
+        let exact = assignByID(order, speakers: speakers)
+        return Dictionary(order.compactMap { id in exact[Data(id.utf8)].map { (id, $0) } },
+                          uniquingKeysWith: { first, _ in first })
+    }
+
+    public static func assignByID(_ order: [String], speakers: [NoteSpeaker]) -> [Data: SpeakerTint] {
+        let stored = Dictionary(speakers.map { ($0.byteID, $0) }, uniquingKeysWith: { first, _ in first })
+        var result: [Data: SpeakerTint] = [:]
+        for id in order {
+            let key = Data(id.utf8)
+            guard result[key] == nil else { continue }
+            result[key] = stored[key].map { of($0, fallbackIndex: result.count) } ?? .stone
         }
         return result
     }
+
 }
 
 /// Colour allocation follows earliest timed speech; canonical transcript/render order stays untouched.
 public enum SpeakerColourOrder {
     public static func earliest<S: Sequence>(_ values: S, id: (S.Element) -> String?,
                                              start: (S.Element) -> Double) -> [String] {
-        var first: [String: (time: Double, position: Int)] = [:]
+        var first: [Data: (id: String, time: Double, position: Int)] = [:]
         for (position, value) in values.enumerated() {
             guard let speaker = id(value) else { continue }
+            let key = Data(speaker.utf8)
             let raw = start(value), time = raw.isFinite ? raw : .infinity
-            if let previous = first[speaker] {
-                if time < previous.time { first[speaker] = (time, previous.position) }
-            } else { first[speaker] = (time, position) }
+            if let previous = first[key] {
+                if time < previous.time { first[key] = (speaker, time, previous.position) }
+            } else { first[key] = (speaker, time, position) }
         }
         return first.keys.sorted {
             let a = first[$0]!, b = first[$1]!
             return a.time != b.time ? a.time < b.time : a.position < b.position
-        }
+        }.map { first[$0]!.id }
     }
 
     public static func segments(_ segments: [TranscriptSegment]) -> [String] {

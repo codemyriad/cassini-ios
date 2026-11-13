@@ -336,7 +336,9 @@ struct PortableConformanceImportTests {
         let renamed = directory.appendingPathComponent("renamed.opus")
         try CassiniDocument.relabel(source, existing: before, labels: ["others~2": "Ada"], target: renamed)
         let relabelled = CassiniDocument.read(renamed)
-        #expect(relabelled.manifest?["speakers"]?.array?.compactMap { $0.object } == [withLabel("Ada")])
+        var renamedSpeaker = withLabel("Ada")
+        renamedSpeaker["provenance"] = .string("user")
+        #expect(relabelled.manifest?["speakers"]?.array?.compactMap { $0.object } == [renamedSpeaker])
         #expect(relabelled.manifest?["x"]?.serialized() == before.manifest?["x"]?.serialized())
     }
 

@@ -11,22 +11,22 @@ struct SpeakerColourPersistenceTests {
                                            .init(id: "b", name: "Ben")])
     }
 
-    @Test func exhaustedForeignSlotsUseBoundedReservationOrdinalsAcrossNoteReloadAndMerge() throws {
+    @Test func exhaustedForeignSlotsUseLowestFreeSlotsAcrossNoteReloadAndMerge() throws {
         let maximum = 9_007_199_254_740_991
         var value = note()
         value.speakers?[0].colourIndex = maximum
         value.backfillSpeakerColours()
-        #expect(value.speakers?.map(\.colourIndex) == [maximum, 1, 2])
+        #expect(value.speakers?.map(\.colourIndex) == [maximum, 0, 1])
         value = try JSONDecoder().decode(Note.self, from: JSONEncoder().encode(value))
         value.addSpeaker(id: "later", name: "Casey")
-        #expect(value.speaker("later")?.colourIndex == 3)
+        #expect(value.speaker("later")?.colourIndex == 2)
         value.mergeSpeaker("a", into: "b")
         value = try JSONDecoder().decode(Note.self, from: JSONEncoder().encode(value))
         value.addSpeaker(id: "last", name: "Devon")
-        #expect(value.speaker("last")?.colourIndex == 4, "kept versions reserve merged identities too")
+        #expect(value.speaker("last")?.colourIndex == 3, "kept versions reserve merged identities too")
         #expect(value.speaker("u")?.colourIndex == maximum)
-        #expect(value.speaker("b")?.colourIndex == 2)
-        #expect(value.speaker("later")?.colourIndex == 3)
+        #expect(value.speaker("b")?.colourIndex == 1)
+        #expect(value.speaker("later")?.colourIndex == 2)
         let reloaded = try JSONDecoder().decode(Note.self, from: JSONEncoder().encode(value))
         #expect(reloaded == value)
     }
@@ -35,15 +35,15 @@ struct SpeakerColourPersistenceTests {
         let maximum = 9_007_199_254_740_991
         var allocator = SpeakerColourAllocator(["old": maximum - 1])
         #expect(allocator.reserve("last-safe") == maximum)
-        #expect(allocator.reserve("new-a") == 2)
-        #expect(allocator.reserve("new-b") == 3)
+        #expect(allocator.reserve("new-a") == 0)
+        #expect(allocator.reserve("new-b") == 1)
         #expect(allocator.reserve("old") == maximum - 1)
         let resumed = allocator.assignments
         allocator = SpeakerColourAllocator(resumed)
-        #expect(allocator.reserve("new-c") == 4)
+        #expect(allocator.reserve("new-c") == 2)
         #expect(allocator.assignments.values.allSatisfy { (0...maximum).contains($0) })
         var duplicates = SpeakerColourAllocator(["old": maximum, "other": maximum])
-        #expect(duplicates.reserve("next") == 2, "display hints need not be unique")
+        #expect(duplicates.reserve("next") == 0, "display hints need not be unique")
     }
 
     @Test func exhaustedForeignSlotExportsValidHintsAndReimportsWithoutRenumbering() throws {
@@ -60,10 +60,10 @@ struct SpeakerColourPersistenceTests {
         #expect(document.state == .ok)
         let roster = try #require(document.manifest?["speakers"]?.array)
         let stored = try roster.map { try #require($0.object).number("colourIndex") }
-        #expect(stored == [Int64(maximum), 1, 2])
+        #expect(stored == [Int64(maximum), 0, 1])
         #expect(stored.allSatisfy { (0...Int64(maximum)).contains($0) })
         let imported = try #require(PortableTranscript(document))
-        #expect(imported.speakers.map(\.colourIndex) == [maximum, 1, 2])
+        #expect(imported.speakers.map(\.colourIndex) == [maximum, 0, 1])
         value.transcript = imported.segments
         value.speakers = imported.speakers
         value.renameSpeaker("u", name: "Alex")
@@ -347,11 +347,15 @@ struct SpeakerColourPersistenceTests {
         #expect(sealed.speakerLabel(composed) == "Alex")
         #expect(sealed.speakerLabel(decomposed) == "Casey")
         let imported = try #require(PortableTranscript(sealed))
-        let speaker = try #require(imported.speakers.first)
-        #expect(Data(speaker.id.utf8) == Data(composed.utf8))
-        #expect(speaker.name == "Alex")
-        #expect(speaker.colourIndex == 2)
-        #expect(speaker.provenance == .user)
+        #expect(imported.speakers.count == 2)
+        #expect(imported.speakers.map(\.byteID) == [Data(composed.utf8), Data(decomposed.utf8)])
+        #expect(imported.speakers.map(\.name) == ["Alex", "Casey"])
+        #expect(imported.speakers.map(\.colourIndex) == [2, 8])
+        #expect(imported.speakers.map(\.provenance) == [.user, .source])
+        #expect(imported.segments.count == 2)
+        #expect(imported.segments.compactMap(\.speakerID).map { Data($0.utf8) } == [Data(composed.utf8), Data(decomposed.utf8)])
+        #expect(imported.segments.map(\.speaker) == ["Alex", "Casey"])
+        #expect(imported.segments.flatMap(\.words).map(\.text) == ["Hello", "Hi"])
     }
 
     @Test func portableExportKeepsAnUnusedByteDistinctSpeakersHints() throws {

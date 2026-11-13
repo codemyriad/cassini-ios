@@ -64,39 +64,37 @@ import Testing
         #expect(reopened.voices.map(\.saveSequence) == [1, 2])
     }
 
-    @Test func forgettingEveryoneRetainsOnlyTheAnonymousCounter() throws {
+    @Test func forgettingEveryoneDeletesTheCounterAndRestartsSaveOrder() throws {
         defer { cleanUp() }
         let library = try library()
-        let voices = [F.voice("alex", "Alex"), F.voice("ben", "Ben")]
-        try library.save(voices)
+        try library.save([F.voice("alex", "Alex"), F.voice("ben", "Ben")])
         try library.forgetAll()
-        let data = try Data(contentsOf: voicesFile)
-        let state = try VoiceCodec.state(data)
-        #expect(state.voices.isEmpty && state.nextSaveSequence == 2)
-        let text = String(decoding: data, as: UTF8.self)
-        #expect(!text.contains("Alex") && !text.contains("Ben"))
-        #expect(voices.allSatisfy { !text.contains($0.id.uuidString) })
+        #expect(library.voices.isEmpty)
+        #expect(!FileManager.default.fileExists(atPath: voicesFile.path))
+        #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path).isEmpty)
+        // The live instance and a relaunched one both restart after an explicit full wipe.
+        try library.save([F.voice("casey", "Casey")])
+        #expect(library.voices.first?.saveSequence == 0)
+        try library.forgetAll()
         let reopened = try self.library()
-        try reopened.save([F.voice("casey", "Casey")])
-        #expect(reopened.voices.first?.saveSequence == 2)
+        try reopened.save([F.voice("devon", "Devon")])
+        #expect(reopened.voices.first?.saveSequence == 0)
     }
 
-    @Test func forgettingThroughASymlinkKeepsTheCounterButNoVoiceEvidence() throws {
+    @Test func forgettingThroughASymlinkLeavesNoVoiceEvidenceOrCounter() throws {
         defer { cleanUp() }
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         let alias = root.appendingPathComponent("alias", isDirectory: true)
         try FileManager.default.createSymbolicLink(atPath: alias.path, withDestinationPath: root.path)
         let library = try VoiceLibrary(root: alias)
-        let original = F.voice("alex", "Alex")
-        try library.save([original])
+        try library.save([F.voice("alex", "Alex")])
         try library.savePrints([F.print(F.axis(0))], noteID: UUID())
         try library.forgetAll()
-        let state = try VoiceCodec.state(Data(contentsOf: voicesFile))
-        #expect(state.voices.isEmpty && state.nextSaveSequence == 1)
-        #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path) == ["voices.json"])
+        #expect(!FileManager.default.fileExists(atPath: voicesFile.path))
+        #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path).isEmpty)
         let reopened = try VoiceLibrary(root: root)
         try reopened.save([F.voice("ben", "Ben")])
-        #expect(reopened.voices.first?.saveSequence == 1)
+        #expect(reopened.voices.first?.saveSequence == 0)
     }
 
     // ports: VoiceRepositoryTest#aNewerPeopleFileStaysReadOnly
@@ -154,8 +152,8 @@ import Testing
         try library.forgetAll()
         #expect(library.problem == nil)
         #expect(try self.library().problem == nil)
-        #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path) == ["voices.json"])
-        #expect(try VoiceCodec.decode(Data(contentsOf: voicesFile)).isEmpty)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path).isEmpty)
+        #expect(!FileManager.default.fileExists(atPath: voicesFile.path))
     }
 
     // ports: VoiceRepositoryTest#anUnreadablePeopleFileIsReadAgainAndAWriteErrorIsAnOutcome
@@ -203,7 +201,8 @@ import Testing
 
         #expect(library.voices.isEmpty)
         #expect(!library.hasEvidence)
-        #expect(Set(try FileManager.default.contentsOfDirectory(atPath: folder.path)) == ["unrelated.txt", "voices.json"])
+        #expect(Set(try FileManager.default.contentsOfDirectory(atPath: folder.path)) == ["unrelated.txt"])
+        #expect(!FileManager.default.fileExists(atPath: voicesFile.path))
         #expect(try self.library().voices.isEmpty)
     }
 

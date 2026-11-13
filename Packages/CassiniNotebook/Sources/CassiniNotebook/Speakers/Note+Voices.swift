@@ -19,7 +19,7 @@ extension Note {
             switch change {
             case .rename(let id, let name): renameSpeaker(id, name: name)
             case .match(let id, let match):
-                if let index = speakers?.firstIndex(where: { $0.id == id }) {
+                if let index = speakers?.firstIndex(where: { $0.byteID == Data(id.utf8) }) {
                     changeShownSpeakers { $0.speakers?[index].match = match }
                 }
             case .reject(let id, let voice, let restore): rejectVoice(voice, for: id, restorePlaceholder: restore)
@@ -32,7 +32,7 @@ extension Note {
     /// "Not <name>": the speaker is never matched to `voiceID` again.
     public mutating func rejectVoice(_ voiceID: UUID, for speakerID: String, restorePlaceholder: Bool) {
         backfillSpeakerColours()
-        guard let index = speakers?.firstIndex(where: { $0.id == speakerID }), let speaker = speakers?[index] else { return }
+        guard let index = speakers?.firstIndex(where: { $0.byteID == Data(speakerID.utf8) }), let speaker = speakers?[index] else { return }
         changeShownSpeakers { note in
             if !speaker.excludedVoiceIDs.contains(voiceID) { note.speakers?[index].excludedVoiceIDs.append(voiceID) }
             note.speakers?[index].match = .rejected(voice: voiceID, score: speaker.match.score ?? 0)
@@ -174,7 +174,7 @@ extension Note {
                                               colourIndices: [String: Int] = [:], explicitNames: Set<String> = []) {
         let attributed = attributed ?? SpeakerAttribution.assign(transcript, turns: turns)
         var order: [String] = []
-        for segment in attributed { if let id = segment.speakerID, !order.contains(id) { order.append(id) } }
+        for segment in attributed { if let id = segment.speakerID, !order.contains(where: { Data($0.utf8) == Data(id.utf8) }) { order.append(id) } }
         guard SpeakerAttribution.canAttribute(turns), !order.isEmpty else {
             speakerAnalysisFailure = .empty
             return
@@ -184,34 +184,34 @@ extension Note {
         let shown = speakers ?? []
         // The undifferentiated one-voice bootstrap is replaced by the first real analysis, not a prior person
         // reserving slot zero. Older identified voices may still provide identity on Transcribe again.
-        let replacesBootstrap = shown.isOneVoice && !shown.contains { order.contains($0.id) }
+        let replacesBootstrap = shown.isOneVoice && !shown.contains { speaker in order.contains { Data($0.utf8) == speaker.byteID } }
         let existing = replacesBootstrap ? [] : shown
         let carried = carriedSpeakers
-        let identityPool = existing + carried.filter { old in !existing.contains { $0.id == old.id } }
-        var knownByID = Dictionary(existing.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let identityPool = existing + carried.filter { old in !existing.contains { $0.byteID == old.byteID } }
+        var knownByID = Dictionary(existing.map { ($0.byteID, $0) }, uniquingKeysWith: { first, _ in first })
         let matchedCounts = Dictionary(grouping: order.compactMap { id -> UUID? in
             guard let match = matches[id], match.automatic else { return nil }
             return match.voiceID
         }, by: { $0 }).mapValues(\.count)
-        for id in order where knownByID[id] == nil {
+        for id in order where knownByID[Data(id.utf8)] == nil {
             guard let match = matches[id], match.automatic, matchedCounts[match.voiceID] == 1,
                   !(excluded[id]?.contains(match.voiceID) ?? false) else { continue }
-            let candidates = identityPool.filter { $0.linkedVoiceID == match.voiceID && !order.contains($0.id) }
+            let candidates = identityPool.filter { old in old.linkedVoiceID == match.voiceID && !order.contains(where: { Data($0.utf8) == old.byteID }) }
             // A confirmed/automatic saved-voice link proves identity only when both sides are unique.
-            if candidates.count == 1 { knownByID[id] = candidates[0] }
+            if candidates.count == 1 { knownByID[Data(id.utf8)] = candidates[0] }
         }
         let reserved = Dictionary(identityPool.compactMap { speaker in
-            speaker.colourIndex.map { (speaker.id, $0) }
+            speaker.colourIndex.map { (speaker.byteID, $0) }
         }, uniquingKeysWith: { first, _ in first })
         var coloursByID = knownByID.compactMapValues { $0.colourIndex }
-        for (id, index) in colourIndices where coloursByID[id] == nil { coloursByID[id] = index }
-        var allocator = SpeakerColourAllocator(coloursByID, reserving: reserved)
-        for id in SpeakerColourOrder.segments(attributed) where coloursByID[id] == nil {
-            coloursByID[id] = allocator.reserve(id)
+        for (id, index) in colourIndices where coloursByID[Data(id.utf8)] == nil { coloursByID[Data(id.utf8)] = index }
+        var allocator = SpeakerColourAllocator(exactAssignments: coloursByID, reserving: reserved)
+        for id in SpeakerColourOrder.segments(attributed) where coloursByID[Data(id.utf8)] == nil {
+            coloursByID[Data(id.utf8)] = allocator.reserve(id)
         }
         let analyzed = order.enumerated().map { offset, id in
-            let known = knownByID[id]
-            let colourIndex = coloursByID[id]
+            let known = knownByID[Data(id.utf8)]
+            let colourIndex = coloursByID[Data(id.utf8)]
             var speaker = NoteSpeaker(id: id, name: DefaultLabels.placeholder(offset + 1),
                                       colourIndex: colourIndex, provenance: .unnamed)
             if let known {

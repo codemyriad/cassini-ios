@@ -78,6 +78,13 @@ public struct NamingInput: Hashable, Sendable {
         return SpeakerTint.assign(speakers.map(\.id), speakers: speakers)
     }
 
+    public func speakerTint(for id: String) -> SpeakerTint? {
+        let speakers = [NoteSpeaker(id: speakerID, name: label, colourIndex: colourIndex ?? ordinal, provenance: provenance)]
+            + mergeTargets.map { NoteSpeaker(id: $0.speakerID, name: $0.name,
+                                             colourIndex: $0.colourIndex ?? $0.ordinal, provenance: $0.provenance) }
+        return SpeakerTint.assignByID(speakers.map(\.id), speakers: speakers)[Data(id.utf8)]
+    }
+
     /// A print exists for the same-person question and the Remember switch.
     public var hasPrint: Bool { draft ? willHavePrint : print != nil }
 
@@ -93,12 +100,12 @@ public struct NamingInput: Hashable, Sendable {
     public static func of(_ note: Note, speakerID: String, print: SpeakerPrint?, voices: [SavedVoice],
                           voicesReadOnly: Bool, voiceModelReady: Bool) -> NamingInput? {
         let palette = Note.assignColourIndices(note.speakers ?? [], order: SpeakerColourOrder.segments(note.transcript))
-        guard let index = palette.firstIndex(where: { $0.id == speakerID }) else { return nil }
+        guard let index = palette.firstIndex(where: { $0.byteID == Data(speakerID.utf8) }) else { return nil }
         let speaker = palette[index]
         let stats = SpeakerStats.of(note.transcript)
-        let stat = stats.first { $0.speakerID == speakerID }
-        let targets = stats.filter { $0.speakerID != speakerID && $0.wordCount > 0 }.compactMap { other -> MergeTarget? in
-            palette.first(where: { $0.id == other.speakerID }).map {
+        let stat = stats.first { Data($0.speakerID.utf8) == Data(speakerID.utf8) }
+        let targets = stats.filter { Data($0.speakerID.utf8) != Data(speakerID.utf8) && $0.wordCount > 0 }.compactMap { other -> MergeTarget? in
+            palette.first(where: { $0.byteID == Data(other.speakerID.utf8) }).map {
                 MergeTarget(speakerID: $0.id, name: $0.name, ordinal: other.ordinal, speakingTime: other.speakingTime,
                             colourIndex: $0.colourIndex, provenance: $0.provenance)
             }

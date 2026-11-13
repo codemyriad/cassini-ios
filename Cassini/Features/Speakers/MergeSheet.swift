@@ -5,16 +5,16 @@ import CassiniNotebook
 struct MergeSheet: View {
     let merge: MergeUI
     let sourceOrdinal: Int
-    let tints: [String: SpeakerTint]
+    let tint: (String) -> SpeakerTint
     let send: (NamingEvent) -> Void
 
     private var source: String { NoteCopy.speakerLabel(merge.source, id: merge.sourceID, ordinal: sourceOrdinal) }
 
     var body: some View {
-        List(merge.targets) { target in
+        List(merge.targets, id: \.byteSpeakerID) { target in
             Button { send(.mergeTarget(target.speakerID)) } label: {
                 HStack(spacing: 12) {
-                    SpeakerAvatar(name: target.name, tint: tints[target.speakerID] ?? .stone)
+                    SpeakerAvatar(name: target.name, tint: tint(target.speakerID))
                     VStack(alignment: .leading, spacing: 2) {
                         Text(Self.name(target)).foregroundStyle(Color.ink)
                         Text(RecordingCopy.compact(target.speakingTime)).font(.caption).foregroundStyle(Color.muted)
@@ -38,4 +38,8 @@ struct MergeSheet: View {
     private static func name(_ target: MergeTarget) -> String {
         NoteCopy.speakerLabel(target.name, id: target.speakerID, ordinal: target.ordinal)
     }
+}
+
+private extension MergeTarget {
+    var byteSpeakerID: Data { Data(speakerID.utf8) }
 }

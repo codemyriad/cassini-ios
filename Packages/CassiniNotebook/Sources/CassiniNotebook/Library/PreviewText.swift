@@ -55,7 +55,7 @@ public enum PreviewText {
     public static func of(_ words: [PreviewWord], positionMs: Int64, labels: [String: String] = [:],
                           endsBoundedByAudio: Bool = false) -> Preview? {
         guard !words.isEmpty else { return nil }
-        let rows = TurnModel.rows(of: words.map {
+        let rows = TranscriptTurns.rows(ofModelWords: words.map {
             TurnModel.Word(speaker: $0.speaker, startMs: Double($0.startMs), endMs: Double($0.endMs), text: $0.text,
                            lowConfidenceSpeaker: $0.lowConfidenceSpeaker)
         }, endsBoundedByAudio: endsBoundedByAudio)
