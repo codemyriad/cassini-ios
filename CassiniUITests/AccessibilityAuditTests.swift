@@ -109,7 +109,13 @@ final class AccessibilityAuditTests: XCTestCase {
         // An iPad window has a resize handle in its corner (`AuditFilter.isWindowControl`).
         let window = UIDevice.current.userInterfaceIdiom == .pad
         let detection = types.intersection(.elementDetection)
-        let passes = [detection, types.subtracting(.elementDetection)].filter { !$0.isEmpty }
+        // Run clipping on its own too: on iOS 18.6 the combined non-detection audit reports
+        // three unattributed Settings clipping predictions; the same screen audited for clipping
+        // alone reports two, as do French and Portuguese. Main reproduces this without a view change.
+        // Keep every requested check and the existing issue filters/limits.
+        let clipping = types.intersection(.textClipped)
+        let passes = [detection, clipping, types.subtracting([.elementDetection, .textClipped])]
+            .filter { !$0.isEmpty }
         do {
             for pass in passes {
                 try app.performAccessibilityAudit(for: pass) { issue in
