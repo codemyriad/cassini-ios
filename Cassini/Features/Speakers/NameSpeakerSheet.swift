@@ -170,8 +170,8 @@ struct NameSpeakerSheet: View {
                         Text(row.name).foregroundStyle(Color.ink)
                         Spacer()
                         if row.likely {
-                            Text(SpeakersCopy.likely).font(.caption.weight(.medium)).foregroundStyle(Color.toneOK)
-                                .padding(.horizontal, 8).padding(.vertical, 3).background(Tone.ok.background, in: Capsule())
+                            Text(SpeakersCopy.likely).font(.caption.weight(.semibold)).foregroundStyle(Color.ink)
+                                .padding(.horizontal, 9).padding(.vertical, 4).background(Color.ink.opacity(0.1), in: Capsule())
                         }
                         if state?.boundVoiceID == row.id { Image(systemName: "checkmark").foregroundStyle(Color.accentInk) }
                     }.frame(minHeight: HitTarget.minimum)
