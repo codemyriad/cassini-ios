@@ -67,7 +67,10 @@ import Testing
             #expect(turn.word(atOffset: chip.nameRange.lowerBound) == chip.wordRange.lowerBound)
             let hit = try #require(TranscriptSearch.matches(sealed.turns, query: "sounds good").first)
             #expect(turn.word(atOffset: hit.range.lowerBound) == chip.wordRange.lowerBound)
-            #expect(SearchFields(note).body.text == turn.text)
+            #expect(SearchFields(note).body.text ==
+                    "The release candidate is ready for testing, Sounds good. and I will send the download link after this call.")
+            #expect(!SearchFields(note).matches(try #require(SearchQuery("Ben"))),
+                    "the viewer keeps the label, but search indexes only speech")
         }
     }
 
