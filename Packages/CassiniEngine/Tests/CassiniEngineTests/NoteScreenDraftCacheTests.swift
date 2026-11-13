@@ -15,7 +15,7 @@ import CassiniNotebook
         let fake = FakeNoteScreen(note: note)
         fake.runningDraft = DraftState(words: words, tentativeFromMs: .max, namingOpen: true)
         var voices = [SavedVoice(name: "Blair", samples: [])]
-        var names = DraftNames(labels: ["a": "Alex"], live: ["b": .init(voice: voices[0].id, score: 0.8, state: .suggested)],
+        var names = DraftNames(labels: ["a": "Alex"], live: ["b": .init(voices[0].id, 0.8, .suggested)],
                                colourIndices: ["a": 8, "b": 3])
         let (changes, sink) = AsyncStream<DraftNames>.makeStream()
         var ports = fake.ports
