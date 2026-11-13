@@ -508,4 +508,3 @@ The pinned badge contract, full catalog and vectors drive the pure selector and 
 `RowBadge` adapts iOS lifecycle states while preserving phone-only statuses and actions. Rendered pills retain
 Dynamic Type and translated text. State, catalog, generation and corruption tests verify the full outputs;
 UI geometry tests cover accessibility text. Runtime rendering never parses JSON.
-
