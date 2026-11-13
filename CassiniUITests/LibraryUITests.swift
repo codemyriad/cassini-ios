@@ -353,7 +353,12 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(date.wait(until: NSPredicate(format: "label CONTAINS 'Any date'"), within: 5),
                       "Close resets a date chosen before any query was typed", file: file, line: line)
         XCTAssertTrue(search.wait(until: NSPredicate(format: "hasKeyboardFocus == true"), within: 5), file: file, line: line)
-        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(within: 5), file: file, line: line)
+        if submitEmptyBeforeDate {
+            // A simulator with a hardware keyboard connected shows iPadOS 18's shortcut bar instead of a software
+            // keyboard, so the field's own focus is the refocus check on this path.
+        } else {
+            XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(within: 5), file: file, line: line)
+        }
         if submitEmptyBeforeDate {
             // The same incorrect keyboard frame can also cover Close; the phone path below exercises focused Close.
             search.typeText("\n")
