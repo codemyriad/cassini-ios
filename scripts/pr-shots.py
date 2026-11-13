@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Vendored unchanged from codemyriad/cassini-ux tools/pr-shots/pr-shots.py @ afe3ba905880e7052dbcef425d204266153a2ae0
+# Vendored unchanged from codemyriad/cassini-ux tools/pr-shots/pr-shots.py @ 5e0c34e0f1bb390298dabdf4eedc494e933fd329
 """W0.8 screenshot comparisons. Diff is read-only; only the coordinator publishes."""
 
 import argparse
@@ -25,7 +25,25 @@ KEY = re.compile(r"[a-z0-9][a-z0-9.-]{0,159}")
 SHA = re.compile(r"[0-9a-f]{40}")
 REPO = re.compile(r"[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9_.-]+")
 MAX_BLOCK_CHARACTERS = 40_000  # Leave room for the authored PR description below GitHub's body limit.
+MAX_PR_BODY_BYTES = 65_000
 MAX_PUBLICATION_PNGS = 1000  # GNOME: 76 pairs x 2 schemes x 3 images = 456; allow >2x headroom.
+PRIMARY_CORE_SCREENS = ("library", "recording", "meeting", "read-and-listen", "search")
+SECONDARY_CORE_SCREENS = (
+    "first-run",
+    "record-first",
+    "received",
+    "transcribing",
+    "speakers",
+    "name-a-speaker",
+    "export",
+    "note-actions-and-export",
+    "settings",
+    "settings-recording",
+    "settings-transcription",
+    "saved-voices",
+    "trash",
+    "recently-deleted",
+)
 Image.MAX_IMAGE_PIXELS = 12_000_000
 
 
@@ -251,15 +269,33 @@ def screen_id(row):
 
 
 def sorted_rows(rows):
-    core = {
-        name: n for n, name in enumerate(("library", "recording", "meeting", "read-and-listen", "search", "settings"))
-    }
-    return sorted(rows, key=lambda r: (core.get(r["screen"], 99), screen_id(r), r["scheme"] != "light"))
+    primary = {name: n for n, name in enumerate(PRIMARY_CORE_SCREENS)}
+    secondary = {name: n for n, name in enumerate(SECONDARY_CORE_SCREENS)}
+    added = {screen_id(r) for r in rows if r.get("status") == "added"}
+
+    def rank(row):
+        sid = screen_id(row)
+        screen, lang, device = sid
+        default_variant = lang == "en" and device in {"desktop", "phone"}
+        if default_variant and screen in primary:
+            tier = (0, primary[screen])
+        elif sid in added:
+            tier = (1, 0 if default_variant else 1)
+        elif default_variant and screen in secondary:
+            tier = (2, secondary[screen])
+        elif default_variant:
+            tier = (3, 0)
+        else:
+            core_order = primary.get(screen, len(primary) + secondary.get(screen, len(secondary)))
+            tier = (4, core_order)
+        return (*tier, sid, row["scheme"] != "light")
+
+    return sorted(rows, key=rank)
 
 
 def block(data, images=True, summary=False, summary_run=None):
     rendered = render_block(data, images, summary, summary_run)
-    if len(rendered) > MAX_BLOCK_CHARACTERS:
+    if len(rendered.encode("utf-8")) > MAX_BLOCK_CHARACTERS:
         return render_block(data, images, summary, summary_run, omit_details=True)
     return rendered
 
@@ -326,9 +362,16 @@ def render_block(data, images, summary, summary_run, omit_details=False):
                     else f"[{side}]({url})"
                 )
             label = escaped(row["label"]) + " · " + row["scheme"]
+            qualifiers = []
+            if row["lang"] != "en":
+                qualifiers.append(escaped(row["lang"]))
+            if row["device"] not in {"desktop", "phone"}:
+                qualifiers.append(escaped(row["device"]))
             modes = {r["scheme"] for r in rows if screen_id(r) == screen_id(row)}
             if len(modes) == 1:
-                label += " (" + row["scheme"] + " only)"
+                qualifiers.append(row["scheme"] + " only")
+            if qualifiers:
+                label += " (" + ", ".join(qualifiers) + ")"
             pct = "–" if row["changed_pct"] is None else f"{row['changed_pct']:g} %"
             if row["diff"] and not (summary and not data.get("git_images")):
                 pct = links["diff"].replace("[diff]", f"[{pct}]")
@@ -719,6 +762,17 @@ def push_host(root, old=None, squash=False):
     )
 
 
+def published_body(existing, data):
+    rendered = block(data)  # Never use the artifact's block.md.
+    body = replace_block(existing, rendered)
+    if len(body.encode("utf-8")) > MAX_PR_BODY_BYTES:
+        rendered = render_block(data, True, False, None, omit_details=True)
+        body = replace_block(existing, rendered)
+    if len(body.encode("utf-8")) > MAX_PR_BODY_BYTES:
+        raise ValueError("PR body exceeds GitHub limit")
+    return rendered, body
+
+
 def publish(args):
     pr = github(f"{args.repo}/pulls/{args.pr}")
     head = pr["head"]["sha"]
@@ -751,7 +805,7 @@ def publish(args):
         raise ValueError("Oversized changes.json")
     data = json.loads(files["changes.json"])
     needed = validated(data, files, args.repo, args.pr, head)
-    rendered = block(data)  # Never use the artifact's block.md.
+    rendered, _ = published_body(pr.get("body") or "", data)
     print(rendered)
     if args.dry_run:
         return
@@ -776,9 +830,7 @@ def publish(args):
     latest = github(f"{args.repo}/pulls/{args.pr}")
     if latest["head"]["sha"] != head:
         raise ValueError("PR head changed during publication; body left untouched")
-    body = replace_block(latest.get("body") or "", rendered)
-    if len(body.encode()) > 65_000:
-        raise ValueError("PR body exceeds GitHub limit")
+    _, body = published_body(latest.get("body") or "", data)
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "body.md"
         path.write_text(body, encoding="utf-8")

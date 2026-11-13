@@ -267,9 +267,9 @@ class ManifestTests(unittest.TestCase):
 
     def test_vendor_is_exact_pinned_shared_script_below_provenance_header(self):
         lines = (ROOT/'scripts/pr-shots.py').read_bytes().splitlines(keepends=True)
-        self.assertIn(b'afe3ba905880e7052dbcef425d204266153a2ae0', lines[1])
+        self.assertIn(b'5e0c34e0f1bb390298dabdf4eedc494e933fd329', lines[1])
         self.assertEqual(hashlib.sha256(lines[0]+b''.join(lines[2:])).hexdigest(),
-                         '5d22dbac2cdf0439d6a8a6be9885f27140bf088a0e17574ed3b55667711550da')
+                         'd4898061024ba464e88c66dc12563d1a61aaa5d6675ccc22e3af62aa2314c994')
 
     def test_missing_pair_and_dark_image_mislabelled_light_refuse(self):
         from PIL import Image
