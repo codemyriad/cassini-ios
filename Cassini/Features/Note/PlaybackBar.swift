@@ -74,21 +74,45 @@ struct PlaybackBar: View {
     }
 
     private var controls: some View {
-        HStack(spacing: 0) {
-            Menu {
-                ForEach([Float(0.75), 1, 1.25, 1.5, 2], id: \.self) { rate in
-                    Button { playback.rate = rate } label: { Text(verbatim: "\(rate.formatted())×") }
-                }
-            } label: {
-                Text(verbatim: "\(playback.rate.formatted())×").font(.footnote.weight(.semibold)).monospacedDigit()
-                    .padding(.horizontal, 10).frame(minHeight: 30)
-                    .background(Color.ink.opacity(0.1), in: Capsule())
-                    .frame(minWidth: HitTarget.minimum, minHeight: HitTarget.minimum)
+        ViewThatFits(in: .horizontal) {
+            controlRow(spacing: 22)
+            controlRow(spacing: 6)
+            VStack(spacing: 8) {
+                transport(spacing: 22)
+                HStack { speed; Spacer(); bookmark }
             }
-            .accessibilityLabel(Text("Playback speed", tableName: "Playback"))
-            .accessibilityIdentifier("playbackSpeed")
+        }
+        .foregroundStyle(Color.ink)
+    }
+
+    private func controlRow(spacing: CGFloat) -> some View {
+        HStack(spacing: 0) {
+            speed
             Spacer(minLength: 0)
-            HStack(spacing: 22) {
+            transport(spacing: spacing)
+            Spacer(minLength: 0)
+            bookmark
+        }
+    }
+
+    private var speed: some View {
+        Menu {
+            ForEach([Float(0.75), 1, 1.25, 1.5, 2], id: \.self) { rate in
+                Button { playback.rate = rate } label: { Text(verbatim: "\(rate.formatted())×") }
+            }
+        } label: {
+            Text(verbatim: "\(playback.rate.formatted())×").font(.footnote.weight(.semibold)).monospacedDigit()
+                .padding(.horizontal, 10).frame(minHeight: 30)
+                .background(Color.ink.opacity(0.1), in: Capsule())
+                .frame(minWidth: HitTarget.minimum, minHeight: HitTarget.minimum)
+                .fixedSize(horizontal: true, vertical: false)
+        }
+        .accessibilityLabel(Text("Playback speed", tableName: "Playback"))
+        .accessibilityIdentifier("playbackSpeed")
+    }
+
+    private func transport(spacing: CGFloat) -> some View {
+        HStack(spacing: spacing) {
             Button { playback.skip(-PlaybackSkip.interval) } label: {
                 Image(systemName: "gobackward.10").font(.system(size: 26)).frame(width: 48, height: 48)
             }
@@ -105,12 +129,15 @@ struct PlaybackBar: View {
             }
             .accessibilityLabel(Text("Forward 10 seconds", tableName: "Playback"))
             .accessibilityIdentifier("skipForward")
-            }
-            Spacer(minLength: 0)
-            Button { markMoment(position) } label: { Image(systemName: "bookmark").font(.system(size: 20)).frame(width: 44, height: 44) }
-            .accessibilityLabel(Text("Mark this moment", tableName: "Playback"))
         }
-        .foregroundStyle(Color.ink)
+        .fixedSize()
+    }
+
+    private var bookmark: some View {
+        Button { markMoment(position) } label: {
+            Image(systemName: "bookmark").font(.system(size: 20)).frame(width: 44, height: 44)
+        }
+        .accessibilityLabel(Text("Mark this moment", tableName: "Playback"))
     }
 
     /// "11:44 of 23:50".

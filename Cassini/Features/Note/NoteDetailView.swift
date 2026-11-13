@@ -66,7 +66,8 @@ struct NoteDetailView: View {
         }
         .onChange(of: NoteScreenState.isGone(note)) { _, gone in if gone { router.close(noteID: noteID) } }
         .onChange(of: model.screen.search?.query) { _, query in router.keepSearch(query, for: noteID) }
-        .backButtonTitle(router.below(noteID: noteID) == .library ? NoteCopy.backToLibrary : nil)
+        .backButtonTitle(router.below(noteID: noteID) == .library ? MeetingPhase1Copy.allMeetings : nil,
+                         accessibilityLabel: router.below(noteID: noteID) == .library ? MeetingPhase1Copy.backToAllMeetings : nil)
         .noteSheetsAndDialogs(model: model)
         .keepsNoteOverlay(noteID: noteID, note: note, readOnly: readOnly, sheet: $model.sheet, draft: $model.sheetDraft,
                           dialog: $model.screen.dialog)

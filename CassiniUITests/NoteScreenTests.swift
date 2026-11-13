@@ -34,9 +34,40 @@ final class NoteScreenTests: XCTestCase {
         XCTAssertEqual(alex.label, "Alex, at 0 seconds")
         XCTAssertTrue(header(app, "Sam").exists)
         XCTAssertGreaterThanOrEqual(alex.frame.height, 44 - 0.001, "a 44 pt target, read through a floating-point transform")
-        XCTAssertTrue(app.buttons["speakersButton"].label.contains("2 speakers"))
+        let inlineSpeakers = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "headerSpeaker-"))
+        XCTAssertEqual(inlineSpeakers.count, 2, "both speakers have individual header actions")
+        XCTAssertTrue(app.buttons["headerSpeaker-alex"].isHittable)
+        XCTAssertTrue(app.buttons["headerSpeaker-sam"].isHittable)
         alex.tap()
         XCTAssertTrue(app.textFields["speakerNameField"].waitForExistence(within: 5), "the header opens Name a speaker")
+    }
+
+    @MainActor func testAnInlineHeaderNameOpensNamingForThatSpeaker() {
+        let app = open()
+        let sam = app.buttons["headerSpeaker-sam"]
+        XCTAssertTrue(sam.waitForExistence(within: 5))
+        sam.tap()
+        let name = app.textFields["speakerNameField"]
+        XCTAssertTrue(name.waitForExistence(within: 5))
+        XCTAssertTrue(name.waitForValue("Sam"), "the inline name opens its own speaker")
+    }
+
+    @MainActor func testCompactTitleFollowsTheHeaderOutOfAndBackIntoView() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed", "long", "--open-fixture",
+                               "11111111-1111-1111-1111-111111111111"]
+        app.launchAndWait()
+        let title = app.staticTexts["noteTitle"]
+        let compact = app.staticTexts["noteCompactTitle"]
+        XCTAssertTrue(title.waitForExistence(within: 15))
+        XCTAssertTrue(poll(within: uiWaitFloor) { title.isHittable && !compact.exists },
+                      "the full header initially supplies the title")
+        XCTAssertTrue(app.scroll(attempts: 8) { compact.exists && compact.isHittable && !title.isHittable })
+        XCTAssertEqual(compact.label, "Three hour workshop")
+        XCTAssertTrue(app.scroll(up: false, attempts: 8) { title.isHittable && !compact.exists },
+                      "returning to the header removes the compact title")
+        XCTAssertTrue(app.buttons["headerSpeaker-alex"].isHittable)
+        XCTAssertTrue(app.buttons["headerSpeaker-sam"].isHittable)
     }
 
     // ports: ScreenBehaviourTest#aWordTapAsksToPlayFromThatWord
@@ -149,7 +180,7 @@ final class NoteScreenTests: XCTestCase {
         XCTAssertTrue(ahead.waitForExistence(within: 10))
         XCTAssertEqual(ahead.label, "Starts after the current transcription.")
 
-        app.navigationBars.buttons["Back to library"].tap()
+        app.navigationBars.buttons["Back to all meetings"].tap()
         let walk = app.buttons.matching(NSPredicate(format: "identifier == 'noteRow' AND label BEGINSWITH %@",
                                                     "Thoughts from the morning walk")).firstMatch
         XCTAssertTrue(walk.waitForExistence(within: 5))
@@ -163,10 +194,10 @@ final class NoteScreenTests: XCTestCase {
         XCTAssertTrue(ahead.wait(until: NSPredicate(format: "label == '1 ahead of this note.'"), within: 10))
     }
 
-    /// The back button reads "Back to library" to VoiceOver.
-    @MainActor func testTheBackButtonSaysBackToLibrary() {
+    /// The back button reads "Back to all meetings" to VoiceOver.
+    @MainActor func testTheBackButtonSaysBackToAllMeetings() {
         let app = open()
-        let back = app.navigationBars.buttons["Back to library"]
+        let back = app.navigationBars.buttons["Back to all meetings"]
         XCTAssertTrue(back.waitForExistence(within: 5))
         back.tap()
         XCTAssertTrue(app.textFields["librarySearch"].waitForExistence(within: 5))

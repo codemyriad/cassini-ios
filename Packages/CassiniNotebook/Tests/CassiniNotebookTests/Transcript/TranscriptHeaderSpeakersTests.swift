@@ -70,6 +70,23 @@ import Testing
         #expect(NoteTranscript.empty.headerSpeakers.isEmpty)
     }
 
+    @Test func cachedHeaderKeepsCanonicallyEquivalentIDsDistinct() {
+        let composed = "voice-\u{E9}", decomposed = "voice-e\u{301}"
+        let transcript = NoteTranscript(turns: [
+            turn("composed", speakerID: composed, name: .named("Alex"), tint: .blue, indices: [1]),
+            turn("decomposed", speakerID: decomposed, name: .named("Casey"), tint: .violet, indices: [0], auto: true)
+        ])
+        #expect(transcript.speakers.count == 2)
+        #expect(transcript.speakers.map { Data($0.utf8) } == [Data(decomposed.utf8), Data(composed.utf8)])
+        #expect(transcript.headerSpeakers.count == 2)
+        #expect(transcript.headerSpeakers.map(\.byteID) == [Data(decomposed.utf8), Data(composed.utf8)])
+        #expect(transcript.headerSpeakers.map(\.name) == [.named("Casey"), .named("Alex")])
+        #expect(transcript.headerSpeakers.map(\.tint) == [.violet, .blue])
+        #expect(transcript.headerSpeakers.map(\.auto) == [true, false])
+        #expect(transcript.speakerTint(for: composed) == .blue)
+        #expect(transcript.speakerTint(for: decomposed) == .violet)
+    }
+
     /// Deliberately separate source indices from displayed row order, as D84 rejoining does.
     private func turn(_ id: String, speakerID: String?, name: SpeakerName, tint: SpeakerTint,
                       indices: [Int], auto: Bool = false) -> NoteTurn {

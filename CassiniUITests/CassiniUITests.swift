@@ -200,7 +200,7 @@ final class CassiniUITests: XCTestCase {
     }
     @MainActor func testSpeakerRenameAppliesToAllPassagesAndPersists() {
         let app = launch(); openFixture(app)
-        app.buttons["speakersButton"].tap()
+        app.openNoteSpeakers()
         XCTAssertTrue(app.navigationBars["Speakers"].waitForExistence(within: 5))
         let alex = app.buttons["speaker-alex"]
         XCTAssertTrue(alex.waitForExistence(within: 5)); alex.tap()

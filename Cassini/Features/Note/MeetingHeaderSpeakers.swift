@@ -8,7 +8,7 @@ struct MeetingHeaderSpeakers: View {
 
     var body: some View {
         FlowLayout(spacing: 16, rowSpacing: 6) {
-            ForEach(speakers) { speaker in
+            ForEach(speakers, id: \.byteID) { speaker in
                 if speaker.id == NoteTranscripts.draftOneVoice {
                     label(speaker)
                 } else {
