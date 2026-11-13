@@ -283,6 +283,11 @@ final class LibraryUITests: XCTestCase {
         return native.exists ? native : menu
     }
 
+    private var submitEmptyBeforeSidebarMenu: Bool {
+        if #available(iOS 26.0, *) { return false }
+        return true
+    }
+
     /// iPadOS 18 can expose the sidebar scroll view beyond the window's left edge. Drag within its visible pane,
     /// clear of the pinned controls, rather than asking XCTest to swipe that unclipped accessibility frame.
     @MainActor private func scrollSidebar(_ app: XCUIApplication, up: Bool = true, until done: () -> Bool) -> Bool {
@@ -362,7 +367,7 @@ final class LibraryUITests: XCTestCase {
         app.launchAndWait(fresh: true)
         let search = app.textFields["librarySearch"]
         XCTAssertTrue(search.waitForExistence(within: 15))
-        assertClosingEmptySearchResetsDate(app, submitEmptyBeforeDate: true)
+        assertClosingEmptySearchResetsDate(app, submitEmptyBeforeDate: submitEmptyBeforeSidebarMenu)
         let sidebar = app.scrollViews["libraryScroll"]
         let initialSearchFrame = settledFrame(search)
         let quiet = row(app, "Quiet room")
@@ -378,8 +383,10 @@ final class LibraryUITests: XCTestCase {
         let date = app.buttons["librarySearchDate"]
         let close = app.buttons["closeLibrarySearch"]
         XCTAssertTrue(close.waitForExistence(within: 5))
-        search.typeText("\n")
-        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(within: 5))
+        if submitEmptyBeforeSidebarMenu {
+            search.typeText("\n")
+            XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(within: 5))
+        }
         // The iPadOS 18 Menu wrapper reports not-hittable even when its native button opens it. Require the
         // actual menu action after scrolling, rather than treating that incorrect AX proxy as interaction proof.
         dateControl(app).tapWhenSettled()

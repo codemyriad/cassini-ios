@@ -25,7 +25,8 @@ struct SearchField: View {
             .accessibilityAddTraits(.isHeader)
             .accessibilityIdentifier("libraryHeading")
             .animation(.easeInOut(duration: 0.15), value: query.isEmpty)
-            TextField(placeholder, text: $query, prompt: Text(placeholder).foregroundStyle(Color.ink3), axis: .vertical)
+            TextField(LibraryPhase1Copy.searchAccessibilityLabel, text: $query,
+                      prompt: Text(placeholder).foregroundStyle(Color.ink3), axis: .vertical)
                 .lineLimit(1...3)
                 .font(.body).autocorrectionDisabled().textInputAutocapitalization(.never)
                 .submitLabel(.search).focused($focused).onSubmit { focused = false }
