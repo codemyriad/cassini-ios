@@ -9,6 +9,7 @@ struct StatusBadgeView: View {
         static let minimumHeight: CGFloat = 22
         static let fontSize: CGFloat = 12
         static let horizontalPadding: CGFloat = 8
+        static let verticalPadding: CGFloat = 3
         static let gap: CGFloat = 4
         static let dot: CGFloat = 6
         static let spinner: CGFloat = 10
@@ -61,6 +62,8 @@ struct StatusPill: View {
     var outlined = false
     @ScaledMetric(relativeTo: .caption) private var fontSize = StatusBadgeView.Metrics.fontSize
     @ScaledMetric(relativeTo: .caption) private var minimumHeight = StatusBadgeView.Metrics.minimumHeight
+    @ScaledMetric(relativeTo: .caption) private var horizontalPadding = StatusBadgeView.Metrics.horizontalPadding
+    @ScaledMetric(relativeTo: .caption) private var verticalPadding = StatusBadgeView.Metrics.verticalPadding
 
     var body: some View {
         HStack(spacing: StatusBadgeView.Metrics.gap) {
@@ -69,7 +72,8 @@ struct StatusPill: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .foregroundStyle(ink)
-        .padding(.horizontal, StatusBadgeView.Metrics.horizontalPadding)
+        .padding(.horizontal, horizontalPadding)
+        .padding(.vertical, verticalPadding)
         .frame(minHeight: minimumHeight)
         .background(fill, in: Capsule())
         .overlay {

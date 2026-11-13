@@ -51,6 +51,21 @@ import CassiniNotebook
         #expect(larger.width <= 200.5 && larger.height > size.height)
     }
 
+    @Test func wrappedAccessibleTextHasClearanceInsideThePill() {
+        let text = "Format\nplus récent"
+        let label = UIHostingController(rootView: Text(verbatim: text).font(.caption.weight(.semibold))
+            .fixedSize(horizontal: false, vertical: true).dynamicTypeSize(.accessibility5))
+        let pill = UIHostingController(rootView: StatusPill(text: text, glyph: .symbol("exclamationmark.circle"),
+            ink: .ink2, fill: .canvasClear, outlined: true).dynamicTypeSize(.accessibility5))
+        label.loadViewIfNeeded()
+        pill.loadViewIfNeeded()
+        let bounds = CGSize(width: 400, height: 1_000)
+        let textSize = label.sizeThatFits(in: bounds)
+        let pillSize = pill.sizeThatFits(in: bounds)
+        #expect(pillSize.height > textSize.height,
+                "wrapped text needs clearance above and below, inside the curved fill and border")
+    }
+
     @Test func phoneStatesUseTheSharedLabelsAndKeepPausedPosition() {
         let cases: [(LibraryRow.Status, String)] = [(.queued, "Queued"), (.paused(atMs: 1_792_000), "Paused at 29:52"),
             (.failed, "Couldn’t transcribe"), (.audioOnly, "Audio only"), (.unplayable, "Can’t play"),
