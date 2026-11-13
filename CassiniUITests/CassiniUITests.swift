@@ -24,7 +24,7 @@ final class CassiniUITests: XCTestCase {
         let app = launch(seed: false)
         XCTAssertTrue(app.buttons["recordButton"].exists)
         XCTAssertTrue(app.scrollViews["libraryScroll"].waitForExistence(within: 5))
-        XCTAssertEqual(app.scrollViews["libraryScroll"].label, "All meetings", "the Library names its meeting list")
+        XCTAssertEqual(app.descendants(matching: .any)["libraryHeading"].label, "All meetings", "the Library names its meeting list")
         capture("Empty library")
         app.buttons["Settings"].tap()
         XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(within: 5))

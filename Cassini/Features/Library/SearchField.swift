@@ -19,7 +19,11 @@ struct SearchField: View {
                 Image(systemName: "magnifyingglass").font(.system(size: 20)).foregroundStyle(Color.ink2)
                     .opacity(query.isEmpty ? 0 : 1)
             }
-            .frame(width: 22, height: 22).accessibilityHidden(true)
+            .frame(width: 22, height: 22)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(isPresented ? LibraryPhase1Copy.searchResultsAccessibilityLabel : MeetingPhase1Copy.allMeetings)
+            .accessibilityAddTraits(.isHeader)
+            .accessibilityIdentifier("libraryHeading")
             .animation(.easeInOut(duration: 0.15), value: query.isEmpty)
             TextField(placeholder, text: $query, prompt: Text(placeholder).foregroundStyle(Color.ink3), axis: .vertical)
                 .lineLimit(1...3)

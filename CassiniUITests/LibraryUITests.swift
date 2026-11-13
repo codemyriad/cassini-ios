@@ -246,9 +246,8 @@ final class LibraryUITests: XCTestCase {
     @MainActor private func assertSearchControlsAndSingleResultAreVisible(_ app: XCUIApplication,
                                                                          result: XCUIElement,
                                                                          file: StaticString = #filePath, line: UInt = #line) {
-        let date = app.buttons["librarySearchDate"]
         let count = app.staticTexts["librarySearchCount"]
-        XCTAssertTrue(date.wait(until: NSPredicate(format: "hittable == true"), within: 5),
+        XCTAssertTrue(dateControl(app).wait(until: NSPredicate(format: "hittable == true"), within: 5),
                       "opening Search brings the date filter into view without another swipe", file: file, line: line)
         XCTAssertTrue(count.wait(until: NSPredicate(format: "label == '1 meeting' AND hittable == true"), within: 15),
                       "the published result count is visible after the scrolled list is searched", file: file, line: line)
@@ -256,16 +255,34 @@ final class LibraryUITests: XCTestCase {
                       "the matching meeting is in view without another swipe", file: file, line: line)
     }
 
+    /// iPadOS 18 exposes an outer Menu wrapper with no activation point and its native button beneath it.
+    /// Target the actual button when present, keeping the labeled wrapper for date-value assertions.
+    @MainActor private func dateControl(_ app: XCUIApplication) -> XCUIElement {
+        let menu = app.buttons["librarySearchDate"]
+        let native = menu.buttons.firstMatch
+        return native.exists ? native : menu
+    }
+
     @MainActor private func assertClosingEmptySearchResetsDate(_ app: XCUIApplication,
+                                                             submitEmptyBeforeDate: Bool = false,
                                                              file: StaticString = #filePath, line: UInt = #line) {
         let search = app.textFields["librarySearch"]
         search.tap()
         capture("Empty Library search focused before choosing a date")
         let close = app.buttons["closeLibrarySearch"]
         XCTAssertTrue(close.waitForExistence(within: 5), file: file, line: line)
+        if submitEmptyBeforeDate {
+            // iPadOS 18 reports the landscape keyboard's AX frame in portrait coordinates, covering Any date.
+            // Submit the still-empty field natively, then wait for keyboard dismissal before opening the menu.
+            search.typeText("\n")
+            XCTAssertTrue(search.wait(until: NSPredicate(format: "hasKeyboardFocus == false"), within: 5), file: file, line: line)
+            XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(within: 5), file: file, line: line)
+            XCTAssertFalse(app.staticTexts["librarySearchCount"].exists, "an empty Submit creates no query", file: file, line: line)
+            XCTAssertTrue(close.isHittable, "empty Submit keeps Search open", file: file, line: line)
+        }
         let date = app.buttons["librarySearchDate"]
         XCTAssertTrue(date.waitForExistence(within: 5), file: file, line: line)
-        date.tap()
+        dateControl(app).tapWhenSettled()
         app.buttons["Today"].tapWhenSettled()
         XCTAssertTrue(date.wait(until: NSPredicate(format: "label CONTAINS 'Today'"), within: 5), file: file, line: line)
         close.tap()
@@ -276,6 +293,15 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(close.waitForExistence(within: 5), file: file, line: line)
         XCTAssertTrue(date.wait(until: NSPredicate(format: "label CONTAINS 'Any date'"), within: 5),
                       "Close resets a date chosen before any query was typed", file: file, line: line)
+        XCTAssertTrue(search.wait(until: NSPredicate(format: "hasKeyboardFocus == true"), within: 5), file: file, line: line)
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(within: 5), file: file, line: line)
+        if submitEmptyBeforeDate {
+            // The same incorrect keyboard frame can also cover Close; the phone path below exercises focused Close.
+            search.typeText("\n")
+            XCTAssertTrue(search.wait(until: NSPredicate(format: "hasKeyboardFocus == false"), within: 5), file: file, line: line)
+            XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(within: 5), file: file, line: line)
+            XCTAssertFalse(app.staticTexts["librarySearchCount"].exists, file: file, line: line)
+        }
         close.tap()
         XCTAssertTrue(app.buttons["settingsButton"].waitForExistence(within: 5), file: file, line: line)
         XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(within: 5), file: file, line: line)
@@ -299,14 +325,15 @@ final class LibraryUITests: XCTestCase {
         app.launchAndWait(fresh: true)
         let search = app.textFields["librarySearch"]
         XCTAssertTrue(search.waitForExistence(within: 15))
-        assertClosingEmptySearchResetsDate(app)
+        assertClosingEmptySearchResetsDate(app, submitEmptyBeforeDate: true)
         let sidebar = app.scrollViews["libraryScroll"]
         let initialSearchFrame = search.frame
         let quiet = row(app, "Quiet room")
-        XCTAssertTrue(sidebar.scroll(attempts: 12) {
+        let reachedQuiet = sidebar.scroll(attempts: 12) {
             quiet.exists && quiet.isHittable && quiet.frame.maxY < app.buttons["recordButton"].frame.minY
-        })
+        }
         capture("iPad Library scrolled before opening Search")
+        XCTAssertTrue(reachedQuiet, "row=\(quiet.exists ? quiet.frame : .null), sidebar=\(sidebar.frame), record=\(app.buttons["recordButton"].frame)")
         XCTAssertTrue(search.isHittable)
         XCTAssertEqual(search.frame, initialSearchFrame, "the sidebar search stays pinned while its rows scroll")
         search.tap()
@@ -346,7 +373,7 @@ final class LibraryUITests: XCTestCase {
         let search = app.textFields["librarySearch"]
         let list = app.scrollViews["libraryScroll"]
         XCTAssertTrue(row(app, "Weekly planning call").waitForExistence(within: 15))
-        XCTAssertEqual(list.label, "All meetings")
+        XCTAssertEqual(app.descendants(matching: .any)["libraryHeading"].label, "All meetings")
         let initialSearchFrame = search.frame
         let emptyQueryValue = search.value as? String
         let last = row(app, "Quiet room")

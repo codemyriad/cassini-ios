@@ -33,48 +33,48 @@ struct LibraryView: View {
         @Bindable var model = model
         let content = model.content
         let exportable = Set(ArchiveSelection.ids(library.notes))
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: Spacing.row) {
-                filters.padding(.top, 6)
-                if model.isSearching, let count = content.facts.results {
-                    Text(LibraryPhase1Copy.template("format.searchCount.meetings", count: count))
-                        .font(.subheadline.weight(.semibold)).foregroundStyle(Color.ink)
-                        .accessibilityAddTraits(.isHeader).accessibilityIdentifier("librarySearchCount")
-                }
-                activity.padding(.top, 6)
-                if !content.loading || content.emptyState == .unavailable {
-                    // The banners say when there are no notes, no matches or no library; the Starred filter has its own.
-                    if content.emptyState == .noStarred { NoStarredState().padding(.top, 8) }
-                    if let results = content.results {
-                        ForEach(results) { row($0, day: $0.day ?? .today, exportable: exportable.contains($0.id)) }
-                    } else {
-                        ForEach(content.sections) { section in
-                            Text(LibraryFormat(calendar: calendar).day(section.key).uppercased())
-                                .font(.caption.weight(.semibold)).tracking(1.6).foregroundStyle(Color.muted)
-                                .accessibilityAddTraits(.isHeader)
-                                .padding(.top, 14)
-                            ForEach(section.rows) { row($0, day: section.key, exportable: exportable.contains($0.id)) }
+        // Keep pinned controls outside the scrolling hit-test region, including after a list swipe.
+        VStack(spacing: 0) {
+            searchHeader
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: Spacing.row) {
+                    filters.padding(.top, 6)
+                    if model.isSearching, let count = content.facts.results {
+                        Text(LibraryPhase1Copy.template("format.searchCount.meetings", count: count))
+                            .font(.subheadline.weight(.semibold)).foregroundStyle(Color.ink)
+                            .accessibilityAddTraits(.isHeader).accessibilityIdentifier("librarySearchCount")
+                    }
+                    activity.padding(.top, 6)
+                    if !content.loading || content.emptyState == .unavailable {
+                        // The banners say when there are no notes, no matches or no library; the Starred filter has its own.
+                        if content.emptyState == .noStarred { NoStarredState().padding(.top, 8) }
+                        if let results = content.results {
+                            ForEach(results) { row($0, day: $0.day ?? .today, exportable: exportable.contains($0.id)) }
+                        } else {
+                            ForEach(content.sections) { section in
+                                Text(LibraryFormat(calendar: calendar).day(section.key).uppercased())
+                                    .font(.caption.weight(.semibold)).tracking(1.6).foregroundStyle(Color.muted)
+                                    .accessibilityAddTraits(.isHeader)
+                                    .padding(.top, 14)
+                                ForEach(section.rows) { row($0, day: section.key, exportable: exportable.contains($0.id)) }
+                            }
                         }
                     }
                 }
+                .padding(.horizontal, Spacing.gutter).padding(.top, 12).padding(.bottom, 28)
+                .readableWidth()
             }
-            .padding(.horizontal, Spacing.gutter).padding(.top, 12).padding(.bottom, 28)
-            .readableWidth()
+            .accessibilityIdentifier("libraryScroll")
+            .meetingScrollEdge()
+            .scrollDismissesKeyboard(.immediately)
+            .scrollPosition($listPosition)
+            .overlay(alignment: .topLeading) { UITestInteractiveMarker(loaded: library.isLoaded && !content.loading) }
+            .trashUndoSnackbar()
         }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(searchPresented ? LibraryPhase1Copy.searchResultsAccessibilityLabel : MeetingPhase1Copy.allMeetings)
-        .accessibilityAddTraits(.isHeader)
-        .accessibilityIdentifier("libraryScroll")
-        .meetingScrollEdge()
-        .scrollDismissesKeyboard(.immediately)
-        .scrollPosition($listPosition)
         .background(Color.paper)
-        .overlay(alignment: .topLeading) { UITestInteractiveMarker(loaded: library.isLoaded && !content.loading) }
-        .trashUndoSnackbar()
         .safeAreaInset(edge: .bottom, spacing: 0) {
             CaptureBar(unavailable: content.emptyState == .unavailable) { importing = true }
         }
-        .safeAreaInset(edge: .top, spacing: 0) { searchHeader.zIndex(1) }
         .navigationTitle(MeetingPhase1Copy.allMeetings)
         .toolbar(.hidden, for: .navigationBar)
         .onAppear(perform: restoreSceneState)
