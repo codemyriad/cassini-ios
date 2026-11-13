@@ -11,6 +11,66 @@ struct SpeakerColourPersistenceTests {
                                            .init(id: "b", name: "Ben")])
     }
 
+    @Test func exhaustedForeignSlotsUseBoundedReservationOrdinalsAcrossNoteReloadAndMerge() throws {
+        let maximum = 9_007_199_254_740_991
+        var value = note()
+        value.speakers?[0].colourIndex = maximum
+        value.backfillSpeakerColours()
+        #expect(value.speakers?.map(\.colourIndex) == [maximum, 1, 2])
+        value = try JSONDecoder().decode(Note.self, from: JSONEncoder().encode(value))
+        value.addSpeaker(id: "later", name: "Casey")
+        #expect(value.speaker("later")?.colourIndex == 3)
+        value.mergeSpeaker("a", into: "b")
+        value = try JSONDecoder().decode(Note.self, from: JSONEncoder().encode(value))
+        value.addSpeaker(id: "last", name: "Devon")
+        #expect(value.speaker("last")?.colourIndex == 4, "kept versions reserve merged identities too")
+        #expect(value.speaker("u")?.colourIndex == maximum)
+        #expect(value.speaker("b")?.colourIndex == 2)
+        #expect(value.speaker("later")?.colourIndex == 3)
+        let reloaded = try JSONDecoder().decode(Note.self, from: JSONEncoder().encode(value))
+        #expect(reloaded == value)
+    }
+
+    @Test func boundedAllocationKeepsTheNormalSuccessorUntilTheLastSafeInteger() {
+        let maximum = 9_007_199_254_740_991
+        var allocator = SpeakerColourAllocator(["old": maximum - 1])
+        #expect(allocator.reserve("last-safe") == maximum)
+        #expect(allocator.reserve("new-a") == 2)
+        #expect(allocator.reserve("new-b") == 3)
+        #expect(allocator.reserve("old") == maximum - 1)
+        let resumed = allocator.assignments
+        allocator = SpeakerColourAllocator(resumed)
+        #expect(allocator.reserve("new-c") == 4)
+        #expect(allocator.assignments.values.allSatisfy { (0...maximum).contains($0) })
+        var duplicates = SpeakerColourAllocator(["old": maximum, "other": maximum])
+        #expect(duplicates.reserve("next") == 2, "display hints need not be unique")
+    }
+
+    @Test func exhaustedForeignSlotExportsValidHintsAndReimportsWithoutRenumbering() throws {
+        let maximum = 9_007_199_254_740_991
+        let folder = try PortableFixtures.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let audio = folder.appendingPathComponent("audio.opus")
+        let output = folder.appendingPathComponent("export.opus")
+        try Data(PortableFixtures.silence(packets: 100)).write(to: audio)
+        var value = note()
+        value.speakers?[0].colourIndex = maximum
+        try PortableTranscript.export(note: value, opus: audio, destination: output, unassignedLabel: "Unknown speaker")
+        let document = CassiniDocument.read(output)
+        #expect(document.state == .ok)
+        let roster = try #require(document.manifest?["speakers"]?.array)
+        let stored = try roster.map { try #require($0.object).number("colourIndex") }
+        #expect(stored == [Double(maximum), 1, 2])
+        #expect(stored.allSatisfy { (0...Double(maximum)).contains($0) && $0.rounded() == $0 })
+        let imported = try #require(PortableTranscript(document))
+        #expect(imported.speakers.map(\.colourIndex) == [maximum, 1, 2])
+        value.transcript = imported.segments
+        value.speakers = imported.speakers
+        value.renameSpeaker("u", name: "Alex")
+        #expect(value.speaker("u")?.colourIndex == maximum)
+        #expect(SpeakerTint.of(try #require(value.speaker("u"))) == SpeakerTint.named(maximum))
+    }
+
     @Test func legacyDecodeBackfillsAllFirstSpeechSlotsAndRoundTripsThem() throws {
         var original = note()
         // Catalog order is not speech order.

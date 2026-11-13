@@ -44,6 +44,23 @@ class UpstreamTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'byte-identical'):
             module.check(self.root, lambda _: self.raw)
 
+    def test_mark_uses_the_same_immutable_commit_and_compares_exact_bytes(self):
+        mark = b'<svg xmlns="http://www.w3.org/2000/svg"/>\n'
+        self.pin['files'] = {'brand/mark/saturn-nav.svg': hashlib.sha256(mark).hexdigest()}
+        self.write_pin()
+        (self.folder / 'mark').mkdir()
+        target = self.folder / 'mark/saturn-nav.svg'
+        target.write_bytes(mark)
+        endpoints = []
+        def fetch(endpoint):
+            endpoints.append(endpoint)
+            return mark if '/mark/' in endpoint else self.raw
+        module.check(self.root, fetch)
+        self.assertTrue(all(endpoint.endswith('?ref=' + self.pin['commit']) for endpoint in endpoints))
+        self.assertEqual(len(endpoints), 2)
+        target.write_bytes(mark + b' ')
+        with self.assertRaisesRegex(ValueError, 'byte-identical'): module.check(self.root, fetch)
+
     def test_replacing_both_local_bytes_and_local_hash_does_not_pass(self):
         local = b'{"tokens": {"invented": {}}}\n'
         self.pin['sha256'] = hashlib.sha256(local).hexdigest()

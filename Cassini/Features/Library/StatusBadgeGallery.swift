@@ -18,6 +18,10 @@ struct StatusBadgeGallery: View {
                StatusBadges.transcribing(etaMinutes: nil, text: text)]
     }
 
+    private var phoneStates: [LibraryRow.Status] {
+        [.queued, .paused(atMs: 1_792_000), .failed, .audioOnly, .unplayable, .unreadable, .newerFormat]
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
@@ -26,6 +30,11 @@ struct StatusBadgeGallery: View {
                 ForEach(Array(badges.enumerated()), id: \.offset) { index, badge in
                     FlowLayout {
                         StatusBadgeView(badge: badge).accessibilityIdentifier("badge-gallery-\(index)")
+                    }
+                }
+                ForEach(Array(phoneStates.enumerated()), id: \.offset) { index, status in
+                    FlowLayout {
+                        PhoneStatusBadgeView(status: status).accessibilityIdentifier("badge-phone-\(index)")
                     }
                 }
                 Text(StatusBadges.interruptedAt(position: "00:41:12",

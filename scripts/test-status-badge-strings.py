@@ -20,6 +20,9 @@ class BadgeStringGenerationTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory(); self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
         shutil.copytree(ROOT / generator.SOURCE, self.root / generator.SOURCE)
+        target = self.root / generator.STRINGS_PIN
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(ROOT / generator.STRINGS_PIN, target)
 
     def test_exact_output_has_all_six_locales_and_preserves_named_placeholders(self):
         expected = generator.render(self.root)
@@ -32,6 +35,14 @@ class BadgeStringGenerationTests(unittest.TestCase):
         self.assertIn('{liveBadge}', output['strings']['states.badge.recording']['localizations']['en']['stringUnit']['value'])
         self.assertIn('{n}', output['strings']['states.badge.transcribing']['localizations']['fr']['stringUnit']['value'])
         self.assertIn('{position}', output['strings']['meeting.interruptedAt']['localizations']['it']['stringUnit']['value'])
+        self.assertIn('{position}', output['strings']['states.phone.pausedAt']['localizations']['fr']['stringUnit']['value'])
+        self.assertEqual(len(output['strings']), 17)
+
+    def test_global_and_bundle_pins_cannot_diverge(self):
+        path = self.root / generator.STRINGS_PIN
+        pin = json.loads(path.read_text()); pin['commit'] = '0' * 40
+        path.write_text(json.dumps(pin))
+        with self.assertRaisesRegex(ValueError, 'Global shared-string pin'): generator.render(self.root)
 
     def test_generated_literal_calls_cover_every_key_and_both_outputs_reject_drift(self):
         import re
@@ -65,6 +76,10 @@ class BadgeStringGenerationTests(unittest.TestCase):
         pin = json.loads((folder / 'UPSTREAM.json').read_text())
         pin['sha256']['strings/strings.json'] = hashlib.sha256(path.read_bytes()).hexdigest()
         (folder / 'UPSTREAM.json').write_text(json.dumps(pin))
+        shared_path = self.root / generator.STRINGS_PIN
+        shared = json.loads(shared_path.read_text())
+        shared['sha256'] = pin['sha256']['strings/strings.json']
+        shared_path.write_text(json.dumps(shared))
 
     def test_fresh_pin_cannot_silently_drop_placeholder(self):
         def mutate(catalog):

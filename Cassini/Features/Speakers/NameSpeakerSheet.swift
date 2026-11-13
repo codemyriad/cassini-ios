@@ -159,7 +159,6 @@ struct NameSpeakerSheet: View {
             Button(yes.0) { send(yes.1) }.accessibilityIdentifier("questionYes")
             Button(no.0) { send(no.1) }.accessibilityIdentifier("questionNo")
         }
-        // IOS-TOK-23: keep the existing pulse steps until Alex specifies a second warning tint.
         .listRowBackground(Color.warnInk.opacity(pulse ? 0.3 : 0.1))
     }
 

@@ -1,5 +1,26 @@
 # Shared string source
 
+WP1 pins the full shared catalog to `codemyriad/cassini-ux`
+`5e0c34e0f1bb390298dabdf4eedc494e933fd329`, `strings/strings.json`, SHA-256
+`4bbe42b47bbf2e6e61ed15b1c54cabf4096e92aca63b9ed84d428070baa52acf`.
+`contracts/shared-strings/UPSTREAM.json` is the global source pin and points to the complete, byte-identical catalog in
+`Packages/CassiniNotebook/Tests/CassiniNotebookTests/Resources/status-badges/strings/strings.json`; the resource
+bundle pin uses the same commit and hash. The generator rejects disagreement between them.
+
+`scripts/generate-status-badge-strings.py` emits only the implemented WP1 selection: the ten existing shared badge /
+interrupted-position keys and the seven `states.phone.*` labels (`audioOnly`, `cantPlay`, `cantReadTranscript`,
+`couldntTranscribe`, `newerFormat`, `pausedAt`, `queued`). All six translations and named placeholders remain
+verbatim. The generated catalog is `Cassini/Resources/Strings/StatusBadge.xcstrings`, with literal lookup call sites
+only in `Cassini/Strings/StatusBadgeStrings.swift`. App language bundle selection remains in the existing
+`StatusBadgeCopy` adapter. The remaining catalog entries are not shipped before their implementation milestone.
+
+The complete existing states, format and library vector resources and their expected rows are repinned from the same
+immutable commit without local edits. The states contract remains v3 with `Received`; WP1 does not implement WP7.
+HARMONY is read at the immutable source commit, not copied into an unused local snapshot.
+
+The pins below document earlier implemented string subsets. They are historical source receipts, not the WP1 source
+for the generated status table.
+
 D14 Search date-filter and D95 unknown-date group copy are vendored from `codemyriad/cassini-ux` at `484c6048447381e04fd1d1133e7ae02c6c6d5e58`,
 `strings/strings.json` (SHA-256 `2b672fc8a88e62d704e6e2b5a4ed8d999a8aa77e90b8c006e7c7c0e43d26e169`).
 Entries: `search.filter.anyDate`, `search.filter.date.today`, `search.filter.date.week`,

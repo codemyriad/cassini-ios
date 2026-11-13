@@ -36,16 +36,15 @@ extension Note {
     /// Metadata-only upgrade for existing local notes and their kept versions.
     public mutating func backfillSpeakerColours() {
         let all = (speakers ?? []) + (versions ?? []).flatMap(\.speakers)
-        var assigned = Dictionary(all.compactMap { speaker in speaker.colourIndex.map { (speaker.id, $0) } },
+        let assigned = Dictionary(all.compactMap { speaker in speaker.colourIndex.map { (speaker.id, $0) } },
                                   uniquingKeysWith: { first, _ in first })
-        var next = (assigned.values.max() ?? -1) + 1
+        var allocator = SpeakerColourAllocator(assigned)
         func fill(_ catalog: [NoteSpeaker], order: [String]) -> [NoteSpeaker] {
             var result = catalog
             var seen = Set<String>()
             for id in order + catalog.map(\.id) where seen.insert(id).inserted {
                 guard let index = result.firstIndex(where: { $0.id == id }), result[index].colourIndex == nil else { continue }
-                if assigned[id] == nil { assigned[id] = next; next += 1 }
-                result[index].colourIndex = assigned[id]
+                result[index].colourIndex = allocator.reserve(id)
             }
             return result
         }
@@ -62,12 +61,13 @@ extension Note {
     /// Fill missing legacy slots once, preserving every existing assignment.
     public static func assignColourIndices(_ speakers: [NoteSpeaker], order: [String]) -> [NoteSpeaker] {
         var result = speakers
-        var next = (speakers.compactMap(\.colourIndex).max() ?? -1) + 1
+        var allocator = SpeakerColourAllocator(Dictionary(speakers.compactMap { speaker in
+            speaker.colourIndex.map { (speaker.id, $0) }
+        }, uniquingKeysWith: { first, _ in first }))
         var seen = Set<String>()
         for id in order + speakers.map(\.id) where seen.insert(id).inserted {
             guard let index = result.firstIndex(where: { $0.id == id }), result[index].colourIndex == nil else { continue }
-            result[index].colourIndex = next
-            next += 1
+            result[index].colourIndex = allocator.reserve(id)
         }
         return result
     }
@@ -187,8 +187,12 @@ extension Note {
         let trimmed = String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(Limits.nameMaxLength))
         guard !trimmed.isEmpty, speaker(id) == nil else { return }
         changeShownSpeakers {
-            let next = (($0.speakers ?? []).compactMap(\.colourIndex).max() ?? -1) + 1
-            $0.speakers = ($0.speakers ?? []) + [NoteSpeaker(id: id, name: trimmed, colourIndex: next, provenance: .user)]
+            let all = ($0.speakers ?? []) + ($0.versions ?? []).flatMap(\.speakers)
+            var allocator = SpeakerColourAllocator(Dictionary(all.compactMap { speaker in
+                speaker.colourIndex.map { (speaker.id, $0) }
+            }, uniquingKeysWith: { first, _ in first }))
+            $0.speakers = ($0.speakers ?? []) + [NoteSpeaker(id: id, name: trimmed,
+                colourIndex: allocator.reserve(id), provenance: .user)]
         }
     }
 }

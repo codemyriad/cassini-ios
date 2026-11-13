@@ -24,7 +24,7 @@ class BrandGenerationTests(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name)
-        for path in (brand.TOKEN, brand.PIN, brand.APPLICATION):
+        for path in (brand.TOKEN, brand.PIN, brand.APPLICATION, brand.MARK):
             target = self.root / path
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(ROOT / path, target)
@@ -70,6 +70,15 @@ class BrandGenerationTests(unittest.TestCase):
         pin.write_text(json.dumps(value))
         with self.assertRaisesRegex(ValueError, "pin/hash mismatch"):
             brand.render(self.root)
+
+    def test_mark_bytes_are_pinned_and_native_asset_preserves_original_vector(self):
+        generated = brand.render(self.root)
+        self.assertEqual(generated[brand.MARK_ASSET], (self.root / brand.MARK).read_bytes())
+        properties = json.loads(generated[brand.MARK_CONTENTS])['properties']
+        self.assertEqual(properties, {'preserves-vector-representation': True, 'template-rendering-intent': 'original'})
+        path = self.root / brand.MARK
+        path.write_bytes(path.read_bytes() + b' ')
+        with self.assertRaisesRegex(ValueError, 'mark pin/hash'): brand.render(self.root)
 
     def test_wrong_source_or_non_commit_pin_is_rejected(self):
         pin = self.root / brand.PIN

@@ -120,30 +120,61 @@ struct RowChip: View {
         if let badge = RowBadge.presentation(row, text: { StatusBadgeCopy.template($0) }) {
             StatusBadgeView(badge: badge)
         } else {
-            localBadge
+            PhoneStatusBadgeView(status: status)
         }
     }
 
-    /// The merged contract retains phone-specific applicability and does not invent their glyph mappings.
-    private var localBadge: some View {
-        HStack(spacing: 5) {
-            if case .recording = status { Circle().fill(colors.ink).frame(width: 6, height: 6) }
-            if case .transcribed = status { Image(systemName: "checkmark").font(.system(size: 9, weight: .bold)) }
-            Text(LibraryCopy.status(status)).font(.caption.weight(.semibold)).monospacedDigit()
-        }
-        .foregroundStyle(colors.ink).padding(.horizontal, 8).padding(.vertical, 4)
-        .background(colors.tint, in: Capsule())
+    var colors: (ink: Color, tint: Color) { PhoneStatusBadgeView(status: status).colors }
+}
+
+/// Phone-only states retain their platform meaning while sharing the native pill anatomy.
+struct PhoneStatusBadgeView: View {
+    let status: LibraryRow.Status
+    var body: some View {
+        StatusPill(text: text(), glyph: glyph, ink: colors.ink, fill: colors.tint,
+                   outlined: status == .newerFormat)
     }
 
-    // Colour roles only; badge anatomy, labels and glyphs stay for Wave 2.
+    func text(language: String = DefaultLabels.appLanguage) -> String {
+        let key: String
+        switch status {
+        case .queued: key = "states.phone.queued"
+        case .paused(let atMs):
+            return StatusBadgeCopy.template("states.phone.pausedAt", language: language)
+                .replacingOccurrences(of: "{position}", with: TimeText.clock(Double(atMs) / 1_000))
+        case .failed: key = "states.phone.couldntTranscribe"
+        case .unplayable: key = "states.phone.cantPlay"
+        case .unreadable: key = "states.phone.cantReadTranscript"
+        case .newerFormat: key = "states.phone.newerFormat"
+        case .audioOnly: key = "states.phone.audioOnly"
+        case .recording, .transcribing, .transcribed: return LibraryCopy.status(status)
+        }
+        return StatusBadgeCopy.template(key, language: language)
+    }
+
+    private var glyph: StatusPill.Glyph {
+        switch status {
+        case .recording: .dot
+        case .transcribing: .spinner
+        case .queued: .symbol("clock")
+        case .paused: .symbol("pause.fill", size: StatusBadgeView.Metrics.spinner)
+        case .failed, .unplayable, .unreadable, .newerFormat: .symbol("exclamationmark.circle")
+        case .audioOnly: .symbol("waveform")
+        case .transcribed: .symbol("checkmark")
+        }
+    }
+
     var colors: (ink: Color, tint: Color) {
         switch status {
         case .recording: (.recordInk, .recordTint)
-        case .failed, .unplayable, .unreadable, .paused: (.warnInk, .warnTint)
+        case .failed, .unplayable, .unreadable: (.error, .errorTint)
+        case .paused: (.warnInk, .warnTint)
         case .transcribed: (.success, .successTint)
-        case .transcribing, .queued, .newerFormat, .audioOnly: (.neutralInk, Color.ink.opacity(0.1))
+        case .newerFormat: (.ink2, .canvasClear)
+        case .transcribing, .queued, .audioOnly: (.ink2, Color.ink.opacity(0.1))
         }
     }
+
 }
 
 /// Highlighted text as SwiftUI draws it: each match in weight 600 on an accent tint, so it does not rely on colour.

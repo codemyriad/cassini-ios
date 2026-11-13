@@ -1,12 +1,13 @@
 import SwiftUI
 import CassiniNotebook
 
-/// W0.4's shared pill. Metrics remain named, provisional phone values from the contract.
+/// Shared presentation, with platform rendering kept separate from persisted badge fields.
 struct StatusBadgeView: View {
     let badge: BadgePresentation
 
     enum Metrics {
         static let minimumHeight: CGFloat = 22
+        static let fontSize: CGFloat = 12
         static let horizontalPadding: CGFloat = 8
         static let gap: CGFloat = 4
         static let dot: CGFloat = 6
@@ -16,55 +17,77 @@ struct StatusBadgeView: View {
     }
 
     var body: some View {
-        HStack(spacing: Metrics.gap) {
-            glyph.accessibilityHidden(true)
-            Text(badge.text).font(.caption.weight(.semibold)).monospacedDigit()
-        }
-        .foregroundStyle(ink)
-        .padding(.horizontal, Metrics.horizontalPadding)
-        .frame(minHeight: Metrics.minimumHeight)
-        .background(background, in: Capsule())
-        .overlay {
-            if badge.tint == .outline {
-                Capsule().strokeBorder(CassiniTokens.color(.line), lineWidth: Metrics.outline)
-            }
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(badge.text)
+        StatusPill(text: badge.text, glyph: glyph, ink: ink, fill: background,
+                   glyphInk: glyphInk, outlined: badge.tint == .outline)
     }
 
-    @ViewBuilder private var glyph: some View {
+    private var glyph: StatusPill.Glyph {
         switch badge.glyph {
-        case .dot:
-            Circle().fill(ink).frame(width: Metrics.dot, height: Metrics.dot)
-        case .spinner:
-            // Only the glyph has a fixed metric; the label keeps the user’s Dynamic Type size.
-            ProgressView().tint(ink).dynamicTypeSize(.medium).scaleEffect(0.5)
-                .frame(width: Metrics.spinner, height: Metrics.spinner)
-        case .alert:
-            Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: Metrics.symbol, weight: .semibold))
-        case .incoming:
-            Image(systemName: "tray.and.arrow.down")
-                .font(.system(size: Metrics.symbol, weight: .semibold))
+        case .dot: .dot
+        case .spinner: .spinner
+        case .alert: .symbol("exclamationmark.circle")
+        case .incoming: .symbol("tray.and.arrow.down")
         }
     }
+
+    var glyphInk: Color { badge.kind == .transcribing && badge.glyph == .spinner ? .accent : ink }
 
     var ink: Color {
-        let role: CassiniTokens.Role = switch badge.tint {
+        switch badge.tint {
         case .red: .recordInk
         case .neutral, .outline: .ink2
         case .amber: .warnInk
         }
-        return CassiniTokens.color(role)
     }
 
     var background: Color {
         switch badge.tint {
-        case .red: CassiniTokens.color(.recordTint)
-        case .neutral: CassiniTokens.color(.neutralTint)
-        case .amber: CassiniTokens.color(.warnTint)
-        case .outline: CassiniTokens.color(.ground).opacity(0)
+        case .red: .recordTint
+        case .neutral: Color.ink.opacity(0.1)
+        case .amber: .warnTint
+        case .outline: .canvasClear
+        }
+    }
+}
+
+/// The same native anatomy also renders phone-only states without adding them to the shared wire enum.
+struct StatusPill: View {
+    enum Glyph { case dot, spinner, symbol(String, size: CGFloat = StatusBadgeView.Metrics.symbol) }
+    let text: String
+    let glyph: Glyph
+    let ink: Color
+    let fill: Color
+    var glyphInk: Color? = nil
+    var outlined = false
+    @ScaledMetric(relativeTo: .caption) private var fontSize = StatusBadgeView.Metrics.fontSize
+    @ScaledMetric(relativeTo: .caption) private var minimumHeight = StatusBadgeView.Metrics.minimumHeight
+
+    var body: some View {
+        HStack(spacing: StatusBadgeView.Metrics.gap) {
+            mark.foregroundStyle(glyphInk ?? ink).accessibilityHidden(true)
+            Text(text).font(.system(size: fontSize, weight: .semibold)).monospacedDigit()
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .foregroundStyle(ink)
+        .padding(.horizontal, StatusBadgeView.Metrics.horizontalPadding)
+        .frame(minHeight: minimumHeight)
+        .background(fill, in: Capsule())
+        .overlay {
+            if outlined { Capsule().strokeBorder(Color.line, lineWidth: StatusBadgeView.Metrics.outline) }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(text)
+    }
+
+    @ViewBuilder private var mark: some View {
+        switch glyph {
+        case .dot:
+            Circle().frame(width: StatusBadgeView.Metrics.dot, height: StatusBadgeView.Metrics.dot)
+        case .spinner:
+            ProgressView().tint(glyphInk ?? ink).controlSize(.mini).dynamicTypeSize(.medium).scaleEffect(0.75)
+                .frame(width: StatusBadgeView.Metrics.spinner, height: StatusBadgeView.Metrics.spinner)
+        case .symbol(let name, let size):
+            Image(systemName: name).font(.system(size: size, weight: .semibold))
         }
     }
 }

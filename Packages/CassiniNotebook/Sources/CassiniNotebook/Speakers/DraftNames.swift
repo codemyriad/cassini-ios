@@ -67,12 +67,11 @@ public struct DraftNames: Hashable, Sendable {
     /// Reserve new raw speaker IDs before applying aliases; existing reservations never move.
     public func observingWords(_ words: [DraftWord]) -> DraftNames {
         var next = self
-        var index = (colourIndices.values.max() ?? -1) + 1
+        var allocator = SpeakerColourAllocator(colourIndices)
         let order = SpeakerColourOrder.earliest(words, id: { $0.speaker.isEmpty ? NoteTranscripts.draftOneVoice : $0.speaker },
                                                 start: { Double($0.startMs) })
         for id in order where next.colourIndices[id] == nil {
-            next.colourIndices[id] = index
-            index += 1
+            next.colourIndices[id] = allocator.reserve(id)
         }
         return next
     }
@@ -303,7 +302,7 @@ extension DraftNames: Codable {
         live = try c.decodeIfPresent([String: LiveMatch].self, forKey: .live) ?? [:]
         rejected = try c.decodeIfPresent([String: [UUID]].self, forKey: .rejected) ?? [:]
         colourIndices = try c.decodeIfPresent([String: Int].self, forKey: .colourIndices) ?? [:]
-        guard colourIndices.values.allSatisfy({ (0...9_007_199_254_740_991).contains($0) }) else {
+        guard colourIndices.values.allSatisfy({ (0...SpeakerColourAllocator.maximum).contains($0) }) else {
             throw DecodingError.dataCorruptedError(forKey: .colourIndices, in: c, debugDescription: "Invalid colour index")
         }
         explicitNames = try c.decodeIfPresent(Set<String>.self, forKey: .explicitNames) ?? []

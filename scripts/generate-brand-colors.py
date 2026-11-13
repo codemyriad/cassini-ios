@@ -19,6 +19,10 @@ OUTPUT = "CassiniShared/CassiniTokens.swift"
 META = "CassiniShared/Brand/COMPATIBILITY.json"
 APPLICATION = "CassiniShared/Brand/application.json"
 ASSET = "Cassini/Resources/Assets.xcassets/AccentColor.colorset/Contents.json"
+MARK_SOURCE = "brand/mark/saturn-nav.svg"
+MARK = "CassiniShared/Brand/mark/saturn-nav.svg"
+MARK_ASSET = "Cassini/Resources/Assets.xcassets/SaturnNav.imageset/saturn-nav.svg"
+MARK_CONTENTS = "Cassini/Resources/Assets.xcassets/SaturnNav.imageset/Contents.json"
 SOURCES = ("Cassini/Design/Tokens.swift", "Cassini/Design/Snackbar.swift",
            "CassiniShared/RecordingActivityColors.swift", "Cassini/Features/Library/NoteRow.swift", ASSET)
 
@@ -101,6 +105,9 @@ def render(root=ROOT):
         raise ValueError("unexpected brand pin source")
     if not re.fullmatch(r"[a-f0-9]{40}", pin.get("commit", "")) or pin.get("sha256") != digest:
         raise ValueError("brand pin/hash mismatch")
+    mark = (root / MARK).read_bytes()
+    if pin.get("files", {}).get(MARK_SOURCE) != hashlib.sha256(mark).hexdigest():
+        raise ValueError("brand mark pin/hash mismatch")
     sheet = json.loads(raw)
     tokens = sheet["tokens"]
     active = {k: v for k, v in tokens.items() if v["status"] == "decided"}
@@ -164,7 +171,11 @@ enum CassiniTokens {{
             if mode == "dark": color["appearances"] = [{"appearance": "luminosity", "value": "dark"}]
             colors.append(color)
         asset = {"colors": colors, "info": {"author": "xcode", "version": 1}}
-        return {OUTPUT: swift.encode(), ASSET: (json.dumps(asset, indent=2) + "\n").encode()}
+        mark_contents = {"images": [{"filename": "saturn-nav.svg", "idiom": "universal"}],
+                         "info": {"author": "xcode", "version": 1},
+                         "properties": {"preserves-vector-representation": True, "template-rendering-intent": "original"}}
+        return {OUTPUT: swift.encode(), ASSET: (json.dumps(asset, indent=2) + "\n").encode(),
+                MARK_ASSET: mark, MARK_CONTENTS: (json.dumps(mark_contents, indent=2) + "\n").encode()}
     header += "// TEMPORARY plumbing compatibility, mechanically extracted from the frozen public baseline.\n"
     compatibility = [extension(sources[SOURCES[0]].decode()), extension(sources[SOURCES[1]].decode()),
                      sources[SOURCES[2]].decode().removeprefix("import SwiftUI\n").strip()]
@@ -283,6 +294,7 @@ def main():
             if META not in outputs:
                 (ROOT / META).unlink(missing_ok=True)
             for path, data in outputs.items():
+                (ROOT / path).parent.mkdir(parents=True, exist_ok=True)
                 (ROOT / path).write_bytes(data)
         check_literals()
     except (ValueError, KeyError, json.JSONDecodeError, subprocess.CalledProcessError) as error:

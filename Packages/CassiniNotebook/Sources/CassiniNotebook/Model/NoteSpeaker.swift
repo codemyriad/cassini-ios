@@ -82,7 +82,7 @@ extension NoteSpeaker: Codable {
         id = try container.decode(String.self, forKey: .id)
         name = try container.decode(String.self, forKey: .name)
         colourIndex = try container.decodeIfPresent(Int.self, forKey: .colourIndex)
-        if let colourIndex, !(0...9_007_199_254_740_991).contains(colourIndex) {
+        if let colourIndex, !(0...SpeakerColourAllocator.maximum).contains(colourIndex) {
             throw DecodingError.dataCorruptedError(forKey: .colourIndex, in: container,
                                                    debugDescription: "Invalid speaker colour index")
         }

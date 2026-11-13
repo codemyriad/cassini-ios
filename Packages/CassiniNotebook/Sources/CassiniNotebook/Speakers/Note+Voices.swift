@@ -200,13 +200,14 @@ extension Note {
             // A confirmed/automatic saved-voice link proves identity only when both sides are unique.
             if candidates.count == 1 { knownByID[id] = candidates[0] }
         }
-        let reserved = identityPool.compactMap(\.colourIndex)
-        var nextColour = max(reserved.max() ?? -1, colourIndices.values.max() ?? -1) + 1
+        let reserved = Dictionary(identityPool.compactMap { speaker in
+            speaker.colourIndex.map { (speaker.id, $0) }
+        }, uniquingKeysWith: { first, _ in first })
         var coloursByID = knownByID.compactMapValues { $0.colourIndex }
         for (id, index) in colourIndices where coloursByID[id] == nil { coloursByID[id] = index }
+        var allocator = SpeakerColourAllocator(coloursByID, reserving: reserved)
         for id in SpeakerColourOrder.segments(attributed) where coloursByID[id] == nil {
-            coloursByID[id] = nextColour
-            nextColour += 1
+            coloursByID[id] = allocator.reserve(id)
         }
         let analyzed = order.enumerated().map { offset, id in
             let known = knownByID[id]

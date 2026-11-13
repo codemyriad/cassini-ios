@@ -65,8 +65,8 @@ struct LibraryView: View {
         }
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
-                HStack(spacing: 8) { OrbitMark(size: 25); // The wordmark sets the name in lower case; VoiceOver reads it as written.
-                    Text(verbatim: ProductName.full.lowercased()).font(.system(.title3, design: .rounded, weight: .semibold)).tracking(-0.6) }
+                HStack(spacing: 8) { OrbitMark(size: 26); // The wordmark sets the name in lower case; VoiceOver reads it as written.
+                    Text(verbatim: ProductName.wordmark).font(.system(size: 18, weight: .medium)) }
                     .foregroundStyle(Color.ink).fixedSize().accessibilityElement(children: .combine)
                     .accessibilityLabel(Text(verbatim: ProductName.full))
                     .accessibilityAddTraits(.isHeader).accessibilityShowsLargeContentViewer()

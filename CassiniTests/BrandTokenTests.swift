@@ -5,7 +5,7 @@ import CassiniNotebook
 @testable import Cassini
 
 @MainActor @Suite struct BrandTokenTests {
-    private struct Pin: Decodable { let repository: String; let commit: String; let path: String; let sha256: String }
+    private struct Pin: Decodable { let repository: String; let commit: String; let path: String; let sha256: String; let files: [String: String] }
     private struct Value: Decodable { let light: String; let dark: String; let status: String }
     private struct Sheet: Decodable { let tokens: [String: Value]; let derived: [String: Value] }
 
@@ -61,10 +61,18 @@ import CassiniNotebook
                 #expect(abs(Double(component) - Double(byte) / 255) < 0.0001)
             }
             #expect(actual.opacity == 1)
-            for status in [LibraryRow.Status.transcribing, .queued, .newerFormat, .audioOnly] {
-                let pill = RowChip(status: status).colors
+            for status in [LibraryRow.Status.transcribing, .queued, .audioOnly] {
+                let pill = PhoneStatusBadgeView(status: status).colors
                 #expect(ContrastTests.resolved(pill.tint, scheme) == ContrastTests.resolved(Color.ink.opacity(0.1), scheme))
                 #expect(ContrastTests.contrast(pill.ink, on: [Color.cardRest, pill.tint], scheme) >= 4.5)
+            }
+            let outline = PhoneStatusBadgeView(status: .newerFormat).colors
+            #expect(ContrastTests.resolved(outline.tint, scheme).opacity == 0)
+            #expect(ContrastTests.resolved(outline.ink, scheme) == ContrastTests.resolved(Color.ink2, scheme))
+            for status in [LibraryRow.Status.failed, .unplayable, .unreadable] {
+                let problem = PhoneStatusBadgeView(status: status).colors
+                #expect(ContrastTests.resolved(problem.ink, scheme) == ContrastTests.resolved(Color.error, scheme))
+                #expect(ContrastTests.resolved(problem.tint, scheme) == ContrastTests.resolved(Color.errorTint, scheme))
             }
         }
     }
@@ -86,8 +94,12 @@ import CassiniNotebook
         let pin = try JSONDecoder().decode(Pin.self, from: Data(contentsOf: pinURL))
         #expect(pin.repository == "https://github.com/codemyriad/cassini-ux")
         #expect(pin.path == "brand/tokens.json")
-        #expect(pin.commit == "b4dec4160a04a5e9995ce0a74d0215aa24a3da9c")
+        #expect(pin.commit == "5e0c34e0f1bb390298dabdf4eedc494e933fd329")
         #expect(SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined() == pin.sha256)
+        let markURL = try #require(bundle.url(forResource: "saturn-nav", withExtension: "svg"))
+        let mark = try Data(contentsOf: markURL)
+        #expect(SHA256.hash(data: mark).map { String(format: "%02x", $0) }.joined() == pin.files["brand/mark/saturn-nav.svg"])
+        #expect(UIImage(named: "SaturnNav", in: bundle, compatibleWith: nil) != nil)
         let sheet = try JSONDecoder().decode(Sheet.self, from: data)
         let active = sheet.tokens.filter { $0.value.status == "decided" }
         #expect(active.count == 53 && active.count == sheet.tokens.count, "All 53 pinned roles are decided")

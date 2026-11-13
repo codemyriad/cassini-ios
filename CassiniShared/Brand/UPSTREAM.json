@@ -1,6 +1,9 @@
 {
   "repository": "https://github.com/codemyriad/cassini-ux",
-  "commit": "b4dec4160a04a5e9995ce0a74d0215aa24a3da9c",
+  "commit": "5e0c34e0f1bb390298dabdf4eedc494e933fd329",
   "path": "brand/tokens.json",
-  "sha256": "9d3d10d88db5d86d18a1cd099df36ca1c00234344fa383d28283992b734c6358"
+  "sha256": "9d3d10d88db5d86d18a1cd099df36ca1c00234344fa383d28283992b734c6358",
+  "files": {
+    "brand/mark/saturn-nav.svg": "38b639fe49123ee236239a523183815505c33b826b135f63b65d691df7caf61e"
+  }
 }

@@ -11,6 +11,28 @@ struct DraftColourPersistenceTests {
                               colourIndices: draft.colourIndices, provenance: draft.provenance)
     }
 
+    @Test func exhaustedForeignDraftSlotContinuesAcrossBatchesAndFreshStoreReloads() throws {
+        let maximum = 9_007_199_254_740_991
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let id = UUID()
+        let folder = root.appendingPathComponent(id.uuidString).appendingPathComponent("work")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let store = DraftNamesStore(root: root) { _ in folder }
+        store.mutate(id) { _ in DraftNames(colourIndices: ["old": maximum]) }
+        let old = DraftWord(speaker: "old", startMs: 0, endMs: 100, text: "First")
+        let a = DraftWord(speaker: "a", startMs: 200, endMs: 300, text: "Second")
+        let b = DraftWord(speaker: "b", startMs: 400, endMs: 500, text: "Third")
+        store.observe(.windowDone(doneMs: 300, totalMs: 1000, words: [old, a]), noteID: id)
+        let fresh = DraftNamesStore(root: root) { _ in folder }
+        #expect(fresh.current(id).colourIndices == ["old": maximum, "a": 1])
+        fresh.observe(.draft(words: [old, a, b], tentativeFromMs: 500), noteID: id)
+        let final = DraftNamesStore(root: root) { _ in folder }.current(id)
+        #expect(final.colourIndices == ["old": maximum, "a": 1, "b": 2])
+        #expect(final.colourIndices.values.allSatisfy { (0...maximum).contains($0) })
+        #expect(try JSONDecoder().decode(DraftNames.self, from: final.encoded()) == final)
+    }
+
     @Test func wordEventsReserveSlotsBeforeMergeAndReloadWithoutRecolouringOtherSpeakers() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }

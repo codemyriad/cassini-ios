@@ -17,23 +17,29 @@ def check(root, fetch=None):
             or not re.fullmatch('[0-9a-f]{40}', pin.get('commit', ''))
             or not re.fullmatch('[0-9a-f]{64}', pin.get('sha256', ''))):
         raise ValueError('Invalid immutable brand source pin')
-    endpoint = f"repos/codemyriad/cassini-ux/contents/brand/tokens.json?ref={pin['commit']}"
-    if fetch is None:
-        result = subprocess.run(['gh', 'api', endpoint], capture_output=True, text=True)
-        if result.returncode:
-            # Never echo authentication diagnostics or credentials from the environment.
-            raise ValueError('Cannot read pinned cassini-ux source with the existing read-only CI credentials')
-        value = json.loads(result.stdout)
-        if value.get('encoding') != 'base64':
-            raise ValueError('Unexpected upstream content encoding')
-        upstream = base64.b64decode(''.join(value['content'].split()), validate=True)
-    else:
-        upstream = fetch(endpoint)
-    vendored = (folder / 'tokens.json').read_bytes()
-    if hashlib.sha256(upstream).hexdigest() != pin['sha256']:
-        raise ValueError('Pinned SHA-256 differs from cassini-ux source')
-    if upstream != vendored:
-        raise ValueError('Vendored brand file is not byte-identical to cassini-ux source')
+    if set(pin.get('files', {})) - {'brand/mark/saturn-nav.svg'}:
+        raise ValueError('Invalid immutable brand source pin')
+    files = {'brand/tokens.json': pin['sha256'], **pin.get('files', {})}
+    for path, digest in files.items():
+        if not re.fullmatch('[0-9a-f]{64}', digest):
+            raise ValueError('Invalid immutable brand source pin')
+        endpoint = f"repos/codemyriad/cassini-ux/contents/{path}?ref={pin['commit']}"
+        if fetch is None:
+            result = subprocess.run(['gh', 'api', endpoint], capture_output=True, text=True)
+            if result.returncode:
+                # Never echo authentication diagnostics or credentials from the environment.
+                raise ValueError('Cannot read pinned cassini-ux source with the existing read-only CI credentials')
+            value = json.loads(result.stdout)
+            if value.get('encoding') != 'base64':
+                raise ValueError('Unexpected upstream content encoding')
+            upstream = base64.b64decode(''.join(value['content'].split()), validate=True)
+        else:
+            upstream = fetch(endpoint)
+        vendored = (folder / Path(path).relative_to('brand')).read_bytes()
+        if hashlib.sha256(upstream).hexdigest() != digest:
+            raise ValueError('Pinned SHA-256 differs from cassini-ux source')
+        if upstream != vendored:
+            raise ValueError('Vendored brand file is not byte-identical to cassini-ux source')
 
 
 if __name__ == '__main__':

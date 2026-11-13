@@ -15,8 +15,9 @@ final class StatusBadgeLayoutTests: XCTestCase {
         let content = window.insetBy(dx: inset, dy: 0)
         let scroll = app.scrollViews.firstMatch
         let viewport = scroll.frame.intersection(window)
-        for index in 0..<9 {
-            let badge = app.descendants(matching: .any)["badge-gallery-\(index)"]
+        let ids = (0..<9).map { "badge-gallery-\($0)" } + (0..<7).map { "badge-phone-\($0)" }
+        for (index, id) in ids.enumerated() {
+            let badge = app.descendants(matching: .any)[id]
             guard badge.waitForExistence(within: 15) else {
                 XCTFail("The actual badge \(index) is missing"); return
             }
