@@ -169,16 +169,15 @@ final class ScreenshotTests: XCTestCase {
         let app = try launchPhone(["--seed", "brandSpeakers", "--open-fixture", Self.fixture])
         XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 10))
         waitForInitialPosition(app)
-        XCTAssertTrue(app.buttons["speakersButton"].waitForExistence(within: 5))
+        XCTAssertTrue(app.buttons["headerSpeaker-brand-0"].waitForExistence(within: 5))
+        XCTAssertEqual(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "headerSpeaker-")).count, 7)
         capture("15-seven-speaker-meeting")
     }
 
     /// The actual Speakers sheet shows an unnamed first speaker reserving slot zero, plus six named speakers.
     @MainActor func test16SevenSpeakerColours() throws {
         let app = try launchPhone(["--seed", "brandSpeakers", "--open-fixture", Self.fixture])
-        let speakers = app.buttons["speakersButton"]
-        XCTAssertTrue(speakers.waitForExistence(within: 10))
-        speakers.tapWhenSettled()
+        app.openNoteSpeakers()
         XCTAssertTrue(app.buttons["speaker-brand-0"].waitForExistence(within: 5))
         let last = app.buttons["speaker-brand-6"]
         XCTAssertTrue(app.scroll(attempts: 6) { last.exists && last.isHittable })
@@ -202,6 +201,28 @@ final class ScreenshotTests: XCTestCase {
         let app = try launchPhone(["--badge-gallery"])
         XCTAssertTrue(app.descendants(matching: .any)["badge-gallery-8"].waitForExistence(within: 15))
         capture("17-status-badges")
+    }
+
+    @MainActor func test18MeetingFind() throws {
+        let app = try launchPhone(["--seed", "reading", "--open-fixture", Self.fixture])
+        waitForInitialPosition(app)
+        app.buttons["searchTranscript"].tap()
+        let field = app.textFields["transcriptSearch"]
+        XCTAssertTrue(field.waitForExistence(within: 5))
+        field.typeText("attention")
+        XCTAssertTrue(app.staticTexts["searchCounter"].wait(until: NSPredicate(format: "label == '1 of 1'"), within: 5))
+        capture("18-meeting-find")
+    }
+
+    @MainActor func test19MeetingScrolled() throws {
+        let app = try launchPhone(["--seed", "long", "--open-fixture", "11111111-1111-1111-1111-111111111111"])
+        waitForInitialPosition(app)
+        let compact = app.staticTexts["noteCompactTitle"]
+        XCTAssertTrue(app.scroll(attempts: 8) {
+            compact.exists && compact.isHittable && !app.staticTexts["noteTitle"].isHittable
+        })
+        XCTAssertEqual(compact.label, "Three hour workshop")
+        capture("19-meeting-scrolled")
     }
 
     // MARK: - iPad

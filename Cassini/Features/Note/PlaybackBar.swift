@@ -2,7 +2,7 @@ import SwiftUI
 import CassiniEngine
 import CassiniNotebook
 
-/// The Read & listen player: the position slider over the waveform, the position and total duration, then back
+/// The floating Read & listen player: the native position slider between its two times, then back
 /// 10 s, play/pause and forward 10 s, with the speed menu and the bookmark button (iOS extras) at the sides.
 ///
 /// Dragging the slider moves only the slider and the times; the player seeks once, when the drag ends. VoiceOver reads
@@ -22,23 +22,21 @@ struct PlaybackBar: View {
     private var isPlaying: Bool { ours && playback.state.isPlaying }
 
     var body: some View {
-        VStack(spacing: 7) {
-            slider
-            HStack {
-                Text(TimeText.clock(position))
-                Spacer()
-                Text(TimeText.clock(duration))
+        VStack(spacing: 8) {
+            HStack(spacing: 10) {
+                Text(TimeText.clock(position)).fixedSize().accessibilityHidden(true)
+                slider
+                Text(TimeText.clock(duration)).fixedSize().accessibilityHidden(true)
             }
-            .font(.caption2.monospacedDigit()).foregroundStyle(Color.muted)
-            .accessibilityHidden(true)
+            .font(.caption.monospacedDigit()).foregroundStyle(Color.muted)
             controls
         }
-        // Five buttons in a row: past AX1 they would not fit, so the bar stops growing there and shows the Large
-        // Content Viewer instead (Android keeps the skip digits' size too).
+        // Keep the established large-content viewer policy for the five controls.
         .dynamicTypeSize(...DynamicTypeSize.accessibility1).accessibilityShowsLargeContentViewer()
-        .padding(.horizontal, Spacing.gutter).padding(.top, 12).padding(.bottom, 8)
-        // Opaque, so its text keeps its contrast over the transcript scrolling under it.
-        .readableWidth().background(Color.paper).overlay(alignment: .top) { Divider() }
+        .padding(.horizontal, 18).padding(.vertical, 14)
+        .meetingGlass(cornerRadius: 26)
+        .frame(maxWidth: ReadableWidth.content).frame(maxWidth: .infinity)
+        .padding(.horizontal, 12).padding(.bottom, 12)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(Text("Playback", tableName: "Playback"))
         .accessibilityIdentifier("playbackBar")
@@ -55,15 +53,12 @@ struct PlaybackBar: View {
 
     private var slider: some View {
         let range = 0...max(0.1, duration)
-        return ZStack {
-            Waveform(levels: note.waveform, progress: position / max(1, duration)).frame(height: 32).padding(.horizontal, 2)
-            Slider(value: Binding(get: { min(position, range.upperBound) }, set: { dragging = $0 }), in: range) { editing in
-                guard !editing, let target = dragging else { return }
-                playback.seek(target)
-                dragging = nil
-            }
-            .tint(.accent)
+        return Slider(value: Binding(get: { min(position, range.upperBound) }, set: { dragging = $0 }), in: range) { editing in
+            guard !editing, let target = dragging else { return }
+            playback.seek(target)
+            dragging = nil
         }
+        .tint(.accent)
         .frame(height: 44)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text("Position", tableName: "Playback"))
@@ -79,38 +74,70 @@ struct PlaybackBar: View {
     }
 
     private var controls: some View {
-        HStack {
-            Menu {
-                ForEach([Float(0.75), 1, 1.25, 1.5, 2], id: \.self) { rate in
-                    Button { playback.rate = rate } label: { Text(verbatim: "\(rate.formatted())×") }
-                }
-            } label: {
-                Text(verbatim: "\(playback.rate.formatted())×").font(.subheadline.weight(.semibold)).frame(width: 48, height: 48)
+        ViewThatFits(in: .horizontal) {
+            controlRow(spacing: 22)
+            controlRow(spacing: 6)
+            VStack(spacing: 8) {
+                transport(spacing: 22)
+                HStack { speed; Spacer(); bookmark }
             }
-            .accessibilityLabel(Text("Playback speed", tableName: "Playback"))
-            .accessibilityIdentifier("playbackSpeed")
-            Spacer()
+        }
+        .foregroundStyle(Color.ink)
+    }
+
+    private func controlRow(spacing: CGFloat) -> some View {
+        HStack(spacing: 0) {
+            speed
+            Spacer(minLength: 0)
+            transport(spacing: spacing)
+            Spacer(minLength: 0)
+            bookmark
+        }
+    }
+
+    private var speed: some View {
+        Menu {
+            ForEach([Float(0.75), 1, 1.25, 1.5, 2], id: \.self) { rate in
+                Button { playback.rate = rate } label: { Text(verbatim: "\(rate.formatted())×") }
+            }
+        } label: {
+            Text(verbatim: "\(playback.rate.formatted())×").font(.footnote.weight(.semibold)).monospacedDigit()
+                .padding(.horizontal, 10).frame(minHeight: 30)
+                .background(Color.ink.opacity(0.1), in: Capsule())
+                .frame(minWidth: HitTarget.minimum, minHeight: HitTarget.minimum)
+                .fixedSize(horizontal: true, vertical: false)
+        }
+        .accessibilityLabel(Text("Playback speed", tableName: "Playback"))
+        .accessibilityIdentifier("playbackSpeed")
+    }
+
+    private func transport(spacing: CGFloat) -> some View {
+        HStack(spacing: spacing) {
             Button { playback.skip(-PlaybackSkip.interval) } label: {
-                Image(systemName: "gobackward.10").font(.title2).frame(width: 52, height: 52)
+                Image(systemName: "gobackward.10").font(.system(size: 26)).frame(width: 48, height: 48)
             }
             .accessibilityLabel(Text("Back 10 seconds", tableName: "Playback"))
             Button { playback.togglePlayback() } label: {
-                Image(systemName: isPlaying ? "pause.fill" : "play.fill").font(.title2).foregroundStyle(Color.paper)
-                    .frame(width: 64, height: 64).background(Color.ink, in: Circle())
+                Image(systemName: isPlaying ? "pause.fill" : "play.fill").font(.system(size: 20)).foregroundStyle(Color.paper)
+                    .frame(width: 52, height: 52).background(Color.ink, in: Circle())
             }
             .accessibilityLabel(isPlaying ? Text("Pause", tableName: "Playback") : Text("Play", tableName: "Playback"))
             .accessibilityValue(isPlaying ? Text("Playing", tableName: "Playback") : Text("Paused", tableName: "Playback"))
             .accessibilityIdentifier("playButton")
             Button { playback.skip(PlaybackSkip.interval) } label: {
-                Image(systemName: "goforward.10").font(.title2).frame(width: 52, height: 52)
+                Image(systemName: "goforward.10").font(.system(size: 26)).frame(width: 48, height: 48)
             }
             .accessibilityLabel(Text("Forward 10 seconds", tableName: "Playback"))
             .accessibilityIdentifier("skipForward")
-            Spacer()
-            Button { markMoment(position) } label: { Image(systemName: "bookmark").font(.title3).frame(width: 48, height: 48) }
-            .accessibilityLabel(Text("Mark this moment", tableName: "Playback"))
         }
-        .foregroundStyle(Color.ink)
+        .fixedSize()
+    }
+
+    private var bookmark: some View {
+        Button { markMoment(position) } label: {
+            Image(systemName: "bookmark").font(.system(size: 20)).frame(width: 44, height: 44)
+        }
+        .accessibilityLabel(Text("Mark this moment", tableName: "Playback"))
     }
 
     /// "11:44 of 23:50".

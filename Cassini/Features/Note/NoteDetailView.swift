@@ -21,6 +21,7 @@ struct NoteDetailView: View {
     @Environment(\.calendar) private var calendar
     @State private var model: NoteScreenModel
     @State private var cache = TranscriptCache()
+    @State private var headerTitleVisible = true
 
     init(model: @autoclosure () -> NoteScreenModel) {
         let model = model()
@@ -65,7 +66,8 @@ struct NoteDetailView: View {
         }
         .onChange(of: NoteScreenState.isGone(note)) { _, gone in if gone { router.close(noteID: noteID) } }
         .onChange(of: model.screen.search?.query) { _, query in router.keepSearch(query, for: noteID) }
-        .backButtonTitle(router.below(noteID: noteID) == .library ? NoteCopy.backToLibrary : nil)
+        .backButtonTitle(router.below(noteID: noteID) == .library ? MeetingPhase1Copy.allMeetings : nil,
+                         accessibilityLabel: router.below(noteID: noteID) == .library ? MeetingPhase1Copy.backToAllMeetings : nil)
         .noteSheetsAndDialogs(model: model)
         .keepsNoteOverlay(noteID: noteID, note: note, readOnly: readOnly, sheet: $model.sheet, draft: $model.sheetDraft,
                           dialog: $model.screen.dialog)
@@ -92,7 +94,8 @@ struct NoteDetailView: View {
             } else {
                 NoteReadingScroll(note: note, mode: mode, transcript: transcript, subtitle: subtitle, matches: matches,
                                   current: current, model: model, cache: cache,
-                                  actions: transcriptActions, suggestion: { suggestionCard($0, in: transcript) })
+                                  actions: transcriptActions, suggestion: { suggestionCard($0, in: transcript) },
+                                  headerTitleVisible: headerTitleVisible, titleVisibilityChanged: { headerTitleVisible = $0 })
             }
         }
         .overlay(alignment: .topLeading) {
@@ -128,6 +131,14 @@ struct NoteDetailView: View {
             .animation(.default, value: model.screen.follow)
         }
         .toolbar {
+            ToolbarItem(placement: .principal) {
+                if !headerTitleVisible, mode != .processing {
+                    Text(note.title).font(.headline).foregroundStyle(Color.ink).lineLimit(1)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .accessibilityAddTraits(.isHeader)
+                        .accessibilityIdentifier("noteCompactTitle")
+                }
+            }
             ToolbarItemGroup(placement: .topBarTrailing) {
                 if mode == .reading, !transcript.isEmpty {
                     Button(NoteCopy.searchInTranscript, systemImage: "magnifyingglass") { model.screen.openSearch() }
@@ -187,9 +198,9 @@ struct NoteSectionView: View {
                 ProcessingCard(note: note, model: model)
             }
         case .chips:
-            if let chips = NoteChips.of(note) {
+            if let chips = NoteChips.of(note), chips.trust != nil || chips.version != nil {
                 NoteChipsRow(chips: chips, toggleTrust: { model.screen.toggleTrust() },
-                             openVersions: { model.versionsTapped() }, openSpeakers: { model.speakersTapped() })
+                             openVersions: { model.versionsTapped() })
             }
         case .banners:
             RecordingNotices(noteID: noteID)

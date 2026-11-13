@@ -60,7 +60,7 @@ final class TextLimitTests: XCTestCase {
     @MainActor func testTheNameFieldStopsAtTheNameLimit() {
         let app = launch(["--seed", "speakers", "--open-fixture", "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA"])
         XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 15))
-        app.buttons["speakersButton"].tap()
+        app.openNoteSpeakers()
         let alex = app.buttons["speaker-alex"]
         XCTAssertTrue(alex.waitForExistence(within: 5))
         alex.tap()

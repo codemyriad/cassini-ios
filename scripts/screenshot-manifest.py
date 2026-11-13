@@ -27,6 +27,8 @@ SHOTS = {
     "15-seven-speaker-meeting": ("Seven-speaker meeting", "Meeting", "test15SevenSpeakerMeeting", "brandSpeakers"),
     "16-seven-speaker-colours": ("Seven speaker colours", "Speakers", "test16SevenSpeakerColours", "brandSpeakers"),
     "17-status-badges": ("Status badges", "StatusBadges", "test17StatusBadges", "badge-gallery"),
+    "18-meeting-find": ("Find in meeting", "Meeting-iOSFind", "test18MeetingFind", "reading"),
+    "19-meeting-scrolled": ("Scrolled meeting", "Meeting-iOSScrolled", "test19MeetingScrolled", "reading"),
 
     "01-split-landscape": ("Split view landscape", "Meeting", "testSplitViewLandscape", "reading"),
     "02-split-portrait": ("Split view portrait", "Meeting", "testSplitViewPortrait", "reading"),

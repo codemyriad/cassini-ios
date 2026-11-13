@@ -64,7 +64,7 @@ final class SpeakerNamingFlowTests: XCTestCase {
     /// the question on the screen. So the test waits for the question's own button, then reads its words.
     @MainActor func testAFirstNameOfASavedVoiceAsksTheSamePersonQuestion() {
         let app = launchSpeakersSeed()
-        app.buttons["speakersButton"].tap()
+        app.openNoteSpeakers()
         let alex = app.buttons["speaker-alex"]
         XCTAssertTrue(alex.waitForExistence(within: 5))
         alex.tap()
@@ -91,7 +91,7 @@ final class SpeakerNamingFlowTests: XCTestCase {
     /// models alone; the Speakers sheet records no consent of its own.
     @MainActor func testIdentifySpeakersWithoutConsentOpensTheModelDownload() {
         let app = launchSpeakersSeed()
-        app.buttons["speakersButton"].tap()
+        app.openNoteSpeakers()
         let identify = app.buttons["Identify speakers"]
         XCTAssertTrue(identify.waitForExistence(within: 5))
         identify.tap()

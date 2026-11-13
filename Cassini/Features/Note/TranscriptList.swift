@@ -12,6 +12,8 @@ import CassiniNotebook
     /// The height between the insets: the transcript's pane.
     var height: CGFloat = 0
     var maxOffset: CGFloat = 0
+    var titleVisibility = MeetingTitleVisibility()
+    var titleContentBottom: CGFloat?
 }
 
 /// The search hits of a transcript, by paragraph, and the current one.

@@ -22,8 +22,11 @@ struct NoteMenu: View {
             Button(note.isFavorite ? NoteCopy.removeStar : NoteCopy.star, systemImage: note.isFavorite ? "star.slash" : "star") {
                 perform(.toggleStar)
             }
-            if note.hasDocument {
+            if note.hasDocument || note.speakers?.isEmpty == false {
                 Button(NoteCopy.speakers, systemImage: "person.2") { perform(.speakers) }
+                    .accessibilityIdentifier("speakersButton")
+            }
+            if note.hasDocument {
                 if (note.versions ?? []).count > 0 {
                     Button(NoteCopy.versions, systemImage: "clock.arrow.circlepath") { perform(.versions) }
                 }
