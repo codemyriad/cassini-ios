@@ -16,6 +16,9 @@ PROPERTIES = {
     'library.allMeetings': 'allMeetings',
     'library.backToAllMeetings': 'backToAllMeetings',
     'meeting.find.placeholder': 'findPlaceholder',
+    'common.stop': 'stop',
+    'player.pause': 'pause',
+    'phone.row.resume': 'resume',
 }
 
 

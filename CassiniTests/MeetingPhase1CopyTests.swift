@@ -23,4 +23,20 @@ import Testing
         #expect(MeetingPhase1Copy.template("meeting.find.placeholder", language: "pt-BR") == "Buscar nesta reunião")
         #expect(MeetingPhase1Copy.template("meeting.find.placeholder", language: "pt-PT") == "Pesquisar nesta reunião")
     }
+
+    /// L-48: Stop replaces Finish on the Recording screen and the Live Activity; Pause and Resume label the side
+    /// control. The Italian Stop is "Ferma" (GLOSSARY), never "Interrompi" or the old "Termina".
+    @Test func recordingControlCopyComesFromTheSharedCatalog() {
+        let expected: [String: [String: String]] = [
+            "common.stop": ["en": "Stop", "it": "Ferma", "fr": "Arrêter", "es": "Detener", "pt-BR": "Parar", "pt-PT": "Parar"],
+            "player.pause": ["en": "Pause", "it": "Pausa", "fr": "Pause", "es": "Pausar", "pt-BR": "Pausar", "pt-PT": "Pausa"],
+            "phone.row.resume": ["en": "Resume", "it": "Riprendi", "fr": "Reprendre", "es": "Reanudar", "pt-BR": "Retomar",
+                                 "pt-PT": "Retomar"],
+        ]
+        for (key, values) in expected {
+            for (language, value) in values {
+                #expect(MeetingPhase1Copy.template(key, language: language) == value, "\(key) \(language)")
+            }
+        }
+    }
 }

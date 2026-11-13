@@ -118,7 +118,7 @@ continues after the screen locks.
   PrivateVoices/                saved voices and each note's prints (excluded from backup)
   <note id>/
     note.json                   the note (schema 2): title, transcript passages and versions, speakers, bookmarks, ...
-    capture.caf | audio.m4a     the recording (PCM while capturing, M4A after Finish)
+    capture.caf | audio.m4a     the recording (PCM while capturing, M4A after Stop)
     source.<ext>                an imported file; document.opus for an imported Cassini document
     playback.caf                the decoded copy of imported Opus
     provenance.json             each on-device run's record, oldest first
@@ -165,7 +165,7 @@ Preferences are in `UserDefaults`, under Android's key names (`SettingsKeys`).
 
 The note is created before capture begins, as a live note pointing at `capture.caf`. The controller watches storage
 (the 200 MiB floor plus the room the finish needs) and the session's interruptions and route changes. It pauses on a
-call or a lost input and never resumes by itself. Finish seals the note (plain, duration, title) and opens it. The
+call or a lost input and never resumes by itself. Stop seals the note (plain, duration, title) and opens it. The
 waveform, the M4A compression and the hand-off to the queue follow. The CAF is removed only once `note.json` points at
 the M4A. If compression fails, the CAF stays the recording. The Live Activity mirrors the state, and its intents
 carry the note id. At launch, `recover` repairs whatever was live.

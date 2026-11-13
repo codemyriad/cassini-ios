@@ -35,6 +35,10 @@ import CassiniNotebook
             let wash = CassiniTokens.color(.ink, forcedDark: true).opacity(0.1)
             #expect(ContrastTests.resolved(Color.recordingButtonWash, scheme) == ContrastTests.resolved(wash, scheme))
             #expect(ContrastTests.resolved(RecordingActivityColors.button, scheme) == ContrastTests.resolved(wash, scheme))
+            // L-08: the night ground is the canonical dark ground #0D1015 in both appearances.
+            let ground = ContrastTests.resolved(Color.recordingBackground, scheme)
+            #expect(Int((ground.red * 255).rounded()) == 0x0D && Int((ground.green * 255).rounded()) == 0x10
+                && Int((ground.blue * 255).rounded()) == 0x15)
             for (color, role) in pairs {
                 let actual = ContrastTests.resolved(color, scheme)
                 let expected = ContrastTests.resolved(CassiniTokens.color(role), .dark)
