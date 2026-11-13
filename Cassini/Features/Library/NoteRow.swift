@@ -72,7 +72,7 @@ struct NoteRow: View {
                 if let meetingTime = format.meetingTime(row) {
                     Text(meetingTime).font(.footnote.monospacedDigit()).foregroundStyle(Color.muted).passive()
                 }
-                RowChip(status: row.status).passive()
+                RowChip(row: row).passive()
                 suffix
                 if row.bookmarkCount > 0 {
                     Label { Text(row.bookmarkCount, format: .number) } icon: { Image(systemName: "bookmark.fill") }.font(.footnote).foregroundStyle(Color.muted).passive()
@@ -112,13 +112,24 @@ struct NoteRow: View {
 
 /// The status chip: text in the status's tone on its tint, never colour alone.
 struct RowChip: View {
-    let status: LibraryRow.Status
+    let row: LibraryRow
+
+    private var status: LibraryRow.Status { row.status }
 
     var body: some View {
+        if let badge = RowBadge.presentation(row, text: { StatusBadgeCopy.template($0) }) {
+            StatusBadgeView(badge: badge)
+        } else {
+            localBadge
+        }
+    }
+
+    /// The merged contract retains phone-specific applicability and does not invent their glyph mappings.
+    private var localBadge: some View {
         HStack(spacing: 5) {
             if case .recording = status { Circle().fill(colors.ink).frame(width: 6, height: 6) }
             if case .transcribed = status { Image(systemName: "checkmark").font(.system(size: 9, weight: .bold)) }
-            Text(LibraryCopy.status(status)).font(.caption.weight(.medium))
+            Text(LibraryCopy.status(status)).font(.caption.weight(.semibold)).monospacedDigit()
         }
         .foregroundStyle(colors.ink).padding(.horizontal, 8).padding(.vertical, 4)
         .background(colors.tint, in: Capsule())
@@ -170,28 +181,34 @@ struct FlowLayout: Layout {
         let rows = rows(width: proposal.width ?? .infinity, subviews)
         let height = rows.map(\.height).reduce(0, +) + spacing * CGFloat(max(0, rows.count - 1))
         let width = rows.map(\.width).max() ?? 0
-        return CGSize(width: proposal.width.map { min($0, width) } ?? width, height: height)
+        // Keep the finite width used to measure wrapping; placement must not propose a smaller width afterwards.
+        let available = proposal.width.flatMap { $0.isFinite ? max(0, $0) : nil }
+        return CGSize(width: available ?? width, height: height)
     }
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout Void) {
         var y = bounds.minY
         for row in rows(width: bounds.width, subviews) {
             var x = bounds.minX
-            for index in row.items {
-                let size = subviews[index].sizeThatFits(.unspecified)
-                subviews[index].place(at: CGPoint(x: x, y: y + (row.height - size.height) / 2), proposal: ProposedViewSize(size))
-                x += size.width + spacing
+            for item in row.items {
+                subviews[item.index].place(at: CGPoint(x: x, y: y + (row.height - item.size.height) / 2),
+                                          proposal: ProposedViewSize(item.size))
+                x += item.size.width + spacing
             }
             y += row.height + spacing
         }
     }
 
-    private struct Row { var items: [Int] = []; var width: CGFloat = 0; var height: CGFloat = 0 }
+    private struct Item { let index: Int; let size: CGSize }
+    private struct Row { var items: [Item] = []; var width: CGFloat = 0; var height: CGFloat = 0 }
 
     private func rows(width: CGFloat, _ subviews: Subviews) -> [Row] {
         var rows: [Row] = [Row()]
         for index in subviews.indices {
-            let size = subviews[index].sizeThatFits(.unspecified)
+            let ideal = subviews[index].sizeThatFits(.unspecified)
+            // An oversized child must wrap its own text, as well as wrapping between row items.
+            let size = width.isFinite && ideal.width > width
+                ? subviews[index].sizeThatFits(ProposedViewSize(width: max(0, width), height: nil)) : ideal
             let needed = rows[rows.count - 1].items.isEmpty ? size.width : rows[rows.count - 1].width + spacing + size.width
             if needed > width, !rows[rows.count - 1].items.isEmpty {
                 rows.append(Row())
@@ -199,7 +216,7 @@ struct FlowLayout: Layout {
             var row = rows[rows.count - 1]
             row.width = row.items.isEmpty ? size.width : row.width + spacing + size.width
             row.height = max(row.height, size.height)
-            row.items.append(index)
+            row.items.append(Item(index: index, size: size))
             rows[rows.count - 1] = row
         }
         return rows.filter { !$0.items.isEmpty }

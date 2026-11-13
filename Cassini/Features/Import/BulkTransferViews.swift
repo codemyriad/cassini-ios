@@ -18,6 +18,9 @@ struct ImportBatchesView: View {
                     UITestStateMarker(identifier: "bulkImportCompleted", value: batch.id.uuidString)
                     #endif
                 } else {
+                    if let badge = StatusBadges.entry(importing: true, text: { StatusBadgeCopy.template($0) }) {
+                        StatusBadgeView(badge: badge)
+                    }
                     ProgressView(BulkTransferCopy.importing(batch.progress))
                     Button(BulkTransferCopy.cancel, role: .cancel) { batch.cancel() }
                         .accessibilityIdentifier("cancelBulkImport")
