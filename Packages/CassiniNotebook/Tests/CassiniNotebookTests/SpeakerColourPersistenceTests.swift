@@ -325,6 +325,63 @@ struct SpeakerColourPersistenceTests {
         #expect(imported.segments.map(\.text) == ["Later", "First"])
     }
 
+    @Test(arguments: [false, true])
+    func portableDisplayHintsMatchExactIDBytesRegardlessOfRosterOrder(reversed: Bool) throws {
+        let composed = "voice-\u{E9}", decomposed = "voice-e\u{301}"
+        let transcript = Transcript([Word(composed, 0, 20, "Hello"), Word(decomposed, 20, 40, "Hi")], language: "en")
+        let first = try CassiniDocument.create(PortableFixtures.silence(), transcript: transcript,
+            title: "English conversation", processing: JSONObject())
+        var document = CassiniDocument.read(first)
+        var roster: [JSON] = [
+            .object(JSONObject([("id", .string(composed)), ("label", .string("Alex")),
+                                ("colourIndex", .int(2)), ("provenance", .string("user"))])),
+            .object(JSONObject([("id", .string(decomposed)), ("label", .string("Casey")),
+                                ("colourIndex", .int(8)), ("provenance", .string("source"))]))
+        ]
+        if reversed { roster.reverse() }
+        document.manifest?["speakers"] = .array(roster)
+        let bytes = try CassiniDocument.create(first, transcript: transcript, title: "English conversation",
+            processing: JSONObject(), existing: document)
+        let sealed = CassiniDocument.read(bytes)
+        #expect(sealed.state == .ok)
+        #expect(sealed.speakerLabel(composed) == "Alex")
+        #expect(sealed.speakerLabel(decomposed) == "Casey")
+        let imported = try #require(PortableTranscript(sealed))
+        let speaker = try #require(imported.speakers.first)
+        #expect(Data(speaker.id.utf8) == Data(composed.utf8))
+        #expect(speaker.name == "Alex")
+        #expect(speaker.colourIndex == 2)
+        #expect(speaker.provenance == .user)
+    }
+
+    @Test func portableExportKeepsAnUnusedByteDistinctSpeakersHints() throws {
+        let composed = "voice-\u{E9}", decomposed = "voice-e\u{301}"
+        let words = Transcript([Word(composed, 0, 20, "Hello")], language: "en")
+        let initial = try CassiniDocument.create(PortableFixtures.silence(), transcript: words,
+            title: "English conversation", processing: JSONObject(), speakerLabels: [composed: "Alex"])
+        var source = CassiniDocument.read(initial)
+        var roster = try #require(source.manifest?["speakers"]?.array)
+        roster.append(.object(JSONObject([("id", .string(decomposed)), ("label", .string("Casey")),
+            ("colourIndex", .int(8)), ("provenance", .string("source"))])))
+        source.manifest?["speakers"] = .array(roster)
+        let bytes = try CassiniDocument.create(initial, transcript: words, title: "English conversation",
+            processing: JSONObject(), existing: source)
+        let folder = try PortableFixtures.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let input = folder.appendingPathComponent("English input.opus"), output = folder.appendingPathComponent("English export.opus")
+        try Data(bytes).write(to: input)
+        let note = TranscriptFixtures.note([.init(composed, 0, 20, "Hello")],
+            speakers: [.init(id: composed, name: "Alex", colourIndex: 2, provenance: .user)])
+        try PortableTranscript.export(note: note, opus: input, destination: output, unassignedLabel: "Unknown speaker")
+        let result = CassiniDocument.read(output)
+        #expect(result.state == .ok)
+        let entry = try #require(result.manifest?["speakers"]?.array?.compactMap(\.object)
+            .first { $0["id"]?.string.map { Data($0.utf8) } == Data(decomposed.utf8) })
+        #expect(entry["label"]?.string == "Casey")
+        #expect(try entry.number("colourIndex") == 8)
+        #expect(entry["provenance"]?.string == "source")
+    }
+
     @Test func portableRoundTripKeepsGappedSlotsAndNamingRevealsTheSameSlot() throws {
         let folder = try PortableFixtures.temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: folder) }

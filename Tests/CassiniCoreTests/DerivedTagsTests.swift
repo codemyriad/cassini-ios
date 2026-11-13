@@ -117,6 +117,39 @@ struct StaleCopiesInPublishedVectorsTests {
         #expect(sameBytes(document.speakerLabel(decomposed), decomposed))
     }
 
+    @Test(arguments: [false, true])
+    func optionalSpeakerHintsMatchExactIDBytes(preservingForeignHints: Bool) throws {
+        let composed = "voice-\u{E9}", decomposed = "voice-e\u{301}"
+        let words = Transcript([Word(composed, 0, 20, "Hello"), Word(decomposed, 20, 40, "Hi")], language: "en")
+        let initial = try CassiniDocument.create(silence(), transcript: words, title: "English conversation", processing: JSONObject())
+        var source = CassiniDocument.read(initial)
+        if preservingForeignHints, let roster = source.manifest?["speakers"]?.array {
+            source.manifest?["speakers"] = .array(roster.map { entry in
+                guard var value = entry.object, sameBytes(value["id"]?.string, decomposed) else { return entry }
+                value["colourIndex"] = .int(8)
+                value["provenance"] = .string("source")
+                return .object(value)
+            })
+        }
+        let bytes = try CassiniDocument.create(initial, transcript: words, title: "English conversation",
+            processing: JSONObject(), existing: source,
+            speakerHints: [composed: JSONObject([("colourIndex", .int(2)), ("provenance", .string("user"))])])
+        let result = CassiniDocument.read(bytes)
+        #expect(result.state == .ok)
+        let roster = try #require(result.manifest?["speakers"]?.array)
+        let own = try #require(roster.compactMap(\.object).first { sameBytes($0["id"]?.string, composed) })
+        let other = try #require(roster.compactMap(\.object).first { sameBytes($0["id"]?.string, decomposed) })
+        #expect(try own.number("colourIndex") == 2)
+        #expect(own["provenance"]?.string == "user")
+        if preservingForeignHints {
+            #expect(try other.number("colourIndex") == 8)
+            #expect(other["provenance"]?.string == "source")
+        } else {
+            #expect(other["colourIndex"] == nil)
+            #expect(other["provenance"] == nil)
+        }
+    }
+
     /** Without CASSINI_FORMAT nothing is Cassini metadata, so an undecodable CASSINI_ comment is only a foreign one. */
     @Test func anUndecodableCassiniCommentInPlainAudioStaysPlainAudio() throws {
         let stray = Array("CASSINI_NOTE=Caf".utf8) + [0xE9]

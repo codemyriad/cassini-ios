@@ -108,14 +108,15 @@ public struct PortableTranscript: Hashable, Sendable {
     private static func speakers(_ transcript: Transcript, _ document: CassiniDocument) -> [NoteSpeaker] {
         let timedOrder = SpeakerColourOrder.earliest(transcript.words, id: { $0.speaker }, start: { Double($0.startMs) })
         let fallback = Dictionary(uniqueKeysWithValues: timedOrder.enumerated().map { ($0.element, $0.offset) })
-        let roster = Dictionary((document.manifest?["speakers"]?.array ?? []).compactMap { value -> (String, JSONObject)? in
+        let roster = Dictionary((document.manifest?["speakers"]?.array ?? []).compactMap { value -> (Data, JSONObject)? in
             guard let entry = value.object, let id = entry["id"]?.string else { return nil }
-            return (id, entry)
+            // Format IDs compare by UTF-8 bytes, rather than Swift canonical equivalence.
+            return (Data(id.utf8), entry)
         }, uniquingKeysWith: { first, _ in first })
         var seen: Set<String> = []
         return transcript.words.compactMap { word in
             guard seen.insert(word.speaker).inserted else { return nil }
-            let entry = roster[word.speaker]
+            let entry = roster[Data(word.speaker.utf8)]
             let index = entry.flatMap { try? $0.number("colourIndex") }.map { Int($0) }
             let label = entry?["label"]?.string ?? word.speaker
             let provenance = (entry?["provenance"]?.string).flatMap { NoteSpeaker.Provenance(rawValue: $0) }
@@ -172,11 +173,14 @@ extension PortableTranscript {
         let palette = Note.assignColourIndices(note.speakers ?? [], order: SpeakerColourOrder.earliest(transcript.words,
             id: { $0.speaker }, start: { Double($0.startMs) }))
         let labels = Dictionary(palette.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
-        let hints = Dictionary(palette.map { speaker -> (String, JSONObject) in
+        let hintEntries = palette.map { speaker -> (String, JSONObject) in
             var hint = JSONObject([("provenance", .string(speaker.provenance.rawValue))])
             if let index = speaker.colourIndex { hint["colourIndex"] = .int(index) }
             return (speaker.id, hint)
-        }, uniquingKeysWith: { first, _ in first })
+        }
+        let hints = Dictionary(hintEntries, uniquingKeysWith: { first, _ in first })
+        let hintsByID = Dictionary(hintEntries.map { (Data($0.0.utf8), $0.1) }, uniquingKeysWith: { first, _ in first })
+        let labelsByID = Dictionary(palette.map { (Data($0.id.utf8), $0.name) }, uniquingKeysWith: { first, _ in first })
         var existing: CassiniDocument?
         var carried: CassiniDocument?
         if source.state == .ok, var manifest = source.manifest {
@@ -186,9 +190,9 @@ extension PortableTranscript {
             }
             if let speakers = manifest["speakers"]?.array {
                 manifest["speakers"] = .array(speakers.map { entry in
-                    guard var speaker = entry.object, let id = speaker["id"]?.string, let label = labels[id] else { return entry }
+                    guard var speaker = entry.object, let id = speaker["id"]?.string, let label = labelsByID[Data(id.utf8)] else { return entry }
                     speaker["label"] = .string(label)
-                    if let hint = hints[id] {
+                    if let hint = hintsByID[Data(id.utf8)] {
                         for (key, value) in hint.pairs { speaker[key] = value }
                     }
                     return .object(speaker)
