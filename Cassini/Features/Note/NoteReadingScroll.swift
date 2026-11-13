@@ -16,6 +16,7 @@ struct NoteReadingScroll: View {
     let cache: TranscriptCache
     let actions: TranscriptActions
     let suggestion: (NoteTurn) -> AnyView?
+    var titleVisibilityChanged: ((Bool) -> Void)? = nil
     @Environment(PlaybackStore.self) private var playback
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var geometry = FollowGeometry()
@@ -31,10 +32,12 @@ struct NoteReadingScroll: View {
 
     var body: some View {
         @Bindable var model = model
+        let headerTranscript = mode.showsDraft ? model.shownDraft.map { cache.draft($0) } ?? transcript : transcript
         ScrollViewReader { proxy in
             ScrollView {
-                VStack(alignment: .leading, spacing: Spacing.section) {
-                    NoteHeader(note: note, subtitle: subtitle)
+                VStack(alignment: .leading, spacing: 20) {
+                    NoteHeader(note: note, subtitle: subtitle, speakers: headerTranscript.headerSpeakers,
+                               nameSpeaker: { model.speakerTapped($0) }, titleVisibilityChanged: titleVisibilityChanged)
                     ForEach(mode.sections, id: \.self) {
                         NoteSectionView(section: $0, note: note, mode: mode, model: model)
                     }
@@ -53,8 +56,9 @@ struct NoteReadingScroll: View {
                                           position: $scrollPosition, suggestion: suggestion)
                     }
                 }
-                .padding(Spacing.gutter).readableWidth()
+                .padding(.horizontal, Spacing.gutter).padding(.top, 8).padding(.bottom, Spacing.gutter).readableWidth()
             }
+            .meetingScrollEdge()
             .scrollPosition($scrollPosition)
             .onScrollGeometryChange(for: ScrollMetrics.self) { ScrollMetrics($0) } action: { _, metrics in
                 geometry.offset = metrics.offset; geometry.top = metrics.top

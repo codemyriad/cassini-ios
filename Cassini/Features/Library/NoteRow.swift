@@ -157,10 +157,11 @@ private extension View {
 /// text sizes the suffix goes under the chip instead of out of the row.
 struct FlowLayout: Layout {
     var spacing: CGFloat = 8
+    var rowSpacing: CGFloat? = nil
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout Void) -> CGSize {
         let rows = rows(width: proposal.width ?? .infinity, subviews)
-        let height = rows.map(\.height).reduce(0, +) + spacing * CGFloat(max(0, rows.count - 1))
+        let height = rows.map(\.height).reduce(0, +) + (rowSpacing ?? spacing) * CGFloat(max(0, rows.count - 1))
         let width = rows.map(\.width).max() ?? 0
         return CGSize(width: proposal.width.map { min($0, width) } ?? width, height: height)
     }
@@ -174,7 +175,7 @@ struct FlowLayout: Layout {
                 subviews[index].place(at: CGPoint(x: x, y: y + (row.height - size.height) / 2), proposal: ProposedViewSize(size))
                 x += size.width + spacing
             }
-            y += row.height + spacing
+            y += row.height + (rowSpacing ?? spacing)
         }
     }
 

@@ -21,6 +21,7 @@ struct NoteDetailView: View {
     @Environment(\.calendar) private var calendar
     @State private var model: NoteScreenModel
     @State private var cache = TranscriptCache()
+    @State private var headerTitleVisible = true
 
     init(model: @autoclosure () -> NoteScreenModel) {
         let model = model()
@@ -92,7 +93,8 @@ struct NoteDetailView: View {
             } else {
                 NoteReadingScroll(note: note, mode: mode, transcript: transcript, subtitle: subtitle, matches: matches,
                                   current: current, model: model, cache: cache,
-                                  actions: transcriptActions, suggestion: { suggestionCard($0, in: transcript) })
+                                  actions: transcriptActions, suggestion: { suggestionCard($0, in: transcript) },
+                                  titleVisibilityChanged: { headerTitleVisible = $0 })
             }
         }
         .overlay(alignment: .topLeading) {
@@ -128,6 +130,12 @@ struct NoteDetailView: View {
             .animation(.default, value: model.screen.follow)
         }
         .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                if !headerTitleVisible, mode != .processing {
+                    Text(note.title).font(.headline).foregroundStyle(Color.ink).lineLimit(1)
+                        .accessibilityIdentifier("noteCompactTitle")
+                }
+            }
             ToolbarItemGroup(placement: .topBarTrailing) {
                 if mode == .reading, !transcript.isEmpty {
                     Button(NoteCopy.searchInTranscript, systemImage: "magnifyingglass") { model.screen.openSearch() }
@@ -187,9 +195,9 @@ struct NoteSectionView: View {
                 ProcessingCard(note: note, model: model)
             }
         case .chips:
-            if let chips = NoteChips.of(note) {
+            if let chips = NoteChips.of(note), chips.trust != nil || chips.version != nil {
                 NoteChipsRow(chips: chips, toggleTrust: { model.screen.toggleTrust() },
-                             openVersions: { model.versionsTapped() }, openSpeakers: { model.speakersTapped() })
+                             openVersions: { model.versionsTapped() })
             }
         case .banners:
             RecordingNotices(noteID: noteID)

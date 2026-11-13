@@ -10,6 +10,18 @@ public enum SpeakerName: Hashable, Sendable {
     public var isNamed: Bool { if case .named = self { true } else { false } }
 }
 
+/// A speaker shown in the meeting header, in canonical word order rather than paragraph display order.
+public struct TranscriptSpeaker: Identifiable, Hashable, Sendable {
+    public let id: String
+    public let name: SpeakerName
+    public let tint: SpeakerTint
+    public let auto: Bool
+
+    public init(id: String, name: SpeakerName, tint: SpeakerTint, auto: Bool) {
+        self.id = id; self.name = name; self.tint = tint; self.auto = auto
+    }
+}
+
 /// One word of a paragraph: its text as the paragraph shows it and where it starts in the audio.
 public struct TurnWord: Hashable, Sendable {
     public var text: String
@@ -34,6 +46,14 @@ public struct TurnInterjection: Hashable, Sendable {
     public let textRange: Range<Int>
     public let nameRange: Range<Int>
     public let crosstalk: Bool
+    public let auto: Bool
+
+    public init(speakerID: String?, name: SpeakerName, tint: SpeakerTint, wordRange: Range<Int>,
+                textRange: Range<Int>, nameRange: Range<Int>, crosstalk: Bool, auto: Bool = false) {
+        self.speakerID = speakerID; self.name = name; self.tint = tint
+        self.wordRange = wordRange; self.textRange = textRange; self.nameRange = nameRange
+        self.crosstalk = crosstalk; self.auto = auto
+    }
 }
 
 /// One viewer-defined reading paragraph. The host's speech and inline chips share one searchable, seekable text.
@@ -113,6 +133,10 @@ public struct WordRef: Hashable, Sendable {
 /// word for the active word. Built once per transcript; the playback position only searches the index.
 public struct NoteTranscript: Hashable, Sendable {
     public let turns: [NoteTurn]
+    /// IDs in first canonical word order, cached while constructing the playback index.
+    public let speakers: [String]
+    /// Header metadata includes speakers who only appear in inline interjections.
+    public let headerSpeakers: [TranscriptSpeaker]
     private let starts: [TimeInterval]
     private let turnOf: [Int]
     private let inTurn: [Int]
@@ -124,12 +148,33 @@ public struct NoteTranscript: Hashable, Sendable {
         self.turns = turns
         var starts: [TimeInterval] = [], turnOf: [Int] = [], inTurn: [Int] = []
         var positions: [String: Int] = [:]
+        var firstWords: [String: (source: Int, encounter: Int)] = [:]
+        var metadata: [String: TranscriptSpeaker] = [:]
+        func remember(_ id: String?, name: SpeakerName, tint: SpeakerTint, auto: Bool) {
+            guard let id, !id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                  name != .unknown, metadata[id] == nil else { return }
+            metadata[id] = TranscriptSpeaker(id: id, name: name, tint: tint, auto: auto)
+        }
         for (position, turn) in turns.enumerated() {
             positions[turn.id] = position
+            remember(turn.speakerID, name: turn.name, tint: turn.tint, auto: turn.auto)
+            for chip in turn.interjections {
+                remember(chip.speakerID, name: chip.name, tint: chip.tint, auto: chip.auto)
+            }
             for (index, word) in turn.words.enumerated() {
+                if let id = word.speakerID,
+                   firstWords[id].map({ word.sourceIndex < $0.source }) ?? true {
+                    firstWords[id] = (word.sourceIndex, starts.count)
+                }
                 starts.append(word.start); turnOf.append(position); inTurn.append(index)
             }
         }
+        let speakerOrder = firstWords.keys.sorted {
+            let lhs = firstWords[$0]!, rhs = firstWords[$1]!
+            return lhs.source == rhs.source ? lhs.encounter < rhs.encounter : lhs.source < rhs.source
+        }
+        self.speakers = speakerOrder
+        self.headerSpeakers = speakerOrder.compactMap { metadata[$0] }
         // Reading order keeps each turn together; playback order remains chronological.
         // Equal starts retain canonical source order rather than the chips' display positions.
         let order = starts.indices.sorted {
@@ -168,15 +213,6 @@ public struct NoteTranscript: Hashable, Sendable {
     public func wordStart(_ word: WordRef) -> TimeInterval? {
         guard let turn = turn(word.turnID), turn.words.indices.contains(word.index) else { return nil }
         return turn.words[word.index].start
-    }
-
-    /// The speakers in order of their first paragraph.
-    public var speakers: [String] {
-        var seen = Set<String>(), order: [String] = []
-        for word in turns.flatMap(\.words).sorted(by: { $0.sourceIndex < $1.sourceIndex }) {
-            if let id = word.speakerID, seen.insert(id).inserted { order.append(id) }
-        }
-        return order
     }
 }
 
@@ -324,7 +360,8 @@ public enum NoteTranscripts {
             }
             return NoteTurn(id: "w\(indices.min()!)", speakerID: speaker, name: made.name, tint: made.tint,
                             start: row.startMs / 1000, auto: made.auto, source: words, row: row,
-                            over: over, suggestion: made.suggestion, inlineSuggestions: inlineSuggestions, passages: passages, template: {
+                            over: over, suggestion: made.suggestion, inlineSuggestions: inlineSuggestions, passages: passages,
+                            automatic: { template(sourceSpeaker($0), false).auto }, template: {
                 let value = template(sourceSpeaker($0), false)
                 return (value.name, value.tint)
             })
@@ -348,7 +385,8 @@ extension SpeakerName {
 extension NoteTurn {
     init(id: String, speakerID: String?, name: SpeakerName, tint: SpeakerTint, start: TimeInterval, auto: Bool,
          source: [TranscriptWord], row: TurnModel.Row, over: [SpeakerName], suggestion: SpeakerSuggestion?,
-         inlineSuggestions: [SpeakerSuggestion], passages: [PassageRef], template: (String?) -> (SpeakerName, SpeakerTint)) {
+         inlineSuggestions: [SpeakerSuggestion], passages: [PassageRef],
+         automatic: (String?) -> Bool = { _ in false }, template: (String?) -> (SpeakerName, SpeakerTint)) {
         var text = "", offsets: [Int] = [], words: [TurnWord] = [], chips: [TurnInterjection] = []
         for member in row.members {
             guard !member.wordIndices.isEmpty else { continue }
@@ -377,7 +415,7 @@ extension NoteTurn {
                 text += ")"
                 chips.append(TurnInterjection(speakerID: member.speaker, name: chipName, tint: chipTint,
                                               wordRange: wordFrom..<words.count, textRange: from..<text.count,
-                                              nameRange: nameRange, crosstalk: member.crosstalk))
+                                              nameRange: nameRange, crosstalk: member.crosstalk, auto: automatic(member.speaker)))
             }
         }
         self.id = id; self.speakerID = speakerID; self.name = name; self.tint = tint; self.start = start
