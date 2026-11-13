@@ -60,8 +60,8 @@ struct SpeakerColourPersistenceTests {
         #expect(document.state == .ok)
         let roster = try #require(document.manifest?["speakers"]?.array)
         let stored = try roster.map { try #require($0.object).number("colourIndex") }
-        #expect(stored == [Double(maximum), 1, 2])
-        #expect(stored.allSatisfy { (0...Double(maximum)).contains($0) && $0.rounded() == $0 })
+        #expect(stored == [Int64(maximum), 1, 2])
+        #expect(stored.allSatisfy { (0...Int64(maximum)).contains($0) })
         let imported = try #require(PortableTranscript(document))
         #expect(imported.speakers.map(\.colourIndex) == [maximum, 1, 2])
         value.transcript = imported.segments
