@@ -798,47 +798,6 @@
         }
       }
     },
-    "Cancel": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cancel"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cancelar"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Annuler"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Annulla"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cancelar"
-          }
-        },
-        "pt-PT": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cancelar"
-          }
-        }
-      }
-    },
     "Cancel analysis": {
       "extractionState": "manual",
       "localizations": {
@@ -1657,170 +1616,6 @@
         }
       }
     },
-    "Future notes will name %@ automatically. The voiceprint never leaves this device.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Future notes will name %@ automatically. The voiceprint never leaves this device."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Las próximas notas nombrarán a %@ automáticamente. La huella de voz nunca sale de este dispositivo."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Les prochaines notes nommeront %@ automatiquement. L’empreinte vocale ne quitte jamais cet appareil."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Le prossime note riconosceranno %@ automaticamente. L’impronta vocale non lascia mai il dispositivo."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "As próximas notas vão nomear %@ automaticamente. A impressão de voz nunca sai deste dispositivo."
-          }
-        },
-        "pt-PT": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "As próximas notas vão nomear %@ automaticamente. A impressão vocal nunca sai deste dispositivo."
-          }
-        }
-      }
-    },
-    "Future notes will name this person automatically. The voiceprint never leaves this device.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Future notes will name this person automatically. The voiceprint never leaves this device."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Las próximas notas nombrarán a esta persona automáticamente. La huella de voz nunca sale de este dispositivo."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Les prochaines notes nommeront cette personne automatiquement. L’empreinte vocale ne quitte jamais cet appareil."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Le prossime note riconosceranno questa persona automaticamente. L’impronta vocale non lascia mai il dispositivo."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "As próximas notas vão nomear esta pessoa automaticamente. A impressão de voz nunca sai deste dispositivo."
-          }
-        },
-        "pt-PT": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "As próximas notas vão nomear esta pessoa automaticamente. A impressão vocal nunca sai deste dispositivo."
-          }
-        }
-      }
-    },
-    "Future notes will suggest %@. The voiceprint never leaves this device.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Future notes will suggest %@. The voiceprint never leaves this device."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Las próximas notas sugerirán a %@. La huella de voz nunca sale de este dispositivo."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Les prochaines notes suggéreront %@. L’empreinte vocale ne quitte jamais cet appareil."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Le prossime note suggeriranno %@. L’impronta vocale non lascia mai il dispositivo."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "As próximas notas vão sugerir %@. A impressão de voz nunca sai deste dispositivo."
-          }
-        },
-        "pt-PT": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "As próximas notas vão sugerir %@. A impressão vocal nunca sai deste dispositivo."
-          }
-        }
-      }
-    },
-    "Future notes will suggest this person. The voiceprint never leaves this device.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Future notes will suggest this person. The voiceprint never leaves this device."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Las próximas notas sugerirán a esta persona. La huella de voz nunca sale de este dispositivo."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Les prochaines notes suggéreront cette personne. L’empreinte vocale ne quitte jamais cet appareil."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Le prossime note suggeriranno questa persona. L’impronta vocale non lascia mai il dispositivo."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "As próximas notas vão sugerir esta pessoa. A impressão de voz nunca sai deste dispositivo."
-          }
-        },
-        "pt-PT": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "As próximas notas vão sugerir esta pessoa. A impressão vocal nunca sai deste dispositivo."
-          }
-        }
-      }
-    },
     "Identify speakers": {
       "extractionState": "manual",
       "localizations": {
@@ -1974,88 +1769,6 @@
         }
       }
     },
-    "Is this the same person?": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Is this the same person?"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "¿Es la misma persona?"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Est-ce la même personne ?"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "È la stessa persona?"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "É a mesma pessoa?"
-          }
-        },
-        "pt-PT": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "É a mesma pessoa?"
-          }
-        }
-      }
-    },
-    "Likely": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Likely"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Probable"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Probable"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Probabile"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Provável"
-          }
-        },
-        "pt-PT": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Provável"
-          }
-        }
-      }
-    },
     "Merge": {
       "extractionState": "manual",
       "localizations": {
@@ -2179,47 +1892,6 @@
         }
       }
     },
-    "Merge into…": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Merge into…"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Fusionar con…"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Fusionner avec…"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Unisci a…"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mesclar com…"
-          }
-        },
-        "pt-PT": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Juntar a…"
-          }
-        }
-      }
-    },
     "Might be %@": {
       "extractionState": "manual",
       "localizations": {
@@ -2257,47 +1929,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Pode ser %@"
-          }
-        }
-      }
-    },
-    "Name": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Name"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nombre"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nom"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nome"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nome"
-          }
-        },
-        "pt-PT": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nome"
           }
         }
       }
@@ -2665,47 +2296,6 @@
         }
       }
     },
-    "Play a sample of this voice": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Play a sample of this voice"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Reproducir una muestra de esta voz"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Lire un extrait de cette voix"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Riproduci un campione di questa voce"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Reproduzir uma amostra desta voz"
-          }
-        },
-        "pt-PT": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Reproduzir uma amostra desta voz"
-          }
-        }
-      }
-    },
     "Previous transcript": {
       "extractionState": "manual",
       "localizations": {
@@ -2737,88 +2327,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Transcrição anterior"
-          }
-        }
-      }
-    },
-    "Recognising saved voices isn’t installed yet.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Recognising saved voices isn’t installed yet."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "El reconocimiento de voces guardadas aún no está instalado."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "La reconnaissance des voix mémorisées n’est pas encore installée."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Il riconoscimento delle voci salvate non è ancora installato."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "O reconhecimento de vozes salvas ainda não está instalado."
-          }
-        },
-        "pt-PT": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "O reconhecimento de vozes guardadas ainda não está instalado."
-          }
-        }
-      }
-    },
-    "Remember this voice on this device": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Remember this voice on this device"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Recordar esta voz en este dispositivo"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mémoriser cette voix sur cet appareil"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ricorda questa voce su questo dispositivo"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Lembrar esta voz neste dispositivo"
-          }
-        },
-        "pt-PT": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Memorizar esta voz neste dispositivo"
           }
         }
       }
@@ -2905,47 +2413,6 @@
         }
       }
     },
-    "Same person": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Same person"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Misma persona"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Même personne"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Stessa persona"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mesma pessoa"
-          }
-        },
-        "pt-PT": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mesma pessoa"
-          }
-        }
-      }
-    },
     "Save": {
       "comment": "Rename saved voice: the button that saves the name",
       "extractionState": "manual",
@@ -2978,88 +2445,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Guardar"
-          }
-        }
-      }
-    },
-    "Save name": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Save name"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Guardar nombre"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Enregistrer le nom"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Salva il nome"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Salvar nome"
-          }
-        },
-        "pt-PT": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Guardar nome"
-          }
-        }
-      }
-    },
-    "Saved voices": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Saved voices"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Voces guardadas"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Voix mémorisées"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Voci salvate"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Vozes salvas"
-          }
-        },
-        "pt-PT": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Vozes guardadas"
           }
         }
       }
@@ -3187,47 +2572,6 @@
         }
       }
     },
-    "Saved voices, closest first": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Saved voices, closest first"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Voces guardadas, primero las más parecidas"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Voix mémorisées, les plus proches d’abord"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Voci salvate, dalla più simile"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Vozes salvas, da mais parecida"
-          }
-        },
-        "pt-PT": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Vozes guardadas, da mais semelhante"
-          }
-        }
-      }
-    },
     "Show all": {
       "extractionState": "manual",
       "localizations": {
@@ -3265,47 +2609,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mostrar todas"
-          }
-        }
-      }
-    },
-    "Someone else": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Someone else"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Otra persona"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Quelqu’un d’autre"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Un’altra persona"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Outra pessoa"
-          }
-        },
-        "pt-PT": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Outra pessoa"
           }
         }
       }
@@ -3494,47 +2797,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Oradores juntados · da versão %lld · %@"
-          }
-        }
-      }
-    },
-    "Speaks for %@ in this note": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Speaks for %@ in this note"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Habla durante %@ en esta nota"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Parle pendant %@ dans cette note"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Parla per %@ in questa nota"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Fala por %@ nesta nota"
-          }
-        },
-        "pt-PT": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Fala durante %@ nesta nota"
           }
         }
       }
@@ -3908,47 +3170,6 @@
         }
       }
     },
-    "Too little speech to remember this voice.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Too little speech to remember this voice."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No hay suficiente habla para recordar esta voz."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Trop peu de parole pour mémoriser cette voix."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Troppo poco parlato per ricordare questa voce."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Pouca fala para lembrar esta voz."
-          }
-        },
-        "pt-PT": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Fala insuficiente para memorizar esta voz."
-          }
-        }
-      }
-    },
     "Transcribed %@ · %@": {
       "comment": "Versions: a transcription's date and time, then its word count",
       "extractionState": "manual",
@@ -4227,47 +3448,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "menos de 1 min"
-          }
-        }
-      }
-    },
-    "“%@” is already a saved voice.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "“%@” is already a saved voice."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "“%@” ya es una voz guardada."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "« %@ » est déjà une voix mémorisée."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "“%@” è già una voce salvata."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "“%@” já é uma voz salva."
-          }
-        },
-        "pt-PT": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "«%@» já é uma voz guardada."
           }
         }
       }

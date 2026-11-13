@@ -446,27 +446,41 @@ public final class NoteScreenModel {
     /// the voiceprint model is installed.
     func draftInput(_ speakerID: String) async -> NamingInput? {
         guard let draft = shownDraft else { return nil }
-        let stats = SpeakerStats.of(words: draft.words.map { Word($0.speaker, $0.startMs, $0.endMs, $0.text) })
-        guard let stat = stats.first(where: { Data($0.speakerID.utf8) == Data(speakerID.utf8) }) else { return nil }
-        let labels = Dictionary(uniqueKeysWithValues: draft.labels.map { (Data($0.key.utf8), $0.value) })
-        let provenance = Dictionary(uniqueKeysWithValues: draft.provenance.map { (Data($0.key.utf8), $0.value) })
-        func label(_ stat: SpeakerStat) -> String { labels[Data(stat.speakerID.utf8)] ?? DefaultLabels.placeholder(stat.ordinal + 1) }
-        let order = SpeakerColourOrder.earliest(draft.words, id: { $0.speaker }, start: { Double($0.startMs) })
-        let fallback = Dictionary(uniqueKeysWithValues: order.enumerated().map { (Data($0.element.utf8), $0.offset) })
-        let stored = Dictionary(uniqueKeysWithValues: draft.colourIndices.map { (Data($0.key.utf8), $0.value) })
-        let indices = stored.merging(fallback) { stored, _ in stored }
-        let targets = stats.filter { Data($0.speakerID.utf8) != Data(speakerID.utf8) && $0.wordCount > 0 }.map {
-            MergeTarget(speakerID: $0.speakerID, name: label($0), ordinal: $0.ordinal, speakingTime: $0.speakingTime,
-                        colourIndex: indices[Data($0.speakerID.utf8)], provenance: provenance[Data($0.speakerID.utf8)])
-        }
         let ready = await ports.speakerModelsReady()
         // A running job holds the audio: no sample plays until it stops.
         let canSample = ports.runningDraft(noteID) == nil && note?.audio.isPlayable == true
-        return NamingInput(speakerID: speakerID, label: label(stat), ordinal: stat.ordinal, speakingTime: stat.speakingTime,
-                           sample: stat.sample, print: nil, match: draftNames.match(speakerID),
-                           voices: ports.savedVoices(), voicesReadOnly: ports.voicesReadOnly(), voiceModelReady: ready,
-                           mergeTargets: targets, canSample: canSample, draft: true, willHavePrint: ready,
-                           colourIndex: indices[Data(speakerID.utf8)], provenance: provenance[Data(speakerID.utf8)])
+        let match = draftNames.match(speakerID)
+        let voices = ports.savedVoices()
+        let readOnly = ports.voicesReadOnly()
+        let language = DefaultLabels.appLanguage
+        return await Task.detached(priority: .userInitiated) {
+            let stats = SpeakerStats.of(words: draft.words.map { Word($0.speaker, $0.startMs, $0.endMs, $0.text) })
+            guard let stat = stats.first(where: { Data($0.speakerID.utf8) == Data(speakerID.utf8) }) else { return nil }
+            let labels = Dictionary(uniqueKeysWithValues: draft.labels.map { (Data($0.key.utf8), $0.value) })
+            let provenance = Dictionary(uniqueKeysWithValues: draft.provenance.map { (Data($0.key.utf8), $0.value) })
+            func label(_ stat: SpeakerStat) -> String {
+                labels[Data(stat.speakerID.utf8)] ?? DefaultLabels.placeholder(stat.ordinal + 1, language: language)
+            }
+            let order = SpeakerColourOrder.earliest(draft.words, id: { $0.speaker }, start: { Double($0.startMs) })
+            let fallback = Dictionary(uniqueKeysWithValues: order.enumerated().map { (Data($0.element.utf8), $0.offset) })
+            let stored = Dictionary(uniqueKeysWithValues: draft.colourIndices.map { (Data($0.key.utf8), $0.value) })
+            let indices = stored.merging(fallback) { stored, _ in stored }
+            let targets = stats.filter { Data($0.speakerID.utf8) != Data(speakerID.utf8) && $0.wordCount > 0 }.map {
+                MergeTarget(speakerID: $0.speakerID, name: label($0), ordinal: $0.ordinal, speakingTime: $0.speakingTime,
+                            colourIndex: indices[Data($0.speakerID.utf8)], provenance: provenance[Data($0.speakerID.utf8)])
+            }
+            let quote = NoteTranscripts.draft(
+                draft.words, tentativeFromMs: draft.tentativeFromMs == .max ? nil : draft.tentativeFromMs,
+                labels: draft.labels, automatic: draft.automatic, suggestions: draft.suggestions,
+                colourIndices: draft.colourIndices, provenance: draft.provenance
+            ).namingQuote(speakerID)
+            return NamingInput(speakerID: speakerID, label: label(stat), ordinal: stat.ordinal, speakingTime: stat.speakingTime,
+                               sample: stat.sample, print: nil, match: match,
+                               voices: voices, voicesReadOnly: readOnly, voiceModelReady: ready,
+                               mergeTargets: targets, canSample: canSample, draft: true, willHavePrint: ready,
+                               colourIndex: indices[Data(speakerID.utf8)], provenance: provenance[Data(speakerID.utf8)],
+                               quote: quote)
+        }.value
     }
 
     // MARK: Opening

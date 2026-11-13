@@ -147,7 +147,7 @@ private struct PersonRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            SpeakerAvatar(name: person.name, tint: SpeakerTint.named(person.colourIndex))
+            SpeakerAvatar(name: person.name, tint: SpeakerTint.named(person.colourIndex), showsPlaceholderNumber: false)
             VStack(alignment: .leading, spacing: 2) {
                 Text(person.name).font(.body.weight(.medium)).foregroundStyle(Color.ink)
                 Text(SpeakersCopy.meta(notes: person.notes, seconds: person.confirmedSeconds)).font(.caption).foregroundStyle(Color.muted)

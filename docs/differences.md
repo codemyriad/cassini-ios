@@ -307,8 +307,8 @@ a local-only label stays as written, and unknown dates contribute only the durat
   by iOS builds before this one hold WeSpeaker embeddings from FluidAudio. They are stale, and the person is named
   again in a note, as Android does for prints of another model.
 - **Automatic naming is opt-in.** Settings has "Name strong matches automatically", off by default. While it is off, a
-  suggestion reads "Is this Luca?", and the Remember subtitle says "Future notes will suggest Luca" instead of Android's
-  "will name Luca automatically".
+  suggestion reads "Is this Luca?"; the Remember this voice card uses the shared two-line copy ("Cassini will recognise
+  Luca in future meetings.\nVoiceprints stay on this iPhone.").
 - **Speaker model install.** The speaker models come from the pinned catalog through the shared
   `PinnedModelInstaller`, as on Android: the diarizer and CAM++ as seekable Zstandard from `dist.gocassini.com`,
   unpacked by `ZstdDecompressor` (facebook/zstd 1.5.7, the release that zstd-jni bundles). Each file is checked
@@ -841,8 +841,9 @@ These features exist only on iOS. They were kept by decision.
   words ("Português (Brasil)") and opens Cassini's page there. Android has a Phone / English / Italiano control.
   Without a choice there, Cassini follows the system's language (D50.1), using Foundation's matching:
   `LocalizationTests` checks that `pt` reads as pt-BR, pt-AO as pt-PT, es-MX as es and de as English.
-- **Copy.** Android's English is used, with "device" for "phone" ("Remember this voice on this device", "Transcribe on
-  this device", "Voiceprints stay on this device"), because Cassini also runs on iPad. Dates have Android's forms
+- **Copy.** Shared Phase 1 strings (`MeetingPhase1`) use the pinned `cassini-ux` catalog (including `.iphone` variants
+  such as "Voiceprints stay on this iPhone."); remaining strings use Android's English, with "device" for "phone"
+  ("Transcribe on this device", "Voiceprints stay on this device"), because Cassini also runs on iPad. Dates have Android's forms
   (`DateLabels`): "Monday 5 Oct" in the Library and on the Note screen, "Deleted 2 Oct", "8 Oct, 9:41 AM", the year
   only for another year; the time of day follows the locale's 12- or 24-hour clock.
 - **Failure copy.** Each stored failure code reads as Android's `error_*`, with iOS's own limits and names (LONG: about

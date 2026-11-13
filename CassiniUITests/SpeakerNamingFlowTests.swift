@@ -74,7 +74,11 @@ final class SpeakerNamingFlowTests: XCTestCase {
         field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 10) + "Sam")
         let samePerson = app.buttons["questionYes"]
         XCTAssertTrue(samePerson.waitForExistence(within: 20), "the field holds \(String(describing: field.value))")
-        XCTAssertTrue(element(app, containing: "“Sam Rivera” is already a saved voice.").waitForExistence(within: 20))
+        XCTAssertTrue(element(app, containing: "Sam Rivera is already a saved voice.").waitForExistence(within: 20))
+        XCTAssertFalse(element(app, containing: "Is this the same person?").exists)
+        XCTAssertTrue(app.staticTexts["speakerQuote"].exists)
+        XCTAssertTrue(app.switches["rememberVoice"].exists)
+        XCTAssertTrue(app.buttons["mergeInto"].exists)
 
         app.buttons["saveSpeakerName"].tap()
         XCTAssertTrue(field.exists, "Save waits until the question is answered")
@@ -107,5 +111,27 @@ final class SpeakerNamingFlowTests: XCTestCase {
         XCTAssertTrue(app.buttons["Download and identify speakers"].exists)
         app.buttons["Not now — keep the audio"].tap()
         XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 5))
+    }
+
+    @MainActor func testNameASpeakerPassesTheAudit() throws {
+        let app = launchSpeakersSeed()
+        let header = app.buttons["speakerHeader-w1"]
+        XCTAssertTrue(header.waitForExistence(within: 10))
+        header.tap()
+        let field = app.textFields["speakerNameField"]
+        XCTAssertTrue(field.waitForExistence(within: 10))
+        XCTAssertTrue(app.staticTexts["speakerQuote"].waitForExistence(within: 5))
+
+        var issues: [String] = []
+        let types = XCUIAccessibilityAuditType.all.subtracting([.contrast, .dynamicType])
+        for pass in [types.intersection(.elementDetection), types.subtracting(.elementDetection)] where !pass.isEmpty {
+            try app.performAccessibilityAudit(for: pass) { issue in
+                if !AuditFilter.isSystemOwned(issue) {
+                    issues.append(AuditFilter.describe(issue))
+                }
+                return true
+            }
+        }
+        XCTAssertTrue(issues.isEmpty, issues.joined(separator: "\n"))
     }
 }
