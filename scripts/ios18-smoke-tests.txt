@@ -20,7 +20,7 @@ AcceptanceWalkTests/testRecordTranscribeReadNameExportTrashAndRestore
 # The Library's toolbar, wordmark and empty state; a note opened and left
 CassiniUITests/testEmptyLibraryAndSettings
 CassiniUITests/testOpenFixtureOpensTheNamedNote
-NoteScreenTests/testTheBackButtonSaysBackToLibrary
+NoteScreenTests/testTheBackButtonSaysBackToAllMeetings
 RecordingSelectionTests/testBackToLibraryThenAnotherRecordingOpensTheRequestedNote
 
 # The accessibility audits and the largest text size

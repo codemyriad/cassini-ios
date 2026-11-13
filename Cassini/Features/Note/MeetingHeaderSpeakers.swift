@@ -20,7 +20,6 @@ struct MeetingHeaderSpeakers: View {
                 }
             }
         }
-        .accessibilityIdentifier("meetingSpeakers")
     }
 
     private func label(_ speaker: TranscriptSpeaker) -> some View {
