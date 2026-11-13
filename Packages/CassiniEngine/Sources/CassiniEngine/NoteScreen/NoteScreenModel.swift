@@ -535,12 +535,15 @@ public final class NoteScreenModel {
         run(start.effect)
     }
 
-    /// Reads a stopped, failed, queued or resuming job's saved progress for its draft; a finished note or a job over
-    /// an existing transcript shows none.
+    /// Reads a stopped, failed, or checkpoint-backed queued/resuming job's saved progress for its draft; a fresh
+    /// queued job (`doneMs == 0`), a consent prompt, or a finished note loads none.
     public func loadSavedDraft() async {
-        let shouldLoad: Bool = if let job {
-            note.map { NoteMode.of($0, job: job).showsDraft } ?? (job.state != .needsConsent)
-        } else {
+        let shouldLoad: Bool = switch job?.state {
+        case .paused?, .failed?:
+            true
+        case .queued?, .running?:
+            (job?.doneMs ?? 0) > 0
+        case .needsConsent?, nil:
             false
         }
         let draft = shouldLoad ? await ports.savedDraft(noteID) : []
