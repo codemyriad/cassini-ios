@@ -77,7 +77,10 @@ final class SpeakerNamingFlowTests: XCTestCase {
         XCTAssertTrue(element(app, containing: "Sam Rivera is already a saved voice.").waitForExistence(within: 20))
         XCTAssertFalse(element(app, containing: "Is this the same person?").exists)
         XCTAssertTrue(app.staticTexts["speakerQuote"].exists)
-        XCTAssertTrue(app.switches["rememberVoice"].exists)
+        let remember = app.switches["rememberVoice"]
+        XCTAssertTrue(remember.exists)
+        XCTAssertTrue(remember.label.contains("Future notes will suggest Sam. The voiceprint never leaves this device."),
+                      "automatic naming is off by default: \(remember.label)")
         XCTAssertTrue(app.buttons["mergeInto"].exists)
 
         app.buttons["saveSpeakerName"].tap()

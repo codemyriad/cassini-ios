@@ -1616,6 +1616,170 @@
         }
       }
     },
+    "Future notes will name %@ automatically. The voiceprint never leaves this device.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Future notes will name %@ automatically. The voiceprint never leaves this device."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Las próximas notas nombrarán a %@ automáticamente. La huella de voz nunca sale de este dispositivo."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les prochaines notes nommeront %@ automatiquement. L’empreinte vocale ne quitte jamais cet appareil."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le prossime note riconosceranno %@ automaticamente. L’impronta vocale non lascia mai il dispositivo."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "As próximas notas vão nomear %@ automaticamente. A impressão de voz nunca sai deste dispositivo."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "As próximas notas vão nomear %@ automaticamente. A impressão vocal nunca sai deste dispositivo."
+          }
+        }
+      }
+    },
+    "Future notes will name this person automatically. The voiceprint never leaves this device.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Future notes will name this person automatically. The voiceprint never leaves this device."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Las próximas notas nombrarán a esta persona automáticamente. La huella de voz nunca sale de este dispositivo."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les prochaines notes nommeront cette personne automatiquement. L’empreinte vocale ne quitte jamais cet appareil."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le prossime note riconosceranno questa persona automaticamente. L’impronta vocale non lascia mai il dispositivo."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "As próximas notas vão nomear esta pessoa automaticamente. A impressão de voz nunca sai deste dispositivo."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "As próximas notas vão nomear esta pessoa automaticamente. A impressão vocal nunca sai deste dispositivo."
+          }
+        }
+      }
+    },
+    "Future notes will suggest %@. The voiceprint never leaves this device.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Future notes will suggest %@. The voiceprint never leaves this device."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Las próximas notas sugerirán a %@. La huella de voz nunca sale de este dispositivo."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les prochaines notes suggéreront %@. L’empreinte vocale ne quitte jamais cet appareil."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le prossime note suggeriranno %@. L’impronta vocale non lascia mai il dispositivo."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "As próximas notas vão sugerir %@. A impressão de voz nunca sai deste dispositivo."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "As próximas notas vão sugerir %@. A impressão vocal nunca sai deste dispositivo."
+          }
+        }
+      }
+    },
+    "Future notes will suggest this person. The voiceprint never leaves this device.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Future notes will suggest this person. The voiceprint never leaves this device."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Las próximas notas sugerirán a esta persona. La huella de voz nunca sale de este dispositivo."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les prochaines notes suggéreront cette personne. L’empreinte vocale ne quitte jamais cet appareil."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le prossime note suggeriranno questa persona. L’impronta vocale non lascia mai il dispositivo."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "As próximas notas vão sugerir esta pessoa. A impressão de voz nunca sai deste dispositivo."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "As próximas notas vão sugerir esta pessoa. A impressão vocal nunca sai deste dispositivo."
+          }
+        }
+      }
+    },
     "Identify speakers": {
       "extractionState": "manual",
       "localizations": {

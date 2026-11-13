@@ -11,6 +11,7 @@ struct NameSpeakerSheet: View {
     var nameChanged: (String) -> Void = { _ in }
     @Environment(LibraryStore.self) private var library
     @Environment(PlaybackStore.self) private var playback
+    @Environment(SettingsStore.self) private var settings
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var model: NameSpeakerModel
@@ -311,7 +312,9 @@ struct NameSpeakerSheet: View {
     private func rememberCard(_ ui: NameSheetUI) -> some View {
         let cardShape = RoundedRectangle(cornerRadius: Radius.field)
         let subtitle = ui.rememberReason.map(SpeakersCopy.rememberReason)
-            ?? SpeakersCopy.rememberBody(ui.name.trimmingCharacters(in: .whitespaces))
+            ?? SpeakersCopy.rememberBody(ui.name.trimmingCharacters(in: .whitespaces),
+                                         automatic: settings.automaticallyNameVoices,
+                                         pad: UIDevice.current.userInterfaceIdiom == .pad)
         return Toggle(isOn: Binding(get: { ui.remember }, set: { send(.rememberToggled($0)) })) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(SpeakersCopy.remember)

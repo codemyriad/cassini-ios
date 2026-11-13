@@ -69,9 +69,49 @@ enum SpeakersCopy {
     static func notName(_ name: String) -> String { String(localized: "Not \(name)?", table: "Speakers") }
     static var remember: String { MeetingPhase1Copy.speakerRememberTitle }
 
-    /// Shared Phase 1 two-line copy (`speakers.rememberVoice.cardBody.iphone` / `.unnamed`).
-    static func rememberBody(_ name: String) -> String {
-        name.isEmpty ? MeetingPhase1Copy.speakerRememberUnnamed : MeetingPhase1Copy.speakerRememberBody(name)
+    /// What remembering does: on iPhone with automatic naming on, the shared Phase 1 two-line copy
+    /// (`speakers.rememberVoice.cardBody.iphone` / `.unnamed`). While automatic naming is off (the iOS default), or on
+    /// iPad where "this iPhone" does not fit, the `Speakers` device strings.
+    static func rememberBody(_ name: String, automatic: Bool, pad: Bool = false, language: String? = nil,
+                             bundle: Bundle = .main) -> String {
+        if automatic && !pad {
+            if let language {
+                if name.isEmpty {
+                    return MeetingPhase1Copy.template("speakers.rememberVoice.cardBody.iphone.unnamed",
+                                                      language: language, bundle: bundle)
+                }
+                return MeetingPhase1Copy.template("speakers.rememberVoice.cardBody.iphone",
+                                                  language: language, bundle: bundle)
+                    .replacingOccurrences(of: "{name}", with: name)
+            }
+            return name.isEmpty ? MeetingPhase1Copy.speakerRememberUnnamed : MeetingPhase1Copy.speakerRememberBody(name)
+        }
+        if let language {
+            let locale = Locale(identifier: language)
+            let selected = Bundle.preferredLocalizations(from: bundle.localizations,
+                forPreferences: [language.replacingOccurrences(of: "_", with: "-")]).first ?? "en"
+            let localized = bundle.path(forResource: selected, ofType: "lproj").flatMap(Bundle.init(path:)) ?? bundle
+            return deviceRememberBody(name, automatic: automatic, bundle: localized, locale: locale)
+        }
+        return deviceRememberBody(name, automatic: automatic)
+    }
+
+    private static func deviceRememberBody(_ name: String, automatic: Bool, bundle: Bundle? = nil,
+                                           locale: Locale = .current) -> String {
+        switch (name.isEmpty, automatic) {
+        case (false, true):
+            String(localized: "Future notes will name \(name) automatically. The voiceprint never leaves this device.",
+                   table: "Speakers", bundle: bundle, locale: locale)
+        case (true, true):
+            String(localized: "Future notes will name this person automatically. The voiceprint never leaves this device.",
+                   table: "Speakers", bundle: bundle, locale: locale)
+        case (false, false):
+            String(localized: "Future notes will suggest \(name). The voiceprint never leaves this device.",
+                   table: "Speakers", bundle: bundle, locale: locale)
+        case (true, false):
+            String(localized: "Future notes will suggest this person. The voiceprint never leaves this device.",
+                   table: "Speakers", bundle: bundle, locale: locale)
+        }
     }
 
     static func rememberReason(_ reason: RememberReason) -> String {
