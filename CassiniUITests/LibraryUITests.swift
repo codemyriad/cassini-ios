@@ -54,6 +54,20 @@ final class LibraryUITests: XCTestCase {
         attachment.name = name; attachment.lifetime = .keepAlways; add(attachment)
     }
 
+    /// Measure the resting capsule after its native morph, without turning animation duration into a test wait.
+    @MainActor private func settledFrame(_ element: XCUIElement) -> CGRect {
+        var previous: CGRect?
+        var result = CGRect.null
+        XCTAssertTrue(poll(within: 5) {
+            guard let frame = (try? element.snapshot())?.frame, !frame.isEmpty else { previous = nil; return false }
+            defer { previous = frame }
+            guard frame == previous else { return false }
+            result = frame
+            return true
+        }, "The search capsule never reached a resting frame")
+        return result
+    }
+
     /// Every row status of the table shows, with its text, in a fixture (Recording is in the recording test below).
     @MainActor func testEveryRowStatusShowsWithItsText() {
         let app = launch(["--seed", "statuses"] + DeviceUnderTest.workingSpeech)
@@ -247,7 +261,13 @@ final class LibraryUITests: XCTestCase {
                                                                          result: XCUIElement,
                                                                          file: StaticString = #filePath, line: UInt = #line) {
         let count = app.staticTexts["librarySearchCount"]
-        XCTAssertTrue(dateControl(app).wait(until: NSPredicate(format: "hittable == true"), within: 5),
+        let date = app.buttons["librarySearchDate"]
+        XCTAssertTrue(poll(within: 5) {
+            guard date.exists, dateControl(app).isEnabled else { return false }
+            let pane = app.scrollViews["libraryScroll"].frame.intersection(app.windows.firstMatch.frame)
+            return pane.contains(date.frame) && date.frame.minY >= app.textFields["librarySearch"].frame.maxY
+                && date.frame.maxY <= app.buttons["recordButton"].frame.minY
+        },
                       "opening Search brings the date filter into view without another swipe", file: file, line: line)
         XCTAssertTrue(count.wait(until: NSPredicate(format: "label == '1 meeting' AND hittable == true"), within: 15),
                       "the published result count is visible after the scrolled list is searched", file: file, line: line)
@@ -261,6 +281,23 @@ final class LibraryUITests: XCTestCase {
         let menu = app.buttons["librarySearchDate"]
         let native = menu.buttons.firstMatch
         return native.exists ? native : menu
+    }
+
+    /// iPadOS 18 can expose the sidebar scroll view beyond the window's left edge. Drag within its visible pane,
+    /// clear of the pinned controls, rather than asking XCTest to swipe that unclipped accessibility frame.
+    @MainActor private func scrollSidebar(_ app: XCUIApplication, up: Bool = true, until done: () -> Bool) -> Bool {
+        for _ in 0..<12 {
+            if done() { return true }
+            let pane = app.scrollViews["libraryScroll"].frame.intersection(app.windows.firstMatch.frame)
+            let top = max(pane.minY, app.textFields["librarySearch"].frame.maxY) + 24
+            let bottom = min(pane.maxY, app.buttons["recordButton"].frame.minY) - 24
+            guard !pane.isEmpty, bottom - top > 100 else { return false }
+            let origin = app.coordinate(withNormalizedOffset: .zero)
+            let start = origin.withOffset(CGVector(dx: pane.midX, dy: up ? bottom : top))
+            let end = origin.withOffset(CGVector(dx: pane.midX, dy: up ? top : bottom))
+            start.press(forDuration: 0, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 0)
+        }
+        return done()
     }
 
     @MainActor private func assertClosingEmptySearchResetsDate(_ app: XCUIApplication,
@@ -327,9 +364,9 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(search.waitForExistence(within: 15))
         assertClosingEmptySearchResetsDate(app, submitEmptyBeforeDate: true)
         let sidebar = app.scrollViews["libraryScroll"]
-        let initialSearchFrame = search.frame
+        let initialSearchFrame = settledFrame(search)
         let quiet = row(app, "Quiet room")
-        let reachedQuiet = sidebar.scroll(attempts: 12) {
+        let reachedQuiet = scrollSidebar(app) {
             quiet.exists && quiet.isHittable && quiet.frame.maxY < app.buttons["recordButton"].frame.minY
         }
         capture("iPad Library scrolled before opening Search")
@@ -339,9 +376,16 @@ final class LibraryUITests: XCTestCase {
         search.tap()
         capture("iPad empty Search focused after scrolling the Library")
         let date = app.buttons["librarySearchDate"]
-        XCTAssertTrue(date.wait(until: NSPredicate(format: "hittable == true"), within: 5))
         let close = app.buttons["closeLibrarySearch"]
         XCTAssertTrue(close.waitForExistence(within: 5))
+        search.typeText("\n")
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(within: 5))
+        // The iPadOS 18 Menu wrapper reports not-hittable even when its native button opens it. Require the
+        // actual menu action after scrolling, rather than treating that incorrect AX proxy as interaction proof.
+        dateControl(app).tapWhenSettled()
+        app.buttons["Today"].tapWhenSettled()
+        XCTAssertTrue(date.wait(until: NSPredicate(format: "label CONTAINS 'Today'"), within: 5))
+        search.tap()
         search.typeText("planning\n")
         XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(within: 5))
         let planning = row(app, "Weekly planning call")
@@ -360,7 +404,7 @@ final class LibraryUITests: XCTestCase {
         settings.tap()
         XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(within: 15))
         XCTAssertTrue(search.isHittable, "Settings replaces only the detail column")
-        XCTAssertTrue(sidebar.scroll(up: false, attempts: 8) { planning.exists && planning.isHittable })
+        XCTAssertTrue(scrollSidebar(app, up: false) { planning.exists && planning.isHittable })
         planning.tap()
         XCTAssertTrue(title.wait(until: NSPredicate(format: "label == 'Weekly planning call'"), within: 15),
                       "selecting the meeting again replaces Settings without a root-detail Back button")
@@ -374,7 +418,7 @@ final class LibraryUITests: XCTestCase {
         let list = app.scrollViews["libraryScroll"]
         XCTAssertTrue(row(app, "Weekly planning call").waitForExistence(within: 15))
         XCTAssertEqual(app.descendants(matching: .any)["libraryHeading"].label, "All meetings")
-        let initialSearchFrame = search.frame
+        let initialSearchFrame = settledFrame(search)
         let emptyQueryValue = search.value as? String
         let last = row(app, "Quiet room")
         XCTAssertTrue(list.scroll(attempts: 12) {
