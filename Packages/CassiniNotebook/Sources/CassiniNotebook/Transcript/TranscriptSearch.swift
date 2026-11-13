@@ -7,7 +7,7 @@ public struct TranscriptMatch: Hashable, Sendable {
     public init(turnID: String, range: Range<Int>) { self.turnID = turnID; self.range = range }
 }
 
-/// In-note search (Android `TranscriptSearch`): case- and diacritic-insensitive matching over each paragraph's text,
+/// In-note search (Android `TranscriptSearch`): case- and diacritic-insensitive matching over each paragraph's speech,
 /// with ranges on the text as shown. "cafe" finds "café", "DELIVERY" finds "delivery".
 public enum TranscriptSearch {
     /// Every match of `query` in `turns`, in text order. A blank query matches nothing; matches do not overlap.
@@ -16,7 +16,7 @@ public enum TranscriptSearch {
         guard !needle.isEmpty else { return [] }
         var result: [TranscriptMatch] = []
         for turn in turns {
-            let folded = fold(turn.text)
+            let folded = spoken(turn)
             let haystack = folded.text
             guard haystack.count >= needle.count else { continue }
             var at = 0
@@ -28,6 +28,25 @@ public enum TranscriptSearch {
                     at += 1
                 }
             }
+        }
+        return result
+    }
+
+    /// Search actual words, keeping the rendered offsets across inline speaker labels and parentheses.
+    /// A label rename must not create a match; a phrase crossing a chip still maps to its real first/last words.
+    private static func spoken(_ turn: NoteTurn) -> Folded {
+        var result = Folded(text: [], source: [])
+        result.text.reserveCapacity(turn.text.count)
+        result.source.reserveCapacity(turn.text.count)
+        for (index, word) in turn.words.enumerated() {
+            let offset = turn.offsets[index]
+            if index > 0 {
+                result.text.append(" ")
+                result.source.append(offset - 1)
+            }
+            let piece = fold(word.text)
+            result.text.append(contentsOf: piece.text)
+            for position in piece.source { result.source.append(offset + position) }
         }
         return result
     }

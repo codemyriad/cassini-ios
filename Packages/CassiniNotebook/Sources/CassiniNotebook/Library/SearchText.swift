@@ -164,7 +164,11 @@ public struct SearchFields: Sendable {
     }
 
     public init(_ note: Note) {
-        self.init(title: note.title, body: NoteTranscripts.sealed(note).turns.map(\.text).joined(separator: "\n\n"), bookmarks: note.bookmarks.compactMap(\.label))
+        // Synthetic inline-speaker labels are presentation, not speech. A single line also keeps paragraph
+        // breaks from consuming the result preview's two lines before the highlighted word appears.
+        self.init(title: note.title,
+                  body: NoteTranscripts.sealed(note).turns.lazy.flatMap(\.words).map(\.text).joined(separator: " "),
+                  bookmarks: note.bookmarks.compactMap(\.label))
     }
 
     /// Whether every phrase is in one of the fields (each phrase may be in another).
