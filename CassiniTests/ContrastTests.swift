@@ -33,49 +33,54 @@ import CassiniNotebook
     static let groupedRow = Color(uiColor: .secondarySystemGroupedBackground)
 
     static let tones: [(String, Tone)] = [("ok", .ok), ("info", .info), ("warn", .warn), ("error", .error), ("plain", .plain)]
-    static let surfaces: [(String, Color)] = [("paper", .paper), ("card", .card)]
+    static let surfaces: [(String, Color)] = [("paper", .paper), ("card", .card), ("meeting card", .cardRest)]
 
     /// One line per pair a screen draws.
     static let pairs: [Pair] = {
         var pairs: [Pair] = [
             text("ink on paper", .ink, on: .paper),
             text("ink on card", .ink, on: .card),
-            text("ink on a row (card at 55 % over paper)", .ink, on: .paper, Color.card.opacity(0.55)),
+            text("ink on card", .ink, on: .card),
             text("muted on paper", .muted, on: .paper),
             text("muted on card", .muted, on: .card),
-            text("muted on a row", .muted, on: .paper, Color.card.opacity(0.55)),
-            text("muted on a preview match (ember 16 % on card)", .muted, on: .card, Color.ember.opacity(0.16)),
-            text("ink on a preview match", .ink, on: .card, Color.ember.opacity(0.16)),
+            text("muted on card", .muted, on: .card),
+            text("ink on preview highlight", .highlightInk, on: .highlight),
+            text("ink on search highlight", .highlightInk, on: .highlight),
             text("faint (draft words that may change) on paper", .faint, on: .paper),
-            text("ember on paper", .ember, on: .paper),
-            text("ember on card", .ember, on: .card),
-            text("ember on a notice card (ember 8 % on paper)", .ember, on: .paper, Color.ember.opacity(0.08)),
+            text("accent on paper", .accentInk, on: .paper),
+            text("accent on card", .accentInk, on: .card),
+            text("accent on notice tint", .accentInk, on: .accentTint),
             text("processing on paper", .processing, on: .paper),
             text("paper on ink (selected filter)", .paper, on: .ink),
-            text("paper on ember (the active word)", .paper, on: .ember),
-            text("ink on a search match (warn 22 % on paper)", .ink, on: .paper, Color.toneWarn.opacity(0.22)),
+            text("active word ink on highlight", .highlightInk, on: .highlight),
+            text("ink on a search match (warn 22 % on paper)", .ink, on: .paper, Color.highlight),
             text("snackbar text on snackbar", .snackbarText, on: .snackbarBackground),
             text("snackbar action on snackbar", .snackbarAction, on: .snackbarBackground),
-            text("white on ember fill (primary button)", .white, on: .emberFill),
+            text("primary label on accent fill", .onAccent, on: .accentStrong),
+            nonText("primary busy indicator on accent fill", .onAccent, on: .accentStrong),
+            text("Record label on Record fill", .onRecord, on: .record),
+            text("destructive filled label", .onRecord, on: .errorFill),
+            text("success filled label", .onRecord, on: .successFill),
+            text("recording badge", .recordInk, on: .recordTint),
             text("recording text on recording background", .recordingText, on: .recordingBackground),
             text("recording secondary on recording background", .recordingSecondary, on: .recordingBackground),
-            text("recording secondary on a recording chip (white 8 %)", .recordingSecondary, on: .recordingBackground, Color.white.opacity(0.08)),
+            text("recording secondary on recording control", .recordingSecondary, on: .recordingBackground, .recordingButtonWash),
             text("recording accent on recording background", .recordingAccent, on: .recordingBackground),
-            text("white on recording finish", .white, on: .recordingFinish),
+            text("label on recording finish", .onRecord, on: .recordingFinish),
             nonText("recording live dot on recording background", .recordingLive, on: .recordingBackground),
             nonText("info bar on its track", Tone.info.color, on: .paper, Tone.info.background, Tone.info.color.opacity(0.18)),
-            text("ink on Name this speaker's question at its pulse (warn 30 % on paper)", .ink, on: .paper, Color.toneWarn.opacity(0.3)),
-            text("ink on Name this speaker's question (warn 10 % on paper)", .ink, on: .paper, Color.toneWarn.opacity(0.1)),
+            text("ink on Name this speaker pulse (warning ink 30 %)", .ink, on: .paper, Color.warnInk.opacity(0.3)),
+            text("ink on Name this speaker rest (warning ink 10 %)", .ink, on: .paper, Color.warnInk.opacity(0.1)),
             text("Live Activity caption on its card", RecordingActivityColors.secondary, on: RecordingActivityColors.background),
-            text("Live Activity title on its card", .white, on: RecordingActivityColors.background),
+            text("Live Activity title on its card", .recordingText, on: RecordingActivityColors.background),
             text("Live Activity warning on its card", RecordingActivityColors.live, on: RecordingActivityColors.background),
-            text("Live Activity Pause on its card", .white, on: RecordingActivityColors.background, RecordingActivityColors.button),
-            text("Live Activity Finish", .white, on: RecordingActivityColors.finish),
+            text("Live Activity Pause on its card", .recordingText, on: RecordingActivityColors.background, RecordingActivityColors.button),
+            text("Live Activity Finish", .onRecord, on: RecordingActivityColors.finish),
             nonText("Live Activity live dot on its card", RecordingActivityColors.live, on: RecordingActivityColors.background),
             nonText("Live Activity paused ring on its card", RecordingActivityColors.secondary, on: RecordingActivityColors.background),
         ]
         // The rows of the grouped lists (Settings, the sheets) keep the system's row background.
-        for (name, color) in [("ink", Color.ink), ("muted", .muted), ("ember", .ember), ("error", .toneError)] {
+        for (name, color) in [("ink", Color.ink), ("muted", .muted), ("accent", .accentInk), ("error", .toneError)] {
             pairs.append(text("\(name) on a grouped list row", color, on: Self.groupedRow))
         }
         for (name, tone) in tones {
@@ -86,10 +91,11 @@ import CassiniNotebook
                 pairs.append(nonText("\(name) dot on \(name) tint over \(surface)", tone.color, on: color, tone.background))
             }
         }
-        for (index, tint) in Color.speakerTints.enumerated() {
+        for (index, tint) in (Color.speakerTints + [Color.unnamedSpeakerTint]).enumerated() {
             for (surface, color) in surfaces {
                 pairs.append(text("speaker tint \(index) on \(surface)", tint, on: color))
-                pairs.append(nonText("speaker tint \(index) avatar over \(surface)", tint, on: color, tint.opacity(0.14)))
+                let wash = (Color.speakerWashes + [Color.unnamedSpeakerWash])[index]
+                pairs.append(text("speaker tint \(index) avatar over \(surface)", tint, on: color, wash))
             }
         }
         return pairs
@@ -107,8 +113,7 @@ import CassiniNotebook
     /// The resolution itself: white on black is 21:1, and a token resolves to its own value in each appearance.
     @Test func theResolutionReadsTheTokens() {
         #expect(abs(Self.contrast(.white, on: [.black], .light) - 21) < 0.01)
-        let paper = Self.rgb(.paper, .dark)
-        #expect(abs(paper.red - 0.075) < 0.002 && abs(paper.blue - 0.095) < 0.002)
+        #expect(Self.rgb(.paper, .dark) == Self.rgb(CassiniTokens.color(.ground), .dark))
         #expect(Self.rgb(.ink, .light) != Self.rgb(.ink, .dark))
         #expect(Self.rgb(Self.groupedRow, .light) != Self.rgb(Self.groupedRow, .dark), "a system colour follows the appearance")
     }

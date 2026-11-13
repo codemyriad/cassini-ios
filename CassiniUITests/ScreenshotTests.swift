@@ -136,6 +136,56 @@ final class ScreenshotTests: XCTestCase {
         captureExportMenu("11-library-export", app)
     }
 
+    /// Opens the real destructive confirmation without accepting it or deleting anything.
+    @MainActor func test12DeleteDialog() throws {
+        let app = try launchPhone(["--seed", "trash"])
+        app.buttons["recentlyDeletedButton"].tap()
+        XCTAssertTrue(app.staticTexts["Old interview draft"].waitForExistence(within: 5))
+        app.buttons["Empty"].tapWhenSettled()
+        let alert = app.alerts.firstMatch
+        XCTAssertTrue(alert.waitForExistence(within: 5))
+        XCTAssertTrue(alert.buttons["Delete"].exists)
+        capture("12-delete-dialog")
+        alert.buttons["Cancel"].tapWhenSettled()
+        XCTAssertTrue(app.staticTexts["Old interview draft"].waitForExistence(within: 5))
+    }
+
+    @MainActor func test13ErrorLine() throws {
+        let app = try launchPhone(["--seed", "brandSpeakers", "--open-fixture", "FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF"])
+        XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 10))
+        let failure = app.descendants(matching: .any)["banner.TX_FAILED"]
+        XCTAssertTrue(failure.waitForExistence(within: 10), "the real failed-note banner shows its error line")
+        capture("13-error-line")
+    }
+
+    @MainActor func test14SuccessBadge() throws {
+        let app = try launchPhone(["--seed", "brandSpeakers"])
+        XCTAssertTrue(row(app, "Community garden planning").waitForExistence(within: 5))
+        XCTAssertTrue(element(app, containing: "Transcribed").waitForExistence(within: 5))
+        capture("14-success-badge")
+    }
+
+    @MainActor func test15SevenSpeakerMeeting() throws {
+        let app = try launchPhone(["--seed", "brandSpeakers", "--open-fixture", Self.fixture])
+        XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 10))
+        waitForInitialPosition(app)
+        XCTAssertTrue(app.buttons["speakersButton"].waitForExistence(within: 5))
+        capture("15-seven-speaker-meeting")
+    }
+
+    /// The actual Speakers sheet shows an unnamed first speaker reserving slot zero, plus six named speakers.
+    @MainActor func test16SevenSpeakerColours() throws {
+        let app = try launchPhone(["--seed", "brandSpeakers", "--open-fixture", Self.fixture])
+        let speakers = app.buttons["speakersButton"]
+        XCTAssertTrue(speakers.waitForExistence(within: 10))
+        speakers.tapWhenSettled()
+        XCTAssertTrue(app.buttons["speaker-brand-0"].waitForExistence(within: 5))
+        let last = app.buttons["speaker-brand-6"]
+        XCTAssertTrue(app.scroll(attempts: 6) { last.exists && last.isHittable })
+        XCTAssertTrue(app.buttons["speaker-brand-0"].isHittable, "all seven speaker rows fit together")
+        capture("16-seven-speaker-colours")
+    }
+
     @MainActor private func captureExportMenu(_ name: String, _ app: XCUIApplication) {
         let item = app.buttons["Transcript as text"]
         var last: CGRect?
@@ -146,6 +196,12 @@ final class ScreenshotTests: XCTestCase {
             return frame == last
         }, "the export submenu has settled")
         capture(name)
+    }
+
+    @MainActor func test17StatusBadges() throws {
+        let app = try launchPhone(["--badge-gallery"])
+        XCTAssertTrue(app.descendants(matching: .any)["badge-gallery-8"].waitForExistence(within: 15))
+        capture("17-status-badges")
     }
 
     // MARK: - iPad
@@ -177,7 +233,9 @@ final class ScreenshotTests: XCTestCase {
         app.launchAndWait()
         // One wait for either screen: waiting for the Library first cost a fixture launch its whole limit.
         let search = app.textFields["librarySearch"], title = app.staticTexts["noteTitle"]
-        XCTAssertTrue(poll(within: max(15, uiWaitFloor)) { search.exists || title.exists })
+        XCTAssertTrue(poll(within: max(15, uiWaitFloor)) {
+            search.exists || title.exists || app.descendants(matching: .any)["badgeGallery"].exists
+        })
         return app
     }
 

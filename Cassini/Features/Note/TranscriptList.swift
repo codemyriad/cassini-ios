@@ -108,9 +108,9 @@ struct FollowChip: View {
                 .padding(.horizontal, 16).frame(minHeight: HitTarget.minimum)
         }
         .buttonStyle(.plain)
-        .foregroundStyle(Color.paper)
-        .background(Color.ink, in: Capsule())
-        .shadow(color: Color.compatibilityBlack.opacity(0.15), radius: 8, y: 2)
+        .foregroundStyle(Color.onInverse)
+        .background(Color.inverse, in: Capsule())
+        .shadow(color: Color.shadow, radius: 8, y: 2)
         .padding(.bottom, 16)
         .accessibilityIdentifier("followPlayback")
     }
@@ -120,9 +120,9 @@ struct FollowChip: View {
 struct NoSpeechState: View {
     var body: some View {
         VStack(spacing: 12) {
-            Image(systemName: "text.bubble").font(.system(size: 30, weight: .light)).foregroundStyle(Color.ember)
+            Image(systemName: "text.bubble").font(.system(size: 30, weight: .light)).foregroundStyle(Color.accentInk)
                 .accessibilityHidden(true)
-            Text(NoteCopy.noSpeechTitle).font(.system(.title2, design: .serif))
+            Text(NoteCopy.noSpeechTitle).font(.system(.title2))
             Text(NoteCopy.noSpeechBody).font(.subheadline).foregroundStyle(Color.muted).multilineTextAlignment(.center)
         }
         .padding(.vertical, 40).frame(maxWidth: .infinity)

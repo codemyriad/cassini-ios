@@ -21,7 +21,7 @@ import Testing
         let available = host.inlineSpeakersForNaming(isDraft: true, renamable: true)
         #expect(available.map(\.speakerID) == ["ben"])
         #expect(available.first?.name == .named("Ben"))
-        #expect(available.first?.tint == .teal)
+        #expect(available.first?.tint == .magenta)
         #expect(available == host.interjections)
         #expect(host.inlineSpeakersForNaming(isDraft: false, renamable: true).isEmpty)
         #expect(host.inlineSpeakersForNaming(isDraft: true, renamable: false).isEmpty)
@@ -30,15 +30,15 @@ import Testing
 
     @Test func namingChoicesExcludeUnnameableIdentitiesAndDeduplicateStably() {
         let specifications: [(String?, SpeakerName, SpeakerTint)] = [
-            ("ben", .named("Benjamin"), .violet),
+            ("ben", .named("Benjamin"), .cyan),
             ("ben", .named("Later duplicate"), .blue),
-            (nil, .unknown, .amber),
-            ("", .named("Empty identity"), .amber),
-            ("  ", .named("Blank identity"), .amber),
-            (NoteTranscripts.draftOneVoice, .placeholder(1, label: "Speaker 1"), .amber),
+            (nil, .unknown, .stone),
+            ("", .named("Empty identity"), .stone),
+            ("  ", .named("Blank identity"), .stone),
+            (NoteTranscripts.draftOneVoice, .placeholder(1, label: "Speaker 1"), .stone),
             ("ada", .named("Host duplicate"), .blue),
-            ("Unknown speaker", .unknown, .amber),
-            ("cy", .placeholder(3, label: "Speaker 3"), .amber)
+            ("Unknown speaker", .unknown, .stone),
+            ("cy", .placeholder(3, label: "Speaker 3"), .stone)
         ]
         let source = [TranscriptWord(speaker: "ada", start: 0, end: 1, text: "Host")] + specifications.enumerated().map {
             TranscriptWord(speaker: $0.element.0, start: Double($0.offset + 1), end: Double($0.offset + 2), text: "Aside\($0.offset)")
@@ -52,14 +52,14 @@ import Testing
         let turn = NoteTurn(id: "w0", speakerID: "ada", name: .named("Ada"), tint: .blue, start: 0, auto: false,
                             source: source, row: row, over: [], suggestion: nil, inlineSuggestions: [], passages: []) { id in
             let spec = specifications.first { $0.0 == id }
-            return (spec?.1 ?? .unknown, spec?.2 ?? .amber)
+            return (spec?.1 ?? .unknown, spec?.2 ?? .stone)
         }
         let choices = turn.inlineSpeakersForNaming(isDraft: true, renamable: true)
         #expect(choices.map(\.speakerID) == ["ben", "cy"])
         // Return the original first chip metadata, including its word/text ranges and confidence.
         #expect(choices == [turn.interjections[0], turn.interjections[8]])
         #expect(choices.map(\.name) == [.named("Benjamin"), .placeholder(3, label: "Speaker 3")])
-        #expect(choices.map(\.tint) == [.violet, .amber])
+        #expect(choices.map(\.tint) == [.cyan, .stone])
         #expect(choices.allSatisfy { $0.crosstalk })
     }
 }

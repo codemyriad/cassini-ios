@@ -18,28 +18,68 @@ extension Note {
         var legacy: [String: String] = [:]
         for index in transcript.indices {
             if let id = transcript[index].speakerID {
-                if !catalog.contains(where: { $0.id == id }) {
+                if !catalog.contains(where: { $0.byteID == Data(id.utf8) }) {
                     catalog.append(NoteSpeaker(id: id, name: transcript[index].speaker ?? DefaultLabels.placeholder(catalog.count + 1)))
                 }
             } else if let name = transcript[index].speaker, !name.isEmpty {
                 let id = legacy[name] ?? "legacy_\(UUID().uuidString)"
                 legacy[name] = id
                 transcript[index].speakerID = id
-                if !catalog.contains(where: { $0.id == id }) { catalog.append(NoteSpeaker(id: id, name: name)) }
+                if !catalog.contains(where: { $0.byteID == Data(id.utf8) }) { catalog.append(NoteSpeaker(id: id, name: name)) }
             }
         }
         speakers = catalog
+        backfillSpeakerColours()
         refreshSpeakerLabels()
+    }
+
+    /// Metadata-only upgrade for existing local notes and their kept versions.
+    public mutating func backfillSpeakerColours() {
+        let all = (speakers ?? []) + (versions ?? []).flatMap(\.speakers)
+        let assigned = Dictionary(all.compactMap { speaker in speaker.colourIndex.map { (speaker.byteID, $0) } },
+                                  uniquingKeysWith: { first, _ in first })
+        var allocator = SpeakerColourAllocator(exactAssignments: assigned)
+        func fill(_ catalog: [NoteSpeaker], order: [String]) -> [NoteSpeaker] {
+            var result = catalog
+            var seen = Set<Data>()
+            for id in order + catalog.map(\.id) where seen.insert(Data(id.utf8)).inserted {
+                guard let index = result.firstIndex(where: { $0.byteID == Data(id.utf8) }), result[index].colourIndex == nil else { continue }
+                result[index].colourIndex = allocator.reserve(id)
+            }
+            return result
+        }
+        // Oldest kept speech supplies a legacy identity's original slot, before later merges/reordering.
+        if var history = versions {
+            for index in history.indices {
+                history[index].speakers = fill(history[index].speakers, order: SpeakerColourOrder.segments(history[index].segments))
+            }
+            versions = history
+        }
+        if let catalog = speakers { speakers = fill(catalog, order: SpeakerColourOrder.segments(transcript)) }
+    }
+
+    /// Fill missing legacy slots once, preserving every existing assignment.
+    public static func assignColourIndices(_ speakers: [NoteSpeaker], order: [String]) -> [NoteSpeaker] {
+        var result = speakers
+        var allocator = SpeakerColourAllocator(exactAssignments: Dictionary(speakers.compactMap { speaker in
+            speaker.colourIndex.map { (speaker.byteID, $0) }
+        }, uniquingKeysWith: { first, _ in first }))
+        var seen = Set<Data>()
+        for id in order + speakers.map(\.id) where seen.insert(Data(id.utf8)).inserted {
+            guard let index = result.firstIndex(where: { $0.byteID == Data(id.utf8) }), result[index].colourIndex == nil else { continue }
+            result[index].colourIndex = allocator.reserve(id)
+        }
+        return result
     }
 
     /// Writes each speaker's name onto its passages.
     public mutating func refreshSpeakerLabels() {
         for index in transcript.indices {
-            if let id = transcript[index].speakerID { transcript[index].speaker = speakers?.first { $0.id == id }?.name }
+            if let id = transcript[index].speakerID { transcript[index].speaker = speakers?.first { $0.byteID == Data(id.utf8) }?.name }
         }
     }
 
-    public func speaker(_ id: String) -> NoteSpeaker? { speakers?.first { $0.id == id } }
+    public func speaker(_ id: String) -> NoteSpeaker? { speakers?.first { $0.byteID == Data(id.utf8) } }
 
     /// Keeps the transcript and speakers as a version, unless the selected version already holds them. A caller whose
     /// change may run again passes the version's `id` and `date`, so that the rerun makes the same version. The
@@ -109,11 +149,12 @@ extension Note {
 
     /// Names a speaker, trimmed and cut to `Limits.nameMaxLength`; a blank name changes nothing.
     public mutating func renameSpeaker(_ id: String, name: String) {
-        guard let index = speakers?.firstIndex(where: { $0.id == id }) else { return }
+        backfillSpeakerColours()
+        guard let index = speakers?.firstIndex(where: { $0.byteID == Data(id.utf8) }) else { return }
         let trimmed = String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(Limits.nameMaxLength))
         guard !trimmed.isEmpty else { return }
         changeShownSpeakers { note in
-            note.speakers?[index].name = trimmed; note.refreshSpeakerLabels()
+            note.speakers?[index].name = trimmed; note.speakers?[index].provenance = .user; note.refreshSpeakerLabels()
         }
     }
 
@@ -122,15 +163,16 @@ extension Note {
     /// was confirmed in, so taking it back later never takes it back twice. The merged version records the alias and
     /// the version it was made from, for the export's provenance.
     public mutating func mergeSpeaker(_ source: String, into target: String, stamp: VersionStamp = VersionStamp(date: Date())) {
-        guard source != target, speaker(source) != nil, let targetIndex = speakers?.firstIndex(where: { $0.id == target })
+        guard Data(source.utf8) != Data(target.utf8), speaker(source) != nil, let targetIndex = speakers?.firstIndex(where: { $0.byteID == Data(target.utf8) })
         else { return }
+        backfillSpeakerColours()
         let mergedFrom = shownVersionIndex.flatMap { versions?[$0].id } ?? stamp.before
         saveCurrentVersion(.beforeSpeakerMerge, id: stamp.before, date: stamp.date)
-        for index in transcript.indices where transcript[index].speakerID == source { transcript[index].speakerID = target }
+        for index in transcript.indices where transcript[index].speakerID.map({ Data($0.utf8) }) == Data(source.utf8) { transcript[index].speakerID = target }
         if case .confirmed(let voice, let score) = speakers?[targetIndex].match {
             speakers?[targetIndex].match = .auto(voice: voice, score: score)
         }
-        speakers?.removeAll { $0.id == source }
+        speakers?.removeAll { $0.byteID == Data(source.utf8) }
         refreshSpeakerLabels()
         selectedVersionID = nil
         saveCurrentVersion(.mergedSpeakers, id: stamp.after, date: stamp.date)
@@ -141,8 +183,16 @@ extension Note {
     }
 
     public mutating func addSpeaker(id: String, name: String) {
+        backfillSpeakerColours()
         let trimmed = String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(Limits.nameMaxLength))
         guard !trimmed.isEmpty, speaker(id) == nil else { return }
-        changeShownSpeakers { $0.speakers = ($0.speakers ?? []) + [NoteSpeaker(id: id, name: trimmed)] }
+        changeShownSpeakers {
+            let all = ($0.speakers ?? []) + ($0.versions ?? []).flatMap(\.speakers)
+            var allocator = SpeakerColourAllocator(exactAssignments: Dictionary(all.compactMap { speaker in
+                speaker.colourIndex.map { (speaker.byteID, $0) }
+            }, uniquingKeysWith: { first, _ in first }))
+            $0.speakers = ($0.speakers ?? []) + [NoteSpeaker(id: id, name: trimmed,
+                colourIndex: allocator.reserve(id), provenance: .user)]
+        }
     }
 }

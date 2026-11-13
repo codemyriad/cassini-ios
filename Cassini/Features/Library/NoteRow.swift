@@ -26,7 +26,7 @@ struct NoteRow: View {
         let format = LibraryFormat(calendar: calendar)
         ZStack {
             // The whole card is the row's button; the texts above it let taps through, the inline suffix does not.
-            Button { perform(.open) } label: { Color.compatibilityClear.contentShape(Rectangle()) }
+            Button { perform(.open) } label: { Color.canvasClear.contentShape(Rectangle()) }
                 .buttonStyle(.plain)
                 .accessibilityLabel(format.rowLabel(row, day: day))
                 .accessibilityHint(LibraryCopy.openNote)
@@ -35,11 +35,11 @@ struct NoteRow: View {
                 .accessibilityActions { accessibilityActions }
             content(format)
         }
-        .background(row.highlighted || selected ? Color.card : Color.card.opacity(0.55),
+        .background(Color.cardRest,
                     in: RoundedRectangle(cornerRadius: Radius.card))
         .overlay {
             if selected {
-                RoundedRectangle(cornerRadius: Radius.card).stroke(Color.ember.opacity(0.6), lineWidth: 1.5)
+                RoundedRectangle(cornerRadius: Radius.card).stroke(Color.accentInk.opacity(0.6), lineWidth: 1.5)
                     .allowsHitTesting(false)
             } else if row.highlighted {
                 RoundedRectangle(cornerRadius: Radius.card).stroke(Tone.info.color.opacity(0.35), lineWidth: 1)
@@ -53,14 +53,14 @@ struct NoteRow: View {
             : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 10))
         return VStack(alignment: .leading, spacing: 8) {
             titleLayout {
-                let titleFont = Font.system(.title3, design: .serif, weight: .medium)
+                let titleFont = Font.headline
                 Text(HighlightedText.attributed(Highlighted(row.title, ranges: row.titleRanges), font: titleFont))
                     .font(titleFont).foregroundStyle(Color.ink).lineLimit(dynamicType.isAccessibilitySize ? nil : 2)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .accessibilityIdentifier("rowTitle").passive()
                 HStack(spacing: 6) {
-                    if row.isFavorite { Image(systemName: "star.fill").font(.caption).foregroundStyle(Color.ember) }
-                    Text(TimeText.clock(row.duration)).font(.subheadline.monospacedDigit()).foregroundStyle(Color.muted)
+                    if row.isFavorite { Image(systemName: "star.fill").font(.footnote).foregroundStyle(Color.accentInk) }
+                    Text(TimeText.clock(row.duration)).font(.footnote.monospacedDigit()).foregroundStyle(Color.muted)
                 }.fixedSize().passive()
             }
             if let preview = row.preview {
@@ -70,12 +70,12 @@ struct NoteRow: View {
             }
             FlowLayout(spacing: 8) {
                 if let meetingTime = format.meetingTime(row) {
-                    Text(meetingTime).font(.caption).foregroundStyle(Color.muted).passive()
+                    Text(meetingTime).font(.footnote.monospacedDigit()).foregroundStyle(Color.muted).passive()
                 }
-                RowChip(status: row.status).passive()
+                RowChip(row: row).passive()
                 suffix
                 if row.bookmarkCount > 0 {
-                    Label { Text(row.bookmarkCount, format: .number) } icon: { Image(systemName: "bookmark.fill") }.font(.caption).foregroundStyle(Color.muted).passive()
+                    Label { Text(row.bookmarkCount, format: .number) } icon: { Image(systemName: "bookmark.fill") }.font(.footnote).foregroundStyle(Color.muted).passive()
                 }
             }
         }
@@ -87,14 +87,14 @@ struct NoteRow: View {
         if let text = LibraryCopy.suffix(row.status) {
             switch row.status.suffix {
             case .resume, .tryAgain:
-                Button { perform(.resume) } label: { Text(text).font(.caption.weight(.semibold)).foregroundStyle(Color.ember) }
+                Button { perform(.resume) } label: { Text(text).font(.footnote.weight(.semibold)).foregroundStyle(Color.accentInk) }
                     .buttonStyle(.plain)
                     .frame(minHeight: HitTarget.minimum).contentShape(Rectangle())
                     .padding(.vertical, -12)
                     .accessibilityLabel(row.status.suffix == .resume ? LibraryCopy.resumeDescription(row.title)
                         : LibraryCopy.tryAgainDescription(row.title))
             default:
-                Text(text).font(.caption).foregroundStyle(Color.muted).passive()
+                Text(text).font(.footnote).foregroundStyle(Color.muted).passive()
             }
         }
     }
@@ -112,19 +112,69 @@ struct NoteRow: View {
 
 /// The status chip: text in the status's tone on its tint, never colour alone.
 struct RowChip: View {
-    let status: LibraryRow.Status
+    let row: LibraryRow
+
+    private var status: LibraryRow.Status { row.status }
 
     var body: some View {
-        HStack(spacing: 5) {
-            if case .recording = status { Circle().fill(tone.color).frame(width: 6, height: 6) }
-            if case .transcribed = status { Image(systemName: "checkmark").font(.system(size: 9, weight: .bold)) }
-            Text(LibraryCopy.status(status)).font(.caption.weight(.medium))
+        if let badge = RowBadge.presentation(row, text: { StatusBadgeCopy.template($0) }) {
+            StatusBadgeView(badge: badge)
+        } else {
+            PhoneStatusBadgeView(status: status)
         }
-        .foregroundStyle(tone.color).padding(.horizontal, 8).padding(.vertical, 4)
-        .background(tone.background, in: Capsule())
     }
 
-    private var tone: Tone { status.tone }
+    var colors: (ink: Color, tint: Color) { PhoneStatusBadgeView(status: status).colors }
+}
+
+/// Phone-only states retain their platform meaning while sharing the native pill anatomy.
+struct PhoneStatusBadgeView: View {
+    let status: LibraryRow.Status
+    var body: some View {
+        StatusPill(text: text(), glyph: glyph, ink: colors.ink, fill: colors.tint,
+                   outlined: status == .newerFormat)
+    }
+
+    func text(language: String = DefaultLabels.appLanguage) -> String {
+        let key: String
+        switch status {
+        case .queued: key = "states.phone.queued"
+        case .paused(let atMs):
+            return StatusBadgeCopy.template("states.phone.pausedAt", language: language)
+                .replacingOccurrences(of: "{position}", with: TimeText.clock(Double(atMs) / 1_000))
+        case .failed: key = "states.phone.couldntTranscribe"
+        case .unplayable: key = "states.phone.cantPlay"
+        case .unreadable: key = "states.phone.cantReadTranscript"
+        case .newerFormat: key = "states.phone.newerFormat"
+        case .audioOnly: key = "states.phone.audioOnly"
+        case .recording, .transcribing, .transcribed: return LibraryCopy.status(status)
+        }
+        return StatusBadgeCopy.template(key, language: language)
+    }
+
+    private var glyph: StatusPill.Glyph {
+        switch status {
+        case .recording: .dot
+        case .transcribing: .spinner
+        case .queued: .symbol("clock")
+        case .paused: .symbol("pause.fill", size: StatusBadgeView.Metrics.spinner)
+        case .failed, .unplayable, .unreadable, .newerFormat: .symbol("exclamationmark.circle")
+        case .audioOnly: .symbol("waveform")
+        case .transcribed: .symbol("checkmark")
+        }
+    }
+
+    var colors: (ink: Color, tint: Color) {
+        switch status {
+        case .recording: (.recordInk, .recordTint)
+        case .failed, .unplayable, .unreadable: (.error, .errorTint)
+        case .paused: (.warnInk, .warnTint)
+        case .transcribed: (.success, .successTint)
+        case .newerFormat: (.ink2, .canvasClear)
+        case .transcribing, .queued, .audioOnly: (.ink2, Color.ink.opacity(0.1))
+        }
+    }
+
 }
 
 /// Highlighted text as SwiftUI draws it: each match in weight 600 on an accent tint, so it does not rely on colour.
@@ -137,8 +187,8 @@ enum HighlightedText {
             let start = text.index(text.startIndex, offsetByCharacters: range.lowerBound)
             let end = text.index(start, offsetByCharacters: range.count)
             text[start..<end].font = font.weight(.semibold)
-            text[start..<end].foregroundColor = .ink
-            text[start..<end].backgroundColor = Color.ember.opacity(0.16)
+            text[start..<end].foregroundColor = .highlightInk
+            text[start..<end].backgroundColor = Color.highlight
         }
         var shown = AttributedString()
         if highlighted.leadingEllipsis { shown += AttributedString("…") }
@@ -163,28 +213,34 @@ struct FlowLayout: Layout {
         let rows = rows(width: proposal.width ?? .infinity, subviews)
         let height = rows.map(\.height).reduce(0, +) + (rowSpacing ?? spacing) * CGFloat(max(0, rows.count - 1))
         let width = rows.map(\.width).max() ?? 0
-        return CGSize(width: proposal.width.map { min($0, width) } ?? width, height: height)
+        // Keep the finite width used to measure wrapping; placement must not propose a smaller width afterwards.
+        let available = proposal.width.flatMap { $0.isFinite ? max(0, $0) : nil }
+        return CGSize(width: available ?? width, height: height)
     }
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout Void) {
         var y = bounds.minY
         for row in rows(width: bounds.width, subviews) {
             var x = bounds.minX
-            for index in row.items {
-                let size = subviews[index].sizeThatFits(.unspecified)
-                subviews[index].place(at: CGPoint(x: x, y: y + (row.height - size.height) / 2), proposal: ProposedViewSize(size))
-                x += size.width + spacing
+            for item in row.items {
+                subviews[item.index].place(at: CGPoint(x: x, y: y + (row.height - item.size.height) / 2),
+                                          proposal: ProposedViewSize(item.size))
+                x += item.size.width + spacing
             }
             y += row.height + (rowSpacing ?? spacing)
         }
     }
 
-    private struct Row { var items: [Int] = []; var width: CGFloat = 0; var height: CGFloat = 0 }
+    private struct Item { let index: Int; let size: CGSize }
+    private struct Row { var items: [Item] = []; var width: CGFloat = 0; var height: CGFloat = 0 }
 
     private func rows(width: CGFloat, _ subviews: Subviews) -> [Row] {
         var rows: [Row] = [Row()]
         for index in subviews.indices {
-            let size = subviews[index].sizeThatFits(.unspecified)
+            let ideal = subviews[index].sizeThatFits(.unspecified)
+            // An oversized child must wrap its own text, as well as wrapping between row items.
+            let size = width.isFinite && ideal.width > width
+                ? subviews[index].sizeThatFits(ProposedViewSize(width: max(0, width), height: nil)) : ideal
             let needed = rows[rows.count - 1].items.isEmpty ? size.width : rows[rows.count - 1].width + spacing + size.width
             if needed > width, !rows[rows.count - 1].items.isEmpty {
                 rows.append(Row())
@@ -192,7 +248,7 @@ struct FlowLayout: Layout {
             var row = rows[rows.count - 1]
             row.width = row.items.isEmpty ? size.width : row.width + spacing + size.width
             row.height = max(row.height, size.height)
-            row.items.append(index)
+            row.items.append(Item(index: index, size: size))
             rows[rows.count - 1] = row
         }
         return rows.filter { !$0.items.isEmpty }

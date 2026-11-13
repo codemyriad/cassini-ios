@@ -11,7 +11,7 @@ struct RecordingActivityWidget: Widget {
         ActivityConfiguration(for: RecordingActivityAttributes.self) { context in
             LockScreenRecording(state: context.state, noteID: context.attributes.noteID)
                 .activityBackgroundTint(RecordingActivityColors.background)
-                .activitySystemActionForegroundColor(Color.compatibilityWhite)
+                .activitySystemActionForegroundColor(Color.recordingText)
                 .widgetURL(RecordingLink.url)
         } dynamicIsland: { context in
             DynamicIsland {
@@ -54,10 +54,10 @@ private struct LockScreenRecording: View {
                 VStack(alignment: .leading, spacing: 2) {
                     (state.isPaused ? Text("Recording paused", tableName: "Recording") : Text("Recording", tableName: "Recording"))
                         .font(.caption.weight(.semibold)).foregroundStyle(RecordingActivityColors.secondary)
-                    Text(state.title).font(.headline).lineLimit(1).foregroundStyle(Color.compatibilityWhite)
+                    Text(state.title).font(.headline).lineLimit(1).foregroundStyle(Color.recordingText)
                 }
                 Spacer(minLength: 8)
-                RecordingTime(state: state).font(.title2.monospacedDigit()).foregroundStyle(Color.compatibilityWhite)
+                RecordingTime(state: state).font(.title2.monospacedDigit()).foregroundStyle(Color.recordingText)
             }
             if let warning = state.warning { WarningText(warning: warning) }
             RecordingButtons(isPaused: state.isPaused, noteID: noteID)
@@ -125,11 +125,11 @@ private struct RecordingButtons: View {
                 Label { Text("Finish", tableName: "Recording") } icon: { Image(systemName: "stop.fill") }
                     .frame(maxWidth: .infinity)
             }
-            .tint(RecordingActivityColors.finish)
+            .tint(RecordingActivityColors.finish).foregroundStyle(Color.onRecord)
         }
         .buttonStyle(.borderedProminent)
         .tint(RecordingActivityColors.button)
         .font(.subheadline.weight(.semibold))
-        .foregroundStyle(Color.compatibilityWhite)
+        .foregroundStyle(Color.recordingText)
     }
 }

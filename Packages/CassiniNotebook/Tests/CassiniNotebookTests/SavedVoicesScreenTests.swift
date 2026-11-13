@@ -46,6 +46,24 @@ import Testing
         #expect(list.first?.confirmedSeconds == 20)
     }
 
+    @Test func coloursFollowSaveOrderThroughNameCountAndSampleSortChanges() {
+        var alex = F.voice("alex", "Alex", seconds: 60).saved(at: 7)
+        let ben = F.voice("ben", "Ben", seconds: 120).saved(at: 12)
+        let before = people([alex, ben])
+        #expect(before.map(\.name) == ["Ben", "Alex"])
+        #expect(before.map(\.colourIndex) == [12, 7])
+        alex.name = "Zoe"
+        alex.samples.append(VoiceSample(noteID: UUID(), print: F.print(F.axis(1))))
+        let after = people([ben, alex], notes: [note(linking: [alex.id])])
+        #expect(after.map(\.name) == ["Zoe", "Ben"])
+        #expect(after.map(\.saveSequence) == [7, 12])
+        #expect(Dictionary(uniqueKeysWithValues: before.map { ($0.id, $0.colourIndex) }) ==
+                Dictionary(uniqueKeysWithValues: after.map { ($0.id, $0.colourIndex) }))
+        let legacy = people([luca, giulia])
+        #expect(legacy.map(\.name) == ["Giulia", "Luca"])
+        #expect(legacy.map(\.colourIndex) == [1, 0], "migrate append order before applying the screen sort")
+    }
+
     // ports: SavedVoicesViewModelTest#renameFromTheOptionsMenu
     @Test func renameFromTheOptionsMenu() {
         var screen = SavedVoicesScreen()

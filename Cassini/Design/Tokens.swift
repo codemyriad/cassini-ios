@@ -12,7 +12,15 @@ extension Tone {
         }
     }
 
-    var background: Color { color.opacity(0.09) }
+    var background: Color {
+        switch self {
+        case .ok: .successTint
+        case .info: .accentTint
+        case .warn: .warnTint
+        case .error: .errorTint
+        case .plain: .neutralTint
+        }
+    }
 }
 
 enum Radius {

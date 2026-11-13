@@ -18,13 +18,16 @@ struct ImportBatchesView: View {
                     UITestStateMarker(identifier: "bulkImportCompleted", value: batch.id.uuidString)
                     #endif
                 } else {
+                    if let badge = StatusBadges.entry(importing: true, text: { StatusBadgeCopy.template($0) }) {
+                        StatusBadgeView(badge: badge)
+                    }
                     ProgressView(BulkTransferCopy.importing(batch.progress))
                     Button(BulkTransferCopy.cancel, role: .cancel) { batch.cancel() }
                         .accessibilityIdentifier("cancelBulkImport")
                 }
             }
             .padding(14).frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+            .background(Color.neutralTint, in: RoundedRectangle(cornerRadius: 12))
         }
     }
 }

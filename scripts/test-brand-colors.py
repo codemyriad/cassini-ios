@@ -24,7 +24,7 @@ class BrandGenerationTests(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name)
-        for path in (brand.TOKEN, brand.PIN, brand.APPLICATION):
+        for path in (brand.TOKEN, brand.PIN, brand.APPLICATION, brand.MARK):
             target = self.root / path
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(ROOT / path, target)
@@ -38,12 +38,47 @@ class BrandGenerationTests(unittest.TestCase):
             self.assertEqual((ROOT / path).read_bytes(), generated, path)
         brand.check_literals(ROOT)
 
+    def test_all_53_roles_and_decided_card_rest_are_generated(self):
+        output = brand.render(self.root)[brand.OUTPUT].decode()
+        sheet = json.loads((self.root / brand.TOKEN).read_text())
+        self.assertEqual(len(sheet['tokens']), 53)
+        for name in ('sidebar', 'sidebar-mac', 'field', 'field-line'):
+            self.assertIn('case ' + brand.role_name(name) + ' = "' + name + '"', output)
+        self.assertIn('static let cardRest = Color(light: rgba(0xFAFAFBFF)', output)
+        self.assertIn('static let recordingButtonWash = CassiniTokens.color(.ink, forcedDark: true).opacity(0.1)', output)
+
+    def test_derived_drift_and_provisional_marks_fail_closed(self):
+        original = json.loads((ROOT / brand.TOKEN).read_text())
+        def repin(sheet):
+            raw = json.dumps(sheet).encode()
+            (self.root / brand.TOKEN).write_bytes(raw)
+            pin = json.loads((ROOT / brand.PIN).read_text()); pin['sha256'] = hashlib.sha256(raw).hexdigest()
+            (self.root / brand.PIN).write_text(json.dumps(pin))
+        import copy
+        sheet = copy.deepcopy(original); sheet['derived']['card-rest']['light'] = '#010203'
+        repin(sheet)
+        self.assertIn(b'0x010203FF', brand.render(self.root)[brand.OUTPUT])
+        for mutate in (lambda s: s['derived']['card-rest'].update(status='pending'),
+                       lambda s: s['tokens']['field'].update(check=['L-42']),
+                       lambda s: s['tokens']['field'].update(status='placeholder')):
+            sheet = copy.deepcopy(original); mutate(sheet); repin(sheet)
+            with self.assertRaises(ValueError): brand.render(self.root)
+
     def test_pin_hash_fault_is_rejected(self):
         pin = self.root / brand.PIN
         value = json.loads(pin.read_text()); value["sha256"] = "0" * 64
         pin.write_text(json.dumps(value))
         with self.assertRaisesRegex(ValueError, "pin/hash mismatch"):
             brand.render(self.root)
+
+    def test_mark_bytes_are_pinned_and_native_asset_preserves_original_vector(self):
+        generated = brand.render(self.root)
+        self.assertEqual(generated[brand.MARK_ASSET], (self.root / brand.MARK).read_bytes())
+        properties = json.loads(generated[brand.MARK_CONTENTS])['properties']
+        self.assertEqual(properties, {'preserves-vector-representation': True, 'template-rendering-intent': 'original'})
+        path = self.root / brand.MARK
+        path.write_bytes(path.read_bytes() + b' ')
+        with self.assertRaisesRegex(ValueError, 'mark pin/hash'): brand.render(self.root)
 
     def test_wrong_source_or_non_commit_pin_is_rejected(self):
         pin = self.root / brand.PIN
@@ -83,7 +118,7 @@ class BrandGenerationTests(unittest.TestCase):
             target = self.root / path; target.parent.mkdir(parents=True, exist_ok=True); target.write_bytes(data)
         brand.check_generated(self.root)
         generated = self.root / brand.OUTPUT
-        generated.write_bytes(generated.read_bytes().replace(b"0x007999FF", b"0x000000FF"))
+        generated.write_bytes(generated.read_bytes().replace(b"0x093351FF", b"0x000000FF"))
         with self.assertRaisesRegex(ValueError, "generated drift: CassiniShared/CassiniTokens.swift"):
             brand.check_generated(self.root)
 
@@ -95,6 +130,7 @@ class BrandGenerationTests(unittest.TestCase):
                 brand.render(self.root)
 
     def test_compatibility_is_extracted_exactly_from_frozen_source(self):
+        (self.root / brand.APPLICATION).write_text(json.dumps({"mode": "plumbing", "compatibility_baseline": brand.BASELINE}))
         generated = brand.render(self.root)[brand.OUTPUT].decode()
         for path in brand.SOURCES[:2]:
             self.assertIn(brand.extension(brand.baseline(path, self.root).decode()), generated)
@@ -103,6 +139,30 @@ class BrandGenerationTests(unittest.TestCase):
         self.assertEqual(metadata["baseline_commit"], brand.BASELINE)
         for path, digest in metadata["sources"].items():
             self.assertEqual(digest, hashlib.sha256(brand.baseline(path, self.root)).hexdigest())
+
+    def test_preview_has_no_compatibility_or_baseline_dependency(self):
+        (self.root / brand.APPLICATION).write_text('{"mode":"preview"}')
+        with patch.object(brand, "baseline", side_effect=AssertionError("preview consulted legacy colours")):
+            outputs = brand.render(self.root)
+        self.assertNotIn(brand.META, outputs)
+        text = outputs[brand.OUTPUT].decode()
+        self.assertNotIn("compatibilityWhite", text)
+        self.assertNotIn("Color.white", text)
+        self.assertIn("static let recordingBackground = CassiniTokens.color(.ground, forcedDark: true)", text)
+        self.assertIn("static let recordingSecondary = CassiniTokens.color(.ink2, forcedDark: true)", text)
+        self.assertIn("static let speakerTints: [Color] = [speaker1, speaker2, speaker3, speaker4, speaker5, speaker6]", text)
+        sheet = json.loads((self.root / brand.TOKEN).read_text())
+        asset = json.loads(outputs[brand.ASSET])
+        for color, mode in zip(asset["colors"], ("light", "dark")):
+            parts = color["color"]["components"]
+            rgb = "#" + "".join(parts[c].removeprefix("0x") for c in ("red", "green", "blue"))
+            self.assertEqual(rgb, sheet["tokens"]["accent"][mode])
+
+    def test_preview_refuses_lingering_compatibility_metadata(self):
+        (self.root / brand.APPLICATION).write_text('{"mode":"preview"}')
+        (self.root / brand.META).write_text('{}')
+        with self.assertRaisesRegex(ValueError, "must not retain compatibility"):
+            brand.check_generated(self.root)
 
     def test_new_colour_asset_requires_generator_ownership(self):
         path = self.root / "Cassini/Resources/New.colorset/Contents.json"

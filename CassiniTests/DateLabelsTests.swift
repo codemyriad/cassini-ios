@@ -93,6 +93,40 @@ final class DateLabelsTests: XCTestCase {
                        "The actual day-header path uses the shared heading")
     }
 
+    @MainActor func testRecordingAndTranscribingKeepSpokenStatusesAndOneDuration() throws {
+        var note = Note(title: "English meeting", createdAt: now)
+        note.duration = 768
+        note.meetingTime = .unknown
+        var row = try XCTUnwrap(LibraryMapping.sections(LibraryIndex([note]).entries, context: RowContext(),
+                                                       now: now, calendar: calendar).first?.rows.first)
+        let format = LibraryFormat(calendar: calendar)
+        for (status, spoken) in [(LibraryRow.Status.recording, "recording"), (.transcribing, "transcribing")] {
+            row.status = status
+            row.isSavingCapture = false
+            let label = format.rowLabel(row, day: .undated)
+            XCTAssertEqual(label, "English meeting, \(format.spokenDuration(768)), \(spoken)")
+            XCTAssertFalse(label.contains("12:48"), "The pill's compact clock must not repeat the spoken duration")
+        }
+    }
+
+    @MainActor func testCaptureSavingUsesTheExplicitFormatLocaleForItsSpokenStatus() throws {
+        var note = Note(title: "English meeting", createdAt: now)
+        note.duration = 768
+        note.meetingTime = .unknown
+        var row = try XCTUnwrap(LibraryMapping.sections(LibraryIndex([note]).entries, context: RowContext(),
+                                                       now: now, calendar: calendar).first?.rows.first)
+        row.status = .recording
+        row.isSavingCapture = true
+        let cases = [("en_US", "saving…"), ("it_IT", "salvataggio…"), ("fr_FR", "sauvegarde…"),
+                     ("es_ES", "guardando…"), ("pt_BR", "salvando…"), ("pt_PT", "a guardar…")]
+        for (locale, status) in cases {
+            var local = calendar
+            local.locale = Locale(identifier: locale)
+            let format = LibraryFormat(calendar: local)
+            XCTAssertEqual(format.rowLabel(row, day: .undated), "English meeting, \(format.spokenDuration(768)), \(status)", locale)
+        }
+    }
+
     func testRecentlyDeletedAndVersionsUseTheShortDate() {
         XCTAssertEqual(Locale.current.language.languageCode?.identifier, "en")
         XCTAssertEqual(Locale.current.region?.identifier, "US", "English copy tests use the scheme's pinned locale")

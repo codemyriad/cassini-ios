@@ -41,8 +41,8 @@ struct SavedVoicesView: View {
                 if !readOnly { Section { Text(SpeakersCopy.empty).foregroundStyle(Color.muted) } }
             } else {
                 Section {
-                    ForEach(Array(people.enumerated()), id: \.element.id) { index, person in
-                        PersonRow(person: person, index: index, editable: !readOnly, send: send)
+                    ForEach(people) { person in
+                        PersonRow(person: person, editable: !readOnly, send: send)
                     }
                 } footer: {
                     if !readOnly { Text(SpeakersCopy.footnote).foregroundStyle(Color.muted) }
@@ -141,17 +141,13 @@ struct SavedVoicesView: View {
 
 /// A person: avatar, name, "14 notes · 22 min confirmed speech", the stale hint, and the options menu.
 private struct PersonRow: View {
-    /// Saved-voice avatars cycle by list position, as on Android.
-    private static let tints: [Color] = [.speakerTints[1], .speakerTints[5], .toneWarn, .speakerTints[3]]
-
     let person: SavedVoiceSummary
-    let index: Int
     let editable: Bool
     let send: (SavedVoicesEvent) -> Void
 
     var body: some View {
         HStack(spacing: 12) {
-            SpeakerAvatar(name: person.name, tint: Self.tints[index % Self.tints.count])
+            SpeakerAvatar(name: person.name, tint: SpeakerTint.named(person.colourIndex))
             VStack(alignment: .leading, spacing: 2) {
                 Text(person.name).font(.body.weight(.medium)).foregroundStyle(Color.ink)
                 Text(SpeakersCopy.meta(notes: person.notes, seconds: person.confirmedSeconds)).font(.caption).foregroundStyle(Color.muted)

@@ -117,6 +117,85 @@ struct StaleCopiesInPublishedVectorsTests {
         #expect(sameBytes(document.speakerLabel(decomposed), decomposed))
     }
 
+    @Test(arguments: [false, true])
+    func freshSealKeepsBothByteDistinctSpeakersAndExactMapsOverrideLegacy(streamed: Bool) throws {
+        let composed = "voice-\u{E9}", decomposed = "voice-e\u{301}"
+        let words = Transcript([Word(composed, 0, 20, "Hello"), Word(decomposed, 20, 40, "Hi")], language: "en")
+        let labels = [Data(composed.utf8): "Alex", Data(decomposed.utf8): "Casey"]
+        let hints = [
+            Data(composed.utf8): JSONObject([("colourIndex", .int(2)), ("provenance", .string("user"))]),
+            Data(decomposed.utf8): JSONObject([("colourIndex", .int(8)), ("provenance", .string("source"))])
+        ]
+        try withTemporaryDirectory { directory in
+            let audio = try silence()
+            let legacyHints = [composed: JSONObject([("colourIndex", .int(0)), ("provenance", .string("unnamed"))])]
+            let result: CassiniDocument
+            if streamed {
+                let input = directory.appendingPathComponent("English source.opus")
+                try Data(audio).write(to: input)
+                result = try CassiniDocument.create(input, transcript: words, title: "English conversation",
+                    processing: JSONObject(), existing: nil, speakerLabels: [composed: "Legacy"], speakerHints: legacyHints,
+                    speakerLabelsByID: labels, speakerHintsByID: hints, target: directory.appendingPathComponent("English seal.opus"))
+            } else {
+                let bytes = try CassiniDocument.create(audio, transcript: words, title: "English conversation",
+                    processing: JSONObject(), speakerLabels: [composed: "Legacy"], speakerHints: legacyHints,
+                    speakerLabelsByID: labels, speakerHintsByID: hints)
+                result = CassiniDocument.read(bytes)
+            }
+            #expect(result.state == .ok)
+            let roster = try #require(result.manifest?["speakers"]?.array)
+            #expect(roster.count == 2)
+            #expect(roster.compactMap { $0.object?["id"]?.string.map { Data($0.utf8) } } ==
+                    [Data(composed.utf8), Data(decomposed.utf8)])
+            #expect(result.speakerLabel(composed) == "Alex")
+            #expect(result.speakerLabel(decomposed) == "Casey")
+            let own = try #require(roster[0].object), other = try #require(roster[1].object)
+            #expect(try own.number("colourIndex") == 2)
+            #expect(own["provenance"]?.string == "user")
+            #expect(try other.number("colourIndex") == 8)
+            #expect(other["provenance"]?.string == "source")
+            let body = try #require(result.selected()?.transcript)
+            #expect(body.words.count == 2)
+            #expect(body.words.map { Data($0.speaker.utf8) } == [Data(composed.utf8), Data(decomposed.utf8)])
+            #expect(body.words.map(\.text) == ["Hello", "Hi"])
+            #expect(body.words.map(\.startMs) == [0, 20])
+            #expect(body.words.map(\.endMs) == [20, 40])
+        }
+    }
+
+    @Test(arguments: [false, true])
+    func optionalSpeakerHintsMatchExactIDBytes(preservingForeignHints: Bool) throws {
+        let composed = "voice-\u{E9}", decomposed = "voice-e\u{301}"
+        let words = Transcript([Word(composed, 0, 20, "Hello"), Word(decomposed, 20, 40, "Hi")], language: "en")
+        let initial = try CassiniDocument.create(silence(), transcript: words, title: "English conversation", processing: JSONObject())
+        var source = CassiniDocument.read(initial)
+        if preservingForeignHints, let roster = source.manifest?["speakers"]?.array {
+            source.manifest?["speakers"] = .array(roster.map { entry in
+                guard var value = entry.object, sameBytes(value["id"]?.string, decomposed) else { return entry }
+                value["colourIndex"] = .int(8)
+                value["provenance"] = .string("source")
+                return .object(value)
+            })
+        }
+        let bytes = try CassiniDocument.create(initial, transcript: words, title: "English conversation",
+            processing: JSONObject(), existing: source,
+            speakerHints: [composed: JSONObject([("colourIndex", .int(2)), ("provenance", .string("user"))])])
+        let result = CassiniDocument.read(bytes)
+        #expect(result.state == .ok)
+        let roster = try #require(result.manifest?["speakers"]?.array)
+        let own = try #require(roster.compactMap(\.object).first { sameBytes($0["id"]?.string, composed) })
+        let other = try #require(roster.compactMap(\.object).first { sameBytes($0["id"]?.string, decomposed) })
+        #expect(try own.number("colourIndex") == 2)
+        #expect(own["provenance"]?.string == "user")
+        if preservingForeignHints {
+            #expect(try other.number("colourIndex") == 8)
+            #expect(other["provenance"]?.string == "source")
+        } else {
+            #expect(other["colourIndex"] == nil)
+            #expect(other["provenance"] == nil)
+        }
+    }
+
     /** Without CASSINI_FORMAT nothing is Cassini metadata, so an undecodable CASSINI_ comment is only a foreign one. */
     @Test func anUndecodableCassiniCommentInPlainAudioStaysPlainAudio() throws {
         let stray = Array("CASSINI_NOTE=Caf".utf8) + [0xE9]

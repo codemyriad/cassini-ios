@@ -10,9 +10,12 @@ ROOT = Path(__file__).resolve().parents[1]
 SOURCE = Path('Packages/CassiniNotebook/Tests/CassiniNotebookTests/Resources/status-badges')
 OUTPUT = Path('Cassini/Resources/Strings/StatusBadge.xcstrings')
 LOOKUP = Path('Cassini/Strings/StatusBadgeStrings.swift')
+STRINGS_PIN = Path('contracts/shared-strings/UPSTREAM.json')
 LANGUAGES = ('en', 'it', 'fr', 'es', 'pt-BR', 'pt-PT')
-IDS = {'states.badge.' + key for key in ('recording', 'importing', 'saving', 'transcribing', 'needsAttention',
-       'interrupted', 'received', 'transcribing.noEta', 'transcribing.underMinute')} | {'meeting.interruptedAt'}
+IDS = ({'states.badge.' + key for key in ('recording', 'importing', 'saving', 'transcribing', 'needsAttention',
+        'interrupted', 'received', 'transcribing.noEta', 'transcribing.underMinute')} | {'meeting.interruptedAt'} |
+       {'states.phone.' + key for key in ('audioOnly', 'cantPlay', 'cantReadTranscript', 'couldntTranscribe',
+        'newerFormat', 'pausedAt', 'queued')})
 
 
 def render(root=ROOT):
@@ -23,8 +26,15 @@ def render(root=ROOT):
     for path, expected in pin['sha256'].items():
         if hashlib.sha256((folder / path).read_bytes()).hexdigest() != expected:
             raise ValueError('W0.4 pin/hash mismatch: ' + path)
+    shared = json.loads((root / STRINGS_PIN).read_text())
+    if (shared.get('repository') != pin['repository'] or shared.get('commit') != pin['commit']
+            or shared.get('path') != 'strings/strings.json'
+            or shared.get('sha256') != pin['sha256']['strings/strings.json']
+            or shared.get('vendored_path') != (SOURCE / 'strings/strings.json').as_posix()):
+        raise ValueError('Global shared-string pin differs from the vendored catalog pin')
     catalog = json.loads((folder / 'strings/strings.json').read_text())
-    selected = [entry for entry in catalog['entries'] if entry['id'].startswith('states.badge.') or entry['id'] == 'meeting.interruptedAt']
+    selected = [entry for entry in catalog['entries'] if entry['id'].startswith(('states.badge.', 'states.phone.'))
+                or entry['id'] == 'meeting.interruptedAt']
     if {entry['id'] for entry in selected} != IDS or len(selected) != len(IDS):
         raise ValueError('Unexpected W0.4 catalog IDs')
     strings = {}

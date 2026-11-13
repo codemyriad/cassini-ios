@@ -136,7 +136,7 @@ public struct NoteChips: Hashable, Sendable {
 
     public static func of(_ note: Note) -> NoteChips? {
         guard note.hasDocument else { return nil }
-        let speakers = Set(note.transcript.compactMap(\.speakerID)).count
+        let speakers = Set(note.transcript.compactMap(\.speakerID).map { Data($0.utf8) }).count
         return NoteChips(trust: DocumentTrust.of(note), version: versionChip(note), speakers: speakers)
     }
 

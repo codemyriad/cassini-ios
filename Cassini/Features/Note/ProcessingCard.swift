@@ -53,17 +53,17 @@ struct ProcessingCard: View {
             ProgressCardContent(progress: running, stop: model.stopJob, cancelDownload: model.cancelJobDownload)
         case .downloading(let download):
             Header(headline: ProgressText.downloadingModels, range: nil, percent: download?.percent)
-            ProgressView(value: download.map { Double($0.percent) / 100 }).tint(.ember)
+            ProgressView(value: download.map { Double($0.percent) / 100 }).tint(.accent)
             if let download { DownloadRow(download: download, cancel: model.cancelJobDownload) }
             stopButton
             footnote
         case .stopping:
             Header(headline: ProgressText.stopping, range: nil, percent: nil)
-            ProgressView().tint(.ember)
+            ProgressView().tint(.accent)
         case .starting, .waitingForPrevious:
             Header(headline: ProgressText.headline(phase == .starting ? .starting : .waitingForPrevious), range: nil,
                    percent: nil)
-            ProgressView(value: Optional<Double>.none).tint(.ember)
+            ProgressView(value: Optional<Double>.none).tint(.accent)
             stopButton
             footnote
         }
@@ -83,7 +83,7 @@ private struct ProgressCardContent: View {
         let range = progress.rangeStartMs != 0 || progress.rangeEndMs != 0
             ? ProgressText.range(startMs: progress.rangeStartMs, endMs: progress.rangeEndMs) : nil
         Header(headline: ProgressText.headline(progress.headline), range: range, percent: progress.percent)
-        ProgressView(value: progress.percent.map { Double($0) / 100 }).tint(.ember)
+        ProgressView(value: progress.percent.map { Double($0) / 100 }).tint(.accent)
             .accessibilityHidden(true)
         StageTracker(step: progress.step, speakersSkipped: progress.speakersSkipped)
         if let download = progress.download {

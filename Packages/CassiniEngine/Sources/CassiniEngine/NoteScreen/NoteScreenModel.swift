@@ -177,6 +177,15 @@ public final class NoteScreenModel {
     /// The draft's names (`names.json`), while the screen is shown.
     public private(set) var draftNames = DraftNames.empty
     @ObservationIgnored private var namesTask: Task<Void, Never>?
+    private struct MappedDraftKey: Equatable {
+        var draft: DraftState
+        var names: DraftNames
+        var voiceNames: [UUID: String]
+        var language: String
+    }
+    @ObservationIgnored private var mappedDraftKey: MappedDraftKey?
+    @ObservationIgnored private var mappedDraft: DraftState?
+    @ObservationIgnored private(set) var shownDraftBuilds = 0
     /// This screen, as the owner of the player.
     @ObservationIgnored public let playerOwner = PlaybackOwner()
     @ObservationIgnored let ports: Ports
@@ -399,18 +408,37 @@ public final class NoteScreenModel {
     /// The draft the screen shows, with its names: the running job's, or the saved progress of a stopped or failed one.
     /// Nil without one.
     public var shownDraft: DraftState? {
+        shownDraft(language: DefaultLabels.appLanguage)
+    }
+
+    /// The language is part of the key because legacy placeholder labels use the app's language. Keeping this
+    /// overload internal lets the key be tested without replacing the process's main localization bundle.
+    func shownDraft(language: String) -> DraftState? {
+        // Read the observable inputs before checking the cache, preserving SwiftUI's dependency registrations.
         let voiceNames = Dictionary(ports.savedVoices().map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
+        let names = draftNames
+        let raw: DraftState
         if let running = ports.runningDraft(noteID) {
-            return DraftView.build(running, names: draftNames, voiceNames: voiceNames)
+            raw = running
+        } else if !savedDraft.isEmpty {
+            raw = DraftState(words: savedDraft, tentativeFromMs: .max, namingOpen: ports.draftNamingOpen(noteID))
+        } else {
+            mappedDraftKey = nil
+            mappedDraft = nil
+            return nil
         }
-        guard !savedDraft.isEmpty else { return nil }
-        let saved = DraftState(words: savedDraft, tentativeFromMs: .max, namingOpen: ports.draftNamingOpen(noteID))
-        return DraftView.build(saved, names: draftNames, voiceNames: voiceNames)
+        let key = MappedDraftKey(draft: raw, names: names, voiceNames: voiceNames, language: language)
+        if mappedDraftKey != key {
+            mappedDraft = DraftView.build(raw, names: names, voiceNames: voiceNames)
+            mappedDraftKey = key
+            shownDraftBuilds += 1
+        }
+        return mappedDraft
     }
 
     /// Whether `speakerID` is a speaker of the draft on screen.
     private func isDraftSpeaker(_ speakerID: String) -> Bool {
-        !speakerID.isEmpty && shownDraft?.words.contains { $0.speaker == speakerID } == true
+        !speakerID.isEmpty && shownDraft?.words.contains { Data($0.speaker.utf8) == Data(speakerID.utf8) } == true
     }
 
     /// What Name a speaker knows about a draft speaker (Android's `draftInput`): its numbers from the draft's words
@@ -419,10 +447,17 @@ public final class NoteScreenModel {
     func draftInput(_ speakerID: String) async -> NamingInput? {
         guard let draft = shownDraft else { return nil }
         let stats = SpeakerStats.of(words: draft.words.map { Word($0.speaker, $0.startMs, $0.endMs, $0.text) })
-        guard let stat = stats.first(where: { $0.speakerID == speakerID }) else { return nil }
-        func label(_ stat: SpeakerStat) -> String { draft.labels[stat.speakerID] ?? DefaultLabels.placeholder(stat.ordinal + 1) }
-        let targets = stats.filter { $0.speakerID != speakerID && $0.wordCount > 0 }.map {
-            MergeTarget(speakerID: $0.speakerID, name: label($0), ordinal: $0.ordinal, speakingTime: $0.speakingTime)
+        guard let stat = stats.first(where: { Data($0.speakerID.utf8) == Data(speakerID.utf8) }) else { return nil }
+        let labels = Dictionary(uniqueKeysWithValues: draft.labels.map { (Data($0.key.utf8), $0.value) })
+        let provenance = Dictionary(uniqueKeysWithValues: draft.provenance.map { (Data($0.key.utf8), $0.value) })
+        func label(_ stat: SpeakerStat) -> String { labels[Data(stat.speakerID.utf8)] ?? DefaultLabels.placeholder(stat.ordinal + 1) }
+        let order = SpeakerColourOrder.earliest(draft.words, id: { $0.speaker }, start: { Double($0.startMs) })
+        let fallback = Dictionary(uniqueKeysWithValues: order.enumerated().map { (Data($0.element.utf8), $0.offset) })
+        let stored = Dictionary(uniqueKeysWithValues: draft.colourIndices.map { (Data($0.key.utf8), $0.value) })
+        let indices = stored.merging(fallback) { stored, _ in stored }
+        let targets = stats.filter { Data($0.speakerID.utf8) != Data(speakerID.utf8) && $0.wordCount > 0 }.map {
+            MergeTarget(speakerID: $0.speakerID, name: label($0), ordinal: $0.ordinal, speakingTime: $0.speakingTime,
+                        colourIndex: indices[Data($0.speakerID.utf8)], provenance: provenance[Data($0.speakerID.utf8)])
         }
         let ready = await ports.speakerModelsReady()
         // A running job holds the audio: no sample plays until it stops.
@@ -430,7 +465,8 @@ public final class NoteScreenModel {
         return NamingInput(speakerID: speakerID, label: label(stat), ordinal: stat.ordinal, speakingTime: stat.speakingTime,
                            sample: stat.sample, print: nil, match: draftNames.match(speakerID),
                            voices: ports.savedVoices(), voicesReadOnly: ports.voicesReadOnly(), voiceModelReady: ready,
-                           mergeTargets: targets, canSample: canSample, draft: true, willHavePrint: ready)
+                           mergeTargets: targets, canSample: canSample, draft: true, willHavePrint: ready,
+                           colourIndex: indices[Data(speakerID.utf8)], provenance: provenance[Data(speakerID.utf8)])
     }
 
     // MARK: Opening

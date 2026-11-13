@@ -34,7 +34,7 @@ public struct DocumentInfoFacts: Hashable, Sendable {
     /// (`ModelCatalog.speechModelNames`).
     public static func of(_ note: Note, provenance: TranscriptProvenance?, fileBytes: Int64?,
                           speechModels: [String: String]) -> DocumentInfoFacts {
-        let speakers = Set(note.transcript.compactMap(\.speakerID))
+        let speakers = Set(note.transcript.compactMap(\.speakerID).map { Data($0.utf8) })
         let processing = provenance.flatMap { $0.inferenceMs > 0 ? $0.inferenceMs : nil }
         let readError: String? = switch note.document?.state {
         case .unreadable?, .invalidMetadata?:

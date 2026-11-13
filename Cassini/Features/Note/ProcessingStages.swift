@@ -38,8 +38,8 @@ struct StageTracker: View {
 
     private func color(_ state: ProgressText.StepState) -> Color {
         switch state {
-        case .done: .ember
-        case .inProgress: .ember.opacity(0.55)
+        case .done: .accentInk
+        case .inProgress: .accentInk.opacity(0.55)
         case .notStarted, .skipped: .ink.opacity(0.1)
         }
     }

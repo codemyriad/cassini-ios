@@ -47,7 +47,7 @@ public enum SpeakerStats {
         for segment in transcript {
             let words = segment.words.isEmpty ? segment.text.split(whereSeparator: \.isWhitespace).count : segment.words.count
             guard let speaker = segment.speakerID else { turns.append(nil); continue }
-            if let last = turns.last, var turn = last, turn.speakerID == speaker {
+            if let last = turns.last, var turn = last, Data(turn.speakerID.utf8) == Data(speaker.utf8) {
                 turn.end = segment.end
                 turn.words += words
                 turns[turns.count - 1] = turn
@@ -57,9 +57,9 @@ public enum SpeakerStats {
         }
         let spoken = turns.compactMap { $0 }
         var order: [String] = []
-        for turn in spoken where !order.contains(turn.speakerID) { order.append(turn.speakerID) }
+        for turn in spoken where !order.contains(where: { Data($0.utf8) == Data(turn.speakerID.utf8) }) { order.append(turn.speakerID) }
         return order.enumerated().map { ordinal, id in
-            let own = spoken.filter { $0.speakerID == id }
+            let own = spoken.filter { Data($0.speakerID.utf8) == Data(id.utf8) }
             var longest = own[0]
             for turn in own.dropFirst() where turn.length > longest.length || (turn.length == longest.length && turn.start < longest.start) {
                 longest = turn
@@ -90,7 +90,7 @@ public enum SpeakerStats {
 
     /// The stats of one speaker, or nil when the speaker says nothing in `transcript`.
     public static func of(_ speakerID: String, in transcript: [TranscriptSegment]) -> SpeakerStat? {
-        of(transcript).first { $0.speakerID == speakerID }
+        of(transcript).first { Data($0.speakerID.utf8) == Data(speakerID.utf8) }
     }
 }
 

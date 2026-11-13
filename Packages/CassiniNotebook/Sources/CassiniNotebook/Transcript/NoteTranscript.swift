@@ -13,6 +13,7 @@ public enum SpeakerName: Hashable, Sendable {
 /// A speaker shown in the meeting header, in canonical word order rather than paragraph display order.
 public struct TranscriptSpeaker: Identifiable, Hashable, Sendable {
     public let id: String
+    public var byteID: Data { Data(id.utf8) }
     public let name: SpeakerName
     public let tint: SpeakerTint
     public let auto: Bool
@@ -85,8 +86,8 @@ public struct NoteTurn: Identifiable, Hashable, Sendable {
     public private(set) var inlineSuggestions: [SpeakerSuggestion]
     /// Host first, then the inline speakers in reading order; each card names its own actual speaker.
     public var allSuggestions: [SpeakerSuggestion] {
-        var seen = Set<String>()
-        return ((suggestion.map { [$0] } ?? []) + inlineSuggestions).filter { seen.insert($0.speakerID).inserted }
+        var seen = Set<Data>()
+        return ((suggestion.map { [$0] } ?? []) + inlineSuggestions).filter { seen.insert($0.byteSpeakerID).inserted }
     }
     /// The passages the paragraph shows, in order, each with where it starts in the paragraph (for Edit passage).
     public let passages: [PassageRef]
@@ -137,6 +138,10 @@ public struct NoteTranscript: Hashable, Sendable {
     public let speakers: [String]
     /// Header metadata includes speakers who only appear in inline interjections.
     public let headerSpeakers: [TranscriptSpeaker]
+    public let speakerTints: [String: SpeakerTint]
+    private let speakerTintsByID: [Data: SpeakerTint]
+
+    public func speakerTint(for id: String) -> SpeakerTint? { speakerTintsByID[Data(id.utf8)] }
     private let starts: [TimeInterval]
     private let turnOf: [Int]
     private let inTurn: [Int]
@@ -148,12 +153,16 @@ public struct NoteTranscript: Hashable, Sendable {
         self.turns = turns
         var starts: [TimeInterval] = [], turnOf: [Int] = [], inTurn: [Int] = []
         var positions: [String: Int] = [:]
-        var firstWords: [String: (source: Int, encounter: Int)] = [:]
-        var metadata: [String: TranscriptSpeaker] = [:]
+        var speakerTints: [String: SpeakerTint] = [:]
+        var exactTints: [Data: SpeakerTint] = [:]
+        var firstWords: [Data: (id: String, source: Int, encounter: Int)] = [:]
+        var metadata: [Data: TranscriptSpeaker] = [:]
         func remember(_ id: String?, name: SpeakerName, tint: SpeakerTint, auto: Bool) {
             guard let id, !id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-                  name != .unknown, metadata[id] == nil else { return }
-            metadata[id] = TranscriptSpeaker(id: id, name: name, tint: tint, auto: auto)
+                  name != .unknown else { return }
+            let key = Data(id.utf8)
+            guard metadata[key] == nil else { return }
+            metadata[key] = TranscriptSpeaker(id: id, name: name, tint: tint, auto: auto)
         }
         for (position, turn) in turns.enumerated() {
             positions[turn.id] = position
@@ -161,10 +170,14 @@ public struct NoteTranscript: Hashable, Sendable {
             for chip in turn.interjections {
                 remember(chip.speakerID, name: chip.name, tint: chip.tint, auto: chip.auto)
             }
+            if let id = turn.speakerID { speakerTints[id] = turn.tint; exactTints[Data(id.utf8)] = turn.tint }
+            for chip in turn.interjections { if let id = chip.speakerID { speakerTints[id] = chip.tint; exactTints[Data(id.utf8)] = chip.tint } }
             for (index, word) in turn.words.enumerated() {
-                if let id = word.speakerID,
-                   firstWords[id].map({ word.sourceIndex < $0.source }) ?? true {
-                    firstWords[id] = (word.sourceIndex, starts.count)
+                if let id = word.speakerID {
+                    let key = Data(id.utf8)
+                    if firstWords[key].map({ word.sourceIndex < $0.source }) ?? true {
+                        firstWords[key] = (id, word.sourceIndex, starts.count)
+                    }
                 }
                 starts.append(word.start); turnOf.append(position); inTurn.append(index)
             }
@@ -173,8 +186,10 @@ public struct NoteTranscript: Hashable, Sendable {
             let lhs = firstWords[$0]!, rhs = firstWords[$1]!
             return lhs.source == rhs.source ? lhs.encounter < rhs.encounter : lhs.source < rhs.source
         }
-        self.speakers = speakerOrder
+        self.speakers = speakerOrder.map { firstWords[$0]!.id }
         self.headerSpeakers = speakerOrder.compactMap { metadata[$0] }
+        self.speakerTints = speakerTints
+        self.speakerTintsByID = exactTints
         // Reading order keeps each turn together; playback order remains chronological.
         // Equal starts retain canonical source order rather than the chips' display positions.
         let order = starts.indices.sorted {
@@ -214,6 +229,8 @@ public struct NoteTranscript: Hashable, Sendable {
         guard let turn = turn(word.turnID), turn.words.indices.contains(word.index) else { return nil }
         return turn.words[word.index].start
     }
+
+
 }
 
 /// The pure mapping from a note's passages (sealed) or a job's draft words to `NoteTranscript` (Android
@@ -236,29 +253,44 @@ public enum NoteTranscripts {
     ///
     /// "auto" shows when the speaker's match is automatic and its label is the voice's name.
     public static func sealed(_ note: Note, voices: [SavedVoice] = [], suggestions: [SpeakerSuggestion] = []) -> NoteTranscript {
+        sealed(note, voices: voices, suggestions: suggestions, colourOrder: SpeakerColourOrder.words)
+    }
+
+    static func sealed(_ note: Note, voices: [SavedVoice] = [], suggestions: [SpeakerSuggestion] = [],
+                       colourOrder: ([TranscriptWord]) -> [String]) -> NoteTranscript {
         let words = note.transcriptWords
         let order = orderOfAppearance(words)
-        let speakers = Dictionary((note.speakers ?? []).map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        let labels = Dictionary(note.transcript.compactMap { s in s.speakerID.flatMap { id in s.speaker.map { (id, $0) } } },
+        let speakers = Dictionary((note.speakers ?? []).map { ($0.byteID, $0) }, uniquingKeysWith: { first, _ in first })
+        let labels = Dictionary(note.transcript.compactMap { s in s.speakerID.flatMap { id in s.speaker.map { (Data(id.utf8), $0) } } },
                                 uniquingKeysWith: { first, _ in first })
-        var names: [String: SpeakerName] = [:]
+        var names: [Data: SpeakerName] = [:]
         for (ordinal, id) in order.enumerated() {
-            names[id] = name(label: speakers[id]?.name ?? labels[id], id: id, ordinal: ordinal)
+            if let speaker = speakers[Data(id.utf8)], speaker.provenance != .unnamed {
+                names[Data(id.utf8)] = .named(speaker.name)
+            } else {
+                names[Data(id.utf8)] = name(label: speakers[Data(id.utf8)]?.name ?? labels[Data(id.utf8)], id: id, ordinal: ordinal)
+            }
         }
-        let tints = SpeakerTint.assign(order) { names[$0]?.isNamed != true }
+        var paletteSpeakers = order.map { id in
+            speakers[Data(id.utf8)] ?? NoteSpeaker(id: id, name: labels[Data(id.utf8)] ?? id)
+        }
+        if paletteSpeakers.contains(where: { $0.colourIndex == nil }) {
+            paletteSpeakers = Note.assignColourIndices(paletteSpeakers, order: colourOrder(words))
+        }
+        let tints = SpeakerTint.assignByID(order, speakers: paletteSpeakers)
         let voiceNames = Dictionary(voices.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
-        let cards = Dictionary(suggestions.map { ($0.speakerID, $0) }, uniquingKeysWith: { first, _ in first })
-        var suggested = Set<String>()
+        let cards = Dictionary(suggestions.map { (Data($0.speakerID.utf8), $0) }, uniquingKeysWith: { first, _ in first })
+        var suggested = Set<Data>()
         return build(words, endsBoundedByAudio: !note.transcript.isEmpty && note.transcript.allSatisfy { $0.wordEndsBoundedByAudio == true }) { speaker, first in
-            guard let speaker else { return Template(name: .unknown, tint: .amber) }
-            let name = names[speaker] ?? unlabeled(1)
+            guard let speaker else { return Template(name: .unknown, tint: .stone) }
+            let name = names[Data(speaker.utf8)] ?? unlabeled(1)
             var auto = false
-            if case .auto(let voice, _) = speakers[speaker]?.match, case .named(let label) = name,
+            if case .auto(let voice, _) = speakers[Data(speaker.utf8)]?.match, case .named(let label) = name,
                let voiceName = voiceNames[voice] {
                 auto = NameMatch.same(label, voiceName)
             }
-            let suggestion = first && !name.isNamed && suggested.insert(speaker).inserted ? cards[speaker] : nil
-            return Template(name: name, tint: tints[speaker] ?? .amber, auto: auto, suggestion: suggestion)
+            let suggestion = first && !name.isNamed && suggested.insert(Data(speaker.utf8)).inserted ? cards[Data(speaker.utf8)] : nil
+            return Template(name: name, tint: tints[Data(speaker.utf8)] ?? .stone, auto: auto, suggestion: suggestion)
         }
     }
 
@@ -268,19 +300,40 @@ public enum NoteTranscripts {
     /// draft, whose words are all settled). Words without a speaker id (Apple Speech, or no speakers told apart) are
     /// one voice, "Speaker 1", as the job saves them (`NoteSpeaker.oneVoice`, D59), under `draftOneVoice`.
     public static func draft(_ words: [DraftWord], tentativeFromMs: Int64?, labels: [String: String] = [:],
-                             automatic: Set<String> = [], suggestions: [DraftSuggestion] = []) -> NoteTranscript {
+                             automatic: Set<String> = [], suggestions: [DraftSuggestion] = [], colourIndices: [String: Int] = [:],
+                             provenance: [String: NoteSpeaker.Provenance] = [:]) -> NoteTranscript {
+        draft(words, tentativeFromMs: tentativeFromMs, labels: labels, automatic: automatic, suggestions: suggestions,
+              colourIndices: colourIndices, provenance: provenance, colourOrder: SpeakerColourOrder.words)
+    }
+
+    static func draft(_ words: [DraftWord], tentativeFromMs: Int64?, labels: [String: String] = [:],
+                      automatic: Set<String> = [], suggestions: [DraftSuggestion] = [], colourIndices: [String: Int] = [:],
+                      provenance: [String: NoteSpeaker.Provenance] = [:],
+                      colourOrder: ([TranscriptWord]) -> [String]) -> NoteTranscript {
         let transcriptWords = words.map {
             TranscriptWord(speaker: $0.speaker.isEmpty ? draftOneVoice : $0.speaker, start: Double($0.startMs) / 1000,
                            end: Double($0.endMs) / 1000, text: $0.text, lowConfidenceSpeaker: $0.lowConfidenceSpeaker == true)
         }
         let order = orderOfAppearance(transcriptWords)
         var names: [String: SpeakerName] = [:]
-        for (ordinal, id) in order.enumerated() { names[id] = name(label: labels[id], id: id, ordinal: ordinal) }
-        let tints = SpeakerTint.assign(order) { names[$0]?.isNamed != true }
+        for (ordinal, id) in order.enumerated() {
+            names[id] = provenance[id].map { $0 == .unnamed ? unlabeled(ordinal + 1) : .named(labels[id] ?? id) }
+                ?? name(label: labels[id], id: id, ordinal: ordinal)
+        }
+        var indices = colourIndices
+        if order.contains(where: { indices[$0] == nil }) {
+            var allocator = SpeakerColourAllocator(indices)
+            for id in colourOrder(transcriptWords) where indices[id] == nil { indices[id] = allocator.reserve(id) }
+        }
+        let palette = order.map { id in
+            NoteSpeaker(id: id, name: labels[id] ?? id, colourIndex: indices[id],
+                        provenance: provenance[id] ?? (names[id]?.isNamed == true ? .user : .unnamed))
+        }
+        let tints = SpeakerTint.assign(order, speakers: palette)
         let built = build(transcriptWords) { speaker, _ in
-            guard let speaker else { return Template(name: .unknown, tint: .amber) }
+            guard let speaker else { return Template(name: .unknown, tint: .stone) }
             let name = names[speaker] ?? unlabeled(1)
-            return Template(name: name, tint: tints[speaker] ?? .amber, auto: automatic.contains(speaker) && name.isNamed)
+            return Template(name: name, tint: tints[speaker] ?? .stone, auto: automatic.contains(speaker) && name.isNamed)
         }
         let cards = Dictionary(suggestions.map { ($0.speakerID, $0) }, uniquingKeysWith: { first, _ in first })
         var placedSpeakers = Set<String>()
@@ -325,25 +378,22 @@ public enum NoteTranscripts {
     }
 
     private static func orderOfAppearance(_ words: [TranscriptWord]) -> [String] {
-        var seen = Set<String>(), order: [String] = []
-        for word in words { if let id = word.speaker, seen.insert(id).inserted { order.append(id) } }
+        var seen = Set<Data>(), order: [String] = []
+        for word in words { if let id = word.speaker, seen.insert(Data(id.utf8)).inserted { order.append(id) } }
         return order
     }
 
     /// The exact viewer pipeline decides rows. Source indices, not contiguous slices, preserve playback and edits.
     private static func build(_ words: [TranscriptWord], endsBoundedByAudio: Bool = false, template: (String?, Bool) -> Template) -> NoteTranscript {
-        let rows = TurnModel.rows(of: words.map {
-            TurnModel.Word(speaker: $0.speaker, startMs: ($0.start * 1000).rounded(), endMs: ($0.end * 1000).rounded(), text: $0.text,
-                           lowConfidenceSpeaker: $0.lowConfidenceSpeaker)
-        }, endsBoundedByAudio: endsBoundedByAudio)
-        var seen = Set<String?>()
+        let rows = TranscriptTurns.rows(of: words, endsBoundedByAudio: endsBoundedByAudio)
+        var seen = Set<Data?>()
         let speakerIDs = Set(words.compactMap(\.speaker))
         func sourceSpeaker(_ id: String?) -> String? {
             id == "Unknown speaker" && !speakerIDs.contains("Unknown speaker") ? nil : id
         }
         let turns = rows.map { row in
             let speaker = sourceSpeaker(row.speaker)
-            let made = template(speaker, seen.insert(speaker).inserted)
+            let made = template(speaker, seen.insert(speaker.map { Data($0.utf8) }).inserted)
             let indices = row.members.flatMap(\.wordIndices)
             var passages: [PassageRef] = [], seenPassages = Set<UUID>()
             for index in indices {
@@ -356,7 +406,7 @@ public enum NoteTranscripts {
             let inlineSuggestions = row.members.compactMap { member -> SpeakerSuggestion? in
                 guard member.kind == .interjection else { return nil }
                 let speaker = sourceSpeaker(member.speaker)
-                return template(speaker, seen.insert(speaker).inserted).suggestion
+                return template(speaker, seen.insert(speaker.map { Data($0.utf8) }).inserted).suggestion
             }
             return NoteTurn(id: "w\(indices.min()!)", speakerID: speaker, name: made.name, tint: made.tint,
                             start: row.startMs / 1000, auto: made.auto, source: words, row: row,

@@ -90,10 +90,24 @@ enum TestFixtures {
             // Sam is not named yet, and the saved voice "Sam Rivera" may be them: the note asks "Is this Sam Rivera?".
             let sam = try seedSuggestedVoice(root: store.root)
             main.speakers?[1].name = DefaultLabels.placeholder(2)
+            main.speakers?[1].provenance = .unnamed
             main.speakers?[1].match = .suggested(voice: sam, score: 0.78)
             main.refreshSpeakerLabels()
         case .voices:
             notes = try seedSavedVoices(root: store.root, main: &main, now: now)
+        case .brandSpeakers:
+            // Six decided speaker slots plus the unnamed stone role, through real note/speaker views.
+            let names = [DefaultLabels.placeholder(1), "Alex Morgan", "Sam Rivera", "Taylor Brooks", "Jordan Reed",
+                         "Casey Green", "Jamie Park"]
+            main.title = "Community garden planning"
+            main.bookmarks = []
+            main.speakers = names.enumerated().map { NoteSpeaker(id: "brand-\($0.offset)", name: $0.element) }
+            let lines = ["Welcome, everyone.", "The beds are ready.", "Seeds arrive Thursday.", "I can bring tools.",
+                         "We will share watering.", "Let us start Saturday.", "That works for me."]
+            main.transcript = lines.enumerated().map { index, text in
+                let speaker = TranscriptSegment(text: text, start: 0, end: 0, speaker: names[index], speakerID: "brand-\(index)")
+                return timedSegment(text, start: Double(index) * 3, end: Double(index + 1) * 3, speaker)
+            }
         case .reading:
             main.transcript = transcribedSegments.map { timedSegment($0.text, start: $0.start, end: $0.end, $0) }
         default:
@@ -101,6 +115,11 @@ enum TestFixtures {
         }
         notes = [main, walk(now: now)] + notes
         switch seed {
+        case .brandSpeakers:
+            var failed = Note(id: failedID, title: "Garden audio check", createdAt: now.addingTimeInterval(-3 * 3600), audioFilename: "audio.wav")
+            failed.duration = fixtureDuration; failed.language = "en-US"; failed.waveform = waveform
+            failed.status = .failed; failed.failure = .audio
+            notes.append(failed)
         case .library, .recording, .voices, .speakers:
             break
         case .search, .reading:
@@ -133,6 +152,13 @@ enum TestFixtures {
             if note.id == fixtureID { try writeSilence(to: url) } else { try FileManager.default.copyItem(at: audio, to: url) }
         }
         if seed == .statuses { try await seedStatusJobs(into: store, now: now, recognizer: recognizer) }
+        if seed == .brandSpeakers {
+            try JobRepository(root: store.root).save([
+                Job(noteID: failedID, seq: 1, kind: .transcribe, state: .failed, failure: .audio,
+                    language: "en-US", enqueuedAt: now,
+                    recognizer: recognizer == .appleSpeech ? nil : recognizer.rawValue),
+            ])
+        }
     }
 
     /// What a seed needs once the app is ready: consent and a running job for `processing`, whose speaker step is
