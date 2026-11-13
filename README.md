@@ -508,3 +508,9 @@ The pinned badge contract, full catalog and vectors drive the pure selector and 
 `RowBadge` adapts iOS lifecycle states while preserving phone-only statuses and actions. Rendered pills retain
 Dynamic Type and translated text. State, catalog, generation and corruption tests verify the full outputs;
 UI geometry tests cover accessibility text. Runtime rendering never parses JSON.
+
+### Phase 1 alignment QA
+
+The [D-989 QA report](docs/qa-phase1-d989.md) records the six audited phone surfaces,
+existing implementation PRs and iOS platform differences. Meeting header names use the same
+assigned speaker colours as transcript labels; unnamed speakers remain stone in both appearances.

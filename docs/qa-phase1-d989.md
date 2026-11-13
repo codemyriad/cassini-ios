@@ -25,6 +25,22 @@ It does not certify the unmerged implementations. Recheck those surfaces after t
 
 ## Evidence
 
-Use `scripts/screenshots.sh --device iphone --output qa/d989/before` on the baseline and the same command with `after` on the corrected head. The named seeds cover Library, Search, Meeting, Recording, Transcribing and Name a speaker in light and dark, plus seven speakers, Find and the compact title. `15-seven-speaker-meeting` is the direct regression comparison: unnamed stone, six named colours, and the first named colour repeating in the transcript.
+Use `scripts/screenshots.sh --device iphone --output DerivedData.noindex/qa/d989/before` on the baseline and the same command with `after` on the corrected head. The named seeds cover Library, Search, Meeting, Recording, Transcribing and Name a speaker in light and dark, plus seven speakers, Find and the compact title. `15-seven-speaker-meeting` is the direct regression comparison: unnamed stone, six named colours, and the first named colour repeating in the transcript.
 
 Generated images and build outputs stay out of git. The before/after comparison boards are attached to D-989; validation results and the exact audited head are recorded in the PR.
+
+## Behaviour and accessibility coverage
+
+The existing full gate provides the interaction checks alongside the visual capture:
+
+| Area | Checks |
+| --- | --- |
+| Library and Search | `LibraryUITests.testEveryRowStatusShowsWithItsText`, `testSearchShowsFlatResultsAndSaysWhenNothingMatches`, `testSearchDateMenuNarrowsMatchesAndClearingResetsIt` |
+| Meeting and Find | `NoteScreenTests.testAnInlineHeaderNameOpensNamingForThatSpeaker`, `testInNoteSearchCountsAndWraps`, `testANoteOpenedFromALibrarySearchScrollsToTheFirstMatch` |
+| Scrolled title | `NoteScreenTests.testCompactTitleAppearsJustPastTheNavigationBarAndHidesTheOriginalFromAccessibility`, its iPad equivalent, and the Find/inset checks |
+| Recording | `LibraryUITests.testDuringARecordingTheCardTheButtonAndTheRowReturnToIt`, `RecordingSelectionTests`, and the Recording accessibility audit |
+| Live draft | `NoteScreenTests.testTheDraftFollowsItsEndBelowTheFixedCard`, inline-speaker naming and suggestion checks |
+| Speaker naming | `SpeakerNamingFlowTests`, including Italian stored placeholders, saved-voice suggestion and duplicate-name question |
+| Large text and colours | `StatusBadgeLayoutTests.testFrenchBadgesStayInsideTheRowAtLargestText`, `AccessibilityAuditTests`, `BrandTokenTests`, `ContrastTests` |
+
+These checks establish existing behaviour; they do not substitute for the open work packages' acceptance checks.
