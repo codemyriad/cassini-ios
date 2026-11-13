@@ -86,10 +86,21 @@ final class NoteScreenTests: XCTestCase {
         let boundary = app.navigationBars.allElementsBoundByIndex.map(\.frame.maxY).max() ?? 0
         let delta = title.frame.maxY - boundary + 8
         XCTAssertGreaterThan(delta, 0)
-        dragReading(app, by: delta)
+        let compact = app.staticTexts["noteCompactTitle"]
+        // A pan consumes touch-recognition travel (different on iOS 18). Correct only while some
+        // title pixels remain below the bar; a covered title without a compact replacement must fail.
+        for _ in 0..<4 {
+            guard !compact.exists, title.exists else { break }
+            let remaining = title.frame.maxY - boundary
+            guard remaining > 0 else { break }
+            dragReading(app, by: max(24, remaining + 8))
+        }
         assertSingleMeetingTitle(app, below: boundary, compact: true)
 
-        dragReading(app, by: -(delta + 24))
+        for _ in 0..<8 {
+            if title.exists, title.isHittable, title.frame.maxY > boundary, !compact.exists { break }
+            dragReading(app, by: -max(delta + 24, 48))
+        }
         assertSingleMeetingTitle(app, below: boundary, compact: false)
     }
 
