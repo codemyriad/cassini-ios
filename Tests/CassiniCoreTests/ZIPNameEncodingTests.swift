@@ -135,6 +135,95 @@ import Testing
         }
     }
 
+    private func annotatedPath(_ path: String, raw: Data) -> Data {
+        let bytes = Data(path.utf8)
+        let crc = raw.withUnsafeBytes { UInt32(CZlib.crc32(0, $0.bindMemory(to: UInt8.self).baseAddress, uInt(raw.count))) }
+        var extra = Data(); extra.zip16(0x7075); extra.zip16(UInt16(5 + bytes.count)); extra.append(1)
+        extra.zip32(crc); extra.append(bytes)
+        return extra
+    }
+
+    private func pathMember(_ path: String, mode: String, body: Data? = nil) -> ZIPAgyFixture.Member {
+        let alias = Data("Alias.wav".utf8)
+        var value = member(mode == "raw" || mode == "utf8" ? Data(path.utf8) : alias,
+                           flags: mode == "utf8" ? 0x800 : 0)
+        if let body { value.body = body; value.packed = body; value.size = UInt32(body.count) }
+        if mode == "annotation" || mode == "localAnnotation" {
+            let extra = annotatedPath(path, raw: alias)
+            if mode == "annotation" { value.extra = extra }
+            value.localExtra = extra
+        } else if mode == "localName" { value.localRawName = Data(path.utf8) }
+        return value
+    }
+
+    @Test func graphemeJoinedSeparatorsCannotHideUnsafePathScalarsInEitherHeader() throws {
+        let paths = ["/\u{0301}café.wav", "\\\u{0301}café.wav", "../\u{0301}café.wav",
+                     "folder/../\u{0301}café.wav", "folder\u{0600}/../café.wav",
+                     "folder\u{0600}\\..\\café.wav", "C:/\u{0301}café.wav", "C:\\\u{0301}café.wav"]
+        try withTemporaryDirectory { folder in
+            let url = folder.appendingPathComponent("paths.zip")
+            for mode in ["raw", "utf8", "annotation", "localAnnotation", "localName"] {
+                for path in paths {
+                    try ZIPAgyFixture.write([pathMember(path, mode: mode)], to: url)
+                    #expect(throws: ZIPFailure.unsafePaths) { try ZIPArchive(url: url) }
+                }
+            }
+        }
+    }
+
+    @Test func prependScalarCannotHideANonemptyDirectoryPayload() throws {
+        try withTemporaryDirectory { folder in
+            let url = folder.appendingPathComponent("directory.zip")
+            for mode in ["raw", "utf8", "annotation"] {
+                for path in ["Folder\u{0600}/", "Folder\u{0600}\\"] {
+                    try ZIPAgyFixture.write([pathMember(path, mode: mode, body: Data([1]))], to: url)
+                    #expect(throws: ZIPFailure.damaged) { try ZIPArchive(url: url) }
+                }
+            }
+        }
+    }
+
+    @Test func finderMetadataAndBasenamesUseScalarBoundariesWithoutDroppingCombiningMarks() throws {
+        try withTemporaryDirectory { folder in
+            let url = folder.appendingPathComponent("metadata.zip")
+            for mode in ["raw", "utf8", "annotation"] {
+                for path in ["__MACOSX/\u{0301}café.wav", "._\u{0301}café.wav", "Notes\u{0600}/._\u{0301}café.wav"] {
+                    try ZIPAgyFixture.write([pathMember(path, mode: mode)], to: url)
+                    let archive = try ZIPArchive(url: url)
+                    #expect(archive.entries.count == 1 && archive.entries[0].isMetadata)
+                }
+                for path in ["Notes/\u{0301}café.opus", "Notes\u{0600}\\\u{0301}café.opus"] {
+                    try ZIPAgyFixture.write([pathMember(path, mode: mode)], to: url)
+                    let archive = try ZIPArchive(url: url)
+                    let entry = try #require(archive.entries.first)
+                    #expect(Array(entry.name.unicodeScalars) == Array("\u{0301}café.opus".unicodeScalars))
+                    #expect(!entry.isMetadata && entry.isFile)
+                    #expect(try read(archive, named: entry.name) == payload)
+                }
+            }
+        }
+    }
+
+    @Test func writerRefusesSeparatorScalarsEvenWhenTheyBelongToLargerGraphemes() throws {
+        try withTemporaryDirectory { folder in
+            let source = folder.appendingPathComponent("audio.wav")
+            try payload.write(to: source)
+            for name in ["Notes/\u{0301}café.wav", "Notes\\\u{0301}café.wav",
+                         "Notes\u{0600}/café.wav", "Notes\u{0600}\\café.wav"] {
+                let writer = try StoredZIPWriter(url: folder.appendingPathComponent("unsafe.zip"))
+                #expect(throws: ZIPFailure.unsafePaths) { try writer.add(file: source, name: name) }
+            }
+            let url = folder.appendingPathComponent("safe.zip")
+            let writer = try StoredZIPWriter(url: url)
+            let name = "\u{0301}café\u{0600}.wav"
+            try writer.add(file: source, name: name)
+            try writer.finish()
+            let archive = try ZIPArchive(url: url)
+            #expect(Array(try #require(archive.entries.first).name.unicodeScalars) == Array(name.unicodeScalars))
+            #expect(try read(archive, named: name) == payload)
+        }
+    }
+
     @Test func unicodeExtraPresenceAndDecodedIdentityRemainStrict() throws {
         try withTemporaryDirectory { folder in
             let url = folder.appendingPathComponent("unicode-extra.zip")
