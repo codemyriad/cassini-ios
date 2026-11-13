@@ -86,6 +86,14 @@ enum TestFixtures {
         var main = fixture(now: now)
         var notes: [Note] = []
         switch seed {
+        case .oneSpeaker:
+            main.title = "Solo planning"
+            main.speakers = [NoteSpeaker(id: "alex", name: "Alex", colourIndex: 0, provenance: .user)]
+            main.transcript = transcribedSegments.map { segment in
+                var segment = segment
+                segment.speakerID = "alex"; segment.speaker = "Alex"
+                return timedSegment(segment.text, start: segment.start, end: segment.end, segment)
+            }
         case .speakers:
             // Sam is not named yet, and the saved voice "Sam Rivera" may be them: the note asks "Is this Sam Rivera?".
             let sam = try seedSuggestedVoice(root: store.root)
@@ -120,7 +128,7 @@ enum TestFixtures {
             failed.duration = fixtureDuration; failed.language = "en-US"; failed.waveform = waveform
             failed.status = .failed; failed.failure = .audio
             notes.append(failed)
-        case .library, .recording, .voices, .speakers:
+        case .library, .recording, .voices, .speakers, .oneSpeaker:
             break
         case .search, .reading:
             // Whistle transcribed the review after Parakeet Ultra could not get its memory: its note says so.

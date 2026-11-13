@@ -78,6 +78,9 @@ public struct LibraryRow: Identifiable, Hashable, Sendable {
     public var day: DayKey?
     public var status: Status
     public var preview: Highlighted?
+    /// Search keeps the matching snippet; ordinary meeting rows omit the transcript quote (L-53).
+    /// The stored preview remains available to existing accessibility and search consumers.
+    public var displayedPreview: Highlighted? { day == nil ? nil : preview }
     /// The note whose job runs: drawn on the card surface.
     public var highlighted: Bool
     /// The note being recorded: a tap returns to the Recording screen.

@@ -76,6 +76,7 @@ private struct RouteDestination: View {
 
     var body: some View {
         screen.navigationBarBackButtonHidden(router.hidesBackButton(route))
+            .toolbar(route == .library ? .hidden : .visible, for: .navigationBar)
     }
 
     @ViewBuilder private var screen: some View {

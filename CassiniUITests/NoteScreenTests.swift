@@ -328,8 +328,9 @@ final class NoteScreenTests: XCTestCase {
         app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed", "processing"] + DeviceUnderTest.workingSpeech
         app.launchAndWait()
         // The seed's job runs first, so the notes queued below wait behind it.
-        let banner = app.buttons["progressBanner"]
-        XCTAssertTrue(banner.wait(until: NSPredicate(format: "label BEGINSWITH 'Transcribing'"), within: 15))
+        let running = app.buttons.matching(NSPredicate(format: "identifier == 'noteRow' AND label BEGINSWITH %@",
+                                                       "Weekly planning call")).firstMatch
+        XCTAssertTrue(running.wait(until: NSPredicate(format: "label CONTAINS ', transcribing'"), within: 15))
         let fixture = app.buttons.matching(NSPredicate(format: "identifier == 'noteRow' AND label BEGINSWITH %@",
                                                        "A quieter kind of productivity")).firstMatch
         XCTAssertTrue(fixture.waitForExistence(within: 5))

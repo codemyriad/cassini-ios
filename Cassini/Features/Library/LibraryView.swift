@@ -2,9 +2,8 @@ import SwiftUI
 import CassiniEngine
 import CassiniNotebook
 
-/// The Library (board 00, features.md section 1): the wordmark, the search with the privacy line, the activity area
-/// (the banners, the recording card, the transcription banner), then the day sections or, while searching, the
-/// flat results. Import audio and Record are pinned to the bottom.
+/// The Library: pinned native search, existing filters and notices, then day groups or highlighted meeting results.
+/// Import audio and Record stay at the bottom; no decorative privacy or meeting-progress card.
 struct LibraryView: View {
     @Environment(LibraryScreenModel.self) private var model
     @Environment(NoticesStore.self) private var notices
@@ -12,7 +11,6 @@ struct LibraryView: View {
     @Environment(LibraryStore.self) private var library
     @Environment(Router.self) private var router
     @Environment(ErrorPresenter.self) private var errors
-    @Environment(\.dynamicTypeSize) private var dynamicType
     @Environment(\.calendar) private var calendar
     @Environment(\.restoresSceneState) private var restoresSceneState
     @SceneStorage("library.query") private var savedQuery = ""
@@ -21,6 +19,10 @@ struct LibraryView: View {
     @SceneStorage("library.dialog") private var savedDialog: Data?
     @State private var renameDraft: String?
     @State private var importing = false
+    @State private var searchPresented = false
+    @State private var listPosition = ScrollPosition()
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Namespace private var searchGlass
     @State private var restored = false
     @State private var dialogRestored = false
     @State private var editMode: EditMode = .inactive
@@ -33,9 +35,12 @@ struct LibraryView: View {
         let exportable = Set(ArchiveSelection.ids(library.notes))
         ScrollView {
             LazyVStack(alignment: .leading, spacing: Spacing.row) {
-                header.padding(.bottom, 8)
-                SearchField(query: $model.query)
                 filters.padding(.top, 6)
+                if model.isSearching, let count = content.facts.results {
+                    Text(LibraryPhase1Copy.template("format.searchCount.meetings", count: count))
+                        .font(.subheadline.weight(.semibold)).foregroundStyle(Color.ink)
+                        .accessibilityAddTraits(.isHeader).accessibilityIdentifier("librarySearchCount")
+                }
                 activity.padding(.top, 6)
                 if !content.loading || content.emptyState == .unavailable {
                     // The banners say when there are no notes, no matches or no library; the Starred filter has its own.
@@ -56,29 +61,22 @@ struct LibraryView: View {
             .padding(.horizontal, Spacing.gutter).padding(.top, 12).padding(.bottom, 28)
             .readableWidth()
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(searchPresented ? LibraryPhase1Copy.searchResultsAccessibilityLabel : MeetingPhase1Copy.allMeetings)
+        .accessibilityAddTraits(.isHeader)
+        .accessibilityIdentifier("libraryScroll")
+        .meetingScrollEdge()
         .scrollDismissesKeyboard(.immediately)
+        .scrollPosition($listPosition)
         .background(Color.paper)
         .overlay(alignment: .topLeading) { UITestInteractiveMarker(loaded: library.isLoaded && !content.loading) }
         .trashUndoSnackbar()
         .safeAreaInset(edge: .bottom, spacing: 0) {
             CaptureBar(unavailable: content.emptyState == .unavailable) { importing = true }
         }
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                HStack(spacing: 8) { OrbitMark(size: 26); // The wordmark sets the name in lower case; VoiceOver reads it as written.
-                    Text(verbatim: ProductName.wordmark).font(.system(size: 18, weight: .medium)) }
-                    .foregroundStyle(Color.ink).fixedSize().accessibilityElement(children: .combine)
-                    .accessibilityLabel(Text(verbatim: ProductName.full))
-                    .accessibilityAddTraits(.isHeader).accessibilityShowsLargeContentViewer()
-                    .accessibilityIdentifier("wordmark")
-            }.sharedBackgroundHidden()
-            ToolbarItemGroup(placement: .topBarTrailing) {
-                Button(TrashCopy.title, systemImage: "trash") { router.show(.trash) }
-                    .accessibilityIdentifier("recentlyDeletedButton")
-                Button(LibraryCopy.settings, systemImage: "slider.horizontal.3") { router.show(.settings) }
-                    .accessibilityIdentifier("settingsButton")
-            }
-        }
+        .safeAreaInset(edge: .top, spacing: 0) { searchHeader.zIndex(1) }
+        .navigationTitle(MeetingPhase1Copy.allMeetings)
+        .toolbar(.hidden, for: .navigationBar)
         .onAppear(perform: restoreSceneState)
         .environment(\.editMode, $editMode)
         .onChange(of: editMode) { _, mode in if !mode.isEditing { selectedNotes.removeAll() } }
@@ -87,7 +85,16 @@ struct LibraryView: View {
             if eligible.isEmpty { editMode = .inactive }
         }
         .shareSheet(item: $archiveExport.shareItem)
-        .onChange(of: model.query) { _, query in if restoresSceneState { savedQuery = query } }
+        .onChange(of: model.query) { _, query in
+            if !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { searchPresented = true }
+            if restoresSceneState { savedQuery = query }
+        }
+        .onChange(of: searchPresented) { _, presented in
+            if presented { listPosition.scrollTo(edge: .top) }
+        }
+        .onChange(of: model.searched) { _, _ in
+            if searchPresented { listPosition.scrollTo(edge: .top) }
+        }
         .onChange(of: model.favoritesOnly) { _, only in if restoresSceneState { savedFavoritesOnly = only } }
         .onChange(of: model.dialog) { _, dialog in
             if dialog == nil { renameDraft = nil }
@@ -114,16 +121,66 @@ struct LibraryView: View {
         } message: { _ in Text(LibraryCopy.freshBody) }
     }
 
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(dynamicType.isAccessibilitySize ? LibraryCopy.headlineLarge : LibraryCopy.headline)
-                .font(.system(.largeTitle)).foregroundStyle(Color.ink)
-                .accessibilityAddTraits(.isHeader)
-            if !dynamicType.isAccessibilitySize { Text(LibraryCopy.subheadline).font(.subheadline).foregroundStyle(Color.muted) }
-        }.padding(.top, 18)
+    @ViewBuilder private var searchHeader: some View {
+        Group {
+            if #available(iOS 26.0, *) {
+                GlassEffectContainer(spacing: 8) {
+                    searchControls
+                }
+            } else {
+                searchControls
+            }
+        }
+        .padding(.horizontal, 16).padding(.vertical, 6)
+        .readableWidth()
+        .animation(reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 0.85), value: searchPresented)
     }
 
-    /// The banners (NoticeCenter's notices and the list's own states), the recording card and the transcription banner.
+    private var searchControls: some View {
+        @Bindable var model = model
+        return HStack(spacing: 8) {
+            SearchField(query: $model.query, isPresented: $searchPresented)
+                .frame(maxWidth: .infinity)
+            searchActions
+        }
+    }
+
+    @ViewBuilder private var searchActions: some View {
+        if #available(iOS 26.0, *) {
+            searchButtons.glassEffect(.regular, in: Capsule())
+                .glassEffectID("libraryActions", in: searchGlass)
+        } else {
+            searchButtons.background(.regularMaterial, in: Capsule())
+        }
+    }
+
+    private var searchButtons: some View {
+        ZStack {
+            if searchPresented {
+                Button(LibraryPhase1Copy.close, systemImage: "xmark") {
+                    model.query = ""
+                    model.searchDate = .any
+                    searchPresented = false
+                }
+                .accessibilityIdentifier("closeLibrarySearch")
+                .transition(.opacity)
+            } else {
+                HStack(spacing: 0) {
+                    Button(TrashCopy.title, systemImage: "trash") { router.show(.trash) }
+                        .accessibilityIdentifier("recentlyDeletedButton")
+                    Button(LibraryCopy.settings, systemImage: "slider.horizontal.3") { router.show(.settings) }
+                        .accessibilityIdentifier("settingsButton")
+                }
+                .transition(.opacity)
+            }
+        }
+        .animation(.easeInOut(duration: 0.15), value: searchPresented)
+        .labelStyle(.iconOnly).font(.system(size: 20)).foregroundStyle(Color.ink)
+        .buttonStyle(LibraryHeaderButtonStyle())
+        .padding(2).frame(width: searchPresented ? 48 : 92, height: 48)
+    }
+
+    /// All real notices, the recording card, standalone downloads and import/export progress stay available.
     @ViewBuilder private var activity: some View {
         BannerList(specs: notices.library(model.content.facts),
                    onAction: { spec, action in notices.perform(action, on: spec) { importing = true } },
@@ -143,7 +200,7 @@ struct LibraryView: View {
                 Spacer(minLength: 0)
                 ArchiveExportControls(selectedNotes: $selectedNotes, archiveExport: archiveExport)
             }.font(.subheadline)
-            if model.isSearching {
+            if searchPresented {
                 Menu {
                     ForEach(SearchDate.allCases, id: \.self) { date in
                         Button {
@@ -213,8 +270,10 @@ struct LibraryView: View {
     private func confirm(_ dialog: LibraryDialog) { Task { await model.confirm(dialog) } }
 
     private func restoreSceneState() {
+        if model.isSearching { searchPresented = true }
         guard restoresSceneState, !restored else { return }
         restored = true
+        if !savedQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { searchPresented = true }
         model.query = savedQuery
         model.favoritesOnly = savedFavoritesOnly
     }
@@ -252,13 +311,6 @@ struct LibraryView: View {
 private extension LibraryDialog {
     var startOver: Bool { if case .startOver = self { true } else { false } }
     var transcribeFresh: Bool { if case .transcribeFresh = self { true } else { false } }
-}
-
-private extension ToolbarContent {
-    /// Keeps the item out of iOS 26's shared glass background; earlier systems draw no background behind bar items.
-    @ToolbarContentBuilder func sharedBackgroundHidden() -> some ToolbarContent {
-        if #available(iOS 26.0, *) { sharedBackgroundVisibility(.hidden) } else { self }
-    }
 }
 
 /// Native Edit/Done keeps its system localization, with a full target inside the button label.

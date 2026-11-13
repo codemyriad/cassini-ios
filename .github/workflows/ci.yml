@@ -41,6 +41,7 @@ on:
       - 'scripts/test-pr-shots-local.py'
       - 'scripts/*status-badge*.py'
       - 'scripts/*meeting-strings*.py'
+      - 'scripts/*library-strings*.py'
       - 'scripts/*brand*.py'
       - 'scripts/*testflight*'
       - 'scripts/launchd/**'
@@ -101,6 +102,8 @@ jobs:
         run: |
           python3 scripts/generate-status-badge-strings.py --check
           python3 scripts/generate-meeting-strings.py --check
+          python3 scripts/generate-library-strings.py --check
+          python3 scripts/test-library-strings.py
           python3 scripts/test-status-badge-strings.py
           python3 Packages/CassiniNotebook/Tests/CassiniNotebookTests/Resources/status-badges/vectors/states/verify.py
           python3 Packages/CassiniNotebook/Tests/CassiniNotebookTests/Resources/status-badges/vectors/states/test_contract.py

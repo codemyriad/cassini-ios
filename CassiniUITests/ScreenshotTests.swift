@@ -93,7 +93,7 @@ final class ScreenshotTests: XCTestCase {
         let app = try launchPhone(["--seed", "search"])
         let search = app.textFields["librarySearch"]
         search.tap()
-        // Search on the keyboard (a new line in the wrapping field) ends the search and hides the keyboard.
+        // Search on the keyboard submits the query and hides the keyboard while keeping results open.
         search.typeText("Thursday\n")
         XCTAssertTrue(row(app, "Garden plans for the spring").waitForExistence(within: 5))
         XCTAssertTrue(row(app, "Notes from the design review").waitForNonExistence(within: 5))
@@ -160,8 +160,10 @@ final class ScreenshotTests: XCTestCase {
 
     @MainActor func test14SuccessBadge() throws {
         let app = try launchPhone(["--seed", "brandSpeakers"])
-        XCTAssertTrue(row(app, "Community garden planning").waitForExistence(within: 5))
-        XCTAssertTrue(element(app, containing: "Transcribed").waitForExistence(within: 5))
+        let completed = row(app, "Community garden planning")
+        XCTAssertTrue(completed.waitForExistence(within: 5))
+        XCTAssertTrue(completed.wait(until: NSPredicate(format: "label CONTAINS[c] 'transcribed'"), within: 5),
+                      "the completed row retains its spoken state without a visual done chip")
         capture("14-success-badge")
     }
 
@@ -223,6 +225,28 @@ final class ScreenshotTests: XCTestCase {
         })
         XCTAssertEqual(compact.label, "Three hour workshop")
         capture("19-meeting-scrolled")
+    }
+
+    @MainActor func test20LibraryScrolled() throws {
+        let app = try launchPhone(["--seed", "statuses"] + DeviceUnderTest.workingSpeech)
+        let search = app.textFields["librarySearch"]
+        XCTAssertTrue(search.waitForExistence(within: 15))
+        let searchFrame = search.frame
+        let quiet = row(app, "Quiet room")
+        XCTAssertTrue(app.scrollViews["libraryScroll"].scroll(attempts: 12) {
+            quiet.exists && quiet.isHittable && quiet.frame.maxY < app.buttons["recordButton"].frame.minY
+        })
+        XCTAssertTrue(search.isHittable)
+        XCTAssertEqual(search.frame, searchFrame, "the search capsule stays pinned while the list scrolls")
+        capture("20-library-scrolled")
+    }
+
+    @MainActor func test21OneSpeakerRow() throws {
+        let app = try launchPhone(["--seed", "oneSpeaker"])
+        let solo = row(app, "Solo planning")
+        XCTAssertTrue(solo.waitForExistence(within: 15))
+        XCTAssertTrue(solo.wait(until: NSPredicate(format: "label CONTAINS[c] 'transcribed' AND label CONTAINS '1 speaker'"), within: 5))
+        capture("21-one-speaker-row")
     }
 
     // MARK: - iPad

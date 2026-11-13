@@ -17,7 +17,7 @@ final class LibraryUITests: XCTestCase {
 
     /// The library's list. Swipes go to it: on iPad the middle of the screen is the note beside it.
     @MainActor private func list(_ app: XCUIApplication) -> XCUIElement {
-        app.scrollViews.containing(.button, identifier: "noteRow").firstMatch
+        app.scrollViews["libraryScroll"]
     }
 
     /// The row titled `title`, fully between the navigation and capture bars before a tap or long-press.
@@ -27,7 +27,9 @@ final class LibraryUITests: XCTestCase {
         for _ in 0..<12 {
             if element.exists {
                 let frame = element.frame
-                let top = navigation.exists ? navigation.frame.maxY : viewport.frame.minY
+                let search = app.textFields["librarySearch"]
+                let top = max(navigation.exists ? navigation.frame.maxY : viewport.frame.minY,
+                              search.exists ? search.frame.maxY : viewport.frame.minY)
                 if !frame.isEmpty {
                     if frame.minY >= top && frame.maxY <= bar.frame.minY && element.isHittable { return element }
                     if frame.minY < top {
@@ -111,16 +113,18 @@ final class LibraryUITests: XCTestCase {
     }
 
     // ports: LibraryBehaviourTest#theControlsSendTheirEvents
-    // ports: LibraryViewModelTest#theProgressBannerOpensTheRunningNoteOrSettings
     @MainActor func testTheControlsLeadWhereTheySay() {
         let app = launch(["--seed", "statuses"] + DeviceUnderTest.workingSpeech)
-        let banner = app.buttons["progressBanner"]
-        XCTAssertTrue(banner.waitForExistence(within: 15))
-        XCTAssertTrue(waitFor(banner, label: "Transcribing Weekly planning call"), banner.label)
-        XCTAssertTrue(waitFor(banner, label: "1 more in queue"), banner.label)
+        let running = row(app, "Weekly planning call")
+        XCTAssertTrue(running.waitForExistence(within: 15))
+        XCTAssertTrue(waitFor(running, label: ", transcribing"), running.label)
+        let queued = row(app, "Interview with the printer")
+        XCTAssertTrue(queued.waitForExistence(within: 15))
+        XCTAssertTrue(waitFor(queued, label: ", queued"), queued.label)
+        XCTAssertFalse(app.buttons["progressBanner"].exists, "the running meeting reports progress in its row")
         XCTAssertTrue(app.buttons["importButton"].isEnabled)
         XCTAssertEqual(app.buttons["recordButton"].label, "Record a new note")
-        banner.tap()
+        running.tap()
         XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 5))
         XCTAssertEqual(app.staticTexts["noteTitle"].label, "Weekly planning call")
     }
@@ -210,11 +214,212 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(garden.waitForExistence(within: 15))
         app.buttons["Clear search"].tap()
         XCTAssertTrue(app.staticTexts["TODAY"].waitForExistence(within: 15))
-        XCTAssertFalse(date.exists, "Date filters only narrow typed Search")
+        XCTAssertTrue(date.wait(until: NSPredicate(format: "label CONTAINS 'Any date'"), within: 5),
+                      "Clear resets the date filter while Search stays open")
+        XCTAssertTrue(app.buttons["closeLibrarySearch"].exists, "Clear keeps Search open")
         search.tap()
         search.typeText("thurs\n")
         XCTAssertTrue(garden.waitForExistence(within: 15))
         XCTAssertTrue(date.label.contains("Any date"), "A new search has no remembered date filter")
+    }
+
+    @MainActor func testOneSpeakerRowKeepsItsSpokenStateWithoutADoneChip() {
+        let app = launch(["--seed", "oneSpeaker"])
+        let solo = row(app, "Solo planning")
+        XCTAssertTrue(solo.waitForExistence(within: 15))
+        XCTAssertTrue(waitFor(solo, label: ", transcribed"), "the completed state remains available to VoiceOver")
+        XCTAssertTrue(waitFor(solo, label: "1 speaker"), "a single known speaker has the same metadata as multiple speakers")
+        XCTAssertFalse(app.staticTexts["Transcribed"].exists, "completed meetings do not repeat a visual done chip")
+        capture("One speaker without done chip")
+    }
+
+    @MainActor func testIPadOneSpeakerRowKeepsItsSpokenStateWithoutADoneChip() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad, "the Library sidebar")
+        testOneSpeakerRowKeepsItsSpokenStateWithoutADoneChip()
+    }
+
+    @MainActor func testIPadOrdinaryRowsOmitQuotesAndSearchKeepsItsHighlightedExcerpt() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad, "the Library sidebar")
+        testOrdinaryRowsOmitQuotesAndSearchKeepsItsHighlightedExcerpt()
+    }
+
+    @MainActor private func assertSearchControlsAndSingleResultAreVisible(_ app: XCUIApplication,
+                                                                         result: XCUIElement,
+                                                                         file: StaticString = #filePath, line: UInt = #line) {
+        let date = app.buttons["librarySearchDate"]
+        let count = app.staticTexts["librarySearchCount"]
+        XCTAssertTrue(date.wait(until: NSPredicate(format: "hittable == true"), within: 5),
+                      "opening Search brings the date filter into view without another swipe", file: file, line: line)
+        XCTAssertTrue(count.wait(until: NSPredicate(format: "label == '1 meeting' AND hittable == true"), within: 15),
+                      "the published result count is visible after the scrolled list is searched", file: file, line: line)
+        XCTAssertTrue(result.wait(until: NSPredicate(format: "hittable == true"), within: 15),
+                      "the matching meeting is in view without another swipe", file: file, line: line)
+    }
+
+    @MainActor private func assertClosingEmptySearchResetsDate(_ app: XCUIApplication,
+                                                             file: StaticString = #filePath, line: UInt = #line) {
+        let search = app.textFields["librarySearch"]
+        search.tap()
+        capture("Empty Library search focused before choosing a date")
+        let close = app.buttons["closeLibrarySearch"]
+        XCTAssertTrue(close.waitForExistence(within: 5), file: file, line: line)
+        let date = app.buttons["librarySearchDate"]
+        XCTAssertTrue(date.waitForExistence(within: 5), file: file, line: line)
+        date.tap()
+        app.buttons["Today"].tapWhenSettled()
+        XCTAssertTrue(date.wait(until: NSPredicate(format: "label CONTAINS 'Today'"), within: 5), file: file, line: line)
+        close.tap()
+        XCTAssertTrue(app.buttons["settingsButton"].waitForExistence(within: 5), file: file, line: line)
+        XCTAssertFalse(close.exists, file: file, line: line)
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(within: 5), file: file, line: line)
+        search.tap()
+        XCTAssertTrue(close.waitForExistence(within: 5), file: file, line: line)
+        XCTAssertTrue(date.wait(until: NSPredicate(format: "label CONTAINS 'Any date'"), within: 5),
+                      "Close resets a date chosen before any query was typed", file: file, line: line)
+        close.tap()
+        XCTAssertTrue(app.buttons["settingsButton"].waitForExistence(within: 5), file: file, line: line)
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(within: 5), file: file, line: line)
+    }
+
+    @MainActor func testClosingEmptySearchResetsItsDateFilter() {
+        let app = launch(["--seed", "search"])
+        assertClosingEmptySearchResetsDate(app)
+    }
+
+    @MainActor func testIPadPinnedSearchRetainsItsQueryWhileSidebarReplacesDetail() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad, "the persistent Library sidebar")
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        // Finish the old scene before rotating, as in the other split-view regressions.
+        app.terminate()
+        XCTAssertTrue(app.wait(for: .notRunning, timeout: 15))
+        XCUIDevice.shared.orientation = .landscapeLeft
+        addTeardownBlock { @MainActor in XCUIDevice.shared.orientation = .portrait }
+        app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed", "statuses"] + DeviceUnderTest.workingSpeech
+        app.launchAndWait(fresh: true)
+        let search = app.textFields["librarySearch"]
+        XCTAssertTrue(search.waitForExistence(within: 15))
+        assertClosingEmptySearchResetsDate(app)
+        let sidebar = app.scrollViews["libraryScroll"]
+        let initialSearchFrame = search.frame
+        let quiet = row(app, "Quiet room")
+        XCTAssertTrue(sidebar.scroll(attempts: 12) {
+            quiet.exists && quiet.isHittable && quiet.frame.maxY < app.buttons["recordButton"].frame.minY
+        })
+        capture("iPad Library scrolled before opening Search")
+        XCTAssertTrue(search.isHittable)
+        XCTAssertEqual(search.frame, initialSearchFrame, "the sidebar search stays pinned while its rows scroll")
+        search.tap()
+        capture("iPad empty Search focused after scrolling the Library")
+        let date = app.buttons["librarySearchDate"]
+        XCTAssertTrue(date.wait(until: NSPredicate(format: "hittable == true"), within: 5))
+        let close = app.buttons["closeLibrarySearch"]
+        XCTAssertTrue(close.waitForExistence(within: 5))
+        search.typeText("planning\n")
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(within: 5))
+        let planning = row(app, "Weekly planning call")
+        XCTAssertTrue(planning.waitForExistence(within: 15))
+        assertSearchControlsAndSingleResultAreVisible(app, result: planning)
+        planning.tap()
+        let title = app.staticTexts["noteTitle"]
+        XCTAssertTrue(title.wait(until: NSPredicate(format: "label == 'Weekly planning call'"), within: 15))
+        XCTAssertTrue(search.isHittable, "the Library stays beside the selected meeting")
+        XCTAssertTrue(close.isHittable)
+        XCTAssertTrue(search.waitForValue("planning"), "selecting a meeting keeps the sidebar query")
+        close.tap()
+        let settings = app.buttons["settingsButton"]
+        XCTAssertTrue(settings.waitForExistence(within: 5))
+        XCTAssertTrue(app.buttons["recentlyDeletedButton"].exists)
+        settings.tap()
+        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(within: 15))
+        XCTAssertTrue(search.isHittable, "Settings replaces only the detail column")
+        XCTAssertTrue(sidebar.scroll(up: false, attempts: 8) { planning.exists && planning.isHittable })
+        planning.tap()
+        XCTAssertTrue(title.wait(until: NSPredicate(format: "label == 'Weekly planning call'"), within: 15),
+                      "selecting the meeting again replaces Settings without a root-detail Back button")
+        XCTAssertTrue(search.isHittable)
+        XCTAssertTrue(settings.isHittable)
+    }
+
+    @MainActor func testPinnedSearchClosesAndResetsItsDateFilterAcrossNoteNavigation() {
+        let app = launch(["--seed", "statuses"] + DeviceUnderTest.workingSpeech)
+        let search = app.textFields["librarySearch"]
+        let list = app.scrollViews["libraryScroll"]
+        XCTAssertTrue(row(app, "Weekly planning call").waitForExistence(within: 15))
+        XCTAssertEqual(list.label, "All meetings")
+        let initialSearchFrame = search.frame
+        let emptyQueryValue = search.value as? String
+        let last = row(app, "Quiet room")
+        XCTAssertTrue(list.scroll(attempts: 12) {
+            last.exists && last.isHittable && last.frame.maxY < app.buttons["recordButton"].frame.minY
+        })
+        capture("Library scrolled before opening Search")
+        XCTAssertTrue(search.isHittable, "Search remains available after the list scrolls")
+        XCTAssertEqual(search.frame, initialSearchFrame, "Search is pinned outside the scrolling list")
+
+        search.tap()
+        capture("Empty Search focused after scrolling the Library")
+        let date = app.buttons["librarySearchDate"]
+        XCTAssertTrue(date.wait(until: NSPredicate(format: "hittable == true"), within: 5))
+        let close = app.buttons["closeLibrarySearch"]
+        XCTAssertTrue(close.waitForExistence(within: 5))
+        XCTAssertFalse(app.buttons["settingsButton"].exists)
+        XCTAssertFalse(app.buttons["recentlyDeletedButton"].exists)
+        search.typeText("planning\n")
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(within: 5), "Search submission dismisses the keyboard")
+        let planning = row(app, "Weekly planning call")
+        XCTAssertTrue(planning.waitForExistence(within: 15))
+        assertSearchControlsAndSingleResultAreVisible(app, result: planning)
+        date.tap()
+        app.buttons["Today"].tapWhenSettled()
+        XCTAssertTrue(date.wait(until: NSPredicate(format: "label CONTAINS 'Today'"), within: 5))
+        close.tap()
+        XCTAssertTrue(app.buttons["settingsButton"].waitForExistence(within: 5))
+        XCTAssertTrue(app.buttons["recentlyDeletedButton"].exists)
+        XCTAssertFalse(close.exists)
+        XCTAssertTrue(poll(within: uiWaitFloor) { (search.value as? String).map { $0.isEmpty || $0 == emptyQueryValue } ?? false },
+                      "Close clears the query")
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(within: 5))
+
+        search.tap()
+        XCTAssertTrue(close.waitForExistence(within: 5))
+        search.typeText("planning\n")
+        XCTAssertTrue(planning.waitForExistence(within: 15))
+        assertSearchControlsAndSingleResultAreVisible(app, result: planning)
+        XCTAssertTrue(date.wait(until: NSPredicate(format: "label CONTAINS 'Any date'"), within: 5),
+                      "closing Search resets the date filter")
+        planning.tap()
+        XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 5))
+        XCTAssertEqual(app.staticTexts["noteTitle"].label, "Weekly planning call")
+        app.navigationBars.buttons["Back to all meetings"].tap()
+        XCTAssertTrue(search.waitForExistence(within: 5), "the note returns to the Library")
+        XCTAssertTrue(close.waitForExistence(within: 5))
+        XCTAssertTrue(search.waitForValue("planning"), "the open Search survives visiting a meeting")
+        assertSearchControlsAndSingleResultAreVisible(app, result: planning)
+        close.tap()
+        let settings = app.buttons["settingsButton"]
+        XCTAssertTrue(settings.waitForExistence(within: 5))
+        settings.tap()
+        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(within: 5), "destination navigation bars are restored")
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(search.waitForExistence(within: 5))
+        XCTAssertTrue(settings.isHittable)
+    }
+
+    @MainActor func testOrdinaryRowsOmitQuotesAndSearchKeepsItsHighlightedExcerpt() {
+        let app = launch(["--seed", "search"])
+        let fixture = row(app, "A quieter kind of productivity")
+        XCTAssertTrue(fixture.waitForExistence(within: 15))
+        XCTAssertFalse(app.descendants(matching: .any)["rowPreview"].exists, "ordinary rows omit transcript quote previews")
+        XCTAssertTrue(fixture.label.contains("What if being productive"), "VoiceOver retains the transcript context while the visual quote is omitted")
+        let search = app.textFields["librarySearch"]
+        search.tap()
+        search.typeText("tomatoe\n")
+        let garden = row(app, "Garden plans for the spring")
+        XCTAssertTrue(garden.waitForExistence(within: 15))
+        XCTAssertTrue(waitFor(garden, label: "tomatoes"), "the Search result retains its matched excerpt")
+        XCTAssertTrue(garden.label.contains("sunny corner"), "the excerpt retains context around the matching word")
+        XCTAssertTrue(fixture.waitForNonExistence(within: 5), "a nonmatching meeting is filtered out")
     }
 
     /// Search finds a spoken word of a note, a long press on the result opens its actions over the search, Move to
@@ -247,7 +452,8 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Record"].exists, "the LIB_EMPTY banner's own Record")
         XCTAssertTrue(app.buttons["Import"].exists, "and its own Import, as Android's banner")
         XCTAssertTrue(app.buttons["Import audio"].exists, "beside the capture bar's Import audio")
-        XCTAssertTrue(app.staticTexts["Transcribed on this device. Audio never leaves it."].exists)
+        XCTAssertFalse(app.staticTexts["Transcribed on this device. Audio never leaves it."].exists,
+                       "the Library does not repeat the first-run privacy line")
         capture("Library empty")
     }
 

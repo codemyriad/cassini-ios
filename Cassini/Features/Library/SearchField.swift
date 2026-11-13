@@ -2,51 +2,55 @@ import SwiftUI
 import UIKit
 import CassiniEngine
 
-/// The Library search: Search on the keyboard hides it, and a 44 pt Clear search button shows while there is text.
-/// The privacy line sits under it.
+/// The pinned Library search. Submit dismisses the keyboard while results and their Close control stay open.
 struct SearchField: View {
     static let identifier = "librarySearch"
     @Binding var query: String
+    @Binding var isPresented: Bool
     @FocusState private var focused: Bool
     @Environment(\.dynamicTypeSize) private var dynamicType
     /// The width the field's text has, for the placeholder that fits it on one line.
     @State private var textWidth: CGFloat = 0
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 6) {
-                Image(systemName: "magnifyingglass").foregroundStyle(Color.muted).accessibilityHidden(true)
-                TextField(placeholder, text: $query, prompt: Text(placeholder).foregroundStyle(Color.ink3), axis: .vertical)
-                    .lineLimit(1...3)
-                    .font(.body).autocorrectionDisabled().textInputAutocapitalization(.never)
-                    .submitLabel(.search).focused($focused).onSubmit { focused = false }
-                    // A field that wraps takes Search as a new line rather than a submit: it ends the search instead.
-                    .onChange(of: query) { _, text in
-                        guard text.contains(where: \.isNewline) else { return }
-                        query = text.filter { !$0.isNewline }
-                        focused = false
-                    }
-                    .accessibilityIdentifier(Self.identifier)
-                    .modifier(TextViewEdits(query: $query, focused: $focused))
-                    .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { textWidth = $0 }
-                if !query.isEmpty {
-                    Button(LibraryCopy.clearSearch, systemImage: "xmark.circle.fill") { query = "" }
-                        .labelStyle(.iconOnly).foregroundStyle(Color.muted)
-                        .frame(width: HitTarget.minimum, height: HitTarget.minimum).contentShape(Rectangle())
-                }
+        HStack(spacing: 6) {
+            ZStack {
+                OrbitMark(size: 22).opacity(query.isEmpty ? 1 : 0)
+                Image(systemName: "magnifyingglass").font(.system(size: 20)).foregroundStyle(Color.ink2)
+                    .opacity(query.isEmpty ? 0 : 1)
             }
-            .padding(.leading, 15).padding(.trailing, 4).frame(minHeight: 52)
-            .cardBackground(radius: Radius.control, outlined: false)
-            .overlay(RoundedRectangle(cornerRadius: Radius.control).stroke(Color.ink.opacity(0.07), lineWidth: 1))
-            Label(LibraryCopy.privacy, systemImage: "lock.shield")
-                .font(.caption).foregroundStyle(Color.muted).padding(.leading, 4)
+            .frame(width: 22, height: 22).accessibilityHidden(true)
+            .animation(.easeInOut(duration: 0.15), value: query.isEmpty)
+            TextField(placeholder, text: $query, prompt: Text(placeholder).foregroundStyle(Color.ink3), axis: .vertical)
+                .lineLimit(1...3)
+                .font(.body).autocorrectionDisabled().textInputAutocapitalization(.never)
+                .submitLabel(.search).focused($focused).onSubmit { focused = false }
+                .onChange(of: query) { _, text in
+                    guard text.contains(where: \.isNewline) else { return }
+                    query = text.filter { !$0.isNewline }
+                    focused = false
+                }
+                .accessibilityLabel(LibraryPhase1Copy.searchAccessibilityLabel)
+                .accessibilityIdentifier(Self.identifier)
+                .modifier(TextViewEdits(query: $query, focused: $focused))
+                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { textWidth = $0 }
+            if !query.isEmpty {
+                Button(LibraryCopy.clearSearch, systemImage: "xmark.circle.fill") { query = "" }
+                    .labelStyle(.iconOnly).foregroundStyle(Color.muted)
+                    .frame(width: HitTarget.minimum, height: HitTarget.minimum).contentShape(Rectangle())
+            }
         }
+        .padding(.leading, 14).padding(.trailing, query.isEmpty ? 14 : 2)
+        .padding(.vertical, 3).frame(minHeight: 48)
+        .meetingGlass(cornerRadius: 24)
+        .onChange(of: focused) { _, value in if value { isPresented = true } }
+        .onChange(of: isPresented) { _, value in if !value { focused = false } }
     }
 
     /// Android's placeholder where it fits on one line (a phone); in the iPad's narrower sidebar, or at large text
     /// sizes, a shorter one, down to "Search". The field wraps typed text, and a wrapped placeholder would too.
     private var placeholder: String {
-        let candidates = [LibraryCopy.searchPlaceholder, LibraryCopy.searchPlaceholderMedium, LibraryCopy.searchPlaceholderShort]
+        let candidates = [LibraryPhase1Copy.searchPlaceholder, LibraryPhase1Copy.searchTitle]
         guard textWidth > 0 else { return candidates[0] }
         let category = UIContentSizeCategory(dynamicType)
         let font = UIFont.preferredFont(forTextStyle: .body, compatibleWith: UITraitCollection(preferredContentSizeCategory: category))

@@ -24,11 +24,14 @@ final class WideScreenTests: XCTestCase {
         return app
     }
 
-    /// The detail column: the window right of the Library's sidebar, whose navigation bar is the narrowest.
+    /// The detail column is right of the Library's scroll view; the pinned sidebar no longer has a native bar.
     @MainActor private func detailColumn(_ app: XCUIApplication) -> CGRect {
         let window = app.windows.firstMatch.frame
-        let sidebar = app.navigationBars.allElementsBoundByIndex.map(\.frame).min { $0.width < $1.width } ?? .zero
-        return CGRect(x: sidebar.maxX, y: window.minY, width: window.maxX - sidebar.maxX, height: window.height)
+        let sidebar = app.scrollViews["libraryScroll"]
+        XCTAssertTrue(sidebar.waitForExistence(within: 5))
+        XCTAssertGreaterThan(sidebar.frame.width, 0, "the sidebar has laid out")
+        return CGRect(x: sidebar.frame.maxX, y: window.minY,
+                      width: window.maxX - sidebar.frame.maxX, height: window.height)
     }
 
     /// Every element lies in the band of `cap` centred in `column`, and the widest of them is wider than a phone's
