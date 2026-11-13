@@ -24,7 +24,7 @@ struct TranscriptVersionsView: View {
                             }
                             Spacer()
                             if note?.selectedVersionID == version.id {
-                                Image(systemName: "checkmark").foregroundStyle(Color.ember)
+                                Image(systemName: "checkmark").foregroundStyle(Color.accentInk)
                             }
                         }
                     }

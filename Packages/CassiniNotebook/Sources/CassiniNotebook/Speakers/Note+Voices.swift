@@ -31,11 +31,15 @@ extension Note {
 
     /// "Not <name>": the speaker is never matched to `voiceID` again.
     public mutating func rejectVoice(_ voiceID: UUID, for speakerID: String, restorePlaceholder: Bool) {
+        backfillSpeakerColours()
         guard let index = speakers?.firstIndex(where: { $0.id == speakerID }), let speaker = speakers?[index] else { return }
         changeShownSpeakers { note in
             if !speaker.excludedVoiceIDs.contains(voiceID) { note.speakers?[index].excludedVoiceIDs.append(voiceID) }
             note.speakers?[index].match = .rejected(voice: voiceID, score: speaker.match.score ?? 0)
-            if restorePlaceholder { note.speakers?[index].name = DefaultLabels.placeholder(index + 1) }
+            if restorePlaceholder {
+                note.speakers?[index].name = DefaultLabels.placeholder(index + 1)
+                note.speakers?[index].provenance = .unnamed
+            }
             note.refreshSpeakerLabels()
         }
     }
@@ -112,7 +116,7 @@ extension Note {
     private var carriedSpeakers: [NoteSpeaker] {
         let shown = speakers ?? []
         let named = shown.isOneVoice ? (versions ?? []).last(where: { !$0.speakers.isOneVoice })?.speakers ?? [] : shown
-        return named.filter { !DefaultLabels.isDefault(id: $0.id, label: $0.name) && !$0.match.isRejection }
+        return named.filter { $0.provenance != .unnamed && !$0.match.isRejection }
     }
 
     /// The saved voices the carried speakers are linked to (`carriedSpeakers`, `NoteSpeaker.linkedVoiceID`), each with
@@ -166,7 +170,8 @@ extension Note {
     public mutating func applySpeakerAnalysis(turns: [SpeakerTurn], matches: [String: VoiceMatch], voiceNames: [UUID: String],
                                               localVoices: Set<UUID> = [], carriedLinks: [UUID: VoiceMatchState] = [:],
                                               autoName: Bool, stamp: VersionStamp, attributed: [TranscriptSegment]? = nil,
-                                              excluded extra: [String: Set<UUID>] = [:], labels: [String: String] = [:]) {
+                                              excluded extra: [String: Set<UUID>] = [:], labels: [String: String] = [:],
+                                              colourIndices: [String: Int] = [:], explicitNames: Set<String> = []) {
         let attributed = attributed ?? SpeakerAttribution.assign(transcript, turns: turns)
         var order: [String] = []
         for segment in attributed { if let id = segment.speakerID, !order.contains(id) { order.append(id) } }
@@ -175,18 +180,55 @@ extension Note {
             return
         }
         let excluded = carriedExclusions(for: turns).merging(extra) { $0.union($1) }
+        backfillSpeakerColours()
+        let shown = speakers ?? []
+        // The undifferentiated one-voice bootstrap is replaced by the first real analysis, not a prior person
+        // reserving slot zero. Older identified voices may still provide identity on Transcribe again.
+        let replacesBootstrap = shown.isOneVoice && !shown.contains { order.contains($0.id) }
+        let existing = replacesBootstrap ? [] : shown
+        let carried = carriedSpeakers
+        let identityPool = existing + carried.filter { old in !existing.contains { $0.id == old.id } }
+        var knownByID = Dictionary(existing.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let matchedCounts = Dictionary(grouping: order.compactMap { id -> UUID? in
+            guard let match = matches[id], match.automatic else { return nil }
+            return match.voiceID
+        }, by: { $0 }).mapValues(\.count)
+        for id in order where knownByID[id] == nil {
+            guard let match = matches[id], match.automatic, matchedCounts[match.voiceID] == 1,
+                  !(excluded[id]?.contains(match.voiceID) ?? false) else { continue }
+            let candidates = identityPool.filter { $0.linkedVoiceID == match.voiceID && !order.contains($0.id) }
+            // A confirmed/automatic saved-voice link proves identity only when both sides are unique.
+            if candidates.count == 1 { knownByID[id] = candidates[0] }
+        }
+        let reserved = identityPool.compactMap(\.colourIndex)
+        var nextColour = max(reserved.max() ?? -1, colourIndices.values.max() ?? -1) + 1
+        var coloursByID = knownByID.compactMapValues { $0.colourIndex }
+        for (id, index) in colourIndices where coloursByID[id] == nil { coloursByID[id] = index }
+        for id in SpeakerColourOrder.segments(attributed) where coloursByID[id] == nil {
+            coloursByID[id] = nextColour
+            nextColour += 1
+        }
         let analyzed = order.enumerated().map { offset, id in
-            var speaker = NoteSpeaker(id: id, name: DefaultLabels.placeholder(offset + 1))
+            let known = knownByID[id]
+            let colourIndex = coloursByID[id]
+            var speaker = NoteSpeaker(id: id, name: DefaultLabels.placeholder(offset + 1),
+                                      colourIndex: colourIndex, provenance: .unnamed)
+            if let known {
+                speaker.name = known.name
+                speaker.provenance = known.provenance
+            }
             speaker.excludedVoiceIDs = (excluded[id] ?? []).sorted { $0.uuidString < $1.uuidString }
             guard let match = matches[id], let name = voiceNames[match.voiceID], !speaker.excludedVoiceIDs.contains(match.voiceID)
             else { return speaker }
             if localVoices.contains(match.voiceID) {
-                if match.automatic { speaker.name = name }
+                if match.automatic { speaker.name = name; speaker.provenance = .user }
             } else if match.automatic, case .confirmed = carriedLinks[match.voiceID] {
                 speaker.name = name
+                speaker.provenance = .user
                 speaker.match = .confirmed(voice: match.voiceID, score: match.score)
             } else if match.automatic && (autoName || carriedLinks[match.voiceID] != nil) {
                 speaker.name = name
+                speaker.provenance = .recognised
                 speaker.match = .auto(voice: match.voiceID, score: match.score)
             } else {
                 speaker.match = .suggested(voice: match.voiceID, score: match.score)
@@ -194,11 +236,12 @@ extension Note {
             return speaker
         }.map { speaker -> NoteSpeaker in
             guard let label = labels[speaker.id]?.trimmingCharacters(in: .whitespacesAndNewlines),
-                  !DefaultLabels.isDefault(id: speaker.id, label: label) else {
+                  explicitNames.contains(speaker.id) || !DefaultLabels.isDefault(id: speaker.id, label: label) else {
                 return speaker
             }
             var named = speaker
             named.name = String(label.prefix(Limits.nameMaxLength))
+            named.provenance = .user
             if let voice = named.match.voiceID, !named.match.isRejection,
                !(voiceNames[voice].map { NameMatch.same($0, label) } ?? false) {
                 named.match = .unmatched

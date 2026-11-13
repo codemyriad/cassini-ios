@@ -13,7 +13,7 @@ struct InNoteSearchBar: View {
     var body: some View {
         HStack(spacing: 4) {
             Image(systemName: "magnifyingglass").foregroundStyle(Color.muted).accessibilityHidden(true)
-            TextField(NoteCopy.searchInTranscript, text: $query)
+            TextField(NoteCopy.searchInTranscript, text: $query, prompt: Text(NoteCopy.searchInTranscript).foregroundStyle(Color.ink3))
                 .autocorrectionDisabled().textInputAutocapitalization(.never).submitLabel(.search)
                 .focused($focused)
                 .onSubmit(next)

@@ -8,7 +8,7 @@ struct CardBackground: ViewModifier {
         content
             .background(Color.card, in: RoundedRectangle(cornerRadius: radius))
             .overlay {
-                if outlined { RoundedRectangle(cornerRadius: radius).stroke(Color.ink.opacity(0.055), lineWidth: 1) }
+                if outlined { RoundedRectangle(cornerRadius: radius).stroke(Color.lineSoft, lineWidth: 1) }
             }
     }
 }

@@ -23,7 +23,7 @@ extension TranscriptionJobTests {
             guard ids.count == 1, let only = ids.first, let id = only else { return nil }
             #expect(id.hasSuffix("_1") && UUID(uuidString: String(id.dropLast(2))) != nil,
                     "the run's first speaker id, never a fixed one: \(id)", sourceLocation: sourceLocation)
-            let voice = NoteSpeaker(id: id, name: DefaultLabels.placeholder(1))
+            let voice = NoteSpeaker(id: id, name: DefaultLabels.placeholder(1), colourIndex: 0, provenance: .unnamed)
             #expect(note?.transcript.allSatisfy { $0.speaker == voice.name } == true, sourceLocation: sourceLocation)
             #expect(note?.speakers == [voice], sourceLocation: sourceLocation)
             #expect(note?.versions?.last?.speakers == [voice], "the version holds the one voice too",

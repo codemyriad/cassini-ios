@@ -26,7 +26,7 @@ struct NoteRow: View {
         let format = LibraryFormat(calendar: calendar)
         ZStack {
             // The whole card is the row's button; the texts above it let taps through, the inline suffix does not.
-            Button { perform(.open) } label: { Color.compatibilityClear.contentShape(Rectangle()) }
+            Button { perform(.open) } label: { Color.canvasClear.contentShape(Rectangle()) }
                 .buttonStyle(.plain)
                 .accessibilityLabel(format.rowLabel(row, day: day))
                 .accessibilityHint(LibraryCopy.openNote)
@@ -35,11 +35,11 @@ struct NoteRow: View {
                 .accessibilityActions { accessibilityActions }
             content(format)
         }
-        .background(row.highlighted || selected ? Color.card : Color.card.opacity(0.55),
+        .background(Color.cardRest,
                     in: RoundedRectangle(cornerRadius: Radius.card))
         .overlay {
             if selected {
-                RoundedRectangle(cornerRadius: Radius.card).stroke(Color.ember.opacity(0.6), lineWidth: 1.5)
+                RoundedRectangle(cornerRadius: Radius.card).stroke(Color.accentInk.opacity(0.6), lineWidth: 1.5)
                     .allowsHitTesting(false)
             } else if row.highlighted {
                 RoundedRectangle(cornerRadius: Radius.card).stroke(Tone.info.color.opacity(0.35), lineWidth: 1)
@@ -53,14 +53,14 @@ struct NoteRow: View {
             : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 10))
         return VStack(alignment: .leading, spacing: 8) {
             titleLayout {
-                let titleFont = Font.system(.title3, design: .serif, weight: .medium)
+                let titleFont = Font.headline
                 Text(HighlightedText.attributed(Highlighted(row.title, ranges: row.titleRanges), font: titleFont))
                     .font(titleFont).foregroundStyle(Color.ink).lineLimit(dynamicType.isAccessibilitySize ? nil : 2)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .accessibilityIdentifier("rowTitle").passive()
                 HStack(spacing: 6) {
-                    if row.isFavorite { Image(systemName: "star.fill").font(.caption).foregroundStyle(Color.ember) }
-                    Text(TimeText.clock(row.duration)).font(.subheadline.monospacedDigit()).foregroundStyle(Color.muted)
+                    if row.isFavorite { Image(systemName: "star.fill").font(.footnote).foregroundStyle(Color.accentInk) }
+                    Text(TimeText.clock(row.duration)).font(.footnote.monospacedDigit()).foregroundStyle(Color.muted)
                 }.fixedSize().passive()
             }
             if let preview = row.preview {
@@ -70,12 +70,12 @@ struct NoteRow: View {
             }
             FlowLayout(spacing: 8) {
                 if let meetingTime = format.meetingTime(row) {
-                    Text(meetingTime).font(.caption).foregroundStyle(Color.muted).passive()
+                    Text(meetingTime).font(.footnote.monospacedDigit()).foregroundStyle(Color.muted).passive()
                 }
                 RowChip(status: row.status).passive()
                 suffix
                 if row.bookmarkCount > 0 {
-                    Label { Text(row.bookmarkCount, format: .number) } icon: { Image(systemName: "bookmark.fill") }.font(.caption).foregroundStyle(Color.muted).passive()
+                    Label { Text(row.bookmarkCount, format: .number) } icon: { Image(systemName: "bookmark.fill") }.font(.footnote).foregroundStyle(Color.muted).passive()
                 }
             }
         }
@@ -87,14 +87,14 @@ struct NoteRow: View {
         if let text = LibraryCopy.suffix(row.status) {
             switch row.status.suffix {
             case .resume, .tryAgain:
-                Button { perform(.resume) } label: { Text(text).font(.caption.weight(.semibold)).foregroundStyle(Color.ember) }
+                Button { perform(.resume) } label: { Text(text).font(.footnote.weight(.semibold)).foregroundStyle(Color.accentInk) }
                     .buttonStyle(.plain)
                     .frame(minHeight: HitTarget.minimum).contentShape(Rectangle())
                     .padding(.vertical, -12)
                     .accessibilityLabel(row.status.suffix == .resume ? LibraryCopy.resumeDescription(row.title)
                         : LibraryCopy.tryAgainDescription(row.title))
             default:
-                Text(text).font(.caption).foregroundStyle(Color.muted).passive()
+                Text(text).font(.footnote).foregroundStyle(Color.muted).passive()
             }
         }
     }
@@ -116,15 +116,23 @@ struct RowChip: View {
 
     var body: some View {
         HStack(spacing: 5) {
-            if case .recording = status { Circle().fill(tone.color).frame(width: 6, height: 6) }
+            if case .recording = status { Circle().fill(colors.ink).frame(width: 6, height: 6) }
             if case .transcribed = status { Image(systemName: "checkmark").font(.system(size: 9, weight: .bold)) }
             Text(LibraryCopy.status(status)).font(.caption.weight(.medium))
         }
-        .foregroundStyle(tone.color).padding(.horizontal, 8).padding(.vertical, 4)
-        .background(tone.background, in: Capsule())
+        .foregroundStyle(colors.ink).padding(.horizontal, 8).padding(.vertical, 4)
+        .background(colors.tint, in: Capsule())
     }
 
-    private var tone: Tone { status.tone }
+    // Colour roles only; badge anatomy, labels and glyphs stay for Wave 2.
+    var colors: (ink: Color, tint: Color) {
+        switch status {
+        case .recording: (.recordInk, .recordTint)
+        case .failed, .unplayable, .unreadable, .paused: (.warnInk, .warnTint)
+        case .transcribed: (.success, .successTint)
+        case .transcribing, .queued, .newerFormat, .audioOnly: (.neutralInk, Color.ink.opacity(0.1))
+        }
+    }
 }
 
 /// Highlighted text as SwiftUI draws it: each match in weight 600 on an accent tint, so it does not rely on colour.
@@ -137,8 +145,8 @@ enum HighlightedText {
             let start = text.index(text.startIndex, offsetByCharacters: range.lowerBound)
             let end = text.index(start, offsetByCharacters: range.count)
             text[start..<end].font = font.weight(.semibold)
-            text[start..<end].foregroundColor = .ink
-            text[start..<end].backgroundColor = Color.ember.opacity(0.16)
+            text[start..<end].foregroundColor = .highlightInk
+            text[start..<end].backgroundColor = Color.highlight
         }
         var shown = AttributedString()
         if highlighted.leadingEllipsis { shown += AttributedString("…") }

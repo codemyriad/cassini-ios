@@ -113,6 +113,7 @@ public struct WordRef: Hashable, Sendable {
 /// word for the active word. Built once per transcript; the playback position only searches the index.
 public struct NoteTranscript: Hashable, Sendable {
     public let turns: [NoteTurn]
+    public let speakerTints: [String: SpeakerTint]
     private let starts: [TimeInterval]
     private let turnOf: [Int]
     private let inTurn: [Int]
@@ -124,12 +125,16 @@ public struct NoteTranscript: Hashable, Sendable {
         self.turns = turns
         var starts: [TimeInterval] = [], turnOf: [Int] = [], inTurn: [Int] = []
         var positions: [String: Int] = [:]
+        var speakerTints: [String: SpeakerTint] = [:]
         for (position, turn) in turns.enumerated() {
             positions[turn.id] = position
+            if let id = turn.speakerID { speakerTints[id] = turn.tint }
+            for chip in turn.interjections { if let id = chip.speakerID { speakerTints[id] = chip.tint } }
             for (index, word) in turn.words.enumerated() {
                 starts.append(word.start); turnOf.append(position); inTurn.append(index)
             }
         }
+        self.speakerTints = speakerTints
         // Reading order keeps each turn together; playback order remains chronological.
         // Equal starts retain canonical source order rather than the chips' display positions.
         let order = starts.indices.sorted {
@@ -207,14 +212,21 @@ public enum NoteTranscripts {
                                 uniquingKeysWith: { first, _ in first })
         var names: [String: SpeakerName] = [:]
         for (ordinal, id) in order.enumerated() {
-            names[id] = name(label: speakers[id]?.name ?? labels[id], id: id, ordinal: ordinal)
+            if let speaker = speakers[id], speaker.provenance != .unnamed {
+                names[id] = .named(speaker.name)
+            } else {
+                names[id] = name(label: speakers[id]?.name ?? labels[id], id: id, ordinal: ordinal)
+            }
         }
-        let tints = SpeakerTint.assign(order) { names[$0]?.isNamed != true }
+        let paletteSpeakers = Note.assignColourIndices(order.map { id in
+            speakers[id] ?? NoteSpeaker(id: id, name: labels[id] ?? id)
+        }, order: SpeakerColourOrder.words(words))
+        let tints = SpeakerTint.assign(order, speakers: paletteSpeakers)
         let voiceNames = Dictionary(voices.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
         let cards = Dictionary(suggestions.map { ($0.speakerID, $0) }, uniquingKeysWith: { first, _ in first })
         var suggested = Set<String>()
         return build(words, endsBoundedByAudio: !note.transcript.isEmpty && note.transcript.allSatisfy { $0.wordEndsBoundedByAudio == true }) { speaker, first in
-            guard let speaker else { return Template(name: .unknown, tint: .amber) }
+            guard let speaker else { return Template(name: .unknown, tint: .stone) }
             let name = names[speaker] ?? unlabeled(1)
             var auto = false
             if case .auto(let voice, _) = speakers[speaker]?.match, case .named(let label) = name,
@@ -222,7 +234,7 @@ public enum NoteTranscripts {
                 auto = NameMatch.same(label, voiceName)
             }
             let suggestion = first && !name.isNamed && suggested.insert(speaker).inserted ? cards[speaker] : nil
-            return Template(name: name, tint: tints[speaker] ?? .amber, auto: auto, suggestion: suggestion)
+            return Template(name: name, tint: tints[speaker] ?? .stone, auto: auto, suggestion: suggestion)
         }
     }
 
@@ -232,19 +244,28 @@ public enum NoteTranscripts {
     /// draft, whose words are all settled). Words without a speaker id (Apple Speech, or no speakers told apart) are
     /// one voice, "Speaker 1", as the job saves them (`NoteSpeaker.oneVoice`, D59), under `draftOneVoice`.
     public static func draft(_ words: [DraftWord], tentativeFromMs: Int64?, labels: [String: String] = [:],
-                             automatic: Set<String> = [], suggestions: [DraftSuggestion] = []) -> NoteTranscript {
+                             automatic: Set<String> = [], suggestions: [DraftSuggestion] = [], colourIndices: [String: Int] = [:],
+                             provenance: [String: NoteSpeaker.Provenance] = [:]) -> NoteTranscript {
         let transcriptWords = words.map {
             TranscriptWord(speaker: $0.speaker.isEmpty ? draftOneVoice : $0.speaker, start: Double($0.startMs) / 1000,
                            end: Double($0.endMs) / 1000, text: $0.text, lowConfidenceSpeaker: $0.lowConfidenceSpeaker == true)
         }
         let order = orderOfAppearance(transcriptWords)
         var names: [String: SpeakerName] = [:]
-        for (ordinal, id) in order.enumerated() { names[id] = name(label: labels[id], id: id, ordinal: ordinal) }
-        let tints = SpeakerTint.assign(order) { names[$0]?.isNamed != true }
+        for (ordinal, id) in order.enumerated() {
+            names[id] = provenance[id].map { $0 == .unnamed ? unlabeled(ordinal + 1) : .named(labels[id] ?? id) }
+                ?? name(label: labels[id], id: id, ordinal: ordinal)
+        }
+        let fallback = Dictionary(uniqueKeysWithValues: SpeakerColourOrder.words(transcriptWords).enumerated().map { ($0.element, $0.offset) })
+        let palette = order.map { id in
+            NoteSpeaker(id: id, name: labels[id] ?? id, colourIndex: colourIndices[id] ?? fallback[id],
+                        provenance: provenance[id] ?? (names[id]?.isNamed == true ? .user : .unnamed))
+        }
+        let tints = SpeakerTint.assign(order, speakers: palette)
         let built = build(transcriptWords) { speaker, _ in
-            guard let speaker else { return Template(name: .unknown, tint: .amber) }
+            guard let speaker else { return Template(name: .unknown, tint: .stone) }
             let name = names[speaker] ?? unlabeled(1)
-            return Template(name: name, tint: tints[speaker] ?? .amber, auto: automatic.contains(speaker) && name.isNamed)
+            return Template(name: name, tint: tints[speaker] ?? .stone, auto: automatic.contains(speaker) && name.isNamed)
         }
         let cards = Dictionary(suggestions.map { ($0.speakerID, $0) }, uniquingKeysWith: { first, _ in first })
         var placedSpeakers = Set<String>()

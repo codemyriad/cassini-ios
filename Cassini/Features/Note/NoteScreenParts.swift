@@ -121,7 +121,7 @@ struct DraftSection: View {
                     .foregroundStyle(Color.muted).accessibilityAddTraits(.isHeader)
                 if changing {
                     Text(NoteCopy.draftTag).font(.caption2.weight(.medium)).foregroundStyle(Color.muted)
-                        .padding(.horizontal, 8).padding(.vertical, 3).background(Color.ink.opacity(0.06), in: Capsule())
+                        .padding(.horizontal, 8).padding(.vertical, 3).background(Color.ink.opacity(0.1), in: Capsule())
                 }
             }
             TranscriptList(transcript: transcript, style: .draft, renamable: draft.namingOpen,
@@ -131,7 +131,7 @@ struct DraftSection: View {
                                return AnyView(VStack(spacing: 12) {
                                    ForEach(turn.allSuggestions, id: \.speakerID) { suggestion in
                                        let ordinal = transcript.speakers.firstIndex(of: suggestion.speakerID) ?? 0
-                                       SuggestionCard(suggestion: suggestion, ordinal: ordinal, model: model)
+                                       SuggestionCard(suggestion: suggestion, ordinal: ordinal, tint: transcript.speakerTints[suggestion.speakerID] ?? .stone, model: model)
                                    }
                                })
                            })
@@ -175,7 +175,8 @@ struct DraftSection: View {
             draftKey = draft
             draftValue = NoteTranscripts.draft(draft.words, tentativeFromMs: draft.tentativeFromMs == .max ? nil : draft.tentativeFromMs,
                                                labels: draft.labels, automatic: draft.automatic,
-                                               suggestions: draft.suggestions)
+                                               suggestions: draft.suggestions, colourIndices: draft.colourIndices,
+                                               provenance: draft.provenance)
         }
         return draftValue
     }

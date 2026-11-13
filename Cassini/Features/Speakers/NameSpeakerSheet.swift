@@ -49,11 +49,11 @@ struct NameSpeakerSheet: View {
             }
             .navigationDestination(isPresented: mergeShown) {
                 if let state, let merge = SpeakerNaming.mergeUI(state) {
-                    MergeSheet(merge: merge, sourceOrdinal: state.input.ordinal, send: send)
+                    MergeSheet(merge: merge, sourceOrdinal: state.input.ordinal, tints: state.input.speakerTints, send: send)
                 }
             }
         }
-        .tint(.ember)
+        .tint(.accent)
         .task { await model.open(draft: draft, sheet: handle) }
         .onDisappear { playback.stopSample() }
         .alert(SpeakersCopy.couldNotSave, isPresented: Binding(get: { model.failure != nil }, set: { if !$0 { model.failure = nil } })) {
@@ -84,7 +84,7 @@ struct NameSpeakerSheet: View {
                     if let name = state?.name, name != text {
                         DispatchQueue.main.async { if nameField == text { nameField = name } }
                     }
-                })
+                }, prompt: Text(SpeakersCopy.nameField).foregroundStyle(Color.ink3))
                     .onAppear { nameField = ui.name }
                     .onChange(of: nameField) { _, text in
                         nameTyped(text)
@@ -119,7 +119,7 @@ struct NameSpeakerSheet: View {
 
     private func header(_ ui: NameSheetUI) -> some View {
         HStack(spacing: 12) {
-            SpeakerAvatar(speaker: ui.label, ordinal: state?.input.ordinal ?? 0)
+            SpeakerAvatar(name: ui.label, tint: state?.input.speakerTints[speakerID] ?? .stone)
             VStack(alignment: .leading, spacing: 2) {
                 Text(shown(ui.label)).font(.headline).foregroundStyle(Color.ink).accessibilityAddTraits(.isHeader)
                 Text(SpeakersCopy.speaksFor(ui.speakingTime)).font(.caption).foregroundStyle(Color.muted)
@@ -128,9 +128,9 @@ struct NameSpeakerSheet: View {
             Button { send(.playSample) } label: {
                 Image(systemName: sampling ? "stop.fill" : "play.fill")
                     .frame(width: HitTarget.minimum, height: HitTarget.minimum)
-                    .background(Color.ember.opacity(0.12), in: Circle())
+                    .background(Color.accentTint, in: Circle())
             }
-            .buttonStyle(.plain).foregroundStyle(Color.ember)
+            .buttonStyle(.plain).foregroundStyle(Color.accentInk)
             .disabled(!ui.canSample || !playback.owns(noteID))
             .accessibilityLabel(sampling ? SpeakersCopy.stopSample : SpeakersCopy.playSample)
         }
@@ -159,7 +159,8 @@ struct NameSpeakerSheet: View {
             Button(yes.0) { send(yes.1) }.accessibilityIdentifier("questionYes")
             Button(no.0) { send(no.1) }.accessibilityIdentifier("questionNo")
         }
-        .listRowBackground(Color.toneWarn.opacity(pulse ? 0.3 : 0.1))
+        // IOS-TOK-23: keep the existing pulse steps until Alex specifies a second warning tint.
+        .listRowBackground(Color.warnInk.opacity(pulse ? 0.3 : 0.1))
     }
 
     private func voiceRows(_ ui: NameSheetUI) -> some View {
@@ -173,7 +174,7 @@ struct NameSpeakerSheet: View {
                             Text(SpeakersCopy.likely).font(.caption.weight(.medium)).foregroundStyle(Color.toneOK)
                                 .padding(.horizontal, 8).padding(.vertical, 3).background(Tone.ok.background, in: Capsule())
                         }
-                        if state?.boundVoiceID == row.id { Image(systemName: "checkmark").foregroundStyle(Color.ember) }
+                        if state?.boundVoiceID == row.id { Image(systemName: "checkmark").foregroundStyle(Color.accentInk) }
                     }.frame(minHeight: HitTarget.minimum)
                 }
                 .accessibilityAddTraits(state?.boundVoiceID == row.id ? .isSelected : [])

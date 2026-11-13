@@ -26,10 +26,17 @@ struct SpeakersView: View {
                     if let failure = note.speakerAnalysisFailure { Section { Text(failure.speakerAnalysisMessage).font(.callout) } }
                     Section {
                         let stats = SpeakerStats.of(note.transcript)
+                        let speaking = stats.filter { $0.wordCount > 0 }
+                        let spoken = Set(speaking.map(\.speakerID))
+                        let order = speaking.map(\.speakerID) + (note.speakers ?? []).map(\.id).filter { !spoken.contains($0) }
+                        let catalog = note.speakers ?? []
+                        let palette = catalog.contains { $0.colourIndex == nil }
+                            ? Note.assignColourIndices(catalog, order: SpeakerColourOrder.segments(note.transcript)) : catalog
+                        let tints = SpeakerTint.assign(order, speakers: palette)
                         ForEach(Array((note.speakers ?? []).enumerated()), id: \.element.id) { index, speaker in
                             let stat = stats.first { $0.speakerID == speaker.id }
                             Button { naming = SpeakerRef(id: speaker.id) } label: {
-                                SpeakerRow(speaker: speaker, ordinal: stat?.ordinal ?? index, speakingTime: stat?.speakingTime ?? 0)
+                                SpeakerRow(speaker: speaker, ordinal: stat?.ordinal ?? index, tint: tints[speaker.id] ?? .stone, speakingTime: stat?.speakingTime ?? 0)
                             }
                             .accessibilityIdentifier("speaker-\(speaker.id)")
                         }
@@ -64,7 +71,7 @@ struct SpeakersView: View {
                 Button(SpeakersCopy.analyzeAgain) { Task { await model.identifySpeakers() } }
             } message: { Text(SpeakersCopy.analyzeAgainBody) }
         }
-        .tint(.ember)
+        .tint(.accent)
     }
 }
 
@@ -76,23 +83,24 @@ struct SpeakerRef: Identifiable, Hashable {
 private struct SpeakerRow: View {
     let speaker: NoteSpeaker
     let ordinal: Int
+    let tint: SpeakerTint
     let speakingTime: Double
     @Environment(VoicesStore.self) private var voices
 
     var body: some View {
         HStack(spacing: 12) {
-            SpeakerAvatar(speaker: speaker.name, ordinal: ordinal)
+            SpeakerAvatar(name: speaker.name, tint: tint)
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
                     Text(NoteCopy.speakerLabel(speaker.name, id: speaker.id, ordinal: ordinal)).foregroundStyle(Color.ink)
                     if case .auto(let id, _) = speaker.match, let voice = voices.voice(id), NameMatch.same(voice.name, speaker.name) {
                         Text(SpeakersCopy.auto).font(.caption2.weight(.semibold)).foregroundStyle(Color.toneInfo)
-                            .padding(.horizontal, 6).padding(.vertical, 2).background(Tone.info.background, in: Capsule())
+                            .padding(.horizontal, 6).padding(.vertical, 2).background(Color.ink.opacity(0.1), in: Capsule())
                     }
                 }
                 Text(SpeakersCopy.speaksFor(speakingTime)).font(.caption).foregroundStyle(Color.muted)
                 if case .suggested(let id, _) = speaker.match, let voice = voices.voice(id) {
-                    Text(SpeakersCopy.mightBe(voice.name)).font(.caption).foregroundStyle(Color.ember)
+                    Text(SpeakersCopy.mightBe(voice.name)).font(.caption).foregroundStyle(Color.accentInk)
                 }
             }
             Spacer()

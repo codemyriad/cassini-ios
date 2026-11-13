@@ -106,10 +106,22 @@ public struct PortableTranscript: Hashable, Sendable {
 
     /// Speakers in order of first appearance, named by the manifest's labels.
     private static func speakers(_ transcript: Transcript, _ document: CassiniDocument) -> [NoteSpeaker] {
+        let timedOrder = SpeakerColourOrder.earliest(transcript.words, id: { $0.speaker }, start: { Double($0.startMs) })
+        let fallback = Dictionary(uniqueKeysWithValues: timedOrder.enumerated().map { ($0.element, $0.offset) })
+        let roster = Dictionary((document.manifest?["speakers"]?.array ?? []).compactMap { value -> (String, JSONObject)? in
+            guard let entry = value.object, let id = entry["id"]?.string else { return nil }
+            return (id, entry)
+        }, uniquingKeysWith: { first, _ in first })
         var seen: Set<String> = []
         return transcript.words.compactMap { word in
             guard seen.insert(word.speaker).inserted else { return nil }
-            return NoteSpeaker(id: word.speaker, name: document.speakerLabel(word.speaker) ?? word.speaker)
+            let entry = roster[word.speaker]
+            let index = entry.flatMap { try? $0.number("colourIndex") }.map { Int($0) }
+            let label = entry?["label"]?.string ?? word.speaker
+            let provenance = (entry?["provenance"]?.string).flatMap { NoteSpeaker.Provenance(rawValue: $0) }
+                ?? (DefaultLabels.isDefault(id: word.speaker, label: label) ? .unnamed : .source)
+            return NoteSpeaker(id: word.speaker, name: label,
+                               colourIndex: index ?? fallback[word.speaker], provenance: provenance)
         }
     }
 
@@ -157,7 +169,14 @@ extension PortableTranscript {
         let transcript = Transcript(words(of: note), language: note.language)
         guard !transcript.words.isEmpty else { throw PortableExportError.noTranscript }
         guard WordBodyBudget.fits(transcript.words, language: transcript.language) else { throw PortableExportError.tooLong }
-        let labels = Dictionary((note.speakers ?? []).map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
+        let palette = Note.assignColourIndices(note.speakers ?? [], order: SpeakerColourOrder.earliest(transcript.words,
+            id: { $0.speaker }, start: { Double($0.startMs) }))
+        let labels = Dictionary(palette.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
+        let hints = Dictionary(palette.map { speaker -> (String, JSONObject) in
+            var hint = JSONObject([("provenance", .string(speaker.provenance.rawValue))])
+            if let index = speaker.colourIndex { hint["colourIndex"] = .int(index) }
+            return (speaker.id, hint)
+        }, uniquingKeysWith: { first, _ in first })
         var existing: CassiniDocument?
         var carried: CassiniDocument?
         if source.state == .ok, var manifest = source.manifest {
@@ -169,6 +188,9 @@ extension PortableTranscript {
                 manifest["speakers"] = .array(speakers.map { entry in
                     guard var speaker = entry.object, let id = speaker["id"]?.string, let label = labels[id] else { return entry }
                     speaker["label"] = .string(label)
+                    if let hint = hints[id] {
+                        for (key, value) in hint.pairs { speaker[key] = value }
+                    }
                     return .object(speaker)
                 })
             }
@@ -185,7 +207,7 @@ extension PortableTranscript {
         var newLabels = labels
         if newLabels[ExportTranscript.unassignedSpeaker] == nil { newLabels[ExportTranscript.unassignedSpeaker] = unassignedLabel }
         return try CassiniDocument.create(opus, transcript: transcript, title: note.title, processing: processing,
-                                          existing: existing, speakerLabels: newLabels, carrying: carried,
+                                          existing: existing, speakerLabels: newLabels, speakerHints: hints, carrying: carried,
                                           recordedAt: (note.origin == .recorded || note.origin == .recovered) ? note.meetingTime.instant : nil,
                                           target: destination).defaultId
     }

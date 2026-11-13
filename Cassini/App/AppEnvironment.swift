@@ -72,7 +72,7 @@ import CassiniEngineTesting
     /// Recording (the recording seed shows that one); `reading` is `search` with word times in the fixture's
     /// passages, so playback highlights one word.
     enum Seed: String, CaseIterable {
-        case library, search, speakers, trash, voices, processing, recording, statuses, long, reading
+        case library, search, speakers, trash, voices, processing, recording, statuses, long, reading, brandSpeakers
     }
 
     var calendar: Calendar {

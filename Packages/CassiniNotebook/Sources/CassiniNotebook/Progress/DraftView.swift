@@ -12,24 +12,31 @@ public enum DraftView {
             merged.speaker = names.resolve(word.speaker)
             return merged
         }
+        let allocated = names.observingWords(draft.words)
         var labels: [String: String] = [:]
+        var provenance: [String: NoteSpeaker.Provenance] = [:]
         var automatic = Set<String>(), placeholders = Set<String>()
         var seen = Set<String>()
         for word in words where !word.speaker.isEmpty && seen.insert(word.speaker).inserted {
             // A stored placeholder (a names.json written elsewhere could hold one) is not a name.
-            if let named = names.labels[word.speaker], !DefaultLabels.isDefault(id: word.speaker, label: named) {
+            if let named = names.labels[word.speaker],
+               names.explicitNames.contains(word.speaker) || !DefaultLabels.isDefault(id: word.speaker, label: named) {
                 labels[word.speaker] = named
+                provenance[word.speaker] = .user
             } else if let auto = names.automatic[word.speaker] {
                 labels[word.speaker] = auto
+                provenance[word.speaker] = .recognised
                 automatic.insert(word.speaker)
             } else {
                 labels[word.speaker] = DefaultLabels.placeholder(seen.count)
                 placeholders.insert(word.speaker)
+                provenance[word.speaker] = .unnamed
             }
         }
         let cards = draft.namingOpen ? suggestions(words, placeholders: placeholders, names: names, voiceNames: voiceNames) : []
         return DraftState(words: words, tentativeFromMs: draft.tentativeFromMs, namingOpen: draft.namingOpen,
-                          labels: labels, automatic: automatic, suggestions: cards)
+                          labels: labels, automatic: automatic, suggestions: cards,
+                          colourIndices: allocated.colourIndices, provenance: provenance)
     }
 
     /// "Is this Luca?" for each placeholder speaker with a live suggested match to a voice that still exists and was not

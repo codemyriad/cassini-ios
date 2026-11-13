@@ -232,7 +232,8 @@ TestFlight still need.
   your library.
 - **Platform.** The app language is set in the Settings app. iOS has no system Back, so the back button carries the
   title of the screen below. The iPad has a split view. Rename is a sheet. Notifications are silent results with
-  hidden-preview text. The warm iOS palette and system fonts stay, with contrast checked by tests. Content width is
+  hidden-preview text. The W1 preview reads the pinned Cassini palette (cool neutral grounds, navy light accent, and a blue/magenta/cyan/orange/violet/slate speaker cycle) with system
+  sans fonts and Dynamic Type; contrast is checked by tests. Content width is
   capped at Android's 560 pt. The App Store build declares its privacy manifests, export compliance and memory
   entitlement.
 
@@ -361,7 +362,7 @@ SIGHUP, SIGTERM and SIGINT stop the renderer; further signals are ignored until 
 `--output` disables lossy pngquant by default and records actual runtime/device, locale, seed, test and pixel size;
 the 1200-pixel downscale remains. Existing normal README renders keep their previous compression behavior.
 
-The canonical cassini-ux `pr-shots.py` is vendored from commit `5ca44dee12614990c833cc6f49017dac7e184ae8`.
+The canonical cassini-ux `pr-shots.py` is vendored from commit `afe3ba905880e7052dbcef425d204266153a2ae0`.
 It adds `pr-shots/` using only its `diff` command; use your PR number with `--pr N`.
 `--render-only` skips that step and needs only Python's standard library. The wrapper uses `python3` from PATH.
 Before diffing it checks each screen has both appearances and probes the canvas against the scheme label

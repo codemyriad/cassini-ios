@@ -161,7 +161,7 @@ struct NoteDetailView: View {
         return AnyView(VStack(spacing: 12) {
             ForEach(turn.allSuggestions, id: \.speakerID) { suggestion in
                 let ordinal = transcript.speakers.firstIndex(of: suggestion.speakerID) ?? 0
-                SuggestionCard(suggestion: suggestion, ordinal: ordinal, model: model)
+                SuggestionCard(suggestion: suggestion, ordinal: ordinal, tint: transcript.speakerTints[suggestion.speakerID] ?? .stone, model: model)
             }
         })
     }

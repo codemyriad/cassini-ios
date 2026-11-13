@@ -142,7 +142,7 @@ import CassiniNotebook
             guard note.trashedAt == nil else { return }
             matching.apply(to: &note, turns: turns, autoName: autoName, stamp: stamp,
                            attributed: attributed.flatMap { Self.attributed($0, onto: note) }, excluded: excluded,
-                           labels: labels)
+                           labels: labels, colourIndices: names?.colourIndices ?? [:], explicitNames: names?.explicitNames ?? [])
         }
         guard saved != nil else { throw CocoaError(.fileWriteUnknown) }
         await refresh()

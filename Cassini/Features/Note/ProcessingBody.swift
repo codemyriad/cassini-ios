@@ -38,7 +38,7 @@ struct ProcessingBody<Top: View, Banners: View>: View {
                     // The end of the list, for the scroll below iOS 26 only; an overlay, so the layout does not change.
                     .overlay(alignment: .bottom) {
                         if #available(iOS 26.0, *) {} else {
-                            Color.compatibilityClear.frame(height: 1).id(Self.end).accessibilityHidden(true)
+                            Color.canvasClear.frame(height: 1).id(Self.end).accessibilityHidden(true)
                         }
                     }
                     .readableWidth()

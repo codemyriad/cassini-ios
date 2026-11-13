@@ -58,7 +58,7 @@ struct SegmentEditor: View {
                 }
             }
         }
-        .tint(.ember)
+        .tint(.accent)
         .interactiveDismissDisabled(text != segment.text)
     }
 

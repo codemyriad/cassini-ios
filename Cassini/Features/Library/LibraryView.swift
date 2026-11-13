@@ -117,7 +117,7 @@ struct LibraryView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(dynamicType.isAccessibilitySize ? LibraryCopy.headlineLarge : LibraryCopy.headline)
-                .font(.system(.largeTitle, design: .serif)).tracking(-1).foregroundStyle(Color.ink)
+                .font(.system(.largeTitle)).foregroundStyle(Color.ink)
                 .accessibilityAddTraits(.isHeader)
             if !dynamicType.isAccessibilitySize { Text(LibraryCopy.subheadline).font(.subheadline).foregroundStyle(Color.muted) }
         }.padding(.top, 18)
@@ -158,7 +158,7 @@ struct LibraryView: View {
                         .font(.subheadline.weight(.medium))
                         .padding(.horizontal, 14).frame(minHeight: HitTarget.minimum)
                         .foregroundStyle(model.searchDate == .any ? Color.muted : Color.paper)
-                        .background(model.searchDate == .any ? Color.compatibilityClear : Color.ink, in: Capsule())
+                        .background(model.searchDate == .any ? Color.ink.opacity(0.1) : Color.ink, in: Capsule())
                         .overlay(Capsule().stroke(Color.muted.opacity(0.3), lineWidth: 1))
                 }
                 .accessibilityIdentifier("librarySearchDate")
@@ -181,7 +181,7 @@ struct LibraryView: View {
                 .font(.subheadline.weight(.medium)).fixedSize(horizontal: true, vertical: false)
                 .padding(.horizontal, 14).frame(minHeight: HitTarget.minimum)
                 .foregroundStyle(selected ? Color.paper : Color.muted)
-                .background(selected ? Color.ink : Color.compatibilityClear, in: Capsule())
+                .background(selected ? Color.ink : Color.ink.opacity(0.1), in: Capsule())
                 .contentShape(Capsule())
         }.buttonStyle(.plain).accessibilityAddTraits(selected ? .isSelected : [])
     }

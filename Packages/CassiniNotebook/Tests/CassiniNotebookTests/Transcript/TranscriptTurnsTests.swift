@@ -59,39 +59,67 @@ import Testing
 }
 
 @Suite struct SpeakerTintTests {
-    // ports: SpeakerTintTest#namedSpeakersCycleBlueTealViolet
-    @Test func namedSpeakersCycleBlueTealViolet() {
-        let order = ["a", "b", "c", "d", "e"]
+    // ports: SpeakerTintTest#namedSpeakersCycleTheSixDecidedRoles
+    @Test func namedSpeakersCycleTheSixDecidedRoles() {
+        let order = ["a", "b", "c", "d", "e", "f", "g"]
         let tints = SpeakerTint.assign(order) { _ in false }
-        #expect(order.map { tints[$0] } == [.blue, .teal, .violet, .blue, .teal])
+        #expect(order.map { tints[$0] } == [.blue, .magenta, .cyan, .orange, .violet, .slate, .blue])
     }
 
-    // ports: SpeakerTintTest#placeholdersAreAmberAndTakeNoSlot
-    @Test func placeholdersAreAmberAndTakeNoSlot() {
+    // ports: SpeakerTintTest#placeholdersAreStoneAndReserveTheirSlot
+    @Test func placeholdersAreStoneAndReserveTheirSlot() {
         let labels = ["s1": "Giulia", "s2": "Speaker 2", "s3": "Paolo Ferri", "s4": "Voce 4", "s5": "Anna"]
         let tints = SpeakerTint.assign(["s1", "s2", "s3", "s4", "s5"], labels: labels)
-        #expect(tints == ["s1": .blue, "s2": .amber, "s3": .teal, "s4": .amber, "s5": .violet])
+        #expect(tints == ["s1": .blue, "s2": .stone, "s3": .cyan, "s4": .stone, "s5": .violet])
     }
 
     // ports: SpeakerTintTest#aSpeakerWithoutALabelIsAPlaceholder
     @Test func aSpeakerWithoutALabelIsAPlaceholder() {
         let tints = SpeakerTint.assign(["s1", "s2"], labels: ["s2": "Luca"])
-        #expect(tints["s1"] == .amber)
-        #expect(tints["s2"] == .blue)
+        #expect(tints["s1"] == .stone)
+        #expect(tints["s2"] == .magenta)
     }
 
     // ports: SpeakerTintTest#theOrderIsTheGivenFirstTurnOrder
     @Test func theOrderIsTheGivenFirstTurnOrder() {
         let labels = ["a": "Anna", "b": "Bruno"]
         #expect(SpeakerTint.assign(["b", "a"], labels: labels)["b"] == .blue)
-        #expect(SpeakerTint.assign(["b", "a"], labels: labels)["a"] == .teal)
+        #expect(SpeakerTint.assign(["b", "a"], labels: labels)["a"] == .magenta)
+    }
+
+    @Test func unnamedFirstSpeakerDoesNotShiftNamingOrMergeAvatarSlots() throws {
+        let note = TranscriptFixtures.note([
+            .init("u", 0, 500, "Yes."), .init("a", 600, 1000, "Welcome."), .init("b", 1100, 1500, "Agreed.")
+        ], speakers: [.init(id: "u", name: "Speaker 1"), .init(id: "a", name: "Alex"), .init(id: "b", name: "Jamie")])
+        let transcript = NoteTranscripts.sealed(note)
+        #expect(transcript.speakerTints == ["u": .stone, "a": .magenta, "b": .cyan])
+        for id in ["u", "a", "b"] {
+            let input = try #require(NamingInput.of(note, speakerID: id, print: nil, voices: [],
+                                                   voicesReadOnly: false, voiceModelReady: false))
+            #expect(input.speakerTints == transcript.speakerTints)
+        }
+    }
+
+    @Test func draftAndRenamedInputsUseTheSameCurrentLabelAssignment() throws {
+        let input = NamingInput(speakerID: "a", label: "Alex", ordinal: 1,
+                                mergeTargets: [.init(speakerID: "u", name: "Speaker 1", ordinal: 0, speakingTime: 1),
+                                               .init(speakerID: "b", name: "Jamie", ordinal: 2, speakingTime: 1)], draft: true)
+        let draft = NoteTranscripts.draft([.init(speaker: "u", startMs: 0, endMs: 500, text: "Yes."),
+                                                  .init(speaker: "a", startMs: 600, endMs: 1000, text: "Welcome."),
+                                                  .init(speaker: "b", startMs: 1100, endMs: 1500, text: "Agreed.")],
+                                         tentativeFromMs: nil, labels: ["u": "Speaker 1", "a": "Alex", "b": "Jamie"])
+        #expect(input.speakerTints == draft.speakerTints)
+        var renamed = input
+        renamed.mergeTargets[0].name = "Morgan"
+        #expect(renamed.speakerTints == SpeakerTint.assign(["u", "a", "b"], labels: ["u": "Morgan", "a": "Alex", "b": "Jamie"]))
+        #expect(renamed.speakerTints != input.speakerTints, "Current labels participate in the palette key")
     }
 
     // ports: SpeakerTintTest#theCycleWraps
     @Test func theCycleWraps() {
         #expect(SpeakerTint.named(0) == .blue)
-        #expect(SpeakerTint.named(2) == .violet)
-        #expect(SpeakerTint.named(3) == .blue)
+        #expect(SpeakerTint.named(2) == .cyan)
+        #expect(SpeakerTint.named(6) == .blue)
     }
 }
 

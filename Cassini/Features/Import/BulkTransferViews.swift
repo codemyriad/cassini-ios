@@ -24,7 +24,7 @@ struct ImportBatchesView: View {
                 }
             }
             .padding(14).frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+            .background(Color.neutralTint, in: RoundedRectangle(cornerRadius: 12))
         }
     }
 }
