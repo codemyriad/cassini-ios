@@ -251,7 +251,7 @@ private struct LibrarySection: View {
                 Text("Recordings", tableName: "Settings")
             }
             LabeledContent {
-                Text(verbatim: TimeText.clock(totals.duration)).monospacedDigit()
+                Text(verbatim: TimeText.clock(totals.duration)).font(.body.monospacedDigit())
             } label: {
                 Text("Audio duration", tableName: "Settings")
             }

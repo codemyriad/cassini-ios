@@ -56,6 +56,8 @@ final class AccessibilityAuditTests: XCTestCase {
         let app = library(extra)
         let language = app.buttons["appLanguageRow"]
         XCTAssertTrue(app.buttons["settingsButton"].tapWhenInteractive(in: app, until: { language.exists }), "Settings did not open")
+        XCTAssertTrue(app.staticTexts["uiTestState-settingsLoaded"].waitForExistence(within: 15),
+                      "Settings has not finished loading")
         return app
     }
 
@@ -73,6 +75,8 @@ final class AccessibilityAuditTests: XCTestCase {
         XCTAssertTrue(app.buttons["settingsButton"].waitForExistence(within: 15))
         let language = app.buttons["appLanguageRow"], row = app.buttons["savedVoicesRow"]
         XCTAssertTrue(app.buttons["settingsButton"].tapWhenInteractive(in: app, until: { language.exists }), "Settings did not open")
+        XCTAssertTrue(app.staticTexts["uiTestState-settingsLoaded"].waitForExistence(within: 15),
+                      "Settings has not finished loading")
         // At the largest text size the row is about six swipes down, more when a loaded host makes each fling shorter:
         // six once stopped a row short of it.
         XCTAssertTrue(app.scroll(attempts: 12) { row.exists && row.isHittable }, "Saved voices is not on the screen")
