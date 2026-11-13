@@ -44,8 +44,14 @@ final class ScreenshotTests: XCTestCase {
         XCTAssertTrue(timeLeft.wait(until: NSPredicate(format: "label CONTAINS %@", "min"), within: 15), timeLeft.label)
         // The draft follows its end as it arrives; back at its start, its header shows under the card.
         let parts = app.descendants(matching: .any).matching(identifier: "draftTranscript")
-        let header = parts.element(boundBy: 0), draft = parts.element(boundBy: parts.count - 1)
-        XCTAssertTrue(draft.scroll(up: false, attempts: 3) { header.exists && header.isHittable })
+        let header = parts.element(boundBy: 0)
+        let viewport = app.scrollViews.containing(.any, identifier: "draftTranscript").firstMatch
+        XCTAssertTrue(viewport.waitForExistence(within: 10))
+        XCTAssertTrue(viewport.scroll(up: false, attempts: 3) {
+            guard let frame = (try? header.snapshot())?.frame, !frame.isEmpty else { return false }
+            // This is a read-only heading, not an action with an activation point. Verify its full visibility.
+            return viewport.frame.intersection(app.windows.firstMatch.frame).contains(frame)
+        })
         capture("03-transcribing")
     }
 
@@ -236,7 +242,7 @@ final class ScreenshotTests: XCTestCase {
         XCTAssertTrue(app.scrollViews["libraryScroll"].scroll(attempts: 12) {
             quiet.exists && quiet.isHittable && quiet.frame.maxY < app.buttons["recordButton"].frame.minY
         })
-        XCTAssertTrue(search.isHittable)
+        XCTAssertTrue(app.windows.firstMatch.frame.contains(search.frame), "the pinned field stays fully visible")
         XCTAssertEqual(search.frame, searchFrame, "the search capsule stays pinned while the list scrolls")
         capture("20-library-scrolled")
     }
