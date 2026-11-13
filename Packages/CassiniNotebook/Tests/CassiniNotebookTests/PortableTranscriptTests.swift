@@ -58,7 +58,7 @@ import CassiniCore
         #expect(portable.language == "it")
         #expect(portable.duration == 1)
         #expect(portable.createdAt != nil)
-        #expect(portable.speakers == [NoteSpeaker(id: "S1", name: "Ada")])
+        #expect(portable.speakers == [NoteSpeaker(id: "S1", name: "Ada", colourIndex: 0, provenance: .source)])
         let meetingID = try #require(portable.meetingID, "Document info shows the meeting id")
         #expect(meetingID.hasPrefix("mtg_"))
         #expect(portable.info == DocumentInfo(state: .ok, meetingID: meetingID))
@@ -290,7 +290,8 @@ struct PortableConformanceImportTests {
     }
 
     /// D56 and D47: every write keeps a speaker's members verbatim, `voiceSource` and members this app does not know
-    /// included; only `label` changes. iOS diarizes as `spk_N`, so a new variant adds its own speakers and never
+    /// included; only `label` and approved optional colour/naming hints change. iOS diarizes as `spk_N`, so a new
+    /// variant adds its own speakers and never
     /// stamps or re-ranks a desktop `<group>~n` voice. The `x["codemyriad.io"]` mirror stays byte for byte.
     @Test func everyWriteKeepsTheSpeakersUnknownMembers() throws {
         let directory = try PortableFixtures.temporaryDirectory()
@@ -308,10 +309,14 @@ struct PortableConformanceImportTests {
         let before = CassiniDocument.read(source)
         try #require(before.state == .ok)
         let original = try #require(before.manifest?["speakers"]?.array?.first?.object)
-        func withLabel(_ label: String) -> String {
+        func withLabel(_ label: String, withHints: Bool = false) -> JSONObject {
             var speaker = original
             speaker["label"] = .string(label)
-            return speaker.serialized()
+            if withHints {
+                speaker["colourIndex"] = .int(0)
+                speaker["provenance"] = .string("user")
+            }
+            return speaker
         }
 
         // An export with a rename and a variant diarized on this device.
@@ -323,15 +328,17 @@ struct PortableConformanceImportTests {
         try PortableTranscript.export(note: note, opus: source, destination: output, unassignedLabel: "Unknown speaker")
         let exported = CassiniDocument.read(output)
         #expect(exported.state == .ok)
-        let speakers = exported.manifest?["speakers"]?.array?.compactMap { $0.object?.serialized() }
-        #expect(speakers == [withLabel("Mira"), #"{"id":"spk_1","label":"Speaker 1"}"#])
+        let speakers = exported.manifest?["speakers"]?.array?.compactMap { $0.object }
+        #expect(speakers == [withLabel("Mira", withHints: true), try JSON.parseObject(#"{"id":"spk_1","label":"Speaker 1","colourIndex":1,"provenance":"unnamed"}"#)])
         #expect(exported.manifest?["x"]?.serialized() == before.manifest?["x"]?.serialized())
 
         // A rename in place.
         let renamed = directory.appendingPathComponent("renamed.opus")
         try CassiniDocument.relabel(source, existing: before, labels: ["others~2": "Ada"], target: renamed)
         let relabelled = CassiniDocument.read(renamed)
-        #expect(relabelled.manifest?["speakers"]?.array?.compactMap { $0.object?.serialized() } == [withLabel("Ada")])
+        var renamedSpeaker = withLabel("Ada")
+        renamedSpeaker["provenance"] = .string("user")
+        #expect(relabelled.manifest?["speakers"]?.array?.compactMap { $0.object } == [renamedSpeaker])
         #expect(relabelled.manifest?["x"]?.serialized() == before.manifest?["x"]?.serialized())
     }
 
@@ -353,8 +360,9 @@ struct PortableConformanceImportTests {
 
         let exported = CassiniDocument.read(output)
         #expect(exported.state == .ok)
-        #expect(exported.manifest?["speakers"]?.array?.compactMap { $0.object?.serialized() }
-                == [#"{"id":"spk_1","label":"Ada"}"#, #"{"id":"unassigned","label":"Voce sconosciuta"}"#])
+        #expect(exported.manifest?["speakers"]?.array?.compactMap { $0.object }
+                == [try JSON.parseObject(#"{"id":"spk_1","label":"Ada","colourIndex":0,"provenance":"user"}"#),
+                    try JSON.parseObject(#"{"id":"unassigned","label":"Voce sconosciuta"}"#)])
         #expect(exported.selected()?.transcript?.words.map(\.speaker) == ["spk_1", "unassigned", "unassigned"])
         // Every reader, this one included, shows the label as stored.
         let reread = try #require(PortableTranscript.read(from: output))
@@ -384,7 +392,7 @@ struct PortableConformanceImportTests {
                                             title: "Shared", processing: JSONObject(), existing: base)).write(to: source)
         let portable = try #require(PortableTranscript.read(from: source))
         try #require(portable.state == .ok)
-        let entry = #"{"id":"unassigned","label":"Unknown speaker","futureMember":1}"#
+        let entry = try JSON.parseObject(#"{"id":"unassigned","label":"Unknown speaker","futureMember":1}"#)
 
         // An Italian export that adds a passage without a speaker, and one where the shown version names no one.
         var note = Note(title: "Shared")
@@ -397,14 +405,19 @@ struct PortableConformanceImportTests {
             try PortableTranscript.export(note: exporting, opus: source, destination: output, unassignedLabel: "Voce sconosciuta")
             let exported = CassiniDocument.read(output)
             #expect(exported.state == .ok)
-            #expect(exported.manifest?["speakers"]?.array?.compactMap { $0.object?.serialized() } == [entry], "export \(index)")
+            var expected = entry
+            if index == 0 {
+                expected["colourIndex"] = .int(0)
+                expected["provenance"] = .string("source")
+            }
+            #expect(exported.manifest?["speakers"]?.array?.compactMap { $0.object } == [expected], "export \(index)")
         }
 
         note.renameSpeaker("unassigned", name: "Mira")
         let renamed = directory.appendingPathComponent("renamed.opus")
         try PortableTranscript.export(note: note, opus: source, destination: renamed, unassignedLabel: "Voce sconosciuta")
-        #expect(CassiniDocument.read(renamed).manifest?["speakers"]?.array?.compactMap { $0.object?.serialized() }
-                == [#"{"id":"unassigned","label":"Mira","futureMember":1}"#])
+        #expect(CassiniDocument.read(renamed).manifest?["speakers"]?.array?.compactMap { $0.object }
+                == [try JSON.parseObject(#"{"id":"unassigned","label":"Mira","futureMember":1,"colourIndex":0,"provenance":"user"}"#)])
     }
 }
 

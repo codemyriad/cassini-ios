@@ -88,17 +88,26 @@ final class LibraryUITests: XCTestCase {
     /// Resume and Try again are inline buttons that queue the note again (the running job is frozen, so it waits).
     @MainActor func testResumeAndTryAgainQueueTheNote() {
         let app = launch(["--seed", "statuses"] + DeviceUnderTest.workingSpeech)
+        let paused = scrolledRow(app, "Paused standup")
+        XCTAssertTrue(paused.exists)
         let resume = app.buttons["Resume transcribing Paused standup"]
-        list(app).scroll(attempts: 4) { resume.exists && resume.isHittable }
         XCTAssertTrue(resume.waitForExistence(within: 10))
-        // The frame comes back through a floating-point transform: once on iOS 18.2 a 44 pt row read 43.99999999999997.
+        // A partially offscreen button can report hittable even when its centre is below the capture bar.
+        // Require the whole card to be visible, then tap once after the Library's interaction event.
         XCTAssertGreaterThanOrEqual(resume.frame.height, 44 - 0.001, "a 44 pt target")
-        resume.tap()
-        XCTAssertTrue(waitFor(row(app, "Paused standup"), label: ", queued"), row(app, "Paused standup").label)
+        XCTAssertLessThanOrEqual(resume.frame.maxY, app.buttons["recordButton"].frame.minY)
+        XCTAssertTrue(resume.tapWhenInteractive(in: app) {
+            row(app, "Paused standup").exists && row(app, "Paused standup").label.contains(", queued")
+        }, row(app, "Paused standup").label)
+        let failed = scrolledRow(app, "Hallway conversation")
+        XCTAssertTrue(failed.exists)
         let tryAgain = app.buttons["Try transcribing Hallway conversation again"]
         XCTAssertTrue(tryAgain.waitForExistence(within: 5))
-        tryAgain.tap()
-        XCTAssertTrue(waitFor(row(app, "Hallway conversation"), label: ", queued"), row(app, "Hallway conversation").label)
+        XCTAssertGreaterThanOrEqual(tryAgain.frame.height, 44 - 0.001, "a 44 pt target")
+        XCTAssertLessThanOrEqual(tryAgain.frame.maxY, app.buttons["recordButton"].frame.minY)
+        XCTAssertTrue(tryAgain.tapWhenInteractive(in: app) {
+            row(app, "Hallway conversation").exists && row(app, "Hallway conversation").label.contains(", queued")
+        }, row(app, "Hallway conversation").label)
     }
 
     // ports: LibraryBehaviourTest#theControlsSendTheirEvents
@@ -223,8 +232,9 @@ final class LibraryUITests: XCTestCase {
         garden.press(forDuration: 1)
         app.buttons["Move to Recently Deleted"].tapWhenSettled()
         XCTAssertTrue(app.buttons["Undo"].waitForExistence(within: 5))
-        XCTAssertFalse(garden.exists, "a note in Recently Deleted is not a result")
+        // Undo is available before the asynchronous search results have rendered the removal.
         XCTAssertTrue(app.staticTexts["Nothing matches “tomatoe”"].waitForExistence(within: 5))
+        XCTAssertFalse(garden.exists, "a note in Recently Deleted is not a result")
         app.buttons["Undo"].tap()
         XCTAssertTrue(garden.waitForExistence(within: 5), "Undo brings the result back")
         XCTAssertEqual(search.value as? String, "tomatoe", "the search stays open")

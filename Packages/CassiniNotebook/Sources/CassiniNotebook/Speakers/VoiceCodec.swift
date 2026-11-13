@@ -19,18 +19,58 @@ public enum VoiceCodec {
     private struct Envelope: Codable {
         var version: Int
         var voices: [SavedVoice]
+        var nextSaveSequence: Int?
     }
 
+    struct State {
+        var voices: [SavedVoice]
+        var nextSaveSequence: Int
+    }
+
+    enum SaveOrderError: Error { case invalid, exhausted }
+
     /// Throws `UnsupportedVoiceFileVersion` for another version, and a decoding error for anything unparseable.
-    public static func decode(_ data: Data) throws -> [SavedVoice] {
+    public static func decode(_ data: Data) throws -> [SavedVoice] { try state(data).voices }
+
+    static func state(_ data: Data) throws -> State {
         let decoder = JSONDecoder()
         let found = try decoder.decode(VoiceFileVersion.self, from: data).version
         guard found == version else { throw UnsupportedVoiceFileVersion(found: found, supported: version) }
-        return try decoder.decode(Envelope.self, from: data).voices
+        let file = try decoder.decode(Envelope.self, from: data)
+        return try ordered(file.voices, nextSaveSequence: file.nextSaveSequence ?? 0)
+    }
+
+    /// Legacy append order supplies missing sequences before any presentation sort. The envelope's high-water mark
+    /// survives deletions, including an empty list; sequences are never allocated by a visible row's position.
+    static func ordered(_ voices: [SavedVoice], nextSaveSequence: Int) throws -> State {
+        guard nextSaveSequence >= 0, Set(voices.map(\.id)).count == voices.count else {
+            throw SaveOrderError.invalid
+        }
+        var next = nextSaveSequence
+        var used: Set<Int> = []
+        for voice in voices {
+            if let sequence = voice.saveSequence {
+                guard sequence >= 0, used.insert(sequence).inserted else { throw SaveOrderError.invalid }
+                guard sequence < Int.max else { throw SaveOrderError.exhausted }
+                next = max(next, sequence + 1)
+            }
+        }
+        let result = try voices.map { voice in
+            if voice.saveSequence != nil { return voice }
+            guard next < Int.max else { throw SaveOrderError.exhausted }
+            defer { next += 1 }
+            return voice.saved(at: next)
+        }
+        return State(voices: result, nextSaveSequence: next)
     }
 
     public static func encode(_ voices: [SavedVoice]) throws -> Data {
-        try JSONEncoder().encode(Envelope(version: version, voices: voices))
+        try encode(ordered(voices, nextSaveSequence: 0))
+    }
+
+    static func encode(_ state: State) throws -> Data {
+        try JSONEncoder().encode(Envelope(version: version, voices: state.voices,
+                                          nextSaveSequence: state.nextSaveSequence))
     }
 
     /// `voices` with `print` of the note confirmed as `voiceID`, called `name`; a new person with `newID` when

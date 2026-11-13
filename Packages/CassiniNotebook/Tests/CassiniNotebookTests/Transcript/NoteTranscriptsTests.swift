@@ -7,6 +7,39 @@ import Testing
 @Suite struct NoteTranscriptsTests {
     typealias F = TranscriptFixtures
 
+    @Test func anIntentionallyUnnamedSuggestedFixtureShowsTheCardButALiteralUserNameDoesNot() throws {
+        let sam = F.voice("Sam Rivera")
+        for provenance in [NoteSpeaker.Provenance.unnamed, .user] {
+            var note = Note(title: "Speaker fixture")
+            note.transcript = [.init(text: "Hello", start: 0, end: 6, speakerID: "alex"),
+                               .init(text: "Welcome", start: 6, end: 14, speakerID: "sam"),
+                               .init(text: "Thanks", start: 14, end: 24, speakerID: "alex")]
+            note.speakers = [.init(id: "alex", name: "Alex", colourIndex: 0),
+                             .init(id: "sam", name: "Sam", colourIndex: 1)]
+            // Like the UI fixture, start with named Sam. Changing only text deliberately keeps .user.
+            note.speakers?[1].name = DefaultLabels.placeholder(2, language: "en")
+            #expect(note.speakers?[1].provenance == .user)
+            note.speakers?[1].provenance = provenance
+            note.speakers?[1].match = .suggested(voice: sam.id, score: 0.78)
+            note.refreshSpeakerLabels()
+            let reloaded = try JSONDecoder().decode(Note.self, from: JSONEncoder().encode(note))
+            let transcript = NoteTranscripts.sealed(reloaded, voices: [sam],
+                suggestions: SpeakerSuggestions.of(reloaded, voices: [sam]))
+            let cards = transcript.turns.flatMap(\.allSuggestions)
+            let shownNames = transcript.turns.flatMap { [$0.name] + $0.interjections.map(\.name) }
+            if provenance == .unnamed {
+                #expect(cards.count == 1)
+                #expect(cards.first?.speakerID == "sam" && cards.first?.voiceName == "Sam Rivera")
+                #expect(transcript.speakerTints["sam"] == .stone)
+                #expect(shownNames.contains(.placeholder(2, label: "Speaker 2")))
+            } else {
+                #expect(cards.isEmpty)
+                #expect(transcript.speakerTints["sam"] == .magenta)
+                #expect(shownNames.contains(.named("Speaker 2")))
+            }
+        }
+    }
+
     // ports: NoteTranscriptsTest#sealedTurnsFollowTheSpeakersWithTintsAndPlaceholders
     @Test func sealedTurnsFollowTheSpeakersWithTintsAndPlaceholders() {
         let transcript = NoteTranscripts.sealed(F.weeklySync)
@@ -15,8 +48,8 @@ import Testing
         #expect(turns.map(\.speakerID) == ["a", "b", "c", "a"])
         #expect(turns[0].name == .named("Giulia"))
         #expect(turns[1].name == .placeholder(2, label: "Speaker 2"))
-        // Placeholders are amber and take no slot: Giulia blue, Paolo teal.
-        #expect(turns.map(\.tint) == [.blue, .amber, .teal, .blue])
+        // Unnamed speakers hide their colour but reserve their first-speech slot.
+        #expect(turns.map(\.tint) == [.blue, .stone, .cyan, .blue])
         #expect(turns[0].text == "Hello everyone.")
         #expect(turns[0].words[1].start == 0.5)
         #expect(transcript.speakers == ["a", "b", "c"])
@@ -55,7 +88,7 @@ import Testing
         let turns = NoteTranscripts.sealed(note, voices: [paolo]).turns
         #expect(!turns[2].auto)
         #expect(turns[1].name == .unknown)
-        #expect(turns[1].tint == .amber)
+        #expect(turns[1].tint == .stone)
     }
 
     // ports: NoteTranscriptsTest#theActiveWordIsTheLastWordThatStarted
@@ -99,7 +132,7 @@ import Testing
         let draft = NoteTranscripts.draft(words, tentativeFromMs: 3_600)
         let turns = draft.turns
         #expect(turns.map(\.name) == [1, 2, 3, 1].map { .placeholder($0, label: "Speaker \($0)") })
-        #expect(turns.allSatisfy { $0.tint == .amber && !$0.auto && $0.suggestion == nil })
+        #expect(turns.allSatisfy { $0.tint == .stone && !$0.auto && $0.suggestion == nil })
         #expect(turns[3].unsettledFrom == 1, "so ends after 3.6 s")
         #expect(turns[0].unsettledFrom == nil)
         #expect(draft.activeWord(at: 3.1) == WordRef(turnID: "w4", index: 0))
@@ -171,7 +204,8 @@ extension NoteTranscriptsTests {
         #expect(row.allSuggestions.map(\.speakerID) == ["ben"])
         #expect(row.allSuggestions.first?.start == 3.05)
         #expect(row.interjections.first?.name == .placeholder(2, label: "Speaker 2"))
-        #expect(row.interjections.first?.tint == .amber)
+        #expect(row.interjections.first?.tint == .stone)
+        #expect(transcript.speakerTints["ben"] == .stone)
         let ben = try #require(NamingInput.of(note, speakerID: "ben", print: nil, voices: [voice],
                                               voicesReadOnly: false, voiceModelReady: false))
         let ada = try #require(NamingInput.of(note, speakerID: "ada", print: nil, voices: [voice],
@@ -183,7 +217,8 @@ extension NoteTranscriptsTests {
         let named = NoteTranscripts.sealed(note, voices: [voice], suggestions: SpeakerSuggestions.of(note, voices: [voice]))
         #expect(named.turns[0].allSuggestions.isEmpty)
         #expect(named.speakers == ["ada", "ben"])
-        #expect(named.turns[0].interjections.first?.tint == .teal)
+        #expect(named.turns[0].interjections.first?.tint == .magenta)
+        #expect(named.speakerTints["ben"] == .magenta)
     }
 
     @Test func aRepeatedChipSpeakerGetsOneSealedCardAndItsLatestDraftCard() throws {

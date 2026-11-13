@@ -43,10 +43,49 @@ public struct TranscriptTurn: Hashable, Sendable {
 /// Adapters to the same turn model used by the note, preview and text export.
 public enum TranscriptTurns {
     public static func rows(of words: [TranscriptWord], endsBoundedByAudio: Bool = false) -> [TurnModel.Row] {
-        TurnModel.rows(of: words.map {
-            TurnModel.Word(speaker: $0.speaker, startMs: ($0.start * 1000).rounded(), endMs: ($0.end * 1000).rounded(), text: $0.text,
-                           lowConfidenceSpeaker: $0.lowConfidenceSpeaker)
+        rows(ofModelWords: words.map {
+            TurnModel.Word(speaker: $0.speaker, startMs: ($0.start * 1000).rounded(), endMs: ($0.end * 1000).rounded(),
+                           text: $0.text, lowConfidenceSpeaker: $0.lowConfidenceSpeaker)
         }, endsBoundedByAudio: endsBoundedByAudio)
+    }
+
+    static func rows(ofModelWords source: [TurnModel.Word], endsBoundedByAudio: Bool) -> [TurnModel.Row] {
+        var rawByCanonical: [String: Data] = [:]
+        var hasCollision = false
+        var values = source
+        for word in values {
+            if let id = word.speaker {
+                let bytes = Data(id.utf8)
+                if let previous = rawByCanonical[id], previous != bytes { hasCollision = true }
+                else { rawByCanonical[id] = bytes }
+            }
+        }
+        guard hasCollision else { return TurnModel.rows(of: values, endsBoundedByAudio: endsBoundedByAudio) }
+        // The viewer's algorithms use String equality. Project all IDs to collision-free ASCII tokens only
+        // when distinct UTF-8 identities would compare equal, then restore the exact IDs at the boundary.
+        var tokens: [Data: String] = [:], originals: [String: String] = [:]
+        for index in values.indices {
+            guard let id = values[index].speaker else { continue }
+            let key = Data(id.utf8)
+            let token: String
+            if let existing = tokens[key] { token = existing }
+            else {
+                token = "__cassini_byte_speaker_\(tokens.count)"
+                tokens[key] = token; originals[token] = id
+            }
+            values[index].speaker = token
+        }
+        return TurnModel.rows(of: values, endsBoundedByAudio: endsBoundedByAudio).map { value in
+            var row = value
+            row.speaker = row.speaker.flatMap { originals[$0] }
+            row.members = row.members.map { value in
+                var member = value
+                member.speaker = member.speaker.flatMap { originals[$0] }
+                return member
+            }
+            row.over = row.over.map { originals[$0] ?? $0 }
+            return row
+        }
     }
 
     public static func of(_ words: [TranscriptWord], endsBoundedByAudio: Bool = false) -> [TranscriptTurn] {

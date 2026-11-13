@@ -3,7 +3,7 @@ import SwiftUI
 struct Waveform: View {
     let levels: [Float]
     var progress: Double = 0
-    var activeColor: Color = .ember
+    var activeColor: Color = .accentInk
     var inactiveColor: Color = .muted.opacity(0.22)
     var body: some View {
         Canvas { context, size in

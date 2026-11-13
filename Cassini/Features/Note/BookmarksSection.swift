@@ -15,7 +15,7 @@ struct BookmarksSection: View {
                     HStack {
                         Button { model.seek(bookmark.time) } label: {
                             HStack {
-                                Text(TimeText.clock(bookmark.time)).monospacedDigit().foregroundStyle(Color.ember)
+                                Text(TimeText.clock(bookmark.time)).monospacedDigit().foregroundStyle(Color.accentInk)
                                 Text(NoteCopy.bookmarkLabel(bookmark)).foregroundStyle(Color.ink)
                                 Spacer()
                             }

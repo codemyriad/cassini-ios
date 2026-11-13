@@ -874,8 +874,20 @@ These features exist only on iOS. They were kept by decision.
 
 ### Look and accessibility
 
-- **Palette.** The warm iOS palette (paper, card, ink, muted, ember) stays the brand, with tone tints and speaker tints
-  added. Fonts are the system's, with Dynamic Type. `ContrastTests` follows Android's `ContrastTest`. It checks every
+- **Palette (W1 draft preview).** The pinned Cassini sheet supplies cool grey light/dark grounds, navy light
+  actions, a separate dark highlight and Record/error/status roles. `scripts/generate-brand-colors.py` turns
+  byte-identical `CassiniShared/Brand/tokens.json` into the app/widget role table and native accent asset; CI checks
+  generated output and immutable upstream bytes. All 53 roles are decided. The four desktop-only roles are listed
+  as unused by name. Resting meeting cards use the generated derived card-rest, and neutral pills and secondary
+  controls composite ink at 10% over their actual backdrop.
+  Speaker slots are stored at first speech, including unnamed speakers; naming reveals the reserved blue, magenta,
+  cyan, orange, violet or slate slot, while unnamed speakers remain stone. Saved voices keep their immutable save
+  sequence through sorting, renaming and deletion. Portable speaker hints retain those meeting slots on export/import.
+  Recording retains forced-dark brand ground, ink, secondary ink and control washes. Error washes match the Record
+  wash; section-5 catalogue banners retain their specified amber. No provisional token or legacy palette remains.
+  Fonts are system sans with Dynamic Type and tabular times. Card title/meta use headline/footnote (17/13 at default).
+  `BrandTokenTests` checks the pin, both appearances and the native accent asset. `ContrastTests` follows Android's
+  `ContrastTest`. It checks every
   pair a screen draws in light and dark (4.5:1 for text, 3:1 for large text and non-text), with tone tints composited
   over the surface under them.
 - **Wide windows.** One `ReadableWidth.content` of 560 pt, Android's `MaxContentWidth`, applies to every screen. On

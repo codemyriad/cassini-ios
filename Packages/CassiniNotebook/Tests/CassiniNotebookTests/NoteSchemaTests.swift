@@ -52,7 +52,7 @@ import Testing
         note.sourceSha256 = "abc"; note.trashedJob = TrashedJob(state: .queued, kind: .transcribeAgain)
         note.previewText = "Preview…"; note.failure = .download(.notEnoughStorage); note.speakerAnalysisFailure = .speakers
         note.fallbackFailure = .memory
-        note.speakers = [NoteSpeaker(id: "a", name: "Alex", match: .rejected(voice: voice, score: 0.7))]
+        note.speakers = [NoteSpeaker(id: "a", name: "Alex", match: .rejected(voice: voice, score: 0.7), colourIndex: 0)]
         let data = try JSONEncoder().encode(note)
         let object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
         #expect(object["schemaVersion"] as? Int == 2)

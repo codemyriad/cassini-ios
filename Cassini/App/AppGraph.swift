@@ -302,6 +302,7 @@ extension View {
             #if DEBUG
             .environment(\.modelInstallRecorder, graph.environment.modelInstallRecorder)
             .environment(\.marksUITestLayout, graph.environment.launch.marksLaunchFinished)
+            .environment(\.showsBadgeGallery, graph.environment.launch.badgeGallery)
             #endif
             .environment(\.clock, graph.environment.clock)
             .environment(\.modelRoot, graph.environment.models)

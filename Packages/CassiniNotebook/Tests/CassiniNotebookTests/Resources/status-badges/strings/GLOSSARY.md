@@ -22,7 +22,8 @@ How to use it:
 | English | it | fr | es | pt-BR | pt-PT | Note |
 |---|---|---|---|---|---|---|
 | Cassini talk / Cassini | Cassini talk / Cassini | Cassini talk / Cassini | Cassini talk / Cassini | Cassini talk / Cassini | Cassini talk / Cassini | Never translated, never inflected. "talk" stays lowercase. No article in it/fr/es; pt-BR may use "o Cassini" when the sentence needs it. When grammar needs a gender, use **masculine** in all four (it: "Cassini si è chiuso", "Cassini è stato aggiornato"). iOS/Android Italian mix "si è chiusa"/"si è chiuso": masculine is the pick. Prefer phrasings that avoid agreement. |
-| Library (the meeting list) | Libreria | Bibliothèque | Biblioteca | Biblioteca | Biblioteca | A named place: capitalise it like a proper noun when English does ("Back to Library" → "Torna alla Libreria"). Never "Archivio", "Documenti", "Réunions". |
+| Library (the meeting list) | Libreria | Bibliothèque | Biblioteca | Biblioteca | Biblioteca | A named place on desktop: capitalise it like a proper noun when English does ("Back to Library" → "Torna alla Libreria"). Never "Archivio", "Documenti", "Réunions". |
+| All meetings (phones, L-50) | Tutte le riunioni | Toutes les réunions | Todas las reuniones | Todas as reuniões | Todas as reuniões | Phone hidden heading, back button and recording screen button (`library.allMeetings`, `library.backToAllMeetings`). Replaces "Library" on those surfaces. |
 | meeting | riunione (f) | réunion (f) | reunión (f) | reunião (f) | reunião (f) | The item in the Library. Never call a meeting a "file"/"fichier"/"archivo"/"arquivo" (except "Cassini file", see below). Feminine in all four: agree participles with it ("Ricevuta", "Reçue", "Recibida", "Recebida"). |
 | Untitled meeting | Riunione senza titolo | Réunion sans titre | Reunión sin título | Reunião sem título | Reunião sem título | |
 | browser meeting | riunione nel browser | réunion dans le navigateur | reunión en el navegador | reunião no navegador | reunião no navegador | A Zoom/Meet/etc. call in a browser tab. |
@@ -105,7 +106,11 @@ Button forms: it imperative (tu); fr, es, pt-BR infinitive. See section 4.
 | English | it | fr | es | pt-BR | pt-PT | Note |
 |---|---|---|---|---|---|---|
 | Record | Registra | Enregistrer | Grabar | Gravar | Gravar | |
-| Stop | Ferma | Arrêter | Detener | Parar | Parar | it: iOS uses "Ferma" ("Ferma e conserva i progressi"), the Android notification uses "Interrompi". Pick **"Ferma"**: "Interrompi" sounds like cutting something short. |
+| Stop | Ferma | Arrêter | Detener | Parar | Parar | Shared across all four apps (L-48, replacing "Finish" on phones). it: iOS uses "Ferma" ("Ferma e conserva i progressi"), the Android notification uses "Interrompi". Pick **"Ferma"**: "Interrompi" sounds like cutting something short. |
+| Stop and keep progress | Ferma e conserva i progressi | Arrêter et garder la progression | Detener y conservar el progreso | Parar e manter o progresso | Parar e manter o progresso | L-45 transcribing sheet/popover button (`transcribing.stopAndKeepProgress`). |
+| Import audio / Import audio… | Importa audio / Importa audio… | Importer un audio / Importer un audio… | Importar audio / Importar audio… | Importar áudio / Importar áudio… | Importar áudio / Importar áudio… | L-23/L-25: phone bottom bar button (`import.button.mobile`) and desktop menu/sidebar button (`import.action`, Mac `Import Audio…`, sentence case in translations). |
+| Find in this meeting | Cerca in questa riunione | Rechercher dans cette réunion | Buscar en esta reunión | Buscar nesta reunião | Pesquisar nesta reunião | L-44 in-meeting search field (`meeting.find.placeholder`). |
+| Resume | Riprendi | Reprendre | Reanudar | Retomar | Retomar | L-52 phone paused row action (`phone.row.resume`). |
 | Stop Recording (Mac menu, GNOME indicator only) | Ferma la registrazione | Arrêter l’enregistrement | Detener la grabación | Parar a gravação | Parar gravação | The only place this longer form is allowed. Never "Stop and Save". |
 | Start recording | Avvia la registrazione | Commencer l’enregistrement | Empezar a grabar | Começar a gravar | Iniciar gravação | |
 | Keep recording | Continua a registrare | Continuer l’enregistrement | Seguir grabando | Continuar gravando | Continuar a gravar | |
@@ -160,7 +165,12 @@ Button forms: it imperative (tu); fr, es, pt-BR infinitive. See section 4.
 | English | it | fr | es | pt-BR | pt-PT | Note |
 |---|---|---|---|---|---|---|
 | Saving… | Salvataggio… | Sauvegarde… | Guardando… | Salvando… | A guardar… | fr: never "Enregistrement…" (reads as "Recording…"). |
-| Received | Ricevuta | Reçue | Recibida | Recebida | Recebida | Must equal the trailing word in `format.previewSubtitle.received`. |
+| Received | Ricevuta | Reçue | Recibida | Recebida | Recebida | Retained through WP6; renamed to `Imported` (`Importata` / `Importée` / `Importada` / `Importada` / `Importada`) in WP7 (`L-57`). |
+| Queued (phone badge, L-52) | In coda | En attente | En cola | Na fila | Em fila | Neutral clock badge on phones (`states.phone.queued`). |
+| Paused at {position} (phone badge, L-52) | In pausa a {position} | En pause à {position} | En pausa en {position} | Em pausa em {position} | Em pausa aos {position} | Amber pause badge on phones (`states.phone.pausedAt`). |
+| Couldn’t transcribe (phone badge, L-52) | Trascrizione non riuscita | Échec de la transcription | No se pudo transcribir | Falha na transcrição | Falha na transcrição | Error alert badge on phones (`states.phone.couldntTranscribe`). |
+| Audio only (phone badge, L-52) | Solo audio | Audio seul | Solo audio | Somente áudio | Apenas áudio | Neutral wave badge on phones (`states.phone.audioOnly`). |
+| Can’t play / Can’t read transcript / Newer format (phone badges, L-52) | Impossibile riprodurre / Trascrizione illeggibile / Formato più recente | Lecture impossible / Transcription illisible / Format plus récent | No se puede reproducir / Transcripción ilegible / Formato más reciente | Não é possível reproduzir / Transcrição ilegível / Formato mais recente | Não é possível reproduzir / Transcrição ilegível / Formato mais recente | Phone row badges (`states.phone.*`). |
 | Interrupted (badge) | Interrotta | Interrompue | Interrumpida | Interrompida | Interrompida | L-26: no position in the badge. |
 | Interrupted at {position} | Interrotta a {position} | Interrompue à {position} | Interrumpida en {position} | Interrompida em {position} | Interrompida aos {position} | Current meeting/detail copy (`meeting.interruptedAt`); placement PROVISIONAL, pending Alex. |
 | Needs attention | Richiede attenzione | À vérifier | Requiere atención | Requer atenção | Requer atenção | |

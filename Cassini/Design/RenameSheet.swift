@@ -33,7 +33,7 @@ struct RenameSheet: View {
         NavigationStack {
             Form {
                 Section {
-                    TextField(fieldLabel, text: $text.handingEdits(to: edited))
+                    TextField(fieldLabel, text: $text.handingEdits(to: edited), prompt: Text(fieldLabel).foregroundStyle(Color.ink3))
                         .focused($focused).submitLabel(.done).onSubmit(confirm)
                         .textInputAutocapitalization(capitalization)
                         .onChange(of: text) { _, typed in edited(typed) }

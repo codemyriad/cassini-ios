@@ -15,10 +15,12 @@ extension ExportTranscript {
     public init(note: Note, version: TranscriptVersion? = nil, unassignedLabel: String) {
         let segments = version?.segments ?? note.transcript
         let speakers = version?.speakers ?? note.speakers ?? []
-        var labels = Dictionary(speakers.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
-        if labels[Self.unassignedSpeaker] == nil { labels[Self.unassignedSpeaker] = unassignedLabel }
-        self.init(title: note.title, durationMs: Self.ms(note.duration), words: segments.flatMap(Self.words), labels: labels,
-                  endsBoundedByAudio: !segments.isEmpty && segments.allSatisfy { $0.wordEndsBoundedByAudio == true })
+        var labels = Dictionary(speakers.map { ($0.byteID, $0.name) }, uniquingKeysWith: { first, _ in first })
+        if labels[Data(Self.unassignedSpeaker.utf8)] == nil { labels[Data(Self.unassignedSpeaker.utf8)] = unassignedLabel }
+        var legacyLabels = Dictionary(speakers.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
+        if legacyLabels[Self.unassignedSpeaker] == nil { legacyLabels[Self.unassignedSpeaker] = unassignedLabel }
+        self.init(title: note.title, durationMs: Self.ms(note.duration), words: segments.flatMap(Self.words), labels: legacyLabels,
+                  endsBoundedByAudio: !segments.isEmpty && segments.allSatisfy { $0.wordEndsBoundedByAudio == true }, labelsByID: labels)
     }
 
     private static func words(of segment: TranscriptSegment) -> [Word] {

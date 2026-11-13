@@ -241,6 +241,11 @@ public struct TranscriptionJob: TranscriptionJobRunning {
             if checkpoint == nil {
                 drafts.mutate(job.noteID) { _ in DraftNames(generation: settings.voicesGeneration) }
             }
+            if let checkpoint { drafts.mutate(job.noteID) { $0.observingWords(checkpoint.draftWords) } }
+            context.events = { [noteID = job.noteID] event in
+                drafts.observe(event, noteID: noteID)
+                events(event)
+            }
             context.live = await host.liveVoices(generation: settings.voicesGeneration)
         }
         context.drafts = drafts
@@ -740,7 +745,7 @@ public struct TranscriptionJob: TranscriptionJobRunning {
         let knownMs: Int64
         let settings: JobSettings
         let stop: StopSignal
-        let events: @Sendable (JobEvent) -> Void
+        var events: @Sendable (JobEvent) -> Void
         var signature = ""
         var totalMs: Int64 = 0
         var segmentation: String?

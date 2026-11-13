@@ -26,8 +26,14 @@ public struct SavedVoice: Codable, Identifiable, Hashable, Sendable {
     public var id: UUID = UUID()
     public var name: String
     public var samples: [VoiceSample]
-    public init(id: UUID = UUID(), name: String, samples: [VoiceSample]) {
-        self.id = id; self.name = name; self.samples = samples
+    /// Immutable zero-based save order. Missing only before the first save or in a legacy version-one file.
+    public let saveSequence: Int?
+    public init(id: UUID = UUID(), name: String, samples: [VoiceSample], saveSequence: Int? = nil) {
+        self.id = id; self.name = name; self.samples = samples; self.saveSequence = saveSequence
+    }
+
+    func saved(at sequence: Int) -> SavedVoice {
+        SavedVoice(id: id, name: name, samples: samples, saveSequence: sequence)
     }
 
     /// Seconds of confirmed speech in the samples.

@@ -5,10 +5,14 @@ public struct MergeTarget: Hashable, Sendable, Identifiable {
     public var speakerID: String
     public var name: String
     public var ordinal: Int
+    public var colourIndex: Int?
+    public var provenance: NoteSpeaker.Provenance?
     public var speakingTime: Double
     public var id: String { speakerID }
-    public init(speakerID: String, name: String, ordinal: Int, speakingTime: Double) {
+    public init(speakerID: String, name: String, ordinal: Int, speakingTime: Double,
+                colourIndex: Int? = nil, provenance: NoteSpeaker.Provenance? = nil) {
         self.speakerID = speakerID; self.name = name; self.ordinal = ordinal; self.speakingTime = speakingTime
+        self.colourIndex = colourIndex; self.provenance = provenance
     }
 }
 
@@ -34,6 +38,8 @@ public struct NamingInput: Hashable, Sendable {
     public var speakerID: String
     public var label: String
     public var ordinal: Int
+    public var colourIndex: Int?
+    public var provenance: NoteSpeaker.Provenance?
     public var speakingTime: Double
     public var sample: SampleWindow?
     public var print: SpeakerPrint?
@@ -54,32 +60,54 @@ public struct NamingInput: Hashable, Sendable {
                 voicesReadOnly: Bool = false, voiceModelReady: Bool = true,
                 currentModel: String = VoiceprintModel.sha256,
                 mergeTargets: [MergeTarget] = [], versions: MergeVersions = MergeVersions(shown: 1, added: 2), canSample: Bool = true,
-                draft: Bool = false, willHavePrint: Bool = false) {
+                draft: Bool = false, willHavePrint: Bool = false,
+                colourIndex: Int? = nil, provenance: NoteSpeaker.Provenance? = nil) {
         self.speakerID = speakerID; self.label = label; self.ordinal = ordinal; self.speakingTime = speakingTime
         self.sample = sample; self.print = print; self.match = match; self.voices = voices
         self.voicesReadOnly = voicesReadOnly; self.voiceModelReady = voiceModelReady; self.currentModel = currentModel
         self.mergeTargets = mergeTargets; self.versions = versions; self.canSample = canSample
         self.draft = draft; self.willHavePrint = willHavePrint
+        self.colourIndex = colourIndex; self.provenance = provenance
+    }
+
+    /// The same fixed slots and explicit naming provenance as transcript headers.
+    public var speakerTints: [String: SpeakerTint] {
+        let speakers = [NoteSpeaker(id: speakerID, name: label, colourIndex: colourIndex ?? ordinal, provenance: provenance)]
+            + mergeTargets.map { NoteSpeaker(id: $0.speakerID, name: $0.name,
+                                             colourIndex: $0.colourIndex ?? $0.ordinal, provenance: $0.provenance) }
+        return SpeakerTint.assign(speakers.map(\.id), speakers: speakers)
+    }
+
+    public func speakerTint(for id: String) -> SpeakerTint? {
+        let speakers = [NoteSpeaker(id: speakerID, name: label, colourIndex: colourIndex ?? ordinal, provenance: provenance)]
+            + mergeTargets.map { NoteSpeaker(id: $0.speakerID, name: $0.name,
+                                             colourIndex: $0.colourIndex ?? $0.ordinal, provenance: $0.provenance) }
+        return SpeakerTint.assignByID(speakers.map(\.id), speakers: speakers)[Data(id.utf8)]
     }
 
     /// A print exists for the same-person question and the Remember switch.
     public var hasPrint: Bool { draft ? willHavePrint : print != nil }
 
     /// The stored name, or nil for a placeholder speaker.
-    public var namedLabel: String? { DefaultLabels.isDefault(id: speakerID, label: label) ? nil : label }
+    public var namedLabel: String? {
+        if let provenance { return provenance == .unnamed ? nil : label }
+        return DefaultLabels.isDefault(id: speakerID, label: label) ? nil : label
+    }
 
     /// What the sheet needs about the note's speaker `speakerID`, with the speaker's latest `print` and the saved
     /// voices as they are now; nil when the note has no such speaker. Merge targets are the other speakers who say
     /// something. Remember works with a print of its own, or once the voiceprint model is installed (`voiceModelReady`).
     public static func of(_ note: Note, speakerID: String, print: SpeakerPrint?, voices: [SavedVoice],
                           voicesReadOnly: Bool, voiceModelReady: Bool) -> NamingInput? {
-        guard let index = note.speakers?.firstIndex(where: { $0.id == speakerID }),
-              let speaker = note.speakers?[index] else { return nil }
+        let palette = Note.assignColourIndices(note.speakers ?? [], order: SpeakerColourOrder.segments(note.transcript))
+        guard let index = palette.firstIndex(where: { $0.byteID == Data(speakerID.utf8) }) else { return nil }
+        let speaker = palette[index]
         let stats = SpeakerStats.of(note.transcript)
-        let stat = stats.first { $0.speakerID == speakerID }
-        let targets = stats.filter { $0.speakerID != speakerID && $0.wordCount > 0 }.compactMap { other -> MergeTarget? in
-            note.speaker(other.speakerID).map {
-                MergeTarget(speakerID: $0.id, name: $0.name, ordinal: other.ordinal, speakingTime: other.speakingTime)
+        let stat = stats.first { Data($0.speakerID.utf8) == Data(speakerID.utf8) }
+        let targets = stats.filter { Data($0.speakerID.utf8) != Data(speakerID.utf8) && $0.wordCount > 0 }.compactMap { other -> MergeTarget? in
+            palette.first(where: { $0.byteID == Data(other.speakerID.utf8) }).map {
+                MergeTarget(speakerID: $0.id, name: $0.name, ordinal: other.ordinal, speakingTime: other.speakingTime,
+                            colourIndex: $0.colourIndex, provenance: $0.provenance)
             }
         }
         let versions = note.mergeVersionNumbers
@@ -88,6 +116,6 @@ public struct NamingInput: Hashable, Sendable {
             sample: stat?.sample, print: print, match: speaker.match, voices: voices, voicesReadOnly: voicesReadOnly,
             voiceModelReady: print != nil || voiceModelReady,
             mergeTargets: targets, versions: MergeVersions(shown: versions.shown, added: versions.added),
-            canSample: note.audio.isPlayable)
+            canSample: note.audio.isPlayable, colourIndex: speaker.colourIndex, provenance: speaker.provenance)
     }
 }

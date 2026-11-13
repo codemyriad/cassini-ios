@@ -36,7 +36,7 @@ struct RecordingView: View {
                     } label: {
                         Label { Text("Mark a moment", tableName: "Recording") } icon: { Image(systemName: "bookmark") }
                             .font(.subheadline).padding(.horizontal, 20).padding(.vertical, 12)
-                            .background(Color.compatibilityWhite.opacity(0.08), in: Capsule())
+                            .background(Color.recordingButtonWash, in: Capsule())
                     }
                     .disabled(!capturing).sensoryFeedback(.success, trigger: bookmarkFeedback).padding(.bottom, 24)
                     RecordingControls(isPaused: screen.phase == .paused, capturing: capturing,
@@ -96,7 +96,7 @@ private struct RecordingHeader: View {
         Button(action: minimise) {
             Image(systemName: "chevron.down").font(.headline)
                 .frame(width: HitTarget.minimum, height: HitTarget.minimum)
-                .background(Color.compatibilityWhite.opacity(0.08), in: Circle())
+                .background(Color.recordingButtonWash, in: Circle())
         }
         .accessibilityLabel(Text("Minimise to library (recording continues)", tableName: "Recording"))
     }
@@ -104,7 +104,7 @@ private struct RecordingHeader: View {
     private var formatLabel: some View {
         Text(RecordingCopy.format(format)).font(.caption.weight(.semibold)).monospacedDigit()
             .padding(.horizontal, 10).padding(.vertical, 6)
-            .background(Color.compatibilityWhite.opacity(0.1), in: Capsule())
+            .background(Color.recordingButtonWash, in: Capsule())
     }
 }
 
@@ -137,14 +137,15 @@ private struct RecordingTitleField: View {
             Text("Title", tableName: "Recording").font(.footnote).foregroundStyle(Color.recordingSecondary).accessibilityHidden(true)
             HStack(spacing: 8) {
                 // Wraps rather than cutting a long title at large text sizes.
-                TextField(String(localized: "Title", table: "Recording"), text: $title, axis: .vertical)
-                    .lineLimit(1...3).font(.system(.title2, design: .serif)).focused($focused).submitLabel(.done)
+                TextField(String(localized: "Title", table: "Recording"), text: $title,
+                          prompt: Text("Title", tableName: "Recording").foregroundStyle(Color.ink3), axis: .vertical)
+                    .lineLimit(1...3).font(.system(.title2)).focused($focused).submitLabel(.done)
                     .textInputAutocapitalization(.sentences).onSubmit { focused = false }
                     .accessibilityIdentifier("recordingTitle")
                 Image(systemName: "pencil").foregroundStyle(Color.recordingSecondary).accessibilityHidden(true)
             }
             .padding(.vertical, 4).padding(.bottom, 6)
-            .overlay(alignment: .bottom) { Rectangle().fill(Color.compatibilityWhite.opacity(0.18)).frame(height: 1) }
+            .overlay(alignment: .bottom) { Rectangle().fill(Color.recordingLine).frame(height: 1) }
         }
     }
 }
@@ -175,12 +176,12 @@ private struct RecordingControls: View {
         HStack(alignment: .center) {
             LabelledCircle(label: Text("Library", tableName: "Recording"), action: library) {
                 Image(systemName: "list.bullet").font(.title3).frame(width: 56, height: 56)
-                    .overlay(Circle().strokeBorder(Color.compatibilityWhite.opacity(0.18), lineWidth: 1))
+                    .overlay(Circle().strokeBorder(Color.recordingLine, lineWidth: 1))
             }
             .frame(maxWidth: .infinity)
             Button(action: pauseOrResume) {
                 ZStack {
-                    Circle().fill(Color.compatibilityWhite.opacity(0.14)).frame(width: 88, height: 88)
+                    Circle().fill(Color.recordingButtonWash).frame(width: 88, height: 88)
                     if isPaused { Circle().fill(Color.recordingLive).frame(width: 26, height: 26) } else { Image(systemName: "pause.fill").font(.system(size: 30)) }
                 }
             }
@@ -189,7 +190,7 @@ private struct RecordingControls: View {
             .accessibilityIdentifier("pauseResumeRecording")
             .frame(maxWidth: .infinity)
             LabelledCircle(label: Text("Finish", tableName: "Recording"), action: finish) {
-                RoundedRectangle(cornerRadius: 4).fill(Color.compatibilityWhite).frame(width: 18, height: 18)
+                RoundedRectangle(cornerRadius: 4).fill(Color.onRecord).frame(width: 18, height: 18)
                     .frame(width: 56, height: 56).background(Color.recordingFinish, in: Circle())
             }
             .disabled(!capturing).opacity(capturing ? 1 : 0.38)

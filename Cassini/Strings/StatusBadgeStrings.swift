@@ -1,4 +1,4 @@
-// Generated from cassini-ux 793209cb3425bece7143178458fddd94b691e12d; do not edit.
+// Generated from cassini-ux 5e0c34e0f1bb390298dabdf4eedc494e933fd329; do not edit.
 import Foundation
 
 /// Literal call sites keep Xcode extraction and the compiled catalog in agreement.
@@ -25,6 +25,20 @@ enum StatusBadgeStrings {
             return String(localized: "states.badge.transcribing.noEta", table: "StatusBadge", bundle: bundle, locale: locale)
         case "states.badge.transcribing.underMinute":
             return String(localized: "states.badge.transcribing.underMinute", table: "StatusBadge", bundle: bundle, locale: locale)
+        case "states.phone.audioOnly":
+            return String(localized: "states.phone.audioOnly", table: "StatusBadge", bundle: bundle, locale: locale)
+        case "states.phone.cantPlay":
+            return String(localized: "states.phone.cantPlay", table: "StatusBadge", bundle: bundle, locale: locale)
+        case "states.phone.cantReadTranscript":
+            return String(localized: "states.phone.cantReadTranscript", table: "StatusBadge", bundle: bundle, locale: locale)
+        case "states.phone.couldntTranscribe":
+            return String(localized: "states.phone.couldntTranscribe", table: "StatusBadge", bundle: bundle, locale: locale)
+        case "states.phone.newerFormat":
+            return String(localized: "states.phone.newerFormat", table: "StatusBadge", bundle: bundle, locale: locale)
+        case "states.phone.pausedAt":
+            return String(localized: "states.phone.pausedAt", table: "StatusBadge", bundle: bundle, locale: locale)
+        case "states.phone.queued":
+            return String(localized: "states.phone.queued", table: "StatusBadge", bundle: bundle, locale: locale)
         default:
             preconditionFailure("Unknown shared status badge key: \(id)")
         }
