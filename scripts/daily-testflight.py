@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import platform
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -350,6 +351,48 @@ def notify_failure(message, inbox_path):
         print('Coordinator inbox unavailable; failure is retained in scheduler/Actions log', file=sys.stderr)
 
 
+GUI_TCC_REMEDIATION = (
+    'restart tmux -L gui from GUI Terminal.app via ~/bin/gui-tmux.command '
+    '(a gui tmux server started from SSH lacks removable-volume TCC access)'
+)
+
+
+def external_permission_error(error):
+    return RuntimeError(f'External volume denied write access ({error}); {GUI_TCC_REMEDIATION}')
+
+
+def create_output_directory(root):
+    output = root/uuid.uuid4().hex
+    try:
+        output.mkdir(parents=True)
+    except PermissionError as error:
+        raise external_permission_error(error) from None
+    return output
+
+
+def preflight_gui_output(runner, output):
+    if os.environ.get('GUIRUN_INSIDE') == '1' or not runner.is_file():
+        return
+    try:
+        probe = subprocess.run(
+            [sys.executable, str(runner), sys.executable, '-c',
+             'from pathlib import Path; import sys, tempfile; '
+             'p = Path(tempfile.mkdtemp(prefix="preflight-", dir=sys.argv[1])); p.rmdir()',
+             str(output)],
+            capture_output=True, text=True, timeout=60,
+            env=dict(os.environ, GUIRUN_TIMEOUT='60'))
+    except Exception:
+        shutil.rmtree(output, ignore_errors=True)
+        raise
+    if probe.returncode:
+        shutil.rmtree(output, ignore_errors=True)
+        lines = [line.strip() for line in (probe.stderr or probe.stdout).splitlines() if line.strip()]
+        detail = lines[-1] if lines else f'exit {probe.returncode}'
+        if 'Operation not permitted' in detail or 'PermissionError' in detail:
+            raise RuntimeError(f'External volume denied GUI write access ({detail}); {GUI_TCC_REMEDIATION}')
+        raise RuntimeError(f'GUI archive session preflight failed: {detail}')
+
+
 def wait_processing(apple, pending, output):
     args = ['xcrun', 'altool', '--build-status', '--wait', *apple.auth(), '--output-format', 'json']
     if pending.get('delivery'):
@@ -358,7 +401,11 @@ def wait_processing(apple, pending, output):
         args += ['--apple-id', APP, '--bundle-version', pending['build'],
                  '--bundle-short-version-string', pending['version'], '--platform', 'ios']
     # Apple's command waits for the processing event; no sleep/poll/re-upload loop.
-    with (output/'processing.log').open('a') as log:
+    try:
+        log_stream = (output/'processing.log').open('a')
+    except PermissionError as error:
+        raise external_permission_error(error) from None
+    with log_stream as log:
         subprocess.run(args, stdout=log, stderr=subprocess.STDOUT, check=True, timeout=3600)
 
 
@@ -433,8 +480,8 @@ def publish(config, state_path, source, apple=None, *, clock=time.monotonic, sle
     apple = apple or Apple()
     apple.guard()
     root = external_output(Path(config['output_root']))
-    output = root/uuid.uuid4().hex
-    output.mkdir(parents=True)
+    output = create_output_directory(root)
+    preflight_gui_output(source/'scripts/run-in-gui.py', output)
     checkout = output/'source'
     command(['git', 'worktree', 'add', '--detach', str(checkout), head], cwd=source)
     versions = set(re.findall(r"MARKETING_VERSION:\s*'([0-9]+\.[0-9]+\.[0-9]+)'", (checkout/'project.yml').read_text()))
