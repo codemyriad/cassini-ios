@@ -142,7 +142,6 @@ public struct ZIPArchive: Sendable {
             let payload = try Self.payload(file, at: offset, before: start, method: header.z16(10),
                                            name: rawName, decodedName: decodedName, unicodeName: unicodeName, packed: packed)
             let mode = (header.z32(38) >> 16) & 0xf000
-            let normalized = name.replacingOccurrences(of: "\\", with: "/")
             directory = directory || mode == 0x4000 || header.z32(38) & 0x10 != 0
             // Directories carry no expanded data. Deflated empty directories have a small stream that
             // preflight still drains: a forged zero size must not hide a payload in an ignored member.
@@ -152,7 +151,7 @@ public struct ZIPArchive: Sendable {
             }
             let regular = !directory && mode != 0xa000
             // Only the first 512 title characters can affect the import's 200-character title. Keep the extension.
-            let base = String(normalized.split(separator: "/", omittingEmptySubsequences: false).last ?? "")
+            let base = String(String.UnicodeScalarView(Self.normalizedScalars(name).split(separator: "/", omittingEmptySubsequences: false).last ?? []))
             let ext = (base as NSString).pathExtension
             let display = String((base as NSString).deletingPathExtension.prefix(512)) + (ext.isEmpty ? "" : "." + String(ext.prefix(32)))
             result.append(Entry(name: display, compressedBytes: packed, expandedBytes: unpacked, isFile: regular, isDirectory: directory, isMetadata: metadata,
@@ -240,19 +239,27 @@ public struct ZIPArchive: Sendable {
         return bytes
     }
 
+    private static func normalizedScalars(_ name: String) -> [Unicode.Scalar] {
+        name.unicodeScalars.map { $0 == "\\" ? "/" : $0 }
+    }
     static func checkPath(_ name: String) throws {
-        let normalized = name.replacingOccurrences(of: "\\", with: "/")
-        let prefix = Array(normalized.utf8.prefix(2))
-        let drive = prefix.count == 2 && prefix[1] == 58 && ((65...90).contains(prefix[0]) || (97...122).contains(prefix[0]))
-        guard !normalized.isEmpty, !normalized.hasPrefix("/"), !normalized.contains("\0"), !drive,
-              !normalized.split(separator: "/").contains("..") else { throw ZIPFailure.unsafePaths }
+        let scalars = normalizedScalars(name)
+        let drive = scalars.count >= 2 && scalars[1] == ":"
+            && ((65...90).contains(scalars[0].value) || (97...122).contains(scalars[0].value))
+        let parent: [Unicode.Scalar] = [".", "."]
+        guard !scalars.isEmpty, scalars.first != "/", !scalars.contains("\0"), !drive,
+              !scalars.split(separator: "/").contains(where: { $0.elementsEqual(parent) }) else {
+            throw ZIPFailure.unsafePaths
+        }
     }
     private static func isDirectoryPath(_ name: String) -> Bool {
-        name.hasSuffix("/") || name.hasSuffix("\\")
+        normalizedScalars(name).last == "/"
     }
     private static func isFinderMetadata(_ name: String) -> Bool {
-        let components = name.replacingOccurrences(of: "\\", with: "/").split(separator: "/")
-        return components.contains("__MACOSX") || components.last?.hasPrefix("._") == true
+        let components = normalizedScalars(name).split(separator: "/")
+        let macosx = Array("__MACOSX".unicodeScalars), sidecar = Array("._".unicodeScalars)
+        return components.contains(where: { $0.elementsEqual(macosx) })
+            || components.last?.starts(with: sidecar) == true
     }
     /// Some writers (including macOS ditto) store UTF-8 without bit 11. Prefer valid UTF-8 in that case,
     /// retaining CP437 for legacy bytes. A UTF-8 flag never permits the legacy fallback.
