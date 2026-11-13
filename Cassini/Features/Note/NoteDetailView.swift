@@ -95,12 +95,7 @@ struct NoteDetailView: View {
     // MARK: Content
 
     private func usesDraftBody(_ mode: NoteMode) -> Bool {
-        switch mode {
-        case .processing, .paused: true
-        case .failed(let overDocument): !overDocument
-        case .queued(_, let overDocument): !overDocument && !(model.shownDraft?.words.isEmpty ?? true)
-        default: false
-        }
+        mode.showsDraft
     }
 
     private func content(_ note: Note, mode: NoteMode) -> some View {
