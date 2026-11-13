@@ -166,7 +166,7 @@ public enum TranscribeAgainRule {
     }
 }
 
-/// The header subtitle outside reading mode: "Today, 10:02 · 48:13".
+/// The meeting header subtitle: "Today, 10:02 · 48:13".
 public struct NoteSubtitle: Hashable, Sendable {
     /// The day as the Library heads it (`DayGroups.key`): today, yesterday, or a date with the year outside the
     /// current one.
@@ -175,9 +175,8 @@ public struct NoteSubtitle: Hashable, Sendable {
     public var meetingTime: MeetingTime = .unknown
     public var duration: TimeInterval
 
-    /// Nil in reading mode, whose header has the search and the chips instead.
+    /// Reading keeps the same resolved meeting date and duration as the other modes (L-44).
     public static func of(_ note: Note, mode: NoteMode, now: Date, calendar: Calendar) -> NoteSubtitle? {
-        guard mode != .reading else { return nil }
         return NoteSubtitle(day: note.meetingTime.day(in: calendar).map { DayGroups.key($0, now: now, calendar: calendar) } ?? .undated,
                             createdAt: note.createdAt, meetingTime: note.meetingTime,
                             duration: note.duration)

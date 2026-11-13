@@ -57,8 +57,21 @@ import Testing
         plain.transcript = []; plain.status = .audioOnly
         #expect(NoteMode.of(plain, job: job(.failed, for: plain)) == .failed(overDocument: false))
         #expect(NoteMode.failed(overDocument: false).showsDraft, "a failure without a transcript shows the draft so far")
-        #expect(NoteSubtitle.of(note, mode: .reading, now: note.createdAt, calendar: .current) == nil,
-                "reading mode has no subtitle")
+        #expect(NoteSubtitle.of(note, mode: .reading, now: note.createdAt, calendar: .current) != nil,
+                "reading retains the meeting date and duration")
+    }
+
+    @Test(arguments: [MeetingTime.unknown, .instant(Date(timeIntervalSince1970: 0)), .local("1970-01-01T00:15:00")])
+    func readingHeaderPreservesResolvedMeetingTimeWithoutCreationFallback(_ time: MeetingTime) throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        var note = F.weeklySync
+        note.createdAt = Date(timeIntervalSince1970: 864_000)
+        note.meetingTime = time
+        let subtitle = try #require(NoteSubtitle.of(note, mode: .reading, now: Date(timeIntervalSince1970: 0), calendar: calendar))
+        #expect(subtitle.meetingTime == time)
+        #expect(subtitle.duration == note.duration)
+        #expect(subtitle.day == (time == .unknown ? .undated : .today))
     }
 
     // ports: NoteViewModelTest#aPlainNoteIsAudioOnlyAndAnUnplayableOneHasNoPlayer (its modes; the banners are
