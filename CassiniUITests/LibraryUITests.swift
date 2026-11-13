@@ -68,6 +68,23 @@ final class LibraryUITests: XCTestCase {
         return result
     }
 
+    /// A real pointer proves that the pinned field receives input. Native inset text fields can report
+    /// not-hittable, while element.tap() auto-scrolls them; neither is proof of a user's tap at this position.
+    @MainActor private func focusSearchWithPointer(_ app: XCUIApplication) {
+        let search = app.textFields["librarySearch"]
+        XCTAssertTrue(search.wait(until: NSPredicate(format: "hasKeyboardFocus == false"), within: 5),
+                      "focus must change as a result of the pointer event")
+        let frame = settledFrame(search)
+        guard app.windows.firstMatch.frame.contains(frame) else {
+            XCTFail("The complete search field must be visible before sending a pointer event")
+            return
+        }
+        app.coordinate(withNormalizedOffset: .zero)
+            .withOffset(CGVector(dx: frame.midX, dy: frame.midY)).tap()
+        XCTAssertTrue(search.wait(until: NSPredicate(format: "hasKeyboardFocus == true"), within: 5),
+                      "the visible pinned field receives a physical tap without accessibility auto-scrolling")
+    }
+
     /// Every row status of the table shows, with its text, in a fixture (Recording is in the recording test below).
     @MainActor func testEveryRowStatusShowsWithItsText() {
         let app = launch(["--seed", "statuses"] + DeviceUnderTest.workingSpeech)
@@ -376,9 +393,8 @@ final class LibraryUITests: XCTestCase {
         }
         capture("iPad Library scrolled before opening Search")
         XCTAssertTrue(reachedQuiet, "row=\(quiet.exists ? quiet.frame : .null), sidebar=\(sidebar.frame), record=\(app.buttons["recordButton"].frame)")
-        XCTAssertTrue(search.isHittable)
         XCTAssertEqual(search.frame, initialSearchFrame, "the sidebar search stays pinned while its rows scroll")
-        search.tap()
+        focusSearchWithPointer(app)
         capture("iPad empty Search focused after scrolling the Library")
         let date = app.buttons["librarySearchDate"]
         let close = app.buttons["closeLibrarySearch"]
@@ -401,7 +417,7 @@ final class LibraryUITests: XCTestCase {
         planning.tap()
         let title = app.staticTexts["noteTitle"]
         XCTAssertTrue(title.wait(until: NSPredicate(format: "label == 'Weekly planning call'"), within: 15))
-        XCTAssertTrue(search.isHittable, "the Library stays beside the selected meeting")
+        focusSearchWithPointer(app)
         XCTAssertTrue(close.isHittable)
         XCTAssertTrue(search.waitForValue("planning"), "selecting a meeting keeps the sidebar query")
         close.tap()
@@ -410,13 +426,15 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(app.buttons["recentlyDeletedButton"].exists)
         settings.tap()
         XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(within: 15))
-        XCTAssertTrue(search.isHittable, "Settings replaces only the detail column")
+        XCTAssertTrue(app.windows.firstMatch.frame.contains(search.frame), "Settings replaces only the detail column")
         XCTAssertTrue(scrollSidebar(app, up: false) { planning.exists && planning.isHittable })
         planning.tap()
         XCTAssertTrue(title.wait(until: NSPredicate(format: "label == 'Weekly planning call'"), within: 15),
                       "selecting the meeting again replaces Settings without a root-detail Back button")
-        XCTAssertTrue(search.isHittable)
         XCTAssertTrue(settings.isHittable)
+        focusSearchWithPointer(app)
+        close.tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(within: 5))
     }
 
     @MainActor func testPinnedSearchClosesAndResetsItsDateFilterAcrossNoteNavigation() {
@@ -432,10 +450,9 @@ final class LibraryUITests: XCTestCase {
             last.exists && last.isHittable && last.frame.maxY < app.buttons["recordButton"].frame.minY
         })
         capture("Library scrolled before opening Search")
-        XCTAssertTrue(search.isHittable, "Search remains available after the list scrolls")
         XCTAssertEqual(search.frame, initialSearchFrame, "Search is pinned outside the scrolling list")
 
-        search.tap()
+        focusSearchWithPointer(app)
         capture("Empty Search focused after scrolling the Library")
         let date = app.buttons["librarySearchDate"]
         XCTAssertTrue(date.wait(until: NSPredicate(format: "hittable == true"), within: 5))
