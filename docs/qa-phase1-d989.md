@@ -47,6 +47,8 @@ The existing full gate provides the interaction checks alongside the visual capt
 
 These checks establish existing behaviour; they do not substitute for the open work packages' acceptance checks.
 
+The full iOS 18 tablet audit also exposed an 18-point-high touch target on Settings’ “Source code and notices” link. Its legacy borderless label now has the standard minimum target and a rectangular content shape; iOS 26+ retains its existing native button layout. The existing tablet accessibility audit checks the corrected target. A focused run then reported an unattributed Settings clipping prediction; its screenshot showed no visible clipping, and the repeated six-screen tablet audit passed without changing its filters or limits. Keep this intermittent legacy-audit limitation visible during review.
+
 ## QA harness corrections
 
 The initial Transcribing screenshot failed in both appearances because XCTest could not compute an activation point for the offscreen static draft heading. The capture now swipes the real scroll view and checks that the heading’s complete frame is inside its visible viewport below the pinned card before each gesture. The focused baseline recapture passes in both appearances.

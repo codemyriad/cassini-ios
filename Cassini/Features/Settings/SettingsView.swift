@@ -307,7 +307,15 @@ private struct AboutCard: View {
             }
             HStack(spacing: 4) {
                 Text("Free software under GPLv3.", tableName: "Settings").foregroundStyle(Color.muted)
-                Button(action: openNotices) { Text("Source code and notices", tableName: "Settings").underline() }
+                Button(action: openNotices) {
+                    if #available(iOS 26.0, *) {
+                        Text("Source code and notices", tableName: "Settings").underline()
+                    } else {
+                        // Older borderless buttons expose only the text's height as their touch target.
+                        Text("Source code and notices", tableName: "Settings").underline()
+                            .frame(minHeight: HitTarget.minimum).contentShape(Rectangle())
+                    }
+                }
                     .tint(.accent).buttonStyle(.borderless)
             }
             .font(.subheadline)
