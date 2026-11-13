@@ -131,9 +131,11 @@ struct NoteDetailView: View {
             .animation(.default, value: model.screen.follow)
         }
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
+            ToolbarItem(placement: .principal) {
                 if !headerTitleVisible, mode != .processing {
                     Text(note.title).font(.headline).foregroundStyle(Color.ink).lineLimit(1)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .accessibilityAddTraits(.isHeader)
                         .accessibilityIdentifier("noteCompactTitle")
                 }
             }
