@@ -205,6 +205,11 @@ public enum NoteTranscripts {
     ///
     /// "auto" shows when the speaker's match is automatic and its label is the voice's name.
     public static func sealed(_ note: Note, voices: [SavedVoice] = [], suggestions: [SpeakerSuggestion] = []) -> NoteTranscript {
+        sealed(note, voices: voices, suggestions: suggestions, colourOrder: SpeakerColourOrder.words)
+    }
+
+    static func sealed(_ note: Note, voices: [SavedVoice] = [], suggestions: [SpeakerSuggestion] = [],
+                       colourOrder: ([TranscriptWord]) -> [String]) -> NoteTranscript {
         let words = note.transcriptWords
         let order = orderOfAppearance(words)
         let speakers = Dictionary((note.speakers ?? []).map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
@@ -218,9 +223,12 @@ public enum NoteTranscripts {
                 names[id] = name(label: speakers[id]?.name ?? labels[id], id: id, ordinal: ordinal)
             }
         }
-        let paletteSpeakers = Note.assignColourIndices(order.map { id in
+        var paletteSpeakers = order.map { id in
             speakers[id] ?? NoteSpeaker(id: id, name: labels[id] ?? id)
-        }, order: SpeakerColourOrder.words(words))
+        }
+        if paletteSpeakers.contains(where: { $0.colourIndex == nil }) {
+            paletteSpeakers = Note.assignColourIndices(paletteSpeakers, order: colourOrder(words))
+        }
         let tints = SpeakerTint.assign(order, speakers: paletteSpeakers)
         let voiceNames = Dictionary(voices.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
         let cards = Dictionary(suggestions.map { ($0.speakerID, $0) }, uniquingKeysWith: { first, _ in first })
@@ -246,6 +254,14 @@ public enum NoteTranscripts {
     public static func draft(_ words: [DraftWord], tentativeFromMs: Int64?, labels: [String: String] = [:],
                              automatic: Set<String> = [], suggestions: [DraftSuggestion] = [], colourIndices: [String: Int] = [:],
                              provenance: [String: NoteSpeaker.Provenance] = [:]) -> NoteTranscript {
+        draft(words, tentativeFromMs: tentativeFromMs, labels: labels, automatic: automatic, suggestions: suggestions,
+              colourIndices: colourIndices, provenance: provenance, colourOrder: SpeakerColourOrder.words)
+    }
+
+    static func draft(_ words: [DraftWord], tentativeFromMs: Int64?, labels: [String: String] = [:],
+                      automatic: Set<String> = [], suggestions: [DraftSuggestion] = [], colourIndices: [String: Int] = [:],
+                      provenance: [String: NoteSpeaker.Provenance] = [:],
+                      colourOrder: ([TranscriptWord]) -> [String]) -> NoteTranscript {
         let transcriptWords = words.map {
             TranscriptWord(speaker: $0.speaker.isEmpty ? draftOneVoice : $0.speaker, start: Double($0.startMs) / 1000,
                            end: Double($0.endMs) / 1000, text: $0.text, lowConfidenceSpeaker: $0.lowConfidenceSpeaker == true)
@@ -256,9 +272,13 @@ public enum NoteTranscripts {
             names[id] = provenance[id].map { $0 == .unnamed ? unlabeled(ordinal + 1) : .named(labels[id] ?? id) }
                 ?? name(label: labels[id], id: id, ordinal: ordinal)
         }
-        let fallback = Dictionary(uniqueKeysWithValues: SpeakerColourOrder.words(transcriptWords).enumerated().map { ($0.element, $0.offset) })
+        var indices = colourIndices
+        if order.contains(where: { indices[$0] == nil }) {
+            var allocator = SpeakerColourAllocator(indices)
+            for id in colourOrder(transcriptWords) where indices[id] == nil { indices[id] = allocator.reserve(id) }
+        }
         let palette = order.map { id in
-            NoteSpeaker(id: id, name: labels[id] ?? id, colourIndex: colourIndices[id] ?? fallback[id],
+            NoteSpeaker(id: id, name: labels[id] ?? id, colourIndex: indices[id],
                         provenance: provenance[id] ?? (names[id]?.isNamed == true ? .user : .unnamed))
         }
         let tints = SpeakerTint.assign(order, speakers: palette)

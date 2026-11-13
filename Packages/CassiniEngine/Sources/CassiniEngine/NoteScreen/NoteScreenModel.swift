@@ -177,6 +177,15 @@ public final class NoteScreenModel {
     /// The draft's names (`names.json`), while the screen is shown.
     public private(set) var draftNames = DraftNames.empty
     @ObservationIgnored private var namesTask: Task<Void, Never>?
+    private struct MappedDraftKey: Equatable {
+        var draft: DraftState
+        var names: DraftNames
+        var voiceNames: [UUID: String]
+        var language: String
+    }
+    @ObservationIgnored private var mappedDraftKey: MappedDraftKey?
+    @ObservationIgnored private var mappedDraft: DraftState?
+    @ObservationIgnored private(set) var shownDraftBuilds = 0
     /// This screen, as the owner of the player.
     @ObservationIgnored public let playerOwner = PlaybackOwner()
     @ObservationIgnored let ports: Ports
@@ -399,13 +408,32 @@ public final class NoteScreenModel {
     /// The draft the screen shows, with its names: the running job's, or the saved progress of a stopped or failed one.
     /// Nil without one.
     public var shownDraft: DraftState? {
+        shownDraft(language: DefaultLabels.appLanguage)
+    }
+
+    /// The language is part of the key because legacy placeholder labels use the app's language. Keeping this
+    /// overload internal lets the key be tested without replacing the process's main localization bundle.
+    func shownDraft(language: String) -> DraftState? {
+        // Read the observable inputs before checking the cache, preserving SwiftUI's dependency registrations.
         let voiceNames = Dictionary(ports.savedVoices().map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
+        let names = draftNames
+        let raw: DraftState
         if let running = ports.runningDraft(noteID) {
-            return DraftView.build(running, names: draftNames, voiceNames: voiceNames)
+            raw = running
+        } else if !savedDraft.isEmpty {
+            raw = DraftState(words: savedDraft, tentativeFromMs: .max, namingOpen: ports.draftNamingOpen(noteID))
+        } else {
+            mappedDraftKey = nil
+            mappedDraft = nil
+            return nil
         }
-        guard !savedDraft.isEmpty else { return nil }
-        let saved = DraftState(words: savedDraft, tentativeFromMs: .max, namingOpen: ports.draftNamingOpen(noteID))
-        return DraftView.build(saved, names: draftNames, voiceNames: voiceNames)
+        let key = MappedDraftKey(draft: raw, names: names, voiceNames: voiceNames, language: language)
+        if mappedDraftKey != key {
+            mappedDraft = DraftView.build(raw, names: names, voiceNames: voiceNames)
+            mappedDraftKey = key
+            shownDraftBuilds += 1
+        }
+        return mappedDraft
     }
 
     /// Whether `speakerID` is a speaker of the draft on screen.
