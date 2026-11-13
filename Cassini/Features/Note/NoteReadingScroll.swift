@@ -16,6 +16,7 @@ struct NoteReadingScroll: View {
     let cache: TranscriptCache
     let actions: TranscriptActions
     let suggestion: (NoteTurn) -> AnyView?
+    var headerTitleVisible = true
     var titleVisibilityChanged: ((Bool) -> Void)? = nil
     @Environment(PlaybackStore.self) private var playback
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -37,7 +38,13 @@ struct NoteReadingScroll: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     NoteHeader(note: note, subtitle: subtitle, speakers: headerTranscript.headerSpeakers,
-                               nameSpeaker: { model.speakerTapped($0) }, titleVisibilityChanged: titleVisibilityChanged)
+                               nameSpeaker: { model.speakerTapped($0) }, headerTitleVisible: headerTitleVisible,
+                               titleContentBottomChanged: { bottom in
+                                   geometry.titleContentBottom = bottom
+                                   if let visible = geometry.titleVisibility.measured(bottom: Double(bottom)) {
+                                       titleVisibilityChanged?(visible)
+                                   }
+                               })
                     ForEach(mode.sections, id: \.self) {
                         NoteSectionView(section: $0, note: note, mode: mode, model: model)
                     }
@@ -56,13 +63,18 @@ struct NoteReadingScroll: View {
                                           position: $scrollPosition, suggestion: suggestion)
                     }
                 }
-                .padding(.horizontal, Spacing.gutter).padding(.top, 8).padding(.bottom, Spacing.gutter).readableWidth()
+                .padding(.horizontal, Spacing.gutter).padding(.top, 8).padding(.bottom, Spacing.gutter)
+                .coordinateSpace(name: NoteHeader.readingContentSpace).readableWidth()
             }
+            .accessibilityIdentifier("noteReadingScroll")
             .meetingScrollEdge()
             .scrollPosition($scrollPosition)
             .onScrollGeometryChange(for: ScrollMetrics.self) { ScrollMetrics($0) } action: { _, metrics in
                 geometry.offset = metrics.offset; geometry.top = metrics.top
                 geometry.height = metrics.height; geometry.maxOffset = metrics.maxOffset
+                if let visible = geometry.titleVisibility.scrolled(offset: Double(metrics.offset), topInset: Double(metrics.top)) {
+                    titleVisibilityChanged?(visible)
+                }
             }
             .onScrollPhaseChange { _, phase in
                 model.scrolled(PlaybackFollow.Scrolling(phase), playing: playback.owns(note.id) && playback.state.isPlaying)
@@ -85,6 +97,8 @@ struct NoteReadingScroll: View {
         .overlay(alignment: .topLeading) {
             UITestStateMarker(identifier: "readingScrollCompleted",
                               value: "\(completedScrolls):\(model.screen.follow.following)")
+            UITestStateMarker(identifier: "meetingTitleGeometry",
+                              value: "bottom=\(geometry.titleContentBottom ?? -1) offset=\(geometry.offset) inset=\(geometry.top) model=\(geometry.titleVisibility.isVisible) header=\(headerTitleVisible)")
         }
     }
 

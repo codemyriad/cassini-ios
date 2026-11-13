@@ -95,7 +95,7 @@ struct NoteDetailView: View {
                 NoteReadingScroll(note: note, mode: mode, transcript: transcript, subtitle: subtitle, matches: matches,
                                   current: current, model: model, cache: cache,
                                   actions: transcriptActions, suggestion: { suggestionCard($0, in: transcript) },
-                                  titleVisibilityChanged: { headerTitleVisible = $0 })
+                                  headerTitleVisible: headerTitleVisible, titleVisibilityChanged: { headerTitleVisible = $0 })
             }
         }
         .overlay(alignment: .topLeading) {

@@ -7,7 +7,9 @@ struct NoteHeader: View {
     let subtitle: NoteSubtitle?
     var speakers: [TranscriptSpeaker] = []
     var nameSpeaker: (String) -> Void = { _ in }
-    var titleVisibilityChanged: ((Bool) -> Void)? = nil
+    var headerTitleVisible = true
+    var titleContentBottomChanged: ((CGFloat) -> Void)? = nil
+    static let readingContentSpace = "noteReadingContent"
     @ScaledMetric(relativeTo: .title2) private var titleSize: CGFloat = 24
     @Environment(\.calendar) private var calendar
 
@@ -30,14 +32,15 @@ struct NoteHeader: View {
 
     private var title: some View {
         Text(note.title).font(.system(size: titleSize, weight: .semibold)).tracking(-0.3).foregroundStyle(Color.ink)
-            .textSelection(.enabled).accessibilityAddTraits(.isHeader).accessibilityIdentifier("noteTitle")
+            .textSelection(.enabled).accessibilityAddTraits(.isHeader)
+            .accessibilityHidden(!headerTitleVisible).accessibilityIdentifier("noteTitle")
     }
 
     @ViewBuilder private var observedTitle: some View {
-        if let titleVisibilityChanged {
-            title.onGeometryChange(for: Bool.self) { proxy in
-                proxy.frame(in: .scrollView(axis: .vertical)).maxY > 0
-            } action: { titleVisibilityChanged($0) }
+        if let titleContentBottomChanged {
+            title.onGeometryChange(for: CGFloat.self) { proxy in
+                proxy.frame(in: .named(Self.readingContentSpace)).maxY
+            } action: { titleContentBottomChanged($0) }
         } else {
             title
         }

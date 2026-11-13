@@ -70,6 +70,155 @@ final class NoteScreenTests: XCTestCase {
         XCTAssertTrue(app.buttons["headerSpeaker-sam"].isHittable)
     }
 
+    /// The title hands off just beyond the navigation bar, rather than a viewport swipe later.
+    @MainActor func testCompactTitleAppearsJustPastTheNavigationBarAndHidesTheOriginalFromAccessibility() {
+        checkCompactTitleAtNavigationBoundary()
+    }
+
+    @MainActor func testIPadCompactTitleAppearsJustPastTheNavigationBarAndHidesTheOriginalFromAccessibility() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad, "the iPad reading column")
+        checkCompactTitleAtNavigationBoundary()
+    }
+
+    @MainActor private func checkCompactTitleAtNavigationBoundary() {
+        let app = openLongMeeting()
+        let title = app.staticTexts["noteTitle"]
+        let boundary = app.navigationBars.allElementsBoundByIndex.map(\.frame.maxY).max() ?? 0
+        let delta = title.frame.maxY - boundary + 8
+        XCTAssertGreaterThan(delta, 0)
+        dragReading(app, by: delta)
+        assertSingleMeetingTitle(app, below: boundary, compact: true)
+
+        dragReading(app, by: -(delta + 24))
+        assertSingleMeetingTitle(app, below: boundary, compact: false)
+    }
+
+    /// Find changes the scroll inset even without a new gesture; its opaque background must not cover the only title.
+    @MainActor func testFindKeepsOneAccessibleTitleAcrossItsInsetAndGentleScrolling() {
+        checkFindTitleAcrossInsetsAndScrolling()
+    }
+
+    @MainActor func testIPadFindKeepsOneAccessibleTitleAcrossItsInsetAndGentleScrolling() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad, "the iPad reading column")
+        checkFindTitleAcrossInsetsAndScrolling()
+    }
+
+    @MainActor private func checkFindTitleAcrossInsetsAndScrolling() {
+        let app = openLongMeeting()
+        let title = app.staticTexts["noteTitle"]
+        let navBottom = app.navigationBars.allElementsBoundByIndex.map(\.frame.maxY).max() ?? 0
+        let gentleDelta = max(0, title.frame.maxY - navBottom - 16)
+        if gentleDelta > 0 { dragReading(app, by: gentleDelta) }
+        app.buttons["searchTranscript"].tap()
+        let close = app.buttons["Close search"]
+        XCTAssertTrue(close.waitForExistence(within: uiWaitFloor))
+        let findBottom = close.frame.maxY + 8 // the Find bar's opaque bottom padding
+        assertSingleMeetingTitle(app, below: findBottom)
+
+        // If opening Find preserved the header, move only far enough to cover its last eight points.
+        let afterOpen = app.staticTexts["noteTitle"]
+        let findDelta = afterOpen.exists ? max(24, afterOpen.frame.maxY - findBottom + 8) : 24
+        dragReading(app, by: findDelta)
+        assertSingleMeetingTitle(app, below: findBottom, compact: true)
+
+        // Focusing Find can move the scroll offset independently of the user's drag. Return until the
+        // actual header is exposed, checking before each gesture rather than assuming the inverse distance.
+        let estimatedReturn = max(gentleDelta + findDelta + findBottom - navBottom + 32, 48)
+        for _ in 0..<8 {
+            let returnedTitle = app.staticTexts["noteTitle"]
+            if returnedTitle.exists && returnedTitle.isHittable && returnedTitle.frame.maxY > findBottom
+                && !app.staticTexts["noteCompactTitle"].exists { break }
+            dragReading(app, by: -estimatedReturn)
+        }
+        assertSingleMeetingTitle(app, below: findBottom, compact: false)
+        close.tap()
+        XCTAssertTrue(app.textFields["transcriptSearch"].waitForNonExistence(within: uiWaitFloor))
+        assertSingleMeetingTitle(app, below: navBottom, compact: false)
+    }
+
+    @MainActor private func openLongMeeting() -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed", "long", "--open-fixture",
+                               "11111111-1111-1111-1111-111111111111"]
+        app.launchAndWait()
+        XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: uiWaitFloor))
+        return app
+    }
+
+    /// Slow, measured drags avoid fling across the obscured-title interval. Completion is the actual scroll-idle event.
+    @MainActor private func dragReading(_ app: XCUIApplication, by delta: CGFloat,
+                                       file: StaticString = #filePath, line: UInt = #line) {
+        let completed = app.staticTexts["uiTestState-readingScrollCompleted"]
+        XCTAssertTrue(completed.waitForExistence(within: uiWaitFloor), file: file, line: line)
+        let scroll = app.scrollViews["noteReadingScroll"]
+        guard scroll.waitForExistence(within: uiWaitFloor) else {
+            XCTFail("the reading scroll view must exist", file: file, line: line)
+            return
+        }
+        var remaining = max(24, abs(delta)) * (delta >= 0 ? 1 : -1)
+        while abs(remaining) > 0.001 {
+            let frame = scroll.frame
+            let close = app.buttons["Close search"]
+            let navBottom = app.navigationBars.allElementsBoundByIndex.map(\.frame.maxY).max() ?? frame.minY
+            let top = max(frame.minY, close.exists ? close.frame.maxY + 8 : navBottom) + 8
+            let keyboard = app.keyboards.firstMatch
+            let player = app.descendants(matching: .any).matching(identifier: "playbackBar").firstMatch
+            var bottom = frame.maxY
+            if keyboard.exists { bottom = min(bottom, keyboard.frame.minY) }
+            if player.exists { bottom = min(bottom, player.frame.minY) }
+            bottom -= 8
+            let capacity = bottom - top
+            guard capacity >= 24 else {
+                XCTFail("a 24 pt reading drag must fit above the player and keyboard", file: file, line: line)
+                return
+            }
+            // Split a long return into spatially bounded gestures; every endpoint remains in the reading viewport.
+            let segments = ceil(abs(remaining) / capacity)
+            let distance = remaining / segments
+            guard abs(distance) >= 24 else {
+                XCTFail("every bounded reading gesture must clear the 24 pt recognition distance", file: file, line: line)
+                return
+            }
+            let centerY = (top + bottom) / 2
+            let start = app.coordinate(withNormalizedOffset: .zero)
+                .withOffset(CGVector(dx: frame.midX, dy: centerY + distance / 2))
+            let end = start.withOffset(CGVector(dx: 0, dy: -distance))
+            let before = completed.value as? String
+            start.press(forDuration: 0, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 0)
+            guard poll(within: uiWaitFloor, { (completed.value as? String) != before }) else {
+                XCTFail("the measured drag must reach scroll idle", file: file, line: line)
+                return
+            }
+            remaining -= distance
+        }
+    }
+
+    @MainActor private func assertSingleMeetingTitle(_ app: XCUIApplication, below boundary: CGFloat,
+                                                    compact expectedCompact: Bool? = nil,
+                                                    file: StaticString = #filePath, line: UInt = #line) {
+        let title = app.staticTexts["noteTitle"]
+        let compact = app.staticTexts["noteCompactTitle"]
+        let accessibleTitles = app.staticTexts.matching(NSPredicate(
+            format: "identifier == 'noteTitle' OR identifier == 'noteCompactTitle'"))
+        let coherent = poll(within: uiWaitFloor) {
+            guard accessibleTitles.count == 1 else { return false }
+            if let expectedCompact, compact.exists != expectedCompact { return false }
+            if compact.exists {
+                return compact.isHittable && !title.exists && compact.label == "Three hour workshop"
+            }
+            return title.exists && title.isHittable && title.frame.maxY > boundary
+        }
+        if !coherent {
+            let state = app.staticTexts["uiTestState-meetingTitleGeometry"].value as? String ?? "no geometry"
+            print("Title visibility: \(state); expected compact=\(String(describing: expectedCompact)); title=\(title.exists ? String(describing: title.frame) : "absent"); compact=\(compact.exists); boundary=\(boundary)")
+            let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+            shot.name = "Title visibility failure"
+            shot.lifetime = .keepAlways
+            add(shot)
+        }
+        XCTAssertTrue(coherent, "exactly one accessible meeting title remains visible above the transcript", file: file, line: line)
+    }
+
     // ports: ScreenBehaviourTest#aWordTapAsksToPlayFromThatWord
     @MainActor func testAWordTapPlaysFromThere() {
         let app = open()
