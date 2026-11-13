@@ -59,7 +59,7 @@ The isolated worktree has no sibling cassini-format checkout. Validation therefo
 
 ## iOS 18 XCTest logging crash
 
-The full iOS 18.2 leg exposed two simulator-app crashes during ordinary accessibility queries, in the Versions/export flow and a fresh Settings launch. Both crash reports have the same stack: `_platform_strcmp` → `runtime_issue_os_log_fault_callback` in `XCTAutomationSupport` → `__LIBTRACE_CLIENT_QUARANTINED_DUE_TO_HIGH_LOGGING_VOLUME__`. Neither triggered stack contains app code. The failing run captured 123 MB of app-side XCTest query logs.
+The full iOS 18.2 leg exposed two simulator-app crashes during ordinary accessibility queries, in the Versions/export flow and a fresh Settings launch. Both crash reports have the same stack: `_platform_strcmp` → `runtime_issue_os_log_fault_callback` in `XCTAutomationSupport` → `__LIBTRACE_CLIENT_QUARANTINED_DUE_TO_HIGH_LOGGING_VOLUME__`. The faults originate in injected XCTest logging, not app logic; generated app entrypoints appear at the bottom of the main-thread stacks. The failing run captured 123 MB of app-side XCTest query logs.
 
 Only actual iOS 18 UI-test app launches now set `OS_ACTIVITY_MODE=disable`. The two affected flows passed together; their app log fell from 10,871,488 bytes/177 query dumps at the default level to 248 bytes/no query dumps. The complete gate verifies sustained execution. The environment setting leaves production launches, hosted tests and iOS 26+ unchanged.
 
