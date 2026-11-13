@@ -117,7 +117,7 @@ enum StopStatePublication: CaseIterable, Equatable, Sendable { case running, hol
                                 sourceLocation: SourceLocation = #_sourceLocation) {
         #expect(h.coordinator.state.running?.noteID == id, sourceLocation: sourceLocation)
         #expect(h.coordinator.state.running?.phase == .stopping, sourceLocation: sourceLocation)
-        #expect(h.progress.phase(for: id) == .stopping, sourceLocation: sourceLocation)
+        #expect(h.progress.phase(for: id)?.isStopping == true, sourceLocation: sourceLocation)
         #expect(h.progress.processingPhase(for: id) == .stopping, sourceLocation: sourceLocation)
     }
 

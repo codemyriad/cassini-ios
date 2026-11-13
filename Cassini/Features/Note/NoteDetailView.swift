@@ -4,9 +4,9 @@ import CassiniNotebook
 
 /// The Note screen (Android `NoteScreen`): one destination whose body follows the note's mode. Reading: the chips, the
 /// banners and the transcript with the active word, auto-follow and in-note search, over the player. Queued: the card,
-/// then the reading content of a transcript. Processing: the progress card and the draft, no player. Paused: the banner,
-/// the read-only draft and the player. Failed: the banner, then the transcript or the draft so far. Audio only and
-/// unplayable: their banners, with the player for the first.
+/// then the reading content of a transcript or a resumed job's draft. Processing: the compact status strip, details
+/// sheet and live draft, no player. Paused: the banner, the read-only draft and the player. Failed: the banner, then
+/// the transcript or the draft so far. Audio only and unplayable: their banners, with the player for the first.
 ///
 /// The rules are the pure `NoteMode`, `NoteBanners`, `NoteTranscripts` and `NoteScreenState` (CassiniNotebook); the
 /// `NoteScreenModel` keeps the screen's state and carries out the effects the rules return; this view reads the stores
@@ -22,6 +22,7 @@ struct NoteDetailView: View {
     @State private var model: NoteScreenModel
     @State private var cache = TranscriptCache()
     @State private var headerTitleVisible = true
+    @State private var transcribingDetailsOpen = false
 
     init(model: @autoclosure () -> NoteScreenModel) {
         let model = model()
@@ -40,14 +41,19 @@ struct NoteDetailView: View {
     /// Why the transcript cannot be changed now.
     private var readOnly: ReadOnlyReason? { model.readOnly }
 
+    private var currentMode: NoteMode? {
+        guard let note else { return nil }
+        return NoteMode.of(note, job: job, ahead: processing.state.ahead(of: noteID) ?? 0)
+    }
+
     var body: some View {
         #if DEBUG
         let _ = RenderProbe.rendered("screen")
         #endif
         @Bindable var model = model
         Group {
-            if let note {
-                content(note, mode: NoteMode.of(note, job: job, ahead: processing.state.ahead(of: noteID) ?? 0))
+            if let note, let mode = currentMode {
+                content(note, mode: mode)
             } else {
                 ContentUnavailableView(NoteCopy.unavailableTitle, systemImage: "waveform.slash",
                                        description: Text(NoteCopy.unavailableBody))
@@ -56,9 +62,15 @@ struct NoteDetailView: View {
         .background(Color.paper)
         .navigationBarTitleDisplayMode(.inline)
         .task(id: model.playerKey) { model.updatePlayer() }
-        .task(id: job.map { "\($0.state)-\($0.doneMs)" }) { await model.loadSavedDraft() }
+        .task(id: job.map { "\($0.id)-\($0.state)-\($0.doneMs)" } ?? "none") { await model.loadSavedDraft() }
         .onDisappear { model.disappeared() }
         .onAppear { model.appeared(start: requestedStart) }
+        .onChange(of: currentMode == .processing) { _, isProcessing in
+            if !isProcessing { transcribingDetailsOpen = false }
+        }
+        .onChange(of: model.sheet != nil) { _, hasSheet in
+            if hasSheet { transcribingDetailsOpen = false }
+        }
         .onChange(of: router.session(noteID).opening) { _, _ in
             // The reused destination can still carry its previous route arguments during this update.
             guard case .note(_, let query, let start)? = router.path.last(where: { $0.noteID == noteID }) else { return }
@@ -68,6 +80,12 @@ struct NoteDetailView: View {
         .onChange(of: model.screen.search?.query) { _, query in router.keepSearch(query, for: noteID) }
         .backButtonTitle(router.below(noteID: noteID) == .library ? MeetingPhase1Copy.allMeetings : nil,
                          accessibilityLabel: router.below(noteID: noteID) == .library ? MeetingPhase1Copy.backToAllMeetings : nil)
+        .sheet(isPresented: Binding(
+            get: { transcribingDetailsOpen && model.sheet == nil && currentMode == .processing },
+            set: { transcribingDetailsOpen = $0 }
+        )) {
+            TranscribingDetailsSheet(noteID: noteID, stop: model.stopJob, cancelDownload: model.cancelJobDownload)
+        }
         .noteSheetsAndDialogs(model: model)
         .keepsNoteOverlay(noteID: noteID, note: note, readOnly: readOnly, sheet: $model.sheet, draft: $model.sheetDraft,
                           dialog: $model.screen.dialog)
@@ -76,6 +94,15 @@ struct NoteDetailView: View {
 
     // MARK: Content
 
+    private func usesDraftBody(_ mode: NoteMode) -> Bool {
+        switch mode {
+        case .processing, .paused: true
+        case .failed(let overDocument): !overDocument
+        case .queued(_, let overDocument): !overDocument && !(model.shownDraft?.words.isEmpty ?? true)
+        default: false
+        }
+    }
+
     private func content(_ note: Note, mode: NoteMode) -> some View {
         let transcript = mode.showsReading
             ? cache.sealed(note, voices: voices.savedVoices, suggestions: readOnly == nil ? voices.suggestions(for: note) : [])
@@ -83,13 +110,22 @@ struct NoteDetailView: View {
         let matches = model.screen.search.map { cache.matches(transcript, query: $0.query) } ?? []
         let current = model.screen.search?.current(of: matches.count) ?? 0
         let subtitle = NoteSubtitle.of(note, mode: mode, now: clock.now, calendar: calendar)
+        let openDetails = {
+            model.sheet = nil
+            transcribingDetailsOpen = true
+        }
         return Group {
-            if case .processing = mode {
-                ProcessingBody(model: model, cache: cache) {
-                    NoteHeader(note: note, subtitle: subtitle)
-                    NoteSectionView(section: .card, note: note, mode: mode, model: model)
+            if usesDraftBody(mode) {
+                let headerSpeakers = mode == .processing ? [] : (model.shownDraft.map { cache.draft($0).headerSpeakers } ?? [])
+                ProcessingBody(note: note, isProcessing: mode == .processing, model: model, cache: cache) {
+                    NoteHeader(note: note, subtitle: subtitle, speakers: headerSpeakers,
+                               nameSpeaker: { model.speakerTapped($0) })
+                    ForEach(mode.sections, id: \.self) { section in
+                        NoteSectionView(section: section, note: note, mode: mode, model: model,
+                                        openDetails: openDetails)
+                    }
                 } banners: {
-                    NoteSectionView(section: .banners, note: note, mode: mode, model: model)
+                    EmptyView()
                 }
             } else {
                 NoteReadingScroll(note: note, mode: mode, transcript: transcript, subtitle: subtitle, matches: matches,
@@ -132,7 +168,7 @@ struct NoteDetailView: View {
         }
         .toolbar {
             ToolbarItem(placement: .principal) {
-                if !headerTitleVisible, mode != .processing {
+                if !headerTitleVisible, !usesDraftBody(mode) {
                     Text(note.title).font(.headline).foregroundStyle(Color.ink).lineLimit(1)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .accessibilityAddTraits(.isHeader)
@@ -178,13 +214,14 @@ struct NoteDetailView: View {
     }
 }
 
-/// A section above the transcript: the progress card, the chips (trust, version, speakers) or the banners. The
-/// callbacks read the note and its job when called: an unchanged list keeps the ones it was made with.
+/// A section above the transcript: the status strip / Queued card, the chips (trust, version, speakers) or the banners.
+/// The callbacks read the note and its job when called: an unchanged list keeps the ones it was made with.
 struct NoteSectionView: View {
     let section: NoteSection
     let note: Note
     let mode: NoteMode
     let model: NoteScreenModel
+    var openDetails: () -> Void = {}
     @Environment(ProcessingStore.self) private var processing
 
     private var noteID: UUID { note.id }
@@ -193,9 +230,9 @@ struct NoteSectionView: View {
         switch section {
         case .card:
             if case .queued(let ahead, _) = mode {
-                ProcessingCard(note: note, ahead: ahead, model: model)
+                QueuedCard(ahead: ahead, model: model)
             } else {
-                ProcessingCard(note: note, model: model)
+                TranscribingStatusView(noteID: noteID, openDetails: openDetails, stop: model.stopJob)
             }
         case .chips:
             if let chips = NoteChips.of(note), chips.trust != nil || chips.version != nil {

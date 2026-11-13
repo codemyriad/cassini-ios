@@ -12,7 +12,17 @@ interrupted-position keys and the seven `states.phone.*` labels (`audioOnly`, `c
 `couldntTranscribe`, `newerFormat`, `pausedAt`, `queued`). All six translations and named placeholders remain
 verbatim. The generated catalog is `Cassini/Resources/Strings/StatusBadge.xcstrings`, with literal lookup call sites
 only in `Cassini/Strings/StatusBadgeStrings.swift`. App language bundle selection remains in the existing
-`StatusBadgeCopy` adapter. The remaining catalog entries are not shipped before their implementation milestone.
+`StatusBadgeCopy` adapter.
+
+`scripts/generate-meeting-strings.py` emits the implemented Phase 1 meeting selection from the same pinned catalog into
+`Cassini/Resources/Strings/MeetingPhase1.xcstrings` and `Cassini/Strings/MeetingPhase1Copy.swift`: WP3 chrome
+(`library.allMeetings`, `library.backToAllMeetings`, `meeting.find.placeholder`) and WP5 transcribing status, details,
+draft heading and compact speaker-match copy (`common.stop`, `transcribing.heading`, `transcribing.eta.minutes`,
+`transcribing.details.a11y`, `transcribing.stopAndKeepProgress`, `transcribing.transcriptSoFar`,
+`transcribing.step.{reading,preparing,words,speakers,saving}`,
+`transcribing.stat.{timeLeft,audioDone,audioDoneValue,wordsSoFar,batteryAtFinish}`,
+`transcribing.speakerSuggestion`, `transcribing.speakerSuggestion.{no,yes}`). Named placeholders stay verbatim and the
+remaining catalog entries are not shipped before their implementation milestone.
 
 The complete existing states, format and library vector resources and their expected rows are repinned from the same
 immutable commit without local edits. The states contract remains v3 with `Received`; WP1 does not implement WP7.

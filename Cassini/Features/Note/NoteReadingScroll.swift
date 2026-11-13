@@ -52,7 +52,7 @@ struct NoteReadingScroll: View {
                         BookmarksSection(note: note, isExpanded: $model.showBookmarks, model: model)
                     }
                     if mode.showsDraft, let draft = model.shownDraft, !draft.words.isEmpty {
-                        DraftSection(draft: draft, transcript: cache.draft(draft), changing: false, model: model)
+                        DraftSection(draft: draft, transcript: cache.draft(draft), model: model)
                     }
                     if note.saysNoSpeech(in: mode) {
                         NoSpeechState()
