@@ -959,6 +959,55 @@ class SchedulerTests(unittest.TestCase):
             daily.notify_failure('[iOS] daily test release failed: controlled fixture', inbox_path)
         self.assertEqual(inbox_path.read_text(), '[iOS] daily test release failed: controlled fixture\n')
 
+    def test_external_tcc_and_gui_preflight_failures_report_remediation_without_burning_builds(self):
+        # 1. Scheduled controller (inside run-in-gui.py): PermissionError creating output directory reports
+        #    actionable ~/bin/gui-tmux.command remediation before reserving a build number.
+        outputs = self.root/'outputs'
+        outputs.mkdir()
+        with patch.object(Path, 'mkdir', side_effect=PermissionError(1, 'Operation not permitted', str(outputs/'x'))):
+            with self.assertRaisesRegex(RuntimeError, r'~/bin/gui-tmux\.command'):
+                daily.create_output_directory(outputs)
+        # 2. Hourly finish_pending: PermissionError opening processing.log preserves pending state for the next wake.
+        pending_state = self.root/'pending-state.json'
+        pending = dict(version='0.1.0', build='17', head=HEAD, output=str(outputs),
+                       notes='New: You can export your notes.', notes_format=daily.NOTES_FORMAT, fragments={})
+        daily.save(pending_state, dict(pending=pending))
+        original_open = Path.open
+        def deny_processing_log(path_self, *args, **kwargs):
+            if path_self.name == 'processing.log':
+                raise PermissionError(1, 'Operation not permitted', str(path_self))
+            return original_open(path_self, *args, **kwargs)
+        with patch.object(daily, 'external_output', return_value=outputs), \
+             patch.object(Path, 'open', deny_processing_log):
+            with self.assertRaisesRegex(RuntimeError, r'~/bin/gui-tmux\.command'):
+                daily.finish_pending(pending_state, FakeApple())
+        self.assertEqual(json.loads(pending_state.read_text())['pending'], pending)
+        # 3. Manual publish (outside GUIRUN_INSIDE=1): preflight_gui_output probes run-in-gui.py BEFORE git worktree
+        #    or next_build(), removes the empty output folder on failure, and never reserves a build number.
+        runner = self.root/'source/scripts/run-in-gui.py'
+        runner.parent.mkdir(parents=True)
+        runner.write_text('#!/usr/bin/env python3\n')
+        for code, stderr, pattern in [
+            (2, "PermissionError: [Errno 1] Operation not permitted: '/Volumes/DrMeyers2/cassini-ios-daily/x'\n", r'~/bin/gui-tmux\.command'),
+            (69, 'GUI tmux session is unavailable. In the Mac\'s logged-in GUI Terminal, run ~/bin/gui-tmux.command\n', r'GUI archive session preflight failed'),
+        ]:
+            with self.subTest(code=code):
+                probe_dir = outputs/f'probe-{code}'
+                probe_dir.mkdir()
+                fake_probe = subprocess.CompletedProcess(['python3'], code, '', stderr)
+                with patch.dict(os.environ, {'GUIRUN_INSIDE': ''}), \
+                     patch.object(daily.subprocess, 'run', return_value=fake_probe):
+                    with self.assertRaisesRegex(RuntimeError, pattern):
+                        daily.preflight_gui_output(runner, probe_dir)
+                self.assertFalse(probe_dir.exists(), 'failed GUI preflight cleans up empty output directory')
+        # 4. Inside GUIRUN_INSIDE=1, preflight_gui_output skips spawning a nested tmux probe.
+        probe_dir = outputs/'already-inside-gui'
+        probe_dir.mkdir()
+        with patch.dict(os.environ, {'GUIRUN_INSIDE': '1'}), \
+             patch.object(daily.subprocess, 'run', side_effect=AssertionError('must not spawn nested run-in-gui')):
+            daily.preflight_gui_output(runner, probe_dir)
+        self.assertTrue(probe_dir.is_dir())
+
 
 # CI runs this file; the fragment renderer's own tests and the repository's real fragments are checked with it, so
 # a fragment that could not be published fails the pull request that adds it.
