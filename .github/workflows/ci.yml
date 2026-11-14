@@ -39,6 +39,10 @@ on:
       - 'scripts/screenshot-manifest.py'
       - 'scripts/screenshots.sh'
       - 'scripts/test-pr-shots-local.py'
+      - 'scripts/*status-badge*.py'
+      - 'scripts/*meeting-strings*.py'
+      - 'scripts/*library-strings*.py'
+      - 'scripts/*brand*.py'
       - 'scripts/*testflight*'
       - 'scripts/launchd/**'
       - '.github/workflows/daily-testflight.yml'
@@ -81,9 +85,30 @@ jobs:
       - uses: actions/checkout@v5
         with:
           path: cassini-ios
+          # The no-visual-change plumbing generator verifies its frozen public baseline.
+          fetch-depth: 0
+      - name: Check generated brand colours and literal boundaries
+        working-directory: cassini-ios
+        run: |
+          python3 scripts/generate-brand-colors.py --check
+          python3 scripts/test-brand-colors.py
+          python3 scripts/test-check-brand-upstream.py
+      - name: Compare brand bytes with pinned cassini-ux source
+        # The private source is read with the trusted runner's existing read-only gh access.
+        # Fork jobs remain on hosted runners and run offline checks without private access.
+        if: github.repository == 'codemyriad/cassini-ios' && (github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository))
+        working-directory: cassini-ios
+        run: python3 scripts/check-brand-upstream.py
       - name: Test harness regressions
         working-directory: cassini-ios
         run: |
+          python3 scripts/generate-status-badge-strings.py --check
+          python3 scripts/generate-meeting-strings.py --check
+          python3 scripts/generate-library-strings.py --check
+          python3 scripts/test-library-strings.py
+          python3 scripts/test-status-badge-strings.py
+          python3 Packages/CassiniNotebook/Tests/CassiniNotebookTests/Resources/status-badges/vectors/states/verify.py
+          python3 Packages/CassiniNotebook/Tests/CassiniNotebookTests/Resources/status-badges/vectors/states/test_contract.py
           python3 scripts/test-ci-runner-selection.py
           python3 scripts/test-daily-testflight.py
           python3 scripts/test-testflight-archive.py

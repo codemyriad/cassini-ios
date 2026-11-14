@@ -18,6 +18,45 @@ import Testing
         #expect(abs(try #require(back.mean(model: F.model, dimension: 3))[0] - 0.6) < 1e-6)
     }
 
+    @Test func legacyAppendOrderMigratesWithoutChangingVersionOrIdentity() throws {
+        let legacy = Data("""
+        {"version":1,"voices":[
+          {"id":"00000000-0000-0000-0000-000000000001","name":"Zoe","samples":[]},
+          {"id":"00000000-0000-0000-0000-000000000002","name":"Alex","samples":[]}
+        ]}
+        """.utf8)
+        let state = try VoiceCodec.state(legacy)
+        #expect(state.voices.map(\.name) == ["Zoe", "Alex"])
+        #expect(state.voices.map(\.saveSequence) == [0, 1])
+        #expect(state.nextSaveSequence == 2)
+        let data = try VoiceCodec.encode(state.voices)
+        let object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        #expect(object["version"] as? Int == 1)
+        #expect(object["nextSaveSequence"] as? Int == 2)
+        #expect(try VoiceCodec.decode(data) == state.voices)
+    }
+
+    @Test func invalidOrExhaustedSaveOrderIsRejectedWithoutWrapping() throws {
+        let voice = F.voice("alex", "Alex")
+        #expect(throws: VoiceCodec.SaveOrderError.self) {
+            try VoiceCodec.ordered([voice.saved(at: -1)], nextSaveSequence: 0)
+        }
+        #expect(throws: VoiceCodec.SaveOrderError.self) {
+            try VoiceCodec.ordered([voice.saved(at: 0), F.voice("ben").saved(at: 0)], nextSaveSequence: 1)
+        }
+        #expect(throws: VoiceCodec.SaveOrderError.self) {
+            try VoiceCodec.ordered([voice.saved(at: Int.max)], nextSaveSequence: 0)
+        }
+        #expect(throws: VoiceCodec.SaveOrderError.self) {
+            try VoiceCodec.ordered([voice], nextSaveSequence: -1)
+        }
+        #expect(throws: VoiceCodec.SaveOrderError.self) {
+            try VoiceCodec.ordered([voice], nextSaveSequence: Int.max)
+        }
+        let empty = try VoiceCodec.state(Data(#"{"version":1,"voices":[],"nextSaveSequence":9}"#.utf8))
+        #expect(empty.voices.isEmpty && empty.nextSaveSequence == 9)
+    }
+
     // ports: VoiceCodecTest#anotherVersionIsRefusedWithItsNumber
     @Test func anotherVersionIsRefusedWithItsNumber() {
         #expect(throws: UnsupportedVoiceFileVersion(found: 2, supported: 1)) {

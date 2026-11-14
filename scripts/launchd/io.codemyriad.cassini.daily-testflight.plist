@@ -2,7 +2,16 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
   <key>Label</key><string>io.codemyriad.cassini.daily-testflight</string>
-  <key>ProgramArguments</key><array><string>__CONTROL__/scripts/scheduled-testflight.sh</string></array>
+  <!-- LaunchAgents do not inherit Terminal's removable-volume access. Start the
+       controller itself in the existing Aqua tmux session, before it creates outputs. -->
+  <key>ProgramArguments</key><array>
+    <string>/usr/bin/python3</string>
+    <string>__CONTROL__/scripts/run-in-gui.py</string>
+    <string>/usr/bin/env</string>
+    <string>DEVELOPER_DIR=/Applications/Xcode-27.0.0.app/Contents/Developer</string>
+    <string>CASSINI_RELEASE_STDERR_RELAY=1</string>
+    <string>__CONTROL__/scripts/scheduled-testflight.sh</string>
+  </array>
   <!-- Wake hourly; Python uses Europe/Berlin explicitly for 09:00, 14:00 and 20:00 (including DST). -->
   <key>StartCalendarInterval</key><dict><key>Minute</key><integer>0</integer></dict>
   <key>EnvironmentVariables</key><dict>

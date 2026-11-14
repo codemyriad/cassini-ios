@@ -92,7 +92,7 @@ private struct SettingsForm: View {
                     BannerList(specs: banners, onAction: { spec, action in notices.perform(action, on: spec) },
                                onDismiss: notices.dismiss)
                 }
-                .listRowInsets(EdgeInsets()).listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets()).listRowBackground(Color.canvasClear)
             }
             if let speechModels = ports.speechModels {
                 if speechModels.shows(.settings) || speechModels.promotionVisible {
@@ -251,7 +251,11 @@ private struct LibrarySection: View {
                 Text("Recordings", tableName: "Settings")
             }
             LabeledContent {
-                Text(verbatim: TimeText.clock(totals.duration))
+                if #available(iOS 26.0, *) {
+                    Text(verbatim: TimeText.clock(totals.duration)).monospacedDigit()
+                } else {
+                    Text(verbatim: TimeText.clock(totals.duration))
+                }
             } label: {
                 Text("Audio duration", tableName: "Settings")
             }
@@ -307,8 +311,16 @@ private struct AboutCard: View {
             }
             HStack(spacing: 4) {
                 Text("Free software under GPLv3.", tableName: "Settings").foregroundStyle(Color.muted)
-                Button(action: openNotices) { Text("Source code and notices", tableName: "Settings").underline() }
-                    .tint(.ember).buttonStyle(.borderless)
+                Button(action: openNotices) {
+                    if #available(iOS 26.0, *) {
+                        Text("Source code and notices", tableName: "Settings").underline()
+                    } else {
+                        // Older borderless buttons expose only the text's height as their touch target.
+                        Text("Source code and notices", tableName: "Settings").underline()
+                            .frame(minHeight: HitTarget.minimum).contentShape(Rectangle())
+                    }
+                }
+                    .tint(.accent).buttonStyle(.borderless)
             }
             .font(.subheadline)
         }

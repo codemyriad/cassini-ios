@@ -9,20 +9,42 @@ import os
 from pathlib import Path
 import platform
 import re
+import shutil
 import subprocess
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
-import unicodedata
 from zoneinfo import ZoneInfo
+
+# The scheduled controller runs from the control clone and refuses to update a dirty one: importing the notes
+# module must not leave a __pycache__ folder beside it.
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from testflight_notes import (FALLBACK_NOTES, collect_fragments, github_release_body,
+                                render_test_notes, validate_test_notes)
+
+NOTES_FORMAT = 'user-fragments-v1'
 
 REPOSITORY = 'codemyriad/cassini-ios'
 APP = '6828353567'
 GROUP = '9f906eb9-750a-47be-957f-097af350dac1'
 ORIGIN = 'https://api.appstoreconnect.apple.com'
 SLOTS = (9, 14, 20)
+CI_WAIT_SECONDS = 45 * 60
+CI_POLL_SECONDS = 30
+MAX_CI_PAGES = 50
+
+
+# The internal states Apple passes through on its own on the way to IN_BETA_TESTING. Every other state is an error.
+WAITING_STATES = ('PROCESSING', 'READY_FOR_BETA_TESTING')
+
+
+class NotReadyYet(RuntimeError):
+    """Apple has the upload but has not made it available to internal testers yet. Nothing failed: the upload
+    intent stays, and the next hourly wake finishes it."""
 
 
 def scheduled(now):
@@ -64,52 +86,63 @@ def eligible_main_run(run, head):
             and run.get('event') in ('push', 'workflow_dispatch', 'schedule'))
 
 
-def green(runs, head):
+def ci_state(runs, head):
     # Newest eligible run wins; a PR merge-ref run cannot approve or block main.
     run = next((run for run in runs if eligible_main_run(run, head)), None)
-    return bool(run and run.get('status') == 'completed' and run.get('conclusion') == 'success')
+    if not run:
+        return None
+    if run.get('status') != 'completed':
+        return 'pending'
+    return 'green' if run.get('conclusion') == 'success' else 'red'
+
+
+def green(runs, head):
+    return ci_state(runs, head) == 'green'
+
+
+def main_ci_state(head):
+    for page in range(1, MAX_CI_PAGES + 1):
+        runs = gh(f'repos/{REPOSITORY}/actions/workflows/ci.yml/runs', branch='main',
+                  head_sha=head, per_page=100, page=page)['workflow_runs']
+        state = ci_state(runs, head)
+        if state is not None:
+            return state
+        if len(runs) < 100:
+            return 'red'
+    return 'red'
 
 
 def main_ci_green(head):
-    page = 1
+    return main_ci_state(head) == 'green'
+
+
+def wait_main_ci_green(head, *, deadline=None, clock=time.monotonic, sleep=time.sleep):
+    end = (clock() + CI_WAIT_SECONDS) if deadline is None else deadline
     while True:
-        runs = gh(f'repos/{REPOSITORY}/actions/workflows/ci.yml/runs', branch='main',
-                  head_sha=head, per_page=100, page=page)['workflow_runs']
-        if any(eligible_main_run(run, head) for run in runs):
-            return green(runs, head)
-        if len(runs) < 100:
+        state = main_ci_state(head)
+        if state == 'green':
+            return True
+        if state != 'pending':
             return False
-        page += 1
+        remaining = end - clock()
+        if remaining <= 0:
+            return False
+        sleep(min(CI_POLL_SECONDS, remaining))
 
 
-def testflight_notes(text, limit=4000):
-    # TestFlight receives plain safe text; retain verbatim titles separately for audit.
-    clean = []
-    for char in text:
-        category = unicodedata.category(char)
-        if char == '\n' or char in ('\u200c', '\u200d'):
-            clean.append(char)
-        elif category in ('Cc', 'Cf', 'Cs'):
-            clean.append(' ')
-        else:
-            clean.append({'<': '‹', '>': '›'}.get(char, char))
-    clean = ''.join(clean)
-    units = lambda value: len(value.encode('utf-16-le')) // 2
-    if units(clean) <= limit:
-        return clean
-    suffix = '\n…'
-    budget = limit - units(suffix)
-    if budget < 0:
-        raise ValueError('TestFlight note limit cannot fit truncation marker')
-    output = []
-    used = 0
-    for char in clean:
-        width = units(char)
-        if used + width > budget:
-            break
-        output.append(char)
-        used += width
-    return ''.join(output) + suffix
+def is_ancestor(source, older, newer):
+    if older == newer:
+        return True
+    try:
+        command(['git', 'merge-base', '--is-ancestor', older, newer], cwd=source)
+    except RuntimeError:
+        return False
+    return True
+
+
+def testflight_notes(text):
+    # Persisted pending releases pass the same store boundary as fresh fragments.
+    return validate_test_notes(text)
 
 
 def next_build(builds, version, reserved):
@@ -198,8 +231,14 @@ class Apple:
         if attributes.get('buildAudienceType') != 'INTERNAL_ONLY':
             raise RuntimeError('Apple did not confirm INTERNAL_ONLY audience')
         detail = self.request('/v1/builds/' + build['id'] + '/buildBetaDetail')['data']['attributes']
-        if detail['internalBuildState'] != 'IN_BETA_TESTING':
-            raise RuntimeError('Internal TestFlight testing is not ready')
+        internal = detail.get('internalBuildState')
+        if internal in WAITING_STATES:
+            raise NotReadyYet(f'Internal TestFlight testing is not ready ({internal})')
+        if internal != 'IN_BETA_TESTING':
+            # Missing export compliance, a processing exception, an expired build, a state this tool does not know:
+            # none of these resolves by waiting, so each wake reports it with Apple's own word for it.
+            raise RuntimeError(f'Internal TestFlight testing needs attention: Apple reports {internal}; '
+                               'the upload stays pending and no new build starts until this is resolved')
         notes = self.request('/v1/builds/' + build['id'] + '/betaBuildLocalizations')['data']
         existing = next((n for n in notes if n['attributes']['locale'] == 'en-US'), None)
         data = {'type': 'betaBuildLocalizations',
@@ -220,11 +259,17 @@ def release_notes(source, previous, head):
     command(['git', 'merge-base', '--is-ancestor', previous, head], cwd=source)
     commits = command(['git', 'rev-list', '--reverse', '--first-parent', previous + '..' + head], cwd=source)
     titles = {}
+    direct = []
     for commit in commits.splitlines():
+        associated = False
         for pr in gh(f'repos/{REPOSITORY}/commits/{commit}/pulls'):
             if pr.get('merged_at') and pr['base']['ref'] == 'main':
                 titles[pr['number']] = pr['title']
-    text = '\n'.join(f'- {title} (#{number})' for number, title in titles.items())
+                associated = True
+        if not associated:
+            subject = command(['git', 'show', '-s', '--format=%s', commit], cwd=source)
+            direct.append(f'- {subject} ({commit[:12]})')
+    text = '\n'.join([*(f'- {title} (#{number})' for number, title in titles.items()), *direct])
     if not text:
         raise RuntimeError('Merged-PR release notes are empty; inspect before upload')
     return text
@@ -292,6 +337,8 @@ def refresh_control(config, arguments, lock):
 
 def notify_failure(message, inbox_path):
     print(message, file=sys.stderr)
+    if os.environ.get('CASSINI_RELEASE_STDERR_RELAY') == '1':
+        return  # The Aqua bridge forwards stderr to launchd's coordinator inbox.
     try:
         if os.path.samestat(os.fstat(sys.stderr.fileno()), inbox_path.stat()):
             return  # launchd already sent this exact line to the coordinator inbox.
@@ -304,6 +351,48 @@ def notify_failure(message, inbox_path):
         print('Coordinator inbox unavailable; failure is retained in scheduler/Actions log', file=sys.stderr)
 
 
+GUI_TCC_REMEDIATION = (
+    'restart tmux -L gui from GUI Terminal.app via ~/bin/gui-tmux.command '
+    '(a gui tmux server started from SSH lacks removable-volume TCC access)'
+)
+
+
+def external_permission_error(error):
+    return RuntimeError(f'External volume denied write access ({error}); {GUI_TCC_REMEDIATION}')
+
+
+def create_output_directory(root):
+    output = root/uuid.uuid4().hex
+    try:
+        output.mkdir(parents=True)
+    except PermissionError as error:
+        raise external_permission_error(error) from None
+    return output
+
+
+def preflight_gui_output(runner, output):
+    if os.environ.get('GUIRUN_INSIDE') == '1' or not runner.is_file():
+        return
+    try:
+        probe = subprocess.run(
+            [sys.executable, str(runner), sys.executable, '-c',
+             'from pathlib import Path; import sys, tempfile; '
+             'p = Path(tempfile.mkdtemp(prefix="preflight-", dir=sys.argv[1])); p.rmdir()',
+             str(output)],
+            capture_output=True, text=True, timeout=60,
+            env=dict(os.environ, GUIRUN_TIMEOUT='60'))
+    except Exception:
+        shutil.rmtree(output, ignore_errors=True)
+        raise
+    if probe.returncode:
+        shutil.rmtree(output, ignore_errors=True)
+        lines = [line.strip() for line in (probe.stderr or probe.stdout).splitlines() if line.strip()]
+        detail = lines[-1] if lines else f'exit {probe.returncode}'
+        if 'Operation not permitted' in detail or 'PermissionError' in detail:
+            raise RuntimeError(f'External volume denied GUI write access ({detail}); {GUI_TCC_REMEDIATION}')
+        raise RuntimeError(f'GUI archive session preflight failed: {detail}')
+
+
 def wait_processing(apple, pending, output):
     args = ['xcrun', 'altool', '--build-status', '--wait', *apple.auth(), '--output-format', 'json']
     if pending.get('delivery'):
@@ -312,7 +401,11 @@ def wait_processing(apple, pending, output):
         args += ['--apple-id', APP, '--bundle-version', pending['build'],
                  '--bundle-short-version-string', pending['version'], '--platform', 'ios']
     # Apple's command waits for the processing event; no sleep/poll/re-upload loop.
-    with (output/'processing.log').open('a') as log:
+    try:
+        log_stream = (output/'processing.log').open('a')
+    except PermissionError as error:
+        raise external_permission_error(error) from None
+    with log_stream as log:
         subprocess.run(args, stdout=log, stderr=subprocess.STDOUT, check=True, timeout=3600)
 
 
@@ -323,18 +416,55 @@ def external_output(path):
     return resolved
 
 
-def publish(config, state_path, source, apple=None):
+def record_release(state, pending, build_id):
+    # Advance the ledger only after internal distribution and its notes are confirmed.
+    state.setdefault('published_fragments', {}).update(pending.get('fragments', {}))
+    state.update(head=pending['head'], version=pending['version'], build=pending['build'], build_id=build_id)
+    del state['pending']
+
+
+def pending_upload(state_path):
+    return state_path.exists() and bool(json.loads(state_path.read_text()).get('pending'))
+
+
+def waiting_message(pending, error=None):
+    state = re.search(r'\(([A-Z_]+)\)$', str(error or ''))
+    state = f' (Apple reports {state.group(1)})' if state else ''
+    return (f"[iOS] TestFlight {pending['version']} ({pending['build']}) from {pending['head']} is uploaded; "
+            f'Apple has not made it available to internal testers yet{state}. The hourly check finishes it; no new upload')
+
+
+def finish_pending(state_path, apple=None):
+    """Finishes an upload a previous run left pending: waits for Apple's processing, checks the build is in internal
+    testing and writes its notes. Never uploads. True when it finished one or none was pending; False when Apple is
+    not ready yet (the intent stays for the next wake)."""
     state = json.loads(state_path.read_text()) if state_path.exists() else {}
-    if state.get('pending'):
-        pending = state['pending']
-        external_output(Path(pending['output']))
-        apple = apple or Apple()
-        wait_processing(apple, pending, Path(pending['output']))
-        build_id = apple.finish(pending)  # Resume finalization only; never resubmit an ambiguous upload.
-        state.update(head=pending['head'], version=pending['version'], build=pending['build'], build_id=build_id)
-        del state['pending']
+    if not state.get('pending'):
+        return True
+    pending = state['pending']
+    external_output(Path(pending['output']))
+    if pending.get('notes_format') != NOTES_FORMAT:
+        # Older controllers persisted developer titles. Preserve the audit, never replay them into TestFlight.
+        pending['legacy_developer_notes'] = pending.get('notes', '')
+        pending.update(notes=FALLBACK_NOTES, notes_format=NOTES_FORMAT, fragments={})
         save(state_path, state)
-        print(f"[iOS] resumed TestFlight {state['version']} ({state['build']}) from {state['head']}")
+    apple = apple or Apple()
+    wait_processing(apple, pending, Path(pending['output']))
+    try:
+        build_id = apple.finish(pending)  # Resume finalization only; never resubmit an ambiguous upload.
+    except NotReadyYet as error:
+        print(waiting_message(pending, error))
+        return False
+    record_release(state, pending, build_id)
+    save(state_path, state)
+    print(f"[iOS] resumed TestFlight {state['version']} ({state['build']}) from {state['head']}")
+    return True
+
+
+def publish(config, state_path, source, apple=None, *, clock=time.monotonic, sleep=time.sleep):
+    if not finish_pending(state_path, apple):
+        return  # One build at a time: nothing new is archived while an upload waits for Apple.
+    state = json.loads(state_path.read_text()) if state_path.exists() else {}
     command(['git', 'fetch', 'origin', 'main:refs/remotes/origin/main'], cwd=source)
     head = command(['git', 'rev-parse', 'origin/main'], cwd=source)
     if gh(f'repos/{REPOSITORY}/git/ref/heads/main')['object']['sha'] != head:
@@ -344,14 +474,14 @@ def publish(config, state_path, source, apple=None):
     if head == previous:
         print('[iOS] daily test release skipped: main unchanged')
         return
-    if not main_ci_green(head):
+    if not wait_main_ci_green(head, clock=clock, sleep=sleep):
         print('[iOS] daily test release skipped: current main latest CI is not green')
         return
     apple = apple or Apple()
     apple.guard()
     root = external_output(Path(config['output_root']))
-    output = root/uuid.uuid4().hex
-    output.mkdir(parents=True)
+    output = create_output_directory(root)
+    preflight_gui_output(source/'scripts/run-in-gui.py', output)
     checkout = output/'source'
     command(['git', 'worktree', 'add', '--detach', str(checkout), head], cwd=source)
     versions = set(re.findall(r"MARKETING_VERSION:\s*'([0-9]+\.[0-9]+\.[0-9]+)'", (checkout/'project.yml').read_text()))
@@ -359,7 +489,9 @@ def publish(config, state_path, source, apple=None):
         raise RuntimeError('App and extension must have one marketing version')
     version = versions.pop()
     raw_notes = release_notes(source, previous, head)
-    notes = testflight_notes(raw_notes)
+    fragments = collect_fragments(checkout, state.get('published_fragments', {}))
+    fragment_hashes = {item['id']: item['sha256'] for item in fragments}
+    notes = render_test_notes(fragments)
     build = next_build(apple.builds(), version, state.get('reserved', {}))
     state.setdefault('reserved', {})[version] = int(build)
     save(state_path, state)  # Retain reservations after failures; never reuse a possibly uploaded number.
@@ -368,8 +500,9 @@ def publish(config, state_path, source, apple=None):
     save(output/'context.json', context)
     (output/'release-notes.txt').write_text(raw_notes + '\n', encoding='utf-8', errors='backslashreplace')
     (output/'release-notes-testflight.txt').write_text(notes + '\n')
+    (output/'release-notes-github.md').write_text(github_release_body(notes, raw_notes))
     save(output/'release-plan.json', dict(head=head, version=version, build=build,
-        raw_notes=raw_notes, testflight_notes=notes))
+        raw_notes=raw_notes, testflight_notes=notes, fragments=fragment_hashes, notes_format=NOTES_FORMAT))
     (output/'tmp').mkdir()
     gui_env = dict(os.environ, TMPDIR=str(output/'tmp') + '/', GUIRUN_TIMEOUT='14400')
     with (output/'archive-export.log').open('w') as log:
@@ -396,21 +529,33 @@ def publish(config, state_path, source, apple=None):
     with (output/'validation.log').open('w') as log:
         subprocess.run(['xcrun', 'altool', '--validate-app', '-f', artifact['ipa'], '-t', 'ios', *apple.auth()],
                        stdout=log, stderr=subprocess.STDOUT, check=True, timeout=3600)
-    command(['git', 'fetch', 'origin', 'main:refs/remotes/origin/main'], cwd=source)
+    if not wait_main_ci_green(head, clock=clock, sleep=sleep):
+        print('[iOS] daily test release skipped: admitted commit left canonical main or its latest CI is no longer green after validation')
+        return
+    command(['git', 'fetch', 'origin', '+main:refs/remotes/origin/main'], cwd=source)
     current = command(['git', 'rev-parse', 'origin/main'], cwd=source)
     canonical = gh(f'repos/{REPOSITORY}/git/ref/heads/main')['object']['sha']
-    if current != head or canonical != head or not main_ci_green(current):
-        print('[iOS] daily test release skipped: main changed or latest CI is no longer green after validation')
+    if current != canonical:
+        command(['git', 'fetch', 'origin', '+main:refs/remotes/origin/main'], cwd=source)
+        current = command(['git', 'rev-parse', 'origin/main'], cwd=source)
+    if current != canonical or not is_ancestor(source, head, current) or not main_ci_green(head):
+        print('[iOS] daily test release skipped: admitted commit left canonical main or its latest CI is no longer green after validation')
         return
-    pending = dict(head=head, version=version, build=build, notes=notes, output=str(output))
+    if int(next_build(apple.builds(), version, {})) > int(build):
+        raise RuntimeError('Another upload consumed the next number during validation; no upload attempted')
+    pending = dict(head=head, version=version, build=build, notes=notes, output=str(output),
+                   fragments=fragment_hashes, notes_format=NOTES_FORMAT)
     state['pending'] = pending
     save(state_path, state)  # Durable upload intent BEFORE calling Apple; ambiguity never causes a duplicate.
     pending['delivery'] = upload(apple, artifact['ipa'], output)
     save(state_path, state)
     wait_processing(apple, pending, output)
-    build_id = apple.finish(pending)
-    state.update(head=head, version=version, build=build, build_id=build_id)
-    del state['pending']
+    try:
+        build_id = apple.finish(pending)
+    except NotReadyYet as error:
+        print(waiting_message(pending, error))
+        return
+    record_release(state, pending, build_id)
     save(state_path, state)
     print(f'[iOS] TestFlight {version} ({build}) released from {head}; internal cassini group')
 
@@ -428,13 +573,14 @@ def main():
     try:
         if platform.system() != 'Darwin' or platform.node().split('.')[0].lower() != 'drmeyers':
             raise RuntimeError('Signing is permitted only on drmeyers, never a rented/pool runner')
-        if args.scheduled and not scheduled(dt.datetime.now(dt.timezone.utc)):
-            print('[iOS] daily test release skipped: outside 09/14/20 Europe/Berlin slots')
-            return 0
+        in_slot = not args.scheduled or scheduled(dt.datetime.now(dt.timezone.utc))
         if args.config.stat().st_mode & 0o077:
             raise RuntimeError('Release config must be private (mode0600)')
         config = json.loads(args.config.read_text())
         state_dir = Path(config['state_dir']).expanduser()
+        if not in_slot and not pending_upload(state_dir/'state.json'):
+            print('[iOS] daily test release skipped: outside 09/14/20 Europe/Berlin slots')
+            return 0
         state_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
         lock_path = state_dir/'release.lock'
         if args.release_lock_fd is not None:
@@ -450,6 +596,11 @@ def main():
                 fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
             except BlockingIOError:
                 print('[iOS] daily test release skipped: another release is active')
+                return 0
+            if not in_slot:
+                # Between slots only an upload that waits for Apple is finished: no fetch, no update of the control
+                # clone, no archive and no upload.
+                finish_pending(state_dir/'state.json')
                 return 0
             if args.refresh_control:
                 if not args.scheduled:

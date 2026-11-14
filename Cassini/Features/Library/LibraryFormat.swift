@@ -54,9 +54,23 @@ struct LibraryFormat {
     func rowLabel(_ row: LibraryRow, day: DayKey) -> String {
         var parts = [row.title, spokenDuration(row.duration)]
         if let date = meetingTime(row, spoken: true, day: row.day ?? day) { parts.append(date) }
-        parts.append(LibraryCopy.status(row.status).lowercased(with: locale))
-        if row.status.suffix != .resume, row.status.suffix != .tryAgain, let suffix = LibraryCopy.suffix(row.status) {
-            parts.append(suffix.trimmingCharacters(in: CharacterSet(charactersIn: "·").union(.whitespaces)).lowercased(with: locale))
+        let language = locale.identifier
+        let status: String
+        if case .transcribed = row.status {
+            status = LibraryPhase1Copy.template("phone.row.transcribed.a11y", language: language)
+        } else {
+            status = RowBadge.presentation(row, text: { StatusBadgeCopy.template($0, language: language) })?.text
+                ?? PhoneStatusBadgeView(status: row.status).text(language: language)
+        }
+        parts.append(status.lowercased(with: locale))
+        switch row.status.suffix {
+        case .speakers:
+            if case .transcribed(let count, _) = row.status {
+                parts.append(LibraryPhase1Copy.speakerCount(count, language: language).lowercased(with: locale))
+            }
+        case .noSpeech:
+            parts.append(LibraryPhase1Copy.template("phone.row.noSpeech", language: language).lowercased(with: locale))
+        default: break
         }
         if row.isFavorite { parts.append(LibraryCopy.starredLabel.lowercased(with: locale)) }
         if let preview = row.preview { parts.append(preview.text) }

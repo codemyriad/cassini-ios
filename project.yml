@@ -82,6 +82,7 @@ targets:
       - CassiniActivity
       - CassiniShared
       - path: Cassini/Resources/Strings/Recording.xcstrings
+      - path: Cassini/Resources/Strings/MeetingPhase1.xcstrings
     dependencies:
       - package: Cassini
         product: CassiniNotebook

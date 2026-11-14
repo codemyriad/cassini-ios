@@ -3,6 +3,7 @@ import Foundation
 /// "Is this Luca?" above a speaker's first passage: a placeholder speaker that a saved voice may be.
 public struct SpeakerSuggestion: Hashable, Sendable {
     public var speakerID: String
+    public var byteSpeakerID: Data { Data(speakerID.utf8) }
     public var label: String
     public var voiceID: UUID
     public var voiceName: String
@@ -25,8 +26,8 @@ public enum SpeakerSuggestions {
         let names = Dictionary(voices.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
         return (note.speakers ?? []).compactMap { speaker -> SpeakerSuggestion? in
             guard case .suggested(let voice, let score) = speaker.match, let name = names[voice],
-                  !speaker.excludedVoiceIDs.contains(voice), DefaultLabels.isDefault(id: speaker.id, label: speaker.name),
-                  let first = note.transcript.first(where: { $0.speakerID == speaker.id }) else { return nil }
+                  !speaker.excludedVoiceIDs.contains(voice), speaker.provenance == .unnamed,
+                  let first = note.transcript.first(where: { $0.speakerID.map({ Data($0.utf8) }) == speaker.byteID }) else { return nil }
             return SpeakerSuggestion(speakerID: speaker.id, label: speaker.name, voiceID: voice, voiceName: name,
                                      score: score, segmentID: first.id, start: first.start)
         }.sorted { ($0.start, $0.speakerID) < ($1.start, $1.speakerID) }

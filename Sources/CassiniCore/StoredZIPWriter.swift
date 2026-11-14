@@ -22,7 +22,7 @@ public final class StoredZIPWriter {
         try check()
         guard !finished, members.count < limits.entries else { throw ZIPFailure.tooLarge }
         try ZIPArchive.checkPath(name)
-        guard !name.contains("/"), !name.contains("\\") else { throw ZIPFailure.unsafePaths }
+        guard !name.unicodeScalars.contains("/"), !name.unicodeScalars.contains("\\") else { throw ZIPFailure.unsafePaths }
         let encoded = Data(name.utf8)
         guard encoded.count <= Int(UInt16.max) else { throw ZIPFailure.entry }
         let input = try FileHandle(forReadingFrom: source)

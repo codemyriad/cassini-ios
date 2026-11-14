@@ -36,16 +36,20 @@ final class ScreenshotTests: XCTestCase {
 
     @MainActor func test03Transcribing() throws {
         let app = try launchPhone(["--seed", "processing", "--open-fixture", Self.processing])
-        let headline = app.descendants(matching: .any)["progressHeadline"]
-        XCTAssertTrue(headline.wait(until: NSPredicate(format: "label CONTAINS %@", "%"), within: 15))
+        // Reports advance the injected uptime, so the compact strip's ETA follows the synthetic pace.
+        let details = app.buttons["transcribingDetails"]
+        XCTAssertTrue(details.wait(until: NSPredicate(format: "label CONTAINS %@", "min"), within: 15), details.label)
         XCTAssertTrue(element(app, containing: "agenda").waitForExistence(within: 10), "the draft so far shows")
-        // Reports advance the injected uptime, so the estimate follows the synthetic pace.
-        let timeLeft = app.descendants(matching: .any).matching(identifier: "timeLeftStat").firstMatch
-        XCTAssertTrue(timeLeft.wait(until: NSPredicate(format: "label CONTAINS %@", "min"), within: 15), timeLeft.label)
-        // The draft follows its end as it arrives; back at its start, its header shows under the card.
+        // The draft follows its end as it arrives; back at its start, its header shows under the status strip.
         let parts = app.descendants(matching: .any).matching(identifier: "draftTranscript")
-        let header = parts.element(boundBy: 0), draft = parts.element(boundBy: parts.count - 1)
-        XCTAssertTrue(draft.scroll(up: false, attempts: 3) { header.exists && header.isHittable })
+        let header = parts.element(boundBy: 0)
+        let viewport = app.scrollViews.containing(.any, identifier: "draftTranscript").firstMatch
+        XCTAssertTrue(viewport.waitForExistence(within: 10))
+        XCTAssertTrue(viewport.scroll(up: false, attempts: 3) {
+            guard let frame = (try? header.snapshot())?.frame, !frame.isEmpty, !frame.isInfinite else { return false }
+            // A static heading has no activation point; require full visibility inside the draft viewport.
+            return viewport.frame.intersection(app.windows.firstMatch.frame).contains(frame)
+        })
         capture("03-transcribing")
     }
 
@@ -71,6 +75,8 @@ final class ScreenshotTests: XCTestCase {
         let app = try launchPhone(["--seed", "library"])
         app.buttons["settingsButton"].tap()
         XCTAssertTrue(app.switches.firstMatch.waitForExistence(within: 5), "Settings shows")
+        XCTAssertTrue(app.staticTexts["uiTestState-settingsLoaded"].waitForExistence(within: 15),
+                      "Settings finishes loading model and language availability before capture")
         capture("05-settings")
     }
 
@@ -91,7 +97,7 @@ final class ScreenshotTests: XCTestCase {
         let app = try launchPhone(["--seed", "search"])
         let search = app.textFields["librarySearch"]
         search.tap()
-        // Search on the keyboard (a new line in the wrapping field) ends the search and hides the keyboard.
+        // Search on the keyboard submits the query and hides the keyboard while keeping results open.
         search.typeText("Thursday\n")
         XCTAssertTrue(row(app, "Garden plans for the spring").waitForExistence(within: 5))
         XCTAssertTrue(row(app, "Notes from the design review").waitForNonExistence(within: 5))
@@ -134,6 +140,57 @@ final class ScreenshotTests: XCTestCase {
         captureExportMenu("11-library-export", app)
     }
 
+    /// Opens the real destructive confirmation without accepting it or deleting anything.
+    @MainActor func test12DeleteDialog() throws {
+        let app = try launchPhone(["--seed", "trash"])
+        app.buttons["recentlyDeletedButton"].tap()
+        XCTAssertTrue(app.staticTexts["Old interview draft"].waitForExistence(within: 5))
+        app.buttons["Empty"].tapWhenSettled()
+        let alert = app.alerts.firstMatch
+        XCTAssertTrue(alert.waitForExistence(within: 5))
+        XCTAssertTrue(alert.buttons["Delete"].exists)
+        capture("12-delete-dialog")
+        alert.buttons["Cancel"].tapWhenSettled()
+        XCTAssertTrue(app.staticTexts["Old interview draft"].waitForExistence(within: 5))
+    }
+
+    @MainActor func test13ErrorLine() throws {
+        let app = try launchPhone(["--seed", "brandSpeakers", "--open-fixture", "FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF"])
+        XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 10))
+        let failure = app.descendants(matching: .any)["banner.TX_FAILED"]
+        XCTAssertTrue(failure.waitForExistence(within: 10), "the real failed-note banner shows its error line")
+        capture("13-error-line")
+    }
+
+    @MainActor func test14SuccessBadge() throws {
+        let app = try launchPhone(["--seed", "brandSpeakers"])
+        let completed = row(app, "Community garden planning")
+        XCTAssertTrue(completed.waitForExistence(within: 5))
+        XCTAssertTrue(completed.wait(until: NSPredicate(format: "label CONTAINS[c] 'transcribed'"), within: 5),
+                      "the completed row retains its spoken state without a visual done chip")
+        capture("14-success-badge")
+    }
+
+    @MainActor func test15SevenSpeakerMeeting() throws {
+        let app = try launchPhone(["--seed", "brandSpeakers", "--open-fixture", Self.fixture])
+        XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 10))
+        waitForInitialPosition(app)
+        XCTAssertTrue(app.buttons["headerSpeaker-brand-0"].waitForExistence(within: 5))
+        XCTAssertEqual(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "headerSpeaker-")).count, 7)
+        capture("15-seven-speaker-meeting")
+    }
+
+    /// The actual Speakers sheet shows an unnamed first speaker reserving slot zero, plus six named speakers.
+    @MainActor func test16SevenSpeakerColours() throws {
+        let app = try launchPhone(["--seed", "brandSpeakers", "--open-fixture", Self.fixture])
+        app.openNoteSpeakers()
+        XCTAssertTrue(app.buttons["speaker-brand-0"].waitForExistence(within: 5))
+        let last = app.buttons["speaker-brand-6"]
+        XCTAssertTrue(app.scroll(attempts: 6) { last.exists && last.isHittable })
+        XCTAssertTrue(app.buttons["speaker-brand-0"].isHittable, "all seven speaker rows fit together")
+        capture("16-seven-speaker-colours")
+    }
+
     @MainActor private func captureExportMenu(_ name: String, _ app: XCUIApplication) {
         let item = app.buttons["Transcript as text"]
         var last: CGRect?
@@ -144,6 +201,56 @@ final class ScreenshotTests: XCTestCase {
             return frame == last
         }, "the export submenu has settled")
         capture(name)
+    }
+
+    @MainActor func test17StatusBadges() throws {
+        let app = try launchPhone(["--badge-gallery"])
+        XCTAssertTrue(app.descendants(matching: .any)["badge-gallery-8"].waitForExistence(within: 15))
+        capture("17-status-badges")
+    }
+
+    @MainActor func test18MeetingFind() throws {
+        let app = try launchPhone(["--seed", "reading", "--open-fixture", Self.fixture])
+        waitForInitialPosition(app)
+        app.buttons["searchTranscript"].tap()
+        let field = app.textFields["transcriptSearch"]
+        XCTAssertTrue(field.waitForExistence(within: 5))
+        field.typeText("attention")
+        XCTAssertTrue(app.staticTexts["searchCounter"].wait(until: NSPredicate(format: "label == '1 of 1'"), within: 5))
+        capture("18-meeting-find")
+    }
+
+    @MainActor func test19MeetingScrolled() throws {
+        let app = try launchPhone(["--seed", "long", "--open-fixture", "11111111-1111-1111-1111-111111111111"])
+        waitForInitialPosition(app)
+        let compact = app.staticTexts["noteCompactTitle"]
+        XCTAssertTrue(app.scroll(attempts: 8) {
+            compact.exists && compact.isHittable && !app.staticTexts["noteTitle"].isHittable
+        })
+        XCTAssertEqual(compact.label, "Three hour workshop")
+        capture("19-meeting-scrolled")
+    }
+
+    @MainActor func test20LibraryScrolled() throws {
+        let app = try launchPhone(["--seed", "statuses"] + DeviceUnderTest.workingSpeech)
+        let search = app.textFields["librarySearch"]
+        XCTAssertTrue(search.waitForExistence(within: 15))
+        let searchFrame = search.frame
+        let quiet = row(app, "Quiet room")
+        XCTAssertTrue(app.scrollViews["libraryScroll"].scroll(attempts: 12) {
+            quiet.exists && quiet.isHittable && quiet.frame.maxY < app.buttons["recordButton"].frame.minY
+        })
+        XCTAssertTrue(app.windows.firstMatch.frame.contains(search.frame), "the pinned field stays fully visible")
+        XCTAssertEqual(search.frame, searchFrame, "the search capsule stays pinned while the list scrolls")
+        capture("20-library-scrolled")
+    }
+
+    @MainActor func test21OneSpeakerRow() throws {
+        let app = try launchPhone(["--seed", "oneSpeaker"])
+        let solo = row(app, "Solo planning")
+        XCTAssertTrue(solo.waitForExistence(within: 15))
+        XCTAssertTrue(solo.wait(until: NSPredicate(format: "label CONTAINS[c] 'transcribed' AND label CONTAINS '1 speaker'"), within: 5))
+        capture("21-one-speaker-row")
     }
 
     // MARK: - iPad
@@ -175,7 +282,9 @@ final class ScreenshotTests: XCTestCase {
         app.launchAndWait()
         // One wait for either screen: waiting for the Library first cost a fixture launch its whole limit.
         let search = app.textFields["librarySearch"], title = app.staticTexts["noteTitle"]
-        XCTAssertTrue(poll(within: max(15, uiWaitFloor)) { search.exists || title.exists })
+        XCTAssertTrue(poll(within: max(15, uiWaitFloor)) {
+            search.exists || title.exists || app.descendants(matching: .any)["badgeGallery"].exists
+        })
         return app
     }
 

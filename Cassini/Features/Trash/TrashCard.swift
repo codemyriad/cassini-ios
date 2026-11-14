@@ -46,7 +46,7 @@ struct TrashCard: View {
         }
         .buttonStyle(.bordered).buttonBorderShape(.capsule).tint(.ink)
         Button(role: .destructive, action: deleteNow) {
-            // The role's system red is too light on the card; ember keeps 4.5:1.
+            // Use the app's error role for this custom destructive action.
             Text(TrashCopy.deleteNow).font(.subheadline.weight(.semibold)).foregroundStyle(Color.toneError)
                 .padding(.horizontal, 14).frame(minHeight: HitTarget.minimum)
         }

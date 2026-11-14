@@ -68,8 +68,10 @@ struct RowStatusTests {
         #expect(RowStatus.suffix(.failed, speakerCount: 0, hasWords: false) == .tryAgain)
         #expect(RowStatus.suffix(.transcribed, speakerCount: 3, hasWords: true) == .speakers)
         #expect(RowStatus.suffix(.transcribed, speakerCount: 2, hasWords: true) == .speakers)
-        #expect(RowStatus.suffix(.transcribed, speakerCount: 1, hasWords: true) == .none)
+        #expect(RowStatus.suffix(.transcribed, speakerCount: 1, hasWords: true) == .speakers)
+        #expect(RowStatus.suffix(.transcribed, speakerCount: 0, hasWords: true) == .none)
         #expect(RowStatus.suffix(.transcribed, speakerCount: 0, hasWords: false) == .noSpeech)
+        #expect(RowStatus.suffix(.transcribed, speakerCount: 3, hasWords: false) == .noSpeech)
         #expect(RowStatus.suffix(.audioOnly, speakerCount: 0, hasWords: false) == .none)
         #expect(RowStatus.suffix(.transcribing, speakerCount: 3, hasWords: true) == .none)
     }

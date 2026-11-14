@@ -1,4 +1,5 @@
 import CassiniCore
+import Foundation
 
 /// One subtitle cue. `text` is the cue's words joined with one space, in canonical order. `prefix` is the SRT label
 /// prefix (`"<label>: "`) or empty. `lines` is `prefix + text` in one line, or two lines when it is over
@@ -52,7 +53,7 @@ public enum SubtitleCues {
             if let prev = previous, let last = drafts.indices.last, !breaksBefore(drafts[last], prev, word) {
                 drafts[last].add(word)
             } else {
-                let budget = prefixed && previous?.speaker != word.speaker ? prefix(t, word.speaker).utf16.count : 0
+                let budget = prefixed && previous.map({ Data($0.speaker.utf8) }) != Data(word.speaker.utf8) ? prefix(t, word.speaker).utf16.count : 0
                 drafts.append(Draft(word, prefixLength: budget))
             }
             previous = word
@@ -61,14 +62,14 @@ public enum SubtitleCues {
             .sorted { $0.element.startMs != $1.element.startMs ? $0.element.startMs < $1.element.startMs : $0.offset < $1.offset }
             .map(\.element)
         var nextStarts = [Int64?](repeating: nil, count: sorted.count)
-        var following: [String: Int64] = [:]
+        var following: [Data: Int64] = [:]
         for index in sorted.indices.reversed() {
-            nextStarts[index] = following[sorted[index].speaker]
-            following[sorted[index].speaker] = sorted[index].startMs
+            nextStarts[index] = following[Data(sorted[index].speaker.utf8)]
+            following[Data(sorted[index].speaker.utf8)] = sorted[index].startMs
         }
         var shownSpeaker: String?
         return sorted.enumerated().map { index, draft in
-            let cuePrefix = prefixed && draft.speaker != shownSpeaker ? prefix(t, draft.speaker) : ""
+            let cuePrefix = prefixed && Data(draft.speaker.utf8) != shownSpeaker.map({ Data($0.utf8) }) ? prefix(t, draft.speaker) : ""
             shownSpeaker = draft.speaker
             let text = draft.words.lazy.map(\.text).joined(separator: " ")
             return Cue(speaker: draft.speaker, label: t.label(draft.speaker), startMs: draft.startMs,
@@ -96,7 +97,7 @@ public enum SubtitleCues {
     private static func prefix(_ t: ExportTranscript, _ speaker: String) -> String { t.label(speaker) + ": " }
 
     private static func breaksBefore(_ cue: Draft, _ prev: Word, _ word: Word) -> Bool {
-        word.speaker != prev.speaker
+        Data(word.speaker.utf8) != Data(prev.speaker.utf8)
             || word.startMs - prev.endMs >= pauseMs
             || word.endMs - cue.startMs > maxSpanMs
             || cue.length + 1 + word.text.utf16.count > maxText

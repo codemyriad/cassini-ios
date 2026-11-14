@@ -1,60 +1,130 @@
 import Foundation
+import SwiftUI
 import CassiniEngine
 import CassiniNotebook
 
-/// The words of speaker naming and saved voices, from the Speakers string table. Android's English copy, with
-/// "device" for Android's "phone" (Cassini also runs on iPad).
+/// The words of speaker naming and saved voices: shared Phase 1 copy (`MeetingPhase1Copy`) for Name a speaker and
+/// Saved voices' shared keys, and the `Speakers` string table for iOS-specific and remaining speaker flows.
 enum SpeakersCopy {
     // MARK: Name a speaker
 
+    static var dialogLabel: String { MeetingPhase1Copy.speakerDialogLabel }
+
     static func speaksFor(_ seconds: Double) -> String {
-        String(localized: "Speaks for \(RecordingCopy.compact(seconds)) in this note", table: "Speakers")
+        MeetingPhase1Copy.speakerTalkTime(RecordingCopy.compact(seconds))
     }
-    static let playSample = String(localized: "Play a sample of this voice", table: "Speakers")
+
+    static func quoted(_ quote: String) -> String {
+        MeetingPhase1Copy.quote(quote)
+    }
+
+    static var playSample: String { MeetingPhase1Copy.speakerPlaySample }
     static let stopSample = String(localized: "Stop the sample", table: "Speakers")
-    static let nameField = String(localized: "Name", table: "Speakers")
-    static let voicesRanked = String(localized: "Saved voices, closest first", table: "Speakers")
-    static let voices = String(localized: "Saved voices", table: "Speakers")
-    static let likely = String(localized: "Likely", table: "Speakers")
+    static var nameField: String { MeetingPhase1Copy.speakerNameLabel }
+    static var voicesRanked: String { MeetingPhase1Copy.speakerVoicesRanked }
+    static var voices: String { MeetingPhase1Copy.savedVoices }
+    static var likely: String { MeetingPhase1Copy.speakerLikely }
     static let showAll = String(localized: "Show all", table: "Speakers")
-    static func alreadySaved(_ name: String) -> String { String(localized: "“\(name)” is already a saved voice.", table: "Speakers") }
-    static let samePersonQuestion = String(localized: "Is this the same person?", table: "Speakers")
-    static let samePerson = String(localized: "Same person", table: "Speakers")
-    static let someoneElse = String(localized: "Someone else", table: "Speakers")
+
+    /// "{name} is already a saved voice." (`speakers.duplicate.notice`), with only the `{name}` placeholder span in
+    /// semibold — splitting the template before substitution so a name matching template words never styles surrounding copy.
+    static func duplicateNotice(_ name: String, language: String? = nil, bundle: Bundle = .main) -> AttributedString {
+        let raw = language.map { MeetingPhase1Copy.template("speakers.duplicate.notice", language: $0, bundle: bundle) }
+            ?? MeetingPhase1Copy.speakerDuplicateNoticeTemplate
+        return styledTemplate(raw, placeholder: "{name}", value: name)
+    }
+
+    static func styledTemplate(_ template: String, placeholder: String, value: String) -> AttributedString {
+        guard !placeholder.isEmpty else { return AttributedString(template) }
+        var result = AttributedString()
+        var remainder = template[...]
+        while let range = remainder.range(of: placeholder) {
+            if range.lowerBound > remainder.startIndex {
+                result += AttributedString(remainder[..<range.lowerBound])
+            }
+            var emphasized = AttributedString(value)
+            emphasized.font = .subheadline.weight(.semibold)
+            result += emphasized
+            remainder = remainder[range.upperBound...]
+        }
+        if !remainder.isEmpty {
+            result += AttributedString(remainder)
+        }
+        return result
+    }
+
+    static var samePerson: String { MeetingPhase1Copy.speakerSamePerson }
+    static var someoneElse: String { MeetingPhase1Copy.speakerSomeoneElse }
     static let answerFirst = String(localized: "Answer the question above first", table: "Speakers")
     static func savedAs(_ name: String) -> String { String(localized: "This voice is saved as “\(name)”.", table: "Speakers") }
     static let renameSavedQuestion = String(localized: "Also rename the saved voice?", table: "Speakers")
+    static func renameSavedNotice(_ name: String) -> AttributedString {
+        var lead = AttributedString(savedAs(name))
+        lead.font = .subheadline.weight(.semibold)
+        return lead + AttributedString(" " + renameSavedQuestion)
+    }
     static let renameSaved = String(localized: "Rename saved voice", table: "Speakers")
     static let nameBlank = String(localized: "Enter a name.", table: "Speakers", comment: "Rename saved voice: the name field is blank")
     static let save = String(localized: "Save", table: "Speakers", comment: "Rename saved voice: the button that saves the name")
     static func notName(_ name: String) -> String { String(localized: "Not \(name)?", table: "Speakers") }
-    static let remember = String(localized: "Remember this voice on this device", table: "Speakers")
+    static var remember: String { MeetingPhase1Copy.speakerRememberTitle }
 
-    /// What remembering does: Android's "Future notes will name … automatically" when automatic naming is on.
-    static func rememberBody(_ name: String, automatic: Bool) -> String {
+    /// What remembering does: on iPhone with automatic naming on, the shared Phase 1 two-line copy
+    /// (`speakers.rememberVoice.cardBody.iphone` / `.unnamed`). While automatic naming is off (the iOS default), or on
+    /// iPad where "this iPhone" does not fit, the `Speakers` device strings.
+    static func rememberBody(_ name: String, automatic: Bool, pad: Bool = false, language: String? = nil,
+                             bundle: Bundle = .main) -> String {
+        if automatic && !pad {
+            if let language {
+                if name.isEmpty {
+                    return MeetingPhase1Copy.template("speakers.rememberVoice.cardBody.iphone.unnamed",
+                                                      language: language, bundle: bundle)
+                }
+                return MeetingPhase1Copy.template("speakers.rememberVoice.cardBody.iphone",
+                                                  language: language, bundle: bundle)
+                    .replacingOccurrences(of: "{name}", with: name)
+            }
+            return name.isEmpty ? MeetingPhase1Copy.speakerRememberUnnamed : MeetingPhase1Copy.speakerRememberBody(name)
+        }
+        if let language {
+            let locale = Locale(identifier: language)
+            let selected = Bundle.preferredLocalizations(from: bundle.localizations,
+                forPreferences: [language.replacingOccurrences(of: "_", with: "-")]).first ?? "en"
+            let localized = bundle.path(forResource: selected, ofType: "lproj").flatMap(Bundle.init(path:)) ?? bundle
+            return deviceRememberBody(name, automatic: automatic, bundle: localized, locale: locale)
+        }
+        return deviceRememberBody(name, automatic: automatic)
+    }
+
+    private static func deviceRememberBody(_ name: String, automatic: Bool, bundle: Bundle? = nil,
+                                           locale: Locale = .current) -> String {
         switch (name.isEmpty, automatic) {
         case (false, true):
-            String(localized: "Future notes will name \(name) automatically. The voiceprint never leaves this device.", table: "Speakers")
+            String(localized: "Future notes will name \(name) automatically. The voiceprint never leaves this device.",
+                   table: "Speakers", bundle: bundle, locale: locale)
         case (true, true):
-            String(localized: "Future notes will name this person automatically. The voiceprint never leaves this device.", table: "Speakers")
+            String(localized: "Future notes will name this person automatically. The voiceprint never leaves this device.",
+                   table: "Speakers", bundle: bundle, locale: locale)
         case (false, false):
-            String(localized: "Future notes will suggest \(name). The voiceprint never leaves this device.", table: "Speakers")
+            String(localized: "Future notes will suggest \(name). The voiceprint never leaves this device.",
+                   table: "Speakers", bundle: bundle, locale: locale)
         case (true, false):
-            String(localized: "Future notes will suggest this person. The voiceprint never leaves this device.", table: "Speakers")
+            String(localized: "Future notes will suggest this person. The voiceprint never leaves this device.",
+                   table: "Speakers", bundle: bundle, locale: locale)
         }
     }
 
     static func rememberReason(_ reason: RememberReason) -> String {
         switch reason {
         case .tooLittleSpeech: tooLittleSpeech
-        case .noModel: String(localized: "Recognising saved voices isn’t installed yet.", table: "Speakers")
+        case .noModel: MeetingPhase1Copy.speakerRememberModelsNeeded
         case .readOnly: String(localized: "Saved voices can’t be changed now, so this voice can’t be remembered.", table: "Speakers")
         }
     }
-    static let tooLittleSpeech = String(localized: "Too little speech to remember this voice.", table: "Speakers")
-    static let mergeInto = String(localized: "Merge into…", table: "Speakers")
-    static let saveName = String(localized: "Save name", table: "Speakers")
-    static let cancel = String(localized: "Cancel", table: "Speakers")
+    static var tooLittleSpeech: String { MeetingPhase1Copy.speakerRememberTooShort }
+    static var mergeInto: String { MeetingPhase1Copy.speakerMergeInto }
+    static var saveName: String { MeetingPhase1Copy.speakerSaveName }
+    static var cancel: String { MeetingPhase1Copy.cancel }
     static let done = String(localized: "Done", table: "Speakers")
     static let nameThisSpeaker = String(localized: "Name this speaker", table: "Speakers")
     static let couldNotSave = String(localized: "Could not save the speaker", table: "Speakers")

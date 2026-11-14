@@ -170,13 +170,23 @@ public final class NoteScreenModel {
     /// A Cassini document is being prepared.
     public private(set) var exportingDocument = false
     public var showBookmarks = false
-    /// The saved progress of a stopped or failed job, for its read-only draft.
+    /// The saved progress of a stopped, failed, queued or resuming job, for its read-only draft.
     public private(set) var savedDraft: [DraftWord] = []
+    @ObservationIgnored private var retainedWords: [DraftWord] = []
     /// The speaker models are installed: Transcribe again says "Speaker names carry over."
     public private(set) var speakerModelsReady = false
     /// The draft's names (`names.json`), while the screen is shown.
     public private(set) var draftNames = DraftNames.empty
     @ObservationIgnored private var namesTask: Task<Void, Never>?
+    private struct MappedDraftKey: Equatable {
+        var draft: DraftState
+        var names: DraftNames
+        var voiceNames: [UUID: String]
+        var language: String
+    }
+    @ObservationIgnored private var mappedDraftKey: MappedDraftKey?
+    @ObservationIgnored private var mappedDraft: DraftState?
+    @ObservationIgnored private(set) var shownDraftBuilds = 0
     /// This screen, as the owner of the player.
     @ObservationIgnored public let playerOwner = PlaybackOwner()
     @ObservationIgnored let ports: Ports
@@ -399,18 +409,52 @@ public final class NoteScreenModel {
     /// The draft the screen shows, with its names: the running job's, or the saved progress of a stopped or failed one.
     /// Nil without one.
     public var shownDraft: DraftState? {
+        shownDraft(language: DefaultLabels.appLanguage)
+    }
+
+    /// The language is part of the key because legacy placeholder labels use the app's language. Keeping this
+    /// overload internal lets the key be tested without replacing the process's main localization bundle.
+    func shownDraft(language: String) -> DraftState? {
+        // Read the observable inputs before checking the cache, preserving SwiftUI's dependency registrations.
         let voiceNames = Dictionary(ports.savedVoices().map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
+        let names = draftNames
+        let currentJob = ports.job(noteID)
+        let currentNote = ports.note(noteID)
+        let modeShowsDraft = currentJob.map { job in
+            currentNote.map { NoteMode.of($0, job: job).showsDraft } ?? (job.state != .needsConsent)
+        } ?? false
+        let raw: DraftState
         if let running = ports.runningDraft(noteID) {
-            return DraftView.build(running, names: draftNames, voiceNames: voiceNames)
+            retainedWords = running.words
+            raw = running
+        } else if modeShowsDraft, !savedDraft.isEmpty {
+            raw = DraftState(words: savedDraft, tentativeFromMs: .max, namingOpen: ports.draftNamingOpen(noteID))
+        } else if modeShowsDraft, let doneMs = currentJob?.doneMs, doneMs > 0, !retainedWords.isEmpty {
+            let kept = retainedWords.filter { $0.endMs <= doneMs }
+            guard !kept.isEmpty else {
+                mappedDraftKey = nil
+                mappedDraft = nil
+                return nil
+            }
+            raw = DraftState(words: kept, tentativeFromMs: .max, namingOpen: ports.draftNamingOpen(noteID))
+        } else {
+            if !modeShowsDraft { retainedWords = [] }
+            mappedDraftKey = nil
+            mappedDraft = nil
+            return nil
         }
-        guard !savedDraft.isEmpty else { return nil }
-        let saved = DraftState(words: savedDraft, tentativeFromMs: .max, namingOpen: ports.draftNamingOpen(noteID))
-        return DraftView.build(saved, names: draftNames, voiceNames: voiceNames)
+        let key = MappedDraftKey(draft: raw, names: names, voiceNames: voiceNames, language: language)
+        if mappedDraftKey != key {
+            mappedDraft = DraftView.build(raw, names: names, voiceNames: voiceNames)
+            mappedDraftKey = key
+            shownDraftBuilds += 1
+        }
+        return mappedDraft
     }
 
     /// Whether `speakerID` is a speaker of the draft on screen.
     private func isDraftSpeaker(_ speakerID: String) -> Bool {
-        !speakerID.isEmpty && shownDraft?.words.contains { $0.speaker == speakerID } == true
+        !speakerID.isEmpty && shownDraft?.words.contains { Data($0.speaker.utf8) == Data(speakerID.utf8) } == true
     }
 
     /// What Name a speaker knows about a draft speaker (Android's `draftInput`): its numbers from the draft's words
@@ -418,19 +462,41 @@ public final class NoteScreenModel {
     /// the voiceprint model is installed.
     func draftInput(_ speakerID: String) async -> NamingInput? {
         guard let draft = shownDraft else { return nil }
-        let stats = SpeakerStats.of(words: draft.words.map { Word($0.speaker, $0.startMs, $0.endMs, $0.text) })
-        guard let stat = stats.first(where: { $0.speakerID == speakerID }) else { return nil }
-        func label(_ stat: SpeakerStat) -> String { draft.labels[stat.speakerID] ?? DefaultLabels.placeholder(stat.ordinal + 1) }
-        let targets = stats.filter { $0.speakerID != speakerID && $0.wordCount > 0 }.map {
-            MergeTarget(speakerID: $0.speakerID, name: label($0), ordinal: $0.ordinal, speakingTime: $0.speakingTime)
-        }
         let ready = await ports.speakerModelsReady()
         // A running job holds the audio: no sample plays until it stops.
         let canSample = ports.runningDraft(noteID) == nil && note?.audio.isPlayable == true
-        return NamingInput(speakerID: speakerID, label: label(stat), ordinal: stat.ordinal, speakingTime: stat.speakingTime,
-                           sample: stat.sample, print: nil, match: draftNames.match(speakerID),
-                           voices: ports.savedVoices(), voicesReadOnly: ports.voicesReadOnly(), voiceModelReady: ready,
-                           mergeTargets: targets, canSample: canSample, draft: true, willHavePrint: ready)
+        let match = draftNames.match(speakerID)
+        let voices = ports.savedVoices()
+        let readOnly = ports.voicesReadOnly()
+        let language = DefaultLabels.appLanguage
+        return await Task.detached(priority: .userInitiated) {
+            let stats = SpeakerStats.of(words: draft.words.map { Word($0.speaker, $0.startMs, $0.endMs, $0.text) })
+            guard let stat = stats.first(where: { Data($0.speakerID.utf8) == Data(speakerID.utf8) }) else { return nil }
+            let labels = Dictionary(uniqueKeysWithValues: draft.labels.map { (Data($0.key.utf8), $0.value) })
+            let provenance = Dictionary(uniqueKeysWithValues: draft.provenance.map { (Data($0.key.utf8), $0.value) })
+            func label(_ stat: SpeakerStat) -> String {
+                labels[Data(stat.speakerID.utf8)] ?? DefaultLabels.placeholder(stat.ordinal + 1, language: language)
+            }
+            let order = SpeakerColourOrder.earliest(draft.words, id: { $0.speaker }, start: { Double($0.startMs) })
+            let fallback = Dictionary(uniqueKeysWithValues: order.enumerated().map { (Data($0.element.utf8), $0.offset) })
+            let stored = Dictionary(uniqueKeysWithValues: draft.colourIndices.map { (Data($0.key.utf8), $0.value) })
+            let indices = stored.merging(fallback) { stored, _ in stored }
+            let targets = stats.filter { Data($0.speakerID.utf8) != Data(speakerID.utf8) && $0.wordCount > 0 }.map {
+                MergeTarget(speakerID: $0.speakerID, name: label($0), ordinal: $0.ordinal, speakingTime: $0.speakingTime,
+                            colourIndex: indices[Data($0.speakerID.utf8)], provenance: provenance[Data($0.speakerID.utf8)])
+            }
+            let quote = NoteTranscripts.draft(
+                draft.words, tentativeFromMs: draft.tentativeFromMs == .max ? nil : draft.tentativeFromMs,
+                labels: draft.labels, automatic: draft.automatic, suggestions: draft.suggestions,
+                colourIndices: draft.colourIndices, provenance: draft.provenance
+            ).namingQuote(speakerID)
+            return NamingInput(speakerID: speakerID, label: label(stat), ordinal: stat.ordinal, speakingTime: stat.speakingTime,
+                               sample: stat.sample, print: nil, match: match,
+                               voices: voices, voicesReadOnly: readOnly, voiceModelReady: ready,
+                               mergeTargets: targets, canSample: canSample, draft: true, willHavePrint: ready,
+                               colourIndex: indices[Data(speakerID.utf8)], provenance: provenance[Data(speakerID.utf8)],
+                               quote: quote)
+        }.value
     }
 
     // MARK: Opening
@@ -483,11 +549,29 @@ public final class NoteScreenModel {
         run(start.effect)
     }
 
-    /// Reads a stopped or failed job's saved progress for its draft; any other job shows none.
+    /// What the saved-draft reload task follows: reloads once per job or state transition, and on `doneMs` changes only
+    /// when `.paused` or `.failed` (never per checkpoint while queued or running).
+    public var savedDraftKey: String {
+        job.map { "\($0.id)-\($0.state)-\($0.state == .paused || $0.state == .failed ? $0.doneMs : 0)" } ?? "none"
+    }
+
+    /// Reads a stopped, failed, or checkpoint-backed queued/resuming job's saved progress for its draft; a running job
+    /// with a live draft keeps the current `savedDraft`, and a fresh queued job (`doneMs == 0`), a consent prompt, or a
+    /// finished note loads none.
     public func loadSavedDraft() async {
-        let stopped = job.map { $0.state == .paused || $0.state == .failed } == true
-        let draft = stopped ? await ports.savedDraft(noteID) : []
-        if !Task.isCancelled { savedDraft = draft }
+        guard ports.runningDraft(noteID) == nil else { return }
+        let shouldLoad: Bool = switch job?.state {
+        case .paused?, .failed?:
+            true
+        case .queued?, .running?:
+            (job?.doneMs ?? 0) > 0
+        case .needsConsent?, nil:
+            false
+        }
+        let draft = shouldLoad ? await ports.savedDraft(noteID) : []
+        guard !Task.isCancelled, ports.runningDraft(noteID) == nil else { return }
+        savedDraft = draft
+        if !shouldLoad || draft.isEmpty { retainedWords = draft }
     }
 
     // MARK: Follow

@@ -59,13 +59,13 @@ public enum TranscriptExports {
         switch format {
         case .markdown:
             guard let options = texts.markdown else { throw MarkdownExport.OptionsRequired() }
-            var seen = Set<String>()
-            let speakers = transcript.words.compactMap { seen.insert($0.speaker).inserted ? $0.speaker : nil }
+            var seen = Set<Data>()
+            let speakers = transcript.words.compactMap { seen.insert(Data($0.speaker.utf8)).inserted ? $0.speaker : nil }
             for (index, speaker) in speakers.enumerated() {
-                let label = transcript.labels[speaker]
+                let label = transcript.labelsByID[Data(speaker.utf8)]
                 if label.flatMap(DefaultLabels.placeholderNumber) == nil,
                    label.map({ DefaultLabels.isDefault(id: speaker, label: $0) }) ?? true {
-                    transcript.labels[speaker] = options.unnamedSpeaker(index + 1)
+                    transcript.labelsByID[Data(speaker.utf8)] = options.unnamedSpeaker(index + 1)
                 }
             }
             text = MarkdownExport.write(transcript, dateLine: options.dateLine(note.meetingTime, transcript.durationMs),

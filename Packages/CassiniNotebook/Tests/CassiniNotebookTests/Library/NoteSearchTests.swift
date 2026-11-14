@@ -84,6 +84,25 @@ final class NoteSearchTests {
         #expect(highlighted.ranges.map { String(Array(highlighted.text)[$0]) } == ["delivery"])
     }
 
+    @Test func multiTurnThursdaySnippetHasNoParagraphGapAndKeepsItsHighlight() throws {
+        var value = note("A quieter kind of productivity", "")
+        value.status = .ready
+        value.transcript = [
+            TranscriptSegment(text: "What if being productive meant leaving room for a pause.", start: 0, end: 5, speakerID: "alex"),
+            TranscriptSegment(text: "Let’s protect an hour on Thursday for focused work\nwithout interruptions.", start: 5, end: 10, speakerID: "sam")
+        ]
+        #expect(NoteTranscripts.sealed(value).turns.count == 2, "Exercise the boundary between distinct speakers")
+        let fields = SearchFields(value)
+        #expect(!fields.body.text.contains("\n\n"))
+        let preview = Highlighted(marked: fields.snippet(try #require(SearchQuery("Thursday")))).singleLine
+        #expect(!preview.text.contains("\n"))
+        #expect(preview.ranges.map { String(Array(preview.text)[$0]) } == ["Thursday"])
+        #expect(preview.text.contains("Let’s protect an hour on Thursday"))
+        let embedded = Highlighted("pause.\r\nThursday\nnext", ranges: [7..<15]).singleLine
+        #expect(embedded.text == "pause. Thursday next")
+        #expect(embedded.ranges.map { String(Array(embedded.text)[$0]) } == ["Thursday"])
+    }
+
     // ports: NoteSearchTest#titleOnlyMatchMarksTheTitleAndNotTheBody
     @Test func titleOnlyMatchMarksTheTitleAndNotTheBody() throws {
         _ = insert("nothing relevant here", title: "Supplier meeting")

@@ -6,13 +6,13 @@ struct NoStarredState: View {
     var body: some View {
         VStack(spacing: 18) {
             ZStack {
-                Circle().fill(Color.ember.opacity(0.06)).frame(width: 148, height: 148)
-                Circle().stroke(Color.ember.opacity(0.1), lineWidth: 1).frame(width: 180, height: 180)
+                Circle().fill(Color.accentTint).frame(width: 148, height: 148)
+                Circle().stroke(Color.accentTint, lineWidth: 1).frame(width: 180, height: 180)
                 OrbitMark(size: 88)
             }
             .padding(.top, 24).accessibilityHidden(true)
             VStack(spacing: 10) {
-                Text(LibraryCopy.noStarredTitle).font(.system(.title2, design: .serif)).foregroundStyle(Color.ink)
+                Text(LibraryCopy.noStarredTitle).font(.system(.title2)).foregroundStyle(Color.ink)
                     .accessibilityAddTraits(.isHeader)
                 Text(LibraryCopy.noStarredBody).font(.subheadline).foregroundStyle(Color.muted)
             }

@@ -18,6 +18,7 @@ struct NameSpeakerSheet: View {
     @State private var pulse = false
     /// The field's own text: a name cut to its limit is put back into the field, which a computed binding cannot do.
     @State private var nameField = ""
+    @FocusState private var nameFocused: Bool
     @AccessibilityFocusState private var questionFocused: Bool
 
     init(model: @autoclosure () -> NameSpeakerModel, draft: String? = nil, nameChanged: @escaping (String) -> Void = { _ in }) {
@@ -35,25 +36,30 @@ struct NameSpeakerSheet: View {
     var body: some View {
         NavigationStack {
             Group {
-                if let state { form(SpeakerNaming.ui(state)) } else { ProgressView() }
-            }
-            .navigationTitle(state.map { shown(SpeakerNaming.ui($0).label) } ?? "")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button(SpeakersCopy.cancel) { send(.cancel) } }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(SpeakersCopy.saveName) { send(.save) }
-                        .disabled(saving || state.map { SpeakerNaming.ui($0).save == .disabled } ?? true)
-                        .accessibilityIdentifier("saveSpeakerName")
+                if let state {
+                    let ui = SpeakerNaming.ui(state)
+                    sheetContent(ui)
+                        .safeAreaInset(edge: .bottom, spacing: 0) {
+                            footer(ui)
+                        }
+                } else {
+                    ProgressView()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
+            .background(Color.paper.ignoresSafeArea())
+            .toolbar(.hidden, for: .navigationBar)
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel(SpeakersCopy.dialogLabel)
+            .accessibilityIdentifier("nameSpeakerSheet")
             .navigationDestination(isPresented: mergeShown) {
                 if let state, let merge = SpeakerNaming.mergeUI(state) {
-                    MergeSheet(merge: merge, sourceOrdinal: state.input.ordinal, send: send)
+                    MergeSheet(merge: merge, sourceOrdinal: state.input.ordinal, tint: { state.input.speakerTint(for: $0) ?? .stone }, send: send)
                 }
             }
         }
-        .tint(.ember)
+        .presentationDragIndicator(.visible)
+        .tint(.accent)
         .task { await model.open(draft: draft, sheet: handle) }
         .onDisappear { playback.stopSample() }
         .alert(SpeakersCopy.couldNotSave, isPresented: Binding(get: { model.failure != nil }, set: { if !$0 { model.failure = nil } })) {
@@ -74,17 +80,105 @@ struct NameSpeakerSheet: View {
         Binding(get: { state?.merge != nil }, set: { if !$0, state?.merge != nil { send(.closeMerge) } })
     }
 
-    @ViewBuilder private func form(_ ui: NameSheetUI) -> some View {
-        Form {
-            Section { header(ui) }
-            Section {
+    private func sheetContent(_ ui: NameSheetUI) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                header(ui)
+                if !ui.quote.isEmpty {
+                    quoteBlock(ui.quote)
+                }
+                nameSection(ui)
+                question(ui)
+                if !ui.voices.isEmpty {
+                    voiceRows(ui)
+                }
+                if let name = ui.notName {
+                    Button { send(.notThisPerson) } label: {
+                        Text(SpeakersCopy.notName(name))
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(Color.accentInk)
+                            .frame(minHeight: HitTarget.minimum, alignment: .leading)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("notThisPerson")
+                }
+                rememberCard(ui)
+            }
+            .readableWidth()
+            .padding(.horizontal, 20)
+            .padding(.top, 24)
+            .padding(.bottom, 16)
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .disabled(saving)
+    }
+
+    private func header(_ ui: NameSheetUI) -> some View {
+        let canPlay = ui.canSample && playback.owns(noteID)
+        return HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(shown(ui.label))
+                    .font(.title3.weight(.bold))
+                    .foregroundStyle(Color.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityAddTraits(.isHeader)
+                Text(SpeakersCopy.speaksFor(ui.speakingTime))
+                    .font(.footnote)
+                    .foregroundStyle(Color.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 8)
+            Button { send(.playSample) } label: {
+                Image(systemName: sampling ? "stop.fill" : "play.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Color.ink)
+                    .frame(width: HitTarget.minimum, height: HitTarget.minimum)
+                    .background(Circle().fill(Color.card))
+                    .overlay(Circle().strokeBorder(Color.line, lineWidth: 1))
+            }
+            .buttonStyle(.plain)
+            .opacity(canPlay ? 1 : 0.4)
+            .disabled(!canPlay)
+            .accessibilityLabel(sampling ? SpeakersCopy.stopSample : SpeakersCopy.playSample)
+        }
+    }
+
+    private func quoteBlock(_ quote: String) -> some View {
+        Text(SpeakersCopy.quoted(quote))
+            .font(.subheadline)
+            .foregroundStyle(Color.muted)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.leading, 15)
+            .padding(.vertical, 2)
+            .overlay(alignment: .leading) {
+                RoundedRectangle(cornerRadius: 1.5)
+                    .fill(Color.line)
+                    .frame(width: 3)
+                    .accessibilityHidden(true)
+            }
+            .accessibilityIdentifier("speakerQuote")
+    }
+
+    private func nameSection(_ ui: NameSheetUI) -> some View {
+        let fieldShape = RoundedRectangle(cornerRadius: Radius.field)
+        return VStack(alignment: .leading, spacing: 6) {
+            Text(SpeakersCopy.nameField)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(Color.ink)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 0) {
                 TextField(SpeakersCopy.nameField, text: $nameField.handingEdits { text in
                     nameTyped(text)
                     // A name cut to its limit goes back once the field's own edit is done, as in the Rename sheet.
                     if let name = state?.name, name != text {
                         DispatchQueue.main.async { if nameField == text { nameField = name } }
                     }
-                })
+                }, prompt: Text(verbatim: ""))
+                    .font(.body)
+                    .foregroundStyle(Color.ink)
+                    .focused($nameFocused)
                     .onAppear { nameField = ui.name }
                     .onChange(of: nameField) { _, text in
                         nameTyped(text)
@@ -94,92 +188,214 @@ struct NameSpeakerSheet: View {
                     .autocorrectionDisabled()
                     .submitLabel(.done)
                     .onSubmit { send(.save) }
+                    .accessibilityLabel(SpeakersCopy.nameField)
                     .accessibilityIdentifier("speakerNameField")
             }
-            question(ui)
-            if !ui.voices.isEmpty { voiceRows(ui) }
-            if let name = ui.notName {
-                Section { Button(SpeakersCopy.notName(name)) { send(.notThisPerson) }.accessibilityIdentifier("notThisPerson") }
-            }
-            Section {
-                Toggle(SpeakersCopy.remember, isOn: Binding(get: { ui.remember }, set: { send(.rememberToggled($0)) }))
-                    .disabled(!ui.rememberEnabled)
-                    .accessibilityIdentifier("rememberVoice")
-            } footer: {
-                Text(ui.rememberReason.map(SpeakersCopy.rememberReason)
-                     ?? SpeakersCopy.rememberBody(ui.name.trimmingCharacters(in: .whitespaces), automatic: settings.automaticallyNameVoices))
-            }
-            if ui.canMerge {
-                Section { Button(SpeakersCopy.mergeInto) { send(.mergeInto) }.accessibilityIdentifier("mergeInto") }
-            }
-        }
-        .paperListBackground()
-        .disabled(saving)
-    }
-
-    private func header(_ ui: NameSheetUI) -> some View {
-        HStack(spacing: 12) {
-            SpeakerAvatar(speaker: ui.label, ordinal: state?.input.ordinal ?? 0)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(shown(ui.label)).font(.headline).foregroundStyle(Color.ink).accessibilityAddTraits(.isHeader)
-                Text(SpeakersCopy.speaksFor(ui.speakingTime)).font(.caption).foregroundStyle(Color.muted)
-            }
-            Spacer()
-            Button { send(.playSample) } label: {
-                Image(systemName: sampling ? "stop.fill" : "play.fill")
-                    .frame(width: HitTarget.minimum, height: HitTarget.minimum)
-                    .background(Color.ember.opacity(0.12), in: Circle())
-            }
-            .buttonStyle(.plain).foregroundStyle(Color.ember)
-            .disabled(!ui.canSample || !playback.owns(noteID))
-            .accessibilityLabel(sampling ? SpeakersCopy.stopSample : SpeakersCopy.playSample)
+            .padding(.horizontal, 14)
+            .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+            .background(fieldShape.fill(Color.card))
+            .overlay(fieldShape.strokeBorder(nameFocused ? Color.accent : Color.line, lineWidth: nameFocused ? 2 : 1))
+            .contentShape(Rectangle())
+            .onTapGesture { nameFocused = true }
         }
     }
 
-    /// The same-person or rename-saved question, focused and pulsed when Save is pressed before it is answered.
+    /// The same-person or rename-saved notice, focused and pulsed when Save is pressed before it is answered.
     @ViewBuilder private func question(_ ui: NameSheetUI) -> some View {
         if let saved = ui.samePerson {
-            questionCard(SpeakersCopy.alreadySaved(saved), SpeakersCopy.samePersonQuestion,
+            questionCard(SpeakersCopy.duplicateNotice(saved),
                          yes: (SpeakersCopy.samePerson, .samePerson), no: (SpeakersCopy.someoneElse, .someoneElse))
         } else if let saved = ui.renameSaved {
-            questionCard(SpeakersCopy.savedAs(saved), SpeakersCopy.renameSavedQuestion,
+            questionCard(SpeakersCopy.renameSavedNotice(saved),
                          yes: (SpeakersCopy.renameSaved, .renameSaved), no: (SpeakersCopy.someoneElse, .keepSaved))
         }
     }
 
-    private func questionCard(_ statement: String, _ question: String, yes: (String, NamingEvent),
+    private func questionCard(_ notice: AttributedString, yes: (String, NamingEvent),
                               no: (String, NamingEvent)) -> some View {
-        Section {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(statement)
-                Text(question).fontWeight(.semibold)
+        let cardShape = RoundedRectangle(cornerRadius: Radius.field)
+        return VStack(alignment: .leading, spacing: 10) {
+            Text(notice)
+                .font(.subheadline)
+                .foregroundStyle(Color.ink)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityFocused($questionFocused)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) { questionButtons(yes: yes, no: no) }
+                VStack(alignment: .leading, spacing: 4) { questionButtons(yes: yes, no: no) }
             }
-            .accessibilityElement(children: .combine)
-            .accessibilityFocused($questionFocused)
-            Button(yes.0) { send(yes.1) }.accessibilityIdentifier("questionYes")
-            Button(no.0) { send(no.1) }.accessibilityIdentifier("questionNo")
         }
-        .listRowBackground(Color.toneWarn.opacity(pulse ? 0.3 : 0.1))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 14)
+        .padding(.top, 12)
+        .padding(.bottom, 6)
+        .background(cardShape.fill(Color.sunken))
+        .overlay {
+            if pulse { cardShape.strokeBorder(Color.speaker0, lineWidth: 2) }
+        }
+    }
+
+    @ViewBuilder private func questionButtons(yes: (String, NamingEvent), no: (String, NamingEvent)) -> some View {
+        Button(yes.0) { send(yes.1) }
+            .buttonStyle(SheetPillButtonStyle(primary: true, compact: true))
+            .accessibilityIdentifier("questionYes")
+        Button(no.0) { send(no.1) }
+            .buttonStyle(SheetPillButtonStyle(primary: false, compact: true))
+            .accessibilityIdentifier("questionNo")
     }
 
     private func voiceRows(_ ui: NameSheetUI) -> some View {
-        Section(ui.ranked ? SpeakersCopy.voicesRanked : SpeakersCopy.voices) {
-            ForEach(ui.voices) { row in
-                Button { send(.pickVoice(row.id)) } label: {
-                    HStack {
-                        Text(row.name).foregroundStyle(Color.ink)
-                        Spacer()
-                        if row.likely {
-                            Text(SpeakersCopy.likely).font(.caption.weight(.medium)).foregroundStyle(Color.toneOK)
-                                .padding(.horizontal, 8).padding(.vertical, 3).background(Tone.ok.background, in: Capsule())
+        let cardShape = RoundedRectangle(cornerRadius: Radius.field)
+        return VStack(alignment: .leading, spacing: 8) {
+            Text(ui.ranked ? SpeakersCopy.voicesRanked : SpeakersCopy.voices)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Color.muted)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
+            VStack(spacing: 0) {
+                ForEach(Array(ui.voices.enumerated()), id: \.element.id) { index, row in
+                    if index > 0 {
+                        Rectangle().fill(Color.lineSoft).frame(height: 1).accessibilityHidden(true)
+                    }
+                    Button { send(.pickVoice(row.id)) } label: {
+                        HStack(spacing: 10) {
+                            SpeakerAvatar(name: row.name, tint: row.tint, size: 32, showsPlaceholderNumber: false)
+                            Text(row.name)
+                                .font(.body)
+                                .foregroundStyle(Color.ink)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Spacer(minLength: 8)
+                            if row.likely {
+                                Text(SpeakersCopy.likely)
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(Color.ink)
+                                    .padding(.horizontal, 9)
+                                    .padding(.vertical, 4)
+                                    .background(Color.ink.opacity(0.1), in: Capsule())
+                                    .fixedSize()
+                            }
+                            if state?.boundVoiceID == row.id {
+                                Image(systemName: "checkmark")
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(Color.accentInk)
+                                    .accessibilityHidden(true)
+                            }
                         }
-                        if state?.boundVoiceID == row.id { Image(systemName: "checkmark").foregroundStyle(Color.ember) }
-                    }.frame(minHeight: HitTarget.minimum)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(state?.boundVoiceID == row.id ? .isSelected : [])
                 }
-                .accessibilityAddTraits(state?.boundVoiceID == row.id ? .isSelected : [])
+                if ui.showAll {
+                    Rectangle().fill(Color.lineSoft).frame(height: 1).accessibilityHidden(true)
+                    Button { send(.showAll) } label: {
+                        Text(SpeakersCopy.showAll)
+                            .font(.body)
+                            .foregroundStyle(Color.accentInk)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
             }
-            if ui.showAll { Button(SpeakersCopy.showAll) { send(.showAll) } }
+            .background(cardShape.fill(Color.card))
+            .clipShape(cardShape)
+            .overlay(cardShape.strokeBorder(Color.lineSoft, lineWidth: 1))
         }
+    }
+
+    private func rememberCard(_ ui: NameSheetUI) -> some View {
+        let cardShape = RoundedRectangle(cornerRadius: Radius.field)
+        let subtitle = ui.rememberReason.map(SpeakersCopy.rememberReason)
+            ?? SpeakersCopy.rememberBody(ui.name.trimmingCharacters(in: .whitespaces),
+                                         automatic: settings.automaticallyNameVoices,
+                                         pad: UIDevice.current.userInterfaceIdiom == .pad)
+        return Toggle(isOn: Binding(get: { ui.remember }, set: { send(.rememberToggled($0)) })) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(SpeakersCopy.remember)
+                    .font(.body.weight(.medium))
+                    .foregroundStyle(Color.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(subtitle)
+                    .font(.footnote)
+                    .foregroundStyle(Color.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .toggleStyle(.switch)
+        .tint(.accent)
+        .disabled(!ui.rememberEnabled)
+        .accessibilityIdentifier("rememberVoice")
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
+        .background(cardShape.fill(Color.card))
+        .overlay(cardShape.strokeBorder(Color.lineSoft, lineWidth: 1))
+    }
+
+    private func footer(_ ui: NameSheetUI) -> some View {
+        VStack(spacing: 0) {
+            Rectangle().fill(Color.lineSoft).frame(height: 1).accessibilityHidden(true)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 12) {
+                    if ui.canMerge { mergeButton }
+                    Spacer(minLength: 8)
+                    HStack(spacing: 8) {
+                        cancelButton
+                        saveButton(ui)
+                    }
+                }
+                VStack(alignment: .trailing, spacing: 8) {
+                    HStack(spacing: 8) {
+                        cancelButton
+                        saveButton(ui)
+                    }
+                    if ui.canMerge {
+                        HStack {
+                            mergeButton
+                            Spacer(minLength: 0)
+                        }
+                    }
+                }
+            }
+            .readableWidth()
+            .padding(.horizontal, 20)
+            .padding(.vertical, 10)
+        }
+        .background(Color.paper)
+        .disabled(saving)
+    }
+
+    private var mergeButton: some View {
+        Button { send(.mergeInto) } label: {
+            Text(SpeakersCopy.mergeInto)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Color.ink)
+                .padding(.vertical, 8)
+                .frame(minHeight: HitTarget.minimum)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("mergeInto")
+    }
+
+    private var cancelButton: some View {
+        Button(SpeakersCopy.cancel) { send(.cancel) }
+            .buttonStyle(SheetPillButtonStyle(primary: false, compact: false))
+    }
+
+    private func saveButton(_ ui: NameSheetUI) -> some View {
+        let disabled = saving || ui.save == .disabled
+        return Button(SpeakersCopy.saveName) { send(.save) }
+            .buttonStyle(SheetPillButtonStyle(primary: true, compact: false))
+            .disabled(disabled)
+            .opacity(disabled ? 0.45 : 1)
+            .accessibilityIdentifier("saveSpeakerName")
     }
 
     // MARK: - Events
@@ -230,6 +446,25 @@ struct NameSpeakerSheet: View {
     private func close() {
         playback.stopSample()
         dismiss()
+    }
+}
+
+private struct SheetPillButtonStyle: ButtonStyle {
+    let primary: Bool
+    let compact: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(primary ? Color.onAccent : Color.ink)
+            .padding(.horizontal, compact ? 14 : 18)
+            .padding(.vertical, compact ? 7 : 10)
+            .background {
+                Capsule().fill(primary ? Color.accentStrong : Color.ink.opacity(0.1))
+            }
+            .opacity(configuration.isPressed ? 0.72 : 1)
+            .frame(minHeight: HitTarget.minimum)
+            .contentShape(Rectangle())
     }
 }
 

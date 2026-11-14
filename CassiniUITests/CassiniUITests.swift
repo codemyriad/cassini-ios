@@ -23,8 +23,8 @@ final class CassiniUITests: XCTestCase {
     @MainActor func testEmptyLibraryAndSettings() {
         let app = launch(seed: false)
         XCTAssertTrue(app.buttons["recordButton"].exists)
-        // iOS 26 projects the identifier onto both the combined text and its framework container.
-        XCTAssertEqual(Set(labels(in: app, identifier: "wordmark")), ["Cassini talk"], "the Library names the product")
+        XCTAssertTrue(app.scrollViews["libraryScroll"].waitForExistence(within: 5))
+        XCTAssertEqual(app.descendants(matching: .any)["libraryHeading"].label, "All meetings", "the Library names its meeting list")
         capture("Empty library")
         app.buttons["Settings"].tap()
         XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(within: 5))
@@ -134,10 +134,10 @@ final class CassiniUITests: XCTestCase {
         app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed", "processing", "--open-fixture", "CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC"]
             + DeviceUnderTest.workingSpeech
         app.launchAndWait()
-        XCTAssertTrue(app.descendants(matching: .any)["progressHeadline"].waitForExistence(within: 15))
+        XCTAssertTrue(app.buttons["transcribingDetails"].waitForExistence(within: 15))
         // The seed's job reports three results a little over a second apart, and each one rebuilds an open menu, which
         // drops a tap that lands then. Its last result is 29:53 processed; after it the job is frozen.
-        XCTAssertTrue(app.staticTexts["Processed, 29:53 / 48:13"].waitForExistence(within: 15))
+        XCTAssertTrue(app.staticTexts["uiTestState-transcribingAudioDone"].waitForValue("29:53 of 48:13"))
         app.buttons["Share and more"].tap()
         app.buttons["Move to Recently Deleted"].tapWhenSettled()
         let alert = app.alerts["Stop transcription and move to Recently Deleted?"]
@@ -182,7 +182,7 @@ final class CassiniUITests: XCTestCase {
             // A host without an audio input: the screen says so and offers Try again.
             XCTAssertTrue(app.buttons["Try again"].exists)
             capture("Microphone unavailable")
-            app.buttons["Library"].tap()
+            app.buttons["recordingAllMeetings"].tap()
             XCTAssertTrue(app.buttons["recordButton"].waitForExistence(within: 5))
             XCTAssertTrue(app.buttons["importButton"].isEnabled)
             return
@@ -192,7 +192,7 @@ final class CassiniUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Resume recording"].waitForExistence(within: 3))
         app.buttons["Resume recording"].tap()
         XCTAssertTrue(pause.waitForEnabled(within: 3))
-        app.buttons["finishRecording"].tap()
+        app.buttons["stopRecording"].tap()
         XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 10))
         XCTAssertTrue(app.buttons["playButton"].waitForEnabled(within: 5), "the sealed recording plays")
         app.buttons["playButton"].tap()
@@ -200,7 +200,7 @@ final class CassiniUITests: XCTestCase {
     }
     @MainActor func testSpeakerRenameAppliesToAllPassagesAndPersists() {
         let app = launch(); openFixture(app)
-        app.buttons["speakersButton"].tap()
+        app.openNoteSpeakers()
         XCTAssertTrue(app.navigationBars["Speakers"].waitForExistence(within: 5))
         let alex = app.buttons["speaker-alex"]
         XCTAssertTrue(alex.waitForExistence(within: 5)); alex.tap()
@@ -274,7 +274,7 @@ final class CassiniUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Resume recording"].waitForExistence(within: 3))
         app.buttons["Resume recording"].tap()
         XCTAssertTrue(pause.waitForEnabled(within: 3))
-        app.buttons["Library"].tap()
+        app.buttons["recordingAllMeetings"].tap()
         let returnButton = app.buttons["recordButton"]
         XCTAssertTrue(returnButton.waitForExistence(within: 5))
         XCTAssertEqual(returnButton.label, "Return to recording", "the recording continues in the Library")
@@ -282,12 +282,12 @@ final class CassiniUITests: XCTestCase {
         let card = app.buttons["activeRecordingCard"]
         XCTAssertTrue(card.waitForExistence(within: 5))
         card.tap()
-        XCTAssertTrue(app.buttons["finishRecording"].waitForExistence(within: 5))
-        app.buttons["Library"].tap()
+        XCTAssertTrue(app.buttons["stopRecording"].waitForExistence(within: 5))
+        app.buttons["recordingAllMeetings"].tap()
         XCTAssertTrue(card.waitForExistence(within: 5), "minimised again")
         card.tap()
-        XCTAssertTrue(app.buttons["finishRecording"].waitForExistence(within: 5))
-        app.buttons["finishRecording"].tap()
+        XCTAssertTrue(app.buttons["stopRecording"].waitForExistence(within: 5))
+        app.buttons["stopRecording"].tap()
         XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 10))
         XCTAssertEqual(app.staticTexts["noteTitle"].label, "Voice note 8 Oct, 09:41")
         XCTAssertTrue(app.buttons["playButton"].waitForEnabled(within: 5), "the sealed recording plays")
@@ -297,11 +297,17 @@ final class CassiniUITests: XCTestCase {
         app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed", "processing", "--open-fixture", "CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC"]
             + DeviceUnderTest.workingSpeech
         app.launchAndWait()
-        let headline = app.descendants(matching: .any)["progressHeadline"]
-        XCTAssertTrue(headline.waitForExistence(within: 15))
-        let frozen = NSPredicate(format: "label == %@", "Finding words, 50%")
-        XCTAssertTrue(headline.wait(until: frozen, within: 10), headline.label)
-        XCTAssertTrue(app.buttons["Stop and keep progress"].exists)
+        let details = app.buttons["transcribingDetails"]
+        let stop = app.buttons["transcribingStop"]
+        XCTAssertTrue(details.waitForExistence(within: 15))
+        XCTAssertTrue(app.staticTexts["uiTestState-transcribingAudioDone"].waitForValue("29:53 of 48:13"))
+        XCTAssertTrue(details.label.hasPrefix("Transcribing · "), details.label)
+        XCTAssertEqual(details.value as? String, "50%")
+        XCTAssertEqual(stop.label, "Stop and keep progress")
+        XCTAssertGreaterThanOrEqual(details.frame.height, 44 - 0.001)
+        XCTAssertGreaterThanOrEqual(stop.frame.width, 44 - 0.001)
+        XCTAssertGreaterThanOrEqual(stop.frame.height, 44 - 0.001)
+        XCTAssertFalse(details.frame.intersects(stop.frame), "the details trigger and Stop are separate 44 pt targets")
         capture("Processing")
     }
     @MainActor func testIPadShowsTheLibraryBesideTheNote() throws {

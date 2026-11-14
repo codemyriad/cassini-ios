@@ -9,6 +9,8 @@ public struct RowContext: Hashable, Sendable {
     public var runningNoteID: UUID?
     /// Each note's job.
     public var jobs: [UUID: Job]
+    /// A capture is being sealed, rather than still recording; not transcription finalization.
+    public var isSavingCapture = false
 
     public init(activeNoteID: UUID? = nil, recordingElapsed: TimeInterval = 0, runningNoteID: UUID? = nil,
                 jobs: [UUID: Job] = [:]) {
@@ -26,6 +28,7 @@ public struct RowContext: Hashable, Sendable {
         }
         self.init(activeNoteID: activeNoteID, recordingElapsed: active?.elapsed ?? 0,
                   runningNoteID: processing.running?.noteID, jobs: processing.jobs)
+        if case .finishing = recording { isSavingCapture = true }
     }
 
     /// The state of `id`'s job, running when the queue says it runs.
@@ -75,12 +78,16 @@ public struct LibraryRow: Identifiable, Hashable, Sendable {
     public var day: DayKey?
     public var status: Status
     public var preview: Highlighted?
+    /// Search keeps the matching snippet; ordinary meeting rows omit the transcript quote (L-53).
+    /// The stored preview remains available to existing accessibility and search consumers.
+    public var displayedPreview: Highlighted? { day == nil ? nil : preview }
     /// The note whose job runs: drawn on the card surface.
     public var highlighted: Bool
     /// The note being recorded: a tap returns to the Recording screen.
     public var isRecording: Bool
     public var isFavorite: Bool
     public var bookmarkCount: Int
+    public var isSavingCapture = false
 }
 
 /// One day of the Library.
@@ -229,7 +236,8 @@ public enum LibraryMapping {
             status: status(note, context: context, speakerCount: entry.speakerCount, hasWords: entry.hasWords),
             preview: hit.map(\.snippet) ?? entry.preview,
             highlighted: context.jobState(note.id) == .running,
-            isRecording: recording, isFavorite: note.isFavorite, bookmarkCount: note.bookmarks.count)
+            isRecording: recording, isFavorite: note.isFavorite, bookmarkCount: note.bookmarks.count,
+            isSavingCapture: recording && context.isSavingCapture)
     }
 
     /// Meeting-day sections and rows, ordered by the viewer's calendar and each meeting's own clock (D95).

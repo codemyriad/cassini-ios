@@ -46,6 +46,18 @@ public final class DraftNamesStore: Sendable {
         state.withLock { load(noteID, &$0) }
     }
 
+    /// Reserve raw speaker IDs before publishing words or applying a live merge; names.json survives checkpoint reload.
+    public func observe(_ event: JobEvent, noteID: UUID) {
+        let words: [DraftWord]
+        switch event {
+        case .started(let start): words = start.restored?.words ?? []
+        case .windowDone(_, _, let value), .draft(let value, _): words = value
+        default: return
+        }
+        guard !words.isEmpty else { return }
+        mutate(noteID) { $0.observingWords(words) }
+    }
+
     /// Applies `reducer` and writes the result; returns it. For the job, whose changes pass the gate.
     @discardableResult
     public func mutate(_ noteID: UUID, _ reducer: (DraftNames) throws -> DraftNames) rethrows -> DraftNames {

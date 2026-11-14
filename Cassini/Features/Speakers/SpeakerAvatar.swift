@@ -2,27 +2,26 @@ import SwiftUI
 import CassiniNotebook
 
 /// A speaker's or a saved voice's round avatar: the placeholder number ("Speaker 3" shows 3) or the first letter of
-/// the name, in the speaker's tint. A placeholder speaker is amber, "not named yet", as on Android.
+/// the name, in the speaker's tint. A placeholder speaker is stone, "not named yet", as on Android.
 struct SpeakerAvatar: View {
     let name: String
     let tint: Color
+    let wash: Color
     var size: CGFloat = 40
+    var showsPlaceholderNumber: Bool = true
 
-    init(name: String, tint: Color, size: CGFloat = 40) {
-        self.name = name; self.tint = tint; self.size = size
+    init(name: String, tint: Color, wash: Color, size: CGFloat = 40, showsPlaceholderNumber: Bool = true) {
+        self.name = name; self.tint = tint; self.wash = wash; self.size = size
+        self.showsPlaceholderNumber = showsPlaceholderNumber
     }
 
-    /// A note's speaker: amber while it is a placeholder, else the tint of its place in the transcript.
-    init(speaker name: String, ordinal: Int, size: CGFloat = 40) {
-        self.init(name: name, tint: Self.tint(name: name, ordinal: ordinal), size: size)
-    }
-
-    static func tint(name: String, ordinal: Int) -> Color {
-        DefaultLabels.placeholderNumber(name) != nil ? .toneWarn : Color.speakerTints[ordinal % Color.speakerTints.count]
+    /// A note's speaker or saved voice: use its canonical transcript/naming tint, never the all-speaker ordinal.
+    init(name: String, tint: SpeakerTint, size: CGFloat = 40, showsPlaceholderNumber: Bool = true) {
+        self.init(name: name, tint: tint.color, wash: tint.wash, size: size, showsPlaceholderNumber: showsPlaceholderNumber)
     }
 
     private var text: String {
-        if let number = DefaultLabels.placeholderNumber(name) { return String(number) }
+        if showsPlaceholderNumber, let number = DefaultLabels.placeholderNumber(name) { return String(number) }
         return name.trimmingCharacters(in: .whitespaces).first.map { String($0).uppercased() } ?? "?"
     }
 
@@ -31,7 +30,7 @@ struct SpeakerAvatar: View {
             .font(.system(size: size * 0.42, weight: .semibold))
             .foregroundStyle(tint)
             .frame(width: size, height: size)
-            .background(tint.opacity(0.14), in: Circle())
+            .background(wash, in: Circle())
             .accessibilityHidden(true)
     }
 }

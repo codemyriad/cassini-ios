@@ -65,12 +65,12 @@ public enum RowStatus: Hashable, Sendable, CaseIterable {
     }
 
     /// "· Resume" when paused, "· Try again" when failed, and for a transcribed note "· No speech" without words or
-    /// "· N speakers" with 2 or more.
+    /// "· N speakers" with 1 or more.
     public static func suffix(_ status: RowStatus, speakerCount: Int, hasWords: Bool) -> Suffix {
         switch status {
         case .paused: .resume
         case .failed: .tryAgain
-        case .transcribed: !hasWords ? .noSpeech : speakerCount >= 2 ? .speakers : .none
+        case .transcribed: !hasWords ? .noSpeech : speakerCount >= 1 ? .speakers : .none
         default: .none
         }
     }

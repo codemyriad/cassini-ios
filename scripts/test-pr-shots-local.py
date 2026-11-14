@@ -234,6 +234,31 @@ class RenderTests(unittest.TestCase):
 
 
 class ManifestTests(unittest.TestCase):
+    def test_large_shared_gallery_preserves_pairs_without_exceeding_pr_body_limit(self):
+        shots = module('shots', 'pr-shots.py')
+        metadata = lambda sha: dict(sha=sha * 40, run_id='1', runner='macOS-arm64', image='test')
+        data = dict(version=1, app='ios', repo='owner/app', pr=1, git_images=False,
+                    base=metadata('a'), head=metadata('b'), rows=[])
+        for number in range(179):
+            for scheme in ('light', 'dark'):
+                key = f'screen-{number:03}.{scheme}'
+                data['rows'].append(dict(screen=f'screen-{number:03}', label=f'Screen {number}',
+                                        scheme=scheme, lang='en', device='phone', status='changed',
+                                        changed_pct=1, bbox=[0, 0, 1, 1],
+                                        **{side: f'{side}/{key}.png' for side in ('before', 'after', 'diff')}))
+        block = shots.block(data)
+        self.assertLess(len(block), 40_000)
+        self.assertEqual(block.count('<img '), 48, '12 screens retain before/after in both appearances')
+        self.assertIn('Screen 11 · light', block)
+        self.assertIn('Screen 11 · dark', block)
+        self.assertIn('remaining 167 screens', block)
+        self.assertNotIn('<details>', block)
+        description = 'Authored notes. ' * 1_300
+        body = shots.replace_block(description, block)
+        self.assertLess(len(body.encode()), 65_000)
+        self.assertEqual(shots.replace_block(body, block), body)
+        self.assertTrue(body.startswith(description.rstrip()))
+
     def test_ci_paths_cover_all_screenshot_tools(self):
         workflow=(ROOT/'.github/workflows/ci.yml').read_text().split('  push:')[0]
         patterns=re.findall(r"^\s+- '([^']+)'",workflow,re.M)
@@ -242,9 +267,9 @@ class ManifestTests(unittest.TestCase):
 
     def test_vendor_is_exact_pinned_shared_script_below_provenance_header(self):
         lines = (ROOT/'scripts/pr-shots.py').read_bytes().splitlines(keepends=True)
-        self.assertIn(b'5ca44dee12614990c833cc6f49017dac7e184ae8', lines[1])
+        self.assertIn(b'5e0c34e0f1bb390298dabdf4eedc494e933fd329', lines[1])
         self.assertEqual(hashlib.sha256(lines[0]+b''.join(lines[2:])).hexdigest(),
-                         '769d2f2d872f9621c83858a633255093739b24e47c88f99c909de42108a27c42')
+                         'd4898061024ba464e88c66dc12563d1a61aaa5d6675ccc22e3af62aa2314c994')
 
     def test_missing_pair_and_dark_image_mislabelled_light_refuse(self):
         from PIL import Image

@@ -2,23 +2,24 @@ import SwiftUI
 import CassiniEngine
 import CassiniNotebook
 
-/// The five steps: done, in progress, not started or skipped.
+/// The five vertical steps in the transcribing details sheet: done, in progress, not started or skipped.
 struct StageTracker: View {
     let step: JobStep
     let speakersSkipped: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        HStack(alignment: .top, spacing: 6) {
+        VStack(alignment: .leading, spacing: 10) {
             ForEach(JobStep.allCases, id: \.self) { column in
                 let state = state(of: column)
-                VStack(alignment: .leading, spacing: 4) {
-                    Capsule().fill(color(state)).frame(height: 4)
-                    Text(ProgressText.step(column)).font(.caption2)
-                        .foregroundStyle(state == .inProgress ? Color.ink : Color.muted)
+                HStack(spacing: 10) {
+                    glyph(state).accessibilityHidden(true)
+                    Text(ProgressText.step(column))
+                        .font(state == .inProgress ? .subheadline.weight(.semibold) : .subheadline)
+                        .foregroundStyle(state == .done || state == .inProgress ? Color.ink : Color.faint)
                         .strikethrough(state == .skipped)
-                        .lineLimit(2).minimumScaleFactor(0.8)
-                        // Wraps to its second line instead of truncating when the card is short of height.
                         .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 0)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .accessibilityElement(children: .ignore)
@@ -26,8 +27,6 @@ struct StageTracker: View {
                 .accessibilityValue(ProgressText.stepState(state))
             }
         }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(Text("Stages", tableName: "Processing"))
     }
 
     private func state(of column: JobStep) -> ProgressText.StepState {
@@ -36,36 +35,80 @@ struct StageTracker: View {
         return column == step ? .inProgress : .notStarted
     }
 
-    private func color(_ state: ProgressText.StepState) -> Color {
+    @ViewBuilder private func glyph(_ state: ProgressText.StepState) -> some View {
         switch state {
-        case .done: .ember
-        case .inProgress: .ember.opacity(0.55)
-        case .notStarted, .skipped: .ink.opacity(0.1)
+        case .inProgress:
+            if reduceMotion {
+                Circle().trim(from: 0.15, to: 0.85)
+                    .stroke(Color.accent, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                    .frame(width: 18, height: 18)
+            } else {
+                ProgressView().tint(.accent).controlSize(.small).dynamicTypeSize(.medium)
+                    .frame(width: 18, height: 18)
+            }
+        case .done:
+            ZStack {
+                Circle().fill(Color.accentStrong).frame(width: 18, height: 18)
+                Image(systemName: "checkmark").font(.system(size: 10, weight: .bold)).foregroundStyle(Color.onAccent)
+            }
+        case .notStarted, .skipped:
+            Circle().strokeBorder(Color.line, lineWidth: 2).frame(width: 18, height: 18)
         }
     }
 }
 
-/// Time left, Processed, Battery at finish (with a reading) and Words so far.
+/// Time left, Audio done, Words so far and Battery at finish (with a reading) in the transcribing details sheet.
 struct StatGrid: View {
     let progress: RunningProgress
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
-        Grid(alignment: .leading, horizontalSpacing: Spacing.row, verticalSpacing: Spacing.tight) {
-            GridRow {
-                ProcessingStat(label: Text("Time left", tableName: "Processing"), value: Text(ProgressText.timeLeft(progress.timeLeft)),
-                     pending: progress.timeLeft == .calculating)
-                .accessibilityIdentifier("timeLeftStat")
-                ProcessingStat(label: Text("Processed", tableName: "Processing"),
-                     value: Text(ProgressText.processed(doneMs: progress.doneMs, totalMs: progress.totalMs)).monospacedDigit())
+        let battery = ProgressText.battery(progress.battery)
+        if dynamicTypeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: Spacing.row) {
+                timeLeftCell
+                audioDoneCell
+                wordsCell
+                if let battery { batteryCell(battery) }
             }
-            GridRow {
-                if let battery = ProgressText.battery(progress.battery) {
-                    ProcessingStat(label: Text("Battery at finish", tableName: "Processing"), value: Text(battery),
-                         pending: progress.battery.isMeasuring)
+        } else {
+            Grid(alignment: .leading, horizontalSpacing: Spacing.row, verticalSpacing: Spacing.row) {
+                GridRow {
+                    timeLeftCell
+                    audioDoneCell
                 }
-                ProcessingStat(label: Text("Words so far", tableName: "Processing"), value: Text(progress.words, format: .number))
+                GridRow {
+                    wordsCell
+                    if let battery { batteryCell(battery) }
+                }
             }
         }
+    }
+
+    private var timeLeftCell: some View {
+        ProcessingStat(label: Text(MeetingPhase1Copy.statTimeLeft),
+                       value: Text(ProgressText.timeLeft(progress.timeLeft)),
+                       pending: progress.timeLeft == .calculating)
+            .accessibilityIdentifier("timeLeftStat")
+    }
+
+    private var audioDoneCell: some View {
+        ProcessingStat(label: Text(MeetingPhase1Copy.statAudioDone),
+                       value: Text(ProgressText.audioDone(doneMs: progress.doneMs, totalMs: progress.totalMs)).monospacedDigit())
+            .accessibilityIdentifier("audioDoneStat")
+    }
+
+    private var wordsCell: some View {
+        ProcessingStat(label: Text(MeetingPhase1Copy.statWordsSoFar),
+                       value: Text(progress.words, format: .number))
+            .accessibilityIdentifier("wordsSoFarStat")
+    }
+
+    private func batteryCell(_ battery: String) -> some View {
+        ProcessingStat(label: Text(MeetingPhase1Copy.statBatteryAtFinish),
+                       value: Text(battery),
+                       pending: progress.battery.isMeasuring)
+            .accessibilityIdentifier("batteryStat")
     }
 }
 
@@ -78,6 +121,7 @@ struct ProcessingStat: View {
         VStack(alignment: .leading, spacing: 2) {
             label.font(.caption).foregroundStyle(Color.muted)
             value.font(.subheadline.weight(.medium)).foregroundStyle(pending ? Color.muted : Color.ink)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)

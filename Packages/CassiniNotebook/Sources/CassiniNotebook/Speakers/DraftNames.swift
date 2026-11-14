@@ -41,6 +41,10 @@ extension LiveMatch: Codable {
 /// confirmed live match exists only while `remembered` holds its voice.
 public struct DraftNames: Hashable, Sendable {
     public var labels: [String: String]
+    /// Append-only first-speech reservations, including speakers later merged away.
+    public var colourIndices: [String: Int]
+    /// Explicit naming distinguishes a literal name "Speaker 1" from a legacy placeholder label.
+    public var explicitNames: Set<String>
     public var merges: [String: String]
     public var remembered: [String: DraftVoice]
     public var automatic: [String: String]
@@ -54,9 +58,22 @@ public struct DraftNames: Hashable, Sendable {
 
     public init(labels: [String: String] = [:], merges: [String: String] = [:], remembered: [String: DraftVoice] = [:],
                 automatic: [String: String] = [:], generation: Int = 0, live: [String: LiveMatch] = [:],
-                rejected: [String: [UUID]] = [:]) {
+                rejected: [String: [UUID]] = [:], colourIndices: [String: Int] = [:], explicitNames: Set<String> = []) {
         self.labels = labels; self.merges = merges; self.remembered = remembered; self.automatic = automatic
         self.generation = generation; self.live = live; self.rejected = rejected
+        self.colourIndices = colourIndices; self.explicitNames = explicitNames
+    }
+
+    /// Reserve new raw speaker IDs before applying aliases; existing reservations never move.
+    public func observingWords(_ words: [DraftWord]) -> DraftNames {
+        var next = self
+        var allocator = SpeakerColourAllocator(colourIndices)
+        let order = SpeakerColourOrder.earliest(words, id: { $0.speaker.isEmpty ? NoteTranscripts.draftOneVoice : $0.speaker },
+                                                start: { Double($0.startMs) })
+        for id in order where next.colourIndices[id] == nil {
+            next.colourIndices[id] = allocator.reserve(id)
+        }
+        return next
     }
 
     /// Whether the job should still try to match `speakerID` live: no confirmed match, no user label, not merged into
@@ -75,7 +92,7 @@ public struct DraftNames: Hashable, Sendable {
         return result
     }
 
-    /// The user named `speakerID` `name`. A blank name or a placeholder removes the label and the remember choice. The
+    /// The user named `speakerID` `name`. A blank name removes the label and the remember choice. The
     /// automatic name and an unconfirmed live match go: the user's name wins over them.
     public func rename(_ speakerID: String, _ name: String) -> DraftNames {
         let id = resolve(speakerID)
@@ -83,11 +100,13 @@ public struct DraftNames: Hashable, Sendable {
         var cleared = self
         cleared.automatic[id] = nil
         if let match = live[id], match.state != .confirmed { cleared.live[id] = nil }
-        if trimmed.isEmpty || DefaultLabels.isDefault(id: id, label: trimmed) {
+        if trimmed.isEmpty {
             cleared.labels[id] = nil
+            cleared.explicitNames.remove(id)
             return cleared.remember(id, nil, generation: generation)
         }
         cleared.labels[id] = trimmed
+        cleared.explicitNames.insert(id)
         return cleared
     }
 
@@ -112,6 +131,7 @@ public struct DraftNames: Hashable, Sendable {
         var next = remember(id, .saved(voice), generation: generation)
         let others = next.live.filter { $0.key != id && $0.value.voice == voice && $0.value.state != .confirmed }.keys
         next.labels[id] = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        next.explicitNames.insert(id)
         next.automatic[id] = nil
         for other in others {
             next.automatic[other] = nil
@@ -131,7 +151,10 @@ public struct DraftNames: Hashable, Sendable {
         let matched = live[id]?.voice == voice
         let named = voiceName != nil && automatic[id] == voiceName
         var next = remembered[id] == .saved(voice) ? remember(id, nil, generation: generation) : self
-        if let voiceName, next.labels[id] == voiceName { next.labels[id] = nil }
+        if let voiceName, next.labels[id] == voiceName {
+            next.labels[id] = nil
+            next.explicitNames.remove(id)
+        }
         if matched || named { next.automatic[id] = nil }
         if matched { next.live[id] = nil }
         var rejections = next.rejected[id] ?? []
@@ -149,6 +172,7 @@ public struct DraftNames: Hashable, Sendable {
         var next = self
         next.merges = try SpeakerMerges.merge(merges, source: source, into: target)
         next.labels[from] = nil
+        next.explicitNames.remove(from)
         if let targetLabel, !targetLabel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             next.labels[into] = targetLabel.trimmingCharacters(in: .whitespacesAndNewlines)
         }
@@ -197,7 +221,7 @@ public struct DraftNames: Hashable, Sendable {
     /// The names after Forget everyone moved the generation to `generation`: no live match, Remember choice, automatic
     /// name or rejection is left; the labels and merges stay.
     public func forgettingEveryone(generation: Int) -> DraftNames {
-        DraftNames(labels: labels, merges: merges, generation: generation)
+        DraftNames(labels: labels, merges: merges, generation: generation, colourIndices: colourIndices, explicitNames: explicitNames)
     }
 
     /// The voice clips of each shown speaker: `windows` with the merges applied, without raising a speaker's 45 s
@@ -259,9 +283,9 @@ extension DraftNames {
 extension DraftNames: Codable {
     /// The members Android's 0.1.0 writes; `live` and `rejected` are written only when not empty.
     public static let keys: Set<String> = ["labels", "merges", "remembered", "automatic", "generation"]
-    public static let optionalKeys: Set<String> = ["live", "rejected"]
+    public static let optionalKeys: Set<String> = ["live", "rejected", "colourIndices", "explicitNames"]
 
-    private enum CodingKeys: String, CodingKey { case labels, merges, remembered, automatic, generation, live, rejected }
+    private enum CodingKeys: String, CodingKey { case labels, merges, remembered, automatic, generation, live, rejected, colourIndices, explicitNames }
 
     public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -277,6 +301,11 @@ extension DraftNames: Codable {
         generation = try c.decodeIfPresent(Int.self, forKey: .generation) ?? 0
         live = try c.decodeIfPresent([String: LiveMatch].self, forKey: .live) ?? [:]
         rejected = try c.decodeIfPresent([String: [UUID]].self, forKey: .rejected) ?? [:]
+        colourIndices = try c.decodeIfPresent([String: Int].self, forKey: .colourIndices) ?? [:]
+        guard colourIndices.values.allSatisfy({ (0...SpeakerColourAllocator.maximum).contains($0) }) else {
+            throw DecodingError.dataCorruptedError(forKey: .colourIndices, in: c, debugDescription: "Invalid colour index")
+        }
+        explicitNames = try c.decodeIfPresent(Set<String>.self, forKey: .explicitNames) ?? []
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -288,6 +317,8 @@ extension DraftNames: Codable {
         try c.encode(generation, forKey: .generation)
         if !live.isEmpty { try c.encode(live, forKey: .live) }
         if !rejected.isEmpty { try c.encode(rejected, forKey: .rejected) }
+        if !colourIndices.isEmpty { try c.encode(colourIndices, forKey: .colourIndices) }
+        if !explicitNames.isEmpty { try c.encode(explicitNames.sorted(), forKey: .explicitNames) }
     }
 
     /// Compact JSON with sorted members.

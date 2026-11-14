@@ -40,17 +40,17 @@ public enum MarkdownExport {
 
     public static func write(_ transcript: ExportTranscript, dateLine: String, copy: MarkdownCopy,
                              notes: [MarkdownNote] = []) -> String {
-        let rows = TurnModel.rows(of: transcript.words.map {
+        let rows = TranscriptTurns.rows(ofModelWords: transcript.words.map {
             TurnModel.Word(speaker: $0.speaker, startMs: Double($0.startMs), endMs: Double($0.endMs),
                            text: $0.text, lowConfidenceSpeaker: $0.lowConfidenceSpeaker)
         }, endsBoundedByAudio: transcript.endsBoundedByAudio)
         var blocks = ["# " + escape(transcript.title)]
         if !dateLine.isEmpty { blocks.append(dateLine) }
         // Inventory includes chip-only speakers; sorting does not change canonical word indices.
-        var seen = Set<String>()
+        var seen = Set<Data>()
         let speakers = transcript.words.enumerated().sorted {
             $0.element.startMs == $1.element.startMs ? $0.offset < $1.offset : $0.element.startMs < $1.element.startMs
-        }.compactMap { seen.insert($0.element.speaker).inserted ? $0.element.speaker : nil }
+        }.compactMap { seen.insert(Data($0.element.speaker.utf8)).inserted ? $0.element.speaker : nil }
         if !speakers.isEmpty {
             blocks.append(copy.speakersLine.replacingOccurrences(of: "{names}",
                 with: speakers.map { escape(transcript.label($0)) }.joined(separator: ", ")))

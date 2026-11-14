@@ -50,6 +50,15 @@ enum TestFixtures {
         (17, "That leaves a week of buffer before the holidays, which I’d rather keep than spend."),
     ].map { start, text in timedSegment(text, start: start, end: start + 8.5) }
 
+    /// The processing seed's draft with two streaming speaker slots (`s1` and `s2`) for `--draft-speaker-suggestion`.
+    static let processingSpeakerDraft: [TranscriptSegment] = [
+        (0, "Morning, everyone. Three things on the agenda today: the launch date, the onboarding copy and hiring.", "s1"),
+        (9, "Let’s start with the launch. Engineering thinks the last two weeks of November are realistic.", "s2"),
+        (17, "That leaves a week of buffer before the holidays, which I’d rather keep than spend.", "s1"),
+    ].map { start, text, speaker in
+        timedSegment(text, start: start, end: start + 8.5, TranscriptSegment(text: text, start: start, end: start + 8.5, speakerID: speaker))
+    }
+
     /// The draft of `--draft-growing`: 120 sentences of 3 s, each its own words.
     static let growingDraft: [TranscriptSegment] = (0..<120).map { index in
         let start = Double(index) * 3
@@ -81,19 +90,43 @@ enum TestFixtures {
     /// progress are that recognizer's, so they resume where the system has no Apple speech; Apple speech's job is a
     /// legacy one, without an identity.
     static func seed(_ seed: AppEnvironment.Seed, into store: NoteStore, now: Date,
-                     recognizer: SpeechRecognizer) async throws {
+                     recognizer: SpeechRecognizer, draftSpeakerSuggestion: Bool = false) async throws {
         guard try store.root.isEmptyDirectory else { return }
         var main = fixture(now: now)
         var notes: [Note] = []
         switch seed {
+        case .oneSpeaker:
+            main.title = "Solo planning"
+            main.speakers = [NoteSpeaker(id: "alex", name: "Alex", colourIndex: 0, provenance: .user)]
+            main.transcript = transcribedSegments.map { segment in
+                var segment = segment
+                segment.speakerID = "alex"; segment.speaker = "Alex"
+                return timedSegment(segment.text, start: segment.start, end: segment.end, segment)
+            }
+        case .processing where draftSpeakerSuggestion:
+            _ = try seedSuggestedVoice(root: store.root)
         case .speakers:
             // Sam is not named yet, and the saved voice "Sam Rivera" may be them: the note asks "Is this Sam Rivera?".
             let sam = try seedSuggestedVoice(root: store.root)
             main.speakers?[1].name = DefaultLabels.placeholder(2)
+            main.speakers?[1].provenance = .unnamed
             main.speakers?[1].match = .suggested(voice: sam, score: 0.78)
             main.refreshSpeakerLabels()
         case .voices:
             notes = try seedSavedVoices(root: store.root, main: &main, now: now)
+        case .brandSpeakers:
+            // Six decided speaker slots plus the unnamed stone role, through real note/speaker views.
+            let names = [DefaultLabels.placeholder(1), "Alex Morgan", "Sam Rivera", "Taylor Brooks", "Jordan Reed",
+                         "Casey Green", "Jamie Park"]
+            main.title = "Community garden planning"
+            main.bookmarks = []
+            main.speakers = names.enumerated().map { NoteSpeaker(id: "brand-\($0.offset)", name: $0.element) }
+            let lines = ["Welcome, everyone.", "The beds are ready.", "Seeds arrive Thursday.", "I can bring tools.",
+                         "We will share watering.", "Let us start Saturday.", "That works for me."]
+            main.transcript = lines.enumerated().map { index, text in
+                let speaker = TranscriptSegment(text: text, start: 0, end: 0, speaker: names[index], speakerID: "brand-\(index)")
+                return timedSegment(text, start: Double(index) * 3, end: Double(index + 1) * 3, speaker)
+            }
         case .reading:
             main.transcript = transcribedSegments.map { timedSegment($0.text, start: $0.start, end: $0.end, $0) }
         default:
@@ -101,7 +134,12 @@ enum TestFixtures {
         }
         notes = [main, walk(now: now)] + notes
         switch seed {
-        case .library, .recording, .voices, .speakers:
+        case .brandSpeakers:
+            var failed = Note(id: failedID, title: "Garden audio check", createdAt: now.addingTimeInterval(-3 * 3600), audioFilename: "audio.wav")
+            failed.duration = fixtureDuration; failed.language = "en-US"; failed.waveform = waveform
+            failed.status = .failed; failed.failure = .audio
+            notes.append(failed)
+        case .library, .recording, .voices, .speakers, .oneSpeaker:
             break
         case .search, .reading:
             // Whistle transcribed the review after Parakeet Ultra could not get its memory: its note says so.
@@ -133,16 +171,31 @@ enum TestFixtures {
             if note.id == fixtureID { try writeSilence(to: url) } else { try FileManager.default.copyItem(at: audio, to: url) }
         }
         if seed == .statuses { try await seedStatusJobs(into: store, now: now, recognizer: recognizer) }
+        if seed == .brandSpeakers {
+            try JobRepository(root: store.root).save([
+                Job(noteID: failedID, seq: 1, kind: .transcribe, state: .failed, failure: .audio,
+                    language: "en-US", enqueuedAt: now,
+                    recognizer: recognizer == .appleSpeech ? nil : recognizer.rawValue),
+            ])
+        }
     }
 
     /// What a seed needs once the app is ready: consent and a running job for `processing`, whose speaker step is
     /// ahead of it, and for `statuses`, whose job has none.
-    @MainActor static func prepare(_ seed: AppEnvironment.Seed, settings: SettingsStore, processing: ProcessingStore) {
+    @MainActor static func prepare(_ seed: AppEnvironment.Seed, settings: SettingsStore, processing: ProcessingStore,
+                                   voices: VoicesStore, draftSpeakerSuggestion: Bool = false) {
         guard seed == .processing || seed == .statuses else { return }
         settings.recordConsent()
         settings.identifySpeakers = seed == .processing
         Task {
             await processing.transcribe(processingID, origin: .screen)
+            if seed == .processing, draftSpeakerSuggestion, let sam = voices.savedVoices.first {
+                processing.drafts?.mutate(processingID) { draft in
+                    var updated = draft
+                    updated.live["s2"] = LiveMatch(sam.id, 0.78, .suggested)
+                    return updated
+                }
+            }
             // The frozen job never ends, so this one stays queued behind it.
             if seed == .statuses { await processing.transcribe(queuedID, origin: .screen) }
         }

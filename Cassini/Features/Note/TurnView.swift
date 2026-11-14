@@ -9,6 +9,7 @@ struct TranscriptActions {
     var nameSpeaker: (String) -> Void = { _ in }
     var editPassage: (UUID) -> Void = { _ in }
     var markMoment: (TimeInterval) -> Void = { _ in }
+    var answerSuggestion: (SpeakerSuggestion, Bool) -> Void = { _, _ in }
 }
 
 /// One paragraph of the transcript (Android `TurnHeader` and `TurnParagraph`): the speaker header, then the words.
@@ -46,6 +47,10 @@ struct TurnView: View, Equatable {
             TurnHeader(turn: turn, button: renamable && turn.nameableSpeakerID != nil) {
                 if let id = turn.nameableSpeakerID { actions.nameSpeaker(id) }
             }
+            if style == .draft, renamable, let suggestion = turn.suggestion {
+                CompactSuggestionRow(suggestion: suggestion, answer: actions.answerSuggestion)
+                    .padding(.bottom, 4)
+            }
             // A draft has no Speakers sheet. Every inline speaker needs a naming control even without a voice card.
             ForEach(turn.inlineSpeakersForNaming(isDraft: style == .draft, renamable: renamable), id: \.speakerID) { chip in
                 if let id = chip.speakerID {
@@ -66,6 +71,10 @@ struct TurnView: View, Equatable {
                         start: turn.words[chip.wordRange.lowerBound].start, auto: false)))
                     .accessibilityHint(NoteCopy.nameThisSpeaker)
                     .accessibilityIdentifier("inlineSpeakerHeader-\(turn.id)-\(id)")
+                    if let suggestion = turn.inlineSuggestions.first(where: { Data($0.speakerID.utf8) == Data(id.utf8) }) {
+                        CompactSuggestionRow(suggestion: suggestion, answer: actions.answerSuggestion)
+                            .padding(.bottom, 4)
+                    }
                 }
             }
             paragraph
@@ -73,11 +82,9 @@ struct TurnView: View, Equatable {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var placeholder: Bool { !turn.name.isNamed }
-
     @ViewBuilder private var paragraph: some View {
         let text = Text(attributed)
-            .font(.system(.body, design: .serif)).lineSpacing(7)
+            .font(.system(.body)).lineSpacing(7)
             .frame(maxWidth: .infinity, alignment: .leading)
             .fixedSize(horizontal: false, vertical: true)
             .onGeometryChange(for: CGRect.self) { $0.frame(in: .scrollView) } action: { frame in
@@ -108,7 +115,7 @@ struct TurnView: View, Equatable {
                 }
                 .contextMenu { menu }
         case .draft:
-            text.foregroundStyle(Color.muted)
+            text.foregroundStyle(Color.ink)
         }
     }
 
@@ -137,12 +144,12 @@ struct TurnView: View, Equatable {
     }
 
     /// The paragraph with its word links (reading), its unsettled words (draft), the active word and the search hits.
-    private var attributed: AttributedString {
+    var attributed: AttributedString {
         var result = style == .reading
             ? turn.linkedText(activeWord: activeIndex, scheme: Self.scheme)
             : AttributedString(turn.text)
         // Use per-run foregrounds: a paragraph-wide link tint would color named chips like an unnamed host.
-        result.foregroundColor = style == .draft || placeholder ? Color.muted : Color.ink
+        result.foregroundColor = Color.ink
         let characters = result.characters
         func range(_ offsets: Range<Int>) -> Range<AttributedString.Index>? {
             guard offsets.lowerBound >= 0, offsets.upperBound <= characters.count else { return nil }
@@ -152,12 +159,12 @@ struct TurnView: View, Equatable {
         // The full chip tint includes its internal spaces; active-word colors are applied after every decoration.
         for chip in turn.interjections {
             if let span = range(chip.textRange) {
-                result[span].foregroundColor = chip.name.isNamed ? Color.ink : Color.muted
-                result[span].backgroundColor = chip.crosstalk ? Color.toneWarn.opacity(0.22) : chip.tint.color.opacity(0.12)
+                result[span].foregroundColor = Color.ink
+                result[span].backgroundColor = chip.crosstalk ? Color.warnTint : chip.tint.wash
             }
             if let name = range(chip.nameRange) {
                 result[name].foregroundColor = chip.tint.color
-                result[name].font = .system(.body, design: .serif, weight: .semibold)
+                result[name].font = .system(.body, weight: .semibold)
             }
         }
         switch style {
@@ -169,14 +176,15 @@ struct TurnView: View, Equatable {
         }
         for match in matches {
             guard let hit = range(match) else { continue }
-            result[hit].backgroundColor = Color.toneWarn.opacity(0.22)
-            if match == currentMatch { result[hit].font = .system(.body, design: .serif, weight: .semibold) }
+            result[hit].backgroundColor = Color.highlight
+            result[hit].foregroundColor = Color.highlightInk
+            if match == currentMatch { result[hit].font = .system(.body, weight: .semibold) }
         }
         if style == .reading, let activeIndex, turn.words.indices.contains(activeIndex),
            let word = range(turn.range(ofWord: activeIndex)) {
-            // The active word is drawn inverted. It carries no link, whose tint would win over its colour.
-            result[word].foregroundColor = Color.paper
-            result[word].backgroundColor = Color.ember
+            // The highlight wash keeps ink text. Active words carry no link, whose tint would win over it.
+            result[word].foregroundColor = Color.highlightInk
+            result[word].backgroundColor = Color.highlight
         }
         return result
     }

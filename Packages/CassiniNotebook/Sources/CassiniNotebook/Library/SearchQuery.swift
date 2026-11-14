@@ -122,6 +122,13 @@ public struct Highlighted: Hashable, Sendable {
         self.init(text, ranges: ranges, leadingEllipsis: leading, trailingEllipsis: trailing)
     }
 
+    /// Flatten line breaks without changing character offsets, so search highlights survive row layout.
+    public var singleLine: Highlighted {
+        var copy = self
+        copy.text = String(text.map { $0.isNewline ? Character(" ") : $0 })
+        return copy
+    }
+
     /// The text as shown: with its ellipses.
     public var display: String {
         (leadingEllipsis ? String(Self.ellipsis) : "") + text + (trailingEllipsis ? String(Self.ellipsis) : "")
