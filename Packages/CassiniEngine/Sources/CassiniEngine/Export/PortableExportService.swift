@@ -155,7 +155,7 @@ public struct PortableExportService: Sendable {
         let unassignedLabel = unassignedLabel
         return try await CancellableFileWork.run {
             try PortableTranscript.export(note: note, opus: opus, destination: target, unassignedLabel: unassignedLabel,
-                                          processing: processing, source: source)
+                                          processing: processing, source: source, allowEmpty: true)
         }
     }
 

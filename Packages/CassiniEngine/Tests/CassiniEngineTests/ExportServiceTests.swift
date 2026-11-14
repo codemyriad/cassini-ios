@@ -31,6 +31,21 @@ struct ExportServiceTests {
         return note
     }
 
+    @Test(arguments: [NoteStatus.audioOnly, .queued, .transcribing, .failed])
+    func singleAudioOnlyCassiniFileHasAnEmptyTimedTranscript(status: NoteStatus) async throws {
+        defer { try? FileManager.default.removeItem(at: base) }
+        try FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
+        var note = transcribedNote(); note.status = status
+        let source = base.appendingPathComponent("source.m4a")
+        try Data(ImportFixtures.m4a).write(to: source)
+        let output = try await PortableExportService(audio: FakeAudioProcessing(), provenance: FakeProvenance(), unassignedLabel: "Unknown speaker")
+            .export(ExportSheetState.portableSnapshot(note), original: source, playable: source, into: base, filename: "audio-only")
+        let document = CassiniDocument.read(output)
+        #expect(document.state == .ok)
+        let transcript = try #require(document.selected()?.transcript)
+        #expect(transcript.words.isEmpty)
+    }
+
     @Test(arguments: [NoteStatus.queued, .failed])
     func archiveKeepsStoredTranscriptWhileAnotherTranscriptionIsQueuedOrFailed(status: NoteStatus) async throws {
         defer { try? FileManager.default.removeItem(at: base) }
@@ -153,15 +168,10 @@ struct ExportServiceTests {
         #expect(copy.lastPathComponent == "Delivery_ Thursday_.m4a")
         #expect(try Data(contentsOf: copy) == Data([7, 8, 9]))
         await service.discard(copy).value
-        let words = [Word("S1", 0, 300, "So,"), Word("S1", 400, 700, "the"), Word("S1", 800, 1100, "delivery"),
-                     Word("S1", 1200, 1500, "slips?"), Word("S2", 1800, 2100, "Yes,"), Word("S2", 2200, 2500, "a"),
-                     Word("S2", 2600, 2900, "Thursday.")]
-        let expected = ExportTranscript(title: "Delivery: Thursday?", durationMs: 9_250, words: words,
-                                        labels: ["S1": "Giulia", "S2": "Speaker 2"])
         let cases: [(TranscriptFormat, String)] = [
-            (.text, TextExport.write(expected, subtitle: "8 Oct 2026, 15:10", emptyText: "No words")),
-            (.subtitles, SrtWriter.write(expected)),
-            (.webVTT, VttWriter.write(expected))
+            (.text, "Giulia · 00:00:00\nSo, the delivery slips?\n\nSpeaker 2 · 00:00:01\nYes, a Thursday.\n"),
+            (.subtitles, "1\n00:00:00,000 --> 00:00:01,500\nGiulia: So, the delivery slips?\n\n2\n00:00:01,800 --> 00:00:02,900\nSpeaker 2: Yes, a Thursday.\n"),
+            (.webVTT, "WEBVTT\n\n00:00:00.000 --> 00:00:01.500\n<v Giulia>So, the delivery slips?</v>\n\n00:00:01.800 --> 00:00:02.900\n<v Speaker 2>Yes, a Thursday.</v>\n")
         ]
         for (format, text) in cases {
             let url = try await service.exportTranscript(note.id, format: format, texts: texts)
@@ -219,7 +229,7 @@ struct ExportServiceTests {
         note.versions = [older]
         try await notes.save(note)
         let url = try await service.exportTranscript(note.id, format: .subtitles, version: older.id, texts: texts)
-        #expect(try String(contentsOf: url, encoding: .utf8) == "1\n00:00:00,000 --> 00:00:01,000\nPrima\n")
+        #expect(try String(contentsOf: url, encoding: .utf8) == "1\n00:00:00,000 --> 00:00:01,000\nGiulia: Prima\n")
     }
 
     @Test func theSweepKeepsEveryNoteAndClearsWaitingExports() async throws {

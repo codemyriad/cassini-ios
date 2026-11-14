@@ -9,20 +9,40 @@ struct NoteActionsMenu: View {
     let noteID: UUID
     @Environment(LibraryScreenModel.self) private var model
 
+    @State private var exportOpen = false
+    @State private var confirmedExport: ExportSheetState.Choice?
+
     var body: some View {
-        if let menu = model.menu(noteID) {
-            Button(menu.isFavorite ? LibraryCopy.removeStar : LibraryCopy.star, systemImage: menu.isFavorite ? "star.slash" : "star") {
-                perform(.toggleStar)
-            }
-            Button(LibraryCopy.rename, systemImage: "pencil") { perform(.rename) }
-            if !menu.recording {
-                transcribeItems(menu)
-                exportMenu(menu)
-                Button(LibraryCopy.documentInfo, systemImage: "info.circle") { perform(.documentInfo) }
-                Divider()
-                Button(TrashCopy.moveToTrash, systemImage: "trash", role: .destructive) { perform(.moveToTrash) }
+        Group {
+            if let menu = model.menu(noteID) {
+                Button(menu.isFavorite ? LibraryCopy.removeStar : LibraryCopy.star, systemImage: menu.isFavorite ? "star.slash" : "star") {
+                    perform(.toggleStar)
+                }
+                Button(LibraryCopy.rename, systemImage: "pencil") { perform(.rename) }
+                if !menu.recording {
+                    transcribeItems(menu)
+                    exportMenu(menu)
+                    Button(LibraryCopy.documentInfo, systemImage: "info.circle") { perform(.documentInfo) }
+                    Divider()
+                    Button(TrashCopy.moveToTrash, systemImage: "trash", role: .destructive) { perform(.moveToTrash) }
+                }
             }
         }
+        .sheet(isPresented: $exportOpen, onDismiss: shareConfirmed) {
+            if let note = model.note(noteID), let menu = model.menu(noteID) {
+                ExportFormatSheet(note: note, jobPending: menu.transcribe == .stop || menu.transcribe == .removeFromQueue) {
+                    confirmedExport = $0
+                }
+            }
+        }
+    }
+
+    private func shareConfirmed() {
+        guard let choice = confirmedExport else { return }
+        confirmedExport = nil
+        if let format = choice.transcriptFormat { perform(.export(format)) }
+        else if choice == .originalAudio { perform(.shareAudio) }
+        else { perform(.exportDocument) }
     }
 
     @ViewBuilder private func transcribeItems(_ menu: LibraryRowMenu) -> some View {
@@ -49,24 +69,10 @@ struct NoteActionsMenu: View {
         }
     }
 
-    /// The transcript formats (disabled, with the reason, for a note without a transcript), the Cassini document and
-    /// the original audio, which is always offered, as Android's Save a copy rows.
+    /// D99 uses the same format selector as the meeting header.
     private func exportMenu(_ menu: LibraryRowMenu) -> some View {
-        let unavailable = ExportCopy.reason(menu.export)
-        return Menu {
-            Section {
-                ForEach(TranscriptFormat.allCases) { format in
-                    Button(ExportCopy.title(format)) { perform(.export(format)) }.disabled(unavailable != nil)
-                }
-            } header: {
-                if let unavailable { Text(unavailable) }
-            }
-            Button(NoteCopy.exportDocument, systemImage: "doc.badge.arrow.up") { perform(.exportDocument) }
-                .disabled(!menu.exportsDocument)
-            Button(NoteCopy.shareAudio, systemImage: "waveform") { perform(.shareAudio) }.disabled(menu.transcribeWaits)
-        } label: {
-            Label(LibraryCopy.export, systemImage: "square.and.arrow.up")
-        }
+        Button(LibraryCopy.export, systemImage: "square.and.arrow.up") { exportOpen = true }
+            .disabled(menu.transcribeWaits)
     }
 
     private func perform(_ action: NoteAction) {

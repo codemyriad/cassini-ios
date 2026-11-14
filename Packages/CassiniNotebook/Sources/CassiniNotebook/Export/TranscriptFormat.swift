@@ -44,10 +44,11 @@ public enum TranscriptExports {
     public static let notExportable: Set<DocumentState> = [.unreadable, .invalidMetadata, .unknownFormat]
 
     /// A note exports its transcript once it has one: a finished transcription (even one without words) or a
-    /// transcript kept from before. A live capture and a document Cassini cannot read (`notExportable`) do not.
+    /// transcript kept from before, with no queued, running or failed job. Live capture and unreadable documents
+    /// (`notExportable`) cannot export text.
     public static func availability(of note: Note) -> TranscriptExportAvailability {
         if let state = note.document?.state, notExportable.contains(state) { return .notReadable }
-        if note.isRecording || (note.transcript.isEmpty && note.status != .ready) { return .afterTranscription }
+        if note.isRecording || note.status != .ready { return .afterTranscription }
         return .available
     }
 
@@ -55,10 +56,7 @@ public enum TranscriptExports {
     public static func data(_ note: Note, format: TranscriptFormat, version: TranscriptVersion? = nil,
                             texts: ExportTexts, markdownNotes: [MarkdownNote] = []) throws -> Data {
         var transcript = ExportTranscript(note: note, version: version, unassignedLabel: texts.unassignedLabel)
-        let text: String
-        switch format {
-        case .markdown:
-            guard let options = texts.markdown else { throw MarkdownExport.OptionsRequired() }
+        if format != .json, let options = texts.markdown {
             var seen = Set<Data>()
             let speakers = transcript.words.compactMap { seen.insert(Data($0.speaker.utf8)).inserted ? $0.speaker : nil }
             for (index, speaker) in speakers.enumerated() {
@@ -68,23 +66,18 @@ public enum TranscriptExports {
                     transcript.labelsByID[Data(speaker.utf8)] = options.unnamedSpeaker(index + 1)
                 }
             }
+        }
+        let text: String
+        switch format {
+        case .markdown:
+            guard let options = texts.markdown else { throw MarkdownExport.OptionsRequired() }
             text = MarkdownExport.write(transcript, dateLine: options.dateLine(note.meetingTime, transcript.durationMs),
                                         copy: options.copy, notes: markdownNotes)
         case .json: return try JSONExport.data(note, version: version)
-        case .subtitles: text = SrtWriter.write(transcript)
-        case .webVTT: text = VttWriter.write(transcript)
+        case .subtitles: text = AlignedTextExport.subtitles(transcript, webVTT: false)
+        case .webVTT: text = AlignedTextExport.subtitles(transcript, webVTT: true)
         case .text:
-            // Android counts the selected variant's distinct word speakers, the count that also labels the turns.
-            let subtitle: String
-            if let render = texts.meetingSubtitle {
-                subtitle = render(note.meetingTime, transcript.durationMs, transcript.speakerCount)
-            } else if let instant = note.meetingTime.instant {
-                subtitle = texts.subtitle(instant, transcript.durationMs, transcript.speakerCount)
-            } else {
-                subtitle = [note.meetingTime.localText, ExportClock.clock(transcript.durationMs, durationMs: transcript.durationMs)]
-                    .compactMap { $0 }.joined(separator: " · ")
-            }
-            text = TextExport.write(transcript, subtitle: subtitle, emptyText: texts.emptyText)
+            text = AlignedTextExport.plainText(transcript)
         }
         return Data(text.utf8)
     }

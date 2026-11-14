@@ -68,3 +68,12 @@ Wave 5 first-run hero and backup-gated privacy copy (`D-974`, `L-27`, `D98`) is 
 into `Cassini/Resources/Strings/LibraryWave5.xcstrings` and `Cassini/Strings/LibraryWave5Copy.swift` across all six
 locales. The Phase 1 `status-badges` bundle stays at `5e0c34e0f1bb390298dabdf4eedc494e933fd329` until `L-10` (`D-997`)
 migrates `Received` to `Imported`. No shared source was edited.
+
+D-1038 repins the global catalog and its complete status/format/library resource bundle to cassini-ux
+`b26190b57d8e35391ba9b4bafd177d66b10f0ec3` (`origin/main`, 14 November 2026).
+`scripts/generate-export-strings.py` compiles the implemented Phase 2 export labels, descriptions, title,
+format-group accessibility label, More formats and audio-only note into `ExportPhase2.xcstrings` for all six locales.
+Existing generated subsets are regenerated from the new global pin. The export resource bundle carries every
+file present in upstream `vectors/export/`, byte-identical with SHA-256 receipts in its `UPSTREAM.json`.
+That commit contains Markdown vectors and audio-size vectors, but no plain-text/SRT/WebVTT goldens;
+local regression tests cover those PARITY §2 rules without claiming shared-vector conformance.

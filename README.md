@@ -530,3 +530,12 @@ assigned speaker colours as transcript labels; unnamed speakers remain stone in 
 Library Search and Find match spoken words rather than labels inserted by the viewer. Search previews
 join paragraphs with spaces so blank lines cannot hide the matching word. Both search surfaces preserve
 the viewer’s spacing around standalone punctuation, including punctuation inside inline replies.
+
+Single-meeting export follows D99 / PARITY §2: Cassini file and Markdown are primary choices, with Plain text,
+SRT and WebVTT under More formats. Audio-only meetings hide text choices; raw imports share the original audio.
+Confirming opens the iOS share sheet. Multi-meeting export remains ZIP. JSON is retained as an internal writer,
+but is absent from the sheet. The Phase 2 TXT/SRT/VTT derivatives use speaker-turn blocks, seven-second subtitle
+segments and monotonic non-overlapping cues; the older Android writer fixtures remain as historical coverage.
+The shared Markdown golden matches byte for byte. At cassini-ux `b26190b`, `vectors/export/` has no TXT/SRT/VTT
+vectors, so those formats have local regression coverage pending shared goldens. This is the current difference
+from Android's older subtitle rules (six-second cues and cross-speaker overlap).

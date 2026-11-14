@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: CC0-1.0
-"""Cross-check the W0.4 contract fixtures; no app imports or recordings."""
+"""Cross-check the W0.4 / L-52 / L-54 badge contract fixtures; no app imports or recordings."""
 import json
 from pathlib import Path
 import re
 
 ROOT=Path(__file__).resolve().parents[2]
 LANGS={'it','fr','es','pt-BR','pt-PT'}
+BADGE_TOKEN_ROLES=(
+    'record-tint','record-ink','ink','ink-2','accent',
+    'warn-tint','warn-ink','error-tint','error','line',
+)
 
 def read(path):return json.loads((ROOT/path).read_text())
 
@@ -31,9 +35,24 @@ def badge(fields,catalog):
     if fields['origin']=='received':return output('received','received','outline','incoming')
     return None
 
+def _check_catalog_entry(catalog,full_id,expected_text):
+    assert full_id in catalog,full_id
+    e=catalog[full_id];assert e['en']==expected_text,full_id
+    placeholders=set(re.findall(r'\{\w+\}',expected_text))
+    assert set(e['l10n'])==LANGS,full_id
+    for lang,translation in e['l10n'].items():
+        assert translation['text'] and set(re.findall(r'\{\w+\}',translation['text']))==placeholders,(full_id,lang)
+        if 'plural' in e:
+            assert {'one','other'} <= set(translation.get('plural',{})),(full_id,lang)
+        for category,form in translation.get('plural',{}).items():
+            assert set(re.findall(r'\{\w+\}',form))<=placeholders,(full_id,lang)
+            if category!='one' and '{n}' in placeholders:assert '{n}' in form,(full_id,lang,category)
+    return e
+
 def verify():
     states=read('vectors/states/states-vectors.json')
     catalog={e['id']:e for e in read('strings/strings.json')['entries']}
+    tokens=read('brand/tokens.json')['tokens']
     assert states['version']==3
     assert states['precedence']==['recording','saving','transcribing','needsAttention','interrupted','received','none']
     assert len({v['id'] for v in states['vectors']})==len(states['vectors'])
@@ -47,22 +66,38 @@ def verify():
     entry=states['entryVectors'][0]
     assert entry['scope']=='import-entry' and entry['fields']=={'importing':True}
     assert entry['badge']==dict(kind='importing',text=catalog['states.badge.importing']['en'],tint='neutral',glyph='spinner')
-    expected={'recording':'Recording {liveBadge}','importing':'Importing…','saving':'Saving…','transcribing':'Transcribing · {n} min','needsAttention':'Needs attention','interrupted':'Interrupted','received':'Received','transcribing.noEta':'Transcribing…','transcribing.underMinute':'Transcribing, less than a minute left'}
+    expected={'recording':'Recording {liveBadge}','importing':'Importing…','saving':'Saving…','transcribing':'Transcribing · {n} min','needsAttention':'Needs attention','interrupted':'Interrupted','received':'Imported','transcribing.noEta':'Transcribing…','transcribing.underMinute':'Transcribing, less than a minute left'}
     for key,text in expected.items():
-        e=catalog['states.badge.'+key];assert e['en']==text,key
-        placeholders=set(re.findall(r'\{\w+\}',text))
-        assert set(e['l10n'])==LANGS,key
-        for lang,translation in e['l10n'].items():
-            assert translation['text'] and set(re.findall(r'\{\w+\}',translation['text']))==placeholders,(key,lang)
-            if 'plural' in e:
-                assert {'one','other'} <= set(translation.get('plural',{})),(key,lang)
-            for category,form in translation.get('plural',{}).items():
-                assert set(re.findall(r'\{\w+\}',form))<=placeholders,(key,lang)
-                if category!='one' and '{n}' in placeholders:assert '{n}' in form,(key,lang,category)
+        e=_check_catalog_entry(catalog,'states.badge.'+key,text)
         if key.startswith('transcribing.'):
             assert 'PROVISIONAL, pending Alex' in e['note'],key
     assert catalog['states.badge.transcribing']['plural']=={'one':'Transcribing · 1 min','other':'Transcribing · {n} min'}
     assert catalog['meeting.interruptedAt']['en']=='Interrupted at {position}'
+
+    phone_expected={
+        'states.phone.queued':'Queued',
+        'states.phone.pausedAt':'Paused at {position}',
+        'states.phone.couldntTranscribe':'Couldn’t transcribe',
+        'states.phone.audioOnly':'Audio only',
+        'states.phone.cantPlay':'Can’t play',
+        'states.phone.cantReadTranscript':'Can’t read transcript',
+        'states.phone.newerFormat':'Newer format',
+        'phone.row.transcribed.a11y':'transcribed',
+        'phone.row.speakerCount':'{n} speakers',
+        'phone.row.noSpeech':'No speech',
+        'phone.row.resume':'Resume',
+        'common.tryAgain':'Try again',
+    }
+    for full_id,text in phone_expected.items():
+        _check_catalog_entry(catalog,full_id,text)
+    assert catalog['phone.row.speakerCount']['plural']=={'one':'1 speaker','other':'{n} speakers'}
+
+    for role in BADGE_TOKEN_ROLES:
+        assert role in tokens and tokens[role].get('status')=='decided',role
+    for mode in ('light','dark'):
+        assert tokens['error'][mode]==tokens['record-ink'][mode],mode
+        assert tokens['error-tint'][mode]==tokens['record-tint'][mode],mode
+
     for vector in read('vectors/format/format-vectors.json')['eta']:
         fields=dict(lifecycle='saved',transcript='running',etaMinutes=vector['minutes'],origin='own')
         assert badge(fields,catalog)['text']==vector['out'],vector
@@ -73,6 +108,6 @@ def verify():
                 result=badge(meeting,catalog)
                 assert meeting['badge']==(result['text'] if result else None),(path.name,meeting['id'])
                 rows+=1
-    print(f'W0.4: {len(states["vectors"])} meeting vectors, 1 import entry, {rows} Library rows and five translation languages pass')
+    print(f'W0.4: {len(states["vectors"])} meeting vectors, 1 import entry, {len(phone_expected)} phone badge/pill strings, {len(BADGE_TOKEN_ROLES)} token roles, {rows} Library rows and five translation languages pass')
 
 if __name__=='__main__':verify()
