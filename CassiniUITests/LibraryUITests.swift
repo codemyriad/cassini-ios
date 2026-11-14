@@ -125,12 +125,33 @@ final class LibraryUITests: XCTestCase {
         XCTAssertEqual(app.staticTexts["noteTitle"].label, "Weekly planning call")
     }
 
+    /// L-49: All meetings on the left, Stop in the centre and a labelled Pause or Resume on the right.
+    @MainActor func testRecordingControlsPutStopInTheCentre() {
+        let app = launch(["--seed", "recording"])
+        app.buttons["recordButton"].tap()
+        let pause = app.buttons["pauseResumeRecording"], stop = app.buttons["stopRecording"]
+        let allMeetings = app.buttons["recordingAllMeetings"]
+        XCTAssertTrue(pause.waitForEnabled(within: 8))
+        XCTAssertEqual(stop.label, "Stop")
+        XCTAssertEqual(pause.label, "Pause recording")
+        XCTAssertEqual(allMeetings.label, "All meetings")
+        XCTAssertFalse(app.staticTexts["Title"].exists, "no visible Title caption (L-48)")
+        XCTAssertLessThan(allMeetings.frame.midX, stop.frame.midX)
+        XCTAssertLessThan(stop.frame.midX, pause.frame.midX)
+        XCTAssertEqual(stop.frame.midX, app.windows.firstMatch.frame.midX, accuracy: 2, "Stop is centred")
+        XCTAssertGreaterThanOrEqual(stop.frame.height, 44)
+        pause.tap()
+        XCTAssertTrue(app.buttons["Resume recording"].waitForExistence(within: 5))
+        stop.tap()
+        XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 10), "Stop saves and opens the note")
+    }
+
     // ports: LibraryBehaviourTest#duringARecordingTheCardAndTheButtonReturnToIt
     @MainActor func testDuringARecordingTheCardTheButtonAndTheRowReturnToIt() {
         let app = launch(["--seed", "recording"])
         app.buttons["recordButton"].tap()
         XCTAssertTrue(app.buttons["Pause recording"].waitForEnabled(within: 8))
-        app.buttons["Library"].tap()
+        app.buttons["recordingAllMeetings"].tap()
         let card = app.buttons["activeRecordingCard"]
         XCTAssertTrue(card.waitForExistence(within: 5))
         XCTAssertTrue(card.label.contains("Recording · Voice note 8 Oct, 09:41"), card.label)
@@ -142,15 +163,15 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(waitFor(recordingRow, label: ", recording"), recordingRow.label)
         capture("Library while recording")
         record.tap()
-        XCTAssertTrue(app.buttons["finishRecording"].waitForExistence(within: 5))
-        app.buttons["Library"].tap()
+        XCTAssertTrue(app.buttons["stopRecording"].waitForExistence(within: 5))
+        app.buttons["recordingAllMeetings"].tap()
         XCTAssertTrue(card.waitForExistence(within: 5))
         card.tap()
-        XCTAssertTrue(app.buttons["finishRecording"].waitForExistence(within: 5))
-        app.buttons["Library"].tap()
+        XCTAssertTrue(app.buttons["stopRecording"].waitForExistence(within: 5))
+        app.buttons["recordingAllMeetings"].tap()
         XCTAssertTrue(recordingRow.waitForExistence(within: 5))
         recordingRow.tap()
-        XCTAssertTrue(app.buttons["finishRecording"].waitForExistence(within: 5), "the recording's row returns to it")
+        XCTAssertTrue(app.buttons["stopRecording"].waitForExistence(within: 5), "the recording's row returns to it")
     }
 
     /// Search shows flat results with their day, says when nothing matches, and opens a note.

@@ -182,7 +182,7 @@ final class CassiniUITests: XCTestCase {
             // A host without an audio input: the screen says so and offers Try again.
             XCTAssertTrue(app.buttons["Try again"].exists)
             capture("Microphone unavailable")
-            app.buttons["Library"].tap()
+            app.buttons["recordingAllMeetings"].tap()
             XCTAssertTrue(app.buttons["recordButton"].waitForExistence(within: 5))
             XCTAssertTrue(app.buttons["importButton"].isEnabled)
             return
@@ -192,7 +192,7 @@ final class CassiniUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Resume recording"].waitForExistence(within: 3))
         app.buttons["Resume recording"].tap()
         XCTAssertTrue(pause.waitForEnabled(within: 3))
-        app.buttons["finishRecording"].tap()
+        app.buttons["stopRecording"].tap()
         XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 10))
         XCTAssertTrue(app.buttons["playButton"].waitForEnabled(within: 5), "the sealed recording plays")
         app.buttons["playButton"].tap()
@@ -274,7 +274,7 @@ final class CassiniUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Resume recording"].waitForExistence(within: 3))
         app.buttons["Resume recording"].tap()
         XCTAssertTrue(pause.waitForEnabled(within: 3))
-        app.buttons["Library"].tap()
+        app.buttons["recordingAllMeetings"].tap()
         let returnButton = app.buttons["recordButton"]
         XCTAssertTrue(returnButton.waitForExistence(within: 5))
         XCTAssertEqual(returnButton.label, "Return to recording", "the recording continues in the Library")
@@ -282,12 +282,12 @@ final class CassiniUITests: XCTestCase {
         let card = app.buttons["activeRecordingCard"]
         XCTAssertTrue(card.waitForExistence(within: 5))
         card.tap()
-        XCTAssertTrue(app.buttons["finishRecording"].waitForExistence(within: 5))
-        app.buttons["Library"].tap()
+        XCTAssertTrue(app.buttons["stopRecording"].waitForExistence(within: 5))
+        app.buttons["recordingAllMeetings"].tap()
         XCTAssertTrue(card.waitForExistence(within: 5), "minimised again")
         card.tap()
-        XCTAssertTrue(app.buttons["finishRecording"].waitForExistence(within: 5))
-        app.buttons["finishRecording"].tap()
+        XCTAssertTrue(app.buttons["stopRecording"].waitForExistence(within: 5))
+        app.buttons["stopRecording"].tap()
         XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 10))
         XCTAssertEqual(app.staticTexts["noteTitle"].label, "Voice note 8 Oct, 09:41")
         XCTAssertTrue(app.buttons["playButton"].waitForEnabled(within: 5), "the sealed recording plays")
