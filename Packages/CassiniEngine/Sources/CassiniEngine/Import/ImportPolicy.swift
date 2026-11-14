@@ -1,4 +1,5 @@
 import Foundation
+import CassiniNotebook
 
 /// The pinned shared policy is the sole source of offered audio types. Header reads are bounded and happen inside
 /// the coordinated/security-scoped accessor, before a destination file is created.
@@ -32,12 +33,17 @@ public enum ImportPolicy {
 
     public static func validate(header: Data, filename: String, fileBytes: Int64?) throws {
         guard accepts(filename: filename), !header.starts(with: Data("fLaC".utf8)) else { throw FileImportError.cannotOpen }
+        let bytes = [UInt8](header)
+        // A decided filename must not admit a recognized non-contract container such as raw ADTS, CAF or AIFF.
+        if case .other(let container?) = ImportClassifier.sniff(bytes), !accepts(filename: "source." + container) {
+            throw FileImportError.cannotOpen
+        }
         let ext = (filename as NSString).pathExtension.lowercased()
         if ext == "opus" || ext == "ogg" || header.starts(with: Data("OggS".utf8)) {
-            guard validOpus([UInt8](header)) else { throw FileImportError.cannotOpen }
+            guard validOpus(bytes) else { throw FileImportError.cannotOpen }
         }
         if ext == "wav" {
-            let h = [UInt8](header)
+            let h = bytes
             guard h.count >= 44, h.starts(with: Array("RIFF".utf8)), Array(h[8..<12]) == Array("WAVE".utf8) else {
                 throw FileImportError.cannotOpen
             }
