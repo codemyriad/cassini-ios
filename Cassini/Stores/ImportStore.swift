@@ -54,17 +54,22 @@ import CassiniNotebook
     /// Files picked in the Library: each becomes a note in the list, as on Android; nothing opens.
     func start(_ urls: [URL]) {
         guard !urls.isEmpty else { return }
-        let audio = urls.filter { $0.pathExtension.lowercased() != "zip" }
-        for url in audio { importFile(url, opensNote: false) }
-        let urls = urls.filter { $0.pathExtension.lowercased() == "zip" }
-        guard !urls.isEmpty else { return }
         tracker.dismissFailure()
         guard let files, let service else { for url in urls { importFile(url, opensNote: false) }; return }
         let batch = ImportBatch(total: urls.count)
         batches.append(batch)
         let fallback = String(localized: "Imported audio", table: "Import")
+        let tracker = tracker
         let operation = BulkImportService(files: files, scratch: scratch) { url, name in
-            try await service.importFile(url, fallbackTitle: fallback, displayName: name)
+            // Preserve the existing ordered batch report and ZIP deduplication. Members of a ZIP have ephemeral
+            // scratch URLs, so their failed cards offer dismissal; ordinary caller URLs can also be retried.
+            let running = await tracker.start(displayName: name ?? url.lastPathComponent, source: name == nil ? url : nil) {
+                try await service.importFile(url, fallbackTitle: fallback, displayName: name)
+            }
+            return try await withTaskCancellationHandler {
+                guard let result = await running.value else { throw CancellationError() }
+                return result
+            } onCancel: { running.cancel() }
         }
         batch.task = Task { [self] in
             await ready()
