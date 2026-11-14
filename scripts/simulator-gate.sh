@@ -14,7 +14,9 @@ case "${1:-}" in
     owner)
         # exec preserves this PID through the test script; the host-slot wrapper has a different PID.
         printf '%s\n' "$$" > "$owner_file"
-        exec "$root/scripts/test.sh" all
+        # The runner closes a cancelled step's pipe before always-run cleanup starts. Keep the owner's
+        # output independent of that pipe so its EXIT trap cannot lose its summary or receive SIGPIPE.
+        exec "$root/scripts/test.sh" all > "$owner_file.log" 2>&1
         ;;
     clean)
         if [ -s "$owner_file" ]; then
@@ -36,6 +38,8 @@ case "${1:-}" in
                     echo "Simulator test owner $owner exited before clone cleanup"
                 fi
             fi
+            # Replay after the owner exits, including its cancellation summary, into this live step's log.
+            if [ -f "$owner_file.log" ]; then cat "$owner_file.log"; fi
             # Only this run's marker; no other runner service or attempt shares it.
             /usr/bin/python3 -I -c 'import pathlib,sys; pathlib.Path(sys.argv[1]).unlink(missing_ok=True)' "$owner_file"
         fi

@@ -417,7 +417,7 @@ wait $!
                 self.assertTrue(stopped.exists(), 'workflow cleanup left the owned worker running')
                 self.assertFalse(owner_file.exists())
                 self.assertEqual(cleaned.read_text().splitlines(), ['cleaned', 'cleaned'])
-                self.assertIn('FAILED (all)', log_path.read_text(), 'test owner did not finish its EXIT summary')
+                self.assertIn('FAILED (all)', result.stdout, 'cleanup did not retain the test owner EXIT summary')
             finally:
                 try:
                     os.killpg(process.pid, signal.SIGKILL)
