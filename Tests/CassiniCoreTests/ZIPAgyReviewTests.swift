@@ -6,9 +6,6 @@ import CZlib
 enum ZIPAgyFixture {
     struct Member {
         var name: String
-        var rawName: Data?
-        var flags: UInt16 = 0x800
-        var localFlags: UInt16?
         var body: Data
         var packed: Data
         var size: UInt32
