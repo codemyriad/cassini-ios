@@ -44,6 +44,19 @@ final class SettingsFlowTests: XCTestCase {
                        "requested=\(group);completed=\(group);consented=\(group)")
     }
 
+    /// iOS extra (draft wording): Moving and backup says notes follow the user's iOS backups, and Learn more opens the
+    /// explanation of iCloud, computer backups, saved voices and the ZIP export.
+    @MainActor func testMovingAndBackupExplainsTheBackupsAndOpensLearnMore() {
+        let app = openSettings()
+        let learnMore = app.buttons["backupInfoRow"]
+        reveal(learnMore, in: app)
+        XCTAssertTrue(element(app, startingWith: "Your notes are included in your iPhone backups").exists)
+        learnMore.tap()
+        XCTAssertTrue(app.navigationBars["Moving and backup"].waitForExistence(within: 15))
+        XCTAssertTrue(element(app, startingWith: "Apple can read an iCloud backup").exists)
+        reveal(element(app, startingWith: "Saved voices stay on this iPhone only"), in: app)
+    }
+
     // ports: SettingsViewModelTest#showsTheModelRowsTheCountsTheVersionAndTheNotificationsBanner (on the screen)
     /// Where the system has no Apple speech (iOS 18) the default device has no recognizer: no picker, and the speech
     /// row says it is not available. That repeats, on purpose, the row of

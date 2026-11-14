@@ -35,6 +35,8 @@ public enum Route: Codable, Hashable, Sendable {
     case modelDownload(noteID: UUID?, part: ModelPart? = nil)
     /// D78: the speech-only upgrade advertised by the Parakeet suggestion.
     case parakeetDownload
+    /// Settings, Moving and backup, Learn more: how the user's own iOS backups treat the notes (an iOS extra).
+    case backupInfo
 
     public var noteID: UUID? {
         if case .note(let id, _, _) = self { id } else { nil }

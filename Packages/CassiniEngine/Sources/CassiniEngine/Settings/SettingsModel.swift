@@ -115,6 +115,7 @@ import CassiniNotebook
     public func openVoices() { onEffect(.open(.savedVoices)) }
     public func openTrash() { onEffect(.open(.trash)) }
     public func openLicenses() { onEffect(.open(.licenses)) }
+    public func openBackupInfo() { onEffect(.open(.backupInfo)) }
     public func turnOnNotifications() { onEffect(.openNotificationSettings) }
     public func openAppLanguage() { onEffect(.openAppLanguageSettings) }
 
