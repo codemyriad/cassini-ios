@@ -64,6 +64,7 @@ import CassiniEngineTesting
         #if DEBUG
         var badgeGallery = false
         var draftSpeakerSuggestion = false
+        var backupExcluded = false
         #endif
     }
 
@@ -217,6 +218,7 @@ extension AppEnvironment {
                   inProcess: inProcess, token: token)
         environment.launch.badgeGallery = arguments.contains("--badge-gallery")
         environment.launch.draftSpeakerSuggestion = draftSpeakerSuggestion
+        environment.launch.backupExcluded = arguments.contains("--backup-excluded")
         return environment
     }
 

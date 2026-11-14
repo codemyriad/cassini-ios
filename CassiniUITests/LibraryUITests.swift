@@ -613,16 +613,55 @@ final class LibraryUITests: XCTestCase {
         XCTAssertEqual(search.value as? String, "tomatoe", "the search stays open")
     }
 
+    // ports: FirstRunHeroBehaviourTest#backupOnPairsTheSubtitleWithItsQualifierAndTheBackupPrivacyLine
     @MainActor func testAnEmptyLibraryOffersRecordAndImport() {
         let app = launch([])
-        XCTAssertTrue(app.staticTexts["No notes yet"].waitForExistence(within: 5))
-        XCTAssertTrue(app.staticTexts["Record something, or import an audio file."].exists)
-        XCTAssertTrue(app.buttons["Record"].exists, "the LIB_EMPTY banner's own Record")
-        XCTAssertTrue(app.buttons["Import"].exists, "and its own Import, as Android's banner")
-        XCTAssertTrue(app.buttons["Import audio"].exists, "beside the capture bar's Import audio")
-        XCTAssertFalse(app.staticTexts["Transcribed on this device. Audio never leaves it."].exists,
-                       "the Library does not repeat the first-run privacy line")
+        let pad = UIDevice.current.userInterfaceIdiom == .pad
+        let title = app.staticTexts["heroTitle"]
+        XCTAssertTrue(title.waitForExistence(within: 15))
+        XCTAssertEqual(title.label, "Every word written down.")
+        let subtitle = app.descendants(matching: .any)["heroSubtitle"]
+        XCTAssertTrue(subtitle.exists)
+        XCTAssertEqual(subtitle.label, "None of it uploaded. (except for encrypted cloud backup)")
+        let howTo = app.staticTexts["heroHowTo"]
+        XCTAssertEqual(howTo.label, "Record something, or import an audio file.")
+        let privacy = app.descendants(matching: .any)["heroPrivacy"]
+        let expectedPrivacy = pad
+            ? "Written down on this iPad. Never uploaded, except to your encrypted cloud backup."
+            : "Written down on this iPhone. Never uploaded, except to your encrypted cloud backup."
+        XCTAssertEqual(privacy.label, expectedPrivacy)
+        XCTAssertFalse(app.staticTexts["No notes yet"].exists, "the Wave 5 hero replaces LIB_EMPTY")
+        XCTAssertFalse(app.buttons["Starred"].exists, "the filter bar hides while the Library has no meetings")
+        XCTAssertTrue(app.buttons["recordButton"].exists)
+        XCTAssertTrue(app.buttons["Import audio"].exists, "Record and Import stay in the bottom capture bar")
+        XCTAssertFalse(app.buttons["Import"].exists, "no duplicate Import banner button")
+        XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", "never leaves")).firstMatch.exists)
         capture("Library empty")
+    }
+
+    // ports: FirstRunHeroBehaviourTest#transferOnlyShowsTheProcessingLineWithoutTheQualifier
+    @MainActor func testAnEmptyLibraryWithBackupExcludedHidesQualifierAndShowsBackupExcludedPrivacyLine() {
+        let app = launch(["--backup-excluded"])
+        let pad = UIDevice.current.userInterfaceIdiom == .pad
+        let title = app.staticTexts["heroTitle"]
+        XCTAssertTrue(title.waitForExistence(within: 15))
+        XCTAssertEqual(title.label, "Every word written down.")
+        let subtitle = app.descendants(matching: .any)["heroSubtitle"]
+        XCTAssertEqual(subtitle.label, "None of it uploaded.")
+        XCTAssertFalse(app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label CONTAINS %@", "(except for encrypted cloud backup)")).firstMatch.exists)
+        let privacy = app.descendants(matching: .any)["heroPrivacy"]
+        let expectedPrivacy = pad
+            ? "Written down on this iPad. Cassini never uploads the audio and marks it to be left out of iCloud Backup."
+            : "Written down on this iPhone. Cassini never uploads the audio and marks it to be left out of iCloud Backup."
+        XCTAssertEqual(privacy.label, expectedPrivacy)
+        XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", "never leaves")).firstMatch.exists)
+    }
+
+    @MainActor func testIPadEmptyLibraryShowsIPadHeroAndPrivacyLines() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad, "the Library sidebar")
+        testAnEmptyLibraryOffersRecordAndImport()
+        testAnEmptyLibraryWithBackupExcludedHidesQualifierAndShowsBackupExcludedPrivacyLine()
     }
 
     // ports: LibraryBehaviourTest#renameSavesTheTrimmedTitleOnlyWhenItChanged

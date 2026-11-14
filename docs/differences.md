@@ -41,6 +41,23 @@ The byte-exact S-5 cases, D84 row tests and catalog selection are pinned to cass
 `Packages/CassiniNotebook/Tests/CassiniNotebookTests/Resources/markdown/UPSTREAM.json` with byte-identical fixture content to Android. Markdown dates use D95 meeting time: a known instant is formatted,
 a local-only label stays as written, and unknown dates contribute only the duration, never the seal/import date.
 
+## First-run hero and backup-gated privacy copy (Wave 5, D-974, D98)
+
+An empty Library shows the shared Wave 5 first-run hero (`FirstRunHeroView`, `HeroWave`) instead of the `LIB_EMPTY`
+banner: `"Every word written down."` over dimmed `"None of it uploaded."`, a decorative wave of square `4 pt` `accent`
+bars fading toward the trailing edge (mirrored in RTL), the how-to line, and a backup-gated privacy line, while Record
+and Import audio stay in the bottom bar.
+
+Because `NoteRepository` lives in `Application Support/Cassini` without `NSURLIsExcludedFromBackupKey`, OS backups and
+Quick Start device migration are enabled by default on iOS today, so the hero pairs `"None of it uploaded."` with
+`"(except for encrypted cloud backup)"` (spoken as `firstRun.hero.subtitlePhoneNote`) and shows
+`privacy.onDevice.{iphone,ipad}.withBackup`. When the library root is marked `isExcludedFromBackup = true` (Wave 6),
+the qualifier hides and the privacy line switches to `privacy.onDevice.{iphone,ipad}.backupExcluded`. Unlike Android's
+phone-only state (`privacy.onDevice.phone`), iOS never claims `"The audio never leaves it."`, because
+`NSURLIsExcludedFromBackupKey` is backup guidance and Quick Start device-to-device migration may still copy local app
+storage (`PARITY.md`, `D98`). Settings' On-device models footer likewise states `"Transcription runs on this device."`
+without claiming backed-up audio never leaves the device. Browser Companion is desktop-only (`n/a` on iOS and Android).
+
 ## Engines and thresholds
 
 ### Speech recognition

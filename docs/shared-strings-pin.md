@@ -58,3 +58,13 @@ The Whistle fallback notice (#117) is vendored from cassini-ux `7cdb069fb0b71953
 `strings/strings.json` (SHA-256 `8b20048485bd928d2067806284c381ffb8033768ecf084387600517d0006690f`): entry
 `models.parakeetUltra.noteFallback`, in `Notices.xcstrings` with all six locales, every value as in the catalog.
 The entries above stay at their pins; no shared source was edited.
+
+Wave 5 first-run hero and backup-gated privacy copy (`D-974`, `L-27`, `D98`) is pinned to `codemyriad/cassini-ux`
+`31973ff9784fcc66c1c7993b903a336e8f2c1432`, `strings/strings.json` (SHA-256
+`c634cdfbcf961391e1f3a084c4d8ac07aa10946a289ecba4da8ec1ebc25717ca`), vendored byte-identically in
+`contracts/wave5-strings/strings.json` alongside `contracts/wave5-strings/UPSTREAM.json`.
+`scripts/generate-wave5-strings.py` compiles the eight iOS Wave 5 IDs (`firstRun.hero.title`, `firstRun.hero.subtitle`,
+`firstRun.hero.phoneBackupQualifier`, `firstRun.hero.subtitlePhoneNote`, `privacy.onDevice.{iphone,ipad}.{withBackup,backupExcluded}`)
+into `Cassini/Resources/Strings/LibraryWave5.xcstrings` and `Cassini/Strings/LibraryWave5Copy.swift` across all six
+locales. The Phase 1 `status-badges` bundle stays at `5e0c34e0f1bb390298dabdf4eedc494e933fd329` until `L-10` (`D-997`)
+migrates `Received` to `Imported`. No shared source was edited.

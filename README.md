@@ -167,6 +167,11 @@ TestFlight still need.
   languages, including for VoiceOver. iOS omits the repeated unknown-date label from individual row metadata,
   the Note subtitle and the Document info Recorded row; the Note subtitle keeps the duration. Android repeats
   “Date unknown” on those surfaces. Neither app displays a document's sealing or import time as its recording date.
+- **First-run hero and backup copy (D98).** An empty Library shows the Wave 5 hero with its backup qualifier and
+  `privacy.onDevice.{iphone,ipad}.withBackup` while backups are enabled (the default), or
+  `privacy.onDevice.{iphone,ipad}.backupExcluded` when the library root is marked `isExcludedFromBackup = true`.
+  Unlike Android's phone-only state, iOS never claims “The audio never leaves it.”, because
+  `NSURLIsExcludedFromBackupKey` is backup guidance and Quick Start device migration may still copy local app storage.
 - **Engines and thresholds.** D78 starts with bundled Whistle and promotes Parakeet Ultra after its pinned files
   are verified. Parakeet needs a device that reports at least 3.25 GiB of physical RAM (every 4 GB device and no 3 GB
   one; Android asks for 4,000,000,000 bytes, which the 4 GB iPhone 12 and 13 do not report) and the normal runtime

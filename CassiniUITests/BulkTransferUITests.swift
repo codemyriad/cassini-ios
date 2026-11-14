@@ -84,7 +84,7 @@ final class BulkTransferUITests: XCTestCase {
             row.press(forDuration: 1)
             app.buttons["Move to Recently Deleted"].tapWhenSettled()
         }
-        XCTAssertTrue(app.staticTexts["No notes yet"].waitForExistence(within: 15))
+        XCTAssertTrue(app.staticTexts["heroTitle"].waitForExistence(within: 15))
         app.buttons["recordButton"].tap()
         XCTAssertTrue(app.buttons["Pause recording"].waitForEnabled(within: 15))
         app.buttons["recordingAllMeetings"].tap()

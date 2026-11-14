@@ -36,6 +36,8 @@ public final class LibraryScreenModel {
         public var trash: @MainActor (UUID) async -> Void
         /// Whether the speaker models are installed, so names carry over to a new version.
         public var speakerModelsReady: @MainActor () async -> Bool
+        /// Whether OS cloud backup is enabled for the library (`nil` until read, so no privacy claim flashes first).
+        public var cloudBackup: @MainActor () -> Bool?
         public var clock: any AppClock
         public var calendar: Calendar
 
@@ -49,11 +51,13 @@ public final class LibraryScreenModel {
                     update: @escaping @MainActor (UUID, @escaping @Sendable (inout Note) -> Void) -> Void,
                     trash: @escaping @MainActor (UUID) async -> Void,
                     speakerModelsReady: @escaping @MainActor () async -> Bool,
+                    cloudBackup: @escaping @MainActor () -> Bool? = { true },
                     clock: any AppClock, calendar: Calendar) {
             self.notes = notes; self.loading = loading; self.unavailable = unavailable; self.processing = processing
             self.phase = phase; self.install = install; self.recording = recording; self.finishing = finishing
             self.transcribe = transcribe; self.startOver = startOver; self.stop = stop; self.dequeue = dequeue
             self.update = update; self.trash = trash; self.speakerModelsReady = speakerModelsReady
+            self.cloudBackup = cloudBackup
             self.clock = clock; self.calendar = calendar
         }
     }
@@ -121,8 +125,10 @@ public final class LibraryScreenModel {
                                  unavailable: unavailable)
         guard isSearching else {
             facts.results = live.count
+            let emptyState = LibraryMapping.emptyState(facts, favoritesOnly: favoritesOnly)
+            let hero = LibraryMapping.firstRunHero(facts, cloudBackup: ports.cloudBackup())
             return LibraryContent(loading: loading, sections: LibraryMapping.sections(live, context: context, now: now, calendar: calendar),
-                                  emptyState: LibraryMapping.emptyState(facts, favoritesOnly: favoritesOnly), facts: facts)
+                                  emptyState: emptyState, hero: hero, facts: facts)
         }
         // Until the first search answers, the results are empty and say nothing. Afterwards a new query or a changed
         // note shows the last results, over the notes as they are now, until the search over them answers.
@@ -320,6 +326,7 @@ private extension LibraryScreenModel {
         withObservationTracking {
             _ = ports.processing()
             _ = ports.recording()
+            _ = ports.cloudBackup()
         } onChange: { [weak self] in
             if Thread.isMainThread {
                 MainActor.assumeIsolated { self?.contextChanged() }

@@ -1,0 +1,7 @@
+{
+  "repository": "https://github.com/codemyriad/cassini-ux",
+  "commit": "31973ff9784fcc66c1c7993b903a336e8f2c1432",
+  "path": "strings/strings.json",
+  "sha256": "c634cdfbcf961391e1f3a084c4d8ac07aa10946a289ecba4da8ec1ebc25717ca",
+  "vendored_path": "contracts/wave5-strings/strings.json"
+}

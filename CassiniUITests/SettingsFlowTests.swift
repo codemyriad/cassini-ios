@@ -69,6 +69,9 @@ final class SettingsFlowTests: XCTestCase {
         XCTAssertFalse(row(app, startingWith: "Speech recognition").exists, "a Ready or Not available row is not a button")
         XCTAssertTrue(row(app, startingWith: "Telling speakers apart").label.contains("Not downloaded"))
         XCTAssertTrue(row(app, startingWith: "Telling speakers apart").label.contains("88 MB"))
+        let modelsFooter = app.staticTexts["Transcription runs on this device."]
+        reveal(modelsFooter, in: app)
+        XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", "never leaves")).firstMatch.exists)
         let voices = row(app, startingWith: "Saved voices")
         reveal(voices, in: app)
         XCTAssertTrue(voices.label.contains("None yet"), voices.label)

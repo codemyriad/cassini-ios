@@ -107,12 +107,15 @@ public struct LibraryContent: Hashable, Sendable {
     /// The flat results while a query is open; nil when not searching.
     public var results: [LibraryRow]?
     public var emptyState: LibraryEmptyState?
+    /// The Wave 5 first-run hero when the library is loaded, empty and not searching, once backup state is read.
+    public var hero: FirstRunHero?
     /// What only the Library knows, for its banners (`Notices.library`).
     public var facts: LibraryFacts
 
     public init(loading: Bool = false, sections: [DaySection] = [], results: [LibraryRow]? = nil,
-                emptyState: LibraryEmptyState? = nil, facts: LibraryFacts = LibraryFacts()) {
+                emptyState: LibraryEmptyState? = nil, hero: FirstRunHero? = nil,
+                facts: LibraryFacts = LibraryFacts()) {
         self.loading = loading; self.sections = sections; self.results = results; self.emptyState = emptyState
-        self.facts = facts
+        self.hero = hero; self.facts = facts
     }
 }

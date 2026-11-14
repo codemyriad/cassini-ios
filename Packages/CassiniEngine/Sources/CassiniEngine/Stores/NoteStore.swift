@@ -75,6 +75,11 @@ public actor NoteStore {
         return report
     }
 
+    /// Whether `root` is eligible for iCloud and computer backups (`false` only when `NSURLIsExcludedFromBackupKey` is set).
+    public func isCloudBackupEnabled() -> Bool {
+        (try? root.resourceValues(forKeys: [.isExcludedFromBackupKey]))?.isExcludedFromBackup != true
+    }
+
     /// Newest first.
     public func all() -> [Note] { notes.values.sorted { $0.sortDate > $1.sortDate } }
 

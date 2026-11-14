@@ -13,6 +13,8 @@ import CassiniNotebook
     public private(set) var loadFailure: String?
     /// The notes have been read.
     public private(set) var isLoaded = false
+    /// Whether the library root is included in OS cloud backups; nil until `load()` has read it off the main actor.
+    public private(set) var cloudBackup: Bool?
     public private(set) var unreadableCount = 0
 
     @ObservationIgnored public let noteStore: NoteStore?
@@ -56,10 +58,12 @@ import CassiniNotebook
             try FileManager.default.setAttributes([.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
                                                   ofItemAtPath: noteStore.root.path)
             let report = try await noteStore.load()
+            let backupEnabled = await noteStore.isCloudBackupEnabled()
             let placedMeanwhile = notes
             notes = report.notes
             for note in placedMeanwhile where self.note(note.id) == nil { place(note) }
             unreadableCount = report.unreadableCount
+            cloudBackup = backupEnabled
             isLoaded = true
         } catch {
             loadFailure = error.localizedDescription
