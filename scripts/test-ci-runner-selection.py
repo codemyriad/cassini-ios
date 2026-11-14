@@ -156,11 +156,12 @@ class CiRunnerSelectionTests(unittest.TestCase):
         self.assertIn("printf 'CASSINI_SIM_PREFIX=ts-ci-ios-%s\\n'", text)
         self.assertIn('"$RUNNER_NAME" >> "$GITHUB_ENV"', text)
         self.assertIn("always() && env.CASSINI_SIM_PREFIX != ''", text)
-        self.assertEqual(text.count("scripts/test.sh clean"), 2)
-        self.assertIn("scripts/test.sh all", text)
+        self.assertIn("exec scripts/simulator-gate.sh run", text)
+        self.assertIn("run: scripts/simulator-gate.sh clean", text)
+        self.assertIn("CASSINI_GATE_OWNER_FILE=", text)
         self.assertNotIn("-only-testing", text)
         self.assertNotIn("CASSINI_IOS18_RUNTIME:", text)
-        self.assertRegex(text, r"(?s)Remove only this run's simulator clones\n        if: always\(\).*?scripts/test.sh clean")
+        self.assertRegex(text, r"(?s)Remove only this run's simulator clones\n        if: always\(\).*?scripts/simulator-gate.sh clean")
         self.assertRegex(text, r"(?s)actions/upload-artifact@v5\n        if: always\(\).*?test-logs\*")
 
     def test_simulator_prefix_belongs_to_one_rented_runner_service(self):
@@ -172,11 +173,13 @@ class CiRunnerSelectionTests(unittest.TestCase):
                 target = pathlib.Path(directory) / "job-env"
                 target.unlink(missing_ok=True)
                 result = subprocess.run(["/bin/bash", "-e", "-c", script], capture_output=True, text=True,
-                                        env=dict(os.environ, RUNNER_NAME=runner, GITHUB_ENV=str(target)), timeout=30)
+                                        env=dict(os.environ, RUNNER_NAME=runner, GITHUB_ENV=str(target),
+                                                 RUNNER_TEMP=directory, GITHUB_RUN_ID="123", GITHUB_RUN_ATTEMPT="2"), timeout=30)
                 with self.subTest(runner=runner):
                     if runner in ("scw32-ios-1", "scw32-ios-2", "scw-m4-ios-1"):
                         self.assertEqual(result.returncode, 0, result.stderr)
-                        self.assertEqual(target.read_text(), f"CASSINI_SIM_PREFIX=ts-ci-ios-{runner}\n")
+                        self.assertEqual(target.read_text(), f"CASSINI_SIM_PREFIX=ts-ci-ios-{runner}\n"
+                                         f"CASSINI_GATE_OWNER_FILE={directory}/cassini-simulator-123-2.pid\n")
                     else:
                         self.assertNotEqual(result.returncode, 0)
                         self.assertFalse(target.exists())

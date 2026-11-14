@@ -38,10 +38,13 @@ does not imply an idle machine.
 Simulator names include the registered runner name, so concurrent services on one host cannot reuse a simulator.
 Each service executes one job at a time. Initial and always-run cleanup remove only that service's clones; after
 a host crash, its next job cleans the same owned prefix rather than abandoning a new generation of clones.
-Cancellation ends this run's build/shard descendants even when a host slot was acquired outside the test script.
+The gate step uses exec through its workflow wrapper and records the actual test owner's PID in a run/attempt-specific
+file under RUNNER_TEMP. Always-run cleanup sends TERM to that owner if needed and waits for its process-exit event
+before deleting clones. A timeout or PID identity mismatch fails cleanup without deleting clones. Cancellation ends
+this run's build/shard descendants even when a host slot was acquired outside the test script.
 Logs and result bundles from both runtime legs
 are uploaded on success or failure and retained for seven days, identified by run and attempt. Native step failure
-fails the job; no upload retry or test retry is added. Superseded PR runs cancel; main/manual runs do not cancel.
+fails the job; no upload retry or test retry is added. No automatic cancellation is configured.
 `CASSINI_POST_STATUS=0` means this job cannot manufacture the legacy status; its token has no statuses-write scope.
 
 ## One-day comparison, then a separate decision

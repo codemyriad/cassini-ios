@@ -25,6 +25,7 @@ on:
       - 'Package.resolved'
       - 'project.yml'
       - 'scripts/test.sh'
+      - 'scripts/simulator-gate.sh'
       - 'scripts/test-events.py'
       - 'scripts/test-test-events.py'
       - 'scripts/test-swift-test-product.py'

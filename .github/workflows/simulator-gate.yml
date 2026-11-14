@@ -35,6 +35,7 @@ jobs:
           esac
           # Stable service ownership also recovers leftovers after a host crash.
           printf 'CASSINI_SIM_PREFIX=ts-ci-ios-%s\n' "$RUNNER_NAME" >> "$GITHUB_ENV"
+          printf 'CASSINI_GATE_OWNER_FILE=%s/cassini-simulator-%s-%s.pid\n' "$RUNNER_TEMP" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" >> "$GITHUB_ENV"
       - uses: actions/checkout@v5
         with:
           # Compare the same immutable PR head as the legacy status, not a moving branch.
@@ -61,16 +62,11 @@ jobs:
       - name: Complete gate without signing or status posting
         working-directory: cassini-ios
         run: |
-          scripts/test.sh clean
-          if [ -x "$HOME/bin/heavy-run" ]; then
-            "$HOME/bin/heavy-run" scripts/test.sh all
-          else
-            scripts/test.sh all
-          fi
+          exec scripts/simulator-gate.sh run
       - name: Remove only this run's simulator clones
         if: always() && env.CASSINI_SIM_PREFIX != ''
         working-directory: cassini-ios
-        run: scripts/test.sh clean
+        run: scripts/simulator-gate.sh clean
       - uses: actions/upload-artifact@v5
         if: always()
         with:

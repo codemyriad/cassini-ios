@@ -181,7 +181,7 @@ class Harness:
         self.cache = base / "cache"
         for d in (self.root / "scripts", self.root / "CassiniUITests", self.stub / "bin", self.home, self.cache):
             d.mkdir(parents=True)
-        for name in ("test.sh", "test-events.py", "check-embedded-minos.py", "ui-test-durations.tsv"):
+        for name in ("test.sh", "simulator-gate.sh", "test-events.py", "check-embedded-minos.py", "ui-test-durations.tsv"):
             shutil.copy2(ROOT / "scripts" / name, self.root / "scripts" / name)
         # The fixture starts with the leg off by default, so the tests of everything else run without an iOS 18 runtime;
         # Ios18LegTests switch the line back to the repository's value where the default is what they test.
@@ -346,6 +346,86 @@ class RuntimePickTests(unittest.TestCase):
 
 
 class FullRunTests(unittest.TestCase):
+    def test_workflow_cleanup_waits_for_owner_after_outer_shell_is_cancelled(self):
+        import select
+        import shlex
+        import signal
+        import sys
+
+        h = Harness(self)
+        owner_file = h.stub / 'owner.pid'
+        stopped = h.stub / 'worker-stopped'
+        cleaned = h.stub / 'workflow-cleaned'
+        ready_read, ready_write = os.pipe()
+        worker = textwrap.dedent('''\
+            import os, signal, sys
+            from pathlib import Path
+            def stop(_signal, _frame):
+                Path(sys.argv[1]).write_text('stopped')
+                raise SystemExit(0)
+            signal.signal(signal.SIGTERM, stop)
+            os.write(int(sys.argv[2]), b'R')
+            signal.pause()
+        ''')
+        functions = '\n'.join(function(name) for name in (
+            'process_tree', 'signal_all', 'end_tree', 'end_own_processes', 'summary'))
+        script = f'''#!/bin/bash
+if [ "$1" = clean ]; then
+    if [ -f {shlex.quote(str(owner_file))} ]; then
+        test -f {shlex.quote(str(stopped))} || exit 9
+    fi
+    echo cleaned >> {shlex.quote(str(cleaned))}
+    exit 0
+fi
+root={shlex.quote(str(h.root))}
+logs={shlex.quote(str(h.stub))}; failed_logs="$logs"
+tier=all; timings=""; started_all=$(date +%s)
+lock_pid=""; fast_pid=""; runtime_tag=""; heavy_started=1; keep_sims=0
+{functions}
+shutdown_clones() {{ :; }}
+post_status() {{ :; }}
+release_heavy_lock() {{ :; }}
+trap summary EXIT
+trap 'exit 143' TERM
+{shlex.join([sys.executable, '-c', worker, str(stopped), str(ready_write)])} &
+wait $!
+'''
+        (h.root / 'scripts/test.sh').write_text(script)
+        # A host-slot wrapper can exit before its ordinary child. Signal only that outer boundary.
+        (h.home / 'bin').mkdir()
+        wrapper = h.home / 'bin/heavy-run'
+        wrapper.write_text('#!/bin/bash\n"$@" &\nwait $!\n')
+        wrapper.chmod(0o755)
+        env = h.env(CASSINI_GATE_OWNER_FILE=str(owner_file))
+        log_path = h.stub / 'workflow.log'
+        with log_path.open('w') as log:
+            process = subprocess.Popen([str(h.root / 'scripts/simulator-gate.sh'), 'run'],
+                env=env, stdout=log, stderr=log, pass_fds=(ready_write,), start_new_session=True)
+            os.close(ready_write)
+            try:
+                self.assertTrue(select.select([ready_read], [], [], 30)[0], 'worker never became ready')
+                self.assertEqual(os.read(ready_read, 1), b'R')
+                owner = int(owner_file.read_text())
+                self.assertNotEqual(owner, process.pid, 'fixture must exercise an independent test owner')
+                process.send_signal(signal.SIGTERM)
+                process.wait(timeout=30)
+                self.assertFalse(stopped.exists(), 'outer cancellation unexpectedly reached the independent owner')
+                result = subprocess.run([str(h.root / 'scripts/simulator-gate.sh'), 'clean'],
+                    env=env, capture_output=True, text=True, timeout=90)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr + log_path.read_text())
+                self.assertIn('exited before clone cleanup', result.stdout)
+                self.assertTrue(stopped.exists(), 'workflow cleanup left the owned worker running')
+                self.assertFalse(owner_file.exists())
+                self.assertEqual(cleaned.read_text().splitlines(), ['cleaned', 'cleaned'])
+                self.assertIn('FAILED (all)', log_path.read_text(), 'test owner did not finish its EXIT summary')
+            finally:
+                try:
+                    os.killpg(process.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                process.wait(timeout=30)
+                os.close(ready_read)
+
     def test_subshell_exit_summary_has_no_owner_side_effects(self):
         import shlex
         h = Harness(self)
