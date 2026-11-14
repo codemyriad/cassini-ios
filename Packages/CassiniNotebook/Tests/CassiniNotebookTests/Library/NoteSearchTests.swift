@@ -88,9 +88,10 @@ final class NoteSearchTests {
         var value = note("A quieter kind of productivity", "")
         value.status = .ready
         value.transcript = [
-            TranscriptSegment(text: "What if being productive meant leaving room for a pause.", start: 0, end: 5),
-            TranscriptSegment(text: "Let’s protect an hour on Thursday for focused work\nwithout interruptions.", start: 5, end: 10)
+            TranscriptSegment(text: "What if being productive meant leaving room for a pause.", start: 0, end: 5, speakerID: "alex"),
+            TranscriptSegment(text: "Let’s protect an hour on Thursday for focused work\nwithout interruptions.", start: 5, end: 10, speakerID: "sam")
         ]
+        #expect(NoteTranscripts.sealed(value).turns.count == 2, "Exercise the boundary between distinct speakers")
         let fields = SearchFields(value)
         #expect(!fields.body.text.contains("\n\n"))
         let preview = Highlighted(marked: fields.snippet(try #require(SearchQuery("Thursday")))).singleLine
