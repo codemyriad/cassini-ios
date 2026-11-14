@@ -309,6 +309,18 @@ struct LibraryMappingTests {
         #expect(LibraryMapping.emptyState(LibraryFacts(liveNotes: 3, results: 3)) == nil)
         #expect(LibraryMapping.emptyState(LibraryFacts(liveNotes: 3, results: 0), favoritesOnly: true) == .noStarred)
     }
+
+    @Test func firstRunHeroFollowsEmptyLibraryAndBackupState() {
+        #expect(LibraryMapping.firstRunHero(LibraryFacts(loading: true), cloudBackup: true) == nil)
+        #expect(LibraryMapping.firstRunHero(LibraryFacts(unavailable: true), cloudBackup: true) == nil)
+        #expect(LibraryMapping.firstRunHero(LibraryFacts(liveNotes: 1, results: 1), cloudBackup: true) == nil)
+        #expect(LibraryMapping.firstRunHero(LibraryFacts(liveNotes: 0, query: "budget", results: 0), cloudBackup: true) == nil)
+        #expect(LibraryMapping.firstRunHero(LibraryFacts(), cloudBackup: nil) == nil)
+        #expect(LibraryMapping.firstRunHero(LibraryFacts(), cloudBackup: true)
+            == FirstRunHero(cloudBackup: true, privacy: .withBackup))
+        #expect(LibraryMapping.firstRunHero(LibraryFacts(), cloudBackup: false)
+            == FirstRunHero(cloudBackup: false, privacy: .backupExcluded))
+    }
 }
 
 private extension ProgressBanner.Announcement {

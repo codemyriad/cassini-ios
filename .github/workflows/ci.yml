@@ -17,6 +17,7 @@ on:
       - 'CassiniShared/**'
       - 'CassiniTests/**'
       - 'CassiniUITests/**'
+      - 'contracts/**'
       - 'Packages/**'
       - 'Whistle/**'
       - 'Sources/**'
@@ -42,6 +43,7 @@ on:
       - 'scripts/*status-badge*.py'
       - 'scripts/*meeting-strings*.py'
       - 'scripts/*library-strings*.py'
+      - 'scripts/*wave5-strings*.py'
       - 'scripts/*brand*.py'
       - 'scripts/*testflight*'
       - 'scripts/launchd/**'
@@ -103,7 +105,9 @@ jobs:
           python3 scripts/generate-status-badge-strings.py --check
           python3 scripts/generate-meeting-strings.py --check
           python3 scripts/generate-library-strings.py --check
+          python3 scripts/generate-wave5-strings.py --check
           python3 scripts/test-library-strings.py
+          python3 scripts/test-wave5-strings.py
           python3 scripts/test-status-badge-strings.py
           python3 Packages/CassiniNotebook/Tests/CassiniNotebookTests/Resources/status-badges/vectors/states/verify.py
           python3 Packages/CassiniNotebook/Tests/CassiniNotebookTests/Resources/status-badges/vectors/states/test_contract.py

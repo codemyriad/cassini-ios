@@ -170,4 +170,22 @@ import CassiniEngineTesting
         XCTAssertEqual(failures.count, 1, "a commit that does not report stays quiet")
         persistence.failSaves(false)
     }
+
+    func testCloudBackupIsNilBeforeLoadAndReflectsRootBackupExclusionOnceLoaded() async throws {
+        let freshRoot = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: freshRoot) }
+        let store = try NoteStore(root: freshRoot)
+        let unread = LibraryStore(noteStore: store) { _ in }
+        XCTAssertNil(unread.cloudBackup)
+        await unread.load()
+        XCTAssertEqual(unread.cloudBackup, true)
+
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        var mutableRoot = freshRoot
+        try mutableRoot.setResourceValues(values)
+        let excluded = LibraryStore(noteStore: try NoteStore(root: freshRoot)) { _ in }
+        await excluded.load()
+        XCTAssertEqual(excluded.cloudBackup, false)
+    }
 }

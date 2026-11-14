@@ -37,6 +37,12 @@ final class AccessibilityAuditTests: XCTestCase {
         return app
     }
 
+    @MainActor private func emptyLibrary(_ extra: [String] = []) -> XCUIApplication {
+        let app = launch(extra)
+        XCTAssertTrue(app.staticTexts["heroTitle"].waitForExistence(within: 15))
+        return app
+    }
+
     @MainActor private func note(_ extra: [String] = []) -> XCUIApplication {
         let app = launch(["--seed", "library", "--open-fixture", Self.fixture] + extra)
         XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 15))
@@ -146,6 +152,7 @@ final class AccessibilityAuditTests: XCTestCase {
     }
 
     @MainActor func testTheLibraryPassesTheAudit() { audit(library(), screen: "library") }
+    @MainActor func testTheEmptyLibraryPassesTheAudit() { audit(emptyLibrary(), screen: "libraryEmpty") }
     @MainActor func testTheNoteScreenPassesTheAudit() { audit(note(), screen: "note", transcript: true) }
     @MainActor func testTheRecordingScreenPassesTheAudit() { audit(recording(), screen: "recording") }
     @MainActor func testSettingsPassesTheAudit() { audit(settings(), screen: "settings", listRows: true) }
@@ -161,7 +168,7 @@ final class AccessibilityAuditTests: XCTestCase {
         // Six screens in one test: about 160 s on a calm host, over the 300 s default when it runs 2-4x slower.
         executionTimeAllowance = 600
         let screens: [(String, @MainActor ([String]) -> XCUIApplication)] = [
-            ("library", library), ("note", note), ("recording", recording), ("settings", settings),
+            ("library", library), ("libraryEmpty", emptyLibrary), ("note", note), ("recording", recording), ("settings", settings),
             ("trash", trash), ("savedVoices", savedVoices)]
         for (name, open) in screens {
             let app = open([])
@@ -179,7 +186,8 @@ final class AccessibilityAuditTests: XCTestCase {
     @MainActor func testNoTextIsClippedAtTheLargestTextSize() {
         defer { XCUIApplication().terminate() }
         let screens: [(String, @MainActor ([String]) -> XCUIApplication)] = [
-            ("library", library), ("note", note), ("settings", settings), ("trash", trash), ("savedVoices", savedVoices)]
+            ("library", library), ("libraryEmpty", emptyLibrary), ("note", note), ("settings", settings),
+            ("trash", trash), ("savedVoices", savedVoices)]
         for (name, open) in screens {
             let app = open(Self.largestText)
             audit(app, screen: "largest-\(name)", .textClipped)
@@ -197,8 +205,8 @@ final class AccessibilityAuditTests: XCTestCase {
     @MainActor private func auditClipping(language: String, region: String) {
         defer { XCUIApplication().terminate() }
         let screens: [(String, @MainActor ([String]) -> XCUIApplication)] = [
-            ("library", library), ("note", note), ("recording", recording), ("settings", settings), ("trash", trash),
-            ("savedVoices", savedVoices)]
+            ("library", library), ("libraryEmpty", emptyLibrary), ("note", note), ("recording", recording),
+            ("settings", settings), ("trash", trash), ("savedVoices", savedVoices)]
         for (name, open) in screens {
             let app = open(["-AppleLanguages", "(\(language))", "-AppleLocale", region])
             if name == "library" {

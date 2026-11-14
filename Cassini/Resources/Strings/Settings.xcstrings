@@ -2132,43 +2132,43 @@
         }
       }
     },
-    "Transcription runs on this device. Audio never leaves it.": {
+    "Transcription runs on this device.": {
       "comment": "On-device models footer",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Transcription runs on this device. Audio never leaves it."
+            "value": "Transcription runs on this device."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "La transcripción se hace en este dispositivo. El audio nunca sale de él."
+            "value": "La transcripción se hace en este dispositivo."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "La transcription s’effectue sur cet appareil. L’audio ne le quitte jamais."
+            "value": "La transcription s’effectue sur cet appareil."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "La trascrizione avviene su questo dispositivo. L’audio non lo lascia mai."
+            "value": "La trascrizione avviene su questo dispositivo."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "A transcrição acontece neste dispositivo. O áudio nunca sai dele."
+            "value": "A transcrição acontece neste dispositivo."
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "A transcrição é feita neste dispositivo. O áudio nunca sai dele."
+            "value": "A transcrição é feita neste dispositivo."
           }
         }
       }
