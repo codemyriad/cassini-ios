@@ -556,13 +556,17 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(result.waitForExistence(within: 15))
         // rowPreview is intentionally hidden from VoiceOver (the row speaks as one button). Read its rendered
         // pixels instead of the combined row label, which includes text even when the excerpt clips it away.
-        let image = try XCTUnwrap(result.screenshot().image.cgImage)
-        let request = VNRecognizeTextRequest()
-        request.recognitionLevel = .accurate
-        request.recognitionLanguages = ["en-US"]
-        try VNImageRequestHandler(cgImage: image).perform([request])
-        let visible = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ")
-        XCTAssertTrue(visible.contains("Thursday"), "rowPreview must draw the matched word: \(visible)")
+        var visible = ""
+        XCTAssertTrue(poll(within: 15) {
+            guard let image = result.screenshot().image.cgImage else { return false }
+            let request = VNRecognizeTextRequest()
+            request.recognitionLevel = .accurate
+            request.recognitionLanguages = ["en-US"]
+            do { try VNImageRequestHandler(cgImage: image).perform([request]) }
+            catch { visible = String(describing: error); return false }
+            visible = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ")
+            return visible.contains("Thursday")
+        }, "rowPreview must draw the matched word: \(visible)")
         capture("Thursday remains visible in the multi-turn search excerpt")
     }
 

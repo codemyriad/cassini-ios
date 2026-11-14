@@ -198,7 +198,8 @@ TestFlight still need.
   speaker. The cross-app vectors are checked through the reader and the import. Android keeps the transcript in a
   sealed document and a Room catalogue. The queue is `jobs.json`, and checkpoints use iOS's own format. Search
   uses an in-memory index instead of FTS4. As on Android, search joins spoken turns with spaces; row excerpts flatten
-  embedded line breaks while preserving highlights. Date filters apply only after typing a query. Local transcription
+  embedded line breaks while preserving highlights. The lazy list separates grouped and flat projections so iOS 18
+  does not retain ordinary row bodies in search results. Date filters apply only after typing a query. Local transcription
   jobs expose a time-left interval, so Library pills and VoiceOver share the catalog’s no-ETA fallback rather than
   inventing a scalar estimate. Saved voices keep one sample per note instead of a running mean.
 - **Transcript rendering (D84).** The pure `CassiniNotebook.TurnModel` ports the gocassini viewer pipeline at

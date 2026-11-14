@@ -58,6 +58,8 @@ struct LibraryView: View {
                     }
                 }
             }
+            // iOS 18 otherwise retains ordinary row bodies when the same notes become flat search results.
+            .id(content.results != nil)
             .padding(.horizontal, Spacing.gutter).padding(.top, 12).padding(.bottom, 28)
             .readableWidth()
         }
