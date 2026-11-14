@@ -602,6 +602,8 @@ stricter or looser than the spec.
   extensions: `.opus`, `.ogg`, `.mp3`, `.m4a`, `.wav`. FLAC and non-contract extensions stay excluded. Bounded probes
   inside the coordinated security-scoped read reject non-Opus Ogg, multiplexed video, FLAC, recognized non-contract
   containers and truncated WAV before a destination file is created. `.opus` no longer accepts MP3 bytes as a fallback.
+  ZIP restoration separately admits legacy `ArchiveAudio` containers, including CAF and AAC, after audio validation,
+  so the app can restore audio-only exports without widening Picker/Open-with admission.
 - **WAV.** iOS hands the admitted MP3/M4A/WAV containers to AVFoundation, which also decodes 24-bit and float WAV.
   There is therefore no separate "Unsupported WAV" failure and no IMPORT_WAV banner.
 - **Sniffing.** AVFoundation reports no MIME type, so the stored name comes from the container signature in the first

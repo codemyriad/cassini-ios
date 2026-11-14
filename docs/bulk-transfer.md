@@ -74,9 +74,9 @@ required.
 
 Platform differences: iOS uses its existing native document picker and system share/save sheet. The picker has
 no custom filter-title API; shared `import.filter.cassiniAndZip` is the import button's accessibility hint.
-Member admission follows the pinned shared decided-format contract (Opus/Ogg, MP3, M4A and WAV), with the same
-coordinated header validation as individual imports. ZIP extraction retains a member's extension on its private
-UUID scratch file. D96
+Individual imports follow the pinned shared decided-format contract (Opus/Ogg, MP3, M4A and WAV). ZIP members
+also admit legacy `ArchiveAudio` containers so exports can be restored unchanged, with audio inspection and
+MPEG-4/3GP video-track rejection. ZIP extraction retains a member's extension on its private UUID scratch file. D96
 copy, including all six translations/plurals, is pinned in [shared-strings-pin.md](shared-strings-pin.md). The
 reviewed Android #166 rules for byte-preserving clean imports, Finder metadata, ZIP64 and header flags are
 covered by regression tests here.
