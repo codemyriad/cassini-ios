@@ -137,10 +137,19 @@ public struct NameSheetUI: Hashable, Sendable {
         public var id: UUID
         public var name: String
         public var likely: Bool
+        public var tint: SpeakerTint
+
+        public init(id: UUID, name: String, likely: Bool, tint: SpeakerTint = .blue) {
+            self.id = id
+            self.name = name
+            self.likely = likely
+            self.tint = tint
+        }
     }
 
     public var speakerID: String
     public var label: String
+    public var quote: String
     public var placeholderNumber: Int?
     public var speakingTime: Double
     public var canSample: Bool

@@ -1191,47 +1191,6 @@
         }
       }
     },
-    "Draft transcript": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Draft transcript"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Borrador de la transcripción"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Brouillon de transcription"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bozza della trascrizione"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Rascunho da transcrição"
-          }
-        },
-        "pt-PT": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Rascunho da transcrição"
-          }
-        }
-      }
-    },
     "Duration": {
       "extractionState": "manual",
       "localizations": {
@@ -1474,47 +1433,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tamanho do ficheiro"
-          }
-        }
-      }
-    },
-    "Finish recording to listen to this note.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Finish recording to listen to this note."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Termina la grabación para escuchar esta nota."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Terminez l’enregistrement pour écouter cette note."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Termina la registrazione per ascoltare questa nota."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Conclua a gravação para ouvir esta nota."
-          }
-        },
-        "pt-PT": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Termine a gravação para ouvir esta nota."
           }
         }
       }
@@ -3303,6 +3221,47 @@
         }
       }
     },
+    "Stop recording to listen to this note.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop recording to listen to this note."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Detén la grabación para escuchar esta nota."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arrêtez l’enregistrement pour écouter cette note."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ferma la registrazione per ascoltare questa nota."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pare a gravação para ouvir esta nota."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pare a gravação para ouvir esta nota."
+          }
+        }
+      }
+    },
     "The draft so far is discarded. Your recording is kept.": {
       "extractionState": "manual",
       "localizations": {
@@ -3874,47 +3833,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Aguarde o fim da transcrição"
-          }
-        }
-      }
-    },
-    "Words may still change": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Words may still change"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Las palabras aún pueden cambiar"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Les mots peuvent encore changer"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Le parole possono ancora cambiare"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "As palavras ainda podem mudar"
-          }
-        },
-        "pt-PT": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "As palavras ainda podem mudar"
           }
         }
       }

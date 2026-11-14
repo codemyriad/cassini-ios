@@ -10,8 +10,24 @@ public enum JobPhase: Hashable, Sendable {
     case downloading(DownloadProgress?)
     /// The pipeline runs: the progress card and the draft transcript.
     case transcribing(RunningProgress, DraftState)
-    /// Stop was asked: the job keeps what is finalized and ends at its next result.
-    case stopping
+    /// Stop was asked: the job keeps what is finalized and ends at its next result, retaining the last live figures.
+    case stopping(StoppingProgress? = nil)
+
+    public var isStopping: Bool {
+        if case .stopping = self { return true }
+        return false
+    }
+}
+
+/// The last live progress and draft retained while a stop saves its checkpoint.
+public struct StoppingProgress: Hashable, Sendable {
+    public var progress: RunningProgress
+    public var draft: DraftState
+
+    public init(progress: RunningProgress, draft: DraftState) {
+        self.progress = progress
+        self.draft = draft
+    }
 }
 
 /// The five columns of the progress card's stepper. On iOS speakers are told apart after the words, from the whole
