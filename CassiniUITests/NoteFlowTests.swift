@@ -89,9 +89,11 @@ extension XCTestCase {
     @MainActor func closeShareSheet(_ app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
         let shareSheet = app.otherElements["ActivityListView"]
         XCTAssertTrue(shareSheet.waitForExistence(within: 15), "the share sheet opens", file: file, line: line)
-        let close = app.shareSheetCloseButton
-        XCTAssertTrue(close.waitForExistence(within: 30), file: file, line: line)
-        close.tap()
+        guard let close = app.waitForShareSheetClose() else {
+            XCTFail("the share sheet exposes its Close button", file: file, line: line)
+            return
+        }
+        close.tapWhenSettled(file: file, line: line)
         XCTAssertTrue(shareSheet.waitForNonExistence(within: 5), file: file, line: line)
         // Accessibility content can disappear before the UIKit presentation finishes closing.
         // Wait for this presentation's SwiftUI dismissal callback before tapping the note's next menu.

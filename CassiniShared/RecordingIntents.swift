@@ -43,7 +43,7 @@ struct ResumeRecordingIntent: LiveActivityIntent {
 }
 
 struct FinishRecordingIntent: LiveActivityIntent {
-    static let title: LocalizedStringResource = LocalizedStringResource("Finish", table: "Recording")
+    static let title: LocalizedStringResource = LocalizedStringResource("common.stop", table: "MeetingPhase1")
     static let isDiscoverable = false
     @Parameter(title: LocalizedStringResource("Recording", table: "Recording")) var noteID: String
     init() {}

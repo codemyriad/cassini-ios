@@ -53,7 +53,10 @@ extension AppGraph {
             present: { errors.present($0.message) })
         if let drafts = processing.drafts {
             ports.draftNames = { drafts.changes($0) }
-            ports.draftNamingOpen = { drafts.isOpen($0) }
+            ports.draftNamingOpen = { id in
+                guard processing.progress.phase(for: id)?.isStopping != true else { return false }
+                return drafts.isOpen(id)
+            }
             ports.changeDraft = { noteID, effects in
                 let generation = settings.voicesGeneration
                 let changed = drafts.mutateIfOpen(noteID) { $0.applying(effects, generation: generation) }
@@ -63,8 +66,16 @@ extension AppGraph {
             }
         }
         ports.runningDraft = { id in
-            guard case .transcribing(_, let draft)? = processing.progress.phase(for: id) else { return nil }
-            return draft
+            switch processing.progress.phase(for: id) {
+            case .transcribing(_, let draft):
+                return draft
+            case .stopping(let last?):
+                var draft = last.draft
+                draft.namingOpen = false
+                return draft
+            default:
+                return nil
+            }
         }
         ports.savedVoices = { voices.savedVoices }
         ports.voicesReadOnly = { voices.isReadOnly }

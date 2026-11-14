@@ -142,7 +142,7 @@ import CassiniNotebook
             guard note.trashedAt == nil else { return }
             matching.apply(to: &note, turns: turns, autoName: autoName, stamp: stamp,
                            attributed: attributed.flatMap { Self.attributed($0, onto: note) }, excluded: excluded,
-                           labels: labels)
+                           labels: labels, colourIndices: names?.colourIndices ?? [:], explicitNames: names?.explicitNames ?? [])
         }
         guard saved != nil else { throw CocoaError(.fileWriteUnknown) }
         await refresh()
@@ -181,8 +181,14 @@ import CassiniNotebook
     public func namingInput(noteID: UUID, speakerID: String) async -> NamingInput? {
         await retryUnreadable()
         guard let note = library.note(noteID), note.speaker(speakerID) != nil else { return nil }
-        return NamingInput.of(note, speakerID: speakerID, print: await print(noteID: noteID, speakerID: speakerID),
-                              voices: savedVoices, voicesReadOnly: isReadOnly, voiceModelReady: await printsReady())
+        let print = await print(noteID: noteID, speakerID: speakerID)
+        let voices = savedVoices
+        let readOnly = isReadOnly
+        let ready = await printsReady()
+        return await Task.detached(priority: .userInitiated) {
+            NamingInput.of(note, speakerID: speakerID, print: print, voices: voices, voicesReadOnly: readOnly,
+                           voiceModelReady: ready)
+        }.value
     }
 
     /// Carries out the sheet's effects for one speaker: the note first, then the saved voices.

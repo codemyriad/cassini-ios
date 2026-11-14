@@ -8,12 +8,17 @@ extension CassiniDocument {
      * provenance members not tied to its transcripts; see [seal]. `recordedAt` is the trustworthy instant at
      * playback position zero. It fills an absent recordedAtUtc on fresh, existing or carried manifests; an existing
      * UTC start over matching audio is never overwritten; a stale source’s UTC/local fields are discarded first. An unknown start stays absent, and no local recording-site label is inferred
-     * from the machine clock.
+     * from the machine clock. Exact UTF-8 keyed speaker maps preserve IDs that Swift String equality would merge;
+     * they override the corresponding legacy String-map entries for the same bytes.
      */
     public static func create(_ audioBytes: [UInt8], transcript: Transcript, title: String, processing: JSONObject,
                               existing: CassiniDocument? = nil, speakerLabels: [String: String] = [:],
-                              carrying source: CassiniDocument? = nil, recordedAt: Date? = nil) throws -> [UInt8] {
-        let (comments, digest) = try seal(OggOpus.scan(ArraySource(audioBytes)), transcript, title, processing, existing, speakerLabels, source, recordedAt)
+                              speakerHints: [String: JSONObject] = [:],
+                              carrying source: CassiniDocument? = nil, recordedAt: Date? = nil,
+                              speakerLabelsByID: [Data: String] = [:], speakerHintsByID: [Data: JSONObject] = [:]) throws -> [UInt8] {
+        let (comments, digest) = try seal(OggOpus.scan(ArraySource(audioBytes)), transcript, title, processing,
+                                          existing, speakerLabels, source, recordedAt, speakerHints,
+                                          speakerLabelsByID, speakerHintsByID)
         let out = ArraySink()
         try check(try OggOpus.rewrite(ArraySource(audioBytes), tags: comments.packet, to: out).digest() == digest, "Audio changed while sealing")
         try verify(read(out.bytes), transcript)
@@ -23,9 +28,13 @@ extension CassiniDocument {
     /** Streams [audio] into [target] behind the new tags and verifies the written file from disk; nothing is left on failure. */
     @discardableResult
     public static func create(_ audio: URL, transcript: Transcript, title: String, processing: JSONObject, existing: CassiniDocument?,
-                              speakerLabels: [String: String], carrying source: CassiniDocument? = nil, recordedAt: Date? = nil,
+                              speakerLabels: [String: String], speakerHints: [String: JSONObject] = [:],
+                              carrying source: CassiniDocument? = nil, recordedAt: Date? = nil,
+                              speakerLabelsByID: [Data: String] = [:], speakerHintsByID: [Data: JSONObject] = [:],
                               target: URL) throws -> CassiniDocument {
-        let (comments, digest) = try seal(OggOpus.scan(audio), transcript, title, processing, existing, speakerLabels, source, recordedAt)
+        let (comments, digest) = try seal(OggOpus.scan(audio), transcript, title, processing,
+                                          existing, speakerLabels, source, recordedAt, speakerHints,
+                                          speakerLabelsByID, speakerHintsByID)
         do {
             try writeWithTags(audio, comments, digest, target)
             let sealed = read(target)
@@ -43,9 +52,8 @@ extension CassiniDocument {
     }
 
     /**
-     * Renames speakers only: bodies, variants, unknown members and unrelated tags stay as they are, and the
-     * manifest and every copy of it are written afresh. The written file must read back identical apart from those
-     * labels.
+     * Renames speakers and marks those names as user-authored: bodies, variants, unknown members and unrelated
+     * tags stay as they are, and the manifest and every copy of it are written afresh. Colour reservations stay fixed.
      */
     @discardableResult
     public static func relabel(_ source: URL, existing: CassiniDocument, labels: [String: String], target: URL) throws -> CassiniDocument {
@@ -58,6 +66,7 @@ extension CassiniDocument {
                 throw CassiniError("Unknown speaker \(id)")
             }
             speaker["label"] = .string(trimmed)
+            speaker["provenance"] = .string("user")
             speakers[i] = .object(speaker)
         }
         manifest["speakers"] = .array(speakers)
@@ -174,7 +183,10 @@ extension CassiniDocument {
      */
     static func seal(_ stream: OggOpus.Info, _ transcript: Transcript, _ title: String, _ processing: JSONObject,
                      _ existing: CassiniDocument?, _ speakerLabels: [String: String],
-                     _ source: CassiniDocument? = nil, _ recordedAt: Date? = nil) throws -> (comments: Comments, digest: String) {
+                     _ source: CassiniDocument? = nil, _ recordedAt: Date? = nil,
+                     _ speakerHints: [String: JSONObject] = [:],
+                     _ speakerLabelsByID: [Data: String] = [:],
+                     _ speakerHintsByID: [Data: JSONObject] = [:]) throws -> (comments: Comments, digest: String) {
         let digest = try stream.digest()
         try check(existing == nil || existing!.state == .ok, "Never rebind stale transcripts to different audio")
         try check(existing == nil || source == nil, "A seal beside a document keeps its manifest; it carries nothing else")
@@ -219,13 +231,25 @@ extension CassiniDocument {
         descriptor["payloadRef"] = .object(ref)
         descriptors.append(.object(descriptor))
         manifest["transcripts"] = .array(descriptors)
+        // Preserve format identity, which distinguishes canonically equivalent Unicode spellings.
+        let labelsByID = Dictionary(uniqueKeysWithValues: speakerLabels.map { (Data($0.key.utf8), $0.value) })
+            .merging(speakerLabelsByID) { _, exact in exact }
+        let hintsByID = Dictionary(uniqueKeysWithValues: speakerHints.map { (Data($0.key.utf8), $0.value) })
+            .merging(speakerHintsByID) { _, exact in exact }
         var speakers = try manifest.array("speakers")
-        var known = Set(speakers.compactMap { $0.object?["id"]?.string.map { Array($0.utf8) } })
-        for word in transcript.words where known.insert(Array(word.speaker.utf8)).inserted {
-            let label = speakerLabels.first { sameBytes($0.key, word.speaker) }?.value ?? word.speaker
+        var known = Set(speakers.compactMap { $0.object?["id"]?.string.map { Data($0.utf8) } })
+        for word in transcript.words where known.insert(Data(word.speaker.utf8)).inserted {
+            let label = labelsByID[Data(word.speaker.utf8)] ?? word.speaker
             speakers.append(.object(JSONObject([("id", .string(word.speaker)), ("label", .string(label))])))
         }
-        manifest["speakers"] = .array(speakers)
+        // The portable speaker object is open: these optional display hints never alter identity or labels.
+        manifest["speakers"] = .array(speakers.map { entry in
+            guard var speaker = entry.object, let id = speaker["id"]?.string, let hints = hintsByID[Data(id.utf8)] else { return entry }
+            for key in ["colourIndex", "provenance"] {
+                if let value = hints[key] { speaker[key] = value }
+            }
+            return .object(speaker)
+        })
         var provenance = manifest["provenance"]?.object ?? JSONObject(carriedProvenance(of: source).map { ($0.key, $0.value) })
         var speech = provenance["speechToText"]?.object ?? JSONObject()
         speech[id] = .object(processing)

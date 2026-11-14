@@ -4,7 +4,7 @@ import CassiniCore
 public enum TextExport {
     public static func write(_ t: ExportTranscript, subtitle: String, emptyText: String) -> String {
         var out = t.title + "\n" + subtitle + "\n\n"
-        let rows = TurnModel.rows(of: t.words.map {
+        let rows = TranscriptTurns.rows(ofModelWords: t.words.map {
             TurnModel.Word(speaker: $0.speaker, startMs: Double($0.startMs), endMs: Double($0.endMs), text: $0.text,
                            lowConfidenceSpeaker: $0.lowConfidenceSpeaker)
         }, endsBoundedByAudio: t.endsBoundedByAudio)

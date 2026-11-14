@@ -69,13 +69,28 @@ public struct PortableTranscript: Hashable, Sendable {
         var language = ""
         if Self.readableStates.contains(document.state) {
             let defaultID = document.defaultId
+            let roster = Self.roster(document)
+            let stored = Dictionary(roster.compactMap { item -> (Data, Int)? in
+                guard let value = try? item.entry.number("colourIndex") else { return nil }
+                return (Data(item.id.utf8), Int(value))
+            }, uniquingKeysWith: { first, _ in first })
+            var allocator = SpeakerColourAllocator(exactAssignments: stored)
+            // A document owns one palette: later variants reserve new identities without renumbering history.
+            for variant in document.variants {
+                guard let transcript = variant.transcript else { continue }
+                for id in SpeakerColourOrder.earliest(transcript.words, id: { $0.speaker }, start: { Double($0.startMs) }) {
+                    _ = allocator.reserve(id)
+                }
+            }
+            for item in roster { _ = allocator.reserve(item.id) }
+            let entries = Dictionary(roster.map { (Data($0.id.utf8), $0.entry) }, uniquingKeysWith: { first, _ in first })
             for variant in document.variants {
                 guard let transcript = variant.transcript else {
                     unavailable[variant.id] = variant.error ?? "unavailable"
                     continue
                 }
                 var version = TranscriptVersion(kind: .imported, segments: Self.segments(transcript, document),
-                                                speakers: Self.speakers(transcript, document), language: transcript.language)
+                                                speakers: Self.speakers(transcript, roster: entries, indices: allocator.byteAssignments), language: transcript.language)
                 version.portableID = variant.id
                 versions.append(version)
                 // The default when it decodes, else the first variant that does.
@@ -104,12 +119,24 @@ public struct PortableTranscript: Hashable, Sendable {
             ?? (try? Date(text, strategy: Date.ISO8601FormatStyle(includingFractionalSeconds: true)))
     }
 
-    /// Speakers in order of first appearance, named by the manifest's labels.
-    private static func speakers(_ transcript: Transcript, _ document: CassiniDocument) -> [NoteSpeaker] {
-        var seen: Set<String> = []
+    private static func roster(_ document: CassiniDocument) -> [(id: String, entry: JSONObject)] {
+        (document.manifest?["speakers"]?.array ?? []).compactMap { value in
+            guard let entry = value.object, let id = entry["id"]?.string else { return nil }
+            return (id, entry)
+        }
+    }
+
+    /// Speakers retain canonical word order and the document-wide, byte-exact palette.
+    private static func speakers(_ transcript: Transcript, roster: [Data: JSONObject], indices: [Data: Int]) -> [NoteSpeaker] {
+        var seen = Set<Data>()
         return transcript.words.compactMap { word in
-            guard seen.insert(word.speaker).inserted else { return nil }
-            return NoteSpeaker(id: word.speaker, name: document.speakerLabel(word.speaker) ?? word.speaker)
+            let id = Data(word.speaker.utf8)
+            guard seen.insert(id).inserted else { return nil }
+            let entry = roster[id]
+            let label = entry?["label"]?.string ?? word.speaker
+            let provenance = (entry?["provenance"]?.string).flatMap { NoteSpeaker.Provenance(rawValue: $0) }
+                ?? (DefaultLabels.isDefault(id: word.speaker, label: label) ? .unnamed : .source)
+            return NoteSpeaker(id: word.speaker, name: label, colourIndex: indices[id], provenance: provenance)
         }
     }
 
@@ -157,7 +184,15 @@ extension PortableTranscript {
         let transcript = Transcript(words(of: note), language: note.language)
         guard !transcript.words.isEmpty else { throw PortableExportError.noTranscript }
         guard WordBodyBudget.fits(transcript.words, language: transcript.language) else { throw PortableExportError.tooLong }
-        let labels = Dictionary((note.speakers ?? []).map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
+        let palette = Note.assignColourIndices(note.speakers ?? [], order: SpeakerColourOrder.earliest(transcript.words,
+            id: { $0.speaker }, start: { Double($0.startMs) }))
+        let labels = Dictionary(palette.map { ($0.byteID, $0.name) }, uniquingKeysWith: { first, _ in first })
+        let hintEntries = palette.map { speaker -> (Data, JSONObject) in
+            var hint = JSONObject([("provenance", .string(speaker.provenance.rawValue))])
+            if let index = speaker.colourIndex { hint["colourIndex"] = .int(index) }
+            return (speaker.byteID, hint)
+        }
+        let hints = Dictionary(hintEntries, uniquingKeysWith: { first, _ in first })
         var existing: CassiniDocument?
         var carried: CassiniDocument?
         if source.state == .ok, var manifest = source.manifest {
@@ -167,8 +202,11 @@ extension PortableTranscript {
             }
             if let speakers = manifest["speakers"]?.array {
                 manifest["speakers"] = .array(speakers.map { entry in
-                    guard var speaker = entry.object, let id = speaker["id"]?.string, let label = labels[id] else { return entry }
+                    guard var speaker = entry.object, let id = speaker["id"]?.string, let label = labels[Data(id.utf8)] else { return entry }
                     speaker["label"] = .string(label)
+                    if let hint = hints[Data(id.utf8)] {
+                        for (key, value) in hint.pairs { speaker[key] = value }
+                    }
                     return .object(speaker)
                 })
             }
@@ -183,11 +221,11 @@ extension PortableTranscript {
         guard fits else { throw PortableExportError.tooLong }
         // Only a new entry takes it: the seal labels the speakers the manifest does not have yet.
         var newLabels = labels
-        if newLabels[ExportTranscript.unassignedSpeaker] == nil { newLabels[ExportTranscript.unassignedSpeaker] = unassignedLabel }
+        if newLabels[Data(ExportTranscript.unassignedSpeaker.utf8)] == nil { newLabels[Data(ExportTranscript.unassignedSpeaker.utf8)] = unassignedLabel }
         return try CassiniDocument.create(opus, transcript: transcript, title: note.title, processing: processing,
-                                          existing: existing, speakerLabels: newLabels, carrying: carried,
+                                          existing: existing, speakerLabels: [:], carrying: carried,
                                           recordedAt: (note.origin == .recorded || note.origin == .recovered) ? note.meetingTime.instant : nil,
-                                          target: destination).defaultId
+                                          speakerLabelsByID: newLabels, speakerHintsByID: hints, target: destination).defaultId
     }
 
     /// The note's words; a passage without word timing becomes words that each span the whole passage, and one

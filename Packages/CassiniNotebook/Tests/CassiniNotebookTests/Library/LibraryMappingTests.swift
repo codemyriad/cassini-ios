@@ -94,6 +94,26 @@ struct LibraryMappingTests {
         #expect(LibraryMapping.row(entry(running), context: live).status == .transcribing)
     }
 
+    @Test func ordinaryRowsOmitTheVisualQuoteWhileSearchRetainsItsMarkedSnippet() {
+        var value = transcribed("English planning", speakers: 1)
+        value.transcript = [TranscriptSegment(text: "English meeting context", start: 0, end: 2, speakerID: "a")]
+        let normal = LibraryMapping.row(entry(value), context: RowContext())
+        #expect(normal.status == .transcribed(speakers: 1, hasWords: true))
+        #expect(normal.status.suffix == .speakers)
+        #expect(normal.preview != nil, "The existing spoken row context is retained")
+        #expect(normal.displayedPreview == nil)
+        let snippet = Highlighted("matching English context", ranges: [9..<16], leadingEllipsis: true)
+        let result = LibraryMapping.row(entry(value), context: RowContext(),
+                                       hit: .init(day: .today, title: nil, snippet: snippet))
+        #expect(result.displayedPreview == snippet)
+        #expect(result.preview == snippet)
+        #expect(result.id == normal.id)
+        #expect(result.status == normal.status)
+        let titleOnly = LibraryMapping.row(entry(value), context: RowContext(),
+                                          hit: .init(day: .today, title: "English planning", snippet: nil))
+        #expect(titleOnly.displayedPreview == nil, "A title-only search result does not restore the ordinary quote")
+    }
+
     // ports: LibraryMappingTest#searchResultsHighlightTitleAndSnippet
     @Test func searchResultsHighlightTitleAndSnippet() {
         let a = note("Call with supplier", createdAt: Self.daysAgo(1)), b = note("Invoice March")
@@ -205,7 +225,8 @@ struct LibraryMappingTests {
         #expect(LibraryMapping.progress(waiting, phase: .waitingForPrevious)?.queued == 0)
         #expect(LibraryMapping.progress(waiting, phase: .starting)?.line == .timeLeft(.calculating))
         #expect(LibraryMapping.progress(waiting, phase: nil)?.line == .timeLeft(.calculating), "before the first report")
-        #expect(LibraryMapping.progress(waiting, phase: .stopping)?.line == .timeLeft(.finishing))
+        #expect(LibraryMapping.progress(waiting, phase: .stopping())?.line == .timeLeft(.finishing))
+        #expect(LibraryMapping.progress(waiting, phase: .stopping(StoppingProgress(progress: progress, draft: .empty)))?.line == .timeLeft(.finishing))
         let download = DownloadProgress(part: .speech, doneBytes: 46, totalBytes: 100, verifying: false)
         let downloading = LibraryMapping.progress(waiting, phase: .downloading(download))
         #expect(downloading?.line == .downloading(.speech, percent: 46))

@@ -111,6 +111,7 @@ extension Note: Codable {
            schema >= 2 || audioFilename == "capture.caf" {
             meetingTime = .instant(createdAt)
         }
+        backfillSpeakerColours()
     }
 
     private mutating func decodeSchemaOne(_ c: KeyedDecodingContainer<CodingKeys>) throws {

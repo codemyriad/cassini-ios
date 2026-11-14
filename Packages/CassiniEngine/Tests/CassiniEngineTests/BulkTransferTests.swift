@@ -29,11 +29,13 @@ private final class BulkSandbox: Sendable {
         }
         try writer.finish(); return url
     }
-    func service(limits: ZIPLimits = .init(), memberLimit: UInt64 = UInt64(Limits.maxImportBytes)) -> BulkImportService {
+    func service(limits: ZIPLimits = .init(), memberLimit: UInt64 = UInt64(Limits.maxImportBytes),
+                 requested: BulkProgressTrace? = nil) -> BulkImportService {
         let importer = ImportService(notes: notes, files: CoordinatedFileImporter(storage: storage), audio: audio,
                                      storage: storage, clock: FakeClock())
         return BulkImportService(files: CoordinatedFileImporter(storage: storage), scratch: scratch, limits: limits, memberLimit: memberLimit) { url, name in
-            try await importer.importFile(url, fallbackTitle: "Imported audio", displayName: name)
+            if let requested { await requested.append(.init(done: 1, total: 1)) }
+            return try await importer.importFile(url, fallbackTitle: "Imported audio", displayName: name)
         }
     }
     func scratchContents() throws -> [String] {
@@ -114,6 +116,85 @@ private struct HeldArchiveCopy: FileImporting {
         #expect(notes.count == 1)
         #expect(notes.first?.title == "English meeting")
         #expect(try sandbox.scratchContents().isEmpty)
+    }
+
+    private func graphemeMember(_ path: String, mode: String, body: Data) -> ZIPAgyFixture.Member {
+        var value = ZIPAgyFixture.Member(mode == "annotation" || mode == "localName" ? "Alias.wav" : path, body)
+        value.flags = mode == "utf8" ? 0x800 : 0
+        if mode == "annotation" {
+            value.extra = ZIPAgyFixture.unicodePath(raw: value.name, path: path); value.localExtra = value.extra
+        } else if mode == "localName" { value.localName = path }
+        return value
+    }
+
+    @Test func graphemeBoundaryPathsRefuseTheWholeArchiveBeforeRequestingAnyImport() async throws {
+        let paths = ["/\u{0301}café.wav", "\\\u{0301}café.wav", "../\u{0301}café.wav",
+                     "folder/../\u{0301}café.wav", "folder\u{0600}/../café.wav",
+                     "folder\u{0600}\\..\\café.wav", "C:/\u{0301}café.wav", "C:\\\u{0301}café.wav"]
+        for mode in ["raw", "utf8", "annotation", "localName"] {
+            for path in paths {
+                let sandbox = try BulkSandbox()
+                let zip = sandbox.folder.appendingPathComponent("unsafe.zip")
+                try ZIPAgyFixture.write([.init("Good.wav", Data(ImportFixtures.wav)),
+                    graphemeMember(path, mode: mode, body: Data(ImportFixtures.mp3))], to: zip)
+                let requests = BulkProgressTrace(), exposed = BulkProgressTrace()
+                let report = await sandbox.service(requested: requests).run([zip], imported: {
+                    _ in await exposed.append(.init(done: 1, total: 1))
+                })
+                #expect(report.archives == [.unsafePaths])
+                #expect(report.summary == ImportSummary())
+                #expect(await requests.values.isEmpty, "even the first valid member must not reach ImportService")
+                #expect(await exposed.values.isEmpty)
+                #expect(await sandbox.notes.all().isEmpty)
+                #expect(try sandbox.scratchContents().isEmpty)
+            }
+        }
+    }
+
+    @Test func nonemptyGraphemeDirectoryRefusesGoodSiblingsBeforeImport() async throws {
+        for mode in ["raw", "utf8", "annotation"] {
+            let sandbox = try BulkSandbox()
+            let zip = sandbox.folder.appendingPathComponent("directory.zip")
+            try ZIPAgyFixture.write([.init("Good.wav", Data(ImportFixtures.wav)),
+                graphemeMember("Folder\u{0600}/", mode: mode, body: Data([1]))], to: zip)
+            let requests = BulkProgressTrace(), exposed = BulkProgressTrace()
+            let report = await sandbox.service(requested: requests).run([zip], imported: {
+                _ in await exposed.append(.init(done: 1, total: 1))
+            })
+            #expect(report.archives == [.damaged])
+            #expect(report.summary == ImportSummary())
+            #expect(await requests.values.isEmpty)
+            #expect(await exposed.values.isEmpty)
+            #expect(await sandbox.notes.all().isEmpty)
+            #expect(try sandbox.scratchContents().isEmpty)
+        }
+    }
+
+    @Test func graphemeMetadataIsIgnoredAndNestedAudioKeepsItsExactBasename() async throws {
+        for mode in ["raw", "utf8", "annotation"] {
+            let sandbox = try BulkSandbox()
+            let zip = sandbox.folder.appendingPathComponent("metadata.zip")
+            let sidecars = ["__MACOSX/\u{0301}café.wav", "._\u{0301}café.wav", "Notes\u{0600}/._\u{0301}café.wav"]
+                .map { graphemeMember($0, mode: mode, body: Data([1])) }
+            try ZIPAgyFixture.write([.init("Good.wav", Data(ImportFixtures.wav))] + sidecars, to: zip)
+            let requests = BulkProgressTrace()
+            let report = await sandbox.service(requested: requests).run([zip])
+            #expect(report.archives.isEmpty)
+            #expect(report.summary.imported == 1 && report.summary.duplicates == 0)
+            #expect(report.summary.unsupported == 3 && report.summary.failed == 0)
+            #expect(await requests.values.count == 1)
+            #expect(await sandbox.notes.all().count == 1)
+            #expect(try sandbox.scratchContents().isEmpty)
+
+            let nested = sandbox.folder.appendingPathComponent("nested.zip")
+            try ZIPAgyFixture.write([graphemeMember("Notes/\u{0301}café.mp3", mode: mode,
+                                                   body: Data(ImportFixtures.mp3))], to: nested)
+            let imported = await sandbox.service().run([nested])
+            #expect(imported.archives.isEmpty && imported.summary.imported == 1 && imported.summary.failed == 0)
+            let title = try #require(await sandbox.notes.all().first { $0.audioFilename == "source.mp3" }?.title)
+            #expect(Array(title.unicodeScalars) == Array("\u{0301}café".unicodeScalars))
+            #expect(try sandbox.scratchContents().isEmpty)
+        }
     }
 
     @Test func directoryPayloadsAndMethodMismatchesRefuseBeforePublishingAnyNote() async throws {

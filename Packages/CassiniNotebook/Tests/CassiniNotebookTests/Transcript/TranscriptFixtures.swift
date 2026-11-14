@@ -20,12 +20,12 @@ enum TranscriptFixtures {
         var from = 0
         while from < words.count {
             var to = from + 1
-            while to < words.count, words[to].speaker == words[from].speaker { to += 1 }
+            while to < words.count, words[to].speaker.map({ Data($0.utf8) }) == words[from].speaker.map({ Data($0.utf8) }) { to += 1 }
             let run = words[from..<to]
             let timed = run.map { TimedWord(text: $0.text, start: Double($0.startMs) / 1000, end: Double($0.endMs) / 1000) }
             note.transcript.append(TranscriptSegment(text: run.map(\.text).joined(separator: " "),
                                                      start: timed.first!.start, end: timed.last!.end,
-                                                     speaker: speakers.first { $0.id == run.first!.speaker }?.name,
+                                                     speaker: speakers.first { $0.byteID == run.first!.speaker.map({ Data($0.utf8) }) }?.name,
                                                      speakerID: run.first!.speaker, words: timed))
             from = to
         }

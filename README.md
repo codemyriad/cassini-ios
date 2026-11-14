@@ -77,9 +77,9 @@ records their exact revisions.
 
 - **Record** with pause and resume, a live waveform, an editable title and "Mark a moment" bookmarks. Recording
   continues with the screen locked or in another app. A Live Activity on the Lock Screen and in the Dynamic Island
-  shows the time and has Pause, Resume and Finish. A call or a disconnected microphone pauses the recording until you
+  shows the time and has Pause, Resume and Stop. A call or a disconnected microphone pauses the recording until you
   resume it.
-- **Safe capture.** Audio is captured as 48 kHz PCM (CAF), which survives a crash, and compressed to M4A at Finish. If
+- **Safe capture.** Audio is captured as 48 kHz PCM (CAF), which survives a crash, and compressed to M4A at Stop. If
   compression fails, the original stays playable. The recording stops and saves before storage runs out, with a
   warning about 15 minutes before. At launch, recordings that were interrupted are repaired and listed as recovered.
 - **Import** any audio format that iOS reads, plus Ogg Opus and Cassini `.opus` documents, from Files (several files
@@ -197,7 +197,11 @@ TestFlight still need.
   as the speaker `unassigned`, labelled "Unknown speaker" in the app's language (D47); Android's words always have a
   speaker. The cross-app vectors are checked through the reader and the import. Android keeps the transcript in a
   sealed document and a Room catalogue. The queue is `jobs.json`, and checkpoints use iOS's own format. Search
-  uses an in-memory index instead of FTS4. Saved voices keep one sample per note instead of a running mean.
+  uses an in-memory index instead of FTS4. As on Android, search joins spoken turns with spaces; row excerpts flatten
+  embedded line breaks while preserving highlights. The lazy list separates grouped and flat projections so iOS 18
+  does not retain ordinary row bodies in search results. Date filters apply only after typing a query. Local transcription
+  jobs expose a time-left interval, so Library pills and VoiceOver share the catalog’s no-ETA fallback rather than
+  inventing a scalar estimate. Saved voices keep one sample per note instead of a running mean.
 - **Transcript rendering (D84).** The pure `CassiniNotebook.TurnModel` ports the gocassini viewer pipeline at
   `1111155cb0017b47c072a8662c54f28ad7c44223`: readable grouping, display-only timing repair, continuity-based
   turn reconstruction, inline interjections, competing-speaker labels and continuation headers. The sealed note,
@@ -210,7 +214,8 @@ TestFlight still need.
 - **Recording.** iOS captures PCM CAF and compresses it to M4A, so there is no 1 GiB AAC limit, and the storage floor
   includes the room for that compression. The audio session does not mix with other apps, so a call pauses the
   recording. Losing the input pauses it too. A Live Activity replaces Android's ongoing notification, and recovery
-  repairs CAF files.
+  repairs CAF files. The Recording screen has Android's controls (All meetings, Stop in the centre, Pause or Resume)
+  on the always-dark night ground; iOS adds "Mark a moment" above them.
 - **Transcription.** A Parakeet run tells speakers apart as it decodes, as on Android. On the Apple Speech fallback,
   and for Identify speakers, the same streaming pipeline runs over the whole file after the words, so that draft has
   one voice.
@@ -232,7 +237,8 @@ TestFlight still need.
   your library.
 - **Platform.** The app language is set in the Settings app. iOS has no system Back, so the back button carries the
   title of the screen below. The iPad has a split view. Rename is a sheet. Notifications are silent results with
-  hidden-preview text. The warm iOS palette and system fonts stay, with contrast checked by tests. Content width is
+  hidden-preview text. The W1 preview reads the pinned Cassini palette (cool neutral grounds, navy light accent, and a blue/magenta/cyan/orange/violet/slate speaker cycle) with system
+  sans fonts and Dynamic Type; contrast is checked by tests. Content width is
   capped at Android's 560 pt. The App Store build declares its privacy manifests, export compliance and memory
   entitlement.
 
@@ -361,7 +367,7 @@ SIGHUP, SIGTERM and SIGINT stop the renderer; further signals are ignored until 
 `--output` disables lossy pngquant by default and records actual runtime/device, locale, seed, test and pixel size;
 the 1200-pixel downscale remains. Existing normal README renders keep their previous compression behavior.
 
-The canonical cassini-ux `pr-shots.py` is vendored from commit `5ca44dee12614990c833cc6f49017dac7e184ae8`.
+The canonical cassini-ux `pr-shots.py` is vendored from commit `5e0c34e0f1bb390298dabdf4eedc494e933fd329`.
 It adds `pr-shots/` using only its `diff` command; use your PR number with `--pr N`.
 `--render-only` skips that step and needs only Python's standard library. The wrapper uses `python3` from PATH.
 Before diffing it checks each screen has both appearances and probes the canvas against the scheme label
@@ -500,3 +506,19 @@ Selected as ZIP; Export All as ZIP includes the whole live Library. Transfers sh
 and retain already imported notes. The [archive rules and iOS differences](docs/bulk-transfer.md) cover limits,
 original-audio fallback, safe paths and cleanup. iOS uses its native picker/share sheet and AVFoundation audio
 support; Android-only container support is not added.
+
+### Shared status badges
+
+The pinned badge contract, full catalog and vectors drive the pure selector and compiled six-language lookup.
+`RowBadge` adapts iOS lifecycle states while preserving phone-only statuses and actions. Rendered pills retain
+Dynamic Type and translated text. State, catalog, generation and corruption tests verify the full outputs;
+UI geometry tests cover accessibility text. Runtime rendering never parses JSON.
+
+### Phase 1 alignment QA
+
+The [D-989 QA report](docs/qa-phase1-d989.md) records the six audited phone surfaces,
+existing implementation PRs and iOS platform differences. Meeting header names use the same
+assigned speaker colours as transcript labels; unnamed speakers remain stone in both appearances.
+Library Search and Find match spoken words rather than labels inserted by the viewer. Search previews
+join paragraphs with spaces so blank lines cannot hide the matching word. Both search surfaces preserve
+the viewer’s spacing around standalone punctuation, including punctuation inside inline replies.

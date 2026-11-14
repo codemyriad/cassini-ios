@@ -1,0 +1,216 @@
+{
+  "generated_at_utc": "2026-11-12T23:39:57+00:00",
+  "scope": "Unmodified real-writer ZIPs over synthetic English text, not real audio. Python inspected bytes; no Swift reader run is claimed.",
+  "platform": {
+    "product_version": "27.0.1",
+    "build_version": "26A434",
+    "architecture": "arm64"
+  },
+  "input": {
+    "files": {
+      "Notes/café.opus": "English ZIP sample.\n",
+      "Notes/Meeting.opus": "English ZIP sample.\n"
+    },
+    "total_plaintext_bytes": 40,
+    "file_and_directory_mtime_utc": "2000-01-01T00:00:00Z",
+    "file_xattr_keys": {
+      "Meeting.opus": [],
+      "café.opus": []
+    }
+  },
+  "tools": {
+    "ditto": {
+      "path": "/usr/bin/ditto",
+      "version_identity": "Apple system ditto from the recorded macOS build; no standalone version asserted",
+      "binary_sha256": "88933d7c96cc2c02219d61f5523b61a902dca8fdeed3b8384f24066ff48541bb"
+    },
+    "sevenzip": {
+      "official_download_page": "https://www.7-zip.org/download.html",
+      "release_url": "https://github.com/ip7z/7zip/releases/tag/26.06",
+      "download_url": "https://github.com/ip7z/7zip/releases/download/26.06/7z2606-mac.tar.xz",
+      "version": "26.06",
+      "release_published_at": "2026-11-07T11:45:33Z",
+      "asset_id": 720543872,
+      "archive_bytes": 965712,
+      "archive_sha256": "b6f17920b4240940461dac8ef4009891881ac44d2a5ead625ede2ec8472185dd",
+      "upstream_digest": "sha256:b6f17920b4240940461dac8ef4009891881ac44d2a5ead625ede2ec8472185dd",
+      "version_output": "7-Zip (z) 26.06 (arm64) : Copyright (c) 1999-2026 Igor Pavlov : 2026-11-06",
+      "binary_sha256": "56cf8eb2fdc6f9c0ac5d7a3cd238505814ac8ed6b88a7c64a7e3256036252c60"
+    }
+  },
+  "fixtures": [
+    {
+      "file": "ditto-macos-unicode.zip",
+      "writer": "ditto",
+      "bytes": 490,
+      "sha256": "587fba0bb9cd41bf8eaf21b8010e658e9a5a38a1ba741af78386ce7223bdd2b1",
+      "archive_modified_after_writer": false,
+      "command": {
+        "cwd": "inputs",
+        "argv": [
+          "/usr/bin/ditto",
+          "-c",
+          "-k",
+          "--sequesterRsrc",
+          "--keepParent",
+          "Notes",
+          "../output/ditto-macos-unicode.zip"
+        ],
+        "exit_code": 0
+      },
+      "members": [
+        {
+          "name": "Notes/",
+          "raw_name_hex": "4e6f7465732f",
+          "central_flags_hex": "0x0000",
+          "local_flags_hex": "0x0000",
+          "method": 0,
+          "central_extra_ids_hex": [
+            "0x5855"
+          ],
+          "local_extra_ids_hex": [
+            "0x5855"
+          ],
+          "central_unicode_path": null,
+          "local_unicode_path": null,
+          "raw_and_decoded_names_equal": true,
+          "valid_unicode_hint_presence_and_value_equal": true,
+          "unencrypted_and_safe_paths": true,
+          "is_directory": true,
+          "plaintext_bytes": 0,
+          "plaintext_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "plaintext_ascii": "",
+          "legacy_cp437_decoding": "Notes/"
+        },
+        {
+          "name": "Notes/café.opus",
+          "raw_name_hex": "4e6f7465732f636166c3a92e6f707573",
+          "central_flags_hex": "0x0008",
+          "local_flags_hex": "0x0008",
+          "method": 8,
+          "central_extra_ids_hex": [
+            "0x5855"
+          ],
+          "local_extra_ids_hex": [
+            "0x5855"
+          ],
+          "central_unicode_path": null,
+          "local_unicode_path": null,
+          "raw_and_decoded_names_equal": true,
+          "valid_unicode_hint_presence_and_value_equal": true,
+          "unencrypted_and_safe_paths": true,
+          "is_directory": false,
+          "plaintext_bytes": 20,
+          "plaintext_sha256": "4729d139b98688e2f64745315a01479f6224f67d97576936d140ba46c760fde3",
+          "plaintext_ascii": "English ZIP sample.\n",
+          "legacy_cp437_decoding": "Notes/caf├⌐.opus"
+        },
+        {
+          "name": "Notes/Meeting.opus",
+          "raw_name_hex": "4e6f7465732f4d656574696e672e6f707573",
+          "central_flags_hex": "0x0008",
+          "local_flags_hex": "0x0008",
+          "method": 8,
+          "central_extra_ids_hex": [
+            "0x5855"
+          ],
+          "local_extra_ids_hex": [
+            "0x5855"
+          ],
+          "central_unicode_path": null,
+          "local_unicode_path": null,
+          "raw_and_decoded_names_equal": true,
+          "valid_unicode_hint_presence_and_value_equal": true,
+          "unencrypted_and_safe_paths": true,
+          "is_directory": false,
+          "plaintext_bytes": 20,
+          "plaintext_sha256": "4729d139b98688e2f64745315a01479f6224f67d97576936d140ba46c760fde3",
+          "plaintext_ascii": "English ZIP sample.\n",
+          "legacy_cp437_decoding": "Notes/Meeting.opus"
+        }
+      ]
+    },
+    {
+      "file": "sevenzip-26.06-macos-unicode.zip",
+      "writer": "sevenzip",
+      "bytes": 478,
+      "sha256": "713fdbac056fc7033971d82af0ff28335244167a74845f93496475d52d0b9b3d",
+      "archive_modified_after_writer": false,
+      "command": {
+        "cwd": "inputs",
+        "argv": [
+          "../sevenzip-26.06/7zz",
+          "a",
+          "-tzip",
+          "../output/sevenzip-26.06-macos-unicode.zip",
+          "Notes"
+        ],
+        "exit_code": 0
+      },
+      "members": [
+        {
+          "name": "Notes/",
+          "raw_name_hex": "4e6f7465732f",
+          "central_flags_hex": "0x0000",
+          "local_flags_hex": "0x0000",
+          "method": 0,
+          "central_extra_ids_hex": [
+            "0x000a"
+          ],
+          "local_extra_ids_hex": [],
+          "central_unicode_path": null,
+          "local_unicode_path": null,
+          "raw_and_decoded_names_equal": true,
+          "valid_unicode_hint_presence_and_value_equal": true,
+          "unencrypted_and_safe_paths": true,
+          "is_directory": true,
+          "plaintext_bytes": 0,
+          "plaintext_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "plaintext_ascii": "",
+          "legacy_cp437_decoding": "Notes/"
+        },
+        {
+          "name": "Notes/Meeting.opus",
+          "raw_name_hex": "4e6f7465732f4d656574696e672e6f707573",
+          "central_flags_hex": "0x0000",
+          "local_flags_hex": "0x0000",
+          "method": 0,
+          "central_extra_ids_hex": [
+            "0x000a"
+          ],
+          "local_extra_ids_hex": [],
+          "central_unicode_path": null,
+          "local_unicode_path": null,
+          "raw_and_decoded_names_equal": true,
+          "valid_unicode_hint_presence_and_value_equal": true,
+          "unencrypted_and_safe_paths": true,
+          "is_directory": false,
+          "plaintext_bytes": 20,
+          "plaintext_sha256": "4729d139b98688e2f64745315a01479f6224f67d97576936d140ba46c760fde3",
+          "plaintext_ascii": "English ZIP sample.\n",
+          "legacy_cp437_decoding": "Notes/Meeting.opus"
+        },
+        {
+          "name": "Notes/café.opus",
+          "raw_name_hex": "4e6f7465732f636166c3a92e6f707573",
+          "central_flags_hex": "0x0800",
+          "local_flags_hex": "0x0800",
+          "method": 0,
+          "central_extra_ids_hex": [
+            "0x000a"
+          ],
+          "local_extra_ids_hex": [],
+          "central_unicode_path": null,
+          "local_unicode_path": null,
+          "raw_and_decoded_names_equal": true,
+          "valid_unicode_hint_presence_and_value_equal": true,
+          "unencrypted_and_safe_paths": true,
+          "is_directory": false,
+          "plaintext_bytes": 20,
+          "plaintext_sha256": "4729d139b98688e2f64745315a01479f6224f67d97576936d140ba46c760fde3",
+          "plaintext_ascii": "English ZIP sample.\n"
+        }
+      ]
+    }
+  ]
+}

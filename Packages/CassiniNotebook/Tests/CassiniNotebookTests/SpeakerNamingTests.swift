@@ -277,6 +277,45 @@ import Testing
         #expect(ui.samePerson == nil)
         #expect(effects(state, .save) == [.relabel(speakerID: "s3", name: "Anna"), .close])
     }
+
+    // ports: SpeakerNamingTest#aChangedQuoteIsPublishedWithoutChangingNamingRules
+    @Test func aChangedQuoteIsPublishedWithoutChangingNamingRules() throws {
+        var initial = input(voices: [anna])
+        initial.quote = "Initial quote."
+        let opened = try on(SpeakerNaming.open(initial), .nameChanged("Anna"))
+        #expect(SpeakerNaming.ui(opened).quote == "Initial quote.")
+        #expect(SpeakerNaming.ui(opened).save == .blockedByQuestion)
+
+        var refreshed = opened
+        refreshed.input.quote = "Updated quote after new words."
+        let ui = SpeakerNaming.ui(refreshed)
+        #expect(ui.quote == "Updated quote after new words.")
+        #expect(ui.samePerson == "Anna Ricci")
+        #expect(ui.save == .blockedByQuestion)
+    }
+
+    // ports: SpeakerNamingTest#savedVoiceColoursKeepTheirStoredSlotWhenTheListIsReordered
+    @Test func savedVoiceColoursKeepTheirStoredSlotWhenTheListIsReordered() {
+        let zara = SavedVoice(name: "Zara", samples: [VoiceSample(noteID: UUID(), print: F.print("z", F.axis(1)))], saveSequence: 0)
+        let marco = SavedVoice(name: "Marco", samples: [VoiceSample(noteID: UUID(), print: F.print("m", F.axis(0)))], saveSequence: 3)
+
+        // Ranked by similarity (Marco closer to axis(0) than Zara): Marco is first but keeps slot 3, Zara keeps slot 0.
+        let ranked = SpeakerNaming.ui(SpeakerNaming.open(input(print: F.axis(0), voices: [zara, marco])))
+        #expect(ranked.voices.map(\.name) == ["Marco", "Zara"])
+        #expect(ranked.voices.map(\.tint) == [SpeakerTint.named(3), SpeakerTint.named(0)])
+
+        // Alphabetical fallback without print: Marco is still slot 3, Zara still slot 0.
+        let alphabetical = SpeakerNaming.ui(SpeakerNaming.open(input(print: nil, voices: [zara, marco])))
+        #expect(alphabetical.voices.map(\.name) == ["Marco", "Zara"])
+        #expect(alphabetical.voices.map(\.tint) == [SpeakerTint.named(3), SpeakerTint.named(0)])
+
+        // Legacy in-memory voices without saveSequence get stable list-index slots (0, 1) before sorting.
+        let unsequencedZara = SavedVoice(name: "Zara", samples: [])
+        let unsequencedMarco = SavedVoice(name: "Marco", samples: [])
+        let legacy = SpeakerNaming.ui(SpeakerNaming.open(input(print: nil, voices: [unsequencedZara, unsequencedMarco])))
+        #expect(legacy.voices.map(\.name) == ["Marco", "Zara"])
+        #expect(legacy.voices.map(\.tint) == [SpeakerTint.named(1), SpeakerTint.named(0)])
+    }
 }
 
 @Suite struct NamingWritesTests {

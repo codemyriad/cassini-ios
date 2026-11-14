@@ -64,10 +64,22 @@ public struct FakeTranscriber: Transcribing {
             events(.preparingModel(.downloading(fraction)))
             while true { try await Task.sleep(for: .seconds(3600)) }
         case .growing(let segments, let interval, let total):
-            for segment in segments {
-                try await clock.sleep(for: interval)
-                events(.finalized(segment))
-                events(.progress(done: segment.end, total: total))
+            if recognizer == .whistle {
+                let resumedMs = request.whistleResume?.doneMs ?? 0
+                events(.progress(done: Double(resumedMs) / 1000, total: total))
+                for segment in segments where CheckpointState.ms(segment.end) > resumedMs {
+                    try await clock.sleep(for: interval)
+                    let samples = Int(CheckpointState.ms(segment.end) * 16)
+                    let checkpoint = WhistleCheckpoint(sourceFrame: Int64(samples), processedSamples: samples,
+                                                       doneSamples: samples, state: Data([1]))
+                    events(.whistleBatch(.init(checkpoint: checkpoint, segments: [segment], languages: ["en"])))
+                }
+            } else {
+                for segment in segments where segment.end > request.startOffset {
+                    try await clock.sleep(for: interval)
+                    events(.finalized(segment))
+                    events(.progress(done: segment.end, total: total))
+                }
             }
             while true { try await Task.sleep(for: .seconds(3600)) }
         case .fails(let error):

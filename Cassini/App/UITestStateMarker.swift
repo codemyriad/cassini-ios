@@ -13,8 +13,12 @@ struct UITestStateMarker: View {
     var body: some View {
         #if DEBUG
         if uiTesting {
-            Text(verbatim: " ").font(.system(size: 1)).opacity(0.01).allowsHitTesting(false)
-                .accessibilityIdentifier("uiTestState-\(identifier)").accessibilityValue(Text(verbatim: value))
+            Color.canvasClear.frame(width: 1, height: 1).allowsHitTesting(false)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(Text(verbatim: " "))
+                .accessibilityAddTraits(.isStaticText)
+                .accessibilityIdentifier("uiTestState-\(identifier)")
+                .accessibilityValue(Text(verbatim: value))
         }
         #endif
     }

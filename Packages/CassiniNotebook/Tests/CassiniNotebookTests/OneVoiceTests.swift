@@ -22,7 +22,7 @@ import Testing
     }
 
     @Test func theOneVoiceIsTheRunsFirstSpeakerInTheLanguageItIsWrittenIn() {
-        #expect(NoteSpeaker.oneVoice(prefix: Self.run, language: "en") == NoteSpeaker(id: Self.run + "1", name: "Speaker 1"))
+        #expect(NoteSpeaker.oneVoice(prefix: Self.run, language: "en") == NoteSpeaker(id: Self.run + "1", name: "Speaker 1", colourIndex: 0))
         #expect(NoteSpeaker.oneVoice(prefix: Self.run, language: "it").name == "Voce 1")
         #expect(NoteSpeaker.oneVoice(prefix: Self.run, language: "fr").name == "Intervenant 1")
         #expect(NoteSpeaker.oneVoice(prefix: Self.run, language: "pt-PT").name == "Orador 1")

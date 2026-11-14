@@ -25,8 +25,76 @@ import Testing
         try library().save(voices)
         let object = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: voicesFile)) as? [String: Any])
         #expect(object["version"] as? Int == 1)
-        #expect(try library().voices == voices)
+        #expect(try library().voices == voices.enumerated().map { $0.element.saved(at: $0.offset) })
         #expect(try library().problem == nil)
+    }
+
+    @Test func deletedSlotsAreNotReusedAfterAnEmptyListAndRelaunch() throws {
+        defer { cleanUp() }
+        let library = try library()
+        try library.save([F.voice("alex", "Alex"), F.voice("ben", "Ben")])
+        #expect(library.voices.map(\.saveSequence) == [0, 1])
+        try library.save(Array(library.voices.prefix(1)))
+        try library.save([])
+        let reopened = try self.library()
+        try reopened.save([F.voice("casey", "Casey")])
+        #expect(reopened.voices.first?.saveSequence == 2)
+        var renamed = try #require(reopened.voices.first)
+        renamed.name = "Zoe"
+        renamed.samples.append(VoiceSample(noteID: UUID(), print: F.print(F.axis(1))))
+        // A stale or replacement caller cannot change an already-saved person's immutable sequence.
+        try reopened.save([F.voice("devon", "Devon"), renamed.saved(at: 900)])
+        #expect(reopened.voices.map(\.saveSequence) == [3, 2])
+        #expect(try self.library().voices == reopened.voices)
+    }
+
+    @Test func legacySaveOrderSurvivesDeletingBeforeItsFirstWrite() throws {
+        defer { cleanUp() }
+        try write("""
+        {"version":1,"voices":[
+          {"id":"00000000-0000-0000-0000-000000000001","name":"Zoe","samples":[]},
+          {"id":"00000000-0000-0000-0000-000000000002","name":"Alex","samples":[]}
+        ]}
+        """, to: voicesFile)
+        let library = try library()
+        #expect(library.voices.map(\.saveSequence) == [0, 1])
+        try library.save(Array(library.voices.suffix(1)))
+        let reopened = try self.library()
+        try reopened.save(reopened.voices + [F.voice("ben", "Ben")])
+        #expect(reopened.voices.map(\.saveSequence) == [1, 2])
+    }
+
+    @Test func forgettingEveryoneDeletesTheCounterAndRestartsSaveOrder() throws {
+        defer { cleanUp() }
+        let library = try library()
+        try library.save([F.voice("alex", "Alex"), F.voice("ben", "Ben")])
+        try library.forgetAll()
+        #expect(library.voices.isEmpty)
+        #expect(!FileManager.default.fileExists(atPath: voicesFile.path))
+        #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path).isEmpty)
+        // The live instance and a relaunched one both restart after an explicit full wipe.
+        try library.save([F.voice("casey", "Casey")])
+        #expect(library.voices.first?.saveSequence == 0)
+        try library.forgetAll()
+        let reopened = try self.library()
+        try reopened.save([F.voice("devon", "Devon")])
+        #expect(reopened.voices.first?.saveSequence == 0)
+    }
+
+    @Test func forgettingThroughASymlinkLeavesNoVoiceEvidenceOrCounter() throws {
+        defer { cleanUp() }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let alias = root.appendingPathComponent("alias", isDirectory: true)
+        try FileManager.default.createSymbolicLink(atPath: alias.path, withDestinationPath: root.path)
+        let library = try VoiceLibrary(root: alias)
+        try library.save([F.voice("alex", "Alex")])
+        try library.savePrints([F.print(F.axis(0))], noteID: UUID())
+        try library.forgetAll()
+        #expect(!FileManager.default.fileExists(atPath: voicesFile.path))
+        #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path).isEmpty)
+        let reopened = try VoiceLibrary(root: root)
+        try reopened.save([F.voice("ben", "Ben")])
+        #expect(reopened.voices.first?.saveSequence == 0)
     }
 
     // ports: VoiceRepositoryTest#aNewerPeopleFileStaysReadOnly
@@ -85,6 +153,7 @@ import Testing
         #expect(library.problem == nil)
         #expect(try self.library().problem == nil)
         #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path).isEmpty)
+        #expect(!FileManager.default.fileExists(atPath: voicesFile.path))
     }
 
     // ports: VoiceRepositoryTest#anUnreadablePeopleFileIsReadAgainAndAWriteErrorIsAnOutcome
@@ -132,7 +201,8 @@ import Testing
 
         #expect(library.voices.isEmpty)
         #expect(!library.hasEvidence)
-        #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path) == ["unrelated.txt"])
+        #expect(Set(try FileManager.default.contentsOfDirectory(atPath: folder.path)) == ["unrelated.txt"])
+        #expect(!FileManager.default.fileExists(atPath: voicesFile.path))
         #expect(try self.library().voices.isEmpty)
     }
 

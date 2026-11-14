@@ -17,6 +17,9 @@ import CassiniNotebook
     public private(set) var phase: JobPhase = .starting
 
     @ObservationIgnored private var tracker = ProgressTracker()
+    @ObservationIgnored private var stopping = false
+    @ObservationIgnored private var pendingPhase: JobPhase = .starting
+    @ObservationIgnored private var publishingPhase = false
     @ObservationIgnored private var ticker: Task<Void, Never>?
     @ObservationIgnored private let battery: (any BatteryMonitoring)?
     @ObservationIgnored private let latestReading = BatteryBox()
@@ -51,7 +54,7 @@ import CassiniNotebook
         tracker = ProgressTracker(finalizationMs: finalizationMs ?? 0) { elapsed in
             box.value.map { BatteryProjection.Reading(elapsedMs: elapsed, percent: $0.percent, charging: $0.charging) }
         }
-        phase = tracker.phase
+        publish()
     }
 
     /// `receivedAt` preserves a producer's injected time across asynchronous queue delivery.
@@ -59,6 +62,8 @@ import CassiniNotebook
         guard noteID != nil else { return }
         let now = receivedAt ?? uptimeMs()
         switch event {
+        case .stopping:
+            stopping = true
         case .stageChanged(.matching, _, _), .stageChanged(.saving, _, _):
             if finalizingSince == nil { finalizingSince = now }
         case .ended(.done):
@@ -84,7 +89,8 @@ import CassiniNotebook
         stopTicking()
         noteID = nil
         finalizingSince = nil
-        phase = .starting
+        stopping = false
+        publishPhase(.starting)
     }
 
     /// What a library row shows for the running job.
@@ -114,7 +120,35 @@ import CassiniNotebook
     }
 
     private func publish() {
-        if phase != tracker.phase { phase = tracker.phase }
+        // The admission flag is authoritative even before a willSet's outer phase assignment has committed.
+        if stopping {
+            let next: JobPhase = switch phase {
+            case .stopping: phase
+            case .transcribing(let progress, let draft): .stopping(StoppingProgress(progress: progress, draft: draft))
+            default:
+                if case .stopping = tracker.phase {
+                    tracker.phase
+                } else if case .transcribing(let progress, let draft) = tracker.phase {
+                    .stopping(StoppingProgress(progress: progress, draft: draft))
+                } else {
+                    .stopping()
+                }
+            }
+            publishPhase(next)
+        } else {
+            publishPhase(tracker.phase)
+        }
+    }
+
+    private func publishPhase(_ next: JobPhase) {
+        pendingPhase = next
+        guard !publishingPhase else { return }
+        publishingPhase = true
+        defer { publishingPhase = false }
+        while phase != pendingPhase {
+            let next = pendingPhase
+            phase = next
+        }
     }
 
     private func readBattery() { latestReading.value = battery?.reading() }

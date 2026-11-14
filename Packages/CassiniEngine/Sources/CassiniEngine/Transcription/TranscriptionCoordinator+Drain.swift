@@ -80,6 +80,7 @@ extension TranscriptionCoordinator {
         active = current
         setRunning(RunningJob(noteID: current.noteID, title: current.title))
         parts.progress?.begin(current.noteID, finalizationMs: settings.finalizationMs)
+        if current.hasAcknowledgedStop { parts.progress?.apply(.stopping) }
         let (events, sink) = AsyncStream.makeStream(of: (JobEvent, Int64?).self)
         current.events = Task { [weak self] in
             for await (event, receivedAt) in events { self?.apply(event, to: current, receivedAt: receivedAt) }
@@ -124,7 +125,13 @@ extension TranscriptionCoordinator {
     }
 
     func apply(_ event: JobEvent, to current: Active, receivedAt: Int64? = nil) {
-        guard active === current, let running = state.running else { return }
+        guard active === current, let running = state.running, running.noteID == current.noteID else { return }
+        // Failed outcomes may still be stopped during fallback hand-over. Only a sealed success wins admission.
+        switch event {
+        case .ended(.done), .ended(.adoptPending): current.hasSealedOutcome = true
+        case .stopping: current.hasAcknowledgedStop = true
+        default: break
+        }
         let updated = running.applying(event)
         setRunning(updated)
         parts.progress?.apply(event, receivedAt: receivedAt)

@@ -17,8 +17,9 @@ import CassiniNotebook
         var effects: [RecordingEffect] = []
         let model: RecordingScreenModel
 
-        @MainActor init(consented: Bool = true, access: MicrophoneAccess = .granted, answer: Bool = true, notifier: Bool = true) throws {
-            h = try RecordingHarness(consented: consented)
+        @MainActor init(consented: Bool = true, access: MicrophoneAccess = .granted, answer: Bool = true, notifier: Bool = true,
+                        recordingNotes: ((CountingRecordingNotes) -> any RecordingNotes)? = nil) throws {
+            h = try RecordingHarness(consented: consented, recordingNotes: recordingNotes)
             permission = FakeMicrophonePermission(access: access, answer: answer)
             h.notifier.setAuthorization(.notDetermined)
             let center = NoticeCenter(settings: h.settings, notifier: h.notifier) { true }
