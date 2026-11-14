@@ -346,6 +346,143 @@ class RuntimePickTests(unittest.TestCase):
 
 
 class FullRunTests(unittest.TestCase):
+    def test_subshell_exit_summary_has_no_owner_side_effects(self):
+        import shlex
+        h = Harness(self)
+        effects = h.stub / 'summary-effects'
+        code = f'''
+logs={shlex.quote(str(h.stub))}; failed_logs="$logs"
+tier=all; timings=""; started_all=$(date +%s)
+fast_pid=""; heavy_started=1; keep_sims=0; runtime_tag=""
+{function('summary')}
+end_own_processes() {{ echo workers >> {shlex.quote(str(effects))}; }}
+shutdown_clones() {{ echo clones >> {shlex.quote(str(effects))}; }}
+post_status() {{ echo status >> {shlex.quote(str(effects))}; }}
+release_heavy_lock() {{ echo release >> {shlex.quote(str(effects))}; }}
+# No real cleanup is installed: the old summary must fail safely, without walking its own collector.
+result=$(trap summary EXIT; exit 7)
+rc=$?
+printf 'rc=%s,result=%s\n' "$rc" "$result"
+'''
+        result = subprocess.run(['/bin/bash', '-c', code], capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), 'rc=7,result=')
+        self.assertFalse(effects.exists(), 'subshell posted status, released lock or cleaned owned resources')
+        self.assertFalse((h.stub / 'FAILED').exists(), 'subshell wrote the run verdict')
+
+    def test_process_tree_snapshot_is_postorder_and_excludes_collector_ancestors(self):
+        import select
+        import signal
+        import sys
+        ready_read, ready_write = os.pipe()
+        worker_code = textwrap.dedent(r'''
+            import os, signal, subprocess, sys
+            read, write = os.pipe()
+            child = subprocess.Popen([sys.executable, '-c',
+                "import os,signal,sys; os.write(int(sys.argv[1]), b'R'); signal.pause()", str(write)], pass_fds=(write,))
+            os.close(write)
+            if os.read(read, 1) != b'R': raise SystemExit('child not ready')
+            os.close(read)
+            os.write(int(sys.argv[1]), ('%s %s\n' % (os.getpid(), child.pid)).encode())
+            os.close(int(sys.argv[1]))
+            signal.pause()
+        ''')
+        worker = subprocess.Popen([sys.executable, '-c', worker_code, str(ready_write)],
+                                  pass_fds=(ready_write,), start_new_session=True)
+        os.close(ready_write)
+        try:
+            self.assertTrue(select.select([ready_read], [], [], 30)[0], 'worker and child never became ready')
+            worker_pid, child_pid = map(int, os.read(ready_read, 256).decode().split())
+            self.assertEqual(worker_pid, worker.pid)
+            code = function('process_tree') + '''
+# The old collector must fail safely, without recursively spawning pgrep for its own process.
+pgrep() { return 1; }
+process_tree "$1"
+echo SELF
+process_tree $$
+echo ANCESTOR
+process_tree $PPID
+'''
+            result = subprocess.run(['/bin/bash', '-c', code, 'tree-test', str(worker_pid)],
+                                    capture_output=True, text=True, timeout=30)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout.splitlines(), [str(child_pid), str(worker_pid), 'SELF', 'ANCESTOR'])
+        finally:
+            # Only this test's private session; no shared runner group is touched.
+            try:
+                if worker.poll() is None:
+                    try: os.killpg(worker.pid, signal.SIGKILL)
+                    except ProcessLookupError: pass
+            finally:
+                worker.wait(timeout=30)
+                os.close(ready_read)
+
+    def test_cancel_under_an_external_host_slot_ends_own_worker_before_clone_cleanup(self):
+        import select
+        import shlex
+        import signal
+        import sys
+
+        h = Harness(self)
+        stopped = h.stub / 'worker-stopped'
+        cleaned = h.stub / 'clone-cleanup-order'
+        ready_read, ready_write = os.pipe()
+        worker = textwrap.dedent('''\
+            import os, signal, sys
+            from pathlib import Path
+            def stopped(_signal, _frame):
+                Path(sys.argv[1]).write_text('worker terminated')
+                raise SystemExit(0)
+            signal.signal(signal.SIGTERM, stopped)
+            os.write(int(sys.argv[2]), b'R')
+            signal.pause()
+        ''')
+        functions = '\n'.join(function(name) for name in (
+            'process_tree', 'signal_all', 'end_tree', 'end_own_processes', 'summary'))
+        code = f'''\
+root={shlex.quote(str(ROOT))}
+logs={shlex.quote(str(h.stub))}
+failed_logs="$logs"
+tier=all; timings=""; started_all=$(date +%s)
+lock_pid=""; fast_pid=""; runtime_tag=""
+heavy_started=1; keep_sims=0
+{functions}
+shutdown_clones() {{
+    if [ -f {shlex.quote(str(stopped))} ]; then
+        echo stopped-first > {shlex.quote(str(cleaned))}
+    else
+        echo worker-still-running > {shlex.quote(str(cleaned))}
+    fi
+}}
+post_status() {{ :; }}
+release_heavy_lock() {{ :; }}
+trap summary EXIT
+trap 'exit 143' TERM
+{shlex.join([sys.executable, '-c', worker, str(stopped), str(ready_write)])} &
+wait $!
+'''
+        process = subprocess.Popen(['/bin/bash', '-c', code], env=h.env(),
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, pass_fds=(ready_write,), start_new_session=True)
+        os.close(ready_write)
+        try:
+            # Readiness means the real worker has installed its handler, before the parent is cancelled.
+            self.assertTrue(select.select([ready_read], [], [], 30)[0], 'worker never signalled readiness')
+            self.assertEqual(os.read(ready_read, 1), b'R')
+            process.send_signal(signal.SIGTERM)  # Only the harness shell; no runner/group cleanup can mask the bug.
+            self.assertEqual(process.wait(timeout=30), 143)  # Process exit event; upper hang guard only.
+            self.assertTrue(stopped.exists(), 'external-slot cancellation left the owned worker running')
+            self.assertEqual(cleaned.read_text().strip(), 'stopped-first')
+        finally:
+            # This private session contains only the fixture, including an orphan left by the regression.
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            process.wait(timeout=30)
+            os.close(ready_read)
+            process.stdout.close()
+            process.stderr.close()
+
     def test_without_cassini_runtime_a_run_uses_the_names_and_files_it_always_did(self):
         h = Harness(self)
         (h.cache / "ui-test-durations.tsv").write_text("AlphaTests/testOne\t10.0\n")

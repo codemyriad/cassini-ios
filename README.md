@@ -335,9 +335,12 @@ runtime builds its dyld cache, about 3.5 GB more under `/Library/Developer/CoreS
 external as the backup. The leg then runs: `ios18_default=smoke` in `scripts/test.sh` is the one line that
 turns it on.
 
-On GitHub, `.github/workflows/ci.yml` runs `scripts/test.sh fast` and `scripts/test.sh build` on a hosted runner
-with Xcode 27.0, for each push to main or a pull request that changes code. The simulator tiers run only locally: the
-`drmeyers/test-all` status that `CASSINI_POST_STATUS=1 scripts/test.sh all` posts is what a merge looks for.
+On GitHub, `.github/workflows/ci.yml` runs harness regressions, `scripts/test.sh fast` and `scripts/test.sh build`
+with Xcode 27.0 on the configured trusted runner pool (hosted fallback for forks/unset configuration).
+The [observational simulator workflow](docs/simulator-gate.md) also runs the full gate on rented self-hosted iOS
+runners for main and same-repository PRs, including the full iOS 18 leg. Its job guard skips fork PRs; a server-side
+runner policy must also exclude PR-edited workflows, as described in that design. During the comparison period, the `drmeyers/test-all` status from
+`CASSINI_POST_STATUS=1 scripts/test.sh all` remains the coordinator's merge gate.
 
 `scripts/screenshots.sh` takes the screenshots above. It runs `CassiniUITests/ScreenshotTests` on its own iPhone 17
 and iPad Pro 13-inch (M5) clones, in light and dark, with the status bar pinned to 9:41. It then exports the named
