@@ -44,6 +44,33 @@ private actor Gate {
         #expect(tracker.cards.isEmpty)
     }
 
+    @Test(arguments: [true, false])
+    func cancellationWinsOverAConcurrentFailure(rejected: Bool) async {
+        let tracker = ImportTracker(clock: clock)
+        let gate = Gate()
+        let task = tracker.start(displayName: "cancelled.wav") {
+            await gate.wait()
+            if rejected { return .rejected(.cannotOpen) }
+            throw CocoaError(.fileReadUnknown)
+        }
+        task.cancel()
+        await gate.release()
+        #expect(await task.value == nil)
+        #expect(tracker.cards.isEmpty)
+        #expect(tracker.failure == nil)
+    }
+
+    @Test func cancellationAfterCommitPreservesTheSuccessfulOutcome() async {
+        let tracker = ImportTracker(clock: clock)
+        let gate = Gate(), id = UUID()
+        let task = tracker.start(displayName: "committed.wav") { await gate.wait(); return .created(id) }
+        task.cancel()
+        await gate.release()
+        #expect(await task.value == .created(id))
+        #expect(tracker.cards.isEmpty)
+        #expect(tracker.failure == nil)
+    }
+
     @Test func importsRunSideBySideAndEachIsShownWhileItRuns() async {
         let tracker = ImportTracker(clock: clock)
         let gate = Gate()

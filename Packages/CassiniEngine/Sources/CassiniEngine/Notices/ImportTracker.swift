@@ -39,13 +39,20 @@ import CassiniNotebook
             let outcome: ImportOutcome?
             var failed: ImportFailureKind?
             do {
-                outcome = try await body()
-                failed = outcome?.failure
+                let result = try await body()
+                // Cancellation can race an I/O rejection. A committed success survives; a cancelled failure
+                // must not leave a problem card or notice behind.
+                if Task.isCancelled, result.failure != nil {
+                    outcome = nil
+                } else {
+                    outcome = result
+                    failed = result.failure
+                }
             } catch is CancellationError {
                 outcome = nil
             } catch {
                 outcome = nil
-                failed = .cannotOpen
+                if !Task.isCancelled { failed = .cannotOpen }
             }
             if let index = running.firstIndex(of: displayName) { running.remove(at: index) }
             if let index = cards.firstIndex(where: { $0.id == id }) {
