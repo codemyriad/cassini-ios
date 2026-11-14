@@ -267,8 +267,7 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(garden.waitForExistence(within: 15))
         app.buttons["Clear search"].tap()
         XCTAssertTrue(app.staticTexts["TODAY"].waitForExistence(within: 15))
-        XCTAssertTrue(date.wait(until: NSPredicate(format: "label CONTAINS 'Any date'"), within: 5),
-                      "Clear resets the date filter while Search stays open")
+        XCTAssertFalse(date.exists, "Clear removes the typed-search date filter while Search stays open")
         XCTAssertTrue(app.buttons["closeLibrarySearch"].exists, "Clear keeps Search open")
         search.tap()
         search.typeText("thurs\n")
@@ -370,14 +369,9 @@ final class LibraryUITests: XCTestCase {
         dateControl(app).tapWhenSettled()
         app.buttons["Today"].tapWhenSettled()
         XCTAssertTrue(date.wait(until: NSPredicate(format: "label CONTAINS 'Today'"), within: 5), file: file, line: line)
-        search.tap()
-        search.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 8))
-        XCTAssertTrue(date.waitForNonExistence(within: 5), "Clearing Search removes its date filter", file: file, line: line)
-        XCTAssertTrue(row(app, "Garden plans for the spring").waitForExistence(within: 5), file: file, line: line)
-        if submitEmptyBeforeDate {
-            search.typeText("\n")
-            XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(within: 5), file: file, line: line)
-        }
+        app.buttons["Clear search"].tapWhenSettled()
+        XCTAssertTrue(app.staticTexts["TODAY"].waitForExistence(within: 5), file: file, line: line)
+        XCTAssertFalse(date.exists, "Clearing Search removes its date filter", file: file, line: line)
         close.tap()
         XCTAssertTrue(app.buttons["settingsButton"].waitForExistence(within: 5), file: file, line: line)
         XCTAssertFalse(close.exists, file: file, line: line)
@@ -437,18 +431,14 @@ final class LibraryUITests: XCTestCase {
         let date = app.buttons["librarySearchDate"]
         let close = app.buttons["closeLibrarySearch"]
         XCTAssertTrue(close.waitForExistence(within: 5))
-        if submitEmptyBeforeSidebarMenu {
-            search.typeText("\n")
-            XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(within: 5))
-        }
-        // The iPadOS 18 Menu wrapper reports not-hittable even when its native button opens it. Require the
-        // actual menu action after scrolling, rather than treating that incorrect AX proxy as interaction proof.
+        XCTAssertFalse(date.exists, "Empty Search has no date filter")
+        search.typeText("planning\n")
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(within: 5))
+        XCTAssertTrue(date.waitForExistence(within: 5))
+        // The iPadOS 18 Menu wrapper can report not-hittable; require the actual native menu action.
         dateControl(app).tapWhenSettled()
         app.buttons["Today"].tapWhenSettled()
         XCTAssertTrue(date.wait(until: NSPredicate(format: "label CONTAINS 'Today'"), within: 5))
-        search.tap()
-        search.typeText("planning\n")
-        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(within: 5))
         let planning = row(app, "Weekly planning call")
         XCTAssertTrue(planning.waitForExistence(within: 15))
         assertSearchControlsAndSingleResultAreVisible(app, result: planning)
@@ -493,7 +483,7 @@ final class LibraryUITests: XCTestCase {
         focusSearchWithPointer(app)
         capture("Empty Search focused after scrolling the Library")
         let date = app.buttons["librarySearchDate"]
-        XCTAssertTrue(date.wait(until: NSPredicate(format: "hittable == true"), within: 5))
+        XCTAssertFalse(date.exists, "Empty Search has no date filter")
         let close = app.buttons["closeLibrarySearch"]
         XCTAssertTrue(close.waitForExistence(within: 5))
         XCTAssertFalse(app.buttons["settingsButton"].exists)
