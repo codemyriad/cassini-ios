@@ -111,7 +111,7 @@ private struct SettingsForm: View {
             } header: {
                 Text("On-device models", tableName: "Settings").foregroundStyle(Color.muted)
             } footer: {
-                Text("Transcription runs on this device. Audio never leaves it.", tableName: "Settings").foregroundStyle(Color.muted)
+                Text("Transcription runs on this device.", tableName: "Settings").foregroundStyle(Color.muted)
             }
             Section {
                 Toggle(isOn: $settings.identifySpeakers) { Text("Identify speakers after transcription", tableName: "Settings") }

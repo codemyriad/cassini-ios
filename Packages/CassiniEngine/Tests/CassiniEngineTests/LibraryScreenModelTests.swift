@@ -39,6 +39,7 @@ import CassiniNotebook
         var effects: [LibraryEffect] = []
         var finishing: UUID?
         var speakerModelsReady = false
+        var cloudBackup: Bool? = true
         @ObservationIgnored let clock = GatedClock()
         @ObservationIgnored lazy var model: LibraryScreenModel = {
             var calendar = Calendar(identifier: .gregorian)
@@ -65,6 +66,7 @@ import CassiniNotebook
                 },
                 trash: { [unowned self] in actions.append("trash \(title($0))") },
                 speakerModelsReady: { [unowned self] in speakerModelsReady },
+                cloudBackup: { [unowned self] in cloudBackup },
                 clock: clock, calendar: calendar))
             model.onEffect = { [unowned self] in effects.append($0) }
             return model
@@ -614,6 +616,67 @@ import CassiniNotebook
         }
         await model.settle()
         #expect(model.content.results?.count == 6)
+    }
+
+    // MARK: Wave 5 first-run hero (D-974)
+
+    // ports: LibraryViewModelTest#groupsTheLibraryByDayAndShowsTheFirstRunHeroInsteadOfTheEmptyBanner
+    @Test func showsTheFirstRunHeroOnAnEmptyLibraryAndHidesItOnceANoteExists() async {
+        let library = Library()
+        let model = library.model
+        #expect(model.content.emptyState == .empty)
+        #expect(model.content.hero == FirstRunHero(cloudBackup: true, privacy: .withBackup))
+
+        library.add("Today note", minutesAgo: 0)
+        library.add("Yesterday note", minutesAgo: 24 * 60)
+        await model.settle()
+        #expect(model.content.hero == nil)
+        #expect(model.content.emptyState == nil)
+        #expect(model.content.sections.map(\.key) == [.today, .yesterday])
+    }
+
+    // ports: LibraryViewModelTest#theFirstRunHeroFollowsEveryAutomaticCopyThatCanLeaveThePhone
+    @Test func theFirstRunHeroFollowsIOSBackupStateAndObservesChanges() async {
+        let library = Library()
+        let model = library.model
+        let before = model.presentationRevision
+        #expect(model.content.hero == FirstRunHero(cloudBackup: true, privacy: .withBackup))
+
+        library.cloudBackup = false
+        await model.settle()
+        #expect(model.presentationRevision != before)
+        #expect(model.content.hero == FirstRunHero(cloudBackup: false, privacy: .backupExcluded))
+
+        library.cloudBackup = true
+        await model.settle()
+        #expect(model.content.hero == FirstRunHero(cloudBackup: true, privacy: .withBackup))
+    }
+
+    // ports: LibraryViewModelTest#noPrivacyClaimIsDrawnBeforeTheBackupChoicesAreRead
+    @Test func noPrivacyClaimIsDrawnBeforeTheBackupStateIsRead() async {
+        let library = Library()
+        library.cloudBackup = nil
+        let model = library.model
+        #expect(model.content.hero == nil)
+
+        library.cloudBackup = false
+        await model.settle()
+        #expect(model.content.hero == FirstRunHero(cloudBackup: false, privacy: .backupExcluded))
+    }
+
+    // ports: LibraryViewModelTest#searchingAnEmptyLibraryShowsNoHero
+    @Test func searchingAnEmptyLibraryShowsNoHeroBeforeOrAfterDebounce() async {
+        let library = Library()
+        let model = library.model
+        #expect(model.content.hero != nil)
+
+        model.query = "budget"
+        #expect(model.content.hero == nil, "no hero while typing before the debounce")
+        await waitUntilSleeping(library.clock)
+        library.clock.release()
+        await model.settle()
+        #expect(model.content.hero == nil)
+        #expect(model.content.emptyState == .noMatch("budget"))
     }
 
     private func waitUntilSleeping(_ clock: GatedClock, count: Int = 1) async {

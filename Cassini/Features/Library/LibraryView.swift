@@ -35,7 +35,9 @@ struct LibraryView: View {
         let exportable = Set(ArchiveSelection.ids(library.notes))
         ScrollView {
             LazyVStack(alignment: .leading, spacing: Spacing.row) {
-                filters.padding(.top, 6)
+                if content.facts.liveNotes > 0 || model.isSearching {
+                    filters.padding(.top, 6)
+                }
                 if model.isSearching, let count = content.facts.results {
                     Text(LibraryPhase1Copy.template("format.searchCount.meetings", count: count))
                         .font(.subheadline.weight(.semibold)).foregroundStyle(Color.ink)
@@ -44,7 +46,8 @@ struct LibraryView: View {
                 activity.padding(.top, 6)
                 ImportCardsView()
                 if !content.loading || content.emptyState == .unavailable {
-                    // The banners say when there are no notes, no matches or no library; the Starred filter has its own.
+                    if let hero = content.hero { FirstRunHeroView(hero: hero) }
+                    // Banners cover no-match and unavailable states; the empty Library uses the Wave 5 hero and Starred has its own.
                     if content.emptyState == .noStarred { NoStarredState().padding(.top, 8) }
                     if let results = content.results {
                         ForEach(results) { row($0, day: $0.day ?? .today, exportable: exportable.contains($0.id)) }
@@ -182,8 +185,9 @@ struct LibraryView: View {
     }
 
     /// All real notices, the recording card, standalone downloads and import/export progress stay available.
+    /// The Wave 5 first-run hero replaces the `LIB_EMPTY` banner (`L-27`).
     @ViewBuilder private var activity: some View {
-        BannerList(specs: notices.library(model.content.facts),
+        BannerList(specs: notices.library(model.content.facts).filter { $0.kind != .libEmpty },
                    onAction: { spec, action in notices.perform(action, on: spec) { importing = true } },
                    onDismiss: notices.dismiss)
         LibraryActivity()

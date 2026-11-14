@@ -182,6 +182,12 @@ import CassiniNotebook
             stop: { processing.stop($0) }, dequeue: { processing.dequeue($0) },
             update: { _ = library.update($0, $1) }, trash: { _ = await trash.requestTrash($0) },
             speakerModelsReady: { await processing.speakerModelsReady() },
+            cloudBackup: {
+                #if DEBUG
+                if environment.launch.backupExcluded { return library.isLoaded ? false : nil }
+                #endif
+                return library.cloudBackup
+            },
             clock: environment.clock, calendar: environment.calendar))
     }
 

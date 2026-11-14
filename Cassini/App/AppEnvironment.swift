@@ -66,6 +66,7 @@ import CassiniEngineTesting
         var failedImportFixture = false
         var importingFixture = false
         var draftSpeakerSuggestion = false
+        var backupExcluded = false
         #endif
     }
 
@@ -221,6 +222,7 @@ extension AppEnvironment {
         environment.launch.failedImportFixture = arguments.contains("--failed-import-fixture")
         environment.launch.importingFixture = arguments.contains("--importing-fixture")
         environment.launch.draftSpeakerSuggestion = draftSpeakerSuggestion
+        environment.launch.backupExcluded = arguments.contains("--backup-excluded")
         return environment
     }
 

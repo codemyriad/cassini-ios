@@ -189,7 +189,7 @@ public enum TranscribeAction: Hashable, Sendable {
 
 /// What the Library shows instead of rows, or above none (Android banners LIB_EMPTY, LIB_NO_MATCH, LIB_UNAVAILABLE).
 public enum LibraryEmptyState: Hashable, Sendable {
-    /// "No notes yet", with Record and Import.
+    /// Empty library once loaded: shown as the Wave 5 first-run hero (`FirstRunHero`, L-27).
     case empty
     /// "Nothing matches “q”".
     case noMatch(String)
@@ -197,6 +197,33 @@ public enum LibraryEmptyState: Hashable, Sendable {
     case unavailable
     /// The Starred filter (an iOS extra) has nothing.
     case noStarred
+}
+
+/// Device family for the device-specific first-run privacy line (`privacy.onDevice.{iphone,ipad}.*`).
+public enum FirstRunDevice: Hashable, Sendable {
+    case phone
+    case pad
+}
+
+/// Backup-gated first-run privacy line on iOS (`PARITY.md` Wave 6 contract §2, D98).
+/// iOS never claims "The audio never leaves it.", because `NSURLIsExcludedFromBackupKey` is backup guidance and
+/// Quick Start device-to-device migration may still copy local app storage.
+public enum FirstRunPrivacy: Hashable, Sendable {
+    /// Cloud backup on (default): `privacy.onDevice.{iphone,ipad}.withBackup`.
+    case withBackup
+    /// Cloud backup excluded (`NSURLIsExcludedFromBackupKey = true`): `privacy.onDevice.{iphone,ipad}.backupExcluded`.
+    case backupExcluded
+}
+
+/// The Wave 5 first-run hero on an empty Library (Android `FirstRunHeroUi`, L-27, D-974, D98).
+public struct FirstRunHero: Hashable, Sendable {
+    public var cloudBackup: Bool
+    public var privacy: FirstRunPrivacy
+
+    public init(cloudBackup: Bool, privacy: FirstRunPrivacy) {
+        self.cloudBackup = cloudBackup
+        self.privacy = privacy
+    }
 }
 
 /// The pure mapping from the notes, the queue and the recorder to what the Library shows (Android `LibraryMapping`).
@@ -363,6 +390,13 @@ public enum LibraryMapping {
         if facts.liveNotes == 0 && facts.query.isEmpty { return .empty }
         if !facts.query.isEmpty { return facts.results == 0 ? .noMatch(facts.query) : nil }
         return favoritesOnly && facts.results == 0 ? .noStarred : nil
+    }
+
+    /// The Wave 5 first-run hero for an empty Library once backup state has been read (`cloudBackup != nil`),
+    /// following the iOS table in `PARITY.md` (D98). Nil while loading, unavailable, searching, or once a note exists.
+    public static func firstRunHero(_ facts: LibraryFacts, cloudBackup: Bool?) -> FirstRunHero? {
+        guard emptyState(facts) == .empty, let cloudBackup else { return nil }
+        return FirstRunHero(cloudBackup: cloudBackup, privacy: cloudBackup ? .withBackup : .backupExcluded)
     }
 
     // MARK: Note actions
