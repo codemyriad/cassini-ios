@@ -16,7 +16,9 @@ export handles Cassini documents/versions/provenance. Clean imported documents r
 a missing/stale optional TITLE tag, so importing the ZIP detects the original digest. The stored audio/document
 and note.json are never written by bulk export. Actual local transcript/title/speaker edits require a private
 portable snapshot for a verified document because iOS stores those edits beside the source; that snapshot includes
-those edits without replacing the source. Audio-only notes keep their original bytes and extension. Every non-OK
+those edits without replacing the source. Audio-only notes keep their original bytes and extension. ZIP restoration
+accepts the legacy `ArchiveAudio` containers, including CAF captures and AAC imports, after audio validation; Picker/Open-with remain limited to
+the shared decided-format contract. MPEG-4/3GP archive members with video tracks are rejected. Every non-OK
 Cassini document keeps its original bytes even when the note has local words, edits or renamed speakers: those
 changes cannot authenticate the original audio binding or recording start. Its on-device versions remain in the
 Library. Wordless Cassini documents also keep their original bytes. Export names use the existing naming rule, with case-insensitive numeric

@@ -1,3 +1,6 @@
+import AVFoundation
+import CassiniCore
+import CassiniNotebook
 import CryptoKit
 import Foundation
 import Synchronization
@@ -28,12 +31,35 @@ public struct CoordinatedFileImporter: FileImporting {
     }
 
     public func copy(from source: URL, to destination: URL, maxBytes: Int64, reserveBytes: Int64) async throws -> ImportedFile {
+        try await copy(from: source, to: destination, maxBytes: maxBytes, reserveBytes: reserveBytes, archiveMember: false)
+    }
+
+    public func copyArchiveMember(from source: URL, to destination: URL, maxBytes: Int64, reserveBytes: Int64) async throws -> ImportedFile {
+        let copied = try await copy(from: source, to: destination, maxBytes: maxBytes, reserveBytes: reserveBytes, archiveMember: true)
+        do {
+            // Legacy MP4/3GP containers must hold audio only, never restore a movie as a note.
+            let content = try await CancellableFileWork.run { try ImportClassifier.sniff(fileAt: destination) }
+            if content == .other(fileExtension: "m4a") || content == .other(fileExtension: "3gp") {
+                let asset = AVURLAsset(url: destination)
+                guard try await asset.loadTracks(withMediaType: .video).isEmpty else { throw FileImportError.cannotOpen }
+            }
+            try Task.checkCancellation()
+            return copied
+        } catch {
+            try? FileManager.default.removeItem(at: destination)
+            if error is CancellationError { throw error }
+            throw FileImportError.cannotOpen
+        }
+    }
+
+    private func copy(from source: URL, to destination: URL, maxBytes: Int64, reserveBytes: Int64,
+                      archiveMember: Bool) async throws -> ImportedFile {
         let cancel = Cancellation()
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
                 DispatchQueue.global(qos: .userInitiated).async {
                     continuation.resume(with: Result {
-                        try coordinatedCopy(from: source, to: destination, maxBytes: maxBytes, reserveBytes: reserveBytes, cancel: cancel)
+                        try coordinatedCopy(from: source, to: destination, maxBytes: maxBytes, reserveBytes: reserveBytes, archiveMember: archiveMember, cancel: cancel)
                     })
                 }
             }
@@ -43,11 +69,11 @@ public struct CoordinatedFileImporter: FileImporting {
     }
 
     private func coordinatedCopy(from source: URL, to destination: URL, maxBytes: Int64, reserveBytes: Int64,
-                                 cancel: Cancellation) throws -> ImportedFile {
+                                 archiveMember: Bool, cancel: Cancellation) throws -> ImportedFile {
         let scoped = source.startAccessingSecurityScopedResource()
         defer { if scoped { source.stopAccessingSecurityScopedResource() } }
         let copy = Copy(storage: storage, folder: destination.deletingLastPathComponent(), maxBytes: maxBytes,
-                        reserveBytes: reserveBytes, cancel: cancel)
+                        reserveBytes: reserveBytes, archiveMember: archiveMember, cancel: cancel)
         // Before any download: the cap and the space for the whole file. Once a placeholder has been downloaded, its
         // bytes already take space on this volume, so the check in the accessor covers only a size not reported here.
         let reported = sizeOf(source)
@@ -74,6 +100,7 @@ private struct Copy {
     let folder: URL
     let maxBytes: Int64
     let reserveBytes: Int64
+    let archiveMember: Bool
     let cancel: Cancellation
 
     /// Rejects a known `size` over the cap and, with `space`, one the free space cannot hold with the reserve.
@@ -106,11 +133,13 @@ private struct Copy {
         try input.seek(toOffset: 0)
         try check(expectedSize, space: true)
         // Admission uses the caller's name, even if a file provider coordinates a different temporary URL.
-        // ZIP is the existing bulk-transfer container; each extracted member retains its contract extension.
+        // ZIP restoration additionally admits legacy audio containers, still inspected before publication.
         if ImportPolicy.accepts(filename: name) {
             let header = try input.read(upToCount: ImportPolicy.probeBytes) ?? Data()
             try ImportPolicy.validate(header: header, filename: name, fileBytes: expectedSize)
             try input.seek(toOffset: 0)
+        } else if archiveMember {
+            guard ArchiveAudio.supports(name) else { throw FileImportError.cannotOpen }
         } else if (name as NSString).pathExtension.lowercased() != "zip" {
             throw FileImportError.cannotOpen
         }

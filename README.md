@@ -167,7 +167,9 @@ TestFlight still need.
 - **Audio import (L-25 / D-1029).** Picker/Open-with types and accepted extensions come from the shared decided-format
   contract. iOS uses AVFoundation for MP3/M4A/WAV, including 24-bit and float WAV beyond Android's 16-bit PCM path.
   `.opus` and `.ogg` require actual Ogg Opus headers; the former Android-compatible MP3-under-`.opus` fallback is
-  excluded by this shared contract. See [the import differences](docs/differences.md#import).
+  excluded by this shared contract. ZIP restoration also accepts legacy audio containers (including CAF and AAC)
+  so audio-only notes exported unchanged can return to the Library; this iOS compatibility path does not expand
+  Picker/Open-with admission. See [the import differences](docs/differences.md#import).
 - **Unknown meeting dates (D95).** The Library names the group with the shared “Date unknown” heading in all six
   languages, including for VoiceOver. iOS omits the repeated unknown-date label from individual row metadata,
   the Note subtitle and the Document info Recorded row; the Note subtitle keeps the duration. Android repeats

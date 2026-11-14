@@ -64,7 +64,10 @@ import CassiniNotebook
             // Preserve the existing ordered batch report and ZIP deduplication. Members of a ZIP have ephemeral
             // scratch URLs, so their failed cards offer dismissal; ordinary caller URLs can also be retried.
             let running = await tracker.start(displayName: name ?? url.lastPathComponent, source: name == nil ? url : nil) {
-                try await service.importFile(url, fallbackTitle: fallback, displayName: name)
+                if let name {
+                    return try await service.importArchiveMember(url, fallbackTitle: fallback, displayName: name)
+                }
+                return try await service.importFile(url, fallbackTitle: fallback)
             }
             return try await withTaskCancellationHandler {
                 guard let result = await running.value else { throw CancellationError() }

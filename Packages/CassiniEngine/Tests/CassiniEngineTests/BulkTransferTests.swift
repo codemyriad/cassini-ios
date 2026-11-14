@@ -3,6 +3,7 @@ import CassiniCore
 import CassiniNotebook
 import CassiniEngineTesting
 import Foundation
+import AVFoundation
 import Testing
 import Synchronization
 
@@ -35,7 +36,10 @@ private final class BulkSandbox: Sendable {
                                      storage: storage, clock: FakeClock())
         return BulkImportService(files: CoordinatedFileImporter(storage: storage), scratch: scratch, limits: limits, memberLimit: memberLimit) { url, name in
             if let requested { await requested.append(.init(done: 1, total: 1)) }
-            return try await importer.importFile(url, fallbackTitle: "Imported audio", displayName: name)
+            if let name {
+                return try await importer.importArchiveMember(url, fallbackTitle: "Imported audio", displayName: name)
+            }
+            return try await importer.importFile(url, fallbackTitle: "Imported audio")
         }
     }
     func scratchContents() throws -> [String] {
@@ -100,6 +104,22 @@ private struct HeldArchiveCopy: FileImporting {
     }
 }
 
+/// The legacy round trips use real AVFoundation decoding rather than header-only test doubles.
+private struct ArchiveTestAudio: AudioProcessing {
+    private let base = FakeAudioProcessing()
+    func inspect(_ url: URL) async throws -> AudioSummary {
+        let file = try AVAudioFile(forReading: url)
+        guard file.length > 0 else { throw FileImportError.cannotOpen }
+        let buffer = try #require(AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: 2048))
+        try file.read(into: buffer)
+        guard buffer.frameLength > 0 else { throw FileImportError.cannotOpen }
+        return AudioSummary(duration: Double(file.length) / file.processingFormat.sampleRate, waveform: [0.5])
+    }
+    func compress(_ source: URL, to destination: URL) async throws { try await base.compress(source, to: destination) }
+    func decodeOpus(_ source: URL, to destination: URL) async throws { try await base.decodeOpus(source, to: destination) }
+    func encodeOpus(_ source: URL, to destination: URL) async throws { try await base.encodeOpus(source, to: destination) }
+}
+
 @Suite(.timeLimit(.minutes(1))) struct BulkTransferTests {
     @Test func archiveUsesRealDigestDedupAndCountsIgnoredMembers() async throws {
         let sandbox = try BulkSandbox()
@@ -115,6 +135,131 @@ private struct HeldArchiveCopy: FileImporting {
         let notes = await sandbox.notes.all()
         #expect(notes.count == 1)
         #expect(notes.first?.title == "English meeting")
+        #expect(try sandbox.scratchContents().isEmpty)
+    }
+
+    @Test func exportedLegacyAudioRestoresButExternalImportsStillRejectIt() async throws {
+        let source = try BulkSandbox(), destination = try BulkSandbox()
+        let audio = ArchiveTestAudio()
+        let files = CoordinatedFileImporter(storage: destination.storage)
+        let importer = ImportService(notes: destination.notes, files: files, audio: audio,
+                                     storage: destination.storage, clock: FakeClock())
+        var originals: [Note] = []
+        for filename in ["capture.caf", "source.aac"] {
+            let note = Note(title: filename == "capture.caf" ? "Uncompressed recording" : "Legacy AAC", audioFilename: filename)
+            let folder = source.notes.directory(for: note.id)
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            let url = folder.appendingPathComponent(filename)
+            let format = try #require(AVAudioFormat(standardFormatWithSampleRate: 44_100, channels: 1))
+            let buffer = try #require(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 44_100))
+            buffer.frameLength = buffer.frameCapacity
+            for index in 0..<Int(buffer.frameLength) {
+                buffer.floatChannelData![0][index] = Float(sin(Double(index) * 440 * 2 * .pi / 44_100)) * 0.3
+            }
+            do {
+                let settings: [String: Any] = filename.hasSuffix("aac")
+                    ? [AVFormatIDKey: kAudioFormatMPEG4AAC, AVSampleRateKey: 44_100, AVNumberOfChannelsKey: 1, AVEncoderBitRateKey: 64_000]
+                    : format.settings
+                let file = try AVAudioFile(forWriting: url, settings: settings)
+                try file.write(from: buffer)
+            }
+            #expect(try await audio.inspect(url).duration > 0)
+            try await source.notes.save(note)
+            originals.append(note)
+
+            // Picker admission and Open-with/service admission stay narrow, even with an explicit display name.
+            #expect(!ImportPolicy.accepts(filename: filename))
+            #expect(try await importer.importFile(url, fallbackTitle: "Imported") == .rejected(.cannotOpen))
+            #expect(try await importer.importFile(url, fallbackTitle: "Imported", displayName: filename) == .rejected(.cannotOpen))
+            let rejectedCopy = destination.folder.appendingPathComponent("external.tmp")
+            await #expect(throws: FileImportError.cannotOpen) {
+                try await files.copy(from: url, to: rejectedCopy, maxBytes: Limits.maxImportBytes, reserveBytes: 0)
+            }
+            #expect(!FileManager.default.fileExists(atPath: rejectedCopy.path))
+        }
+        #expect(await destination.notes.all().isEmpty)
+        let exporter = BulkExportService(folder: source.scratch) { note, folder in
+            try await BulkExportService.copyOriginal(source.notes.audioURL(for: note),
+                to: folder.appendingPathComponent(note.audioFilename))
+        }
+        let zip = try await exporter.export(originals)
+        #expect(try ZIPArchive(url: zip).entries.map { ($0.name as NSString).pathExtension }.sorted() == ["aac", "caf"])
+        let bulk = BulkImportService(files: files, scratch: destination.scratch) { url, name in
+            if let name { return try await importer.importArchiveMember(url, fallbackTitle: "Imported", displayName: name) }
+            return try await importer.importFile(url, fallbackTitle: "Imported")
+        }
+        let report = await bulk.run([zip])
+        #expect(report.summary.imported == 2)
+        #expect(report.summary.failed == 0)
+        #expect(report.summary.unsupported == 0)
+        #expect(report.archives.isEmpty)
+        let restored = await destination.notes.all()
+        #expect(restored.count == 2)
+        for original in originals {
+            let note = try #require(restored.first { $0.title == original.title })
+            #expect(note.audio == .plain)
+            #expect((note.audioFilename as NSString).pathExtension == (original.audioFilename as NSString).pathExtension)
+            let stored = destination.notes.audioURL(for: note)
+            #expect(try Data(contentsOf: stored) == Data(contentsOf: source.notes.audioURL(for: original)))
+            #expect(try await audio.inspect(stored).duration > 0)
+        }
+        #expect(try destination.scratchContents().isEmpty)
+    }
+
+    @Test func corruptLegacyArchiveAudioDoesNotBecomeANote() async throws {
+        let sandbox = try BulkSandbox()
+        let files = CoordinatedFileImporter(storage: sandbox.storage)
+        let importer = ImportService(notes: sandbox.notes, files: files, audio: ArchiveTestAudio(),
+                                     storage: sandbox.storage, clock: FakeClock())
+        let zip = try sandbox.archive([("Broken.caf", Data("caff".utf8)), ("Broken.aac", Data([0xff, 0xf1, 0, 0]))])
+        let bulk = BulkImportService(files: files, scratch: sandbox.scratch) { url, name in
+            try await importer.importArchiveMember(url, fallbackTitle: "Imported", displayName: name ?? "")
+        }
+        let report = await bulk.run([zip])
+        #expect(report.summary.failed == 2)
+        #expect(report.summary.imported == 0)
+        #expect(await sandbox.notes.all().isEmpty)
+        #expect(try sandbox.scratchContents().isEmpty)
+    }
+
+    @Test func archiveMovieIsRejectedEvenUnderALegacyAudioName() async throws {
+        let sandbox = try BulkSandbox()
+        let movie = sandbox.folder.appendingPathComponent("movie.mp4")
+        let writer = try AVAssetWriter(outputURL: movie, fileType: .mp4)
+        let input = AVAssetWriterInput(mediaType: .video, outputSettings: [
+            AVVideoCodecKey: AVVideoCodecType.h264, AVVideoWidthKey: 16, AVVideoHeightKey: 16
+        ])
+        let adaptor = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: input,
+            sourcePixelBufferAttributes: [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32ARGB,
+                                         kCVPixelBufferWidthKey as String: 16, kCVPixelBufferHeightKey as String: 16])
+        writer.add(input)
+        try #require(writer.startWriting())
+        writer.startSession(atSourceTime: .zero)
+        var pixel: CVPixelBuffer?
+        try #require(CVPixelBufferCreate(kCFAllocatorDefault, 16, 16, kCVPixelFormatType_32ARGB, nil, &pixel) == kCVReturnSuccess)
+        let buffer = try #require(pixel)
+        CVPixelBufferLockBaseAddress(buffer, [])
+        memset(CVPixelBufferGetBaseAddress(buffer), 0, CVPixelBufferGetDataSize(buffer))
+        CVPixelBufferUnlockBaseAddress(buffer, [])
+        try #require(input.isReadyForMoreMediaData)
+        try #require(adaptor.append(buffer, withPresentationTime: .zero))
+        input.markAsFinished()
+        await writer.finishWriting()
+        try #require(writer.status == .completed)
+        let zip = try sandbox.archive([("Movie.mp4", Data(contentsOf: movie)), ("Disguised.caf", Data(contentsOf: movie))])
+        // Even an audio double that would accept arbitrary bytes must never see these movie members.
+        let audio = FakeAudioProcessing(opensAnyFile: true)
+        let files = CoordinatedFileImporter(storage: sandbox.storage)
+        let importer = ImportService(notes: sandbox.notes, files: files, audio: audio,
+                                     storage: sandbox.storage, clock: FakeClock())
+        let bulk = BulkImportService(files: files, scratch: sandbox.scratch) { url, name in
+            try await importer.importArchiveMember(url, fallbackTitle: "Imported", displayName: name ?? "")
+        }
+        let report = await bulk.run([zip])
+        #expect(report.summary.failed == 2)
+        #expect(report.summary.imported == 0)
+        #expect(audio.inspections == 0)
+        #expect(await sandbox.notes.all().isEmpty)
         #expect(try sandbox.scratchContents().isEmpty)
     }
 
@@ -373,7 +518,10 @@ private struct HeldArchiveCopy: FileImporting {
         let importer = ImportService(notes: sandbox.notes, files: CoordinatedFileImporter(storage: sandbox.storage),
                                      audio: audio, storage: sandbox.storage, clock: FakeClock())
         let batch = BulkImportService(files: CoordinatedFileImporter(storage: sandbox.storage), scratch: sandbox.scratch) { url, name in
-            try await importer.importFile(url, fallbackTitle: "Imported", displayName: name)
+            if let name {
+                return try await importer.importArchiveMember(url, fallbackTitle: "Imported", displayName: name)
+            }
+            return try await importer.importFile(url, fallbackTitle: "Imported")
         }
         let single = Task { try await importer.importFile(source, fallbackTitle: "Single") }
         let bulk = Task { await batch.run([zip]) }
@@ -402,7 +550,10 @@ private struct HeldArchiveCopy: FileImporting {
         let batch = BulkImportService(files: HeldArchiveCopy(base: CoordinatedFileImporter(storage: sandbox.storage), copied: copied, release: release),
                                       scratch: sandbox.scratch) { url, name in
             await exposed.append(.init(done: 1, total: 1))
-            return try await importer.importFile(url, fallbackTitle: "Bulk", displayName: name)
+            if let name {
+                return try await importer.importArchiveMember(url, fallbackTitle: "Bulk", displayName: name)
+            }
+            return try await importer.importFile(url, fallbackTitle: "Bulk")
         }
         let bulk = Task { await batch.run([zip]) }
         await copied.wait()
