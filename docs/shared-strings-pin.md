@@ -58,3 +58,10 @@ The Whistle fallback notice (#117) is vendored from cassini-ux `7cdb069fb0b71953
 `strings/strings.json` (SHA-256 `8b20048485bd928d2067806284c381ffb8033768ecf084387600517d0006690f`): entry
 `models.parakeetUltra.noteFallback`, in `Notices.xcstrings` with all six locales, every value as in the catalog.
 The entries above stay at their pins; no shared source was edited.
+
+D-1029 adds `common.tryAgain` to the generated Library selection; the current shared pin already includes every
+import-card label, so the strings pin does not change. `scripts/import-contract.py --update <cassini-ux checkout>`
+vendors `contract/import-types.json` from that checkout’s immutable `origin/main` and records its SHA-256 in
+`contracts/import-types/UPSTREAM.json`. It also generates the Open-with UTI list. `check-strings.sh` verifies both.
+D-1029 requires an actual Ogg Opus header for `.opus` / `.ogg`, tightening the earlier Android-compatible rule that
+allowed arbitrary decodable audio under `.opus`. iOS continues to decode MP3, M4A and PCM/float WAV using AVFoundation.

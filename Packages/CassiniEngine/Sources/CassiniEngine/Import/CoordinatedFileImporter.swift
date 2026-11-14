@@ -100,6 +100,19 @@ private struct Copy {
         let input: FileHandle
         do { input = try FileHandle(forReadingFrom: source) } catch { throw FileImportError.cannotOpen }
         defer { try? input.close() }
+        // Provider metadata can be cached across a replacement at the same URL. The coordinated descriptor is
+        // authoritative; retain this length to detect truncation or growth during the read.
+        let expectedSize = Int64(clamping: try input.seekToEnd())
+        try input.seek(toOffset: 0)
+        try check(expectedSize, space: true)
+        // ZIP is the existing bulk-transfer container; each extracted member retains its contract extension.
+        if ImportPolicy.accepts(filename: source.lastPathComponent) {
+            let header = try input.read(upToCount: ImportPolicy.probeBytes) ?? Data()
+            try ImportPolicy.validate(header: header, filename: source.lastPathComponent, fileBytes: expectedSize)
+            try input.seek(toOffset: 0)
+        } else if source.pathExtension.lowercased() != "zip" {
+            throw FileImportError.cannotOpen
+        }
         guard FileManager.default.createFile(atPath: destination.path, contents: nil),
               let output = try? FileHandle(forWritingTo: destination) else { throw lowSpace(size, 0) ?? FileImportError.cannotOpen }
         defer { try? output.close() }
@@ -122,6 +135,8 @@ private struct Copy {
             hasher.update(data: chunk)
             do { try output.write(contentsOf: chunk) } catch { throw lowSpace(size, total) ?? FileImportError.cannotOpen }
         }
+        if total != expectedSize { throw FileImportError.cannotOpen }
+        if cancel.isCancelled { throw CancellationError() }
         do { try output.synchronize() } catch { throw lowSpace(size, total) ?? FileImportError.cannotOpen }
         return (hasher.finalize().map { String(format: "%02x", $0) }.joined(), total)
     }

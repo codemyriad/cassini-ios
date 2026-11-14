@@ -12,6 +12,32 @@ final class LibraryUITests: XCTestCase {
         return app
     }
 
+    @MainActor func testImportingCardShowsSharedSpinnerBadge() {
+        let app = launch(["--importing-fixture"])
+        let card = app.descendants(matching: .any)["importingCard"].firstMatch
+        XCTAssertTrue(card.waitForExistence(within: 15))
+        XCTAssertTrue(card.staticTexts["Audio.ogg"].exists)
+        XCTAssertTrue(card.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "Importing…")).firstMatch.exists)
+        XCTAssertFalse(app.buttons["retryImport"].exists)
+        XCTAssertFalse(app.buttons["dismissImport"].exists)
+        capture("Importing audio")
+    }
+
+    @MainActor func testFailedImportKeepsNeedsAttentionCardAndCanRetryAndDismiss() {
+        let app = launch(["--failed-import-fixture"])
+        let card = app.descendants(matching: .any)["failedImportCard"].firstMatch
+        XCTAssertTrue(card.waitForExistence(within: 15))
+        XCTAssertTrue(card.staticTexts["Damaged audio.ogg"].exists)
+        XCTAssertTrue(card.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "Needs attention")).firstMatch.exists)
+        XCTAssertTrue(app.buttons["retryImport"].exists)
+        capture("Failed import - Needs attention")
+        app.buttons["retryImport"].tapWhenSettled()
+        XCTAssertTrue(app.buttons["dismissImport"].waitForExistence(within: 15))
+        app.buttons["dismissImport"].tapWhenSettled()
+        XCTAssertTrue(app.textFields["librarySearch"].exists)
+        XCTAssertFalse(card.exists)
+    }
+
     @MainActor private func row(_ app: XCUIApplication, _ title: String) -> XCUIElement {
         app.buttons.matching(NSPredicate(format: "identifier == 'noteRow' AND label BEGINSWITH %@", title)).firstMatch
     }

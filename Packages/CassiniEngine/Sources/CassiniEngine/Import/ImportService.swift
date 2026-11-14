@@ -35,6 +35,7 @@ public struct ImportService: Sendable {
     /// `fallbackTitle` names a file without a usable name. Throws only `CancellationError`, and then leaves nothing
     /// behind.
     public func importFile(_ url: URL, fallbackTitle: String, displayName: String? = nil) async throws -> ImportOutcome {
+        guard ImportPolicy.accepts(filename: displayName ?? url.lastPathComponent) else { return .rejected(.cannotOpen) }
         let id = UUID()
         let folder = notes.directory(for: id)
         do {

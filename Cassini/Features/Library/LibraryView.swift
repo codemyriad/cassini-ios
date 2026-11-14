@@ -42,6 +42,7 @@ struct LibraryView: View {
                         .accessibilityAddTraits(.isHeader).accessibilityIdentifier("librarySearchCount")
                 }
                 activity.padding(.top, 6)
+                ImportCardsView()
                 if !content.loading || content.emptyState == .unavailable {
                     // The banners say when there are no notes, no matches or no library; the Starred filter has its own.
                     if content.emptyState == .noStarred { NoStarredState().padding(.top, 8) }
@@ -106,7 +107,8 @@ struct LibraryView: View {
         .fileImporter(isPresented: $importing, allowedContentTypes: ImportStore.contentTypes, allowsMultipleSelection: true) { result in
             switch result {
             case .success(let urls): imports.start(urls)
-            case .failure(let error): errors.present(error.localizedDescription)
+            case .failure(let error):
+                if (error as? CocoaError)?.code != .userCancelled { errors.present(error.localizedDescription) }
             }
         }
         .sheet(item: renaming) { RenameNoteDialog(noteID: $0.id, draft: renameDraft) { renameDraft = $0 } }

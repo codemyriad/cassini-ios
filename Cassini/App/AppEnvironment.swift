@@ -63,6 +63,8 @@ import CassiniEngineTesting
         var token = ""
         #if DEBUG
         var badgeGallery = false
+        var failedImportFixture = false
+        var importingFixture = false
         var draftSpeakerSuggestion = false
         #endif
     }
@@ -216,6 +218,8 @@ extension AppEnvironment {
                   platform: arguments.contains("--ios18-platform") ? .iOS18 : LivePlatform.facts,
                   inProcess: inProcess, token: token)
         environment.launch.badgeGallery = arguments.contains("--badge-gallery")
+        environment.launch.failedImportFixture = arguments.contains("--failed-import-fixture")
+        environment.launch.importingFixture = arguments.contains("--importing-fixture")
         environment.launch.draftSpeakerSuggestion = draftSpeakerSuggestion
         return environment
     }

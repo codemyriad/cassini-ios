@@ -21,6 +21,7 @@ PROPERTIES = {
     'import.button.mobile': 'importAudio',
     'common.record': 'record',
     'common.close': 'close',
+    'common.tryAgain': 'tryAgain',
     'search.title': 'searchTitle',
 }
 PLURALS = {'phone.row.speakerCount', 'format.searchCount.places', 'format.searchCount.meetings'}

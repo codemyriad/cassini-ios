@@ -7,6 +7,16 @@ import CassiniNotebook
 ///
 /// A new import clears the last failure ("shown until dismissed or the next import"); a failed one sets it.
 @MainActor @Observable public final class ImportTracker {
+    public struct Card: Identifiable, Equatable, Sendable {
+        public let id: UUID
+        public let displayName: String
+        public let source: URL?
+        public var failure: ImportFailureKind?
+    }
+    /// Session-only entries: success, duplicate and cancellation remove their own card; failures remain until dismissed.
+    public private(set) var cards: [Card] = []
+    public func dismissCard(_ id: UUID) { cards.removeAll { $0.id == id && $0.failure != nil } }
+
     /// The display names of the imports that run, in the order they started.
     public private(set) var running: [String] = []
     /// The last import that failed, until it is dismissed or another import starts.
@@ -19,8 +29,10 @@ import CassiniNotebook
     /// Runs `body`, the import of the file named `displayName`. The task's value is nil when the import was cancelled
     /// or threw; a throw other than cancellation is shown as "Can't open this file".
     @discardableResult
-    public func start(displayName: String,
+    public func start(displayName: String, source: URL? = nil,
                       _ body: @escaping @Sendable () async throws -> ImportOutcome) -> Task<ImportOutcome?, Never> {
+        let id = UUID()
+        cards.append(Card(id: id, displayName: displayName, source: source))
         running.append(displayName)
         failure = nil
         return Task {
@@ -36,6 +48,9 @@ import CassiniNotebook
                 failed = .cannotOpen
             }
             if let index = running.firstIndex(of: displayName) { running.remove(at: index) }
+            if let index = cards.firstIndex(where: { $0.id == id }) {
+                if let failed { cards[index].failure = failed } else { cards.remove(at: index) }
+            }
             if let failed { failure = ImportFailureFact(displayName: displayName, kind: failed, at: clock.now) }
             return outcome
         }

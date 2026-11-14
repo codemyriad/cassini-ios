@@ -65,7 +65,7 @@ public struct BulkImportService: Sendable {
                     }
                     units = max(1, archive.entries.count)
                     total += units - 1
-                    guard archive.entries.contains(where: { $0.isFile && !$0.isMetadata && ArchiveAudio.supports($0.name) }) else {
+                    guard archive.entries.contains(where: { $0.isFile && !$0.isMetadata && ImportPolicy.accepts(filename: $0.name) }) else {
                         report.summary.unsupported += archive.entries.filter { !$0.isDirectory }.count
                         throw ZIPFailure.empty
                     }
@@ -75,9 +75,9 @@ public struct BulkImportService: Sendable {
                         await progress(.init(done: done + 1, total: total))
                         defer { done += 1 }
                         if entry.isDirectory { continue }
-                        guard entry.isFile && !entry.isMetadata && ArchiveAudio.supports(entry.name) else { report.summary.unsupported += 1; continue }
+                        guard entry.isFile && !entry.isMetadata && ImportPolicy.accepts(filename: entry.name) else { report.summary.unsupported += 1; continue }
                         guard entry.expandedBytes <= memberLimit else { report.summary.failed += 1; continue }
-                        let staged = folder.appendingPathComponent(UUID().uuidString + ".tmp")
+                        let staged = folder.appendingPathComponent(UUID().uuidString + "." + (entry.name as NSString).pathExtension.lowercased())
                         defer { try? FileManager.default.removeItem(at: staged) }
                         do {
                             let remaining = budget.remaining

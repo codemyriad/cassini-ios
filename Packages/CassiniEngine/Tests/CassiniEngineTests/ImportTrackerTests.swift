@@ -23,6 +23,27 @@ private actor Gate {
 @MainActor @Suite struct ImportTrackerTests {
     let clock = FakeClock()
 
+    @Test func failedCardsPersistIndependentlyAndDuplicatesAndCancellationLeaveNoCard() async throws {
+        let tracker = ImportTracker(clock: clock)
+        let gate = Gate()
+        let running = tracker.start(displayName: "same.ogg") { await gate.wait(); return .created(UUID()) }
+        #expect(tracker.cards.count == 1)
+        #expect(tracker.cards.first?.failure == nil)
+        _ = await tracker.start(displayName: "same.ogg") { .rejected(.cannotOpen) }.value
+        let failedID = try #require(tracker.cards.last?.id)
+        _ = await tracker.start(displayName: "duplicate.ogg") { .existing(UUID()) }.value
+        _ = await tracker.start(displayName: "cancelled.ogg") { throw CancellationError() }.value
+        #expect(tracker.cards.count == 2)
+        #expect(tracker.cards.last?.failure == .cannotOpen)
+        tracker.dismissCard(tracker.cards[0].id) // A running import cannot be dismissed underneath its task.
+        #expect(tracker.cards.count == 2)
+        await gate.release()
+        _ = await running.value
+        #expect(tracker.cards.map(\.id) == [failedID])
+        tracker.dismissCard(failedID)
+        #expect(tracker.cards.isEmpty)
+    }
+
     @Test func importsRunSideBySideAndEachIsShownWhileItRuns() async {
         let tracker = ImportTracker(clock: clock)
         let gate = Gate()

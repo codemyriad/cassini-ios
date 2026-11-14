@@ -87,6 +87,7 @@ extension AppGraph {
     /// Stops what the graph does on its own, so a graph replaced by a relaunch inside the app neither records, plays
     /// nor transcribes beside the new one.
     func quietForUITestRelaunch() {
+        imports.finishImportingFixture()
         if recording.state.inProgress { recording.controller.pause() }
         playback.stop()
         processing.stopAll()

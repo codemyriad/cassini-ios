@@ -7,9 +7,24 @@ import CassiniNotebook
 /// Audio and Cassini documents from the file picker or opened from other apps. Each file is imported on its own, side
 /// by side; `ImportTracker` shows the ones that run and the last failure.
 @MainActor @Observable final class ImportStore {
-    /// What the picker offers: audio (Ogg Opus and Cassini documents included) and any Ogg file.
-    static let contentTypes: [UTType] = [.audio, .zip, UTType("org.xiph.opus"), UTType(filenameExtension: "ogg")]
-        .compactMap { $0 }
+    /// Audio types from the decided shared contract, plus the existing bulk ZIP transfer.
+    static let contentTypes: [UTType] = ImportPolicy.utis.compactMap(UTType.init) + [.zip]
+
+    #if DEBUG
+    @ObservationIgnored private var fixtureContinuation: AsyncStream<Void>.Continuation?
+    @ObservationIgnored private var fixtureTask: Task<ImportOutcome?, Never>?
+    /// UI automation holds a real tracker task at an event gate, never at a timer.
+    func prepareImportingFixture() {
+        guard fixtureTask == nil else { return }
+        let (stream, continuation) = AsyncStream<Void>.makeStream()
+        fixtureContinuation = continuation
+        fixtureTask = tracker.start(displayName: "Audio.ogg") {
+            for await _ in stream { }
+            throw CancellationError()
+        }
+    }
+    func finishImportingFixture() { fixtureContinuation?.finish(); fixtureTask?.cancel(); fixtureTask = nil }
+    #endif
 
     let tracker: ImportTracker
     var batches: [ImportBatch] = []
@@ -38,6 +53,10 @@ import CassiniNotebook
 
     /// Files picked in the Library: each becomes a note in the list, as on Android; nothing opens.
     func start(_ urls: [URL]) {
+        guard !urls.isEmpty else { return }
+        let audio = urls.filter { $0.pathExtension.lowercased() != "zip" }
+        for url in audio { importFile(url, opensNote: false) }
+        let urls = urls.filter { $0.pathExtension.lowercased() == "zip" }
         guard !urls.isEmpty else { return }
         tracker.dismissFailure()
         guard let files, let service else { for url in urls { importFile(url, opensNote: false) }; return }
@@ -74,7 +93,7 @@ import CassiniNotebook
     @discardableResult
     func importFile(_ url: URL, opensNote: Bool) -> Task<ImportOutcome?, Never> {
         let fallbackTitle = String(localized: "Imported audio", table: "Import")
-        let running = tracker.start(displayName: Self.displayName(of: url)) { [service, library, ready] in
+        let running = tracker.start(displayName: Self.displayName(of: url), source: url) { [service, library, ready] in
             await ready()
             try Task.checkCancellation()
             guard let service, await library.loadFailure == nil else { return .rejected(.cannotSave) }
@@ -85,6 +104,12 @@ import CassiniNotebook
             if let outcome { _ = await finish(outcome, opensNote: opensNote) }
             return outcome
         }
+    }
+
+    func retry(_ card: ImportTracker.Card) {
+        guard card.failure != nil, let source = card.source else { return }
+        tracker.dismissCard(card.id)
+        importFile(source, opensNote: false)
     }
 
     private func finish(_ outcome: ImportOutcome, opensNote: Bool, offersConsent: Bool = true) async -> UUID? {
