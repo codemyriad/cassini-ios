@@ -111,6 +111,7 @@ struct CompactSuggestionRow: View {
         .buttonStyle(.plain)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(SpeakersCopy.not(suggestion.voiceName))
+        .accessibilityInputLabels([MeetingPhase1Copy.speakerSuggestionNo, SpeakersCopy.not(suggestion.voiceName)])
         .accessibilityAddTraits(.isButton)
         .accessibilityIdentifier("suggestionNo")
     }
@@ -129,6 +130,7 @@ struct CompactSuggestionRow: View {
         .buttonStyle(.plain)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(SpeakersCopy.yes(suggestion.voiceName))
+        .accessibilityInputLabels([MeetingPhase1Copy.speakerSuggestionYes, SpeakersCopy.yes(suggestion.voiceName)])
         .accessibilityAddTraits(.isButton)
         .accessibilityIdentifier("suggestionYes")
     }

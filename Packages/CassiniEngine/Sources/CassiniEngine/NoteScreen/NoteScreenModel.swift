@@ -549,9 +549,17 @@ public final class NoteScreenModel {
         run(start.effect)
     }
 
-    /// Reads a stopped, failed, or checkpoint-backed queued/resuming job's saved progress for its draft; a fresh
-    /// queued job (`doneMs == 0`), a consent prompt, or a finished note loads none.
+    /// What the saved-draft reload task follows: reloads once per job or state transition, and on `doneMs` changes only
+    /// when `.paused` or `.failed` (never per checkpoint while queued or running).
+    public var savedDraftKey: String {
+        job.map { "\($0.id)-\($0.state)-\($0.state == .paused || $0.state == .failed ? $0.doneMs : 0)" } ?? "none"
+    }
+
+    /// Reads a stopped, failed, or checkpoint-backed queued/resuming job's saved progress for its draft; a running job
+    /// with a live draft keeps the current `savedDraft`, and a fresh queued job (`doneMs == 0`), a consent prompt, or a
+    /// finished note loads none.
     public func loadSavedDraft() async {
+        guard ports.runningDraft(noteID) == nil else { return }
         let shouldLoad: Bool = switch job?.state {
         case .paused?, .failed?:
             true
@@ -561,10 +569,9 @@ public final class NoteScreenModel {
             false
         }
         let draft = shouldLoad ? await ports.savedDraft(noteID) : []
-        if !Task.isCancelled {
-            savedDraft = draft
-            if !shouldLoad || draft.isEmpty { retainedWords = draft }
-        }
+        guard !Task.isCancelled, ports.runningDraft(noteID) == nil else { return }
+        savedDraft = draft
+        if !shouldLoad || draft.isEmpty { retainedWords = draft }
     }
 
     // MARK: Follow

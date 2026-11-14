@@ -111,6 +111,42 @@ import CassiniNotebook
         #expect(model.shownDraft == nil)
     }
 
+    @Test func runningJobWithLiveDraftDoesNotReloadSavedDraftAcrossCheckpoints() async {
+        let note = Note(title: "Live checkpoints")
+        let fake = FakeNoteScreen(note: note)
+        fake.draft = words
+        fake.job = Job(noteID: note.id, seq: 1, kind: .transcribe, state: .paused, doneMs: 5_000, totalMs: 60_000,
+                       enqueuedAt: .distantPast)
+        let model = NoteScreenModel(noteID: note.id, ports: fake.ports)
+        let pausedKey = model.savedDraftKey
+        await model.loadSavedDraft()
+        #expect(fake.calls == ["savedDraft"])
+        #expect(model.savedDraft == words)
+
+        fake.runningDraft = DraftState(words: words, tentativeFromMs: .max, namingOpen: true)
+        fake.job = Job(noteID: note.id, seq: 1, kind: .transcribe, state: .running, doneMs: 5_000,
+                       totalMs: 60_000, enqueuedAt: .distantPast)
+        let runningKey = model.savedDraftKey
+        #expect(runningKey != pausedKey)
+        let callsBeforeRunning = fake.calls.count
+
+        for step in 1...10 {
+            fake.job = Job(noteID: note.id, seq: 1, kind: .transcribe, state: .running,
+                           doneMs: Int64(step) * 5_000, totalMs: 60_000, enqueuedAt: .distantPast)
+            #expect(model.savedDraftKey == runningKey)
+            await model.loadSavedDraft()
+            #expect(model.savedDraft == words)
+        }
+        #expect(fake.calls[callsBeforeRunning...].filter { $0 == "savedDraft" }.isEmpty)
+
+        // Pausing at a new checkpoint changes savedDraftKey and reloads once runningDraft clears.
+        fake.runningDraft = nil
+        fake.job = Job(noteID: note.id, seq: 1, kind: .transcribe, state: .paused, doneMs: 50_000,
+                       totalMs: 60_000, enqueuedAt: .distantPast)
+        #expect(model.savedDraftKey != runningKey)
+        #expect(model.savedDraftKey != pausedKey)
+    }
+
     @Test func jobProgressRetainsLastLiveProgressAndDraftWhileStopping() throws {
         let id = UUID()
         let progress = JobProgress(uptimeMs: { 2_000 })

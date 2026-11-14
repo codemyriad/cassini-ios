@@ -62,7 +62,7 @@ struct NoteDetailView: View {
         .background(Color.paper)
         .navigationBarTitleDisplayMode(.inline)
         .task(id: model.playerKey) { model.updatePlayer() }
-        .task(id: job.map { "\($0.id)-\($0.state)-\($0.doneMs)" } ?? "none") { await model.loadSavedDraft() }
+        .task(id: model.savedDraftKey) { await model.loadSavedDraft() }
         .onDisappear { model.disappeared() }
         .onAppear { model.appeared(start: requestedStart) }
         .onChange(of: currentMode == .processing) { _, isProcessing in
