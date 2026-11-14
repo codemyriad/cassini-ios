@@ -34,7 +34,7 @@ import CassiniNotebook
     @ObservationIgnored private let language: @MainActor () -> String
     @ObservationIgnored private let clock: any AppClock
     @ObservationIgnored private let job: JobProgress?
-    @ObservationIgnored private var installing: Task<Void, Never>?
+    private var installing: Task<Void, Never>?
     /// Counts the standalone installs started and cancelled; an install whose number is no longer this one has ended.
     @ObservationIgnored private var installNumber = 0
     /// The parts the running standalone install still has to do, in order.
@@ -52,9 +52,9 @@ import CassiniNotebook
     @ObservationIgnored private var speechFailureLanguage: String?
     @ObservationIgnored private var followers: [Task<Void, Never>] = []
     /// Standalone installs whose run has ended, a cancelled one's closing refresh included, and the running job's
-    /// model downloads the follower has seen begin: what a test waits on instead of sleeping.
-    @ObservationIgnored private(set) var installsEnded = 0
-    @ObservationIgnored private(set) var downloadsFollowed = 0
+    /// model downloads the follower has seen begin: observed, so a test waits on them instead of sleeping.
+    private(set) var installsEnded = 0
+    private(set) var downloadsFollowed = 0
     @ObservationIgnored private let background: (any BackgroundRunner)?
     @ObservationIgnored private let backgroundTitle: @MainActor () -> String
     @ObservationIgnored private let backgroundSubtitle: @MainActor () -> String

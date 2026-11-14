@@ -7,7 +7,7 @@ import CassiniEngineTesting
 import CassiniNotebook
 
 /// The standalone model installs and the stored model status, over fake models.
-@MainActor @Suite struct ModelInstallsTests {
+@MainActor @Suite(.timeLimit(.minutes(1))) struct ModelInstallsTests {
     @Test func hardwareAndLocaleFailuresStayDistinctEvenWithTheSameAssetStatus() async {
         for failure in [JobFailure.model, .unsupportedLanguage] {
             let models = ModelInstalls(transcriber: FakeUnavailableTranscriber(failure), analyzer: FakeAnalyzer(), clock: FakeClock()) { "en-US" }
@@ -571,6 +571,7 @@ private final class ScriptedAnalyzer: SpeakerAnalyzing {
 
     func finish(with error: SpeakerAnalysisError?, status: ModelPartStatus) {
         state.withLock { $0.status = status }
+        Changes.signal()
         held.end(error)
     }
 
@@ -586,10 +587,11 @@ private final class ScriptedAnalyzer: SpeakerAnalyzing {
 
     /// A gated install waits for `finish`; cancelling its caller ends the wait with `CancellationError`, as the shared
     /// installer does for a caller that leaves, and counts in `cancels`.
+    /// A gated install counts once it waits, so a test that saw it counted can finish it.
     func installModels(progress: @escaping @Sendable (InstallProgress) -> Void) async throws {
-        state.withLock { $0.installs += 1; $0.progress = progress }
-        guard gated else { return }
-        try await held.wait()
+        let start: @Sendable () -> Void = { self.state.withLock { $0.installs += 1; $0.progress = progress } }
+        guard gated else { start(); Changes.signal(); return }
+        try await held.wait(started: start)
     }
 }
 
@@ -607,14 +609,19 @@ private final class HeldInstall: Sendable {
     var cancels: Int { state.withLock { $0.cancels } }
     var isWaiting: Bool { state.withLock { $0.waiter != nil } }
 
-    func wait() async throws {
+    /// `started` runs once the wait can be ended, before the change is signalled.
+    func wait(started: @Sendable () -> Void) async throws {
         state.withLock { $0.cancelled = false }
         try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
                 let cancelled = state.withLock { state in
                     if !state.cancelled { state.waiter = continuation }
+                    // Publish the count/progress before isWaiting or end can observe the waiter.
+                    // Both callers acquire held.state before fake.state; neither holds fake.state here.
+                    started()
                     return state.cancelled
                 }
+                Changes.signal()
                 if cancelled { continuation.resume(throwing: CancellationError()) }
             }
         } onCancel: {
@@ -624,6 +631,7 @@ private final class HeldInstall: Sendable {
                 defer { state.waiter = nil }
                 return state.waiter
             }
+            Changes.signal()
             waiter?.resume(throwing: CancellationError())
         }
     }
@@ -631,6 +639,7 @@ private final class HeldInstall: Sendable {
     /// Ends the wait: returns without `error`, else throws it.
     func end(_ error: Error?) {
         let waiter = state.withLock { state in defer { state.waiter = nil }; return state.waiter }
+        Changes.signal()
         if let error { waiter?.resume(throwing: error) } else { waiter?.resume() }
     }
 }
@@ -668,10 +677,13 @@ private final class LanguageTranscriber: Transcribing {
     /// Whether the next installs fail with no connection.
     var failsInstall: Bool {
         get { state.withLock { $0.failsInstall } }
-        set { state.withLock { $0.failsInstall = newValue } }
+        set { state.withLock { $0.failsInstall = newValue }; Changes.signal() }
     }
 
-    func set(_ language: String, _ status: ModelPartStatus) { state.withLock { $0.statuses[language] = status } }
+    func set(_ language: String, _ status: ModelPartStatus) {
+        state.withLock { $0.statuses[language] = status }
+        Changes.signal()
+    }
 
     func finish(status: ModelPartStatus) {
         let waiter = state.withLock { state in
@@ -679,11 +691,14 @@ private final class LanguageTranscriber: Transcribing {
             defer { state.finish = nil }
             return state.finish
         }
+        Changes.signal()
         waiter?.resume()
     }
 
+    /// Lets the held status reads go; signals only when there were any, so a wait that calls it is not woken by it.
     func releaseReads() {
         let reads = state.withLock { state in defer { state.reads = [] }; return state.reads }
+        if !reads.isEmpty { Changes.signal() }
         for read in reads { read.resume() }
     }
 
@@ -694,23 +709,32 @@ private final class LanguageTranscriber: Transcribing {
 
     func assetStatus(locale: Locale) async -> ModelPartStatus {
         let status = state.withLock { $0.statuses[locale.identifier(.bcp47)] ?? .unsupported }
-        if gatedStatus { await withCheckedContinuation { continuation in state.withLock { $0.reads.append(continuation) } } }
+        if gatedStatus {
+            await withCheckedContinuation { continuation in
+                state.withLock { $0.reads.append(continuation) }
+                Changes.signal()
+            }
+        }
         return status
     }
 
     func installAssets(locale: Locale, progress: @escaping @Sendable (InstallProgress) -> Void) async throws {
+        // A held install counts once it waits, so a test that saw it counted can finish it.
         let fails = state.withLock { state in
-            state.installs += 1
+            if state.failsInstall || !gated { state.installs += 1 }
             return state.failsInstall
         }
+        if fails || !gated { Changes.signal() }
         if fails { throw TranscriptionError.failed(.download(.noConnection)) }
         guard gated else { return }
         await withTaskCancellationHandler {
             await withCheckedContinuation { continuation in
                 let cancelled = state.withLock { state in
+                    state.installs += 1
                     if !state.cancelled { state.finish = continuation }
                     return state.cancelled
                 }
+                Changes.signal()
                 if cancelled { continuation.resume() }
             }
         } onCancel: {
@@ -719,6 +743,7 @@ private final class LanguageTranscriber: Transcribing {
                 defer { state.finish = nil }
                 return state.finish
             }
+            Changes.signal()
             waiter?.resume()
         }
         try Task.checkCancellation()
@@ -762,23 +787,46 @@ private final class SharedInstallTranscriber: Transcribing {
     func assetStatus(locale: Locale) async -> ModelPartStatus { state.withLock { $0.status } }
 
     func installAssets(locale: Locale, progress: @escaping @Sendable (InstallProgress) -> Void) async throws {
-        state.withLock { $0.installs += 1; $0.progress = progress }
-        defer { state.withLock { $0.ended = true } }
-        try await held.wait()
+        defer { state.withLock { $0.ended = true }; Changes.signal() }
+        try await held.wait { self.state.withLock { $0.installs += 1; $0.progress = progress } }
     }
 
     func speechLanguages() async -> [SpeechLanguage] { [] }
 }
 
-/// Polls `condition` on the main actor until it holds, for at most 30 seconds: an upper bound for a busy machine (the
-/// package tests run beside the UI build), never a wait a passing run sees.
-@MainActor private func until(_ condition: @MainActor () -> Bool) async throws {
-    let deadline = ContinuousClock.now + .seconds(30)
-    while !condition() {
-        guard ContinuousClock.now < deadline else {
-            Issue.record("The condition never held")
-            return
+/// Wakes every `until` whenever a fake's state changes; the fakes signal after each change a test can wait on. A
+/// signal from a test running beside this one only makes a wait look at its condition once more.
+private enum Changes {
+    private static let waiters = Mutex<[UUID: @Sendable () -> Void]>([:])
+
+    static func signal() {
+        for wake in waiters.withLock({ Array($0.values) }) { wake() }
+    }
+
+    static func add(_ wake: @escaping @Sendable () -> Void) -> UUID {
+        let id = UUID()
+        waiters.withLock { $0[id] = wake }
+        return id
+    }
+
+    static func remove(_ id: UUID) { _ = waiters.withLock { $0.removeValue(forKey: id) } }
+}
+
+/// Waits on the main actor until `condition` holds, looking at it again only when something it can depend on changes:
+/// an observed property it read (`ModelInstalls`, `Language`) or a fake's state (`Changes`). Both are armed before the
+/// condition is read, so no change between the read and the wait is missed. No deadline: the suite's time limit ends a
+/// wait that never holds, and the cancellation fails the test.
+@MainActor private func until(sourceLocation: SourceLocation = #_sourceLocation,
+                               _ condition: @MainActor () -> Bool) async throws {
+    while true {
+        let (changed, wake) = AsyncStream.makeStream(of: Void.self, bufferingPolicy: .bufferingNewest(1))
+        let token = Changes.add { wake.yield() }
+        defer { Changes.remove(token) }
+        if withObservationTracking(condition, onChange: { wake.yield() }) { return }
+        for await _ in changed { break }
+        if Task.isCancelled {
+            Issue.record("The condition never held", sourceLocation: sourceLocation)
+            throw CancellationError()
         }
-        try await Task.sleep(for: .milliseconds(5))
     }
 }
