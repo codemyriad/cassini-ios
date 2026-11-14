@@ -438,6 +438,31 @@ private struct HeldArchiveCopy: FileImporting {
         #expect(try sandbox.scratchContents().isEmpty)
     }
 
+    @Test func manualZIPNeverIncludesPrivateVoicesUnderEitherBackupPreference() async throws {
+        let sandbox = try BulkSandbox()
+        let voices = try VoiceStore(root: sandbox.notes.root)
+        try await voices.save([SavedVoice(name: "PRIVATE_VOICE_SENTINEL", samples: [])])
+        let enrollment = sandbox.notes.root.appendingPathComponent("PrivateVoices/Enrollment", isDirectory: true)
+        try FileManager.default.createDirectory(at: enrollment, withIntermediateDirectories: true)
+        try Data("PRIVATE_AUDIO_SENTINEL".utf8).write(to: enrollment.appendingPathComponent("private.caf"))
+        let source = try sandbox.file("source.wav", Data(ImportFixtures.wav))
+        let portable = PortableExportService(audio: sandbox.audio, provenance: FakeProvenance(), unassignedLabel: "Speaker")
+        let storage = BackupStorage(root: sandbox.notes.root)
+        for includeVoices in [true, false] {
+            try await storage.apply(cloud: true, voices: includeVoices)
+            let output = try await BulkExportService(folder: sandbox.scratch) { note, work in
+                try await portable.archiveSnapshot(note, original: source, playable: source, into: work)
+            }.export([Note(title: "Meeting", audioFilename: "source.wav")])
+            let archive = try ZIPArchive(url: output)
+            #expect(archive.entries.count == 1)
+            #expect(!archive.entries[0].name.contains("PrivateVoices"))
+            var bytes = Data()
+            try archive.read(archive.entries[0], remainingBytes: 1_000_000) { bytes.append($0) }
+            #expect(bytes.range(of: Data("PRIVATE_VOICE_SENTINEL".utf8)) == nil)
+            #expect(bytes.range(of: Data("PRIVATE_AUDIO_SENTINEL".utf8)) == nil)
+        }
+    }
+
     @Test func exportWritesEachMemberAndDeletesItsSnapshotBeforePreparingTheNext() async throws {
         let sandbox = try BulkSandbox()
         let first = Note(title: "English first"), second = Note(title: "English second")

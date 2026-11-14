@@ -44,6 +44,7 @@ struct LibraryView: View {
                         .accessibilityAddTraits(.isHeader).accessibilityIdentifier("librarySearchCount")
                 }
                 activity.padding(.top, 6)
+                if library.isLoaded, !model.isSearching { BackupNoticeCard() }
                 if !content.loading || content.emptyState == .unavailable {
                     if let hero = content.hero { FirstRunHeroView(hero: hero) }
                     // Banners cover no-match and unavailable states; the empty Library uses the Wave 5 hero and Starred has its own.

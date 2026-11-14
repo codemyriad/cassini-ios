@@ -17,11 +17,13 @@ public struct SpeakerPrint: Codable, Hashable, Sendable {
 public struct VoiceSample: Codable, Hashable, Sendable {
     public var noteID: UUID
     public var print: SpeakerPrint
+    /// Absent for legacy transcript samples; guided samples have private audio and no Library meeting.
+    public var guidedEnrollment: Bool?
     public init(noteID: UUID, print: SpeakerPrint) { self.noteID = noteID; self.print = print }
 }
 
 /// A person the user named and asked Cassini to remember: the confirmed samples of their voice. Stored only on this
-/// device. Android keeps a running mean; iOS keeps the samples, so taking one back is exact.
+/// device, subject to the phone backup preference. Android keeps a running mean; iOS keeps the samples, so taking one back is exact.
 public struct SavedVoice: Codable, Identifiable, Hashable, Sendable {
     public var id: UUID = UUID()
     public var name: String
@@ -40,7 +42,7 @@ public struct SavedVoice: Codable, Identifiable, Hashable, Sendable {
     public var confirmedSpeech: Double { samples.reduce(0) { $0 + $1.print.speechSeconds } }
 
     /// Notes the samples come from.
-    public var recordingCount: Int { Set(samples.map(\.noteID)).count }
+    public var recordingCount: Int { Set(samples.filter { $0.guidedEnrollment != true }.map(\.noteID)).count }
 
     /// The samples that can be compared with a print of `model` with `dimension` values.
     public func usableSamples(model: String, dimension: Int? = nil) -> [VoiceSample] {

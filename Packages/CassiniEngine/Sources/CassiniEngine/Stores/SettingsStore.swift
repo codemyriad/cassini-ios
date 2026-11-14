@@ -9,6 +9,29 @@ public final class SettingsStore {
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let clock: any AppClock
 
+    public private(set) var cloudBackup: Bool
+    public private(set) var includeSavedVoicesInBackups: Bool
+    public private(set) var backupNoticeDismissed: Bool
+    public private(set) var voiceSetupAnswered: Bool
+
+    public func dismissBackupNotice() {
+        backupNoticeDismissed = true
+        defaults.set(true, forKey: "backup.noticeDismissed")
+    }
+
+    public func answerVoiceSetup(enable: Bool) {
+        automaticallyNameVoices = enable
+        voiceSetupAnswered = true
+        defaults.set(true, forKey: "voices.setupAnswered")
+    }
+
+    func commitBackup(cloud: Bool, voices: Bool) {
+        // One defaults record keeps both switches consistent across launches.
+        defaults.set(["cloud": cloud, "voices": voices], forKey: "backup.inclusion")
+        cloudBackup = cloud
+        includeSavedVoicesInBackups = voices
+    }
+
     /// BCP-47.
     public var speechLanguage: String { didSet { defaults.set(speechLanguage, forKey: SettingsKeys.speechLanguage) } }
     public var autoTranscribe: Bool { didSet { defaults.set(autoTranscribe, forKey: SettingsKeys.autoTranscribe) } }
@@ -31,6 +54,11 @@ public final class SettingsStore {
     public init(defaults: UserDefaults, clock: any AppClock, defaultLanguage: String = Locale.current.identifier(.bcp47)) {
         self.defaults = defaults
         self.clock = clock
+        let inclusion = defaults.dictionary(forKey: "backup.inclusion")
+        cloudBackup = inclusion?["cloud"] as? Bool ?? true
+        includeSavedVoicesInBackups = inclusion?["voices"] as? Bool ?? true
+        backupNoticeDismissed = defaults.bool(forKey: "backup.noticeDismissed")
+        voiceSetupAnswered = defaults.bool(forKey: "voices.setupAnswered")
         let storedLanguage = defaults.string(forKey: SettingsKeys.speechLanguage)
         speechLanguage = storedLanguage.map { Locale(identifier: $0).identifier(.bcp47) } ?? defaultLanguage
         autoTranscribe = defaults.object(forKey: SettingsKeys.autoTranscribe) as? Bool ?? true

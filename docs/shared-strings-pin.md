@@ -1,5 +1,10 @@
 # Shared string source
 
+Current Wave 5/6 source: `cassini-ux` `b26190b57d8e35391ba9b4bafd177d66b10f0ec3`,
+`strings/strings.json`, SHA-256 `10d65abc7b10f81422377632aa899506b33e02cc9269afc96e11ec89cee69367`.
+`contracts/wave5-strings/UPSTREAM.json` pins the byte-identical source for both generated tables.
+The earlier feature receipts below remain independent pins.
+
 WP1 pins the full shared catalog to `codemyriad/cassini-ux`
 `5e0c34e0f1bb390298dabdf4eedc494e933fd329`, `strings/strings.json`, SHA-256
 `4bbe42b47bbf2e6e61ed15b1c54cabf4096e92aca63b9ed84d428070baa52acf`.
@@ -60,11 +65,17 @@ The Whistle fallback notice (#117) is vendored from cassini-ux `7cdb069fb0b71953
 The entries above stay at their pins; no shared source was edited.
 
 Wave 5 first-run hero and backup-gated privacy copy (`D-974`, `L-27`, `D98`) is pinned to `codemyriad/cassini-ux`
-`31973ff9784fcc66c1c7993b903a336e8f2c1432`, `strings/strings.json` (SHA-256
-`c634cdfbcf961391e1f3a084c4d8ac07aa10946a289ecba4da8ec1ebc25717ca`), vendored byte-identically in
+`b26190b57d8e35391ba9b4bafd177d66b10f0ec3`, `strings/strings.json` (SHA-256
+`10d65abc7b10f81422377632aa899506b33e02cc9269afc96e11ec89cee69367`), vendored byte-identically in
 `contracts/wave5-strings/strings.json` alongside `contracts/wave5-strings/UPSTREAM.json`.
 `scripts/generate-wave5-strings.py` compiles the eight iOS Wave 5 IDs (`firstRun.hero.title`, `firstRun.hero.subtitle`,
 `firstRun.hero.phoneBackupQualifier`, `firstRun.hero.subtitlePhoneNote`, `privacy.onDevice.{iphone,ipad}.{withBackup,backupExcluded}`)
 into `Cassini/Resources/Strings/LibraryWave5.xcstrings` and `Cassini/Strings/LibraryWave5Copy.swift` across all six
 locales. The Phase 1 `status-badges` bundle stays at `5e0c34e0f1bb390298dabdf4eedc494e933fd329` until `L-10` (`D-997`)
 migrates `Received` to `Imported`. No shared source was edited.
+
+Wave 6 (`D-979`, supersedes #120) and the Wave 5 hero source now pin `b26190b57d8e35391ba9b4bafd177d66b10f0ec3`
+(SHA-256 `10d65abc7b10f81422377632aa899506b33e02cc9269afc96e11ec89cee69367`). The full byte-identical catalog is in
+`contracts/wave5-strings/strings.json`. `generate-wave6-strings.py` selects iOS backup and voice wording,
+with all six translations verbatim in `Wave6.xcstrings`; Android-only exclusion claims are deliberately omitted.
+Earlier Phase 1 receipts remain pinned independently to avoid changing their contracts.

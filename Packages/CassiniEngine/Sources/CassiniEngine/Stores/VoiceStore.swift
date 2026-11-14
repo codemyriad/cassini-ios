@@ -48,6 +48,26 @@ public actor VoiceStore {
                              canForgetEveryone: library.canForgetEveryone)
     }
 
+    public func enroll(name: String, print: SpeakerPrint, audio: URL) throws {
+        try VoiceEnrollment.validate(print)
+        let cleaned = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleaned.isEmpty, cleaned.count <= Limits.nameMaxLength else { throw VoiceEnrollment.Invalid.invalidName }
+        let id = UUID()
+        let folder = library.folder.appendingPathComponent("Enrollment", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let destination = folder.appendingPathComponent("\(id.uuidString).caf")
+        do {
+            try FileManager.default.copyItem(at: audio, to: destination)
+            var sample = VoiceSample(noteID: id, print: print)
+            sample.guidedEnrollment = true
+            try library.save(library.voices + [SavedVoice(id: id, name: cleaned, samples: [sample])])
+        } catch {
+            // Cleanup can fail after the new list was committed: keep audio belonging to that committed voice.
+            if !library.voices.contains(where: { $0.id == id }) { try? FileManager.default.removeItem(at: destination) }
+            throw error
+        }
+    }
+
     public func voices() -> [SavedVoice] { library.voices }
 
     /// Writes the saved voices; throws `VoiceLibraryError.readOnly` when they cannot be changed now.

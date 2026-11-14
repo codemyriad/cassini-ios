@@ -19,7 +19,7 @@ public enum VoiceLibraryError: Error, Hashable, Sendable {
 }
 
 /// The private voice files: `PrivateVoices/voices.json` (the saved voices) and `PrivateVoices/<note id>.json` (each
-/// note's prints). They live apart from the notes, are excluded from backups, and never go into an export.
+/// note's prints). They live apart from the notes, follow the phone backup preference, and never go into an export.
 ///
 /// A file this Cassini cannot use is never deleted: a newer one is left alone, an unparseable one is renamed
 /// `<name>.corrupt-<epoch ms>`. Not thread-safe: `VoiceStore` serialises access.
@@ -39,11 +39,8 @@ public final class VoiceLibrary {
         folder = root.appendingPathComponent("PrivateVoices", isDirectory: true)
         self.now = now
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        var resource = folder
-        var values = URLResourceValues()
-        values.isExcludedFromBackup = true
-        try resource.setResourceValues(values)
         read()
+        if problem == nil { try cleanEnrollmentAudio() }
     }
 
     private var voicesFile: URL { folder.appendingPathComponent("voices.json") }
@@ -80,6 +77,7 @@ public final class VoiceLibrary {
         try DurableFile.write(VoiceCodec.encode(state), to: voicesFile)
         voices = saved
         nextSaveSequence = next
+        try cleanEnrollmentAudio()
     }
 
     /// The prints of every analysis of the note. A newer file reads as none and is kept; an unparseable one is set
@@ -113,7 +111,7 @@ public final class VoiceLibrary {
         if let problem, problem != .damaged { throw VoiceLibraryError.readOnly(problem) }
         let fileManager = FileManager.default
         for url in try fileManager.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
-        where url.lastPathComponent.hasPrefix("voices.json") || noteID(of: url) != nil {
+        where url.lastPathComponent == "Enrollment" || url.lastPathComponent.hasPrefix("voices.json") || noteID(of: url) != nil {
             try fileManager.removeItem(at: url)
         }
         voices = []
@@ -152,6 +150,18 @@ public final class VoiceLibrary {
             deleted.insert(id)
         }
         return deleted.sorted { $0.uuidString < $1.uuidString }
+    }
+
+    /// Remove private sample audio only after the new voice list is durable. Startup finishes a deletion
+    /// interrupted between committing that list and removing its sample. Never inspect a newer/unreadable list.
+    private func cleanEnrollmentAudio() throws {
+        let directory = folder.appendingPathComponent("Enrollment", isDirectory: true)
+        guard FileManager.default.fileExists(atPath: directory.path) else { return }
+        let kept = Set(voices.filter { $0.samples.contains { $0.guidedEnrollment == true } }.map { $0.id.uuidString + ".caf" })
+        for file in try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
+        where !kept.contains(file.lastPathComponent) {
+            try FileManager.default.removeItem(at: file)
+        }
     }
 
     // MARK: - Files

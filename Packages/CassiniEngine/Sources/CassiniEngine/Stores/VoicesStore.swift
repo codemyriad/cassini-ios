@@ -256,6 +256,14 @@ import CassiniNotebook
         try? await store?.prints(noteID: noteID).last { $0.speakerID == speakerID }
     }
 
+    /// Enrolls a guided sample without making a Library meeting or exporting its private audio.
+    public func enroll(name: String, print: SpeakerPrint, audio: URL, generation: Int) async throws {
+        guard generation == settings.voicesGeneration, let store else { throw VoiceEnrollment.Invalid.ambiguous }
+        try VoiceEnrollment.validate(print)
+        try await store.enroll(name: name, print: print, audio: audio)
+        await refresh()
+    }
+
     // MARK: - Saved voices
 
     /// Renames a saved voice. Names already in notes stay, as on Android.
