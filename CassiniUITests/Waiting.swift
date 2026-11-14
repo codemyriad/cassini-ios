@@ -146,6 +146,12 @@ extension XCUIApplication {
     /// instead of five. `fresh` asks for a new process. Below iOS 26, always start a new process: the iOS 18
     /// accessibility tree can retain elements from the replaced graph and crash while XCTest reads them.
     @MainActor func launchAndWait(fresh: Bool = false, file: StaticString = #filePath, line: UInt = #line) {
+        if ProcessInfo.processInfo.operatingSystemVersion.majorVersion == 18 {
+            // Xcode 27's accessibility query dumps can quarantine iOS 18's log client, then crash inside
+            // XCTAutomationSupport's os_log fault callback. This affects only the UI-test app process;
+            // stdout/stderr, crash reporting, assertions and accessibility audits remain enabled.
+            launchEnvironment["OS_ACTIVITY_MODE"] = "disable"
+        }
         if DeviceUnderTest.iOS18Facts, !launchArguments.contains("--ios18-platform") { launchArguments.append("--ios18-platform") }
         if #available(iOS 26, *), !fresh, Launches.relaunchInApp(launchArguments) { return }
         launch()

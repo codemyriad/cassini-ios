@@ -46,8 +46,8 @@ final class ScreenshotTests: XCTestCase {
         let viewport = app.scrollViews.containing(.any, identifier: "draftTranscript").firstMatch
         XCTAssertTrue(viewport.waitForExistence(within: 10))
         XCTAssertTrue(viewport.scroll(up: false, attempts: 3) {
-            guard let frame = (try? header.snapshot())?.frame, !frame.isEmpty else { return false }
-            // This is a read-only heading, not an action with an activation point. Verify its full visibility.
+            guard let frame = (try? header.snapshot())?.frame, !frame.isEmpty, !frame.isInfinite else { return false }
+            // A static heading has no activation point; require full visibility inside the draft viewport.
             return viewport.frame.intersection(app.windows.firstMatch.frame).contains(frame)
         })
         capture("03-transcribing")

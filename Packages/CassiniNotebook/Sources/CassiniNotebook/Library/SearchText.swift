@@ -164,7 +164,26 @@ public struct SearchFields: Sendable {
     }
 
     public init(_ note: Note) {
-        self.init(title: note.title, body: NoteTranscripts.sealed(note).turns.map(\.text).joined(separator: " "), bookmarks: note.bookmarks.compactMap(\.label))
+        // Synthetic inline-speaker labels are presentation, not speech. A single line also keeps paragraph
+        // breaks from consuming the result preview's two lines before the highlighted word appears.
+        self.init(title: note.title,
+                  body: NoteTranscripts.sealed(note).turns.lazy.map(Self.spokenText).filter { !$0.isEmpty }.joined(separator: " "),
+                  bookmarks: note.bookmarks.compactMap(\.label))
+    }
+
+    /// Keep the viewer's punctuation spacing while omitting synthetic inline-speaker labels.
+    private static func spokenText(_ turn: NoteTurn) -> String {
+        guard !turn.interjections.isEmpty else { return turn.text }
+        var text = ""
+        text.reserveCapacity(turn.text.utf8.count)
+        var previousEnd = 0
+        for (index, word) in turn.words.enumerated() {
+            let offset = turn.offsets[index]
+            if index > 0 && offset > previousEnd { text.append(" ") }
+            text.append(word.text)
+            previousEnd = max(previousEnd, offset + word.text.count)
+        }
+        return text
     }
 
     /// Whether every phrase is in one of the fields (each phrase may be in another).
