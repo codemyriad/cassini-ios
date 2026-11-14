@@ -36,24 +36,27 @@ import CassiniNotebook
         return head + payload
     }
 
-    @Test func rejectsUnsupportedHeadersBeforeCreatingDestinationAndPreservesCaller() async throws {
+    @Test(arguments: [true, false])
+    func rejectsUnsupportedHeadersBeforeCreatingDestinationAndPreservesCaller(metadataKnown: Bool) async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
         let opus = Array("OpusHead".utf8) + [1, 1] + [UInt8](repeating: 0, count: 9)
         let tags = page(Array("OpusTags".utf8) + [UInt8](repeating: 0, count: 8), bos: false)
         let invalid: [(String, [UInt8])] = [
-            ("video.ogg", page([0x80] + Array("theora".utf8))),
-            ("vorbis.ogg", page([1] + Array("vorbis".utf8))),
-            ("speex.opus", page(Array("Speex   ".utf8))),
-            ("flac.ogg", page([0x7f] + Array("FLAC".utf8))),
+            ("video.ogg", page([0x80] + Array("theora".utf8) + [UInt8](repeating: 0, count: 32)) + tags),
+            ("vorbis.ogg", page([1] + Array("vorbis".utf8) + [UInt8](repeating: 0, count: 32)) + tags),
+            ("speex.opus", page(Array("Speex   ".utf8) + [UInt8](repeating: 0, count: 32)) + tags),
+            ("flac.ogg", page([0x7f] + Array("FLAC".utf8) + [UInt8](repeating: 0, count: 32)) + tags),
             ("native.mp3", Array("fLaC".utf8) + [UInt8](repeating: 0, count: 80)),
             ("multiplexed.ogg", page(opus) + page([0x80] + Array("theora".utf8), serial: 2)),
             ("truncated.opus", page(opus)),
             ("truncated.wav", Array("RIFF".utf8) + [0xff, 0xff, 0, 0] + Array("WAVE".utf8) + [UInt8](repeating: 0, count: 32)),
             ("video.ogv", page(opus) + tags),
         ]
-        let importer = CoordinatedFileImporter(storage: FakeStorage())
+        let importer = CoordinatedFileImporter(storage: FakeStorage(), sizeOf: { url in
+            metadataKnown ? CoordinatedFileImporter.reportedSize(of: url) : nil
+        })
         for (name, bytes) in invalid {
             let source = root.appendingPathComponent(name), destination = root.appendingPathComponent("copy")
             try Data(bytes).write(to: source)
