@@ -260,4 +260,72 @@ extension NoteTranscriptsTests {
         #expect(row.allSuggestions.map(\.speakerID) == ["ada", "ben"])
         #expect(row.allSuggestions.map(\.start) == [3.5, 3.05])
     }
+
+    // ports: NoteTranscriptsTest#namingQuotesUseOnlyTheSelectedSpeakersFirstSpeechInBothTranscriptForms
+    @Test func namingQuotesUseOnlyTheSelectedSpeakersFirstSpeechInBothTranscriptForms() throws {
+        let sealed = NoteTranscripts.sealed(F.weeklySync)
+        #expect(sealed.namingQuote("a") == "Hello everyone.")
+        #expect(sealed.namingQuote("b") == "Welcome")
+        #expect(sealed.namingQuote("c") == "Here")
+        #expect(sealed.namingQuote("missing") == "")
+
+        let giulia = try #require(NamingInput.of(F.weeklySync, speakerID: "a", print: nil, voices: [],
+                                                 voicesReadOnly: false, voiceModelReady: false))
+        #expect(giulia.quote == "Hello everyone.")
+
+        let draftWords = F.words.map { DraftWord(speaker: $0.speaker!, startMs: Int64($0.startMs), endMs: Int64($0.endMs), text: $0.text) }
+        let draft = NoteTranscripts.draft(draftWords, tentativeFromMs: 3_600)
+        #expect(draft.namingQuote("a") == "Hello everyone.")
+        #expect(draft.namingQuote("b") == "Welcome")
+        #expect(draft.namingQuote("c") == "Here")
+
+        // Inline overlap-chip speaker: quote extracts only ben's spoken words, never synthetic "(Name: …)" labels.
+        let vector = try D84IntegrationVector.load("acknowledgment")
+        var overlapNote = Note(title: "Overlap")
+        overlapNote.transcript = TranscriptSegment.segments(of: vector.words)
+        overlapNote.speakers = [.init(id: "ada", name: "Ada"), .init(id: "ben", name: "Speaker 2")]
+        let overlap = NoteTranscripts.sealed(overlapNote)
+        #expect(overlap.namingQuote("ben") == "Sounds good.")
+        #expect(!overlap.namingQuote("ada").contains("Sounds good"))
+
+        // Byte-distinct canonical-equivalent speaker IDs ("e\u{0301}" vs "\u{00E9}") never cross-contaminate quotes.
+        let decomposed = "e\u{0301}", precomposed = "\u{00E9}"
+        var canonical = Note(title: "Canonical IDs")
+        canonical.speakers = [.init(id: decomposed, name: "One"), .init(id: precomposed, name: "Two")]
+        canonical.transcript = [.init(text: "First speaker.", start: 0, end: 1, speakerID: decomposed),
+                                .init(text: "Second speaker.", start: 2, end: 3, speakerID: precomposed)]
+        let canonicalTranscript = NoteTranscripts.sealed(canonical)
+        #expect(canonicalTranscript.namingQuote(decomposed) == "First speaker.")
+        #expect(canonicalTranscript.namingQuote(precomposed) == "Second speaker.")
+    }
+
+    // ports: NoteTranscriptsTest#namingQuotesBoundLongSpeechAndNeverSplitASurrogatePair
+    @Test func namingQuotesBoundLongSpeechAndNeverSplitASurrogatePair() {
+        let fortyOne = (1...41).map { i in F.W("a", i * 100, i * 100 + 80, "w\(i)") }
+        let expectedForty = (1...40).map { "w\($0)" }.joined(separator: " ") + "…"
+        #expect(NoteTranscripts.sealed(F.note(fortyOne)).namingQuote("a") == expectedForty)
+
+        let surrogateToken = String(repeating: "x", count: 239) + "😀more"
+        let surrogateQuote = NoteTranscripts.sealed(F.note([F.W("a", 0, 100, surrogateToken)])).namingQuote("a")
+        #expect(surrogateQuote == String(repeating: "x", count: 239) + "…")
+        #expect(!surrogateQuote.utf16.contains { (0xD800...0xDFFF).contains($0) })
+
+        // Multi-scalar grapheme cluster ("👍🏽" = 4 UTF-16 units) at the 240-UTF-16 limit is dropped whole, never split.
+        let modifierToken = String(repeating: "x", count: 238) + "👍🏽more"
+        let modifierQuote = NoteTranscripts.sealed(F.note([F.W("a", 0, 100, modifierToken)])).namingQuote("a")
+        #expect(modifierQuote == String(repeating: "x", count: 238) + "…")
+
+        #expect(NoteTranscripts.sealed(Note(title: "Empty")).namingQuote("a") == "")
+    }
+
+    @Test func namingQuoteStopsAtFirstContiguousRunOnLargeTranscript() {
+        let words: [F.W] = (0..<6_000).map { index in
+            let speaker = index < 4 ? "a" : (index < 5_996 ? "b" : "a")
+            return F.W(speaker, index * 200, index * 200 + 150, "w\(index)")
+        }
+        let transcript = NoteTranscripts.sealed(F.note(words))
+        let expectedB = (4..<44).map { "w\($0)" }.joined(separator: " ") + "…"
+        #expect(transcript.namingQuote("a") == "w0 w1 w2 w3")
+        #expect(transcript.namingQuote("b") == expectedB)
+    }
 }

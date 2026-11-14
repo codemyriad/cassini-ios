@@ -55,6 +55,7 @@ import CassiniNotebook
         await model.open(draft: nil) { [actions] in actions.record($0) }
         let sheet = SpeakerNaming.ui(try #require(model.state))
         #expect(sheet.draft)
+        #expect(sheet.quote == "Lunga")
         #expect(!sheet.canSample, "a running job holds the audio: no sample plays")
         send(model, .nameChanged("Luca"), .save)
         await model.settle()
@@ -173,9 +174,11 @@ extension NameSpeakerModelTests {
         await ben.open(draft: nil) { [actions] in actions.record($0) }
         let input = try #require(ben.state?.input)
         #expect(input.draft && input.speakerID == "b" && input.ordinal == 1)
+        #expect(input.quote == "Yes.")
         #expect(input.mergeTargets.map(\.speakerID) == ["a"])
         let ada = screen.naming("a")
         await ada.open(draft: nil) { [actions] in actions.record($0) }
+        #expect(ada.state?.input.quote == "Ready,")
         #expect(ada.state?.input.mergeTargets.map(\.speakerID) == ["b"])
         screen.sheet = nil
         fake.draftNamingOpen = false
