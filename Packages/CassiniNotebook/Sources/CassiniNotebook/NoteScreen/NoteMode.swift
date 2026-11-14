@@ -39,7 +39,7 @@ public enum NoteMode: Hashable, Sendable {
     public var showsDraft: Bool {
         switch self {
         case .processing, .paused: true
-        case .failed(let overDocument): !overDocument
+        case .queued(_, let overDocument), .failed(let overDocument): !overDocument
         default: false
         }
     }

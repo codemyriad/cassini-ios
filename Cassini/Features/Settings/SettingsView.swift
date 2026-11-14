@@ -251,7 +251,11 @@ private struct LibrarySection: View {
                 Text("Recordings", tableName: "Settings")
             }
             LabeledContent {
-                Text(verbatim: TimeText.clock(totals.duration)).font(.body.monospacedDigit())
+                if #available(iOS 26.0, *) {
+                    Text(verbatim: TimeText.clock(totals.duration)).monospacedDigit()
+                } else {
+                    Text(verbatim: TimeText.clock(totals.duration))
+                }
             } label: {
                 Text("Audio duration", tableName: "Settings")
             }

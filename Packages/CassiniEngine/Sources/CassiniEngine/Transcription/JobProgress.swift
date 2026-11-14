@@ -121,7 +121,23 @@ import CassiniNotebook
 
     private func publish() {
         // The admission flag is authoritative even before a willSet's outer phase assignment has committed.
-        publishPhase(stopping ? .stopping : tracker.phase)
+        if stopping {
+            let next: JobPhase = switch phase {
+            case .stopping: phase
+            case .transcribing(let progress, let draft): .stopping(StoppingProgress(progress: progress, draft: draft))
+            default:
+                if case .stopping = tracker.phase {
+                    tracker.phase
+                } else if case .transcribing(let progress, let draft) = tracker.phase {
+                    .stopping(StoppingProgress(progress: progress, draft: draft))
+                } else {
+                    .stopping()
+                }
+            }
+            publishPhase(next)
+        } else {
+            publishPhase(tracker.phase)
+        }
     }
 
     private func publishPhase(_ next: JobPhase) {

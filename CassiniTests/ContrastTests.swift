@@ -82,6 +82,22 @@ import CassiniNotebook
             text("Live Activity Finish", .onRecord, on: RecordingActivityColors.finish),
             nonText("Live Activity live dot on its card", RecordingActivityColors.live, on: RecordingActivityColors.background),
             nonText("Live Activity paused ring on its card", RecordingActivityColors.secondary, on: RecordingActivityColors.background),
+            // WP5 transcribing status strip, details sheet (raised) and compact speaker suggestion (neutral tint).
+            text("ink on raised sheet", .ink, on: .raised),
+            text("muted on raised sheet", .muted, on: .raised),
+            text("faint (upcoming or skipped step) on raised sheet", .faint, on: .raised),
+            text("warning on raised sheet", .toneWarn, on: .raised),
+            text("ink on sheet secondary button (ink 10 % on raised)", .ink, on: .raised, Color.ink.opacity(0.1)),
+            nonText("accent spinner on paper", .accent, on: .paper),
+            nonText("accent spinner on raised sheet", .accent, on: .raised),
+            nonText("accent spinner on sheet secondary button", .accent, on: .raised, Color.ink.opacity(0.1)),
+            nonText("accent progress fill on status track", .accent, on: .paper, .neutralTint),
+            nonText("accent progress fill on sheet track", .accent, on: .raised, .neutralTint),
+            nonText("done step badge on raised sheet", .accentStrong, on: .raised),
+            nonText("checkmark on done step badge", .onAccent, on: .accentStrong),
+            text("ink on compact speaker suggestion (neutral tint)", .ink, on: .paper, .neutralTint),
+            text("muted No on compact speaker suggestion (neutral tint)", .muted, on: .paper, .neutralTint),
+            nonText("Yes pill fill on compact speaker suggestion (neutral tint)", .accentStrong, on: .paper, .neutralTint),
         ]
         // The rows of the grouped lists (Settings, the sheets) keep the system's row background.
         for (name, color) in [("ink", Color.ink), ("muted", .muted), ("accent", .accentInk), ("error", .toneError)] {

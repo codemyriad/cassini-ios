@@ -9,6 +9,7 @@ struct TranscriptActions {
     var nameSpeaker: (String) -> Void = { _ in }
     var editPassage: (UUID) -> Void = { _ in }
     var markMoment: (TimeInterval) -> Void = { _ in }
+    var answerSuggestion: (SpeakerSuggestion, Bool) -> Void = { _, _ in }
 }
 
 /// One paragraph of the transcript (Android `TurnHeader` and `TurnParagraph`): the speaker header, then the words.
@@ -46,6 +47,10 @@ struct TurnView: View, Equatable {
             TurnHeader(turn: turn, button: renamable && turn.nameableSpeakerID != nil) {
                 if let id = turn.nameableSpeakerID { actions.nameSpeaker(id) }
             }
+            if style == .draft, renamable, let suggestion = turn.suggestion {
+                CompactSuggestionRow(suggestion: suggestion, answer: actions.answerSuggestion)
+                    .padding(.bottom, 4)
+            }
             // A draft has no Speakers sheet. Every inline speaker needs a naming control even without a voice card.
             ForEach(turn.inlineSpeakersForNaming(isDraft: style == .draft, renamable: renamable), id: \.speakerID) { chip in
                 if let id = chip.speakerID {
@@ -66,6 +71,10 @@ struct TurnView: View, Equatable {
                         start: turn.words[chip.wordRange.lowerBound].start, auto: false)))
                     .accessibilityHint(NoteCopy.nameThisSpeaker)
                     .accessibilityIdentifier("inlineSpeakerHeader-\(turn.id)-\(id)")
+                    if let suggestion = turn.inlineSuggestions.first(where: { Data($0.speakerID.utf8) == Data(id.utf8) }) {
+                        CompactSuggestionRow(suggestion: suggestion, answer: actions.answerSuggestion)
+                            .padding(.bottom, 4)
+                    }
                 }
             }
             paragraph
@@ -106,7 +115,7 @@ struct TurnView: View, Equatable {
                 }
                 .contextMenu { menu }
         case .draft:
-            text.foregroundStyle(Color.muted)
+            text.foregroundStyle(Color.ink)
         }
     }
 
@@ -135,12 +144,12 @@ struct TurnView: View, Equatable {
     }
 
     /// The paragraph with its word links (reading), its unsettled words (draft), the active word and the search hits.
-    private var attributed: AttributedString {
+    var attributed: AttributedString {
         var result = style == .reading
             ? turn.linkedText(activeWord: activeIndex, scheme: Self.scheme)
             : AttributedString(turn.text)
         // Use per-run foregrounds: a paragraph-wide link tint would color named chips like an unnamed host.
-        result.foregroundColor = style == .draft ? Color.muted : Color.ink
+        result.foregroundColor = Color.ink
         let characters = result.characters
         func range(_ offsets: Range<Int>) -> Range<AttributedString.Index>? {
             guard offsets.lowerBound >= 0, offsets.upperBound <= characters.count else { return nil }
