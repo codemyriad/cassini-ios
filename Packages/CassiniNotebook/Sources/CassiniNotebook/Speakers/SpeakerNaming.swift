@@ -189,7 +189,11 @@ public enum SpeakerNaming {
     }
 
     static func rankedVoices(_ input: NamingInput) -> [NameMatch.Ranked] {
-        NameMatch.rank(input.print, voices: input.voices, model: input.currentModel, suggest: VoiceThresholds.campplus.suggest)
+        // Legacy/test callers without an explicit saveSequence get append-order slots before sorting.
+        let voices = input.voices.enumerated().map { index, value in
+            value.saveSequence == nil ? value.saved(at: index) : value
+        }
+        return NameMatch.rank(input.print, voices: voices, model: input.currentModel, suggest: VoiceThresholds.campplus.suggest)
     }
 }
 

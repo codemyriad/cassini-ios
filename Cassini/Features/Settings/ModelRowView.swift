@@ -19,25 +19,44 @@ struct ModelRowView: View {
         }
     }
 
-    private func content(chevron: Bool) -> some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Group {
-                    if let modelName { Text(verbatim: modelName) } else { Text(row.part.settingsLabel) }
-                }.foregroundStyle(Color.ink)
-                if let size = row.size.label(locale: locale) {
-                    Text(size).font(.subheadline).foregroundStyle(Color.muted)
-                }
+    @ViewBuilder private func content(chevron: Bool) -> some View {
+        if #available(iOS 26.0, *) {
+            HStack(spacing: 12) {
+                partLabel
+                Spacer(minLength: 8)
+                statusLabel(chevron: chevron)
             }
-            Spacer(minLength: 8)
-            Text(row.status.label).font(.subheadline.weight(.medium)).foregroundStyle(row.status.tone.color)
-                .multilineTextAlignment(.trailing)
-            if chevron {
-                Image(systemName: "chevron.forward").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
+            .contentShape(Rectangle())
+            .accessibilityElement(children: .combine)
+        } else {
+            // iOS 18's List row clipping check flags two wrapping columns in an HStack; LabeledContent stacks at AX sizes.
+            LabeledContent {
+                HStack(spacing: 12) { statusLabel(chevron: chevron) }
+            } label: {
+                partLabel
+            }
+            .contentShape(Rectangle())
+            .accessibilityElement(children: .combine)
+        }
+    }
+
+    private var partLabel: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Group {
+                if let modelName { Text(verbatim: modelName) } else { Text(row.part.settingsLabel) }
+            }.foregroundStyle(Color.ink)
+            if let size = row.size.label(locale: locale) {
+                Text(size).font(.subheadline).foregroundStyle(Color.muted)
             }
         }
-        .contentShape(Rectangle())
-        .accessibilityElement(children: .combine)
+    }
+
+    @ViewBuilder private func statusLabel(chevron: Bool) -> some View {
+        Text(row.status.label).font(.subheadline.weight(.medium)).foregroundStyle(row.status.tone.color)
+            .multilineTextAlignment(.trailing)
+        if chevron {
+            Image(systemName: "chevron.forward").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
+        }
     }
 }
 

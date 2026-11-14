@@ -10,9 +10,13 @@ extension SpeakerNaming {
         let shown = state.showAll ? ranked : Array(ranked.prefix(visibleVoices))
         let reason = rememberReason(input)
         return NameSheetUI(
-            speakerID: input.speakerID, label: input.label, placeholderNumber: DefaultLabels.placeholderNumber(input.label),
+            speakerID: input.speakerID, label: input.label, quote: input.quote,
+            placeholderNumber: DefaultLabels.placeholderNumber(input.label),
             speakingTime: input.speakingTime, canSample: input.sample != nil && input.canSample, name: state.name,
-            voices: shown.map { NameSheetUI.VoiceRow(id: $0.voice.id, name: $0.voice.name, likely: $0.likely) },
+            voices: shown.map {
+                NameSheetUI.VoiceRow(id: $0.voice.id, name: $0.voice.name, likely: $0.likely,
+                                     tint: SpeakerTint.named($0.voice.saveSequence ?? 0))
+            },
             showAll: !state.showAll && ranked.count > visibleVoices, ranked: input.print != nil,
             samePerson: samePerson(state)?.name, renameSaved: renameQuestion(state)?.name, notName: notName(input)?.name,
             remember: state.remember && reason == nil, rememberEnabled: reason == nil,
