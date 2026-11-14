@@ -35,15 +35,18 @@ public enum TranscriptSearch {
     /// Search actual words, keeping the rendered offsets across inline speaker labels and parentheses.
     /// A label rename must not create a match; a phrase crossing a chip still maps to its real first/last words.
     private static func spoken(_ turn: NoteTurn) -> Folded {
+        guard !turn.interjections.isEmpty else { return fold(turn.text) }
         var result = Folded(text: [], source: [])
         result.text.reserveCapacity(turn.text.count)
         result.source.reserveCapacity(turn.text.count)
+        var previousEnd = 0
         for (index, word) in turn.words.enumerated() {
             let offset = turn.offsets[index]
-            if index > 0 {
+            if index > 0 && offset > previousEnd {
                 result.text.append(" ")
                 result.source.append(offset - 1)
             }
+            previousEnd = max(previousEnd, offset + word.text.count)
             let piece = fold(word.text)
             result.text.append(contentsOf: piece.text)
             for position in piece.source { result.source.append(offset + position) }

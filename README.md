@@ -515,4 +515,5 @@ The [D-989 QA report](docs/qa-phase1-d989.md) records the six audited phone surf
 existing implementation PRs and iOS platform differences. Meeting header names use the same
 assigned speaker colours as transcript labels; unnamed speakers remain stone in both appearances.
 Library Search and Find match spoken words rather than labels inserted by the viewer. Search previews
-join paragraphs with spaces so blank lines cannot hide the matching word.
+join paragraphs with spaces so blank lines cannot hide the matching word. Both search surfaces preserve
+the viewer’s spacing around standalone punctuation, including punctuation inside inline replies.

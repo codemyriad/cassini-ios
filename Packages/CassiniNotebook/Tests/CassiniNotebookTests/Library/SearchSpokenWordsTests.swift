@@ -85,6 +85,55 @@ import Testing
         #expect(turn.words[last].speakerID == "ben")
     }
 
+    @Test(arguments: [false, true])
+    func standalonePunctuationKeepsViewerSpacingInFindAndLibrary(inline: Bool) throws {
+        var note = try inlineReply()
+        if !inline { note.transcript = [TranscriptSegment(text: "Hello world. Hello to everyone", start: 0, end: 3, speakerID: "ada")] }
+        note.transcript = note.transcript.map { segment in
+            var segment = segment
+            // Apple Speech emits punctuation separately, including zero-duration punctuation.
+            let atoms = segment.text == "good." ? ["world", ".", "Hello"]
+                : segment.text.split(separator: " ").flatMap { token -> [String] in
+                    if let last = token.last, ",.!?:;)".contains(last) {
+                        return [String(token.dropLast()), String(last)]
+                    }
+                    return [String(token)]
+                }
+            let step = (segment.end - segment.start) / Double(atoms.count)
+            segment.words = atoms.enumerated().map { index, text in
+                let start = segment.start + Double(index) * step
+                return TimedWord(text: text, start: start, end: text == "." ? start : start + step)
+            }
+            return segment
+        }
+        let turns = NoteTranscripts.sealed(note).turns
+        #expect(turns.contains { !$0.interjections.isEmpty } == inline)
+        for query in ["world.", "world. Hello"] {
+            let hit = try #require(TranscriptSearch.matches(turns, query: query).first)
+            let turn = try #require(turns.first { $0.id == hit.turnID })
+            #expect(String(Array(turn.text)[hit.range]) == query)
+            let word = try #require(turn.word(atOffset: hit.range.lowerBound))
+            #expect(turn.words[word].speakerID == (inline ? "ben" : "ada"))
+        }
+        #expect(TranscriptSearch.matches(turns, query: "world .").isEmpty)
+        let fields = SearchFields(note)
+        let snippet = Highlighted(marked: fields.snippet(try #require(SearchQuery("world"))))
+        #expect(snippet.text.contains("world. Hello"))
+        #expect(!snippet.text.contains("world ."))
+        #expect(!snippet.text.contains("testing ,"))
+        #expect(!snippet.text.contains("Ben:"))
+        #expect(snippet.ranges.map { String(Array(snippet.text)[$0]) } == ["world"])
+    }
+
+    @Test func leadingEmptyDraftAtomsKeepSearchRangesNonnegative() throws {
+        let turns = NoteTranscripts.draft([
+            DraftWord(speaker: "a", startMs: 0, endMs: 0, text: ""),
+            DraftWord(speaker: "a", startMs: 0, endMs: 500, text: "Hello")
+        ], tentativeFromMs: nil).turns
+        #expect(turns.first?.offsets == [0, 0])
+        #expect(TranscriptSearch.matches(turns, query: "Hello").map(\.range) == [0..<5])
+    }
+
     @Test func searchingAnElevenHourTranscriptScalesWithItsWords() throws {
         func transcript(_ count: Int) -> [NoteTurn] {
             NoteTranscripts.draft((0..<count).map { index in
