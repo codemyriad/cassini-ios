@@ -87,7 +87,7 @@ enum FailureReason {
     static func of(_ error: any Error) -> String {
         switch error {
         case RepositoryError.invalidDocument:
-            String(localized: "This note’s details are not supported or are damaged. Its files have been kept.", table: "Failures")
+            String(localized: "This meeting’s details are not supported or are damaged. Its files have been kept.", table: "Failures")
         default: error.localizedDescription
         }
     }

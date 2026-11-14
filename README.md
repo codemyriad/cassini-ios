@@ -163,6 +163,11 @@ TestFlight still need.
 
 [docs/differences.md](docs/differences.md) describes each difference in detail. In summary:
 
+- **Phase 2 meeting wording.** Settings, Saved voices, Speakers and Recently Deleted use the shared meeting
+  catalog in all six UI languages. iOS retains its existing Recently Deleted labels and device-specific
+  speaker explanations; the shared phone entries retain their historical `android.*` IDs. See
+  [the immutable source pin](docs/shared-strings-pin.md).
+
 - **Unknown meeting dates (D95).** The Library names the group with the shared “Date unknown” heading in all six
   languages, including for VoiceOver. iOS omits the repeated unknown-date label from individual row metadata,
   the Note subtitle and the Document info Recorded row; the Note subtitle keeps the duration. Android repeats
