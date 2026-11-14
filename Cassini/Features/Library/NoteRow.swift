@@ -6,9 +6,9 @@ enum NoteRowAction {
     case open, resume, rename, trash
 }
 
-/// A Library row (board 00): the title (2 lines) with the duration, the preview or search snippet (2 lines) with its
-/// ellipses and highlights, and the meta line (the time, or the day and time in search results; the status chip; the
-/// suffix). "· Resume" and "· Try again" are inline buttons.
+/// A Library row: title and duration, search-only snippet, then time, status and neutral metadata pills.
+/// Finished meetings show their speaker count or No speech instead of a status chip. Resume and Try again stay
+/// inline buttons; the row's spoken status and named actions are retained.
 ///
 /// For VoiceOver the row is one button described as "title, duration, day time, status[, suffix][, preview]", with
 /// Resume or Try again, Rename and Move to Recently Deleted (not while recording) as named actions.
@@ -21,6 +21,7 @@ struct NoteRow: View {
     let perform: (NoteRowAction) -> Void
     @Environment(\.calendar) private var calendar
     @Environment(\.dynamicTypeSize) private var dynamicType
+    @ScaledMetric(relativeTo: .footnote) private var starSize: CGFloat = 16
 
     var body: some View {
         let format = LibraryFormat(calendar: calendar)
@@ -51,7 +52,7 @@ struct NoteRow: View {
     private func content(_ format: LibraryFormat) -> some View {
         let titleLayout = dynamicType.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 6))
             : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 10))
-        return VStack(alignment: .leading, spacing: 8) {
+        return VStack(alignment: .leading, spacing: 4) {
             titleLayout {
                 let titleFont = Font.headline
                 Text(HighlightedText.attributed(Highlighted(row.title, ranges: row.titleRanges), font: titleFont))
@@ -59,43 +60,50 @@ struct NoteRow: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .accessibilityIdentifier("rowTitle").passive()
                 HStack(spacing: 6) {
-                    if row.isFavorite { Image(systemName: "star.fill").font(.footnote).foregroundStyle(Color.accentInk) }
+                    if row.isFavorite { Image(systemName: "star.fill").font(.system(size: starSize)).foregroundStyle(Color.accentInk) }
                     Text(TimeText.clock(row.duration)).font(.footnote.monospacedDigit()).foregroundStyle(Color.muted)
                 }.fixedSize().passive()
             }
-            if let preview = row.preview {
-                // An excerpt by design, two lines as on Android.
-                Text(HighlightedText.attributed(preview, font: .subheadline)).font(.subheadline).foregroundStyle(Color.muted)
+            if let preview = row.displayedPreview {
+                // Search retains the two-line matching context, with its original highlights.
+                Text(HighlightedText.attributed(preview.singleLine, font: .subheadline)).font(.subheadline).foregroundStyle(Color.muted)
                     .lineLimit(2).accessibilityIdentifier("rowPreview").passive()
             }
-            FlowLayout(spacing: 8) {
+            FlowLayout(spacing: 8, rowSpacing: 4) {
                 if let meetingTime = format.meetingTime(row) {
                     Text(meetingTime).font(.footnote.monospacedDigit()).foregroundStyle(Color.muted).passive()
                 }
                 RowChip(row: row).passive()
                 suffix
                 if row.bookmarkCount > 0 {
-                    Label { Text(row.bookmarkCount, format: .number) } icon: { Image(systemName: "bookmark.fill") }.font(.footnote).foregroundStyle(Color.muted).passive()
+                    RowMetadataPill(text: Text(row.bookmarkCount, format: .number), systemImage: "bookmark.fill").passive()
                 }
             }
         }
-        .padding(.horizontal, 16).padding(.vertical, 14)
+        .padding(.horizontal, 16).padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     @ViewBuilder private var suffix: some View {
-        if let text = LibraryCopy.suffix(row.status) {
-            switch row.status.suffix {
-            case .resume, .tryAgain:
-                Button { perform(.resume) } label: { Text(text).font(.footnote.weight(.semibold)).foregroundStyle(Color.accentInk) }
-                    .buttonStyle(.plain)
-                    .frame(minHeight: HitTarget.minimum).contentShape(Rectangle())
-                    .padding(.vertical, -12)
-                    .accessibilityLabel(row.status.suffix == .resume ? LibraryCopy.resumeDescription(row.title)
-                        : LibraryCopy.tryAgainDescription(row.title))
-            default:
-                Text(text).font(.footnote).foregroundStyle(Color.muted).passive()
+        switch row.status.suffix {
+        case .resume, .tryAgain:
+            Button { perform(.resume) } label: {
+                Text(row.status.suffix == .resume ? LibraryCopy.resume : LibraryCopy.tryAgain)
+                    .font(.footnote.weight(.semibold)).foregroundStyle(Color.ink)
             }
+            .buttonStyle(.plain)
+            .frame(minHeight: HitTarget.minimum).contentShape(Rectangle())
+            .padding(.vertical, -12)
+            .accessibilityLabel(row.status.suffix == .resume ? LibraryCopy.resumeDescription(row.title)
+                : LibraryCopy.tryAgainDescription(row.title))
+        case .speakers:
+            if case .transcribed(let count, _) = row.status {
+                RowMetadataPill(text: Text(verbatim: LibraryPhase1Copy.speakerCount(count)), systemImage: "person.2.fill").passive()
+            }
+        case .noSpeech:
+            RowMetadataPill(text: Text(verbatim: LibraryPhase1Copy.noSpeech)).passive()
+        case .none:
+            EmptyView()
         }
     }
 
@@ -116,8 +124,10 @@ struct RowChip: View {
 
     private var status: LibraryRow.Status { row.status }
 
-    var body: some View {
-        if let badge = RowBadge.presentation(row, text: { StatusBadgeCopy.template($0) }) {
+    @ViewBuilder var body: some View {
+        if case .transcribed = status {
+            EmptyView()
+        } else if let badge = RowBadge.presentation(row, text: { StatusBadgeCopy.template($0) }) {
             StatusBadgeView(badge: badge)
         } else {
             PhoneStatusBadgeView(status: status)
@@ -125,6 +135,28 @@ struct RowChip: View {
     }
 
     var colors: (ink: Color, tint: Color) { PhoneStatusBadgeView(status: status).colors }
+}
+
+/// Noninteractive row metadata shares the neutral phone pill geometry, growing with Dynamic Type.
+struct RowMetadataPill: View {
+    let text: Text
+    var systemImage: String? = nil
+    @ScaledMetric(relativeTo: .caption) private var fontSize: CGFloat = 12
+    @ScaledMetric(relativeTo: .caption) private var minimumHeight: CGFloat = 22
+    @ScaledMetric(relativeTo: .caption) private var horizontalPadding: CGFloat = 8
+    @ScaledMetric(relativeTo: .caption) private var verticalPadding: CGFloat = 3
+
+    var body: some View {
+        HStack(spacing: 4) {
+            if let systemImage { Image(systemName: systemImage).accessibilityHidden(true) }
+            text.fixedSize(horizontal: false, vertical: true)
+        }
+        .font(.system(size: fontSize, weight: .semibold)).monospacedDigit()
+        .foregroundStyle(Color.ink2)
+        .padding(.horizontal, horizontalPadding).padding(.vertical, verticalPadding)
+        .frame(minHeight: minimumHeight)
+        .background(Color.ink.opacity(0.1), in: Capsule())
+    }
 }
 
 /// Phone-only states retain their platform meaning while sharing the native pill anatomy.

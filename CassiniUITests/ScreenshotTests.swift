@@ -42,14 +42,13 @@ final class ScreenshotTests: XCTestCase {
         XCTAssertTrue(element(app, containing: "agenda").waitForExistence(within: 10), "the draft so far shows")
         // The draft follows its end as it arrives; back at its start, its header shows under the status strip.
         let parts = app.descendants(matching: .any).matching(identifier: "draftTranscript")
-        let header = parts.firstMatch, draft = app.scrollViews.firstMatch
-        XCTAssertTrue(draft.scroll(up: false, attempts: 3) {
-            guard header.exists else { return false }
-            let frame = header.frame
-            // This is a static heading, with no activation point while offscreen. Check that it is fully
-            // visible inside the draft's viewport below the pinned card before taking the screenshot.
-            let viewport = draft.frame.intersection(app.windows.firstMatch.frame)
-            return !frame.isEmpty && !frame.isInfinite && viewport.contains(frame)
+        let header = parts.element(boundBy: 0)
+        let viewport = app.scrollViews.containing(.any, identifier: "draftTranscript").firstMatch
+        XCTAssertTrue(viewport.waitForExistence(within: 10))
+        XCTAssertTrue(viewport.scroll(up: false, attempts: 3) {
+            guard let frame = (try? header.snapshot())?.frame, !frame.isEmpty, !frame.isInfinite else { return false }
+            // A static heading has no activation point; require full visibility inside the draft viewport.
+            return viewport.frame.intersection(app.windows.firstMatch.frame).contains(frame)
         })
         capture("03-transcribing")
     }
@@ -98,7 +97,7 @@ final class ScreenshotTests: XCTestCase {
         let app = try launchPhone(["--seed", "search"])
         let search = app.textFields["librarySearch"]
         search.tap()
-        // Search on the keyboard (a new line in the wrapping field) ends the search and hides the keyboard.
+        // Search on the keyboard submits the query and hides the keyboard while keeping results open.
         search.typeText("Thursday\n")
         XCTAssertTrue(row(app, "Garden plans for the spring").waitForExistence(within: 5))
         XCTAssertTrue(row(app, "Notes from the design review").waitForNonExistence(within: 5))
@@ -165,8 +164,10 @@ final class ScreenshotTests: XCTestCase {
 
     @MainActor func test14SuccessBadge() throws {
         let app = try launchPhone(["--seed", "brandSpeakers"])
-        XCTAssertTrue(row(app, "Community garden planning").waitForExistence(within: 5))
-        XCTAssertTrue(element(app, containing: "Transcribed").waitForExistence(within: 5))
+        let completed = row(app, "Community garden planning")
+        XCTAssertTrue(completed.waitForExistence(within: 5))
+        XCTAssertTrue(completed.wait(until: NSPredicate(format: "label CONTAINS[c] 'transcribed'"), within: 5),
+                      "the completed row retains its spoken state without a visual done chip")
         capture("14-success-badge")
     }
 
@@ -228,6 +229,28 @@ final class ScreenshotTests: XCTestCase {
         })
         XCTAssertEqual(compact.label, "Three hour workshop")
         capture("19-meeting-scrolled")
+    }
+
+    @MainActor func test20LibraryScrolled() throws {
+        let app = try launchPhone(["--seed", "statuses"] + DeviceUnderTest.workingSpeech)
+        let search = app.textFields["librarySearch"]
+        XCTAssertTrue(search.waitForExistence(within: 15))
+        let searchFrame = search.frame
+        let quiet = row(app, "Quiet room")
+        XCTAssertTrue(app.scrollViews["libraryScroll"].scroll(attempts: 12) {
+            quiet.exists && quiet.isHittable && quiet.frame.maxY < app.buttons["recordButton"].frame.minY
+        })
+        XCTAssertTrue(app.windows.firstMatch.frame.contains(search.frame), "the pinned field stays fully visible")
+        XCTAssertEqual(search.frame, searchFrame, "the search capsule stays pinned while the list scrolls")
+        capture("20-library-scrolled")
+    }
+
+    @MainActor func test21OneSpeakerRow() throws {
+        let app = try launchPhone(["--seed", "oneSpeaker"])
+        let solo = row(app, "Solo planning")
+        XCTAssertTrue(solo.waitForExistence(within: 15))
+        XCTAssertTrue(solo.wait(until: NSPredicate(format: "label CONTAINS[c] 'transcribed' AND label CONTAINS '1 speaker'"), within: 5))
+        capture("21-one-speaker-row")
     }
 
     // MARK: - iPad

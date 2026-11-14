@@ -24,10 +24,12 @@ final class BulkTransferUITests: XCTestCase {
         app.buttons["libraryArchiveMenu"].tap()
         XCTAssertTrue(app.collectionViews.buttons["Export All as ZIP…"].waitForExistence(within: 15))
         XCTAssertFalse(app.collectionViews.buttons["Export Selected as ZIP…"].exists)
-        app.navigationBars.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.5)).tap()
-        app.buttons["selectNotesForExport"].tap()
+        app.staticTexts["TODAY"].firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        XCTAssertTrue(app.collectionViews.buttons["Export All as ZIP…"].waitForNonExistence(within: 15),
+                      "a noninteractive day heading dismisses the menu before selection starts")
         let selection = app.buttons["selectArchiveNote-AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA"]
-        XCTAssertTrue(selection.waitForExistence(within: 15))
+        XCTAssertTrue(app.buttons["selectNotesForExport"].tapWhenInteractive(in: app, until: { selection.exists }),
+                      "Edit enters selection mode after the menu is dismissed")
         selection.tap()
         app.buttons["libraryArchiveMenu"].tap()
         app.collectionViews.buttons["Export Selected as ZIP…"].tapWhenSettled()

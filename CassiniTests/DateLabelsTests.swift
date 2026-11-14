@@ -93,19 +93,19 @@ final class DateLabelsTests: XCTestCase {
                        "The actual day-header path uses the shared heading")
     }
 
-    @MainActor func testRecordingAndTranscribingKeepSpokenStatusesAndOneDuration() throws {
+    @MainActor func testRecordingAndTranscribingSpeakTheVisibleBadgeText() throws {
         var note = Note(title: "English meeting", createdAt: now)
         note.duration = 768
         note.meetingTime = .unknown
         var row = try XCTUnwrap(LibraryMapping.sections(LibraryIndex([note]).entries, context: RowContext(),
                                                        now: now, calendar: calendar).first?.rows.first)
         let format = LibraryFormat(calendar: calendar)
-        for (status, spoken) in [(LibraryRow.Status.recording, "recording"), (.transcribing, "transcribing")] {
+        for (status, spoken) in [(LibraryRow.Status.recording, "recording 12:48"), (.transcribing, "transcribing…")] {
             row.status = status
             row.isSavingCapture = false
             let label = format.rowLabel(row, day: .undated)
             XCTAssertEqual(label, "English meeting, \(format.spokenDuration(768)), \(spoken)")
-            XCTAssertFalse(label.contains("12:48"), "The pill's compact clock must not repeat the spoken duration")
+            XCTAssertEqual(label.contains("12:48"), status == .recording)
         }
     }
 
