@@ -11,7 +11,7 @@ import CassiniEngine
         WindowGroup {
             RootView(restoresNavigation: graph.environment.launch.restoresNavigation)
                 .environment(graph)
-                .tint(.ember)
+                .tint(.accent)
                 .task {
                     delegate.notifications.handler = { [graph] in graph.handle($0) }
                     await graph.start()

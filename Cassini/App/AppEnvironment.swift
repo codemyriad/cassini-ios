@@ -61,6 +61,10 @@ import CassiniEngineTesting
         var marksLaunchFinished = false
         /// What the `launchFinished` marker carries: the token of the UI-test relaunch that built this environment.
         var token = ""
+        #if DEBUG
+        var badgeGallery = false
+        var draftSpeakerSuggestion = false
+        #endif
     }
 
     enum OpenFixture: Equatable {
@@ -72,7 +76,7 @@ import CassiniEngineTesting
     /// Recording (the recording seed shows that one); `reading` is `search` with word times in the fixture's
     /// passages, so playback highlights one word.
     enum Seed: String, CaseIterable {
-        case library, search, speakers, trash, voices, processing, recording, statuses, long, reading
+        case library, search, speakers, trash, voices, processing, recording, statuses, long, reading, brandSpeakers, oneSpeaker
     }
 
     var calendar: Calendar {
@@ -197,10 +201,12 @@ extension AppEnvironment {
     /// The environment of UI-test launch arguments. A relaunch inside the running app (`UITestRelaunch`) passes
     /// `inProcess` and its `token`.
     static func uiTesting(arguments: [String], inProcess: Bool = false, token: String = "") -> AppEnvironment {
-        uiTesting(reset: arguments.contains("--reset-test-data"), seed: seed(in: arguments),
+        let draftSpeakerSuggestion = arguments.contains("--draft-speaker-suggestion")
+        var environment = uiTesting(reset: arguments.contains("--reset-test-data"), seed: seed(in: arguments),
                   openFixture: fixture(in: arguments), modelsMissing: arguments.contains("--models-missing"),
                   modelDownloading: arguments.contains("--model-downloading"),
                   draftGrowing: arguments.contains("--draft-growing"),
+                  draftSpeakerSuggestion: draftSpeakerSuggestion,
                   speakersReady: arguments.contains("--speakers-ready"),
                   parakeet: arguments.contains("--parakeet"),
                   notificationsDenied: arguments.contains("--notifications-denied"),
@@ -209,6 +215,9 @@ extension AppEnvironment {
                   bundledCapable: arguments.contains("--d78-capable"), bundledVerified: arguments.contains("--d78-verified"),
                   platform: arguments.contains("--ios18-platform") ? .iOS18 : LivePlatform.facts,
                   inProcess: inProcess, token: token)
+        environment.launch.badgeGallery = arguments.contains("--badge-gallery")
+        environment.launch.draftSpeakerSuggestion = draftSpeakerSuggestion
+        return environment
     }
 
     /// A separate library and preferences, a fixed clock and en_US formatting (or the region of `-AppleLocale`, for the
@@ -227,6 +236,7 @@ extension AppEnvironment {
     /// and the background runner never asks for continued processing.
     static func uiTesting(reset: Bool, seed: Seed?, openFixture: OpenFixture? = nil,
                           modelsMissing: Bool = false, modelDownloading: Bool = false, draftGrowing: Bool = false,
+                          draftSpeakerSuggestion: Bool = false,
                           speakersReady: Bool = false, parakeet: Bool = false,
                           notificationsDenied: Bool = false, heldCapture: Bool = false, region: String? = nil,
                           speechFailure: String? = nil, bundledSpeech: Bool = false, bundledCapable: Bool = false, bundledVerified: Bool = false,
@@ -243,7 +253,8 @@ extension AppEnvironment {
             .growing(TestFixtures.growingDraft, every: .milliseconds(1_200), total: TestFixtures.processingDuration)
         case .processing:
             .frozen(done: 0.62 * TestFixtures.processingDuration, total: TestFixtures.processingDuration,
-                    draft: TestFixtures.processingDraft, pace: TestFixtures.processingPace)
+                    draft: draftSpeakerSuggestion ? TestFixtures.processingSpeakerDraft : TestFixtures.processingDraft,
+                    pace: TestFixtures.processingPace)
         case .statuses:
             .frozen(done: 0.62 * TestFixtures.processingDuration, total: TestFixtures.processingDuration)
         default:
@@ -374,6 +385,7 @@ struct DefaultsModelConsent: ModelConsentRecords, @unchecked Sendable {
 extension EnvironmentValues {
     #if DEBUG
     @Entry var marksUITestLayout = false
+    @Entry var showsBadgeGallery = false
     #endif
     /// The clock dates are shown against.
     @Entry var clock: any AppClock = SystemClock()

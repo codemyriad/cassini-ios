@@ -104,7 +104,10 @@ private func rewritten(_ data: [UInt8], tags: ([String]) -> [String] = { $0 }, m
         #expect(comments(before) { $0 == "CASSINI_PAYLOAD_RAW_BYTES" } != comments(after) { $0 == "CASSINI_PAYLOAD_RAW_BYTES" })
         var expected = before.manifest!
         var renamed = expected["speakers"]!.array!
-        var first0 = renamed[0].object!; first0["label"] = .string("Anna"); renamed[0] = .object(first0)
+        var first0 = renamed[0].object!
+        first0["label"] = .string("Anna")
+        first0["provenance"] = .string("user")
+        renamed[0] = .object(first0)
         expected["speakers"] = .array(renamed)
         #expect(expected.serialized() == after.manifest?.serialized())
     }

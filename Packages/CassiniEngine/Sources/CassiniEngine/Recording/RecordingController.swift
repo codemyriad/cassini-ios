@@ -168,9 +168,19 @@ public final class RecordingController {
         publishActivity()
     }
 
-    /// Stops and saves. `title` is the field's final value; nil keeps the current one (the Live Activity's Finish).
-    public func finish(title: String? = nil) {
-        serialized { await self.end(.user, title: title) }
+    /// Stops and saves. The request enters finishing synchronously; sealing stays serialized.
+    /// `title` is the field's final value; nil keeps the captured current one (the Live Activity's Finish).
+    public func finish(title: String? = nil) { requestEnd(.user, title: title) }
+
+    /// First request wins, including a storage/microphone stop before a user Finish.
+    func requestEnd(_ stop: Stop, title: String?) {
+        guard let current = state.activeRecording else {
+            // Preserve Finish during start: it waits for the serialized start to produce an active capture.
+            if case .starting = state { serialized { await self.end(stop, title: title) } }
+            return
+        }
+        setState(.finishing(noteID: current.noteID))
+        serialized { await self.end(stop, title: title, recording: current) }
     }
 
     /// The screen has handled `ended`.

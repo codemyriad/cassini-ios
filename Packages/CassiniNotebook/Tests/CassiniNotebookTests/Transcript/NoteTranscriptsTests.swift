@@ -7,6 +7,39 @@ import Testing
 @Suite struct NoteTranscriptsTests {
     typealias F = TranscriptFixtures
 
+    @Test func anIntentionallyUnnamedSuggestedFixtureShowsTheCardButALiteralUserNameDoesNot() throws {
+        let sam = F.voice("Sam Rivera")
+        for provenance in [NoteSpeaker.Provenance.unnamed, .user] {
+            var note = Note(title: "Speaker fixture")
+            note.transcript = [.init(text: "Hello", start: 0, end: 6, speakerID: "alex"),
+                               .init(text: "Welcome", start: 6, end: 14, speakerID: "sam"),
+                               .init(text: "Thanks", start: 14, end: 24, speakerID: "alex")]
+            note.speakers = [.init(id: "alex", name: "Alex", colourIndex: 0),
+                             .init(id: "sam", name: "Sam", colourIndex: 1)]
+            // Like the UI fixture, start with named Sam. Changing only text deliberately keeps .user.
+            note.speakers?[1].name = DefaultLabels.placeholder(2, language: "en")
+            #expect(note.speakers?[1].provenance == .user)
+            note.speakers?[1].provenance = provenance
+            note.speakers?[1].match = .suggested(voice: sam.id, score: 0.78)
+            note.refreshSpeakerLabels()
+            let reloaded = try JSONDecoder().decode(Note.self, from: JSONEncoder().encode(note))
+            let transcript = NoteTranscripts.sealed(reloaded, voices: [sam],
+                suggestions: SpeakerSuggestions.of(reloaded, voices: [sam]))
+            let cards = transcript.turns.flatMap(\.allSuggestions)
+            let shownNames = transcript.turns.flatMap { [$0.name] + $0.interjections.map(\.name) }
+            if provenance == .unnamed {
+                #expect(cards.count == 1)
+                #expect(cards.first?.speakerID == "sam" && cards.first?.voiceName == "Sam Rivera")
+                #expect(transcript.speakerTints["sam"] == .stone)
+                #expect(shownNames.contains(.placeholder(2, label: "Speaker 2")))
+            } else {
+                #expect(cards.isEmpty)
+                #expect(transcript.speakerTints["sam"] == .magenta)
+                #expect(shownNames.contains(.named("Speaker 2")))
+            }
+        }
+    }
+
     // ports: NoteTranscriptsTest#sealedTurnsFollowTheSpeakersWithTintsAndPlaceholders
     @Test func sealedTurnsFollowTheSpeakersWithTintsAndPlaceholders() {
         let transcript = NoteTranscripts.sealed(F.weeklySync)
@@ -15,8 +48,8 @@ import Testing
         #expect(turns.map(\.speakerID) == ["a", "b", "c", "a"])
         #expect(turns[0].name == .named("Giulia"))
         #expect(turns[1].name == .placeholder(2, label: "Speaker 2"))
-        // Placeholders are amber and take no slot: Giulia blue, Paolo teal.
-        #expect(turns.map(\.tint) == [.blue, .amber, .teal, .blue])
+        // Unnamed speakers hide their colour but reserve their first-speech slot.
+        #expect(turns.map(\.tint) == [.blue, .stone, .cyan, .blue])
         #expect(turns[0].text == "Hello everyone.")
         #expect(turns[0].words[1].start == 0.5)
         #expect(transcript.speakers == ["a", "b", "c"])
@@ -55,7 +88,7 @@ import Testing
         let turns = NoteTranscripts.sealed(note, voices: [paolo]).turns
         #expect(!turns[2].auto)
         #expect(turns[1].name == .unknown)
-        #expect(turns[1].tint == .amber)
+        #expect(turns[1].tint == .stone)
     }
 
     // ports: NoteTranscriptsTest#theActiveWordIsTheLastWordThatStarted
@@ -99,7 +132,7 @@ import Testing
         let draft = NoteTranscripts.draft(words, tentativeFromMs: 3_600)
         let turns = draft.turns
         #expect(turns.map(\.name) == [1, 2, 3, 1].map { .placeholder($0, label: "Speaker \($0)") })
-        #expect(turns.allSatisfy { $0.tint == .amber && !$0.auto && $0.suggestion == nil })
+        #expect(turns.allSatisfy { $0.tint == .stone && !$0.auto && $0.suggestion == nil })
         #expect(turns[3].unsettledFrom == 1, "so ends after 3.6 s")
         #expect(turns[0].unsettledFrom == nil)
         #expect(draft.activeWord(at: 3.1) == WordRef(turnID: "w4", index: 0))
@@ -171,7 +204,8 @@ extension NoteTranscriptsTests {
         #expect(row.allSuggestions.map(\.speakerID) == ["ben"])
         #expect(row.allSuggestions.first?.start == 3.05)
         #expect(row.interjections.first?.name == .placeholder(2, label: "Speaker 2"))
-        #expect(row.interjections.first?.tint == .amber)
+        #expect(row.interjections.first?.tint == .stone)
+        #expect(transcript.speakerTints["ben"] == .stone)
         let ben = try #require(NamingInput.of(note, speakerID: "ben", print: nil, voices: [voice],
                                               voicesReadOnly: false, voiceModelReady: false))
         let ada = try #require(NamingInput.of(note, speakerID: "ada", print: nil, voices: [voice],
@@ -183,7 +217,8 @@ extension NoteTranscriptsTests {
         let named = NoteTranscripts.sealed(note, voices: [voice], suggestions: SpeakerSuggestions.of(note, voices: [voice]))
         #expect(named.turns[0].allSuggestions.isEmpty)
         #expect(named.speakers == ["ada", "ben"])
-        #expect(named.turns[0].interjections.first?.tint == .teal)
+        #expect(named.turns[0].interjections.first?.tint == .magenta)
+        #expect(named.speakerTints["ben"] == .magenta)
     }
 
     @Test func aRepeatedChipSpeakerGetsOneSealedCardAndItsLatestDraftCard() throws {
@@ -224,5 +259,73 @@ extension NoteTranscriptsTests {
         #expect(row.inlineSuggestions.map(\.speakerID) == ["ben"])
         #expect(row.allSuggestions.map(\.speakerID) == ["ada", "ben"])
         #expect(row.allSuggestions.map(\.start) == [3.5, 3.05])
+    }
+
+    // ports: NoteTranscriptsTest#namingQuotesUseOnlyTheSelectedSpeakersFirstSpeechInBothTranscriptForms
+    @Test func namingQuotesUseOnlyTheSelectedSpeakersFirstSpeechInBothTranscriptForms() throws {
+        let sealed = NoteTranscripts.sealed(F.weeklySync)
+        #expect(sealed.namingQuote("a") == "Hello everyone.")
+        #expect(sealed.namingQuote("b") == "Welcome")
+        #expect(sealed.namingQuote("c") == "Here")
+        #expect(sealed.namingQuote("missing") == "")
+
+        let giulia = try #require(NamingInput.of(F.weeklySync, speakerID: "a", print: nil, voices: [],
+                                                 voicesReadOnly: false, voiceModelReady: false))
+        #expect(giulia.quote == "Hello everyone.")
+
+        let draftWords = F.words.map { DraftWord(speaker: $0.speaker!, startMs: Int64($0.startMs), endMs: Int64($0.endMs), text: $0.text) }
+        let draft = NoteTranscripts.draft(draftWords, tentativeFromMs: 3_600)
+        #expect(draft.namingQuote("a") == "Hello everyone.")
+        #expect(draft.namingQuote("b") == "Welcome")
+        #expect(draft.namingQuote("c") == "Here")
+
+        // Inline overlap-chip speaker: quote extracts only ben's spoken words, never synthetic "(Name: …)" labels.
+        let vector = try D84IntegrationVector.load("acknowledgment")
+        var overlapNote = Note(title: "Overlap")
+        overlapNote.transcript = TranscriptSegment.segments(of: vector.words)
+        overlapNote.speakers = [.init(id: "ada", name: "Ada"), .init(id: "ben", name: "Speaker 2")]
+        let overlap = NoteTranscripts.sealed(overlapNote)
+        #expect(overlap.namingQuote("ben") == "Sounds good.")
+        #expect(!overlap.namingQuote("ada").contains("Sounds good"))
+
+        // Byte-distinct canonical-equivalent speaker IDs ("e\u{0301}" vs "\u{00E9}") never cross-contaminate quotes.
+        let decomposed = "e\u{0301}", precomposed = "\u{00E9}"
+        var canonical = Note(title: "Canonical IDs")
+        canonical.speakers = [.init(id: decomposed, name: "One"), .init(id: precomposed, name: "Two")]
+        canonical.transcript = [.init(text: "First speaker.", start: 0, end: 1, speakerID: decomposed),
+                                .init(text: "Second speaker.", start: 2, end: 3, speakerID: precomposed)]
+        let canonicalTranscript = NoteTranscripts.sealed(canonical)
+        #expect(canonicalTranscript.namingQuote(decomposed) == "First speaker.")
+        #expect(canonicalTranscript.namingQuote(precomposed) == "Second speaker.")
+    }
+
+    // ports: NoteTranscriptsTest#namingQuotesBoundLongSpeechAndNeverSplitASurrogatePair
+    @Test func namingQuotesBoundLongSpeechAndNeverSplitASurrogatePair() {
+        let fortyOne = (1...41).map { i in F.W("a", i * 100, i * 100 + 80, "w\(i)") }
+        let expectedForty = (1...40).map { "w\($0)" }.joined(separator: " ") + "…"
+        #expect(NoteTranscripts.sealed(F.note(fortyOne)).namingQuote("a") == expectedForty)
+
+        let surrogateToken = String(repeating: "x", count: 239) + "😀more"
+        let surrogateQuote = NoteTranscripts.sealed(F.note([F.W("a", 0, 100, surrogateToken)])).namingQuote("a")
+        #expect(surrogateQuote == String(repeating: "x", count: 239) + "…")
+        #expect(!surrogateQuote.utf16.contains { (0xD800...0xDFFF).contains($0) })
+
+        // Multi-scalar grapheme cluster ("👍🏽" = 4 UTF-16 units) at the 240-UTF-16 limit is dropped whole, never split.
+        let modifierToken = String(repeating: "x", count: 238) + "👍🏽more"
+        let modifierQuote = NoteTranscripts.sealed(F.note([F.W("a", 0, 100, modifierToken)])).namingQuote("a")
+        #expect(modifierQuote == String(repeating: "x", count: 238) + "…")
+
+        #expect(NoteTranscripts.sealed(Note(title: "Empty")).namingQuote("a") == "")
+    }
+
+    @Test func namingQuoteStopsAtFirstContiguousRunOnLargeTranscript() {
+        let words: [F.W] = (0..<6_000).map { index in
+            let speaker = index < 4 ? "a" : (index < 5_996 ? "b" : "a")
+            return F.W(speaker, index * 200, index * 200 + 150, "w\(index)")
+        }
+        let transcript = NoteTranscripts.sealed(F.note(words))
+        let expectedB = (4..<44).map { "w\($0)" }.joined(separator: " ") + "…"
+        #expect(transcript.namingQuote("a") == "w0 w1 w2 w3")
+        #expect(transcript.namingQuote("b") == expectedB)
     }
 }

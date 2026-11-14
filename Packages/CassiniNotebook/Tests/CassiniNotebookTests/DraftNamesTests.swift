@@ -30,7 +30,7 @@ import Testing
         let draft = DraftNames(labels: ["s1": "Élodie"], merges: ["s4": "s1"], remembered: ["s1": .saved(anna)],
                                automatic: ["s2": "Luca"], generation: 3,
                                live: ["s1": confirmed(anna, 0.61), "s2": auto(luca, 0.83), "s3": suggested(paolo)],
-                               rejected: ["s3": [luca, anna]])
+                               rejected: ["s3": [luca, anna]], colourIndices: ["s1": 0, "s2": 1], explicitNames: ["s1"])
         let object = try json(draft)
         #expect(Set(object.keys) == DraftNames.keys.union(DraftNames.optionalKeys))
         #expect(try roundTrip(draft) == draft)
@@ -248,10 +248,10 @@ import Testing
         #expect(!after.openForLive("s"))
     }
 
-    // ports: CheckpointNamesTest#aBlankOrPlaceholderNameReturnsToTheDefault
-    @Test func aBlankOrPlaceholderNameReturnsToTheDefault() {
+    // L-41: explicit placeholder-looking names are names; only a blank returns to the default.
+    @Test func aBlankNameReturnsToTheDefault() {
         let draft = empty.rename("s", "Giulia").remember("s", .new, generation: 0)
-        for name in ["", "   ", "Speaker 3", "Voce 2"] {
+        for name in ["", "   "] {
             let after = draft.rename("s", name)
             #expect(after.labels["s"] == nil, "\(name)")
             #expect(after.remembered["s"] == nil, "\(name)")
@@ -333,6 +333,6 @@ import Testing
         let draft = try empty.applyLive(["a": auto(luca)], names: names).confirm("b", voice: anna, name: "Anna", generation: 0, score: 0.7)
             .reject("c", voice: paolo).merge("d", into: "b")
         #expect(draft.forgettingEveryone(generation: 3)
-                == DraftNames(labels: ["b": "Anna"], merges: ["d": "b"], generation: 3))
+                == DraftNames(labels: ["b": "Anna"], merges: ["d": "b"], generation: 3, explicitNames: ["b"]))
     }
 }

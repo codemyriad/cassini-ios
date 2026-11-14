@@ -7,8 +7,8 @@ Neither route signs on the rented Mac/pool runners. Both controller and archive 
 No scheduler or runner is installed merely by merging this PR. Activation requires the coordinator’s explicit go-ahead.
 
 Existing manual archive/export, GUI/keychain, Apple upload/processing and internal `cassini` group are reused.
-The added pipeline selects current `main`, requires the newest exact-head main CI run from this repository's push/workflow_dispatch events to be successful, and reports
-unchanged/red/pending main as a skip. Every push to main runs CI; only pull requests retain path filters. After archive it checks main/CI again before upload. A private local mutex
+The added pipeline admits current `main` at slot start, waits up to 45 minutes if the newest exact-head main CI run from this repository's push/workflow_dispatch/schedule events is still in progress, and reports
+unchanged, red, or timed-out main CI as a skip. Every push to main and nightly schedule runs CI; only pull requests retain path filters. After archive and validation it publishes the admitted SHA even if `main` fast-forwarded during the build, provided the admitted SHA remains an ancestor of canonical `main` and its latest CI is still green. A private local mutex
 serializes calendar/manual calls; only archive/export hold `~/.cassini-heavy.lock`. Resource/keychain checks happen
 inside that lock. A locked keychain fails with the exact Keychain Access unlock instruction; no identity is changed.
 
@@ -25,8 +25,7 @@ in the artifacts. Sanitization is also applied when finalizing a pre-existing pe
 Export is **Internal**, `testFlightInternalTestingOnly=true`. Archive/export signatures, both bundle versions,
 certificate continuity, memory entitlement, Whistle pins/runtime identity and embedded minimum OS are checked.
 The controller validates the IPA hash again before upload. Frozen archive checkouts verify their immutable HEAD
-and cleanliness, while the controller handles canonical-main freshness immediately before upload; shared remote
-ref updates cannot invalidate an otherwise unchanged archive checkout. No App Store submission, public release, external group,
+and cleanliness, while the controller verifies immediately before upload that the admitted SHA is still an ancestor of canonical `main` and its CI remains green; normal fast-forwards on `main` during archive or validation never discard a valid admitted build. No App Store submission, public release, external group,
 tester membership, production metadata, key import/unlock or signing identity edit is implemented.
 
 Apple processing uses `altool --build-status --wait`, bounded by an outer hang guard. No sleep/poll loop or upload
@@ -34,7 +33,15 @@ retry is implemented. Upload stdout and stderr are logged separately; JSON is pa
 A delivery UUID in JSON is optional, with an explicit stderr Delivery UUID fallback. If neither is present after a
 successful upload, processing is awaited by app/version/build in the same run. No accepted upload fails merely
 because altool changed its optional JSON metadata shape. Before upload, durable intent is written; ambiguous interruption never resubmits that build.
-The next invocation can finish the existing upload after Apple processing. State advances only after Apple confirms
+The next invocation can finish the existing upload after Apple processing.
+Apple often reports a processed build as VALID some minutes before it is in internal testing: its internal state is
+still `PROCESSING` or `READY_FOR_BETA_TESTING`. Only those two states are a wait; any other state that is not
+`IN_BETA_TESTING` (missing export compliance, compliance review, a processing exception, expired, or one this tool
+does not know) is reported as a failure with Apple's word for it at every wake, and the upload stays pending until
+someone resolves it. A wait is not a failure:
+the slot logs that the build is uploaded and waiting, keeps the intent, and the hourly wake between slots finishes
+it (internal-testing check, then the notes) without fetching, updating the control clone, archiving or uploading.
+While an upload waits, no new build is started. State advances only after Apple confirms
 VALID/unexpired, INTERNAL_ONLY, IN_BETA_TESTING and the existing group's automatic access, and beta notes are written.
 If a prior intent has no identifiable Apple build, inspect its retained upload log before manually reconciling state;
 never clear intent merely to retry an upload. Failed archive numbers remain reserved; later numbers may have gaps.
@@ -75,6 +82,14 @@ fetch/fast-forward. When it updates itself, it execs the current controller with
 file descriptor, so no manual release can enter during deployment. Non-slot hours and busy release slots do not
 touch the clone or shared refs. The private lock-transfer CLI options are implementation details, not operator flags.
 
+The LaunchAgent enters `run-in-gui.py` first. An Aqua LaunchAgent by itself does not inherit Terminal's removable-
+volume permission: the controller creates external outputs before the archive worker starts. The existing GUI tmux
+server must therefore supply Terminal's approved context to the whole scheduled controller. No new permission or
+signing identity is created. `CASSINI_RELEASE_STDERR_RELAY=1` applies only inside this launchd bridge: stderr is
+forwarded to the coordinator inbox, so the controller does not append the same failure a second time. Direct manual
+runs keep their normal notification path. Prove activation by starting a no-upload audit through launchd itself;
+a shell/guirun-only dry run cannot establish the LaunchAgent's volume access.
+
 For manual dispatch, register a drmeyers-only Actions runner with label `cassini-ios-release-drmeyers`; this exclusive
 label is intentionally absent from general pool selectors. Restrict its runner group to this repository/workflow.
 Keep its service in the logged-in user context with Homebrew tools on PATH. Do not attach this label to any rented Mac.
@@ -89,7 +104,7 @@ No live launchd job, signing runner, notification watcher or upload has been act
 
 ## Validation
 
-`/usr/bin/python3 scripts/test-daily-testflight.py` tests DST slots, paginated push/manual CI provenance (excluding PR/fork runs), sanitized Unicode/UTF-16 notes, version-specific numbering,
+`/usr/bin/python3 scripts/test-daily-testflight.py` tests DST slots, paginated push/manual/scheduled CI provenance (excluding PR/fork runs), sanitized Unicode/UTF-16 notes, version-specific numbering,
 failed reservations, durable intent before upload, no duplicate on an ambiguous upload, resumed finalization,
 internal-only guards, JWT redaction and scheduler/workflow routing without network, signing, GUI or simulators.
 `test-testflight-archive.py` uses real temporary linked Git worktrees to verify shared-ref advances are harmless

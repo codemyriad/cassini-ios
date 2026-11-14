@@ -2,13 +2,7 @@ import SwiftUI
 import CassiniNotebook
 
 extension SpeakerTint {
-    /// The speaker label's colour, from the speaker tints of the palette.
-    var color: Color {
-        switch self {
-        case .blue: Color.speakerTints[1]
-        case .teal: Color.speakerTints[5]
-        case .violet: Color.speakerTints[3]
-        case .amber: Color.speakerTints[4]
-        }
-    }
+    private var paletteIndex: Int? { Self.namedCycle.firstIndex(of: self) }
+    var color: Color { paletteIndex.map { Color.speakerTints[$0] } ?? .unnamedSpeakerTint }
+    var wash: Color { paletteIndex.map { Color.speakerWashes[$0] } ?? .unnamedSpeakerWash }
 }

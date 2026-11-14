@@ -2,7 +2,7 @@ import SwiftUI
 import CassiniEngine
 import CassiniNotebook
 
-/// The activity area at the top of the Library: the recording card, then the transcription banner.
+/// The Library retains its recording card and standalone model download banner. Meeting jobs stay in their rows.
 struct LibraryActivity: View {
     @Environment(LibraryScreenModel.self) private var model
     @Environment(Router.self) private var router
@@ -11,7 +11,7 @@ struct LibraryActivity: View {
         if let card = model.recordingCard {
             RecordingCard(card: card) { router.presentRecording() }
         }
-        if let banner = model.progress {
+        if let banner = model.progress, banner.noteID == nil {
             ProgressBannerCard(banner: banner) { model.openProgress() }
         }
     }
@@ -25,16 +25,16 @@ struct RecordingCard: View {
     var body: some View {
         Button(action: open) {
             HStack(spacing: 14) {
-                Image(systemName: card.paused ? "pause.circle" : "waveform.circle.fill").font(.title).foregroundStyle(Color.recordingAccent)
+                Image(systemName: card.paused ? "pause.circle" : "waveform.circle.fill").font(.title).foregroundStyle(Color.recordInk)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(LibraryCopy.recordingCard(card.title, paused: card.paused)).font(.headline).lineLimit(1)
-                    Text(LibraryCopy.tapToReturn).font(.caption).foregroundStyle(Color.recordingSecondary)
+                    Text(LibraryCopy.tapToReturn).font(.caption).foregroundStyle(Color.muted)
                 }
                 Spacer(minLength: 8)
                 Text(TimeText.clock(card.elapsed)).font(.body.monospacedDigit())
             }
-            .foregroundStyle(Color.recordingText).padding(18)
-            .background(Color.recordingBackground, in: RoundedRectangle(cornerRadius: Radius.card))
+            .foregroundStyle(Color.ink).padding(18)
+            .background(Color.surface, in: RoundedRectangle(cornerRadius: Radius.card))
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
@@ -96,8 +96,8 @@ struct CaptureBar: View {
 
     var body: some View {
         ViewThatFits(in: .horizontal) {
-            HStack(spacing: 18) { importButton(collapsed: false); recordButton }
-            HStack(spacing: 12) { importButton(collapsed: true); recordButton }
+            HStack(spacing: 18) { importButton(collapsed: false); Spacer(minLength: 8); recordButton }
+            HStack(spacing: 12) { importButton(collapsed: true); Spacer(minLength: 8); recordButton }
         }
         .disabled(unavailable)
         // Pinned over the list, the bar stops growing at AX1 and shows the Large Content Viewer instead.
@@ -105,7 +105,7 @@ struct CaptureBar: View {
         .padding(.horizontal, Spacing.gutter).padding(.vertical, 14)
         .readableWidth()
         // Opaque, so its buttons keep their contrast over the list scrolling under it.
-        .background(Color.paper).overlay(alignment: .top) { Divider() }
+        .background(Color.paper)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("captureBar")
     }
@@ -113,13 +113,15 @@ struct CaptureBar: View {
     private func importButton(collapsed: Bool) -> some View {
         Button(action: importAudio) {
             if collapsed {
-                Label(LibraryCopy.importAudio, systemImage: "square.and.arrow.down")
-                    .labelStyle(.iconOnly).font(.title3.weight(.semibold))
+                Label(LibraryPhase1Copy.importAudio, systemImage: "square.and.arrow.down")
+                    .labelStyle(.iconOnly).font(.title3.weight(.semibold)).foregroundStyle(Color.ink)
                     .frame(width: 52, height: 52)
-                    .background(Color.ink.opacity(0.06), in: Circle())
+                    .background(Color.ink.opacity(0.1), in: Circle())
             } else {
-                Label(LibraryCopy.importAudio, systemImage: "square.and.arrow.down")
-                    .font(.subheadline.weight(.semibold)).fixedSize().frame(minWidth: 88, minHeight: 52)
+                Label(LibraryPhase1Copy.importAudio, systemImage: "square.and.arrow.down")
+                    .font(.subheadline.weight(.semibold)).foregroundStyle(Color.ink)
+                    .fixedSize().padding(.horizontal, 16).frame(minWidth: 88, minHeight: 52)
+                    .background(Color.ink.opacity(0.1), in: Capsule())
             }
         }
         .accessibilityHint(unavailable ? LibraryCopy.unavailableTitle : BulkTransferCopy.filter)
@@ -130,12 +132,12 @@ struct CaptureBar: View {
         let active = recording.state.activeRecording
         return Button { Task { await recording.start() } } label: {
             if let active {
-                Label(LibraryCopy.recordingButton(TimeText.clock(active.elapsed)), systemImage: "waveform").fixedSize()
+                Label(LibraryCopy.recordingButton(TimeText.clock(active.elapsed)), systemImage: "waveform").monospacedDigit().fixedSize()
             } else {
-                Label(LibraryCopy.record, systemImage: "mic.fill").fixedSize()
+                Label(LibraryPhase1Copy.record, systemImage: "mic.fill").fixedSize()
             }
         }
-        .buttonStyle(PrimaryButtonStyle())
+        .buttonStyle(RecordButtonStyle())
         .disabled(recording.isBusy)
         .accessibilityLabel(active == nil ? LibraryCopy.recordDescription : LibraryCopy.returnToRecording)
         .accessibilityHint(unavailable ? LibraryCopy.unavailableTitle : "")

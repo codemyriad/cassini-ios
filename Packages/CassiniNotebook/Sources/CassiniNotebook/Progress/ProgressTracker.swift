@@ -58,7 +58,14 @@ public struct ProgressTracker: Sendable {
             begin(start, at: nowMs)
         case .stopping:
             stopping = true
-            phase = .stopping
+            switch phase {
+            case .stopping:
+                break
+            case .transcribing(let progress, let draft):
+                phase = .stopping(StoppingProgress(progress: progress, draft: draft))
+            default:
+                phase = .stopping()
+            }
         case .ended(let ended):
             outcome = ended
             if ended == .done { publish(at: nowMs, done: true) }

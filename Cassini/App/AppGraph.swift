@@ -201,7 +201,10 @@ import CassiniNotebook
         // The models' status is read once the library is ready, without holding the launch for it.
         Task { [models = processing.models] in await models.refresh() }
         #if DEBUG
-        if let seed = environment.launch.seed { TestFixtures.prepare(seed, settings: settings, processing: processing) }
+        if let seed = environment.launch.seed {
+            TestFixtures.prepare(seed, settings: settings, processing: processing, voices: voices,
+                                 draftSpeakerSuggestion: environment.launch.draftSpeakerSuggestion)
+        }
         switch environment.launch.openFixture {
         case .note(let id): router.openNote(id)
         case .newest: if let id = library.notes.first?.id { router.openNote(id) }
@@ -253,7 +256,8 @@ import CassiniNotebook
         if let seed = environment.launch.seed, let store = library.noteStore {
             startup.register(.load) { [environment] in
                 try await TestFixtures.seed(seed, into: store, now: environment.clock.now,
-                                            recognizer: environment.transcriber.recognizer)
+                                            recognizer: environment.transcriber.recognizer,
+                                            draftSpeakerSuggestion: environment.launch.draftSpeakerSuggestion)
             }
         }
         #endif
@@ -302,6 +306,7 @@ extension View {
             #if DEBUG
             .environment(\.modelInstallRecorder, graph.environment.modelInstallRecorder)
             .environment(\.marksUITestLayout, graph.environment.launch.marksLaunchFinished)
+            .environment(\.showsBadgeGallery, graph.environment.launch.badgeGallery)
             #endif
             .environment(\.clock, graph.environment.clock)
             .environment(\.modelRoot, graph.environment.models)

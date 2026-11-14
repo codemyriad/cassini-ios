@@ -306,9 +306,11 @@ a local-only label stays as written, and unknown dates contribute only the durat
   thresholds (0.72 automatic, 0.50 suggest, 0.08 margin) and its 4 s minimum, which Remember needs too. Voices saved
   by iOS builds before this one hold WeSpeaker embeddings from FluidAudio. They are stale, and the person is named
   again in a note, as Android does for prints of another model.
-- **Automatic naming is opt-in.** Settings has "Name strong matches automatically", off by default. While it is off, a
-  suggestion reads "Is this Luca?", and the Remember subtitle says "Future notes will suggest Luca" instead of Android's
-  "will name Luca automatically".
+- **Automatic naming is opt-in.** Settings has "Name strong voice matches automatically", off by default. While it is
+  off, a suggestion reads "Is this Luca?", and the Remember this voice subtitle says "Future notes will suggest Luca.
+  The voiceprint never leaves this device." instead of promising automatic naming. When it is on, iPhone uses the shared
+  two-line copy ("Luca is named automatically next time.\nThe voiceprint stays on this iPhone.") and iPad uses the
+  device wording ("Future notes will name Luca automatically. The voiceprint never leaves this device.").
 - **Speaker model install.** The speaker models come from the pinned catalog through the shared
   `PinnedModelInstaller`, as on Android: the diarizer and CAM++ as seekable Zstandard from `dist.gocassini.com`,
   unpacked by `ZstdDecompressor` (facebook/zstd 1.5.7, the release that zstd-jni bundles). Each file is checked
@@ -841,8 +843,10 @@ These features exist only on iOS. They were kept by decision.
   words ("Português (Brasil)") and opens Cassini's page there. Android has a Phone / English / Italiano control.
   Without a choice there, Cassini follows the system's language (D50.1), using Foundation's matching:
   `LocalizationTests` checks that `pt` reads as pt-BR, pt-AO as pt-PT, es-MX as es and de as English.
-- **Copy.** Android's English is used, with "device" for "phone" ("Remember this voice on this device", "Transcribe on
-  this device", "Voiceprints stay on this device"), because Cassini also runs on iPad. Dates have Android's forms
+- **Copy.** Shared Phase 1 strings (`MeetingPhase1`) use the pinned `cassini-ux` catalog; on iPad, `.iphone` strings
+  ("The voiceprint stays on this iPhone.") fall back to `Speakers` device wording ("The voiceprint never leaves this
+  device.") because Cassini also runs on iPad, as do remaining strings derived from Android's English ("Transcribe on
+  this device", "Voiceprints stay on this device"). Dates have Android's forms
   (`DateLabels`): "Monday 5 Oct" in the Library and on the Note screen, "Deleted 2 Oct", "8 Oct, 9:41 AM", the year
   only for another year; the time of day follows the locale's 12- or 24-hour clock.
 - **Failure copy.** Each stored failure code reads as Android's `error_*`, with iOS's own limits and names (LONG: about
@@ -874,8 +878,20 @@ These features exist only on iOS. They were kept by decision.
 
 ### Look and accessibility
 
-- **Palette.** The warm iOS palette (paper, card, ink, muted, ember) stays the brand, with tone tints and speaker tints
-  added. Fonts are the system's, with Dynamic Type. `ContrastTests` follows Android's `ContrastTest`. It checks every
+- **Palette (W1 draft preview).** The pinned Cassini sheet supplies cool grey light/dark grounds, navy light
+  actions, a separate dark highlight and Record/error/status roles. `scripts/generate-brand-colors.py` turns
+  byte-identical `CassiniShared/Brand/tokens.json` into the app/widget role table and native accent asset; CI checks
+  generated output and immutable upstream bytes. All 53 roles are decided. The four desktop-only roles are listed
+  as unused by name. Resting meeting cards use the generated derived card-rest, and neutral pills and secondary
+  controls composite ink at 10% over their actual backdrop.
+  Speaker slots are stored at first speech, including unnamed speakers; naming reveals the reserved blue, magenta,
+  cyan, orange, violet or slate slot, while unnamed speakers remain stone. Saved voices keep their immutable save
+  sequence through sorting, renaming and deletion. Portable speaker hints retain those meeting slots on export/import.
+  Recording retains forced-dark brand ground, ink, secondary ink and control washes. Error washes match the Record
+  wash; section-5 catalogue banners retain their specified amber. No provisional token or legacy palette remains.
+  Fonts are system sans with Dynamic Type and tabular times. Card title/meta use headline/footnote (17/13 at default).
+  `BrandTokenTests` checks the pin, both appearances and the native accent asset. `ContrastTests` follows Android's
+  `ContrastTest`. It checks every
   pair a screen draws in light and dark (4.5:1 for text, 3:1 for large text and non-text), with tone tints composited
   over the surface under them.
 - **Wide windows.** One `ReadableWidth.content` of 560 pt, Android's `MaxContentWidth`, applies to every screen. On

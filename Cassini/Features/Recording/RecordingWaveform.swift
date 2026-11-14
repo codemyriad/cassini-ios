@@ -18,7 +18,7 @@ struct RecordingWaveform: View {
                 let barHeight = max(4, (CGFloat(min(1, max(0, level))) * (size.height - 4)).rounded())
                 let rect = CGRect(x: CGFloat(index) * (width + gap), y: (size.height - barHeight) / 2, width: width, height: barHeight)
                 let fresh = index >= count - WaveformBars.freshCount && !isPaused
-                context.fill(Path(roundedRect: rect, cornerRadius: 2), with: .color(fresh ? .recordingAccent : .white.opacity(0.28)))
+                context.fill(Path(roundedRect: rect, cornerRadius: 2), with: .color(fresh ? Color.recordingAccent : Color.recordingSecondary))
             }
         }
         .frame(height: height)

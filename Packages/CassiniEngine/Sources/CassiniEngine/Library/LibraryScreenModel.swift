@@ -363,6 +363,7 @@ private extension LibraryScreenModel {
     func scheduleSearch() {
         pendingSearch?.cancel()
         let text = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Date filters belong to typed search; clearing the text restores the unfiltered Library.
         if text.isEmpty { searchDate = .any }
         guard text != searched else { pendingSearch = nil; return }
         guard !text.isEmpty else {

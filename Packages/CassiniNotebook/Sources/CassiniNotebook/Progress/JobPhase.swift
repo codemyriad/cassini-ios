@@ -10,8 +10,24 @@ public enum JobPhase: Hashable, Sendable {
     case downloading(DownloadProgress?)
     /// The pipeline runs: the progress card and the draft transcript.
     case transcribing(RunningProgress, DraftState)
-    /// Stop was asked: the job keeps what is finalized and ends at its next result.
-    case stopping
+    /// Stop was asked: the job keeps what is finalized and ends at its next result, retaining the last live figures.
+    case stopping(StoppingProgress? = nil)
+
+    public var isStopping: Bool {
+        if case .stopping = self { return true }
+        return false
+    }
+}
+
+/// The last live progress and draft retained while a stop saves its checkpoint.
+public struct StoppingProgress: Hashable, Sendable {
+    public var progress: RunningProgress
+    public var draft: DraftState
+
+    public init(progress: RunningProgress, draft: DraftState) {
+        self.progress = progress
+        self.draft = draft
+    }
 }
 
 /// The five columns of the progress card's stepper. On iOS speakers are told apart after the words, from the whole
@@ -98,15 +114,19 @@ public struct DraftState: Hashable, Sendable {
     /// Each shown speaker's label: the user's name, else an automatic live match's name, else the placeholder
     /// ("Speaker N", numbered by first word).
     public var labels: [String: String]
+    public var colourIndices: [String: Int]
+    public var provenance: [String: NoteSpeaker.Provenance]
     /// The speakers whose label is an automatic live match's name ("auto" badge).
     public var automatic: Set<String>
     /// "Is this Luca?" for placeholder speakers with a live suggestion, in the order of their latest turn.
     public var suggestions: [DraftSuggestion]
 
     public init(words: [DraftWord], tentativeFromMs: Int64, namingOpen: Bool = false, labels: [String: String] = [:],
-                automatic: Set<String> = [], suggestions: [DraftSuggestion] = []) {
+                automatic: Set<String> = [], suggestions: [DraftSuggestion] = [],
+                colourIndices: [String: Int] = [:], provenance: [String: NoteSpeaker.Provenance] = [:]) {
         self.words = words; self.tentativeFromMs = tentativeFromMs; self.namingOpen = namingOpen
         self.labels = labels; self.automatic = automatic; self.suggestions = suggestions
+        self.colourIndices = colourIndices; self.provenance = provenance
     }
 
     public static let empty = DraftState(words: [], tentativeFromMs: 0)

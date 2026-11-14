@@ -12,26 +12,18 @@ struct RootView: View {
     @SceneStorage("navigation.path") private var savedPath: Data?
     /// The split view's columns below iOS 26 (see `body`).
     @State private var columns: NavigationSplitViewVisibility = .all
+    #if DEBUG
+    @Environment(\.showsBadgeGallery) private var showsBadgeGallery
+    #endif
 
     var body: some View {
         @Bindable var router = router
         Group {
-            if sizeClass == .regular {
-                if #available(iOS 26.0, *) {
-                    NavigationSplitView { LibraryView() } detail: { detail(path: $router.path) }
-                } else {
-                    // iPadOS 18's automatic style starts portrait with the sidebar hidden (only "Choose a recording"
-                    // and a Show Sidebar button) and lays it over the note when shown; iPadOS 26 keeps the Library
-                    // beside the note, as the README shows. Both columns and the balanced style give iPadOS 18 that
-                    // layout; the sidebar button still hides and shows the Library.
-                    NavigationSplitView(columnVisibility: $columns) { LibraryView() } detail: { detail(path: $router.path) }
-                        .navigationSplitViewStyle(.balanced)
-                }
-            } else {
-                NavigationStack(path: $router.path) {
-                    LibraryView().routeDestinations()
-                }
-            }
+            #if DEBUG
+            if showsBadgeGallery { StatusBadgeGallery() } else { navigation }
+            #else
+            navigation
+            #endif
         }
         .fullScreenCover(item: $router.fullScreen) { _ in RecordingView() }
         .trashStopConfirmation()
@@ -49,6 +41,21 @@ struct RootView: View {
         .onChange(of: sizeClass) { _, size in router.isSplit = size == .regular }
         .onChange(of: router.encodedPath) { _, path in if restoresNavigation { savedPath = path } }
         .environment(\.restoresSceneState, restoresNavigation)
+    }
+
+    @ViewBuilder private var navigation: some View {
+        @Bindable var router = router
+        if sizeClass == .regular {
+            if #available(iOS 26.0, *) {
+                NavigationSplitView { LibraryView() } detail: { detail(path: $router.path) }
+            } else {
+                // iPadOS 18 needs both columns and the balanced style to keep the Library beside the note.
+                NavigationSplitView(columnVisibility: $columns) { LibraryView() } detail: { detail(path: $router.path) }
+                    .navigationSplitViewStyle(.balanced)
+            }
+        } else {
+            NavigationStack(path: $router.path) { LibraryView().routeDestinations() }
+        }
     }
 
     private func detail(path: Binding<[Route]>) -> some View {
@@ -69,6 +76,7 @@ private struct RouteDestination: View {
 
     var body: some View {
         screen.navigationBarBackButtonHidden(router.hidesBackButton(route))
+            .toolbar(route == .library ? .hidden : .visible, for: .navigationBar)
     }
 
     @ViewBuilder private var screen: some View {

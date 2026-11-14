@@ -24,20 +24,29 @@ import CassiniNotebook
     }
 
     // ports: ProgressTrackerTest#stoppingStaysUntilTheEndAndStopsTheTicks
-    @Test func stoppingStaysUntilTheEndAndStopsTheTicks() {
+    @Test func stoppingStaysUntilTheEndAndStopsTheTicks() throws {
         var t = Tracked()
         t.send(started(totalMs: 70_000))
         t.advance(1_500)
+        t.send(.windowDone(doneMs: 10_000, totalMs: 70_000, words: words(0, 10)))
+        t.advance(1_000)
+        guard case .transcribing(let progress, let draft) = t.phase else {
+            Issue.record("Expected live transcribing phase, got \(t.phase)")
+            return
+        }
+        let expected = JobPhase.stopping(StoppingProgress(progress: progress, draft: draft))
         t.send(.stopping)
-        #expect(t.phase == .stopping)
+        #expect(t.phase == expected)
+        t.send(.stopping)
+        #expect(t.phase == expected, "duplicate stopping preserves the retained live figures")
         let reads = t.battery.reads.count
         t.send(.windowDone(doneMs: 28_000, totalMs: 70_000, words: words(0, 28)))
         t.send(.stageChanged(.saving))
         t.advance(30_000)
-        #expect(t.phase == .stopping)
+        #expect(t.phase == expected)
         #expect(t.battery.reads.count == reads)
         t.send(.ended(.paused(.user)))
-        #expect(t.phase == .stopping)
+        #expect(t.phase == expected)
         #expect(t.tracker.outcome == .paused(.user))
         #expect(!t.tracker.isTicking)
     }
@@ -48,7 +57,7 @@ import CassiniNotebook
         t.send(.stopping)
         t.send(started())
         t.advance(5_000)
-        #expect(t.phase == .stopping)
+        #expect(t.phase == .stopping())
         #expect(t.battery.reads.isEmpty)
     }
 
@@ -633,7 +642,7 @@ extension ProgressTrackerTests {
         stopped.send(.stopping)
         stopped.send(.waitingForPrevious)
         stopped.send(.downloading(checking))
-        #expect(stopped.phase == .stopping)
+        #expect(stopped.phase == .stopping())
         #expect(!stopped.tracker.isTicking)
     }
 
@@ -658,9 +667,13 @@ extension ProgressTrackerTests {
         let checking = DownloadProgress(part: .speakers, doneBytes: 0, totalBytes: 0, verifying: true)
         var stopped = Tracked()
         stopped.send(started())
+        guard case .transcribing(let progress, let draft) = stopped.phase else {
+            Issue.record("Expected live transcribing phase, got \(stopped.phase)")
+            return
+        }
         stopped.send(.stopping)
         stopped.send(.downloading(checking))
-        #expect(stopped.phase == .stopping)
+        #expect(stopped.phase == .stopping(StoppingProgress(progress: progress, draft: draft)))
         var ended = Tracked()
         ended.send(started())
         ended.send(.ended(.done))

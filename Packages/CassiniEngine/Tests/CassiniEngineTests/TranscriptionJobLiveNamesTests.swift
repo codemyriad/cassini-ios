@@ -169,10 +169,12 @@ import CassiniNotebook
         // A new process reads names.json beside the checkpoint.
         let reread = DraftNamesStore(notes: h.notes)
         #expect(reread.current(h.noteID).labels == [speakers.a: "Chiara"])
+        #expect(reread.current(h.noteID).colourIndices[speakers.a] == 0)
 
         transcriber.afterWindow = { _ in }
         #expect(await h.run().outcome == .done)
         #expect(h.host.analyses.single?.names?.labels == [speakers.a: "Chiara"])
+        #expect(h.host.analyses.single?.names?.colourIndices[speakers.a] == 0)
     }
 }
 

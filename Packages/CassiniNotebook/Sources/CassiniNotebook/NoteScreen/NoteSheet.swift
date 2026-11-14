@@ -17,8 +17,30 @@ public enum NoteSheet: Identifiable, Hashable, Sendable {
         case .speakers: "speakers"
         case .versions: "versions"
         case .documentInfo: "documentInfo"
-        case .naming(let id, _): "naming-\(id)"
+        case .naming(let id, _): "naming-\(Data(id.utf8).base64EncodedString())"
         case .editing(let segment): "editing-\(segment.id)"
+        }
+    }
+
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        switch (lhs, rhs) {
+        case (.rename(let a), .rename(let b)): a == b
+        case (.speakers, .speakers), (.versions, .versions), (.documentInfo, .documentInfo): true
+        case (.naming(let a, let firstDraft), .naming(let b, let secondDraft)):
+            Data(a.utf8) == Data(b.utf8) && firstDraft == secondDraft
+        case (.editing(let a), .editing(let b)): a == b
+        default: false
+        }
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        switch self {
+        case .rename(let draft): hasher.combine(0); hasher.combine(draft)
+        case .speakers: hasher.combine(1)
+        case .versions: hasher.combine(2)
+        case .documentInfo: hasher.combine(3)
+        case .naming(let id, let draft): hasher.combine(4); hasher.combine(Data(id.utf8)); hasher.combine(draft)
+        case .editing(let segment): hasher.combine(5); hasher.combine(segment)
         }
     }
 
