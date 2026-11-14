@@ -134,10 +134,10 @@ final class CassiniUITests: XCTestCase {
         app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed", "processing", "--open-fixture", "CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC"]
             + DeviceUnderTest.workingSpeech
         app.launchAndWait()
-        XCTAssertTrue(app.descendants(matching: .any)["progressHeadline"].waitForExistence(within: 15))
+        XCTAssertTrue(app.buttons["transcribingDetails"].waitForExistence(within: 15))
         // The seed's job reports three results a little over a second apart, and each one rebuilds an open menu, which
         // drops a tap that lands then. Its last result is 29:53 processed; after it the job is frozen.
-        XCTAssertTrue(app.staticTexts["Processed, 29:53 / 48:13"].waitForExistence(within: 15))
+        XCTAssertTrue(app.staticTexts["uiTestState-transcribingAudioDone"].waitForValue("29:53 of 48:13"))
         app.buttons["Share and more"].tap()
         app.buttons["Move to Recently Deleted"].tapWhenSettled()
         let alert = app.alerts["Stop transcription and move to Recently Deleted?"]
@@ -297,11 +297,17 @@ final class CassiniUITests: XCTestCase {
         app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed", "processing", "--open-fixture", "CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC"]
             + DeviceUnderTest.workingSpeech
         app.launchAndWait()
-        let headline = app.descendants(matching: .any)["progressHeadline"]
-        XCTAssertTrue(headline.waitForExistence(within: 15))
-        let frozen = NSPredicate(format: "label == %@", "Finding words, 50%")
-        XCTAssertTrue(headline.wait(until: frozen, within: 10), headline.label)
-        XCTAssertTrue(app.buttons["Stop and keep progress"].exists)
+        let details = app.buttons["transcribingDetails"]
+        let stop = app.buttons["transcribingStop"]
+        XCTAssertTrue(details.waitForExistence(within: 15))
+        XCTAssertTrue(app.staticTexts["uiTestState-transcribingAudioDone"].waitForValue("29:53 of 48:13"))
+        XCTAssertTrue(details.label.hasPrefix("Transcribing · "), details.label)
+        XCTAssertEqual(details.value as? String, "50%")
+        XCTAssertEqual(stop.label, "Stop and keep progress")
+        XCTAssertGreaterThanOrEqual(details.frame.height, 44 - 0.001)
+        XCTAssertGreaterThanOrEqual(stop.frame.width, 44 - 0.001)
+        XCTAssertGreaterThanOrEqual(stop.frame.height, 44 - 0.001)
+        XCTAssertFalse(details.frame.intersects(stop.frame), "the details trigger and Stop are separate 44 pt targets")
         capture("Processing")
     }
     @MainActor func testIPadShowsTheLibraryBesideTheNote() throws {

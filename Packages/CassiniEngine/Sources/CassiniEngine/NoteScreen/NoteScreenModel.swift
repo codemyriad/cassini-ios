@@ -170,8 +170,9 @@ public final class NoteScreenModel {
     /// A Cassini document is being prepared.
     public private(set) var exportingDocument = false
     public var showBookmarks = false
-    /// The saved progress of a stopped or failed job, for its read-only draft.
+    /// The saved progress of a stopped, failed, queued or resuming job, for its read-only draft.
     public private(set) var savedDraft: [DraftWord] = []
+    @ObservationIgnored private var retainedWords: [DraftWord] = []
     /// The speaker models are installed: Transcribe again says "Speaker names carry over."
     public private(set) var speakerModelsReady = false
     /// The draft's names (`names.json`), while the screen is shown.
@@ -417,12 +418,27 @@ public final class NoteScreenModel {
         // Read the observable inputs before checking the cache, preserving SwiftUI's dependency registrations.
         let voiceNames = Dictionary(ports.savedVoices().map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
         let names = draftNames
+        let currentJob = ports.job(noteID)
+        let currentNote = ports.note(noteID)
+        let modeShowsDraft = currentJob.map { job in
+            currentNote.map { NoteMode.of($0, job: job).showsDraft } ?? (job.state != .needsConsent)
+        } ?? false
         let raw: DraftState
         if let running = ports.runningDraft(noteID) {
+            retainedWords = running.words
             raw = running
-        } else if !savedDraft.isEmpty {
+        } else if modeShowsDraft, !savedDraft.isEmpty {
             raw = DraftState(words: savedDraft, tentativeFromMs: .max, namingOpen: ports.draftNamingOpen(noteID))
+        } else if modeShowsDraft, let doneMs = currentJob?.doneMs, doneMs > 0, !retainedWords.isEmpty {
+            let kept = retainedWords.filter { $0.endMs <= doneMs }
+            guard !kept.isEmpty else {
+                mappedDraftKey = nil
+                mappedDraft = nil
+                return nil
+            }
+            raw = DraftState(words: kept, tentativeFromMs: .max, namingOpen: ports.draftNamingOpen(noteID))
         } else {
+            if !modeShowsDraft { retainedWords = [] }
             mappedDraftKey = nil
             mappedDraft = nil
             return nil
@@ -533,11 +549,29 @@ public final class NoteScreenModel {
         run(start.effect)
     }
 
-    /// Reads a stopped or failed job's saved progress for its draft; any other job shows none.
+    /// What the saved-draft reload task follows: reloads once per job or state transition, and on `doneMs` changes only
+    /// when `.paused` or `.failed` (never per checkpoint while queued or running).
+    public var savedDraftKey: String {
+        job.map { "\($0.id)-\($0.state)-\($0.state == .paused || $0.state == .failed ? $0.doneMs : 0)" } ?? "none"
+    }
+
+    /// Reads a stopped, failed, or checkpoint-backed queued/resuming job's saved progress for its draft; a running job
+    /// with a live draft keeps the current `savedDraft`, and a fresh queued job (`doneMs == 0`), a consent prompt, or a
+    /// finished note loads none.
     public func loadSavedDraft() async {
-        let stopped = job.map { $0.state == .paused || $0.state == .failed } == true
-        let draft = stopped ? await ports.savedDraft(noteID) : []
-        if !Task.isCancelled { savedDraft = draft }
+        guard ports.runningDraft(noteID) == nil else { return }
+        let shouldLoad: Bool = switch job?.state {
+        case .paused?, .failed?:
+            true
+        case .queued?, .running?:
+            (job?.doneMs ?? 0) > 0
+        case .needsConsent?, nil:
+            false
+        }
+        let draft = shouldLoad ? await ports.savedDraft(noteID) : []
+        guard !Task.isCancelled, ports.runningDraft(noteID) == nil else { return }
+        savedDraft = draft
+        if !shouldLoad || draft.isEmpty { retainedWords = draft }
     }
 
     // MARK: Follow
