@@ -1,9 +1,25 @@
 import AVFoundation
 import Foundation
+import CassiniEngineTesting
 import Testing
 @testable import CassiniInference
 
 @Suite struct WhistleAudioReaderTests {
+    @Test(arguments: [48_000, 44_100]) func nativeFLACResamplesForTranscription(rate: Int) throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".flac")
+        defer { try? FileManager.default.removeItem(at: url) }
+        try FLACFixtures.native(rate: rate).write(to: url)
+        let reader = try WhistleAudioReader(url: url, position: 0)
+        var count = 0
+        while let block = try reader.next() { count += block.count }
+        #expect(count == FLACFixtures.samples * 48_000 / rate)
+        #expect(reader.position == FLACFixtures.samples)
+        for bytes in FLACFixtures.invalid {
+            try bytes.write(to: url)
+            #expect(throws: (any Error).self) { try WhistleAudioReader(url: url, position: 0) }
+        }
+    }
+
     @Test(arguments: [16_000, 44_100, 48_000], [false, true])
     func resumedBlocksAreExactlyTheSameAfterSeeking(rate: Int, compressed: Bool) throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)

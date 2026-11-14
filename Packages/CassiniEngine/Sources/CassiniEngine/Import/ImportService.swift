@@ -46,7 +46,7 @@ public struct ImportService: Sendable {
 
     private func importFile(_ url: URL, fallbackTitle: String, displayName: String?, archiveMember: Bool) async throws -> ImportOutcome {
         let name = displayName ?? url.lastPathComponent
-        guard archiveMember ? ArchiveAudio.supports(name) : ImportPolicy.accepts(filename: name) else { return .rejected(.cannotOpen) }
+        guard archiveMember ? ArchiveAudio.supports(name) : (ImportPolicy.accepts(filename: name) || url.pathExtension.isEmpty) else { return .rejected(.cannotOpen) }
         let id = UUID()
         let folder = notes.directory(for: id)
         do {

@@ -1,5 +1,6 @@
 import AVFoundation
 import Foundation
+import CassiniEngineTesting
 import Speech
 import Testing
 @testable import CassiniInference
@@ -7,6 +8,23 @@ import Testing
 /// `FileReader` over generated WAV and CAF files: the resume offset, the recording-clock time of the first block, block reading,
 /// conversion, the end of the file and a file cut short.
 @Suite struct FileReaderTests {
+    @Test(arguments: [48_000, 44_100]) func nativeFLACReachesTheEndForAppleAndParakeet(rate: Int) throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".flac")
+        defer { try? FileManager.default.removeItem(at: url) }
+        try FLACFixtures.native(rate: rate).write(to: url)
+        let output = try #require(AVAudioFormat(standardFormatWithSampleRate: 16_000, channels: 1))
+        let reader = try FileReader(url: url, from: 0, to: output, downmix: true)
+        var count = 0
+        while let block = reader.nextBuffer() { count += Int(block.0.frameLength) }
+        #expect(abs(count - FLACFixtures.samples * 16_000 / rate) <= 1)
+        #expect(reader.reachedEnd)
+        #expect(reader.failure == nil)
+        for bytes in FLACFixtures.invalid {
+            try bytes.write(to: url)
+            #expect(throws: (any Error).self) { try FileReader(url: url, from: 0, to: output) }
+        }
+    }
+
     private let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     private let rate = 16_000.0
 

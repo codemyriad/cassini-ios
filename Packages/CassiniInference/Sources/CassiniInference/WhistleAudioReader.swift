@@ -1,5 +1,6 @@
 import AVFoundation
 import CassiniEngine
+import CassiniCore
 
 /// One-second reads anchored to source frames. Each block primes the file decoder and, when needed, its
 /// rate converter with the same bounded context on a fresh run and on resume. The converter itself cannot
@@ -15,6 +16,7 @@ final class WhistleAudioReader {
     private(set) var position: Int64
 
     init(url: URL, position: Int64, onRead: (@Sendable (Range<Int64>) -> Void)? = nil) throws {
+        try NativeFLAC.validateIfPresent(url)
         self.onRead = onRead
         file = try AVAudioFile(forReading: url, commonFormat: .pcmFormatFloat32, interleaved: false)
         let hz = file.processingFormat.sampleRate

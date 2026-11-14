@@ -7,6 +7,7 @@ public struct AudioInspection: Sendable {
     public let waveform: [Float]
     public static func inspect(_ url: URL, onWindow: (@Sendable () throws -> Void)? = nil) async throws -> AudioInspection {
         try await CancellableFileWork.run(priority: .utility) {
+            try NativeFLAC.validateIfPresent(url)
             let file = try AVAudioFile(forReading: url)
             guard file.length > 0, file.processingFormat.sampleRate > 0 else { throw AudioError.empty }
             let duration = Double(file.length) / file.processingFormat.sampleRate
@@ -43,6 +44,7 @@ public enum AudioArchive {
     /// Writes `source` as M4A to `destination`, replacing a copy an earlier, unfinished attempt left there.
     public static func compress(source: URL, destination: URL) async throws {
         if FileManager.default.fileExists(atPath: destination.path) { try FileManager.default.removeItem(at: destination) }
+        try await CancellableFileWork.run { _ = try NativeFLAC.validateIfPresent(source) }
         let asset = AVURLAsset(url: source)
         guard let export = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetAppleM4A) else {
             throw AudioError.unreadable
@@ -56,7 +58,7 @@ public enum AudioError: LocalizedError {
     public var errorDescription: String? {
         switch self {
         case .empty: "This audio file is empty. Choose a recording with audio."
-        case .unreadable: "This audio format could not be opened. Try M4A, WAV, MP3, AIFF, or CAF."
+        case .unreadable: "This audio format could not be opened. Try Opus/Ogg, M4A, WAV, MP3, or FLAC."
         case .microphoneDenied: "Microphone access is off. Enable it for Cassini in Settings to record."
         case .noInput: "No microphone is available. Connect an audio input and try again."
         case .startFailed: "The microphone could not start. Check your audio connection and try again."

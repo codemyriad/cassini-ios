@@ -59,12 +59,12 @@ The Whistle fallback notice (#117) is vendored from cassini-ux `7cdb069fb0b71953
 `models.parakeetUltra.noteFallback`, in `Notices.xcstrings` with all six locales, every value as in the catalog.
 The entries above stay at their pins; no shared source was edited.
 
-D-1029 adds `common.tryAgain` to the generated Library selection; the current shared pin already includes every
-import-card label, so the strings pin does not change. `scripts/import-contract.py --update <cassini-ux checkout>`
+D-1029 adds `common.tryAgain` to the generated Library selection. D-1052 advances the shared pin to include the
+current catalog and keeps all implemented import-card labels. `scripts/import-contract.py --update <cassini-ux checkout>`
 vendors `contract/import-types.json` from that checkout’s immutable `origin/main` and records its SHA-256 in
 `contracts/import-types/UPSTREAM.json`. It also generates the Open-with UTI list. `check-strings.sh` verifies both.
 D-1029 requires an actual Ogg Opus header for `.opus` / `.ogg`, tightening the earlier Android-compatible rule that
-allowed arbitrary decodable audio under `.opus`. iOS continues to decode MP3, M4A and PCM/float WAV using AVFoundation.
+allowed arbitrary decodable audio under `.opus`. iOS continues to decode MP3, M4A, native FLAC and PCM/float WAV using AVFoundation.
 
 Wave 5 first-run hero and backup-gated privacy copy (`D-974`, `L-27`, `D98`) is pinned to `codemyriad/cassini-ux`
 `b26190b57d8e35391ba9b4bafd177d66b10f0ec3`, `strings/strings.json` (SHA-256
@@ -104,3 +104,6 @@ Wave 6 (`D-979`, supersedes #120) shares the Wave 5 source pin
 `contracts/wave5-strings/strings.json`. `generate-wave6-strings.py` selects iOS backup and voice wording,
 with all six translations verbatim in `Wave6.xcstrings`; Android-only exclusion claims are deliberately omitted.
 The global catalog and generated Phase 2 subsets retain the current main-branch pins described above.
+
+D-1052 pins the native FLAC import contract (v2026-11-14.3) to the same immutable source as the complete
+shared catalog above. Native FLAC is validated before import and again before decoding or transcription.

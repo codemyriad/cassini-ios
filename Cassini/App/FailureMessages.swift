@@ -8,7 +8,7 @@ import CassiniNotebook
 extension JobFailure {
     var transcriptionMessage: String {
         switch self {
-        case .open: String(localized: "This audio could not be opened. Try M4A, WAV, MP3, AIFF, or CAF.", table: "Failures")
+        case .open: String(localized: "This audio could not be opened. Try Opus/Ogg, M4A, WAV, MP3, or FLAC.", table: "Failures")
         case .save: String(localized: "The transcript could not be saved.", table: "Failures")
         case .space: String(localized: "Your device is running low on storage. Free up space, then try again.", table: "Failures")
         case .long:
@@ -18,7 +18,7 @@ extension JobFailure {
         case .empty: String(localized: "This recording contains no audio samples.", table: "Failures")
         case .large: String(localized: "This file is too large. Choose a file under 4 GB.", table: "Failures")
         case .audio: String(localized: "Could not read this audio. The original file has been kept.", table: "Failures")
-        case .wav: String(localized: "Use a 16-bit PCM WAV, or try M4A, MP3, AIFF, or CAF.", table: "Failures")
+        case .wav: String(localized: "Use a 16-bit PCM WAV, or try Opus/Ogg, M4A, MP3, or FLAC.", table: "Failures")
         case .stalled: String(localized: "Audio decoding stalled. Try another file.", table: "Failures")
         case .timings: String(localized: "Word timing could not be read. Try transcribing again.", table: "Failures")
         case .modelDownload: String(localized: "Model download failed. Check your connection and retry.", table: "Failures")

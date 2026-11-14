@@ -1,4 +1,5 @@
 import AVFoundation
+import CassiniCore
 import CassiniNotebook
 
 /// Reads an audio file from a start offset and converts it block by block. Only one consumer calls `nextBuffer()`, one
@@ -32,6 +33,7 @@ final class FileReader: @unchecked Sendable {
     /// `downmix` averages the channels of a file with more channels than `format` (Parakeet hears one); otherwise
     /// the converter's own channel map applies.
     init(url: URL, from offset: TimeInterval, to format: AVAudioFormat, downmix: Bool = false) throws {
+        try NativeFLAC.validateIfPresent(url)
         file = try AVAudioFile(forReading: url)
         let rate = file.processingFormat.sampleRate
         duration = Double(file.length) / rate

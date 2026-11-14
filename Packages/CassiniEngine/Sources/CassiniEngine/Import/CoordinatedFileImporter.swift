@@ -4,6 +4,7 @@ import CassiniNotebook
 import CryptoKit
 import Foundation
 import Synchronization
+import UniformTypeIdentifiers
 
 /// Copies a file another app offered (the picker, Files, a share) into the library, as Android's `ImportRepository.copy`.
 ///
@@ -141,9 +142,15 @@ private struct Copy {
         try check(expectedSize, space: true)
         // Admission uses the caller's name, even if a file provider coordinates a different temporary URL.
         // ZIP restoration additionally admits legacy audio containers, still inspected before publication.
-        if ImportPolicy.accepts(filename: name) {
+        let admissionName = (name as NSString).pathExtension.isEmpty ? name + ".flac" : name
+        if ImportPolicy.accepts(filename: admissionName) {
             let header = try input.read(upToCount: ImportPolicy.probeBytes) ?? Data()
-            try ImportPolicy.validate(header: header, filename: name, fileBytes: expectedSize)
+            let type = try? source.resourceValues(forKeys: [.contentTypeKey]).contentType
+            // Generic data hints carry no audio claim; concrete MIME hints must agree with native FLAC.
+            let mime = type?.preferredMIMEType
+            try ImportPolicy.validate(header: header, filename: admissionName, fileBytes: expectedSize,
+                                      typeIdentifier: type?.identifier,
+                                      mimeType: mime == "application/octet-stream" ? nil : mime)
             try input.seek(toOffset: 0)
         } else if archiveMember {
             guard ArchiveAudio.supports(name) else { throw FileImportError.cannotOpen }
@@ -174,6 +181,12 @@ private struct Copy {
         }
         if total != expectedSize { throw FileImportError.cannotOpen }
         if cancel.isCancelled { throw CancellationError() }
+        do {
+            try NativeFLAC.validateIfPresent(destination) {
+                if cancel.isCancelled { throw CancellationError() }
+            }
+        } catch is CancellationError { throw CancellationError() }
+        catch { throw FileImportError.cannotOpen }
         do { try output.synchronize() } catch { throw lowSpace(expectedSize, total) ?? FileImportError.cannotOpen }
         return (hasher.finalize().map { String(format: "%02x", $0) }.joined(), total)
     }
