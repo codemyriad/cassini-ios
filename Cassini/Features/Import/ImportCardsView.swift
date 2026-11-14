@@ -18,7 +18,7 @@ struct ImportCardView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(card.displayName).font(.system(size: 17, weight: .semibold)).foregroundStyle(Color.ink)
+            Text(card.displayName).font(.headline).foregroundStyle(Color.ink)
             HStack {
                 StatusPill(text: StatusBadgeCopy.template(card.failure == nil ? "states.badge.importing" : "states.badge.needsAttention"),
                            glyph: card.failure == nil ? .spinner : .symbol("exclamationmark.circle"),

@@ -88,7 +88,7 @@ private struct Copy {
     /// Streams `source` to `destination`; the limits are enforced as it goes.
     func run(from source: URL, size: Int64?, to destination: URL, name: String) throws -> ImportedFile {
         do {
-            let (sha256, bytes) = try stream(from: source, size: size, to: destination)
+            let (sha256, bytes) = try stream(from: source, size: size, to: destination, name: name)
             return ImportedFile(displayName: name, byteCount: bytes, sha256: sha256)
         } catch {
             try? FileManager.default.removeItem(at: destination)
@@ -96,7 +96,7 @@ private struct Copy {
         }
     }
 
-    private func stream(from source: URL, size: Int64?, to destination: URL) throws -> (String, Int64) {
+    private func stream(from source: URL, size: Int64?, to destination: URL, name: String) throws -> (String, Int64) {
         let input: FileHandle
         do { input = try FileHandle(forReadingFrom: source) } catch { throw FileImportError.cannotOpen }
         defer { try? input.close() }
@@ -105,16 +105,17 @@ private struct Copy {
         let expectedSize = Int64(clamping: try input.seekToEnd())
         try input.seek(toOffset: 0)
         try check(expectedSize, space: true)
+        // Admission uses the caller's name, even if a file provider coordinates a different temporary URL.
         // ZIP is the existing bulk-transfer container; each extracted member retains its contract extension.
-        if ImportPolicy.accepts(filename: source.lastPathComponent) {
+        if ImportPolicy.accepts(filename: name) {
             let header = try input.read(upToCount: ImportPolicy.probeBytes) ?? Data()
-            try ImportPolicy.validate(header: header, filename: source.lastPathComponent, fileBytes: expectedSize)
+            try ImportPolicy.validate(header: header, filename: name, fileBytes: expectedSize)
             try input.seek(toOffset: 0)
-        } else if source.pathExtension.lowercased() != "zip" {
+        } else if (name as NSString).pathExtension.lowercased() != "zip" {
             throw FileImportError.cannotOpen
         }
         guard FileManager.default.createFile(atPath: destination.path, contents: nil),
-              let output = try? FileHandle(forWritingTo: destination) else { throw lowSpace(size, 0) ?? FileImportError.cannotOpen }
+              let output = try? FileHandle(forWritingTo: destination) else { throw lowSpace(expectedSize, 0) ?? FileImportError.cannotOpen }
         defer { try? output.close() }
         var hasher = SHA256()
         var total: Int64 = 0
@@ -123,21 +124,21 @@ private struct Copy {
             if cancel.isCancelled { throw CancellationError() }
             let chunk: Data
             do { chunk = try input.read(upToCount: CoordinatedFileImporter.bufferBytes) ?? Data() } catch {
-                throw lowSpace(size, total) ?? FileImportError.cannotOpen
+                throw lowSpace(expectedSize, total) ?? FileImportError.cannotOpen
             }
             guard !chunk.isEmpty else { break }
             total += Int64(chunk.count)
             if total > maxBytes { throw FileImportError.tooLarge }
             if total >= nextSpaceCheck {
                 nextSpaceCheck += CoordinatedFileImporter.spaceCheckBytes
-                if let low = lowSpace(size, total) { throw low }
+                if let low = lowSpace(expectedSize, total) { throw low }
             }
             hasher.update(data: chunk)
-            do { try output.write(contentsOf: chunk) } catch { throw lowSpace(size, total) ?? FileImportError.cannotOpen }
+            do { try output.write(contentsOf: chunk) } catch { throw lowSpace(expectedSize, total) ?? FileImportError.cannotOpen }
         }
         if total != expectedSize { throw FileImportError.cannotOpen }
         if cancel.isCancelled { throw CancellationError() }
-        do { try output.synchronize() } catch { throw lowSpace(size, total) ?? FileImportError.cannotOpen }
+        do { try output.synchronize() } catch { throw lowSpace(expectedSize, total) ?? FileImportError.cannotOpen }
         return (hasher.finalize().map { String(format: "%02x", $0) }.joined(), total)
     }
 
