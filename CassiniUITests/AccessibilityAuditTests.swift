@@ -110,7 +110,11 @@ final class AccessibilityAuditTests: XCTestCase {
         // An iPad window has a resize handle in its corner (`AuditFilter.isWindowControl`).
         let window = UIDevice.current.userInterfaceIdiom == .pad
         let detection = types.intersection(.elementDetection)
-        let passes = [detection, types.subtracting(.elementDetection)].filter { !$0.isEmpty }
+        // iOS 18's combined audit can duplicate unattributed clipping predictions on unchanged List screens.
+        // Run clipping separately, retaining every requested check and the existing filters and issue limits.
+        let clipping = types.intersection(.textClipped)
+        let passes = [detection, clipping, types.subtracting([.elementDetection, .textClipped])]
+            .filter { !$0.isEmpty }
         do {
             for pass in passes {
                 try app.performAccessibilityAudit(for: pass) { issue in

@@ -25,7 +25,7 @@ struct MeetingHeaderSpeakers: View {
     private func label(_ speaker: TranscriptSpeaker) -> some View {
         HStack(spacing: 6) {
             Circle().fill(speaker.tint.color).frame(width: 7, height: 7).accessibilityHidden(true)
-            Text(NoteCopy.speakerName(speaker.name)).font(.subheadline).foregroundStyle(Color.ink)
+            Text(NoteCopy.speakerName(speaker.name)).font(.subheadline).foregroundStyle(speaker.tint.color)
                 .underline(!speaker.name.isNamed, color: Color.muted.opacity(0.55))
                 .fixedSize(horizontal: false, vertical: true)
             if speaker.auto {

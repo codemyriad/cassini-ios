@@ -42,8 +42,15 @@ final class ScreenshotTests: XCTestCase {
         XCTAssertTrue(element(app, containing: "agenda").waitForExistence(within: 10), "the draft so far shows")
         // The draft follows its end as it arrives; back at its start, its header shows under the status strip.
         let parts = app.descendants(matching: .any).matching(identifier: "draftTranscript")
-        let header = parts.element(boundBy: 0), draft = parts.element(boundBy: parts.count - 1)
-        XCTAssertTrue(draft.scroll(up: false, attempts: 3) { header.exists && header.isHittable })
+        let header = parts.firstMatch, draft = app.scrollViews.firstMatch
+        XCTAssertTrue(draft.scroll(up: false, attempts: 3) {
+            guard header.exists else { return false }
+            let frame = header.frame
+            // This is a static heading, with no activation point while offscreen. Check that it is fully
+            // visible inside the draft's viewport below the pinned card before taking the screenshot.
+            let viewport = draft.frame.intersection(app.windows.firstMatch.frame)
+            return !frame.isEmpty && !frame.isInfinite && viewport.contains(frame)
+        })
         capture("03-transcribing")
     }
 
