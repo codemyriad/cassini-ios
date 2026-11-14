@@ -105,14 +105,17 @@ import CassiniNotebook
             return try await service.importFile(url, fallbackTitle: fallbackTitle)
         }
         return Task {
-            let outcome = await running.value
-            if let outcome { _ = await finish(outcome, opensNote: opensNote) }
-            return outcome
+            await withTaskCancellationHandler {
+                let outcome = await running.value
+                if let outcome { _ = await finish(outcome, opensNote: opensNote) }
+                return outcome
+            } onCancel: { running.cancel() }
         }
     }
 
     func retry(_ card: ImportTracker.Card) {
-        guard card.failure != nil, let source = card.source else { return }
+        guard card.failure != nil, let source = card.source,
+              tracker.cards.contains(where: { $0.id == card.id && $0.failure != nil }) else { return }
         tracker.dismissCard(card.id)
         importFile(source, opensNote: false)
     }

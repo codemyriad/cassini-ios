@@ -47,6 +47,21 @@ private actor ImportScreenGate {
         XCTAssertEqual(LibraryPhase1Copy.tryAgain, LibraryCopy.tryAgain)
     }
 
+    func testCancellingAColdImportForwardsCancellationAndLeavesNoFailureOrMeeting() async throws {
+        let test = TestGraph(); defer { test.tearDown() }
+        // Startup is the event gate: no service or file access can begin until graph.start returns.
+        let task = test.graph.imports.importFile(test.root.appendingPathComponent("Cancelled.wav"), opensNote: false)
+        XCTAssertEqual(test.graph.imports.tracker.cards.count, 1)
+        task.cancel()
+        await test.graph.start()
+        let outcome = await task.value
+        XCTAssertNil(outcome)
+        XCTAssertTrue(test.graph.imports.tracker.cards.isEmpty)
+        XCTAssertNil(test.graph.imports.tracker.failure)
+        XCTAssertTrue(test.graph.library.notes.isEmpty)
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: test.root.path).filter { UUID(uuidString: $0) != nil }, [])
+    }
+
     func testPickerContainsOnlyDecidedAudioTypesAndZIP() {
         XCTAssertEqual(Set(ImportStore.contentTypes.map(\.identifier)), Set(ImportPolicy.utis + ["public.zip-archive"]))
         XCTAssertFalse(ImportStore.contentTypes.contains(.audio))
