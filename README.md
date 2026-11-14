@@ -109,7 +109,8 @@ records their exact revisions.
   back or forward, change the speed, and use the lock-screen and headphone controls. The playback position is kept
   across launches.
 - **Search** titles, transcripts and bookmarks, ignoring case and accents, with the matches highlighted. Search inside
-  a note shows a "1 of 3" counter. You can star notes and filter by star.
+  a note shows a "1 of 3" counter. The Library remembers All / Starred on this device. Search combines Starred,
+  Speaker, date (including This year), and Recorded by me; closing Search resets its filters.
 - **Edit and versions.** You can edit a passage's text; its word timing is dropped, but its place in the audio is
   kept. Every transcription, merge and run of edits keeps the transcript from before it as a version you can go back
   to.
@@ -163,6 +164,9 @@ TestFlight still need.
 
 [docs/differences.md](docs/differences.md) describes each difference in detail. In summary:
 
+- **Library and Search (D99).** iOS uses a native All / Starred segmented control and a scrolling Search chip row.
+  The filter contract matches Android: AND, local calendar dates, recorded meetings only for Recorded by me, and
+  transient Search choices seeded from the remembered Library choice. Stars stay in local Library metadata.
 - **Unknown meeting dates (D95).** The Library names the group with the shared “Date unknown” heading in all six
   languages, including for VoiceOver. iOS omits the repeated unknown-date label from individual row metadata,
   the Note subtitle and the Document info Recorded row; the Note subtitle keeps the duration. Android repeats

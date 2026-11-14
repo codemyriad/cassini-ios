@@ -287,7 +287,7 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(garden.waitForExistence(within: 15))
         app.buttons["Clear search"].tap()
         XCTAssertTrue(app.staticTexts["TODAY"].waitForExistence(within: 15))
-        XCTAssertFalse(date.exists, "Clear removes the typed-search date filter while Search stays open")
+        XCTAssertTrue(date.exists, "Search keeps its unified filter row after clearing the text")
         XCTAssertTrue(app.buttons["closeLibrarySearch"].exists, "Clear keeps Search open")
         search.tap()
         search.typeText("thurs\n")
@@ -381,7 +381,7 @@ final class LibraryUITests: XCTestCase {
             XCTAssertTrue(close.isHittable, "empty Submit keeps Search open", file: file, line: line)
         }
         let date = app.buttons["librarySearchDate"]
-        XCTAssertFalse(date.exists, "Date filtering requires a typed query", file: file, line: line)
+        XCTAssertTrue(date.exists, "Open Search offers its filter row before typing", file: file, line: line)
         search.tap()
         search.typeText("Thursday\n")
         XCTAssertTrue(app.staticTexts["librarySearchCount"].waitForExistence(within: 5), file: file, line: line)
@@ -391,14 +391,14 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(date.wait(until: NSPredicate(format: "label CONTAINS 'Today'"), within: 5), file: file, line: line)
         app.buttons["Clear search"].tapWhenSettled()
         XCTAssertTrue(app.staticTexts["TODAY"].waitForExistence(within: 5), file: file, line: line)
-        XCTAssertFalse(date.exists, "Clearing Search removes its date filter", file: file, line: line)
+        XCTAssertTrue(date.exists, "Clearing Search keeps its filter row", file: file, line: line)
         close.tap()
         XCTAssertTrue(app.buttons["settingsButton"].waitForExistence(within: 5), file: file, line: line)
         XCTAssertFalse(close.exists, file: file, line: line)
         XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(within: 5), file: file, line: line)
         search.tap()
         XCTAssertTrue(close.waitForExistence(within: 5), file: file, line: line)
-        XCTAssertFalse(date.exists, "Reopening empty Search offers no date filter", file: file, line: line)
+        XCTAssertTrue(date.exists, "Reopening Search offers the unified filter row", file: file, line: line)
         XCTAssertTrue(search.wait(until: NSPredicate(format: "hasKeyboardFocus == true"), within: 5), file: file, line: line)
         if submitEmptyBeforeDate {
             // A simulator with a hardware keyboard connected shows iPadOS 18's shortcut bar instead of a software
@@ -451,7 +451,7 @@ final class LibraryUITests: XCTestCase {
         let date = app.buttons["librarySearchDate"]
         let close = app.buttons["closeLibrarySearch"]
         XCTAssertTrue(close.waitForExistence(within: 5))
-        XCTAssertFalse(date.exists, "Empty Search has no date filter")
+        XCTAssertTrue(date.exists, "Open Search offers its filter row before typing")
         search.typeText("planning\n")
         XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(within: 5))
         XCTAssertTrue(date.waitForExistence(within: 5))
@@ -503,7 +503,7 @@ final class LibraryUITests: XCTestCase {
         focusSearchWithPointer(app)
         capture("Empty Search focused after scrolling the Library")
         let date = app.buttons["librarySearchDate"]
-        XCTAssertFalse(date.exists, "Empty Search has no date filter")
+        XCTAssertTrue(date.exists, "Open Search offers its filter row before typing")
         let close = app.buttons["closeLibrarySearch"]
         XCTAssertTrue(close.waitForExistence(within: 5))
         XCTAssertFalse(app.buttons["settingsButton"].exists)

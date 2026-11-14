@@ -43,6 +43,25 @@ import CassiniCore
     #expect(PortableTranscript.read(from: url) == nil)
 }
 
+@Test func starringStaysLocalWhenExportingACassiniFile() throws {
+    let directory = try PortableFixtures.temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let source = directory.appendingPathComponent("audio.opus")
+    let output = directory.appendingPathComponent("export.opus")
+    let audio = Data(try PortableFixtures.silence())
+    try audio.write(to: source)
+    var note = Note(title: "Planning")
+    note.isFavorite = true
+    note.transcript = [TranscriptSegment(text: "Hello", start: 0, end: 0.5)]
+    try PortableTranscript.export(note: note, opus: source, destination: output, unassignedLabel: "Unknown speaker")
+    let document = CassiniDocument.read(output)
+    #expect(document.state == .ok)
+    #expect(document.manifest?["isFavorite"] == nil)
+    #expect(document.manifest?["starred"] == nil)
+    #expect(!document.comments.contains { $0.lowercased().contains("favorite") || $0.lowercased().contains("starred") })
+    #expect(try Data(contentsOf: source) == audio)
+}
+
 @Suite struct PortableReadTests {
     private func read(_ bytes: [UInt8]) -> PortableTranscript? { PortableTranscript(CassiniDocument.read(bytes)) }
 

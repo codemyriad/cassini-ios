@@ -195,7 +195,7 @@ public enum LibraryEmptyState: Hashable, Sendable {
     case noMatch(String)
     /// "Your notes can't be opened": not the same as an empty library.
     case unavailable
-    /// The Starred filter (an iOS extra) has nothing.
+    /// The Starred filter has nothing.
     case noStarred
 }
 
@@ -387,6 +387,7 @@ public enum LibraryMapping {
     public static func emptyState(_ facts: LibraryFacts, favoritesOnly: Bool = false) -> LibraryEmptyState? {
         if facts.unavailable { return .unavailable }
         if facts.loading { return nil }
+        if facts.query.isEmpty && favoritesOnly && facts.results == 0 { return .noStarred }
         if facts.liveNotes == 0 && facts.query.isEmpty { return .empty }
         if !facts.query.isEmpty { return facts.results == 0 ? .noMatch(facts.query) : nil }
         return favoritesOnly && facts.results == 0 ? .noStarred : nil

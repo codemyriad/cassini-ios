@@ -40,6 +40,7 @@ import CassiniNotebook
         var finishing: UUID?
         var speakerModelsReady = false
         var cloudBackup: Bool? = true
+        var defaults: UserDefaults?
         @ObservationIgnored let clock = GatedClock()
         @ObservationIgnored lazy var model: LibraryScreenModel = {
             var calendar = Calendar(identifier: .gregorian)
@@ -67,7 +68,7 @@ import CassiniNotebook
                 trash: { [unowned self] in actions.append("trash \(title($0))") },
                 speakerModelsReady: { [unowned self] in speakerModelsReady },
                 cloudBackup: { [unowned self] in cloudBackup },
-                clock: clock, calendar: calendar))
+                clock: clock, calendar: calendar), defaults: defaults)
             model.onEffect = { [unowned self] in effects.append($0) }
             return model
         }()
@@ -82,6 +83,79 @@ import CassiniNotebook
         }
 
         func title(_ id: UUID) -> String { notes.first { $0.id == id }?.title ?? "?" }
+    }
+
+    @Test func rememberedStarredAppliesToTheVeryFirstProjection() throws {
+        let suite = "D1042-\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let first = Library()
+        first.defaults = defaults
+        #expect(!first.model.favoritesOnly)
+        first.model.favoritesOnly = true
+        let next = Library()
+        next.defaults = defaults
+        let unstarred = next.add("Unstarred")
+        let starred = next.add("Starred")
+        next.notes[next.notes.firstIndex { $0.id == starred }!].isFavorite = true
+        let initial = next.model.content
+        #expect(initial.sections.flatMap(\.rows).map(\.id) == [starred])
+        #expect(!initial.sections.flatMap(\.rows).contains { $0.id == unstarred })
+        next.notes = []
+        // A fresh model with no meetings still shows the shared starred empty state.
+        let empty = Library()
+        empty.defaults = defaults
+        #expect(empty.model.content.emptyState == .noStarred)
+        empty.model.favoritesOnly = false
+        let all = Library()
+        all.defaults = defaults
+        #expect(!all.model.favoritesOnly)
+    }
+
+    @Test func unifiedFiltersCombineAndCloseRestoresTheLibraryChoice() async throws {
+        let library = Library()
+        let own = library.add("Planning own")
+        let imported = library.add("Planning imported")
+        let document = library.add("Planning document")
+        let recovered = library.add("Planning recovered")
+        let otherSpeaker = library.add("Planning Bob")
+        let old = library.add("Planning last year", minutesAgo: 400 * 24 * 60)
+        let unstarred = library.add("Planning unstarred")
+        let unrelated = library.add("Unrelated")
+        for i in library.notes.indices {
+            library.notes[i].isFavorite = library.notes[i].id != unstarred
+            library.notes[i].speakers = [NoteSpeaker(id: "s1", name: library.notes[i].id == otherSpeaker ? "Bob" : "Alice")]
+        }
+        library.notes[library.notes.firstIndex { $0.id == imported }!].origin = .imported
+        library.notes[library.notes.firstIndex { $0.id == document }!].origin = .importedDocument
+        library.notes[library.notes.firstIndex { $0.id == recovered }!].origin = .recovered
+        let model = library.model
+        model.favoritesOnly = true
+        model.query = "Planning"
+        await waitUntilSleeping(library.clock)
+        library.clock.release()
+        await model.settle()
+        #expect(model.searchStarred)
+        #expect(model.searchSpeakers == ["Alice", "Bob"])
+        model.searchSpeaker = "Alice"
+        #expect(Set(model.content.results!.map(\.id)) == Set([own, imported, document, recovered, old]))
+        model.recordedByMe = true
+        #expect(Set(model.content.results!.map(\.id)) == Set([own, old]))
+        model.searchDate = .year
+        #expect(model.content.results?.map(\.id) == [own])
+        model.searchStarred = false
+        #expect(Set(model.content.results!.map(\.id)) == Set([own, unstarred]))
+        #expect(!model.content.results!.contains { $0.id == unrelated })
+        model.closeSearch()
+        #expect(model.searchSpeaker == nil && model.searchDate == .any && !model.recordedByMe)
+        #expect(model.searchStarred && model.favoritesOnly)
+        #expect(model.content.results == nil)
+        #expect(!model.content.sections.flatMap(\.rows).contains { $0.id == unstarred })
+        model.beginSearch()
+        #expect(model.searchStarred && model.searchSpeaker == nil)
+        model.searchStarred = false
+        model.closeSearch()
+        #expect(model.favoritesOnly && model.searchStarred)
     }
 
     /// The view must observe these projections, rather than retain a pre-active row captured by a lazy builder.

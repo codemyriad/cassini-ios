@@ -188,7 +188,7 @@ import CassiniNotebook
                 #endif
                 return library.cloudBackup
             },
-            clock: environment.clock, calendar: environment.calendar))
+            clock: environment.clock, calendar: environment.calendar), defaults: environment.defaults)
     }
 
     /// Runs the launch steps once; the app is ready when it returns.

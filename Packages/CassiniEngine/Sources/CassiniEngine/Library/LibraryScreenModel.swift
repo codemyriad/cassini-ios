@@ -70,8 +70,19 @@ public final class LibraryScreenModel {
     }
     /// The trimmed query the results are for; it follows `query` after the debounce.
     public private(set) var searched = ""
-    /// Only starred notes (an iOS extra).
-    public var favoritesOnly = false
+    /// The per-device Library choice. Read before the first projection, never restored by a view.
+    public static let favoritesKey = "library.favoritesOnly"
+    public var favoritesOnly = false {
+        didSet {
+            defaults?.set(favoritesOnly, forKey: Self.favoritesKey)
+            if searchOpen { searchStarred = favoritesOnly }
+        }
+    }
+    public var searchStarred = false
+    public var searchSpeaker: String?
+    public var recordedByMe = false
+    private var searchOpen = false
+    @ObservationIgnored private let defaults: UserDefaults?
     /// D14 search-only filter: transient, reset when the query closes, never scene-persisted.
     public var searchDate: SearchDate = .any
     /// The confirmation or form open over the Library.
@@ -103,7 +114,9 @@ public final class LibraryScreenModel {
         let hits: [LibraryIndex.Hit]
     }
 
-    public init(ports: Ports) {
+    public init(ports: Ports, defaults: UserDefaults? = nil) {
+        self.defaults = defaults
+        self.favoritesOnly = defaults?.bool(forKey: Self.favoritesKey) ?? false
         day = ports.calendar.startOfDay(for: ports.clock.now)
         self.ports = ports
         observeNotes()
@@ -137,7 +150,9 @@ public final class LibraryScreenModel {
         let interval = searchDate.interval(now: now, calendar: calendar)
         let hits = current.filter {
             let note = $0.entry.note
-            return (!favoritesOnly || note.isFavorite) &&
+            return (!searchStarred || note.isFavorite) &&
+                (!recordedByMe || note.origin == .recorded) &&
+                (searchSpeaker.map { name in Self.namedSpeakers(note).contains(name) } ?? true) &&
                 (interval.map { range in
                     note.meetingTime.isWithin(range, calendar: calendar)
                 } ?? true)
@@ -148,6 +163,39 @@ public final class LibraryScreenModel {
         }
         return LibraryContent(loading: loading, results: LibraryMapping.results(hits, context: context, now: now, calendar: calendar),
                               emptyState: LibraryMapping.emptyState(facts, favoritesOnly: favoritesOnly), facts: facts)
+    }
+
+    /// Every named speaker in the Library, independent of the current query and filters.
+    public var searchSpeakers: [String] {
+        _ = presentationRevision
+        return Set(index.entries.flatMap { Self.namedSpeakers($0.note) }).sorted {
+            $0.localizedStandardCompare($1) == .orderedAscending
+        }
+    }
+
+    private static func namedSpeakers(_ note: Note) -> [String] {
+        (note.speakers ?? []).filter {
+            $0.provenance != .unnamed && !$0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }.map(\.name)
+    }
+
+    public func beginSearch() {
+        guard !searchOpen else { return }
+        searchOpen = true
+        searchStarred = favoritesOnly
+    }
+
+    public func closeSearch() {
+        query = ""
+        resetSearchFilters()
+    }
+
+    private func resetSearchFilters() {
+        searchOpen = false
+        searchStarred = favoritesOnly
+        searchSpeaker = nil
+        searchDate = .any
+        recordedByMe = false
     }
 
     /// The note of a row, as the rows were last built.
@@ -370,8 +418,8 @@ private extension LibraryScreenModel {
     func scheduleSearch() {
         pendingSearch?.cancel()
         let text = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        // Date filters belong to typed search; clearing the text restores the unfiltered Library.
-        if text.isEmpty { searchDate = .any }
+        // Clearing the text restores the Library and drops the transient Search choices.
+        if text.isEmpty { resetSearchFilters() } else { beginSearch() }
         guard text != searched else { pendingSearch = nil; return }
         guard !text.isEmpty else {
             searched = ""

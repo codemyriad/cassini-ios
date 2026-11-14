@@ -786,7 +786,8 @@ stricter or looser than the spec.
 
 These features exist only on iOS. They were kept by decision.
 
-- **Stars** and the All / Starred filter, with its own empty state ("Keep your favorites close.").
+- **Library filters (D99).** iOS uses a native All / Starred segmented control; Android uses filter chips. Both
+  follow the shared per-device starring and transient Search filter contract as each Phase 2 slice lands.
 - **Bookmarks** ("Mark a moment" while recording, a bookmark button in the player). Their labels are searched too, and
   an unlabelled one reads "Moment at 01:05".
 - **Playback speed** (0.75–2×), kept for the next file.

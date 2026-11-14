@@ -1,8 +1,8 @@
 # Shared string source
 
-WP1 pins the full shared catalog to `codemyriad/cassini-ux`
-`5e0c34e0f1bb390298dabdf4eedc494e933fd329`, `strings/strings.json`, SHA-256
-`4bbe42b47bbf2e6e61ed15b1c54cabf4096e92aca63b9ed84d428070baa52acf`.
+D-1042 repins the full shared catalog to `codemyriad/cassini-ux`
+`b26190b57d8e35391ba9b4bafd177d66b10f0ec3`, `strings/strings.json`, SHA-256
+`10d65abc7b10f81422377632aa899506b33e02cc9269afc96e11ec89cee69367`.
 `contracts/shared-strings/UPSTREAM.json` is the global source pin and points to the complete, byte-identical catalog in
 `Packages/CassiniNotebook/Tests/CassiniNotebookTests/Resources/status-badges/strings/strings.json`; the resource
 bundle pin uses the same commit and hash. The generator rejects disagreement between them.
@@ -25,7 +25,7 @@ draft heading and compact speaker-match copy (`common.stop`, `transcribing.headi
 remaining catalog entries are not shipped before their implementation milestone.
 
 The complete existing states, format and library vector resources and their expected rows are repinned from the same
-immutable commit without local edits. The states contract remains v3 with `Received`; WP1 does not implement WP7.
+immutable commit without local edits. The states contract remains v3; `received` remains its internal kind and the new catalog calls it `Imported`.
 HARMONY is read at the immutable source commit, not copied into an unused local snapshot.
 
 The pins below document earlier implemented string subsets. They are historical source receipts, not the WP1 source
@@ -66,5 +66,7 @@ Wave 5 first-run hero and backup-gated privacy copy (`D-974`, `L-27`, `D98`) is 
 `scripts/generate-wave5-strings.py` compiles the eight iOS Wave 5 IDs (`firstRun.hero.title`, `firstRun.hero.subtitle`,
 `firstRun.hero.phoneBackupQualifier`, `firstRun.hero.subtitlePhoneNote`, `privacy.onDevice.{iphone,ipad}.{withBackup,backupExcluded}`)
 into `Cassini/Resources/Strings/LibraryWave5.xcstrings` and `Cassini/Strings/LibraryWave5Copy.swift` across all six
-locales. The Phase 1 `status-badges` bundle stays at `5e0c34e0f1bb390298dabdf4eedc494e933fd329` until `L-10` (`D-997`)
-migrates `Received` to `Imported`. No shared source was edited.
+locales. The Phase 1 `status-badges` bundle was subsequently repinned for D-1042 to `b26190b57d8e35391ba9b4bafd177d66b10f0ec3` with the full catalog and contract vectors. No shared source was edited.
+
+D-1042 adds the shared Library All/Starred and Search filter IDs to `generate-library-strings.py`,
+including the shared date wording and starred empty state.
