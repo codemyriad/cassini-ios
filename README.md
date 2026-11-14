@@ -77,9 +77,9 @@ records their exact revisions.
 
 - **Record** with pause and resume, a live waveform, an editable title and "Mark a moment" bookmarks. Recording
   continues with the screen locked or in another app. A Live Activity on the Lock Screen and in the Dynamic Island
-  shows the time and has Pause, Resume and Finish. A call or a disconnected microphone pauses the recording until you
+  shows the time and has Pause, Resume and Stop. A call or a disconnected microphone pauses the recording until you
   resume it.
-- **Safe capture.** Audio is captured as 48 kHz PCM (CAF), which survives a crash, and compressed to M4A at Finish. If
+- **Safe capture.** Audio is captured as 48 kHz PCM (CAF), which survives a crash, and compressed to M4A at Stop. If
   compression fails, the original stays playable. The recording stops and saves before storage runs out, with a
   warning about 15 minutes before. At launch, recordings that were interrupted are repaired and listed as recovered.
 - **Import** any audio format that iOS reads, plus Ogg Opus and Cassini `.opus` documents, from Files (several files
@@ -213,7 +213,8 @@ TestFlight still need.
 - **Recording.** iOS captures PCM CAF and compresses it to M4A, so there is no 1 GiB AAC limit, and the storage floor
   includes the room for that compression. The audio session does not mix with other apps, so a call pauses the
   recording. Losing the input pauses it too. A Live Activity replaces Android's ongoing notification, and recovery
-  repairs CAF files.
+  repairs CAF files. The Recording screen has Android's controls (All meetings, Stop in the centre, Pause or Resume)
+  on the always-dark night ground; iOS adds "Mark a moment" above them.
 - **Transcription.** A Parakeet run tells speakers apart as it decodes, as on Android. On the Apple Speech fallback,
   and for Identify speakers, the same streaming pipeline runs over the whole file after the words, so that draft has
   one voice.

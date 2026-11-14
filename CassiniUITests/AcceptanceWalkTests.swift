@@ -24,7 +24,7 @@ final class AcceptanceWalkTests: XCTestCase {
         app.buttons["recordButton"].tap()
         XCTAssertTrue(app.buttons["Pause recording"].waitForEnabled(within: 8))
         shot("01-recording")
-        app.buttons["finishRecording"].tap()
+        app.buttons["stopRecording"].tap()
         let title = app.staticTexts["noteTitle"]
         XCTAssertTrue(title.waitForExistence(within: 10))
         XCTAssertEqual(title.label, Self.title)

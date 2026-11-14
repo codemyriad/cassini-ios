@@ -44,7 +44,7 @@ final class BulkTransferUITests: XCTestCase {
         app.launchAndWait(fresh: true)
         app.buttons["recordButton"].tap()
         XCTAssertTrue(app.buttons["Pause recording"].waitForEnabled(within: 15))
-        app.buttons["Library"].tap()
+        app.buttons["recordingAllMeetings"].tap()
         XCTAssertTrue(app.buttons["activeRecordingCard"].waitForExistence(within: 15))
         app.buttons["libraryArchiveMenu"].tap()
         let export = app.collectionViews.buttons["Export All as ZIP…"]
@@ -87,7 +87,7 @@ final class BulkTransferUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["No notes yet"].waitForExistence(within: 15))
         app.buttons["recordButton"].tap()
         XCTAssertTrue(app.buttons["Pause recording"].waitForEnabled(within: 15))
-        app.buttons["Library"].tap()
+        app.buttons["recordingAllMeetings"].tap()
         XCTAssertTrue(app.buttons["activeRecordingCard"].waitForExistence(within: 15))
         XCTAssertFalse(app.buttons["libraryArchiveMenu"].exists)
         XCTAssertFalse(app.buttons["selectNotesForExport"].exists)

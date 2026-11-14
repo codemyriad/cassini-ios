@@ -134,7 +134,7 @@ the kill-and-resume items.
 ### Live Activity
 
 - Record, then lock the phone. The Lock Screen shows the recording with its running time. Pause from the Lock Screen:
-  the time stops and the button becomes Resume. Resume, then Finish from the Lock Screen: the note opens in Cassini
+  the time stops and the button becomes Resume. Resume, then Stop from the Lock Screen: the note opens in Cassini
   with the audio saved.
 - The Dynamic Island shows the recording, and a tap returns to the Recording screen.
 - Minimise a recording, return through the Library's card and through the Live Activity, then minimise and finish

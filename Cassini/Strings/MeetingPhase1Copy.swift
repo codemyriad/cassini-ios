@@ -27,6 +27,12 @@ enum MeetingPhase1Copy {
     static var findPlaceholder: String {
         String(localized: "meeting.find.placeholder", table: "MeetingPhase1")
     }
+    static var resume: String {
+        String(localized: "phone.row.resume", table: "MeetingPhase1")
+    }
+    static var pause: String {
+        String(localized: "player.pause", table: "MeetingPhase1")
+    }
     static var speakerDialogLabel: String {
         String(localized: "speakers.dialog.a11y", table: "MeetingPhase1")
     }
@@ -167,6 +173,10 @@ enum MeetingPhase1Copy {
             return String(localized: "library.backToAllMeetings", table: "MeetingPhase1", bundle: localized, locale: locale)
         case "meeting.find.placeholder":
             return String(localized: "meeting.find.placeholder", table: "MeetingPhase1", bundle: localized, locale: locale)
+        case "phone.row.resume":
+            return String(localized: "phone.row.resume", table: "MeetingPhase1", bundle: localized, locale: locale)
+        case "player.pause":
+            return String(localized: "player.pause", table: "MeetingPhase1", bundle: localized, locale: locale)
         case "speakers.dialog.a11y":
             return String(localized: "speakers.dialog.a11y", table: "MeetingPhase1", bundle: localized, locale: locale)
         case "speakers.duplicate.notice":

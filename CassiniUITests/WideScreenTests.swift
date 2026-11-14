@@ -71,7 +71,7 @@ final class WideScreenTests: XCTestCase {
         XCTAssertTrue(app.buttons["recordButton"].waitForExistence(within: 10))
         app.buttons["recordButton"].tap()
         XCTAssertTrue(app.buttons["Pause recording"].waitForEnabled(within: 8))
-        assertCentred([app.descendants(matching: .any)["recordingTitle"], app.buttons["pauseResumeRecording"], app.buttons["finishRecording"]],
+        assertCentred([app.descendants(matching: .any)["recordingTitle"], app.buttons["pauseResumeRecording"], app.buttons["stopRecording"]],
                       in: app.windows.firstMatch.frame)
     }
 

@@ -122,7 +122,7 @@ private struct RecordingButtons: View {
                 }
             }
             Button(intent: FinishRecordingIntent(noteID: noteID)) {
-                Label { Text("Finish", tableName: "Recording") } icon: { Image(systemName: "stop.fill") }
+                Label { Text("common.stop", tableName: "MeetingPhase1") } icon: { Image(systemName: "stop.fill") }
                     .frame(maxWidth: .infinity)
             }
             .tint(RecordingActivityColors.finish).foregroundStyle(Color.onRecord)

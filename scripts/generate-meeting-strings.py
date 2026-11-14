@@ -20,6 +20,8 @@ ENTRIES = {
     'library.allMeetings': ('allMeetings', None),
     'library.backToAllMeetings': ('backToAllMeetings', None),
     'meeting.find.placeholder': ('findPlaceholder', None),
+    'phone.row.resume': ('resume', None),
+    'player.pause': ('pause', None),
     'speakers.dialog.a11y': ('speakerDialogLabel', None),
     'speakers.duplicate.notice': ('speakerDuplicateNotice', 'name'),
     'speakers.duplicate.samePerson': ('speakerSamePerson', None),
