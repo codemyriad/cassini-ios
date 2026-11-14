@@ -14,6 +14,8 @@ public enum RowBadge {
             // Local jobs expose an interval, not a single integer ETA. Keep that detail in the meeting;
             // the contract's no-ETA fallback avoids inventing a conversion policy for the badge.
             return StatusBadges.transcribing(etaMinutes: nil, text: text)
+        case .transcribed where row.provenance != .own:
+            return StatusBadges.meeting(BadgeFields(origin: .received, transcript: .done), text: text)
         default:
             return nil
         }

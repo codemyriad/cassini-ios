@@ -1,15 +1,15 @@
 # Shared string source
 
-WP1 pins the full shared catalog to `codemyriad/cassini-ux`
-`5e0c34e0f1bb390298dabdf4eedc494e933fd329`, `strings/strings.json`, SHA-256
-`4bbe42b47bbf2e6e61ed15b1c54cabf4096e92aca63b9ed84d428070baa52acf`.
+D-1034 (L-10) pins the full shared catalog to `codemyriad/cassini-ux`
+`b26190b57d8e35391ba9b4bafd177d66b10f0ec3`, `strings/strings.json`, SHA-256
+`10d65abc7b10f81422377632aa899506b33e02cc9269afc96e11ec89cee69367`.
 `contracts/shared-strings/UPSTREAM.json` is the global source pin and points to the complete, byte-identical catalog in
 `Packages/CassiniNotebook/Tests/CassiniNotebookTests/Resources/status-badges/strings/strings.json`; the resource
 bundle pin uses the same commit and hash. The generator rejects disagreement between them.
 
-`scripts/generate-status-badge-strings.py` emits only the implemented WP1 selection: the ten existing shared badge /
+`scripts/generate-status-badge-strings.py` emits the implemented badge and provenance selection: the ten existing shared badge /
 interrupted-position keys and the seven `states.phone.*` labels (`audioOnly`, `cantPlay`, `cantReadTranscript`,
-`couldntTranscribe`, `newerFormat`, `pausedAt`, `queued`). All six translations and named placeholders remain
+`couldntTranscribe`, `newerFormat`, `pausedAt`, `queued`), plus the two L-10 header subtitle templates. All six translations and named placeholders remain
 verbatim. The generated catalog is `Cassini/Resources/Strings/StatusBadge.xcstrings`, with literal lookup call sites
 only in `Cassini/Strings/StatusBadgeStrings.swift`. App language bundle selection remains in the existing
 `StatusBadgeCopy` adapter.
@@ -25,7 +25,7 @@ draft heading and compact speaker-match copy (`common.stop`, `transcribing.headi
 remaining catalog entries are not shipped before their implementation milestone.
 
 The complete existing states, format and library vector resources and their expected rows are repinned from the same
-immutable commit without local edits. The states contract remains v3 with `Received`; WP1 does not implement WP7.
+immutable commit without local edits. The states contract remains v3; L-10 adopts the `Imported` label with model kind `received`.
 HARMONY is read at the immutable source commit, not copied into an unused local snapshot.
 
 The pins below document earlier implemented string subsets. They are historical source receipts, not the WP1 source
@@ -66,5 +66,6 @@ Wave 5 first-run hero and backup-gated privacy copy (`D-974`, `L-27`, `D98`) is 
 `scripts/generate-wave5-strings.py` compiles the eight iOS Wave 5 IDs (`firstRun.hero.title`, `firstRun.hero.subtitle`,
 `firstRun.hero.phoneBackupQualifier`, `firstRun.hero.subtitlePhoneNote`, `privacy.onDevice.{iphone,ipad}.{withBackup,backupExcluded}`)
 into `Cassini/Resources/Strings/LibraryWave5.xcstrings` and `Cassini/Strings/LibraryWave5Copy.swift` across all six
-locales. The Phase 1 `status-badges` bundle stays at `5e0c34e0f1bb390298dabdf4eedc494e933fd329` until `L-10` (`D-997`)
-migrates `Received` to `Imported`. No shared source was edited.
+locales. The `status-badges` bundle now uses the global D-1034 pin above, adopting `Imported`. No shared source was edited.
+
+L-10 also compiles `format.previewSubtitle.received` and `format.previewSubtitle.importedOtherDevice` into the StatusBadge catalog. Library and Search derive provenance from stored import origins; recovered local recordings remain own. Imported transcript versions identify files transcribed on another device, including after local edits or re-transcription. Import-flow catalogs and strings are unchanged.

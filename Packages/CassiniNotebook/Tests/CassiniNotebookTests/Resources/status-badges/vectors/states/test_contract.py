@@ -27,11 +27,15 @@ class ContractChecks(unittest.TestCase):
             ('lost placeholder','strings/strings.json',lambda d:catalog_entry(d,'states.badge.recording')['l10n']['fr'].update(text='Enregistrement')),
             ('lost plural count','strings/strings.json',lambda d:catalog_entry(d,'states.badge.transcribing')['l10n']['it']['plural'].update(other='In trascrizione')),
             ('undecided fallback rewrite','strings/strings.json',lambda d:catalog_entry(d,'states.badge.transcribing.noEta').update(en='Transcribing · soon')),
+            ('phone badge placeholder drift','strings/strings.json',lambda d:catalog_entry(d,'states.phone.pausedAt')['l10n']['es'].update(text='En pausa')),
+            ('phone speaker pill plural drift','strings/strings.json',lambda d:catalog_entry(d,'phone.row.speakerCount')['plural'].update(one='{n} speaker')),
+            ('undecided badge token role','brand/tokens.json',lambda d:d['tokens']['warn-ink'].update(status='proposed')),
+            ('error red diverges from record-ink','brand/tokens.json',lambda d:d['tokens']['error'].update(dark='#FF0000')),
             ('stale Library badge','vectors/library-vectors/expected/main.json',lambda d:d['groups'][0]['meetings'][0].update(badge='Recording')),
         ]
         with tempfile.TemporaryDirectory() as directory:
             root=Path(directory)
-            for path in ['strings/strings.json','vectors/states/states-vectors.json','vectors/format/format-vectors.json']:
+            for path in ['brand/tokens.json','strings/strings.json','vectors/states/states-vectors.json','vectors/format/format-vectors.json']:
                 target=root/path;target.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(contract.ROOT/path,target)
             shutil.copytree(contract.ROOT/'vectors/library-vectors/expected',root/'vectors/library-vectors/expected')
             with patch.object(contract,'ROOT',root):
