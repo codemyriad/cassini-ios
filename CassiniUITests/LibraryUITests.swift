@@ -1,4 +1,5 @@
 import XCTest
+import Vision
 
 /// The Library end to end (Android `LibraryBehaviourTest` and the Library rows of `TextLimitBehaviourTest`): its
 /// controls, the row statuses and inline actions, the search, the empty states and Rename.
@@ -340,18 +341,29 @@ final class LibraryUITests: XCTestCase {
             XCTAssertTrue(close.isHittable, "empty Submit keeps Search open", file: file, line: line)
         }
         let date = app.buttons["librarySearchDate"]
+        XCTAssertFalse(date.exists, "Date filtering requires a typed query", file: file, line: line)
+        search.tap()
+        search.typeText("Thursday\n")
+        XCTAssertTrue(app.staticTexts["librarySearchCount"].waitForExistence(within: 5), file: file, line: line)
         XCTAssertTrue(date.waitForExistence(within: 5), file: file, line: line)
         dateControl(app).tapWhenSettled()
         app.buttons["Today"].tapWhenSettled()
         XCTAssertTrue(date.wait(until: NSPredicate(format: "label CONTAINS 'Today'"), within: 5), file: file, line: line)
+        search.tap()
+        search.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 8))
+        XCTAssertTrue(date.waitForNonExistence(within: 5), "Clearing Search removes its date filter", file: file, line: line)
+        XCTAssertTrue(row(app, "Garden plans for the spring").waitForExistence(within: 5), file: file, line: line)
+        if submitEmptyBeforeDate {
+            search.typeText("\n")
+            XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(within: 5), file: file, line: line)
+        }
         close.tap()
         XCTAssertTrue(app.buttons["settingsButton"].waitForExistence(within: 5), file: file, line: line)
         XCTAssertFalse(close.exists, file: file, line: line)
         XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(within: 5), file: file, line: line)
         search.tap()
         XCTAssertTrue(close.waitForExistence(within: 5), file: file, line: line)
-        XCTAssertTrue(date.wait(until: NSPredicate(format: "label CONTAINS 'Any date'"), within: 5),
-                      "Close resets a date chosen before any query was typed", file: file, line: line)
+        XCTAssertFalse(date.exists, "Reopening empty Search offers no date filter", file: file, line: line)
         XCTAssertTrue(search.wait(until: NSPredicate(format: "hasKeyboardFocus == true"), within: 5), file: file, line: line)
         if submitEmptyBeforeDate {
             // A simulator with a hardware keyboard connected shows iPadOS 18's shortcut bar instead of a software
@@ -520,6 +532,27 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(waitFor(garden, label: "tomatoes"), "the Search result retains its matched excerpt")
         XCTAssertTrue(garden.label.contains("sunny corner"), "the excerpt retains context around the matching word")
         XCTAssertTrue(fixture.waitForNonExistence(within: 5), "a nonmatching meeting is filtered out")
+    }
+
+    @MainActor func testThursdaySearchKeepsTheMatchedTurnInTheVisiblePreview() throws {
+        let app = launch(["--seed", "search"])
+        let search = app.textFields["librarySearch"]
+        search.tap()
+        search.typeText("Thursday\n")
+        XCTAssertTrue(app.staticTexts["librarySearchCount"].waitForExistence(within: 15))
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(within: 5))
+        let result = row(app, "A quieter kind of productivity")
+        XCTAssertTrue(result.waitForExistence(within: 15))
+        // rowPreview is intentionally hidden from VoiceOver (the row speaks as one button). Read its rendered
+        // pixels instead of the combined row label, which includes text even when the excerpt clips it away.
+        let image = try XCTUnwrap(result.screenshot().image.cgImage)
+        let request = VNRecognizeTextRequest()
+        request.recognitionLevel = .accurate
+        request.recognitionLanguages = ["en-US"]
+        try VNImageRequestHandler(cgImage: image).perform([request])
+        let visible = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ")
+        XCTAssertTrue(visible.contains("Thursday"), "rowPreview must draw the matched word: \(visible)")
+        capture("Thursday remains visible in the multi-turn search excerpt")
     }
 
     /// Search finds a spoken word of a note, a long press on the result opens its actions over the search, Move to

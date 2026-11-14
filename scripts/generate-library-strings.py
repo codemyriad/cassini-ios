@@ -14,6 +14,7 @@ STRINGS_PIN = Path('contracts/shared-strings/UPSTREAM.json')
 LANGUAGES = ('en', 'it', 'fr', 'es', 'pt-BR', 'pt-PT')
 PROPERTIES = {
     'phone.row.noSpeech': 'noSpeech',
+    'phone.row.transcribed.a11y': 'transcribedAccessibilityLabel',
     'search.field.placeholder': 'searchPlaceholder',
     'search.field.a11y': 'searchAccessibilityLabel',
     'search.results.a11y': 'searchResultsAccessibilityLabel',

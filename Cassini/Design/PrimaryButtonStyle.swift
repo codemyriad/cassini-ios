@@ -11,6 +11,9 @@ struct PrimaryButtonStyle: ButtonStyle {
 
 struct RecordButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
-        PrimaryButtonStyle(fill: .record, text: .onRecord).makeBody(configuration: configuration)
+        configuration.label.font(.headline).foregroundStyle(Color.onRecord)
+            .padding(.horizontal, 22).padding(.vertical, 17)
+            .frame(minWidth: 160).background(Color.record, in: Capsule())
+            .opacity(configuration.isPressed ? 0.75 : 1)
     }
 }

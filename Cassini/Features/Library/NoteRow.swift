@@ -66,7 +66,7 @@ struct NoteRow: View {
             }
             if let preview = row.displayedPreview {
                 // Search retains the two-line matching context, with its original highlights.
-                Text(HighlightedText.attributed(preview, font: .subheadline)).font(.subheadline).foregroundStyle(Color.muted)
+                Text(HighlightedText.attributed(preview.singleLine, font: .subheadline)).font(.subheadline).foregroundStyle(Color.muted)
                     .lineLimit(2).accessibilityIdentifier("rowPreview").passive()
             }
             FlowLayout(spacing: 8, rowSpacing: 4) {

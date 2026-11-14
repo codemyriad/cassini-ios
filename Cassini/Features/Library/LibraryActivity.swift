@@ -114,12 +114,14 @@ struct CaptureBar: View {
         Button(action: importAudio) {
             if collapsed {
                 Label(LibraryPhase1Copy.importAudio, systemImage: "square.and.arrow.down")
-                    .labelStyle(.iconOnly).font(.title3.weight(.semibold))
+                    .labelStyle(.iconOnly).font(.title3.weight(.semibold)).foregroundStyle(Color.ink)
                     .frame(width: 52, height: 52)
                     .background(Color.ink.opacity(0.1), in: Circle())
             } else {
                 Label(LibraryPhase1Copy.importAudio, systemImage: "square.and.arrow.down")
-                    .font(.subheadline.weight(.semibold)).fixedSize().frame(minWidth: 88, minHeight: 52)
+                    .font(.subheadline.weight(.semibold)).foregroundStyle(Color.ink)
+                    .fixedSize().padding(.horizontal, 16).frame(minWidth: 88, minHeight: 52)
+                    .background(Color.ink.opacity(0.1), in: Capsule())
             }
         }
         .accessibilityHint(unavailable ? LibraryCopy.unavailableTitle : BulkTransferCopy.filter)

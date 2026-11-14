@@ -16,6 +16,9 @@ enum LibraryPhase1Copy {
     static var noSpeech: String {
         String(localized: "phone.row.noSpeech", table: "LibraryPhase1")
     }
+    static var transcribedAccessibilityLabel: String {
+        String(localized: "phone.row.transcribed.a11y", table: "LibraryPhase1")
+    }
     static var searchAccessibilityLabel: String {
         String(localized: "search.field.a11y", table: "LibraryPhase1")
     }
@@ -61,6 +64,8 @@ enum LibraryPhase1Copy {
             return String(localized: "phone.row.noSpeech", table: "LibraryPhase1", bundle: localized, locale: locale)
         case "phone.row.speakerCount":
             return String(localized: "phone.row.speakerCount", defaultValue: "\(count) speakers", table: "LibraryPhase1", bundle: localized, locale: locale)
+        case "phone.row.transcribed.a11y":
+            return String(localized: "phone.row.transcribed.a11y", table: "LibraryPhase1", bundle: localized, locale: locale)
         case "search.field.a11y":
             return String(localized: "search.field.a11y", table: "LibraryPhase1", bundle: localized, locale: locale)
         case "search.field.placeholder":

@@ -32,6 +32,41 @@ import CassiniNotebook
         XCTAssertEqual(LibraryPhase1Copy.speakerCount(1, language: "en"), "1 speaker")
     }
 
+    func testVoiceOverAgreesWithVisiblePillsInAllSixLocales() throws {
+        let statuses: [LibraryRow.Status] = [.recording, .transcribing, .queued, .paused(atMs: 768_000),
+            .failed, .unplayable, .unreadable, .newerFormat, .audioOnly,
+            .transcribed(speakers: 1, hasWords: true), .transcribed(speakers: 0, hasWords: false)]
+        for language in ["en", "it", "fr", "es", "pt-BR", "pt-PT"] {
+            var calendar = Calendar(identifier: .gregorian)
+            calendar.locale = Locale(identifier: language)
+            let format = LibraryFormat(calendar: calendar)
+            for status in statuses {
+                var value = row(status: status)
+                value.duration = 768
+                let label = format.rowLabel(value, day: .today)
+                let visible: String
+                if case .transcribed = status {
+                    visible = LibraryPhase1Copy.template("phone.row.transcribed.a11y", language: language)
+                } else {
+                    visible = RowBadge.presentation(value, text: { StatusBadgeCopy.template($0, language: language) })?.text
+                        ?? PhoneStatusBadgeView(status: status).text(language: language)
+                }
+                XCTAssertTrue(label.contains(visible.lowercased(with: format.locale)), "\(language): \(label) / \(visible)")
+                if case .recording = status { XCTAssertTrue(label.contains("12:48"), language) }
+                if case .transcribing = status {
+                    // Current local jobs expose an interval, so the visible pill uses the shared no-ETA fallback.
+                    // Speak that exact badge, including its ellipsis, rather than the legacy bare status.
+                    XCTAssertEqual(visible, StatusBadgeCopy.template("states.badge.transcribing.noEta", language: language))
+                }
+                if case .transcribed(let count, let hasWords) = status {
+                    let pill = hasWords ? LibraryPhase1Copy.speakerCount(count, language: language)
+                        : LibraryPhase1Copy.template("phone.row.noSpeech", language: language)
+                    XCTAssertTrue(label.contains(pill.lowercased(with: format.locale)), "\(language): \(label) / \(pill)")
+                }
+            }
+        }
+    }
+
     func testActualRowHidesTheOrdinaryPreviewAndKeepsTheSearchSnippet() {
         let snippet = Highlighted("English matching context continues across the two-line search excerpt.", ranges: [8..<16])
         let ordinary = row(preview: snippet)

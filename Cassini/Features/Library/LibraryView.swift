@@ -197,7 +197,7 @@ struct LibraryView: View {
                 Spacer(minLength: 0)
                 ArchiveExportControls(selectedNotes: $selectedNotes, archiveExport: archiveExport)
             }.font(.subheadline)
-            if searchPresented {
+            if model.isSearching {
                 Menu {
                     ForEach(SearchDate.allCases, id: \.self) { date in
                         Button {
