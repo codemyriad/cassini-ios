@@ -143,10 +143,11 @@ extension XCUIApplication {
     ///
     /// When the app is already on the screen, launched with the same system arguments (such as a text size), and the
     /// launch resets the test data, the launch happens inside the app (`Launches.relaunchInApp`): about a second
-    /// instead of five. `fresh` asks for a new process.
+    /// instead of five. `fresh` asks for a new process. Below iOS 26, always start a new process: the iOS 18
+    /// accessibility tree can retain elements from the replaced graph and crash while XCTest reads them.
     @MainActor func launchAndWait(fresh: Bool = false, file: StaticString = #filePath, line: UInt = #line) {
         if DeviceUnderTest.iOS18Facts, !launchArguments.contains("--ios18-platform") { launchArguments.append("--ios18-platform") }
-        if !fresh, Launches.relaunchInApp(launchArguments) { return }
+        if #available(iOS 26, *), !fresh, Launches.relaunchInApp(launchArguments) { return }
         launch()
         Launches.launched(launchArguments)
         XCTAssertTrue(staticTexts["launchFinished"].waitForExistence(within: 30), "the launch did not finish", file: file, line: line)
