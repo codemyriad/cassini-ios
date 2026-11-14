@@ -616,9 +616,11 @@ private final class HeldInstall: Sendable {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
                 let cancelled = state.withLock { state in
                     if !state.cancelled { state.waiter = continuation }
+                    // Publish the count/progress before isWaiting or end can observe the waiter.
+                    // Both callers acquire held.state before fake.state; neither holds fake.state here.
+                    started()
                     return state.cancelled
                 }
-                started()
                 Changes.signal()
                 if cancelled { continuation.resume(throwing: CancellationError()) }
             }
