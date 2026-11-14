@@ -40,14 +40,21 @@ public struct CoordinatedFileImporter: FileImporting {
             // Legacy MP4/3GP containers must hold audio only, never restore a movie as a note.
             let content = try await CancellableFileWork.run { try ImportClassifier.sniff(fileAt: destination) }
             if content == .other(fileExtension: "m4a") || content == .other(fileExtension: "3gp") {
-                let asset = AVURLAsset(url: destination)
-                guard try await asset.loadTracks(withMediaType: .video).isEmpty else { throw FileImportError.cannotOpen }
+                // AVFoundation cannot reliably open source.tmp. Use a content-derived extension,
+                // independent of both the staging name and a disguised archive member's name.
+                let ext = content == .other(fileExtension: "3gp") ? "3gp" : "mp4"
+                let probe = destination.deletingLastPathComponent().appendingPathComponent(UUID().uuidString + "." + ext)
+                try FileManager.default.linkItem(at: destination, to: probe)
+                defer { try? FileManager.default.removeItem(at: probe) }
+                let asset = AVURLAsset(url: probe)
+                guard try await asset.loadTracks(withMediaType: .video).isEmpty,
+                      try await !asset.loadTracks(withMediaType: .audio).isEmpty else { throw FileImportError.cannotOpen }
             }
             try Task.checkCancellation()
             return copied
         } catch {
             try? FileManager.default.removeItem(at: destination)
-            if error is CancellationError { throw error }
+            if error is CancellationError || Task.isCancelled { throw CancellationError() }
             throw FileImportError.cannotOpen
         }
     }

@@ -1,5 +1,6 @@
 @testable import CassiniEngine
 import CassiniCore
+import CassiniAudio
 import CassiniNotebook
 import CassiniEngineTesting
 import Foundation
@@ -120,6 +121,33 @@ private struct ArchiveTestAudio: AudioProcessing {
     func encodeOpus(_ source: URL, to destination: URL) async throws { try await base.encodeOpus(source, to: destination) }
 }
 
+private func archiveTestM4A(in folder: URL, frequency: Double = 660) async throws -> URL {
+    let capture = folder.appendingPathComponent(UUID().uuidString + ".caf")
+    defer { try? FileManager.default.removeItem(at: capture) }
+    let format = try #require(AVAudioFormat(standardFormatWithSampleRate: 44_100, channels: 1))
+    let buffer = try #require(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 44_100))
+    buffer.frameLength = buffer.frameCapacity
+    for index in 0..<Int(buffer.frameLength) {
+        buffer.floatChannelData![0][index] = Float(sin(Double(index) * frequency * 2 * .pi / 44_100)) * 0.3
+    }
+    do {
+        let file = try AVAudioFile(forWriting: capture, settings: format.settings)
+        try file.write(from: buffer)
+    }
+    let audio = folder.appendingPathComponent(UUID().uuidString + ".m4a")
+    try await AudioArchive.compress(source: capture, destination: audio)
+    return audio
+}
+
+private func archiveTestMP4(in folder: URL) async throws -> URL {
+    let audio = try await archiveTestM4A(in: folder, frequency: 880)
+    defer { try? FileManager.default.removeItem(at: audio) }
+    let mp4 = folder.appendingPathComponent(UUID().uuidString + ".mp4")
+    let export = try #require(AVAssetExportSession(asset: AVURLAsset(url: audio), presetName: AVAssetExportPresetPassthrough))
+    try await export.export(to: mp4, as: .mp4)
+    return mp4
+}
+
 @Suite(.timeLimit(.minutes(1))) struct BulkTransferTests {
     @Test func archiveUsesRealDigestDedupAndCountsIgnoredMembers() async throws {
         let sandbox = try BulkSandbox()
@@ -177,24 +205,37 @@ private struct ArchiveTestAudio: AudioProcessing {
             }
             #expect(!FileManager.default.fileExists(atPath: rejectedCopy.path))
         }
+        for (filename, fixture) in [("audio.m4a", try await archiveTestM4A(in: source.folder)),
+                                    ("source.mp4", try await archiveTestMP4(in: source.folder))] {
+            let asset = AVURLAsset(url: fixture)
+            #expect(try await !asset.loadTracks(withMediaType: .audio).isEmpty)
+            #expect(try await asset.loadTracks(withMediaType: .video).isEmpty)
+            let note = Note(title: filename, audioFilename: filename)
+            let folder = source.notes.directory(for: note.id)
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            try FileManager.default.moveItem(at: fixture, to: folder.appendingPathComponent(filename))
+            try await source.notes.save(note)
+            originals.append(note)
+        }
         #expect(await destination.notes.all().isEmpty)
         let exporter = BulkExportService(folder: source.scratch) { note, folder in
             try await BulkExportService.copyOriginal(source.notes.audioURL(for: note),
                 to: folder.appendingPathComponent(note.audioFilename))
         }
         let zip = try await exporter.export(originals)
-        #expect(try ZIPArchive(url: zip).entries.map { ($0.name as NSString).pathExtension }.sorted() == ["aac", "caf"])
+        #expect(try ZIPArchive(url: zip).entries.map { ($0.name as NSString).pathExtension }.sorted() == ["aac", "caf", "m4a", "mp4"])
         let bulk = BulkImportService(files: files, scratch: destination.scratch) { url, name in
             if let name { return try await importer.importArchiveMember(url, fallbackTitle: "Imported", displayName: name) }
             return try await importer.importFile(url, fallbackTitle: "Imported")
         }
         let report = await bulk.run([zip])
-        #expect(report.summary.imported == 2)
+        #expect(report.summary.imported == 4)
+        #expect(report.summary.duplicates == 0)
         #expect(report.summary.failed == 0)
         #expect(report.summary.unsupported == 0)
         #expect(report.archives.isEmpty)
         let restored = await destination.notes.all()
-        #expect(restored.count == 2)
+        #expect(restored.count == 4)
         for original in originals {
             let note = try #require(restored.first { $0.title == original.title })
             #expect(note.audio == .plain)
@@ -202,6 +243,9 @@ private struct ArchiveTestAudio: AudioProcessing {
             let stored = destination.notes.audioURL(for: note)
             #expect(try Data(contentsOf: stored) == Data(contentsOf: source.notes.audioURL(for: original)))
             #expect(try await audio.inspect(stored).duration > 0)
+            #expect(try FileManager.default.contentsOfDirectory(atPath: stored.deletingLastPathComponent().path)
+                .filter { ["mp4", "3gp"].contains(($0 as NSString).pathExtension) } ==
+                (note.audioFilename.hasSuffix(".mp4") ? [note.audioFilename] : []))
         }
         #expect(try destination.scratchContents().isEmpty)
     }
@@ -246,7 +290,10 @@ private struct ArchiveTestAudio: AudioProcessing {
         input.markAsFinished()
         await writer.finishWriting()
         try #require(writer.status == .completed)
-        let zip = try sandbox.archive([("Movie.mp4", Data(contentsOf: movie)), ("Disguised.caf", Data(contentsOf: movie))])
+        let m4a = try await archiveTestM4A(in: sandbox.folder)
+        let mp4 = try await archiveTestMP4(in: sandbox.folder)
+        let zip = try sandbox.archive([("Movie.mp4", Data(contentsOf: movie)), ("Disguised.caf", Data(contentsOf: movie)),
+                                       ("audio.m4a", Data(contentsOf: m4a)), ("Audio.mp4", Data(contentsOf: mp4))])
         // Even an audio double that would accept arbitrary bytes must never see these movie members.
         let audio = FakeAudioProcessing(opensAnyFile: true)
         let files = CoordinatedFileImporter(storage: sandbox.storage)
@@ -256,11 +303,34 @@ private struct ArchiveTestAudio: AudioProcessing {
             try await importer.importArchiveMember(url, fallbackTitle: "Imported", displayName: name ?? "")
         }
         let report = await bulk.run([zip])
+        // cannotOpen is the existing rejection for an unreadable/unsupported container; bulk counts it as failed.
         #expect(report.summary.failed == 2)
-        #expect(report.summary.imported == 0)
-        #expect(audio.inspections == 0)
-        #expect(await sandbox.notes.all().isEmpty)
+        #expect(report.summary.unsupported == 0)
+        #expect(report.summary.imported == 2)
+        #expect(report.summary.duplicates == 0)
+        #expect(audio.inspections == 2)
+        let restored = await sandbox.notes.all()
+        #expect(Set(restored.map(\.title)) == ["audio", "Audio"])
+        for note in restored {
+            let stored = sandbox.notes.audioURL(for: note)
+            #expect(FileManager.default.fileExists(atPath: stored.path))
+            let asset = AVURLAsset(url: stored)
+            #expect(try await !asset.loadTracks(withMediaType: .audio).isEmpty)
+            #expect(try await asset.loadTracks(withMediaType: .video).isEmpty)
+        }
         #expect(try sandbox.scratchContents().isEmpty)
+
+        // Exercise copy cleanup directly: ImportService's folder deletion must not hide a leaked probe.
+        let probeFolder = sandbox.folder.appendingPathComponent("probe-cleanup")
+        try FileManager.default.createDirectory(at: probeFolder, withIntermediateDirectories: true)
+        let truncated = try sandbox.file("truncated.m4a", Data(contentsOf: m4a).prefix(32))
+        for source in [movie, truncated] {
+            let staging = probeFolder.appendingPathComponent("source.tmp")
+            await #expect(throws: FileImportError.cannotOpen) {
+                try await files.copyArchiveMember(from: source, to: staging, maxBytes: Limits.maxImportBytes, reserveBytes: 0)
+            }
+            #expect(try FileManager.default.contentsOfDirectory(atPath: probeFolder.path).isEmpty)
+        }
     }
 
     private func graphemeMember(_ path: String, mode: String, body: Data) -> ZIPAgyFixture.Member {
