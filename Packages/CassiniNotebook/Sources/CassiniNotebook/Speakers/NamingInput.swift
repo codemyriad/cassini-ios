@@ -54,6 +54,7 @@ public struct NamingInput: Hashable, Sendable {
     public var canSample: Bool
     public var draft: Bool
     public var willHavePrint: Bool
+    public var quote: String
 
     public init(speakerID: String, label: String, ordinal: Int = 0, speakingTime: Double = 0, sample: SampleWindow? = nil,
                 print: SpeakerPrint? = nil, match: VoiceMatchState = .unmatched, voices: [SavedVoice] = [],
@@ -61,13 +62,15 @@ public struct NamingInput: Hashable, Sendable {
                 currentModel: String = VoiceprintModel.sha256,
                 mergeTargets: [MergeTarget] = [], versions: MergeVersions = MergeVersions(shown: 1, added: 2), canSample: Bool = true,
                 draft: Bool = false, willHavePrint: Bool = false,
-                colourIndex: Int? = nil, provenance: NoteSpeaker.Provenance? = nil) {
+                colourIndex: Int? = nil, provenance: NoteSpeaker.Provenance? = nil,
+                quote: String = "") {
         self.speakerID = speakerID; self.label = label; self.ordinal = ordinal; self.speakingTime = speakingTime
         self.sample = sample; self.print = print; self.match = match; self.voices = voices
         self.voicesReadOnly = voicesReadOnly; self.voiceModelReady = voiceModelReady; self.currentModel = currentModel
         self.mergeTargets = mergeTargets; self.versions = versions; self.canSample = canSample
         self.draft = draft; self.willHavePrint = willHavePrint
         self.colourIndex = colourIndex; self.provenance = provenance
+        self.quote = quote
     }
 
     /// The same fixed slots and explicit naming provenance as transcript headers.
@@ -111,11 +114,13 @@ public struct NamingInput: Hashable, Sendable {
             }
         }
         let versions = note.mergeVersionNumbers
+        let quote = NoteTranscripts.sealed(note, voices: voices).namingQuote(speakerID)
         return NamingInput(
             speakerID: speakerID, label: speaker.name, ordinal: stat?.ordinal ?? index, speakingTime: stat?.speakingTime ?? 0,
             sample: stat?.sample, print: print, match: speaker.match, voices: voices, voicesReadOnly: voicesReadOnly,
             voiceModelReady: print != nil || voiceModelReady,
             mergeTargets: targets, versions: MergeVersions(shown: versions.shown, added: versions.added),
-            canSample: note.audio.isPlayable, colourIndex: speaker.colourIndex, provenance: speaker.provenance)
+            canSample: note.audio.isPlayable, colourIndex: speaker.colourIndex, provenance: speaker.provenance,
+            quote: quote)
     }
 }

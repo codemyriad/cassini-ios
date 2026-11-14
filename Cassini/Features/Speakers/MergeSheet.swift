@@ -25,6 +25,7 @@ struct MergeSheet: View {
         }
         .navigationTitle(SpeakersCopy.mergeTitle(source))
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.visible, for: .navigationBar)
         .alert(merge.confirm.map { SpeakersCopy.mergeConfirmTitle(source, Self.name($0)) } ?? "",
                isPresented: Binding(get: { merge.confirm != nil }, set: { if !$0 { send(.cancelMerge) } }),
                presenting: merge.confirm) { target in

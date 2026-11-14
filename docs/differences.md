@@ -306,9 +306,11 @@ a local-only label stays as written, and unknown dates contribute only the durat
   thresholds (0.72 automatic, 0.50 suggest, 0.08 margin) and its 4 s minimum, which Remember needs too. Voices saved
   by iOS builds before this one hold WeSpeaker embeddings from FluidAudio. They are stale, and the person is named
   again in a note, as Android does for prints of another model.
-- **Automatic naming is opt-in.** Settings has "Name strong matches automatically", off by default. While it is off, a
-  suggestion reads "Is this Luca?", and the Remember subtitle says "Future notes will suggest Luca" instead of Android's
-  "will name Luca automatically".
+- **Automatic naming is opt-in.** Settings has "Name strong voice matches automatically", off by default. While it is
+  off, a suggestion reads "Is this Luca?", and the Remember this voice subtitle says "Future notes will suggest Luca.
+  The voiceprint never leaves this device." instead of promising automatic naming. When it is on, iPhone uses the shared
+  two-line copy ("Luca is named automatically next time.\nThe voiceprint stays on this iPhone.") and iPad uses the
+  device wording ("Future notes will name Luca automatically. The voiceprint never leaves this device.").
 - **Speaker model install.** The speaker models come from the pinned catalog through the shared
   `PinnedModelInstaller`, as on Android: the diarizer and CAM++ as seekable Zstandard from `dist.gocassini.com`,
   unpacked by `ZstdDecompressor` (facebook/zstd 1.5.7, the release that zstd-jni bundles). Each file is checked
@@ -841,8 +843,10 @@ These features exist only on iOS. They were kept by decision.
   words ("Português (Brasil)") and opens Cassini's page there. Android has a Phone / English / Italiano control.
   Without a choice there, Cassini follows the system's language (D50.1), using Foundation's matching:
   `LocalizationTests` checks that `pt` reads as pt-BR, pt-AO as pt-PT, es-MX as es and de as English.
-- **Copy.** Android's English is used, with "device" for "phone" ("Remember this voice on this device", "Transcribe on
-  this device", "Voiceprints stay on this device"), because Cassini also runs on iPad. Dates have Android's forms
+- **Copy.** Shared Phase 1 strings (`MeetingPhase1`) use the pinned `cassini-ux` catalog; on iPad, `.iphone` strings
+  ("The voiceprint stays on this iPhone.") fall back to `Speakers` device wording ("The voiceprint never leaves this
+  device.") because Cassini also runs on iPad, as do remaining strings derived from Android's English ("Transcribe on
+  this device", "Voiceprints stay on this device"). Dates have Android's forms
   (`DateLabels`): "Monday 5 Oct" in the Library and on the Note screen, "Deleted 2 Oct", "8 Oct, 9:41 AM", the year
   only for another year; the time of day follows the locale's 12- or 24-hour clock.
 - **Failure copy.** Each stored failure code reads as Android's `error_*`, with iOS's own limits and names (LONG: about

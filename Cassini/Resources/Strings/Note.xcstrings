@@ -1437,47 +1437,6 @@
         }
       }
     },
-    "Finish recording to listen to this note.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Finish recording to listen to this note."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Termina la grabación para escuchar esta nota."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Terminez l’enregistrement pour écouter cette note."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Termina la registrazione per ascoltare questa nota."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Conclua a gravação para ouvir esta nota."
-          }
-        },
-        "pt-PT": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Termine a gravação para ouvir esta nota."
-          }
-        }
-      }
-    },
     "Fix the transcript first: Transcribe again": {
       "extractionState": "manual",
       "localizations": {
@@ -3258,6 +3217,47 @@
           "stringUnit": {
             "state": "translated",
             "value": "Parar e manter o progresso"
+          }
+        }
+      }
+    },
+    "Stop recording to listen to this note.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop recording to listen to this note."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Detén la grabación para escuchar esta nota."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arrêtez l’enregistrement pour écouter cette note."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ferma la registrazione per ascoltare questa nota."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pare a gravação para ouvir esta nota."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pare a gravação para ouvir esta nota."
           }
         }
       }

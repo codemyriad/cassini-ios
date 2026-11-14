@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compile the pinned shared Phase 1 meeting strings into native localization assets."""
+"""Compile the pinned shared Phase 1 meeting and speaker strings into native localization assets."""
 import argparse
 import hashlib
 import json
@@ -12,26 +12,45 @@ OUTPUT = Path('Cassini/Resources/Strings/MeetingPhase1.xcstrings')
 LOOKUP = Path('Cassini/Strings/MeetingPhase1Copy.swift')
 STRINGS_PIN = Path('contracts/shared-strings/UPSTREAM.json')
 LANGUAGES = ('en', 'it', 'fr', 'es', 'pt-BR', 'pt-PT')
-PROPERTIES = {
-    'common.stop': 'stop',
-    'library.allMeetings': 'allMeetings',
-    'library.backToAllMeetings': 'backToAllMeetings',
-    'meeting.find.placeholder': 'findPlaceholder',
-    'transcribing.details.a11y': 'transcribingDetailsA11y',
-    'transcribing.heading': 'transcribingHeading',
-    'transcribing.speakerSuggestion.no': 'speakerSuggestionNo',
-    'transcribing.speakerSuggestion.yes': 'speakerSuggestionYes',
-    'transcribing.stat.audioDone': 'statAudioDone',
-    'transcribing.stat.batteryAtFinish': 'statBatteryAtFinish',
-    'transcribing.stat.timeLeft': 'statTimeLeft',
-    'transcribing.stat.wordsSoFar': 'statWordsSoFar',
-    'transcribing.step.preparing': 'stepPreparing',
-    'transcribing.step.reading': 'stepReading',
-    'transcribing.step.saving': 'stepSaving',
-    'transcribing.step.speakers': 'stepSpeakers',
-    'transcribing.step.words': 'stepWords',
-    'transcribing.stopAndKeepProgress': 'stopAndKeepProgress',
-    'transcribing.transcriptSoFar': 'transcriptSoFar',
+ENTRIES = {
+    'common.cancel': ('cancel', None),
+    'common.quote': ('quote', 'quote'),
+    'common.savedVoices': ('savedVoices', None),
+    'common.stop': ('stop', None),
+    'library.allMeetings': ('allMeetings', None),
+    'library.backToAllMeetings': ('backToAllMeetings', None),
+    'meeting.find.placeholder': ('findPlaceholder', None),
+    'speakers.dialog.a11y': ('speakerDialogLabel', None),
+    'speakers.duplicate.notice': ('speakerDuplicateNotice', 'name'),
+    'speakers.duplicate.samePerson': ('speakerSamePerson', None),
+    'speakers.duplicate.someoneElse': ('speakerSomeoneElse', None),
+    'speakers.mergeInto': ('speakerMergeInto', None),
+    'speakers.nameLabel': ('speakerNameLabel', None),
+    'speakers.playSample': ('speakerPlaySample', None),
+    'speakers.rememberVoice.cardBody.iphone': ('speakerRememberBody', 'name'),
+    'speakers.rememberVoice.cardBody.iphone.unnamed': ('speakerRememberUnnamed', None),
+    'speakers.rememberVoice.modelsNeeded': ('speakerRememberModelsNeeded', None),
+    'speakers.rememberVoice.title': ('speakerRememberTitle', None),
+    'speakers.rememberVoice.tooShort': ('speakerRememberTooShort', None),
+    'speakers.saveName': ('speakerSaveName', None),
+    'speakers.savedVoices.heading': ('speakerVoicesRanked', None),
+    'speakers.savedVoices.likely': ('speakerLikely', None),
+    'speakers.talkTime': ('speakerTalkTime', 'talkTime'),
+    'transcribing.details.a11y': ('transcribingDetailsA11y', None),
+    'transcribing.heading': ('transcribingHeading', None),
+    'transcribing.speakerSuggestion.no': ('speakerSuggestionNo', None),
+    'transcribing.speakerSuggestion.yes': ('speakerSuggestionYes', None),
+    'transcribing.stat.audioDone': ('statAudioDone', None),
+    'transcribing.stat.batteryAtFinish': ('statBatteryAtFinish', None),
+    'transcribing.stat.timeLeft': ('statTimeLeft', None),
+    'transcribing.stat.wordsSoFar': ('statWordsSoFar', None),
+    'transcribing.step.preparing': ('stepPreparing', None),
+    'transcribing.step.reading': ('stepReading', None),
+    'transcribing.step.saving': ('stepSaving', None),
+    'transcribing.step.speakers': ('stepSpeakers', None),
+    'transcribing.step.words': ('stepWords', None),
+    'transcribing.stopAndKeepProgress': ('stopAndKeepProgress', None),
+    'transcribing.transcriptSoFar': ('transcriptSoFar', None),
 }
 TEMPLATES = {
     'transcribing.speakerSuggestion': ('speakerSuggestion', ('name',)),
@@ -67,26 +86,32 @@ def outputs(root=ROOT):
             or shared.get('sha256') != digest
             or shared.get('vendored_path') != (SOURCE / 'strings/strings.json').as_posix()):
         raise ValueError('Meeting-string pin/hash mismatch')
-    wanted = set(PROPERTIES) | set(TEMPLATES) | set(PLURALS)
+    wanted = set(ENTRIES) | set(TEMPLATES) | set(PLURALS)
     selected = [entry for entry in json.loads(source.read_text())['entries'] if entry['id'] in wanted]
     if len(selected) != len(wanted) or {entry['id'] for entry in selected} != wanted:
-        raise ValueError('Missing or duplicate Phase 1 meeting string IDs')
+        raise ValueError('Missing or duplicate Phase 1 string IDs')
     by_id = {entry['id']: entry for entry in selected}
     strings = {}
-
-    for key in sorted(PROPERTIES):
+    for key in sorted(ENTRIES):
         entry = by_id[key]
-        if entry.get('placeholders') or entry.get('plural'):
-            raise ValueError(f'Plain meeting string gained placeholders or plurals: {key}')
+        _, argument = ENTRIES[key]
+        expected_args = {argument} if argument else set()
+        if set(entry.get('placeholders', {})) != expected_args or entry.get('plural'):
+            raise ValueError(f'Phase 1 string declaration changed: {key}')
+        expected_placeholders = {f'{{{argument}}}'} if argument else set()
         locales = {}
         for language in LANGUAGES:
             translation = entry if language == 'en' else entry['l10n'][language]
             value = entry['en'] if language == 'en' else translation['text']
-            if not isinstance(value, str) or not value.strip() or re.search(r'\{\w+\}', value) or translation.get('plural'):
-                raise ValueError(f'Meeting string needs nonempty plain text: {key} {language}')
+            found_placeholders = set(re.findall(r'\{\w+\}', value)) if isinstance(value, str) else None
+            if (not isinstance(value, str) or not value.strip()
+                    or found_placeholders != expected_placeholders
+                    or translation.get('plural')):
+                raise ValueError(f'Phase 1 string invalid or placeholder drift: {key} {language}')
             locales[language] = {'stringUnit': {'state': 'translated', 'value': value}}
+        comment_tail = '; named placeholders stay verbatim.' if argument else '.'
         strings[key] = {
-            'comment': f'Generated from cassini-ux {pin["commit"]}, {key}.',
+            'comment': f'Generated from cassini-ux {pin["commit"]}, {key}{comment_tail}',
             'extractionState': 'manual', 'localizations': locales,
         }
 
@@ -133,10 +158,18 @@ def outputs(root=ROOT):
     catalog = (json.dumps({'sourceLanguage': 'en', 'strings': strings, 'version': '1.0'},
                           ensure_ascii=False, indent=2) + '\n').encode()
     lines = [f'// Generated from cassini-ux {pin["commit"]}; do not edit.', 'import Foundation', '',
-             '/// Shared meeting copy, resolved using the current app language.', 'enum MeetingPhase1Copy {']
-    for key, name in sorted(PROPERTIES.items()):
-        lines += [f'    static var {name}: String {{',
-                  f'        String(localized: "{key}", table: "MeetingPhase1")', '    }']
+             '/// Shared Phase 1 meeting and speaker copy, resolved using the current app language.',
+             'enum MeetingPhase1Copy {']
+    for key, (name, argument) in sorted(ENTRIES.items()):
+        if argument is None:
+            lines += [f'    static var {name}: String {{',
+                      f'        String(localized: "{key}", table: "MeetingPhase1")', '    }']
+        else:
+            lines += [f'    static var {name}Template: String {{',
+                      f'        String(localized: "{key}", table: "MeetingPhase1")', '    }',
+                      f'    static func {name}(_ {argument}: String) -> String {{',
+                      f'        {name}Template.replacingOccurrences(of: "{{{argument}}}", with: {argument})',
+                      '    }']
     for key, (name, params) in sorted(TEMPLATES.items()):
         signature = ', '.join(f'{p}: String' for p in params)
         lines += [f'    static func {name}({signature}) -> String {{',

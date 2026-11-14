@@ -62,7 +62,7 @@ struct RecordingNotices: View {
             }
         }
         if recording.state.isActive {
-            NoticeCard(title: String(localized: "Finish recording to listen to this note.", table: "Note"), symbol: "mic")
+            NoticeCard(title: String(localized: "Stop recording to listen to this note.", table: "Note"), symbol: "mic")
         }
     }
 }
