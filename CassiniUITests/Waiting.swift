@@ -143,7 +143,8 @@ extension XCUIApplication {
     ///
     /// When the app is already on the screen, launched with the same system arguments (such as a text size), and the
     /// launch resets the test data, the launch happens inside the app (`Launches.relaunchInApp`): about a second
-    /// instead of five. `fresh` asks for a new process.
+    /// instead of five. `fresh` asks for a new process. Below iOS 26, always start a new process: the iOS 18
+    /// accessibility tree can retain elements from the replaced graph and crash while XCTest reads them.
     @MainActor func launchAndWait(fresh: Bool = false, file: StaticString = #filePath, line: UInt = #line) {
         if ProcessInfo.processInfo.operatingSystemVersion.majorVersion == 18 {
             // Xcode 27's accessibility query dumps can quarantine iOS 18's log client, then crash inside
@@ -152,7 +153,7 @@ extension XCUIApplication {
             launchEnvironment["OS_ACTIVITY_MODE"] = "disable"
         }
         if DeviceUnderTest.iOS18Facts, !launchArguments.contains("--ios18-platform") { launchArguments.append("--ios18-platform") }
-        if !fresh, Launches.relaunchInApp(launchArguments) { return }
+        if #available(iOS 26, *), !fresh, Launches.relaunchInApp(launchArguments) { return }
         launch()
         Launches.launched(launchArguments)
         XCTAssertTrue(staticTexts["launchFinished"].waitForExistence(within: 30), "the launch did not finish", file: file, line: line)
@@ -170,6 +171,7 @@ extension XCUIApplication {
     private static let options: [String: Bool] = [
         "--ui-testing": false, "--reset-test-data": false, "--seed-test-data": false, "--seed": true,
         "--open-fixture": true, "--models-missing": false, "--notifications-denied": false, "--capture-held": false,
+        "--draft-speaker-suggestion": false,
     ]
     /// The system arguments of the process this runner launched last; nil when a new process must come first.
     private static var processArguments: [String]?

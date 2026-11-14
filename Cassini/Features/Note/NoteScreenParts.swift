@@ -62,7 +62,7 @@ struct RecordingNotices: View {
             }
         }
         if recording.state.isActive {
-            NoticeCard(title: String(localized: "Finish recording to listen to this note.", table: "Note"), symbol: "mic")
+            NoticeCard(title: String(localized: "Stop recording to listen to this note.", table: "Note"), symbol: "mic")
         }
     }
 }
@@ -93,48 +93,38 @@ struct FollowChipHost: View {
     }
 }
 
-/// The draft of the running job, as it grows, with its names; "Words may still change" while it does.
-/// `ProcessingBody` follows its end as the list grows.
+/// The draft of the running or paused job, with its names (`Transcript so far`). `ProcessingBody` follows its end as
+/// the list grows while transcribing.
 struct RunningDraft: View {
     let model: NoteScreenModel
     let cache: TranscriptCache
 
     var body: some View {
         if let draft = model.shownDraft, !draft.words.isEmpty {
-            DraftSection(draft: draft, transcript: cache.draft(draft), changing: true, model: model)
+            DraftSection(draft: draft, transcript: cache.draft(draft), model: model)
         }
     }
 }
 
-/// "Draft transcript" and its paragraphs. While the job lets the draft be named, a speaker's header opens Name a
-/// speaker and the "Is this Luca?" cards answer in the draft's names.
+/// "Transcript so far" and its paragraphs. While the job lets the draft be named, a speaker's header opens Name a
+/// speaker and the compact inline "Is this Luca?" rows answer in the draft's names.
 struct DraftSection: View {
     let draft: DraftState
     let transcript: NoteTranscript
-    let changing: Bool
     let model: NoteScreenModel
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
-                Text(NoteCopy.draftTitle).font(.caption.weight(.semibold)).tracking(1.2).textCase(.uppercase)
-                    .foregroundStyle(Color.muted).accessibilityAddTraits(.isHeader)
-                if changing {
-                    Text(NoteCopy.draftTag).font(.caption2.weight(.medium)).foregroundStyle(Color.muted)
-                        .padding(.horizontal, 8).padding(.vertical, 3).background(Color.ink.opacity(0.1), in: Capsule())
-                }
-            }
+            Text(MeetingPhase1Copy.transcriptSoFar)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Color.ink)
+                .accessibilityAddTraits(.isHeader)
             TranscriptList(transcript: transcript, style: .draft, renamable: draft.namingOpen,
-                           actions: TranscriptActions(nameSpeaker: { model.speakerTapped($0) }),
-                           suggestion: { turn in
-                               guard draft.namingOpen, !turn.allSuggestions.isEmpty else { return nil }
-                               return AnyView(VStack(spacing: 12) {
-                                   ForEach(turn.allSuggestions, id: \.byteSpeakerID) { suggestion in
-                                       let ordinal = transcript.speakers.firstIndex { Data($0.utf8) == Data(suggestion.speakerID.utf8) } ?? 0
-                                       SuggestionCard(suggestion: suggestion, ordinal: ordinal, tint: transcript.speakerTint(for: suggestion.speakerID) ?? .stone, model: model)
-                                   }
-                               })
-                           })
+                           actions: TranscriptActions(
+                               nameSpeaker: { model.speakerTapped($0) },
+                               answerSuggestion: { suggestion, yes in
+                                   Task { await model.answer(suggestion, yes: yes) }
+                               }))
         }
         .accessibilityIdentifier("draftTranscript")
     }

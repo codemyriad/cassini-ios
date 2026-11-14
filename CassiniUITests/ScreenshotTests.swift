@@ -36,13 +36,11 @@ final class ScreenshotTests: XCTestCase {
 
     @MainActor func test03Transcribing() throws {
         let app = try launchPhone(["--seed", "processing", "--open-fixture", Self.processing])
-        let headline = app.descendants(matching: .any)["progressHeadline"]
-        XCTAssertTrue(headline.wait(until: NSPredicate(format: "label CONTAINS %@", "%"), within: 15))
+        // Reports advance the injected uptime, so the compact strip's ETA follows the synthetic pace.
+        let details = app.buttons["transcribingDetails"]
+        XCTAssertTrue(details.wait(until: NSPredicate(format: "label CONTAINS %@", "min"), within: 15), details.label)
         XCTAssertTrue(element(app, containing: "agenda").waitForExistence(within: 10), "the draft so far shows")
-        // Reports advance the injected uptime, so the estimate follows the synthetic pace.
-        let timeLeft = app.descendants(matching: .any).matching(identifier: "timeLeftStat").firstMatch
-        XCTAssertTrue(timeLeft.wait(until: NSPredicate(format: "label CONTAINS %@", "min"), within: 15), timeLeft.label)
-        // The draft follows its end as it arrives; back at its start, its header shows under the card.
+        // The draft follows its end as it arrives; back at its start, its header shows under the status strip.
         let parts = app.descendants(matching: .any).matching(identifier: "draftTranscript")
         let header = parts.firstMatch, draft = app.scrollViews.firstMatch
         XCTAssertTrue(draft.scroll(up: false, attempts: 3) {

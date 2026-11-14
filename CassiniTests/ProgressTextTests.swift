@@ -34,11 +34,41 @@ final class ProgressTextTests: XCTestCase {
         XCTAssertEqual(ProgressText.step(.speakers), "Speakers & matching")
         XCTAssertEqual(ProgressText.stepDescription(.words), "Step 3 of 5: Words")
         XCTAssertEqual(ProgressText.stepState(.skipped), "skipped")
+        XCTAssertEqual(ProgressText.compactEta(.range(lowMs: 1 * minute, highMs: 1 * minute), language: "en"), "about 1 min left")
+        XCTAssertEqual(ProgressText.compactEta(.range(lowMs: 6 * minute, highMs: 6 * minute), language: "en"), "about 6 min left")
+        XCTAssertEqual(ProgressText.compactEta(.range(lowMs: 6 * minute, highMs: 9 * minute), language: "en"), "about 6–9 min left")
+        XCTAssertEqual(ProgressText.compactEta(.range(lowMs: 70 * minute, highMs: 90 * minute), language: "en"), "about 70–90 min left")
+        XCTAssertEqual(ProgressText.compactEta(.range(lowMs: 10 * second, highMs: 50 * second), language: "en"), "under \(nb("1 min")) left")
+        XCTAssertEqual(ProgressText.compactEta(.calculating, language: "en"), "calculating time left…")
+        XCTAssertEqual(ProgressText.compactEta(.finishing, language: "en"), "finishing…")
     }
 
-    // ports: FormatTest#clock (the progress card's range and Processed stat)
-    func testTheProcessedStatAndTheRangeAreClockTimes() {
+    // ports: FormatTest#compactEtaLocales + TranscribingSheetStepLabelAlignment
+    func testCompactEtaAudioDoneAndStepDescriptionsFollowExplicitLocales() {
+        XCTAssertEqual(ProgressText.compactEta(.range(lowMs: 1 * minute, highMs: 1 * minute), language: "it"), "circa 1 min rimanente")
+        XCTAssertEqual(ProgressText.compactEta(.range(lowMs: 4 * minute, highMs: 6 * minute), language: "it"), "circa 4–6 min rimanenti")
+        XCTAssertEqual(ProgressText.compactEta(.range(lowMs: 1 * minute, highMs: 1 * minute), language: "fr"), "environ 1 min restante")
+        XCTAssertEqual(ProgressText.compactEta(.range(lowMs: 4 * minute, highMs: 6 * minute), language: "fr"), "environ 4–6 min restantes")
+        XCTAssertEqual(ProgressText.compactEta(.range(lowMs: 1 * minute, highMs: 1 * minute), language: "es"), "queda 1 min")
+        XCTAssertEqual(ProgressText.compactEta(.range(lowMs: 4 * minute, highMs: 6 * minute), language: "es"), "quedan unos 4–6 min")
+        XCTAssertEqual(ProgressText.compactEta(.range(lowMs: 1 * minute, highMs: 1 * minute), language: "pt-BR"), "cerca de 1 min restante")
+        XCTAssertEqual(ProgressText.compactEta(.range(lowMs: 4 * minute, highMs: 6 * minute), language: "pt-PT"), "cerca de 4–6 min restantes")
+
+        XCTAssertEqual(ProgressText.audioDone(doneMs: 29 * minute + 52 * second, totalMs: 48 * minute + 13 * second, language: "fr"),
+                       "29:52 sur 48:13")
+        XCTAssertEqual(ProgressText.audioDone(doneMs: 29 * minute + 52 * second, totalMs: 48 * minute + 13 * second, language: "it"),
+                       "29:52 su 48:13")
+        XCTAssertEqual(ProgressText.audioDone(doneMs: 29 * minute + 52 * second, totalMs: 48 * minute + 13 * second, language: "es"),
+                       "29:52 de 48:13")
+
+        XCTAssertEqual(ProgressText.stepDescription(.saving, language: "pt-BR"), "Etapa 5 de 5: Salvamento")
+        XCTAssertEqual(ProgressText.stepDescription(.saving, language: "pt-PT"), "Passo 5 de 5: Gravação")
+        XCTAssertEqual(ProgressText.stepDescription(.speakers, language: "fr"), "Étape 4 sur 5\u{00A0}: Intervenants et correspondance")
+    }
+
+    // ports: FormatTest#clock (the progress sheet's range and Audio done stat)
+    func testTheAudioDoneStatAndTheRangeAreClockTimes() {
         XCTAssertEqual(ProgressText.range(startMs: 29 * minute, endMs: 29 * minute + 45 * second), "29:00–29:45")
-        XCTAssertEqual(ProgressText.processed(doneMs: 29 * minute + 52 * second, totalMs: 48 * minute + 13 * second), "29:52 / 48:13")
+        XCTAssertEqual(ProgressText.audioDone(doneMs: 29 * minute + 52 * second, totalMs: 48 * minute + 13 * second), "29:52 of 48:13")
     }
 }

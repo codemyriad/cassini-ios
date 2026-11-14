@@ -416,43 +416,48 @@ final class NoteScreenTests: XCTestCase {
         XCTAssertTrue(wait("label == 'Supplier call'", app.staticTexts["noteTitle"]))
     }
 
-    // ports: ModelDownloadFlowTest (Cancel in the processing card's download banner)
-    /// The job's model download shows its part in the card, and Cancel stops the job: the note is audio only again.
-    /// Without Apple speech the downloaded speech model is Parakeet's (`DeviceUnderTest.downloadedSpeech`).
+    // ports: ModelDownloadFlowTest (Cancel in the transcribing details sheet's download banner)
+    /// The job's model download shows its part in the details sheet, and Cancel stops the job: the sheet closes and
+    /// the note is audio only again. Without Apple speech the downloaded speech model is Parakeet's.
     @MainActor func testCancelInTheCardsDownloadStopsTheJob() {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed", "processing", "--model-downloading",
                                "--open-fixture", "CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC"] + DeviceUnderTest.downloadedSpeech
         app.launchAndWait()
+        let details = app.buttons["transcribingDetails"]
+        XCTAssertTrue(details.waitForExistence(within: 15))
+        details.tap()
         let banner = app.descendants(matching: .any)["banner.DL_DOWNLOADING"]
         XCTAssertTrue(banner.waitForExistence(within: 15))
         XCTAssertTrue(app.staticTexts["Downloading speech recognition — 46%"].exists)
         banner.buttons["Cancel"].tap()
-        XCTAssertTrue(banner.waitForNonExistence(within: 10))
+        XCTAssertTrue(app.descendants(matching: .any)["transcribingDetailsSheet"].waitForNonExistence(within: 10))
         XCTAssertTrue(app.buttons["Transcribe"].waitForExistence(within: 10), "the note is audio only again")
     }
 
     // ports: ScreenBehaviourTest#newDraftTextKeepsTheProgressCardInView
-    /// New draft text scrolls the end of the draft into view below the fixed card; a scroll up stops that, and a
-    /// scroll back to the end starts it again.
+    /// New draft text scrolls the end of the draft into view below the pinned status strip; a scroll up stops that, and
+    /// stopping and resuming keeps the held-away scroll position.
     @MainActor func testTheDraftFollowsItsEndBelowTheFixedCard() {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed", "processing", "--draft-growing",
                                "--open-fixture", "CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC"] + DeviceUnderTest.workingSpeech
         app.launchAndWait()
         app.appendDraft(sentences: 24)
-        // The draft's header, its tag and its paragraphs all carry the section's identifier; the last one ends it.
+        // The draft's header and its paragraphs carry the section's identifier; the last one ends it.
         let parts = app.descendants(matching: .any).matching(identifier: "draftTranscript")
         XCTAssertTrue(parts.firstMatch.waitForExistence(within: 15))
         var draft: XCUIElement { parts.element(boundBy: parts.count - 1) }
         XCTAssertTrue(poll(within: 15) { app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "Sentence 24 ")).firstMatch.exists },
                       "the requested draft arrived; parts: \(parts.allElementsBoundByIndex.map { $0.label })")
         let window = app.windows.firstMatch.frame
-        let stop = app.buttons["Stop and keep progress"]
-        // The draft outgrows the screen; its end stays in view and so does the card.
+        let stop = app.buttons["transcribingStop"]
+        // The draft outgrows the screen; its end stays in view and so does the pinned status strip.
         XCTAssertTrue(poll(within: 30) { draft.frame.height > window.height / 2 && draft.frame.maxY <= window.maxY + 1 },
                       "the end of the draft follows the new text")
-        XCTAssertTrue(stop.isHittable, "the card stays fixed above the draft")
+        XCTAssertTrue(stop.isHittable, "the status strip stays fixed above the draft")
+        XCTAssertTrue(app.descendants(matching: .any)["transcribingScrolledDivider"].exists,
+                      "scrolled draft shows the 1 pt divider beneath the pinned strip")
 
         draft.swipeDown()
         XCTAssertTrue(poll(within: 15) { draft.frame.maxY > window.maxY + 100 })
@@ -467,6 +472,16 @@ final class NoteScreenTests: XCTestCase {
                       "the rendered draft grew below its previous end")
         XCTAssertGreaterThan(draft.frame.maxY, window.maxY + 100, "after a scroll up, new text does not scroll")
         XCTAssertTrue(stop.isHittable)
+
+        // Stopping and resuming keeps the shared scroll container and its held-away position.
+        stop.tap()
+        let resume = app.buttons["Resume"]
+        XCTAssertTrue(resume.waitForExistence(within: 10))
+        XCTAssertGreaterThan(draft.frame.maxY, window.maxY + 100, "paused draft preserves the held-away scroll position")
+        resume.tap()
+        XCTAssertTrue(stop.waitForExistence(within: 10))
+        XCTAssertEqual(follow.value as? String, "scrolling=false,following=false")
+        XCTAssertGreaterThan(draft.frame.maxY, window.maxY + 100, "resumed draft stays where the reader left it")
     }
 
     /// The note screen's Rename is the Library's dialog: Save waits for a change, and a blank title says why.
@@ -528,6 +543,102 @@ final class NoteScreenTests: XCTestCase {
         XCTAssertTrue(app.buttons["Transcribe"].exists)
         XCTAssertFalse(app.buttons["searchTranscript"].exists, "no search without a transcript")
         XCTAssertFalse(app.buttons["Dismiss"].exists, "Plain audio has no close, as in Android's catalogue")
+    }
+
+    // ports: TranscribingPhase1Test#detailsSheetStepsStatsAndStopLifecycle
+    @MainActor func testTranscribingDetailsSheetShowsProgressStepsStatsAndClosesWhenStopped() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed", "processing", "--open-fixture",
+                               "CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC"] + DeviceUnderTest.workingSpeech
+        app.launchAndWait()
+        let details = app.buttons["transcribingDetails"]
+        XCTAssertTrue(details.waitForExistence(within: 15))
+        XCTAssertTrue(app.staticTexts["uiTestState-transcribingAudioDone"].waitForValue("29:53 of 48:13"))
+        // Scroll back to the start of the draft so the un-scrolled state can be verified.
+        let parts = app.descendants(matching: .any).matching(identifier: "draftTranscript")
+        let header = app.staticTexts["Transcript so far"]
+        XCTAssertTrue(parts.element(boundBy: parts.count - 1).scroll(up: false, attempts: 3) { header.exists && header.isHittable })
+        XCTAssertFalse(app.descendants(matching: .any)["transcribingScrolledDivider"].exists,
+                       "no divider while the draft rests at the top")
+
+        details.tap()
+        let sheet = app.descendants(matching: .any)["transcribingDetailsSheet"]
+        XCTAssertTrue(sheet.waitForExistence(within: 5))
+        XCTAssertEqual(app.staticTexts["transcribingDetailsPercent"].label, "52%")
+        XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "identifier == 'audioDoneStat' AND label CONTAINS %@",
+                                                                           "29:53 of 48:13")).firstMatch.exists)
+        XCTAssertTrue(app.descendants(matching: .any)["wordsSoFarStat"].exists)
+        let wordsStep = app.descendants(matching: .any)["Step 3 of 5: Words"]
+        XCTAssertEqual(wordsStep.value as? String, "in progress")
+        let speakersStep = app.descendants(matching: .any)["Step 4 of 5: Speakers & matching"]
+        XCTAssertEqual(speakersStep.value as? String, "not started")
+
+        let sheetStop = app.buttons["transcribingDetailsStop"]
+        XCTAssertEqual(sheetStop.label, "Stop and keep progress")
+        sheetStop.tap()
+        XCTAssertTrue(sheet.waitForNonExistence(within: 10), "stopping closes the details sheet once the job pauses")
+        let resume = app.buttons["Resume"]
+        XCTAssertTrue(resume.waitForExistence(within: 10))
+        XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "agenda")).firstMatch.exists,
+                      "checkpoint draft words stay visible while paused")
+        resume.tap()
+        XCTAssertTrue(details.waitForExistence(within: 10))
+        XCTAssertFalse(sheet.exists, "resuming does not reopen a dismissed details sheet")
+    }
+
+    // ports: TranscribingPhase1Test#compactSpeakerSuggestionInLiveDraft
+    @MainActor func testCompactSpeakerSuggestionInLiveDraftNamesWithSeparateTargets() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed", "processing", "--draft-speaker-suggestion",
+                               "--open-fixture", "CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC"] + DeviceUnderTest.workingSpeech
+        app.launchAndWait()
+        XCTAssertTrue(app.buttons["transcribingDetails"].waitForExistence(within: 15))
+        XCTAssertTrue(app.staticTexts["uiTestState-transcribingAudioDone"].waitForValue("29:53 of 48:13"))
+
+        let yes = app.buttons["suggestionYes"]
+        let no = app.buttons["suggestionNo"]
+        XCTAssertTrue(yes.waitForExistence(within: 10))
+        XCTAssertTrue(no.exists)
+        XCTAssertEqual(no.label, "Not Sam Rivera")
+        XCTAssertEqual(yes.label, "Yes, Sam Rivera")
+        XCTAssertGreaterThanOrEqual(no.frame.width, 44 - 0.001)
+        XCTAssertGreaterThanOrEqual(no.frame.height, 44 - 0.001)
+        XCTAssertGreaterThanOrEqual(yes.frame.width, 44 - 0.001)
+        XCTAssertGreaterThanOrEqual(yes.frame.height, 44 - 0.001)
+        XCTAssertFalse(no.frame.intersects(yes.frame), "No and Yes are separate 44 pt targets")
+
+        yes.tap()
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Sam Rivera, at")).firstMatch
+            .waitForExistence(within: 5), "Yes names the speaker in the live draft")
+        XCTAssertTrue(yes.waitForNonExistence(within: 5))
+    }
+
+    // ports: TranscribingPhase1Test#frenchLargeFontLayout
+    @MainActor func testTranscribingStripAndDetailsSheetAdaptInFrenchAtLargestDynamicType() {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "--ui-testing", "--reset-test-data", "--seed", "processing", "--draft-speaker-suggestion",
+            "--open-fixture", "CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC",
+            "-AppleLanguages", "(fr)", "-AppleLocale", "fr_FR",
+            "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL",
+        ] + DeviceUnderTest.workingSpeech
+        app.launchAndWait(fresh: true)
+        let details = app.buttons["transcribingDetails"]
+        let stop = app.buttons["transcribingStop"]
+        XCTAssertTrue(details.waitForExistence(within: 15))
+        XCTAssertTrue(details.label.hasPrefix("Transcription · "), details.label)
+        XCTAssertEqual(stop.label, "Arrêter et garder la progression")
+        XCTAssertGreaterThanOrEqual(details.frame.height, 44 - 0.001)
+        XCTAssertGreaterThanOrEqual(stop.frame.width, 44 - 0.001)
+        XCTAssertGreaterThanOrEqual(stop.frame.height, 44 - 0.001)
+        XCTAssertFalse(details.frame.intersects(stop.frame))
+
+        details.tap()
+        let sheet = app.descendants(matching: .any)["transcribingDetailsSheet"]
+        XCTAssertTrue(sheet.waitForExistence(within: 5))
+        XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@",
+                                                                           "Intervenants et correspondance")).firstMatch.exists)
+        XCTAssertTrue(app.descendants(matching: .any)["audioDoneStat"].exists)
     }
 }
 

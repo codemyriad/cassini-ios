@@ -61,8 +61,6 @@ enum NoteCopy {
 
     static let noSpeechTitle = String(localized: "No speech", table: "Note")
     static let noSpeechBody = String(localized: "No words were found in this recording.", table: "Note")
-    static let draftTitle = String(localized: "Draft transcript", table: "Note")
-    static let draftTag = String(localized: "Words may still change", table: "Note")
     static let nameThisSpeaker = String(localized: "Name this speaker", table: "Note")
     static let auto = String(localized: "auto", table: "Note", comment: "Badge of a speaker named automatically from a saved voice")
     static let playFromStartOfTurn = String(localized: "Play from start of turn", table: "Note")

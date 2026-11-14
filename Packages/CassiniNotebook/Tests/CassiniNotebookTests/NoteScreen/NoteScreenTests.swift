@@ -55,6 +55,8 @@ import Testing
         #expect(NoteMode.of(note, job: job(.needsConsent, for: note)) == .reading)
         var plain = note
         plain.transcript = []; plain.status = .audioOnly
+        #expect(NoteMode.of(plain, job: job(.queued, for: plain)).showsDraft,
+                "a resumed job queued without a transcript keeps its checkpoint draft")
         #expect(NoteMode.of(plain, job: job(.failed, for: plain)) == .failed(overDocument: false))
         #expect(NoteMode.failed(overDocument: false).showsDraft, "a failure without a transcript shows the draft so far")
         #expect(NoteSubtitle.of(note, mode: .reading, now: note.createdAt, calendar: .current) != nil,

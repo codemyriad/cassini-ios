@@ -50,6 +50,15 @@ enum TestFixtures {
         (17, "That leaves a week of buffer before the holidays, which I’d rather keep than spend."),
     ].map { start, text in timedSegment(text, start: start, end: start + 8.5) }
 
+    /// The processing seed's draft with two streaming speaker slots (`s1` and `s2`) for `--draft-speaker-suggestion`.
+    static let processingSpeakerDraft: [TranscriptSegment] = [
+        (0, "Morning, everyone. Three things on the agenda today: the launch date, the onboarding copy and hiring.", "s1"),
+        (9, "Let’s start with the launch. Engineering thinks the last two weeks of November are realistic.", "s2"),
+        (17, "That leaves a week of buffer before the holidays, which I’d rather keep than spend.", "s1"),
+    ].map { start, text, speaker in
+        timedSegment(text, start: start, end: start + 8.5, TranscriptSegment(text: text, start: start, end: start + 8.5, speakerID: speaker))
+    }
+
     /// The draft of `--draft-growing`: 120 sentences of 3 s, each its own words.
     static let growingDraft: [TranscriptSegment] = (0..<120).map { index in
         let start = Double(index) * 3
@@ -81,11 +90,13 @@ enum TestFixtures {
     /// progress are that recognizer's, so they resume where the system has no Apple speech; Apple speech's job is a
     /// legacy one, without an identity.
     static func seed(_ seed: AppEnvironment.Seed, into store: NoteStore, now: Date,
-                     recognizer: SpeechRecognizer) async throws {
+                     recognizer: SpeechRecognizer, draftSpeakerSuggestion: Bool = false) async throws {
         guard try store.root.isEmptyDirectory else { return }
         var main = fixture(now: now)
         var notes: [Note] = []
         switch seed {
+        case .processing where draftSpeakerSuggestion:
+            _ = try seedSuggestedVoice(root: store.root)
         case .speakers:
             // Sam is not named yet, and the saved voice "Sam Rivera" may be them: the note asks "Is this Sam Rivera?".
             let sam = try seedSuggestedVoice(root: store.root)
@@ -163,12 +174,20 @@ enum TestFixtures {
 
     /// What a seed needs once the app is ready: consent and a running job for `processing`, whose speaker step is
     /// ahead of it, and for `statuses`, whose job has none.
-    @MainActor static func prepare(_ seed: AppEnvironment.Seed, settings: SettingsStore, processing: ProcessingStore) {
+    @MainActor static func prepare(_ seed: AppEnvironment.Seed, settings: SettingsStore, processing: ProcessingStore,
+                                   voices: VoicesStore, draftSpeakerSuggestion: Bool = false) {
         guard seed == .processing || seed == .statuses else { return }
         settings.recordConsent()
         settings.identifySpeakers = seed == .processing
         Task {
             await processing.transcribe(processingID, origin: .screen)
+            if seed == .processing, draftSpeakerSuggestion, let sam = voices.savedVoices.first {
+                processing.drafts?.mutate(processingID) { draft in
+                    var updated = draft
+                    updated.live["s2"] = LiveMatch(sam.id, 0.78, .suggested)
+                    return updated
+                }
+            }
             // The frozen job never ends, so this one stays queued behind it.
             if seed == .statuses { await processing.transcribe(queuedID, origin: .screen) }
         }

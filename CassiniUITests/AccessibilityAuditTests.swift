@@ -106,6 +106,7 @@ final class AccessibilityAuditTests: XCTestCase {
         var titleClipped = false
         // Unattributed clipping issues let through so far, the title's included (`AuditFilter.listRowLimit`).
         var unattributedClips = 0
+        let listRowLimit = AuditFilter.listRowLimit(settings: screen == "settings" || screen.hasSuffix("-settings"))
         // An iPad window has a resize handle in its corner (`AuditFilter.isWindowControl`).
         let window = UIDevice.current.userInterfaceIdiom == .pad
         let detection = types.intersection(.elementDetection)
@@ -121,7 +122,7 @@ final class AccessibilityAuditTests: XCTestCase {
                         titleClipped = true
                         unattributedClips += 1
                     } else if listRows, AuditFilter.isListRowPrediction(issue),
-                              unattributedClips < AuditFilter.listRowLimit {
+                              unattributedClips < listRowLimit {
                         // Passes: see `isListRowPrediction`; the next one fails.
                         unattributedClips += 1
                     } else if transcript, AuditFilter.isActiveWord(issue) {
@@ -261,14 +262,18 @@ enum AuditFilter {
     /// removing the privacy line, the footer or the Forget section leaves both; hiding the navigation bar or the back
     /// button leaves them. Settings was attributed by analogy (same List rows, same two issues, unchanged by the
     /// navigation-bar experiments); its parts were not removed one by one. With the app's own bar each screen reports at
-    /// most two (`listRowLimit`), so a third fails. The largest-size test (`testNoTextIsClippedAtTheLargestTextSize`)
+    /// most two on Saved voices and three on Settings (`listRowLimit`); the next issue fails.
+    /// The largest-size test (`testNoTextIsClippedAtTheLargestTextSize`)
     /// does not use this pass, but it is no full backstop: at AX5 Saved voices still reports one unattributed issue,
     /// unexplained, which `isNavigationTitle` lets through though the title is not cut (125 pt in a 393 pt bar). iOS 26
     /// and 27 report no such issue. Evidence: cassini-ios18-cache/ios18-g/evidence-18.2-full2 (the failing run) and
     /// evidence-audits-diag{1,2,4} (the experiments). An issue that names an element still fails.
     /// The most unattributed clipping issues one audit of a List screen lets through, the navigation title's included:
     /// Settings and Saved voices each reported two with the app's own bar (evidence-audits-diag1, diag2).
-    static let listRowLimit = 2
+    /// On iOS 18.2, fresh-process Settings audits also report a third identical prediction: reproduced in the
+    /// full PR #150 gate and in an isolated audit. Its attached screenshot shows wrapping labels, and the full
+    /// largest-text audit passes without this allowance. Keep the extra prediction limited to Settings.
+    static func listRowLimit(settings: Bool) -> Int { settings ? 3 : 2 }
 
     @MainActor static func isListRowPrediction(_ issue: XCUIAccessibilityAuditIssue) -> Bool {
         ProcessInfo.processInfo.operatingSystemVersion.majorVersion < 26

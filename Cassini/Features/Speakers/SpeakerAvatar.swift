@@ -8,18 +8,20 @@ struct SpeakerAvatar: View {
     let tint: Color
     let wash: Color
     var size: CGFloat = 40
+    var showsPlaceholderNumber: Bool = true
 
-    init(name: String, tint: Color, wash: Color, size: CGFloat = 40) {
+    init(name: String, tint: Color, wash: Color, size: CGFloat = 40, showsPlaceholderNumber: Bool = true) {
         self.name = name; self.tint = tint; self.wash = wash; self.size = size
+        self.showsPlaceholderNumber = showsPlaceholderNumber
     }
 
-    /// A note's speaker: use its canonical transcript/naming tint, never the all-speaker ordinal.
-    init(name: String, tint: SpeakerTint, size: CGFloat = 40) {
-        self.init(name: name, tint: tint.color, wash: tint.wash, size: size)
+    /// A note's speaker or saved voice: use its canonical transcript/naming tint, never the all-speaker ordinal.
+    init(name: String, tint: SpeakerTint, size: CGFloat = 40, showsPlaceholderNumber: Bool = true) {
+        self.init(name: name, tint: tint.color, wash: tint.wash, size: size, showsPlaceholderNumber: showsPlaceholderNumber)
     }
 
     private var text: String {
-        if let number = DefaultLabels.placeholderNumber(name) { return String(number) }
+        if showsPlaceholderNumber, let number = DefaultLabels.placeholderNumber(name) { return String(number) }
         return name.trimmingCharacters(in: .whitespaces).first.map { String($0).uppercased() } ?? "?"
     }
 
