@@ -662,7 +662,7 @@ final class LibraryUITests: XCTestCase {
         let app = launch(["--seed", "search"])
         let notice = app.staticTexts["Parakeet Ultra couldn’t run on this device for this recording, so Whistle transcribed it."]
         let review = row(app, "Notes from the design review")
-        XCTAssertTrue(review.waitForExistence(within: 15))
+        XCTAssertTrue(app.scrollViews["libraryScroll"].scroll { review.exists && review.isHittable })
         review.tap()
         XCTAssertTrue(notice.waitForExistence(within: 15))
     }
