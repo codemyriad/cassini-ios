@@ -39,8 +39,16 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(renamed.waitForExistence(within: uiWaitFloor))
         renamed.press(forDuration: 1)
         app.buttons["Star"].tapWhenSettled()
+        // Star changes the render key. Wait for the replacement row and the dismissing menu before
+        // starting another gesture; XCTest can otherwise long-press the retiring row at {-1, -1}.
+        XCTAssertTrue(poll(within: uiWaitFloor) {
+            renamed.label.contains(", starred") && !app.buttons["Star"].exists && renamed.isHittable
+        }, "The starred replacement row is interactive before reopening its menu")
         renamed.press(forDuration: 1)
         app.buttons["Remove star"].tapWhenSettled()
+        XCTAssertTrue(poll(within: uiWaitFloor) {
+            !renamed.label.contains(", starred") && !app.buttons["Remove star"].exists && renamed.isHittable
+        }, "Removing the star completes before returning to recording")
         app.buttons["activeRecordingCard"].tap()
         XCTAssertTrue(app.buttons["stopRecording"].waitForExistence(within: uiWaitFloor))
         app.buttons["stopRecording"].tap()
