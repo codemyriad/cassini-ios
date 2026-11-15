@@ -250,6 +250,36 @@ import CassiniNotebook
         #expect(model.content.emptyState == nil)
     }
 
+    @Test func firstTypedQueryHidesFilterOnlyPreloadDuringDebounce() async {
+        let library = Library()
+        let meeting = library.add("Budget")
+        library.notes[0].isFavorite = true
+        _ = library.add("Other")
+        let model = library.model
+        model.beginSearch()
+        await model.settle()
+
+        model.query = "zzz"
+        #expect(model.content.results?.isEmpty == true)
+        #expect(model.content.facts.results == nil)
+        await waitUntilSleeping(library.clock)
+        #expect(model.content.results?.isEmpty == true)
+        #expect(model.content.facts.results == nil)
+        library.clock.release()
+        await model.settle()
+        #expect(model.content.facts.results == 0)
+
+        model.searchStarred = true
+        model.query = ""
+        // Clearing resets transient filters; a chip can immediately start another filter-only search.
+        model.searchStarred = true
+        #expect(model.content.results?.isEmpty == true)
+        #expect(model.content.facts.results == nil)
+        await model.settle()
+        #expect(model.content.results?.map(\.id) == [meeting])
+        #expect(model.content.facts.results == 1)
+    }
+
     @Test func changingQueryKeepsPreviousHitsBeforeTheSearchAnswers() async {
         let library = Library()
         let meeting = library.add("Budget")

@@ -150,7 +150,9 @@ public final class LibraryScreenModel {
                                   emptyState: emptyState, hero: hero, facts: facts)
         }
         // Query and speaker identify the asynchronous work. Other chips filter these hits synchronously.
-        guard let found, found.speaker == searchSpeaker else {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let foundTrimmed = found?.query.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard let found, found.speaker == searchSpeaker, trimmed.isEmpty == foundTrimmed.isEmpty else {
             return LibraryContent(loading: loading, results: [],
                                   emptyState: unavailable ? .unavailable : nil, facts: facts)
         }
