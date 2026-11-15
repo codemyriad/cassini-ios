@@ -223,7 +223,7 @@ struct LibraryView: View {
                         filterButton(LibraryPhase1Copy.recordedByMe, selected: model.recordedByMe) { model.recordedByMe.toggle() }
                             .accessibilityIdentifier("libraryRecordedByMe")
                     }
-                }
+                }.accessibilityIdentifier("librarySearchFilters")
             } else {
                 HStack {
                     Picker(LibraryPhase1Copy.filtersAccessibilityLabel, selection: $model.favoritesOnly) {

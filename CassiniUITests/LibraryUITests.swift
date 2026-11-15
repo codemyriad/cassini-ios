@@ -39,12 +39,15 @@ final class LibraryUITests: XCTestCase {
         app.buttons["Alice"].tapWhenSettled()
         XCTAssertTrue(imported.waitForExistence(within: uiWaitFloor), "Filter-only search finds Alice")
         let own = app.buttons["libraryRecordedByMe"]
-        // The chip row scrolls horizontally on narrow phones.
+        // iOS 18 can report a clipped chip as hittable even when its centre is outside the scroll view.
+        let filters = app.scrollViews["librarySearchFilters"]
         for _ in 0..<5 {
-            if own.isHittable { break }
-            speaker.swipeLeft()
+            if own.exists && filters.frame.contains(own.frame) { break }
+            filters.swipeLeft()
         }
+        XCTAssertTrue(filters.frame.contains(own.frame))
         own.tapWhenSettled()
+        XCTAssertTrue(poll(within: uiWaitFloor) { own.isSelected })
         XCTAssertTrue(poll(within: uiWaitFloor) { recovered.exists && !imported.exists })
         app.buttons["closeLibrarySearch"].tapWhenSettled()
         XCTAssertTrue(imported.waitForExistence(within: uiWaitFloor), "Closing Search restores All")
