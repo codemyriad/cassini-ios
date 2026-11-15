@@ -127,7 +127,7 @@ final class ScreenshotTests: XCTestCase {
         let app = try launchPhone(["--seed", "reading", "--open-fixture", Self.fixture])
         XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 10))
         app.buttons["Share and more"].tap()
-        app.collectionViews.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Export transcript'")).firstMatch.tapWhenSettled()
+        app.buttons["exportOpen"].tapWhenSettled()
         captureExportMenu("10-note-export", app)
     }
 
@@ -136,7 +136,7 @@ final class ScreenshotTests: XCTestCase {
         let note = row(app, "A quieter kind of productivity")
         XCTAssertTrue(note.waitForExistence(within: 5))
         note.press(forDuration: 1)
-        app.buttons["Export"].tapWhenSettled()
+        app.buttons["exportOpen"].tapWhenSettled()
         captureExportMenu("11-library-export", app)
     }
 
@@ -192,14 +192,14 @@ final class ScreenshotTests: XCTestCase {
     }
 
     @MainActor private func captureExportMenu(_ name: String, _ app: XCUIApplication) {
-        let item = app.buttons["Transcript as text"]
+        let item = app.buttons["exportChoice-cassiniFile"]
         var last: CGRect?
         XCTAssertTrue(poll(within: 15) {
             guard item.exists && item.isHittable else { return false }
             let frame = item.frame
             defer { last = frame }
             return frame == last
-        }, "the export submenu has settled")
+        }, "the export sheet has settled")
         capture(name)
     }
 

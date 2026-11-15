@@ -88,3 +88,12 @@ L-10 also compiles `format.previewSubtitle.received` and `format.previewSubtitle
 
 D-1042 adds the shared Library All/Starred and Search filter IDs to `generate-library-strings.py`,
 including the shared date wording and starred empty state, using the same immutable catalog and vectors.
+
+D-1038 repins the global catalog and its complete status/format/library resource bundle to cassini-ux
+`b26190b57d8e35391ba9b4bafd177d66b10f0ec3` (`origin/main`, 14 November 2026).
+`scripts/generate-export-strings.py` compiles the implemented Phase 2 export labels, descriptions, title,
+format-group accessibility label, More formats and audio-only note into `ExportPhase2.xcstrings` for all six locales.
+Existing generated subsets are regenerated from the new global pin. The export resource bundle carries every
+file present in upstream `vectors/export/`, byte-identical with SHA-256 receipts in its `UPSTREAM.json`.
+That commit contains Markdown vectors and audio-size vectors, but no plain-text/SRT/WebVTT goldens;
+local regression tests cover those PARITY §2 rules without claiming shared-vector conformance.

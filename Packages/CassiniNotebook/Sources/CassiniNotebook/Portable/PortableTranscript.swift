@@ -179,10 +179,10 @@ extension PortableTranscript {
     @discardableResult
     public static func export(note: Note, opus: URL, destination: URL, unassignedLabel: String,
                               processing: JSONObject = ExportProvenance.userEdited,
-                              source known: CassiniDocument? = nil) throws -> String? {
+                              source known: CassiniDocument? = nil, allowEmpty: Bool = false) throws -> String? {
         let source = known ?? CassiniDocument.read(opus)
         let transcript = Transcript(words(of: note), language: note.language)
-        guard !transcript.words.isEmpty else { throw PortableExportError.noTranscript }
+        guard allowEmpty || !transcript.words.isEmpty else { throw PortableExportError.noTranscript }
         guard WordBodyBudget.fits(transcript.words, language: transcript.language) else { throw PortableExportError.tooLong }
         let palette = Note.assignColourIndices(note.speakers ?? [], order: SpeakerColourOrder.earliest(transcript.words,
             id: { $0.speaker }, start: { Double($0.startMs) }))

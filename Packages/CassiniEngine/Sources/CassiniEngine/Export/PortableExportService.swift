@@ -30,7 +30,8 @@ public struct PortableExportService: Sendable {
         self.unassignedLabel = unassignedLabel
     }
 
-    /// D96 backup: clean imported documents and raw/opaque audio keep their exact bytes, so re-import deduplicates.
+    /// D96 backup: clean imported documents and audio without a finished transcript keep their exact bytes,
+    /// so re-import deduplicates. A completed no-speech run is still a transcript.
     /// Local transcript/title/speaker changes need a snapshot only for a verified original. Non-OK documents
     /// retain their exact bytes even with local versions, so an archive cannot silently re-sign untrusted metadata.
     public func archiveSnapshot(_ note: Note, original: URL, playable: URL, into folder: URL) async throws -> URL {
@@ -48,6 +49,7 @@ public struct PortableExportService: Sendable {
 
     /// The exported file, `<folder>/<filename>.opus`. Nothing it made stays in `folder` when it throws.
     public func export(_ note: Note, original: URL, playable: URL, into folder: URL, filename: String) async throws -> URL {
+        let note = ExportSheetState.portableSnapshot(note)
         let work = folder.appendingPathComponent("work", isDirectory: true)
         let output = folder.appendingPathComponent(filename).appendingPathExtension("opus")
         try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
@@ -155,7 +157,7 @@ public struct PortableExportService: Sendable {
         let unassignedLabel = unassignedLabel
         return try await CancellableFileWork.run {
             try PortableTranscript.export(note: note, opus: opus, destination: target, unassignedLabel: unassignedLabel,
-                                          processing: processing, source: source)
+                                          processing: processing, source: source, allowEmpty: true)
         }
     }
 
