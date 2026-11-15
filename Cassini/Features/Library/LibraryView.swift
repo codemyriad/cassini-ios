@@ -50,15 +50,18 @@ struct LibraryView: View {
                     if let hero = content.hero, !model.favoritesOnly { FirstRunHeroView(hero: hero) }
                     // Banners cover no-match and unavailable states; the empty Library uses the Wave 5 hero and Starred has its own.
                     if content.emptyState == .noStarred { NoStarredState().padding(.top, 8) }
+                    // LazyVStack can retain a covered row body for an unchanged UUID even after the
+                    // model publishes new capture/job facts. The render key excludes live duration ticks
+                    // so they preserve taps and context menus; navigation and selection use the note UUID.
                     if let results = content.results {
-                        ForEach(results) { row($0, day: $0.day ?? .today, exportable: exportable.contains($0.id)) }
+                        ForEach(results, id: \.renderKey) { row($0, day: $0.day ?? .today, exportable: exportable.contains($0.id)) }
                     } else {
                         ForEach(content.sections) { section in
                             Text(LibraryFormat(calendar: calendar).day(section.key).uppercased())
                                 .font(.caption.weight(.semibold)).tracking(1.6).foregroundStyle(Color.muted)
                                 .accessibilityAddTraits(.isHeader)
                                 .padding(.top, 14)
-                            ForEach(section.rows) { row($0, day: section.key, exportable: exportable.contains($0.id)) }
+                            ForEach(section.rows, id: \.renderKey) { row($0, day: section.key, exportable: exportable.contains($0.id)) }
                         }
                     }
                 }

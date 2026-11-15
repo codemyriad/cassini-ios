@@ -222,7 +222,13 @@ TestFlight still need.
   sealed document and a Room catalogue. The queue is `jobs.json`, and checkpoints use iOS's own format. Search
   uses an in-memory index instead of FTS4. As on Android, search joins spoken turns with spaces; row excerpts flatten
   embedded line breaks while preserving highlights. The lazy list separates grouped and flat projections so iOS 18
-  does not retain ordinary row bodies in search results. Date filters apply only after typing a query. Local transcription
+  does not retain ordinary row bodies in search results. Rows key their stateless SwiftUI drawing by `renderKey`,
+  which includes the full row presentation except live recording duration ticks. Ticks update text in place without
+  interrupting taps or context menus; Stop and other presentation changes replace retained Recording badges. Note
+  UUIDs still identify navigation and actions. Android does not need this SwiftUI identity workaround. Library renames
+  of a live note also update the iOS recorder’s title before it seals the note, keeping the mirror and capture in sync.
+  On iPad, a newly recorded or imported note replaces the detail column so its Library selection follows the note.
+  Date filters apply only after typing a query. Local transcription
   jobs expose a time-left interval, so Library pills and VoiceOver share the catalog’s no-ETA fallback rather than
   inventing a scalar estimate. Saved voices keep one sample per note instead of a running mean.
 - **Transcript rendering (D84).** The pure `CassiniNotebook.TurnModel` ports the gocassini viewer pipeline at

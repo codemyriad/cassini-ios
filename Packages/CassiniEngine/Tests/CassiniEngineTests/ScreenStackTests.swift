@@ -17,6 +17,20 @@ import CassiniEngine
         #expect(screens.path == [.note(b)])
     }
 
+    @Test func aNewRecordedOrImportedNoteReplacesTheSplitDetailAndSelection() {
+        let paths: [[Route]] = [[.settings], [.note(a), .savedVoices]]
+        for path in paths {
+            var screens = ScreenStack(path: path, isSplit: true)
+            screens.openNote(b)
+            #expect(screens.path == [.note(b)])
+            #expect(screens.selectedNoteID == b)
+            #expect(screens.hidesBackButton(.note(b)))
+            screens.offerModelDownload(for: b)
+            #expect(screens.path == [.note(b), .modelDownload(noteID: b)])
+            #expect(screens.selectedNoteID == b)
+        }
+    }
+
     @Test func reopeningTheSameRouteHasANewRequestButEditsAndPoppingBackKeepIt() throws {
         var screens = ScreenStack(isSplit: true)
         screens.show(.note(a, query: "Thursday"))
