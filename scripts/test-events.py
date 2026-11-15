@@ -85,6 +85,45 @@ def watch(args):
                     return 0
 
 
+def stop_tree(args):
+    """Stop a verified owner's current tree, including children in other sessions.
+
+    Register every exit before signaling: descendants can be orphaned when the
+    owner exits, and kill(pid, 0) cannot distinguish exited zombies from workers.
+    """
+    table = subprocess.check_output(["/bin/ps", "-ax", "-o", "pid=,ppid="], text=True)
+    children = {}
+    for row in table.splitlines():
+        pid, parent = map(int, row.split())
+        children.setdefault(parent, []).append(pid)
+    tree = [args.pid]
+    for parent in tree:
+        tree.extend(children.get(parent, []))
+    with Events() as events:
+        pending = {pid for pid in tree if events.process(pid)}
+
+        def drain(deadline):
+            while pending:
+                for event in events.until(deadline):
+                    if event.filter == select.KQ_FILTER_PROC:
+                        pending.discard(event.ident)
+                if time.monotonic() >= deadline:
+                    break
+
+        for sig, seconds in ((signal.SIGTERM, 10), (signal.SIGKILL, 5)):
+            # Consume already delivered exits before signaling (especially at escalation).
+            drain(time.monotonic())
+            for pid in tree:
+                if pid in pending:
+                    with contextlib.suppress(ProcessLookupError):
+                        os.kill(pid, sig)
+            drain(time.monotonic() + seconds)
+            if not pending:
+                return 0
+        print(f"processes still alive; refusing clone cleanup: {sorted(pending)}", file=sys.stderr)
+        return 124
+
+
 def hold(args):
     """One blocking flock retains kernel waiter ordering; parent exit releases it."""
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
@@ -170,6 +209,8 @@ def main():
     command.add_argument("total", type=float)
     command.add_argument("--start")
     command.add_argument("--total-status", type=int, default=124)
+    command = commands.add_parser("stop-tree")
+    command.add_argument("pid", type=int)
     command = commands.add_parser("hold")
     command.add_argument("path")
     command.add_argument("parent", type=int)
@@ -184,7 +225,7 @@ def main():
     command = commands.add_parser("resource-event")
     command.add_argument("deadline", type=float)
     args = parser.parse_args()
-    return {"watch": watch, "hold": hold, "lock-ready": lock_ready,
+    return {"watch": watch, "stop-tree": stop_tree, "hold": hold, "lock-ready": lock_ready,
             "resource-event": resource_event}[args.command](args)
 
 

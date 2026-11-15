@@ -32,10 +32,11 @@ case "${1:-}" in
                 esac
                 if [ -n "$command_line" ]; then
                     echo "Stopping simulator test owner $owner before clone cleanup"
-                    kill -TERM "$owner" 2>/dev/null || true
-                    # kqueue exit event, not a fixed delay. On timeout, leave clones in place and fail cleanup.
-                    /usr/bin/python3 -I "$root/scripts/test-events.py" watch "$owner" /dev/null 60 60
-                    echo "Simulator test owner $owner exited before clone cleanup"
+                    # Bash defers TERM traps while waiting on foreground children. Stop the whole
+                    # PPID tree, across sessions, and await every exit before touching clones.
+                    # Bounded TERM/KILL waits fail closed if any captured process survives.
+                    /usr/bin/python3 -I "$root/scripts/test-events.py" stop-tree "$owner"
+                    echo "Simulator test owner $owner and descendants exited before clone cleanup"
                 fi
             fi
             # Replay after the owner exits, including its cancellation summary, into this live step's log.

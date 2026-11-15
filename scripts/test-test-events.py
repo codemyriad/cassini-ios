@@ -196,6 +196,73 @@ else:
         finally:
             unrelated.stdin.close(); finish(unrelated); unrelated.stdout.close()
 
+    def test_simulator_cleanup_stops_foreground_tree_across_sessions(self):
+        scripts = self.root / "scripts"
+        scripts.mkdir()
+        shutil.copy2(HELPER, scripts / HELPER.name)
+        gate = scripts / "simulator-gate.sh"
+        shutil.copy2(ROOT / "scripts/simulator-gate.sh", gate)
+        marker = self.root / "owner.pid"
+        env = dict(os.environ, CASSINI_GATE_OWNER_FILE=str(marker))
+        # Real macOS Bash defers its TERM trap while this foreground child runs.
+        fake = scripts / "test.sh"
+        fake.write_text('''#!/bin/bash
+set -eu
+cd "$(dirname "$0")/.."
+if [ "$1" = clean ]; then
+    exec /usr/bin/python3 -I check.py
+fi
+trap 'touch exited; exit 143' TERM
+echo "$$" > fixture-owner.pid
+/usr/bin/python3 -I child.py
+''')
+        fake.chmod(0o755)
+        (self.root / "check.py").write_text('''import pathlib, subprocess
+root = pathlib.Path('.')
+assert (root / 'exited').exists(), 'owner trap did not run'
+for name in ('fixture-owner.pid', 'child.pid', 'grandchild.pid'):
+    pid = (root / name).read_text().strip()
+    result = subprocess.run(['/bin/ps', '-p', pid, '-o', 'stat='], capture_output=True, text=True)
+    assert not result.stdout.strip() or result.stdout.strip().startswith('Z'), (name, result.stdout)
+(root / 'cleaned').touch()
+''')
+        for ignore_term in (False, True):
+            with self.subTest(ignore_term=ignore_term):
+                for name in ('exited', 'cleaned', 'ready', 'child.pid', 'grandchild.pid'):
+                    (self.root / name).unlink(missing_ok=True)
+                (self.root / "grandchild.py").write_text(
+                    "import os, pathlib, signal\n"
+                    + ("signal.signal(signal.SIGTERM, signal.SIG_IGN)\n" if ignore_term else "")
+                    + "pathlib.Path('grandchild.pid').write_text(str(os.getpid()))\n"
+                    "pathlib.Path('ready').touch()\n"
+                    "signal.pause()\n")
+                (self.root / "child.py").write_text(
+                    "import os, pathlib, subprocess, sys\n"
+                    "pathlib.Path('child.pid').write_text(str(os.getpid()))\n"
+                    "p = subprocess.Popen([sys.executable, '-I', 'grandchild.py'], start_new_session=True)\n"
+                    "p.wait()\n")
+                with events.Events() as queue:
+                    queue.file(self.root)
+                    owner = subprocess.Popen(["/bin/bash", str(gate), "owner"], env=env)
+                    try:
+                        deadline = time.monotonic() + HANG_GUARD
+                        while not (self.root / "ready").exists():
+                            self.assertTrue(queue.until(deadline), "grandchild did not become ready")
+                        result = subprocess.run(["/bin/bash", str(gate), "clean"], env=env,
+                                                capture_output=True, text=True, timeout=HANG_GUARD)
+                        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                        self.assertEqual(finish(owner), 143)
+                        self.assertTrue((self.root / "cleaned").exists())
+                        self.assertFalse(marker.exists())
+                    finally:
+                        for name in ('child.pid', 'grandchild.pid'):
+                            path = self.root / name
+                            if path.exists():
+                                kill_quietly(int(path.read_text()))
+                        if owner.poll() is None:
+                            owner.kill()
+                        owner.wait()
+
     def test_end_tree_ends_entire_command_tree(self):
         child = self.root / "child"
         script = self.root / "tree.py"
