@@ -304,6 +304,98 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 10), "Stop saves and opens the note")
     }
 
+    @MainActor func testFinishedRecordingRefreshesMaterializedRow() throws {
+        try assertFinishedRecordingRow(minimised: true)
+    }
+
+    @MainActor func testFinishedRecordingRefreshesCoveredLibrary() throws {
+        try assertFinishedRecordingRow(minimised: false)
+    }
+
+    @MainActor func testIPadFinishedRecordingRefreshesMaterializedRow() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad)
+        try assertFinishedRecordingRow(minimised: true)
+    }
+
+    @MainActor func testIPadFinishedRecordingRefreshesCoveredLibrary() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad)
+        try assertFinishedRecordingRow(minimised: false)
+    }
+
+    @MainActor func testFinishedAudioOnlyRecordingRefreshesMaterializedRow() throws {
+        try assertFinishedRecordingRow(minimised: true, automatic: false)
+    }
+
+    @MainActor func testFinishedAudioOnlyRecordingRefreshesCoveredLibrary() throws {
+        try assertFinishedRecordingRow(minimised: false, automatic: false)
+    }
+
+    @MainActor func testIPadFinishedAudioOnlyRecordingRefreshesMaterializedRow() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad)
+        try assertFinishedRecordingRow(minimised: true, automatic: false)
+    }
+
+    @MainActor func testIPadFinishedAudioOnlyRecordingRefreshesCoveredLibrary() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad)
+        try assertFinishedRecordingRow(minimised: false, automatic: false)
+    }
+
+    @MainActor private func assertFinishedRecordingRow(minimised: Bool, automatic: Bool = true) throws {
+        if UIDevice.current.userInterfaceIdiom == .pad {
+            XCUIApplication().terminate()
+            XCUIDevice.shared.orientation = .landscapeLeft
+            addTeardownBlock { @MainActor in XCUIDevice.shared.orientation = .portrait }
+        }
+        let app = launch(["--seed", "recording"] + DeviceUnderTest.workingSpeech)
+        if !automatic {
+            app.buttons["settingsButton"].tap()
+            let toggle = app.switches["Transcribe after recording or import"]
+            XCTAssertTrue(toggle.waitForExistence(within: uiWaitFloor))
+            // SwiftUI exposes the form row as a switch too; activate the nested UISwitch.
+            if toggle.value as? String != "0" {
+                toggle.switches.firstMatch.tap()
+            }
+            XCTAssertTrue(toggle.waitForValue("0"), "Automatic transcription is off before starting")
+            if UIDevice.current.userInterfaceIdiom != .pad {
+                app.navigationBars.buttons["All meetings"].tap()
+            }
+        }
+        app.buttons["recordButton"].tap()
+        XCTAssertTrue(app.buttons["pauseResumeRecording"].waitForEnabled(within: uiWaitFloor))
+        let meeting = row(app, "Voice note 8 Oct, 09:41")
+        if minimised {
+            app.buttons["recordingAllMeetings"].tap()
+            XCTAssertTrue(waitFor(meeting, label: ", recording"), meeting.label)
+            try assertRowPixels(meeting, contain: "Recording")
+            meeting.tap()
+            XCTAssertTrue(app.buttons["stopRecording"].waitForExistence(within: uiWaitFloor))
+        }
+        app.buttons["stopRecording"].tap()
+        XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: uiWaitFloor))
+        // The regular-width Library stays alongside the detail; compact width returns via Back.
+        if UIDevice.current.userInterfaceIdiom != .pad {
+            app.navigationBars.buttons["Back to all meetings"].tap()
+        }
+        XCTAssertTrue(waitFor(meeting, label: automatic ? ", transcribed" : ", audio only"), meeting.label)
+        XCTAssertFalse(meeting.label.localizedCaseInsensitiveContains("recording"), meeting.label)
+        try assertRowPixels(meeting, contain: automatic ? "2 speakers" : "Audio only", excluding: "Recording")
+    }
+
+    @MainActor private func assertRowPixels(_ row: XCUIElement, contain expected: String, excluding forbidden: String? = nil) throws {
+        var visible = ""
+        XCTAssertTrue(poll(within: uiWaitFloor) {
+            guard row.exists, row.isHittable, let image = row.screenshot().image.cgImage else { return false }
+            let request = VNRecognizeTextRequest()
+            request.recognitionLevel = .accurate
+            request.recognitionLanguages = ["en-US"]
+            do { try VNImageRequestHandler(cgImage: image).perform([request]) }
+            catch { visible = String(describing: error); return false }
+            visible = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ")
+            return visible.localizedCaseInsensitiveContains(expected)
+                && !(forbidden.map { visible.localizedCaseInsensitiveContains($0) } ?? false)
+        }, "Expected rendered \(expected), excluding \(forbidden ?? "nothing"): \(visible)")
+    }
+
     // ports: LibraryBehaviourTest#duringARecordingTheCardAndTheButtonReturnToIt
     @MainActor func testDuringARecordingTheCardTheButtonAndTheRowReturnToIt() {
         let app = launch(["--seed", "recording"])
