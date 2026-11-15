@@ -21,6 +21,22 @@ struct SearchDateTests {
         if timestamp.hasPrefix("2026-11") { #expect(today.duration == 25 * 3600) }
     }
 
+    @Test(arguments: ["2026-07-03T12:00:00-04:00", "2027-01-01T00:30:00-05:00"])
+    func thisYearStartsAtLocalJanuaryMidnight(_ timestamp: String) throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try #require(TimeZone(identifier: "America/New_York"))
+        let now = try #require(ISO8601DateFormatter().date(from: timestamp))
+        let interval = try #require(SearchDate.year.interval(now: now, calendar: calendar))
+        let year = calendar.component(.year, from: now)
+        let january = try #require(calendar.date(from: DateComponents(year: year, month: 1, day: 1)))
+        #expect(interval.start == january)
+        #expect(MeetingTime.instant(january).isWithin(interval, calendar: calendar))
+        #expect(!MeetingTime.instant(january.addingTimeInterval(-1)).isWithin(interval, calendar: calendar))
+        #expect(MeetingTime.instant(now).isWithin(interval, calendar: calendar))
+        #expect(!MeetingTime.instant(interval.end).isWithin(interval, calendar: calendar))
+        #expect(MeetingTime.unknown.isWithin(interval, calendar: calendar) == false)
+    }
+
     @Test func midnightDSTNormalizesBothBoundsToTheirOwnLocalDayStart() throws {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = try #require(TimeZone(identifier: "America/Santiago"))

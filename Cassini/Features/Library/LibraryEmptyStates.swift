@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The Starred filter with no starred notes (iOS extra). An empty library, a search that found nothing and a library
+/// The shared Starred filter empty state. An empty library, a search that found nothing and a library
 /// that could not be opened are the Library's banners (LIB_EMPTY, LIB_NO_MATCH, LIB_UNAVAILABLE), as on Android.
 struct NoStarredState: View {
     var body: some View {
@@ -12,9 +12,8 @@ struct NoStarredState: View {
             }
             .padding(.top, 24).accessibilityHidden(true)
             VStack(spacing: 10) {
-                Text(LibraryCopy.noStarredTitle).font(.system(.title2)).foregroundStyle(Color.ink)
+                Text(LibraryPhase1Copy.starredEmpty).font(.system(.title2)).foregroundStyle(Color.ink)
                     .accessibilityAddTraits(.isHeader)
-                Text(LibraryCopy.noStarredBody).font(.subheadline).foregroundStyle(Color.muted)
             }
             .multilineTextAlignment(.center)
         }

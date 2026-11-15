@@ -59,9 +59,35 @@ public enum TurnModel {
         }
     }
 
-    /// Each input item is one canonical word. Returned indices always name the original input, never a sorted copy.
-    /// Audio-bounded files bypass legacy punctuation-tail repair; their measured ends are already authoritative.
-    public static func rows(of words: [Word], endsBoundedByAudio: Bool = false) -> [Row] {
+    /// A whole attributed reading run, before paragraph layout and inline interjection rendering.
+    public struct WholeRun: Sendable {
+        public let speaker: String?
+        public let startMs: Double
+        public let wordIndices: [Int]
+    }
+
+    public static func wholeRuns(of words: [Word], endsBoundedByAudio: Bool = false) -> [WholeRun] {
+        // String equality normalizes Unicode; grouping must preserve byte-exact stored speaker IDs.
+        var values = words
+        var tokens: [Data: String] = [:]
+        for index in values.indices {
+            guard let id = values[index].speaker else { continue }
+            if id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                values[index].speaker = nil
+                continue
+            }
+            let bytes = Data(id.utf8)
+            if tokens[bytes] == nil { tokens[bytes] = "__cassini_byte_speaker_\(tokens.count)" }
+            values[index].speaker = tokens[bytes]
+        }
+        return turnRuns(orderedBlocks(values, endsBoundedByAudio: endsBoundedByAudio)).map { run in
+            let indices = run.blocks.flatMap(\.words).map(\.index)
+            return WholeRun(speaker: run.speaker == nil ? nil : indices.first.flatMap { words[$0].speaker }, startMs: run.startMs,
+                            wordIndices: indices)
+        }
+    }
+
+    private static func orderedBlocks(_ words: [Word], endsBoundedByAudio: Bool) -> [Block] {
         let raw = readableBlocks(words)
         let repaired = endsBoundedByAudio ? raw : repairTiming(raw)
         // Repair changes effective word ends. Cache audible evidence only after that projection is final.
@@ -70,9 +96,15 @@ public enum TurnModel {
             block.prepareSpans()
             return block
         }
-        let ordered = prepared.enumerated().sorted {
+        return prepared.enumerated().sorted {
             $0.element.startMs == $1.element.startMs ? $0.offset < $1.offset : $0.element.startMs < $1.element.startMs
         }.map(\.element)
+    }
+
+    /// Each input item is one canonical word. Returned indices always name the original input, never a sorted copy.
+    /// Audio-bounded files bypass legacy punctuation-tail repair; their measured ends are already authoritative.
+    public static func rows(of words: [Word], endsBoundedByAudio: Bool = false) -> [Row] {
+        let ordered = orderedBlocks(words, endsBoundedByAudio: endsBoundedByAudio)
         let runs = turnRuns(ordered)
         let nested = nestedRuns(runs)
         let over = competingSpeakers(runs, nested: nested)

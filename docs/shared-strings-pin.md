@@ -85,3 +85,6 @@ The `status-badges` bundle now uses the global D-1034 pin above, adopting `Impor
 The shared source was updated first in cassini-ux #44; its complete catalog is vendored without edits.
 
 L-10 also compiles `format.previewSubtitle.received` and `format.previewSubtitle.importedOtherDevice` into the StatusBadge catalog. Library and Search derive provenance from stored import origins; recovered local recordings remain own. Imported transcript versions identify files transcribed on another device, including after local edits or re-transcription. Import-flow catalogs and strings are unchanged.
+
+D-1042 adds the shared Library All/Starred and Search filter IDs to `generate-library-strings.py`,
+including the shared date wording and starred empty state, using the same immutable catalog and vectors.

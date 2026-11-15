@@ -141,6 +141,21 @@ enum TestFixtures {
         }
         notes = [main, walk(now: now)] + notes
         switch seed {
+        case .libraryFilters:
+            var recovered = transcribed("Recovered budget", at: now, "")
+            recovered.id = fixtureID
+            recovered.origin = .recovered
+            recovered.isFavorite = true
+            recovered.speakers = [NoteSpeaker(id: "a", name: "Alice"), NoteSpeaker(id: "b", name: "Bob")]
+            recovered.transcript = [
+                .init(text: "Hello from Alice", start: 0, end: 6, speakerID: "a"),
+                .init(text: "The budget belongs to Bob", start: 6, end: 14, speakerID: "b")]
+            var imported = recovered
+            imported.id = UUID()
+            imported.title = "Imported budget"
+            imported.origin = .imported
+            imported.isFavorite = false
+            notes = [recovered, imported]
         case .brandSpeakers:
             var failed = Note(id: failedID, title: "Garden audio check", createdAt: now.addingTimeInterval(-3 * 3600), audioFilename: "audio.wav")
             failed.duration = fixtureDuration; failed.language = "en-US"; failed.waveform = waveform

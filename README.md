@@ -110,7 +110,8 @@ records their exact revisions.
   back or forward, change the speed, and use the lock-screen and headphone controls. The playback position is kept
   across launches.
 - **Search** titles, transcripts and bookmarks, ignoring case and accents, with the matches highlighted. Search inside
-  a note shows a "1 of 3" counter. You can star notes and filter by star.
+  a note shows a "1 of 3" counter. The Library remembers All / Starred on this device. Search combines Starred,
+  Speaker, date (including This year), and Recorded by me; closing Search resets its filters.
 - **Edit and versions.** You can edit a passage's text; its word timing is dropped, but its place in the audio is
   kept. Every transcription, merge and run of edits keeps the transcript from before it as a version you can go back
   to.
@@ -163,6 +164,11 @@ TestFlight still need.
 ## Differences from Android
 
 [docs/differences.md](docs/differences.md) describes each difference in detail. In summary:
+
+- **Library and Search (D99).** iOS uses a native All / Starred segmented control and a scrolling Search chip row.
+  The filter contract matches Android: AND, local calendar dates, own recordings (including recovered captures) for Recorded by me, case-insensitive speaker names, and
+  transient Search choices seeded from the remembered Library choice. Speaker searches match that speaker’s words
+  and show their excerpt; with no text, they match meetings with that named speaker. Stars stay in local Library metadata.
 
 - **Phase 2 meeting wording.** Settings, Saved voices, Speakers and Recently Deleted use the shared meeting
   catalog in all six UI languages. iOS retains its existing Recently Deleted labels and device-specific

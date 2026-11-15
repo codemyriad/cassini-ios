@@ -106,10 +106,11 @@ public struct LibraryIndex: Sendable {
     /// `hits` (of `query`, from an earlier copy of the index) over the notes as they are now: a note that went is
     /// dropped, and a note that changed is matched again on its own, so a row never shows a trashed note or an old
     /// title while the search over the new notes runs.
-    public func current(_ hits: [Hit], query: SearchQuery?) -> [Hit] {
+    public func current(_ hits: [Hit], query: SearchQuery?, speaker: String? = nil) -> [Hit] {
         hits.compactMap { hit in
             guard let entry = cache[hit.entry.note.id] else { return nil }
             if entry.note == hit.entry.note { return hit.with(entry) }
+            if let speaker { return Self.speakerHit(entry, query: query, speaker: speaker) }
             guard let query else { return Hit(entry: entry, snippet: "", titleSnippet: entry.note.title) }
             let fields = entry.fields ?? SearchFields(entry.note)
             guard fields.matches(query) else { return nil }
@@ -119,7 +120,10 @@ public struct LibraryIndex: Sendable {
 
     /// The notes that match every phrase of `query` in index order; every note when there is no query (only
     /// punctuation was typed). `orderedHits` supplies the viewer-calendar order without repeating matching work.
-    public mutating func search(_ query: SearchQuery?) -> [Hit] {
+    public mutating func search(_ query: SearchQuery?, speaker: String? = nil) -> [Hit] {
+        if let speaker {
+            return entries.compactMap { Self.speakerHit($0, query: query, speaker: speaker) }
+        }
         guard let query else { return entries.map { Hit(entry: $0, snippet: "", titleSnippet: $0.note.title) } }
         var hits: [Hit] = []
         for index in entries.indices {
@@ -135,4 +139,39 @@ public struct LibraryIndex: Sendable {
         }
         return hits
     }
+    /// Names offered by the filter, excluding imported placeholder labels as well as unnamed slots.
+    public static func namedSpeakers(_ note: Note) -> [NoteSpeaker] {
+        (note.speakers ?? []).filter {
+            $0.provenance != .unnamed && !DefaultLabels.isDefault(id: $0.id, label: $0.name)
+        }
+    }
+
+    private static func speakerHit(_ entry: Entry, query: SearchQuery?, speaker: String) -> Hit? {
+        let ids = Set(namedSpeakers(entry.note).filter {
+            $0.name.caseInsensitiveCompare(speaker) == .orderedSame
+        }.map { Data($0.id.utf8) })
+        guard !ids.isEmpty else { return nil }
+        guard let query else { return Hit(entry: entry, snippet: "", titleSnippet: entry.note.title) }
+        let words = entry.note.transcriptWords
+        let modelWords = words.map {
+            TurnModel.Word(speaker: $0.speaker, startMs: ($0.start * 1000).rounded(),
+                           endMs: ($0.end * 1000).rounded(), text: $0.text,
+                           lowConfidenceSpeaker: $0.lowConfidenceSpeaker)
+        }
+        let runs = TurnModel.wholeRuns(of: modelWords, endsBoundedByAudio:
+            !entry.note.transcript.isEmpty && entry.note.transcript.allSatisfy { $0.wordEndsBoundedByAudio == true })
+            .filter { $0.speaker.map { ids.contains(Data($0.utf8)) } == true }
+            .sorted {
+                $0.startMs == $1.startMs
+                    ? ($0.wordIndices.first ?? 0) < ($1.wordIndices.first ?? 0) : $0.startMs < $1.startMs
+            }
+        for run in runs {
+            let fields = SearchFields(title: "", body: TurnModel.joinedText(run.wordIndices.map { words[$0].text }))
+            if fields.matches(query) {
+                return Hit(entry: entry, snippet: fields.snippet(query), titleSnippet: entry.note.title)
+            }
+        }
+        return nil
+    }
+
 }
