@@ -67,11 +67,20 @@ D-1029 requires an actual Ogg Opus header for `.opus` / `.ogg`, tightening the e
 allowed arbitrary decodable audio under `.opus`. iOS continues to decode MP3, M4A and PCM/float WAV using AVFoundation.
 
 Wave 5 first-run hero and backup-gated privacy copy (`D-974`, `L-27`, `D98`) is pinned to `codemyriad/cassini-ux`
-`31973ff9784fcc66c1c7993b903a336e8f2c1432`, `strings/strings.json` (SHA-256
-`c634cdfbcf961391e1f3a084c4d8ac07aa10946a289ecba4da8ec1ebc25717ca`), vendored byte-identically in
+`b26190b57d8e35391ba9b4bafd177d66b10f0ec3`, `strings/strings.json` (SHA-256
+`10d65abc7b10f81422377632aa899506b33e02cc9269afc96e11ec89cee69367`), vendored byte-identically in
 `contracts/wave5-strings/strings.json` alongside `contracts/wave5-strings/UPSTREAM.json`.
 `scripts/generate-wave5-strings.py` compiles the eight iOS Wave 5 IDs (`firstRun.hero.title`, `firstRun.hero.subtitle`,
 `firstRun.hero.phoneBackupQualifier`, `firstRun.hero.subtitlePhoneNote`, `privacy.onDevice.{iphone,ipad}.{withBackup,backupExcluded}`)
-into `Cassini/Resources/Strings/LibraryWave5.xcstrings` and `Cassini/Strings/LibraryWave5Copy.swift` across all six
-locales. The Phase 1 `status-badges` bundle stays at `5e0c34e0f1bb390298dabdf4eedc494e933fd329` until `L-10` (`D-997`)
-migrates `Received` to `Imported`. No shared source was edited.
+into `Cassini/Resources/Strings/LibraryWave5.xcstrings` and `Cassini/Strings/LibraryWave5Copy.swift`, and the four Phase 2
+Saved voices IDs (`D-1047`, `L-67`: `savedVoices.howToAdd`, `savedVoices.row.meetingCount`, `savedVoices.row.meta`,
+`savedVoices.row.stale`) into `Cassini/Resources/Strings/SavedVoicesPhase2.xcstrings` and
+`Cassini/Strings/SavedVoicesPhase2Copy.swift` across all six locales. It also synchronises the 18 Phase 2 entries
+in Settings, Speakers, Trash and Failures from their shared IDs, retaining native lookup keys and compiling
+named placeholders to native format arguments.
+These include all 11 iOS additions from cassini-ux #44 and six existing phone entries now declared for iOS.
+The generator verifies the immutable catalog hash and rejects missing entries, locale/placeholder drift and
+changes to the compiled Phase 2 values. No Phase 2 translation is maintained locally.
+The Phase 1 `status-badges` bundle stays at
+`5e0c34e0f1bb390298dabdf4eedc494e933fd329` until `L-10` (`D-997`) migrates `Received` to `Imported`.
+The shared source was updated first in cassini-ux #44; its complete catalog is vendored without edits.

@@ -164,6 +164,11 @@ TestFlight still need.
 
 [docs/differences.md](docs/differences.md) describes each difference in detail. In summary:
 
+- **Phase 2 meeting wording.** Settings, Saved voices, Speakers and Recently Deleted use the shared meeting
+  catalog in all six UI languages. iOS retains its existing Recently Deleted labels and device-specific
+  speaker explanations; the shared phone entries retain their historical `android.*` IDs. See
+  [the immutable source pin](docs/shared-strings-pin.md).
+
 - **Audio import (L-25 / D-1029).** Picker/Open-with types and accepted extensions come from the shared decided-format
   contract. iOS uses AVFoundation for MP3/M4A/WAV, including 24-bit and float WAV beyond Android's 16-bit PCM path.
   `.opus` and `.ogg` require actual Ogg Opus headers; the former Android-compatible MP3-under-`.opus` fallback is
