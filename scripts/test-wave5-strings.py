@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Offline pin, locale-preservation and generated-output fault controls for Wave 5 strings."""
+"""Offline pin, locale-preservation and generated-output fault controls for Wave 5 / Phase 2 strings."""
 import hashlib
 import importlib.util
 import json
@@ -21,7 +21,8 @@ class Wave5StringGenerationTests(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name)
-        for rel in (generator.STRINGS_PIN, generator.SOURCE):
+        for rel in (generator.STRINGS_PIN, generator.SOURCE, *(
+                Path(f'Cassini/Resources/Strings/{table}.xcstrings') for table in generator.PHASE2_TABLES)):
             target = self.root / rel
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(ROOT / rel, target)
@@ -37,10 +38,50 @@ class Wave5StringGenerationTests(unittest.TestCase):
             for language, localized in item['localizations'].items():
                 expected = entries[key]['en'] if language == 'en' else entries[key]['l10n'][language]['text']
                 self.assertEqual(localized['stringUnit']['value'], expected)
+
+        saved_voices = json.loads(output[generator.SAVED_VOICES_OUTPUT])['strings']
+        self.assertEqual(set(saved_voices), generator.SAVED_VOICES_IDS)
+        for key, item in saved_voices.items():
+            self.assertEqual(set(item['localizations']), set(generator.LANGUAGES))
+            for language, localized in item['localizations'].items():
+                if key in generator.SAVED_VOICES_PLURALS:
+                    forms = entries[key]['plural'] if language == 'en' else entries[key]['l10n'][language]['plural']
+                    compiled = localized['variations']['plural']
+                    self.assertEqual(set(compiled), set(forms))
+                    for category, expected_form in forms.items():
+                        self.assertEqual(
+                            compiled[category]['stringUnit']['value'],
+                            expected_form.replace('{n}', '%lld'),
+                        )
+                else:
+                    expected = entries[key]['en'] if language == 'en' else entries[key]['l10n'][language]['text']
+                    self.assertEqual(localized['stringUnit']['value'], expected)
+
+
+        for table, keys in generator.PHASE2_TABLES.items():
+            path = Path(f'Cassini/Resources/Strings/{table}.xcstrings')
+            compiled = json.loads(output[path])['strings']
+            for key, shared_id in keys.items():
+                entry = entries[shared_id]
+                self.assertEqual(set(compiled[key]['localizations']), set(generator.LANGUAGES))
+                for language, localized in compiled[key]['localizations'].items():
+                    translation = entry if language == 'en' else entry['l10n'][language]
+                    forms = translation.get('plural', {})
+                    def native(value):
+                        return value.replace('{n}', '%lld').replace('{name}', '%@').replace('{title}', '%@')
+                    if forms:
+                        actual = localized['variations']['plural']
+                        self.assertEqual(set(actual), set(forms))
+                        for category, value in forms.items():
+                            self.assertEqual(actual[category]['stringUnit']['value'], native(value))
+                    else:
+                        value = entry['en'] if language == 'en' else translation['text']
+                        self.assertEqual(localized['stringUnit']['value'], native(value))
+
         for path, content in output.items():
             self.assertEqual(content, (ROOT / path).read_bytes())
 
-    def test_both_generated_files_reject_drift(self):
+    def test_all_generated_files_reject_drift(self):
         for path, content in generator.outputs(self.root).items():
             target = self.root / path
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -50,6 +91,19 @@ class Wave5StringGenerationTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'drift'):
                 generator.check(self.root)
             (self.root / path).write_bytes(content)
+
+    def test_phase2_translation_drift_is_rejected(self):
+        for path, content in generator.outputs(self.root).items():
+            target = self.root / path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(content)
+        path = self.root / 'Cassini/Resources/Strings/Trash.xcstrings'
+        catalog = json.loads(path.read_text())
+        key = 'Meetings you delete stay here for 30 days.'
+        catalog['strings'][key]['localizations']['fr']['stringUnit']['value'] = 'Local translation drift'
+        path.write_text(json.dumps(catalog))
+        with self.assertRaisesRegex(ValueError, 'Trash.xcstrings drift'):
+            generator.check(self.root)
 
     def test_source_hash_and_commit_pin_are_checked(self):
         source = self.root / generator.SOURCE
@@ -90,6 +144,14 @@ class Wave5StringGenerationTests(unittest.TestCase):
             item['l10n']['fr']['text'] = 'Rien {extra}'
         self.repin(add_placeholder)
         with self.assertRaisesRegex(ValueError, 'Placeholder drift'):
+            generator.outputs(self.root)
+
+    def test_repin_rejects_dropping_count_in_zero_covering_one_plural(self):
+        def drop_count(entries):
+            item = next(e for e in entries if e['id'] == 'savedVoices.row.meetingCount')
+            item['l10n']['fr']['plural']['one'] = '1 réunion'
+        self.repin(drop_count)
+        with self.assertRaisesRegex(ValueError, 'Plural form loses its count'):
             generator.outputs(self.root)
 
 

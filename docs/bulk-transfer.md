@@ -16,7 +16,9 @@ export handles Cassini documents/versions/provenance. Clean imported documents r
 a missing/stale optional TITLE tag, so importing the ZIP detects the original digest. The stored audio/document
 and note.json are never written by bulk export. Actual local transcript/title/speaker edits require a private
 portable snapshot for a verified document because iOS stores those edits beside the source; that snapshot includes
-those edits without replacing the source. Audio-only notes keep their original bytes and extension. Every non-OK
+those edits without replacing the source. Audio-only notes keep their original bytes and extension. ZIP restoration
+accepts the legacy `ArchiveAudio` containers, including CAF captures and AAC imports, after audio validation; Picker/Open-with remain limited to
+the shared decided-format contract. MPEG-4/3GP archive members with video tracks are rejected. Every non-OK
 Cassini document keeps its original bytes even when the note has local words, edits or renamed speakers: those
 changes cannot authenticate the original audio binding or recording start. Its on-device versions remain in the
 Library. Wordless Cassini documents also keep their original bytes. Export names use the existing naming rule, with case-insensitive numeric
@@ -72,7 +74,9 @@ required.
 
 Platform differences: iOS uses its existing native document picker and system share/save sheet. The picker has
 no custom filter-title API; shared `import.filter.cassiniAndZip` is the import button's accessibility hint.
-Supported member audio types follow AVFoundation, so Android-only AMR/WebM containers are not promised. D96
+Individual imports follow the pinned shared decided-format contract (Opus/Ogg, MP3, M4A and WAV). ZIP members
+also admit legacy `ArchiveAudio` containers so exports can be restored unchanged, with audio inspection and
+MPEG-4/3GP video-track rejection. ZIP extraction retains a member's extension on its private UUID scratch file. D96
 copy, including all six translations/plurals, is pinned in [shared-strings-pin.md](shared-strings-pin.md). The
 reviewed Android #166 rules for byte-preserving clean imports, Finder metadata, ZIP64 and header flags are
 covered by regression tests here.

@@ -78,149 +78,6 @@
         }
       }
     },
-    "%lld notes": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "variations": {
-            "plural": {
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld note"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld notes"
-                }
-              }
-            }
-          }
-        },
-        "es": {
-          "variations": {
-            "plural": {
-              "many": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld notas"
-                }
-              },
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld nota"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld notas"
-                }
-              }
-            }
-          }
-        },
-        "fr": {
-          "variations": {
-            "plural": {
-              "many": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld notes"
-                }
-              },
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld note"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld notes"
-                }
-              }
-            }
-          }
-        },
-        "it": {
-          "variations": {
-            "plural": {
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld nota"
-                }
-              },
-              "many": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld note"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld note"
-                }
-              }
-            }
-          }
-        },
-        "pt-BR": {
-          "variations": {
-            "plural": {
-              "many": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld notas"
-                }
-              },
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld nota"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld notas"
-                }
-              }
-            }
-          }
-        },
-        "pt-PT": {
-          "variations": {
-            "plural": {
-              "many": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld notas"
-                }
-              },
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld nota"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld notas"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "%lld words": {
       "comment": "A transcript version's word count",
       "extractionState": "manual",
@@ -839,7 +696,8 @@
         }
       }
     },
-    "Cassini stops recognising all %lld saved voices and deletes the voiceprints from every note. Names already in your notes stay.": {
+    "Cassini stops recognising all %lld saved voices and deletes the voiceprints from every meeting. Names already in your meetings stay.": {
+      "comment": "Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3, android.savedVoices.forgetEveryone.body.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -848,37 +706,37 @@
               "one": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "Cassini stops recognising %lld saved voice and deletes the voiceprints from every note. Names already in your notes stay."
+                  "value": "Cassini stops recognising %lld saved voice and deletes the voiceprints from every meeting. Names already in your meetings stay."
                 }
               },
               "other": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "Cassini stops recognising all %lld saved voices and deletes the voiceprints from every note. Names already in your notes stay."
+                  "value": "Cassini stops recognising all %lld saved voices and deletes the voiceprints from every meeting. Names already in your meetings stay."
                 }
               }
             }
           }
         },
-        "es": {
+        "it": {
           "variations": {
             "plural": {
               "many": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "Cassini dejará de reconocer las %lld voces guardadas y eliminará las huellas de voz de todas las notas. Los nombres que ya están en tus notas se mantienen."
+                  "value": "Cassini smette di riconoscere tutte le %lld voci salvate ed elimina le impronte vocali da ogni riunione. I nomi già presenti nelle riunioni restano."
                 }
               },
               "one": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "Cassini dejará de reconocer %lld voz guardada y eliminará las huellas de voz de todas las notas. Los nombres que ya están en tus notas se mantienen."
+                  "value": "Cassini smette di riconoscere %lld voce salvata ed elimina le impronte vocali da ogni riunione. I nomi già presenti nelle riunioni restano."
                 }
               },
               "other": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "Cassini dejará de reconocer las %lld voces guardadas y eliminará las huellas de voz de todas las notas. Los nombres que ya están en tus notas se mantienen."
+                  "value": "Cassini smette di riconoscere tutte le %lld voci salvate ed elimina le impronte vocali da ogni riunione. I nomi già presenti nelle riunioni restano."
                 }
               }
             }
@@ -890,43 +748,43 @@
               "many": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "Cassini cesse de reconnaître les %lld voix mémorisées et supprime les empreintes vocales de toutes les notes. Les noms déjà présents dans vos notes sont conservés."
+                  "value": "Cassini cesse de reconnaître les %lld voix mémorisées et supprime les empreintes vocales de toutes les réunions. Les noms déjà présents dans vos réunions restent."
                 }
               },
               "one": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "Cassini cesse de reconnaître %lld voix mémorisée et supprime les empreintes vocales de toutes les notes. Les noms déjà présents dans vos notes sont conservés."
+                  "value": "Cassini cesse de reconnaître %lld voix mémorisée et supprime les empreintes vocales de toutes les réunions. Les noms déjà présents dans vos réunions restent."
                 }
               },
               "other": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "Cassini cesse de reconnaître les %lld voix mémorisées et supprime les empreintes vocales de toutes les notes. Les noms déjà présents dans vos notes sont conservés."
+                  "value": "Cassini cesse de reconnaître les %lld voix mémorisées et supprime les empreintes vocales de toutes les réunions. Les noms déjà présents dans vos réunions restent."
                 }
               }
             }
           }
         },
-        "it": {
+        "es": {
           "variations": {
             "plural": {
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Cassini smette di riconoscere %lld voce salvata ed elimina le impronte vocali da ogni nota. I nomi già presenti nelle note restano."
-                }
-              },
               "many": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "Cassini smette di riconoscere tutte le %lld voci salvate ed elimina le impronte vocali da ogni nota. I nomi già presenti nelle note restano."
+                  "value": "Cassini deja de reconocer las %lld voces guardadas y elimina las huellas de voz de todas las reuniones. Los nombres que ya están en tus reuniones se mantienen."
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Cassini deja de reconocer %lld voz guardada y elimina las huellas de voz de todas las reuniones. Los nombres que ya están en tus reuniones se mantienen."
                 }
               },
               "other": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "Cassini smette di riconoscere tutte le %lld voci salvate ed elimina le impronte vocali da ogni nota. I nomi già presenti nelle note restano."
+                  "value": "Cassini deja de reconocer las %lld voces guardadas y elimina las huellas de voz de todas las reuniones. Los nombres que ya están en tus reuniones se mantienen."
                 }
               }
             }
@@ -938,19 +796,19 @@
               "many": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "O Cassini deixa de reconhecer todas as %lld vozes salvas e exclui as impressões de voz de todas as notas. Os nomes que já estão nas suas notas permanecem."
+                  "value": "O Cassini deixa de reconhecer todas as %lld vozes salvas e exclui as impressões de voz de todas as reuniões. Os nomes já presentes nas suas reuniões permanecem."
                 }
               },
               "one": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "O Cassini deixa de reconhecer %lld voz salva e exclui as impressões de voz de todas as notas. Os nomes que já estão nas suas notas permanecem."
+                  "value": "O Cassini deixa de reconhecer %lld voz salva e exclui as impressões de voz de todas as reuniões. Os nomes já presentes nas suas reuniões permanecem."
                 }
               },
               "other": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "O Cassini deixa de reconhecer todas as %lld vozes salvas e exclui as impressões de voz de todas as notas. Os nomes que já estão nas suas notas permanecem."
+                  "value": "O Cassini deixa de reconhecer todas as %lld vozes salvas e exclui as impressões de voz de todas as reuniões. Os nomes já presentes nas suas reuniões permanecem."
                 }
               }
             }
@@ -962,19 +820,19 @@
               "many": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "O Cassini deixa de reconhecer todas as %lld vozes guardadas e elimina as impressões vocais de todas as notas. Os nomes já presentes nas notas mantêm-se."
+                  "value": "O Cassini deixa de reconhecer todas as %lld vozes guardadas e elimina as impressões vocais de todas as reuniões. Os nomes já presentes nas suas reuniões mantêm-se."
                 }
               },
               "one": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "O Cassini deixa de reconhecer %lld voz guardada e elimina as impressões vocais de todas as notas. Os nomes já presentes nas notas mantêm-se."
+                  "value": "O Cassini deixa de reconhecer %lld voz guardada e elimina as impressões vocais de todas as reuniões. Os nomes já presentes nas suas reuniões mantêm-se."
                 }
               },
               "other": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "O Cassini deixa de reconhecer todas as %lld vozes guardadas e elimina as impressões vocais de todas as notas. Os nomes já presentes nas notas mantêm-se."
+                  "value": "O Cassini deixa de reconhecer todas as %lld vozes guardadas e elimina as impressões vocais de todas as reuniões. Os nomes já presentes nas suas reuniões mantêm-se."
                 }
               }
             }
@@ -982,43 +840,44 @@
         }
       }
     },
-    "Cassini stops recognising this voice. Names already in your notes stay.": {
+    "Cassini stops recognising this voice. Names already in your meetings stay.": {
+      "comment": "Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3, android.savedVoices.forget.body.",
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Cassini stops recognising this voice. Names already in your notes stay."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cassini dejará de reconocer esta voz. Los nombres que ya están en tus notas se mantienen."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cassini cesse de reconnaître cette voix. Les noms déjà présents dans vos notes sont conservés."
+            "value": "Cassini stops recognising this voice. Names already in your meetings stay."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Cassini smette di riconoscere questa voce. I nomi già presenti nelle note restano."
+            "value": "Cassini smette di riconoscere questa voce. I nomi già presenti nelle riunioni restano."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cassini cesse de reconnaître cette voix. Les noms déjà présents dans vos réunions restent."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cassini deja de reconocer esta voz. Los nombres que ya están en tus reuniones se mantienen."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "O Cassini deixa de reconhecer esta voz. Os nomes que já estão nas suas notas permanecem."
+            "value": "O Cassini deixa de reconhecer esta voz. Os nomes já presentes nas suas reuniões permanecem."
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "O Cassini deixa de reconhecer esta voz. Os nomes já presentes nas notas mantêm-se."
+            "value": "O Cassini deixa de reconhecer esta voz. Os nomes já presentes nas suas reuniões mantêm-se."
           }
         }
       }
@@ -1064,43 +923,44 @@
         }
       }
     },
-    "Deletes the voiceprints of every note. Names already in your notes stay.": {
+    "Deletes the voiceprints of every meeting. Names already in your meetings stay.": {
+      "comment": "Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3, ios.savedVoices.forgetAllData.body.",
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Deletes the voiceprints of every note. Names already in your notes stay."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Elimina las huellas de voz de todas las notas. Los nombres que ya están en tus notas se mantienen."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Supprime les empreintes vocales de toutes les notes. Les noms déjà présents dans vos notes sont conservés."
+            "value": "Deletes the voiceprints of every meeting. Names already in your meetings stay."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Elimina le impronte vocali di ogni nota. I nomi già presenti nelle note restano."
+            "value": "Elimina le impronte vocali di ogni riunione. I nomi già presenti nelle riunioni restano."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supprime les empreintes vocales de toutes les réunions. Les noms déjà présents dans vos réunions sont conservés."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elimina las huellas de voz de todas las reuniones. Los nombres que ya están en tus reuniones se mantienen."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Exclui as impressões de voz de todas as notas. Os nomes que já estão nas suas notas permanecem."
+            "value": "Exclui as impressões de voz de todas as reuniões. Os nomes que já estão nas suas reuniões permanecem."
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "Elimina as impressões vocais de todas as notas. Os nomes já presentes nas notas mantêm-se."
+            "value": "Elimina as impressões vocais de todas as reuniões. Os nomes já presentes nas reuniões mantêm-se."
           }
         }
       }
@@ -1616,166 +1476,170 @@
         }
       }
     },
-    "Future notes will name %@ automatically. The voiceprint never leaves this device.": {
+    "Future meetings will name %@ automatically. The voiceprint never leaves this device.": {
+      "comment": "Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3, ios.speakers.rememberVoice.description.",
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Future notes will name %@ automatically. The voiceprint never leaves this device."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Las próximas notas nombrarán a %@ automáticamente. La huella de voz nunca sale de este dispositivo."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Les prochaines notes nommeront %@ automatiquement. L’empreinte vocale ne quitte jamais cet appareil."
+            "value": "Future meetings will name %@ automatically. The voiceprint never leaves this device."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Le prossime note riconosceranno %@ automaticamente. L’impronta vocale non lascia mai il dispositivo."
+            "value": "Le prossime riunioni riconosceranno %@ automaticamente. L’impronta vocale non lascia mai il dispositivo."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les prochaines réunions nommeront %@ automatiquement. L’empreinte vocale ne quitte jamais cet appareil."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Las próximas reuniones nombrarán a %@ automáticamente. La huella de voz nunca sale de este dispositivo."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "As próximas notas vão nomear %@ automaticamente. A impressão de voz nunca sai deste dispositivo."
+            "value": "As próximas reuniões vão nomear %@ automaticamente. A impressão de voz nunca sai deste dispositivo."
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "As próximas notas vão nomear %@ automaticamente. A impressão vocal nunca sai deste dispositivo."
+            "value": "As próximas reuniões vão nomear %@ automaticamente. A impressão vocal nunca sai deste dispositivo."
           }
         }
       }
     },
-    "Future notes will name this person automatically. The voiceprint never leaves this device.": {
+    "Future meetings will name this person automatically. The voiceprint never leaves this device.": {
+      "comment": "Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3, ios.speakers.rememberVoice.description.unnamed.",
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Future notes will name this person automatically. The voiceprint never leaves this device."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Las próximas notas nombrarán a esta persona automáticamente. La huella de voz nunca sale de este dispositivo."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Les prochaines notes nommeront cette personne automatiquement. L’empreinte vocale ne quitte jamais cet appareil."
+            "value": "Future meetings will name this person automatically. The voiceprint never leaves this device."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Le prossime note riconosceranno questa persona automaticamente. L’impronta vocale non lascia mai il dispositivo."
+            "value": "Le prossime riunioni riconosceranno questa persona automaticamente. L’impronta vocale non lascia mai il dispositivo."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les prochaines réunions nommeront cette personne automatiquement. L’empreinte vocale ne quitte jamais cet appareil."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Las próximas reuniones nombrarán a esta persona automáticamente. La huella de voz nunca sale de este dispositivo."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "As próximas notas vão nomear esta pessoa automaticamente. A impressão de voz nunca sai deste dispositivo."
+            "value": "As próximas reuniões vão nomear esta pessoa automaticamente. A impressão de voz nunca sai deste dispositivo."
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "As próximas notas vão nomear esta pessoa automaticamente. A impressão vocal nunca sai deste dispositivo."
+            "value": "As próximas reuniões vão nomear esta pessoa automaticamente. A impressão vocal nunca sai deste dispositivo."
           }
         }
       }
     },
-    "Future notes will suggest %@. The voiceprint never leaves this device.": {
+    "Future meetings will suggest %@. The voiceprint never leaves this device.": {
+      "comment": "Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3, ios.speakers.suggestVoice.description.",
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Future notes will suggest %@. The voiceprint never leaves this device."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Las próximas notas sugerirán a %@. La huella de voz nunca sale de este dispositivo."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Les prochaines notes suggéreront %@. L’empreinte vocale ne quitte jamais cet appareil."
+            "value": "Future meetings will suggest %@. The voiceprint never leaves this device."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Le prossime note suggeriranno %@. L’impronta vocale non lascia mai il dispositivo."
+            "value": "Le prossime riunioni suggeriranno %@. L’impronta vocale non lascia mai il dispositivo."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les prochaines réunions suggéreront %@. L’empreinte vocale ne quitte jamais cet appareil."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Las próximas reuniones sugerirán a %@. La huella de voz nunca sale de este dispositivo."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "As próximas notas vão sugerir %@. A impressão de voz nunca sai deste dispositivo."
+            "value": "As próximas reuniões vão sugerir %@. A impressão de voz nunca sai deste dispositivo."
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "As próximas notas vão sugerir %@. A impressão vocal nunca sai deste dispositivo."
+            "value": "As próximas reuniões vão sugerir %@. A impressão vocal nunca sai deste dispositivo."
           }
         }
       }
     },
-    "Future notes will suggest this person. The voiceprint never leaves this device.": {
+    "Future meetings will suggest this person. The voiceprint never leaves this device.": {
+      "comment": "Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3, ios.speakers.suggestVoice.description.unnamed.",
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Future notes will suggest this person. The voiceprint never leaves this device."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Las próximas notas sugerirán a esta persona. La huella de voz nunca sale de este dispositivo."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Les prochaines notes suggéreront cette personne. L’empreinte vocale ne quitte jamais cet appareil."
+            "value": "Future meetings will suggest this person. The voiceprint never leaves this device."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Le prossime note suggeriranno questa persona. L’impronta vocale non lascia mai il dispositivo."
+            "value": "Le prossime riunioni suggeriranno questa persona. L’impronta vocale non lascia mai il dispositivo."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les prochaines réunions suggéreront cette personne. L’empreinte vocale ne quitte jamais cet appareil."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Las próximas reuniones sugerirán a esta persona. La huella de voz nunca sale de este dispositivo."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "As próximas notas vão sugerir esta pessoa. A impressão de voz nunca sai deste dispositivo."
+            "value": "As próximas reuniões vão sugerir esta pessoa. A impressão de voz nunca sai deste dispositivo."
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "As próximas notas vão sugerir esta pessoa. A impressão vocal nunca sai deste dispositivo."
+            "value": "As próximas reuniões vão sugerir esta pessoa. A impressão vocal nunca sai deste dispositivo."
           }
         }
       }
@@ -2097,47 +1961,6 @@
         }
       }
     },
-    "Name them again in a note to keep recognising them": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Name them again in a note to keep recognising them"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ponle nombre de nuevo en una nota para seguir reconociendo esta voz"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nommez de nouveau cette personne dans une note pour continuer à la reconnaître"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dai di nuovo il nome in una nota per continuare a riconoscerla"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nomeie de novo em uma nota para continuar reconhecendo"
-          }
-        },
-        "pt-PT": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dê nome novamente numa nota para continuar a reconhecer esta voz"
-          }
-        }
-      }
-    },
     "Name this speaker": {
       "extractionState": "manual",
       "localizations": {
@@ -2419,43 +2242,44 @@
         }
       }
     },
-    "People in this note": {
+    "People in this meeting": {
+      "comment": "Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3, ios.speakers.peopleInMeeting.",
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "People in this note"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Personas en esta nota"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Personnes dans cette note"
+            "value": "People in this meeting"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Persone in questa nota"
+            "value": "Persone in questa riunione"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Personnes dans cette réunion"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Personas en esta reunión"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pessoas nesta nota"
+            "value": "Pessoas nesta reunião"
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pessoas nesta nota"
+            "value": "Pessoas nesta reunião"
           }
         }
       }
@@ -3006,43 +2830,44 @@
         }
       }
     },
-    "The note could not be saved. Nothing was changed.": {
+    "The meeting could not be saved. Nothing was changed.": {
+      "comment": "Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3, ios.speakers.meetingSaveFailed.",
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "The note could not be saved. Nothing was changed."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No se pudo guardar la nota. No se cambió nada."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Impossible de sauvegarder la note. Rien n’a été modifié."
+            "value": "The meeting could not be saved. Nothing was changed."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Impossibile salvare la nota. Non è stato modificato nulla."
+            "value": "Impossibile salvare la riunione. Non è stato modificato nulla."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossible de sauvegarder la réunion. Rien n’a été modifié."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo guardar la reunión. No se cambió nada."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Não foi possível salvar a nota. Nada foi alterado."
+            "value": "Não foi possível salvar a reunião. Nada foi alterado."
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "Não foi possível guardar a nota. Nada foi alterado."
+            "value": "Não foi possível guardar a reunião. Nada foi alterado."
           }
         }
       }
@@ -3289,47 +3114,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Esta voz está guardada como «%@»."
-          }
-        }
-      }
-    },
-    "To add someone, name a speaker in any note and keep “Remember this voice” on.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "To add someone, name a speaker in any note and keep “Remember this voice” on."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Para añadir a alguien, pon nombre a un hablante en cualquier nota y deja activado “Recordar esta voz”."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Pour ajouter quelqu’un, nommez un intervenant dans une note et laissez « Mémoriser cette voix » activé."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Per aggiungere qualcuno, dai un nome a una voce in una nota e lascia attivo “Ricorda questa voce”."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Para adicionar alguém, nomeie um locutor em qualquer nota e mantenha “Lembrar esta voz” ativado."
-          }
-        },
-        "pt-PT": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Para adicionar alguém, dê nome a um orador numa nota e mantenha «Memorizar esta voz» ativado."
           }
         }
       }

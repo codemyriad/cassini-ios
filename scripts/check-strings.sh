@@ -19,6 +19,7 @@
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
+python3 "$root/scripts/import-contract.py"
 python3 "$root/scripts/generate-meeting-strings.py" --check
 python3 "$root/scripts/generate-library-strings.py" --check
 python3 "$root/scripts/generate-wave5-strings.py" --check

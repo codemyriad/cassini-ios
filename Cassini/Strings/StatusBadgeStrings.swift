@@ -5,6 +5,10 @@ import Foundation
 enum StatusBadgeStrings {
     static func template(_ id: String, bundle: Bundle, locale: Locale) -> String {
         switch id {
+        case "format.previewSubtitle.importedOtherDevice":
+            return String(localized: "format.previewSubtitle.importedOtherDevice", table: "StatusBadge", bundle: bundle, locale: locale)
+        case "format.previewSubtitle.received":
+            return String(localized: "format.previewSubtitle.received", table: "StatusBadge", bundle: bundle, locale: locale)
         case "meeting.interruptedAt":
             return String(localized: "meeting.interruptedAt", table: "StatusBadge", bundle: bundle, locale: locale)
         case "states.badge.importing":

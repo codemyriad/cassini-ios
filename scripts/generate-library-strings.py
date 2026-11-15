@@ -13,6 +13,20 @@ LOOKUP = Path('Cassini/Strings/LibraryPhase1Copy.swift')
 STRINGS_PIN = Path('contracts/shared-strings/UPSTREAM.json')
 LANGUAGES = ('en', 'it', 'fr', 'es', 'pt-BR', 'pt-PT')
 PROPERTIES = {
+    'library.filter.all': 'all',
+    'library.filter.starred': 'starred',
+    'library.filters.a11y': 'filtersAccessibilityLabel',
+    'library.starred.empty': 'starredEmpty',
+    'search.filter.starred': 'searchStarred',
+    'search.filter.speakerNone': 'speakerNone',
+    'search.filter.speaker': 'speakerTemplate',
+    'search.filter.anySpeaker': 'anySpeaker',
+    'search.filter.anyDate': 'anyDate',
+    'search.filter.date.today': 'today',
+    'search.filter.date.week': 'pastWeek',
+    'search.filter.date.month': 'pastMonth',
+    'search.filter.date.year': 'thisYear',
+    'search.filter.recordedByMe': 'recordedByMe',
     'phone.row.noSpeech': 'noSpeech',
     'phone.row.transcribed.a11y': 'transcribedAccessibilityLabel',
     'search.field.placeholder': 'searchPlaceholder',
@@ -21,6 +35,7 @@ PROPERTIES = {
     'import.button.mobile': 'importAudio',
     'common.record': 'record',
     'common.close': 'close',
+    'common.tryAgain': 'tryAgain',
     'search.title': 'searchTitle',
 }
 PLURALS = {'phone.row.speakerCount', 'format.searchCount.places', 'format.searchCount.meetings'}
@@ -53,7 +68,7 @@ def outputs(root=ROOT):
             translation = entry if language == 'en' else entry['l10n'][language]
             value = entry['en'] if language == 'en' else translation['text']
             placeholders = set(re.findall(r'\{\w+\}', value))
-            expected = {'{n}'} if entry['id'] in PLURALS else ({'{places}', '{meetings}'} if entry['id'] == JOIN else set())
+            expected = {'{n}'} if entry['id'] in PLURALS else ({'{places}', '{meetings}'} if entry['id'] == JOIN else ({'{name}'} if entry['id'] == 'search.filter.speaker' else set()))
             if not isinstance(value, str) or not value.strip() or placeholders != expected or '%' in value:
                 raise ValueError(f'Placeholder drift: {entry["id"]} {language}')
             forms = translation.get('plural', {})

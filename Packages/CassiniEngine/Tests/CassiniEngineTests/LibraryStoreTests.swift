@@ -41,6 +41,19 @@ import CassiniEngineTesting
         try NoteRepository(root: root).load().notes.first { $0.id == id }
     }
 
+    func testStarsSurviveReloadAndCanBeRemoved() async throws {
+        let note = Note(title: "Planning")
+        try await library.insert(note)
+        library.update(note.id) { $0.isFavorite = true }
+        await library.settle()
+        let reopened = LibraryStore(noteStore: NoteStore(persistence: persistence)) { _ in }
+        await reopened.load()
+        XCTAssertEqual(reopened.note(note.id)?.isFavorite, true)
+        reopened.update(note.id) { $0.isFavorite = false }
+        await reopened.settle()
+        XCTAssertEqual(try stored(note.id)?.isFavorite, false)
+    }
+
     func testAnUnsavedSealSurvivesALaterWriteAndIsWrittenWithIt() async throws {
         let id = try await recordingWithAFailedSeal()
         XCTAssertEqual(try stored(id)?.audio, .live)

@@ -20,11 +20,13 @@ struct ExportFormatSheet: View {
                         DisclosureGroup(ExportPhase2Copy.moreFormats, isExpanded: $expanded) {
                             ForEach(state.moreFormats) { row($0) }
                         }
+                        .accessibilityIdentifier("exportMoreFormats")
                     }
                 }
                 .accessibilityLabel(ExportPhase2Copy.formatGroup)
                 if state.audioOnly { Text(ExportPhase2Copy.audioOnlyNote) }
             }
+            .accessibilityIdentifier("exportFormats")
             .navigationTitle(ExportPhase2Copy.title.replacingOccurrences(of: "{title}", with: note.title))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -38,6 +40,7 @@ struct ExportFormatSheet: View {
                         confirm(chosen)
                         dismiss()
                     }
+                    .accessibilityIdentifier("exportConfirm")
                 }
             }
         }
@@ -55,6 +58,7 @@ struct ExportFormatSheet: View {
             }
             .foregroundStyle(.primary)
         }
+        .accessibilityIdentifier("exportChoice-\(choice.rawValue)")
         .accessibilityAddTraits((selection ?? state.selection) == choice ? .isSelected : [])
     }
 

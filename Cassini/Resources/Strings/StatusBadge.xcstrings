@@ -1,6 +1,90 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "format.previewSubtitle.importedOtherDevice": {
+      "comment": "Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3, format.previewSubtitle.importedOtherDevice; named placeholders stay verbatim.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{day}, {time} · {duration} · Imported · Transcribed on another device"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{day}, {time} · {duration} · Importata · Trascritta su un altro dispositivo"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{day}, {time} · {duration} · Importée · Transcrite sur un autre appareil"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{day}, {time} · {duration} · Importada · Transcrita en otro dispositivo"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{day}, {time} · {duration} · Importada · Transcrita em outro dispositivo"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{day}, {time} · {duration} · Importada · Transcrita noutro dispositivo"
+          }
+        }
+      }
+    },
+    "format.previewSubtitle.received": {
+      "comment": "Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3, format.previewSubtitle.received; named placeholders stay verbatim.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{day}, {time} · {duration} · Imported"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{day}, {time} · {duration} · Importata"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{day}, {time} · {duration} · Importée"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{day}, {time} · {duration} · Importada"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{day}, {time} · {duration} · Importada"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{day}, {time} · {duration} · Importada"
+          }
+        }
+      }
+    },
     "meeting.interruptedAt": {
       "comment": "Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3, meeting.interruptedAt; named placeholders stay verbatim.",
       "extractionState": "manual",

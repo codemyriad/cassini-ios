@@ -3,14 +3,13 @@ import CassiniEngine
 import CassiniNotebook
 
 /// The long-press actions of a Library row: the iOS form of Android's Note actions sheet (features.md section 6). What
-/// it offers comes from `LibraryScreenModel.menu(_:)` and each row goes to `perform(_:on:)`; the exports and Document
-/// info belong to the Note screen, which opens and starts them.
+/// it offers comes from `LibraryScreenModel.menu(_:)`. The Library hosts the export selector;
+/// confirmed exports and Document info open the Note screen, which runs the action.
 struct NoteActionsMenu: View {
     let noteID: UUID
     @Environment(LibraryScreenModel.self) private var model
 
-    @State private var exportOpen = false
-    @State private var confirmedExport: ExportSheetState.Choice?
+    let openExport: () -> Void
 
     var body: some View {
         Group {
@@ -28,21 +27,6 @@ struct NoteActionsMenu: View {
                 }
             }
         }
-        .sheet(isPresented: $exportOpen, onDismiss: shareConfirmed) {
-            if let note = model.note(noteID), let menu = model.menu(noteID) {
-                ExportFormatSheet(note: note, jobPending: menu.transcribe == .stop || menu.transcribe == .removeFromQueue) {
-                    confirmedExport = $0
-                }
-            }
-        }
-    }
-
-    private func shareConfirmed() {
-        guard let choice = confirmedExport else { return }
-        confirmedExport = nil
-        if let format = choice.transcriptFormat { perform(.export(format)) }
-        else if choice == .originalAudio { perform(.shareAudio) }
-        else { perform(.exportDocument) }
     }
 
     @ViewBuilder private func transcribeItems(_ menu: LibraryRowMenu) -> some View {
@@ -71,7 +55,8 @@ struct NoteActionsMenu: View {
 
     /// D99 uses the same format selector as the meeting header.
     private func exportMenu(_ menu: LibraryRowMenu) -> some View {
-        Button(LibraryCopy.export, systemImage: "square.and.arrow.up") { exportOpen = true }
+        Button(LibraryCopy.export, systemImage: "square.and.arrow.up") { openExport() }
+            .accessibilityIdentifier("exportOpen")
             .disabled(menu.transcribeWaits)
     }
 

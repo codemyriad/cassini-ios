@@ -34,6 +34,7 @@
     "vectors/states/README.md": "e2540837d041af896fb22f2f9ab623d4c85f3db0e2903d4feede806f05271fb1",
     "vectors/states/states-vectors.json": "2b946da58459452cb9fd17cacef58a3f10585a69142796cdd693e2f90fd9f497",
     "vectors/states/test_contract.py": "fa09c5fe60a1cf00db52f63ca3094d74e6c2e5828b15d316acf74994c9329240",
-    "vectors/states/verify.py": "81559ba2af4d5ae074feee11fdcb6ee122ce06f4366c01affa5754cc05500965"
+    "vectors/states/verify.py": "81559ba2af4d5ae074feee11fdcb6ee122ce06f4366c01affa5754cc05500965",
+    "brand/tokens.json": "9d3d10d88db5d86d18a1cd099df36ca1c00234344fa383d28283992b734c6358"
   }
 }

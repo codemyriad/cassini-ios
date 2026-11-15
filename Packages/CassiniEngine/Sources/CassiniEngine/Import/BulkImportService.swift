@@ -6,6 +6,7 @@ import CassiniNotebook
 /// A ZIP's entire directory is validated before any of its members can become notes. Only a UUID-named scratch file
 /// is written; archive paths are never handed to the filesystem. Completed imports survive cancellation.
 public struct BulkImportService: Sendable {
+    /// A non-nil name identifies a staged ZIP member; route it to `ImportService.importArchiveMember`.
     public typealias ImportFile = @Sendable (URL, String?) async throws -> ImportOutcome
     private let files: any FileImporting
     private let scratch: URL
@@ -77,7 +78,7 @@ public struct BulkImportService: Sendable {
                         if entry.isDirectory { continue }
                         guard entry.isFile && !entry.isMetadata && ArchiveAudio.supports(entry.name) else { report.summary.unsupported += 1; continue }
                         guard entry.expandedBytes <= memberLimit else { report.summary.failed += 1; continue }
-                        let staged = folder.appendingPathComponent(UUID().uuidString + ".tmp")
+                        let staged = folder.appendingPathComponent(UUID().uuidString + "." + (entry.name as NSString).pathExtension.lowercased())
                         defer { try? FileManager.default.removeItem(at: staged) }
                         do {
                             let remaining = budget.remaining

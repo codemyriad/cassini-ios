@@ -13,6 +13,22 @@ struct TranscriptExportsTests {
         return note
     }
 
+    @Test func starringDoesNotChangeTranscriptExports() throws {
+        var value = note([TranscriptSegment(text: "Hello", start: 0, end: 1)])
+        let markdown = MarkdownOptions(copy: try MarkdownExportTests.copy("en"), dateLine: { _, _ in "Today" },
+                                       untitled: "Untitled", unnamedSpeaker: { "Speaker \($0)" })
+        var exportTexts = texts
+        exportTexts.markdown = markdown
+        for format in TranscriptFormat.allCases {
+            value.isFavorite = false
+            let before = try TranscriptExports.data(value, format: format, texts: exportTexts)
+            value.isFavorite = true
+            #expect(try TranscriptExports.data(value, format: format, texts: exportTexts) == before)
+        }
+        let json = try JSONSerialization.jsonObject(with: JSONExport.data(value)) as? [String: Any]
+        #expect(json?["isFavorite"] == nil)
+    }
+
     @Test func timedWordsKeepTheirSpeakersAndTimesInCanonicalOrder() {
         let segments = [
             TranscriptSegment(text: "Yes, sure.", start: 0, end: 0.9, speakerID: "S1",

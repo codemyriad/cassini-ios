@@ -23,6 +23,54 @@ private actor Gate {
 @MainActor @Suite struct ImportTrackerTests {
     let clock = FakeClock()
 
+    @Test func failedCardsPersistIndependentlyAndDuplicatesAndCancellationLeaveNoCard() async throws {
+        let tracker = ImportTracker(clock: clock)
+        let gate = Gate()
+        let running = tracker.start(displayName: "same.ogg") { await gate.wait(); return .created(UUID()) }
+        #expect(tracker.cards.count == 1)
+        #expect(tracker.cards.first?.failure == nil)
+        _ = await tracker.start(displayName: "same.ogg") { .rejected(.cannotOpen) }.value
+        let failedID = try #require(tracker.cards.last?.id)
+        _ = await tracker.start(displayName: "duplicate.ogg") { .existing(UUID()) }.value
+        _ = await tracker.start(displayName: "cancelled.ogg") { throw CancellationError() }.value
+        #expect(tracker.cards.count == 2)
+        #expect(tracker.cards.last?.failure == .cannotOpen)
+        tracker.dismissCard(tracker.cards[0].id) // A running import cannot be dismissed underneath its task.
+        #expect(tracker.cards.count == 2)
+        await gate.release()
+        _ = await running.value
+        #expect(tracker.cards.map(\.id) == [failedID])
+        tracker.dismissCard(failedID)
+        #expect(tracker.cards.isEmpty)
+    }
+
+    @Test(arguments: [true, false])
+    func cancellationWinsOverAConcurrentFailure(rejected: Bool) async {
+        let tracker = ImportTracker(clock: clock)
+        let gate = Gate()
+        let task = tracker.start(displayName: "cancelled.wav") {
+            await gate.wait()
+            if rejected { return .rejected(.cannotOpen) }
+            throw CocoaError(.fileReadUnknown)
+        }
+        task.cancel()
+        await gate.release()
+        #expect(await task.value == nil)
+        #expect(tracker.cards.isEmpty)
+        #expect(tracker.failure == nil)
+    }
+
+    @Test func cancellationAfterCommitPreservesTheSuccessfulOutcome() async {
+        let tracker = ImportTracker(clock: clock)
+        let gate = Gate(), id = UUID()
+        let task = tracker.start(displayName: "committed.wav") { await gate.wait(); return .created(id) }
+        task.cancel()
+        await gate.release()
+        #expect(await task.value == .created(id))
+        #expect(tracker.cards.isEmpty)
+        #expect(tracker.failure == nil)
+    }
+
     @Test func importsRunSideBySideAndEachIsShownWhileItRuns() async {
         let tracker = ImportTracker(clock: clock)
         let gate = Gate()

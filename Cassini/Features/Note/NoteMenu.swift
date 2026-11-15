@@ -38,6 +38,7 @@ struct NoteMenu: View {
             if note.hasDocument { Button(NoteCopy.documentInfo, systemImage: "info.circle") { perform(.documentInfo) } }
             Divider()
             Button(LibraryCopy.export, systemImage: "square.and.arrow.up") { exportOpen = true }
+                .accessibilityIdentifier("exportOpen")
                 .disabled(exportingDocument || finishing || note.isRecording)
             if let transcribeRow {
                 Divider()
