@@ -84,6 +84,12 @@ extension AVAudioRecorder: CaptureRecorder {}
         })
     }
 
+    isolated deinit {
+        timer?.invalidate()
+        observers.forEach(NotificationCenter.default.removeObserver)
+        continuation.finish()
+    }
+
     var elapsed: TimeInterval { recorder?.currentTime ?? 0 }
 
     var fileBytes: Int64 {

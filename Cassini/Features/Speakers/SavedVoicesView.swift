@@ -12,6 +12,7 @@ struct SavedVoicesView: View {
     @State private var enrolling = false
     @Environment(LibraryStore.self) private var library
     @Environment(PlaybackStore.self) private var playback
+    @State private var playingVoiceID: UUID?
     @State private var sampleOwner = PlaybackOwner()
     @State private var samples: [UUID: SavedVoicePlayback] = [:]
     @Environment(Router.self) private var router
@@ -59,7 +60,7 @@ struct SavedVoicesView: View {
                 Section {
                     ForEach(people) { person in
                         PersonRow(person: person, editable: !readOnly, sample: samples[person.id],
-                                  owner: sampleOwner, send: send)
+                                  owner: sampleOwner, playingVoiceID: $playingVoiceID, send: send)
                     }
                 } footer: {
                     if !readOnly { Text(SpeakersCopy.footnote).foregroundStyle(Color.muted) }
@@ -89,13 +90,16 @@ struct SavedVoicesView: View {
         .task {
             await voices.refresh()
         }
-        .task(id: voices.savedVoices) {
+        .task(id: SavedVoicePlayback.Snapshot(voices: voices.savedVoices, notes: library.notes, root: library.root)) {
             let people = voices.savedVoices, notes = library.notes, root = library.root
             let prepared = await Task.detached { SavedVoicePlayback.samples(voices: people, notes: notes, root: root) }.value
             guard !Task.isCancelled else { return }
             samples = prepared
         }
-        .onDisappear { playback.leave(sampleOwner) }
+        .onChange(of: playback.state.sample) { _, sample in
+            if sample == nil { playingVoiceID = nil }
+        }
+        .onDisappear { playback.leave(sampleOwner); playingVoiceID = nil }
         .sheet(isPresented: $enrolling) { VoiceEnrollmentView() }
         .sheet(isPresented: presented(where: { if case .rename = $0 { true } else { false } })) {
             if case .rename(let id, let name)? = dialog {
@@ -173,6 +177,7 @@ private struct PersonRow: View {
     let editable: Bool
     let sample: SavedVoicePlayback?
     let owner: PlaybackOwner
+    @Binding var playingVoiceID: UUID?
     @Environment(PlaybackStore.self) private var playback
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let send: (SavedVoicesEvent) -> Void
@@ -219,12 +224,13 @@ private struct PersonRow: View {
     private var controls: some View {
         HStack(spacing: 12) {
             if let sample {
-                let playing = playback.owns(sample.source.noteID) && playback.state.sample != nil
+                let playing = playingVoiceID == person.id && playback.owns(sample.source.noteID) && playback.state.sample != nil
                 Button {
-                    if playing { playback.stopSample() }
+                    if playing { playback.stopSample(); playingVoiceID = nil }
                     else {
-                        playback.controller.show(sample.source, at: 0, owner: owner)
-                        _ = playback.controller.playRange(sample.source.noteID, from: sample.start, to: sample.end)
+                        playback.controller.show(sample.source, at: sample.savedPosition, owner: owner)
+                        let started = playback.controller.playRange(sample.source.noteID, from: sample.start, to: sample.end)
+                        playingVoiceID = started ? person.id : nil
                     }
                 } label: { Image(systemName: playing ? "stop.fill" : "play.fill").frame(minWidth: HitTarget.minimum, minHeight: HitTarget.minimum) }
                 .buttonStyle(.borderless)

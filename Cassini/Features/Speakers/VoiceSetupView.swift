@@ -46,6 +46,7 @@ struct VoiceEnrollmentView: View {
                     }
                     .disabled(enrollment.busy)
                     if enrollment.recording { Text(Wave6Copy.voicesEnrollRecording) }
+                    if let failure = enrollment.failure { Text(failure).foregroundStyle(Color.toneError) }
                     if enrollment.tooShort { Text(Wave6Copy.voicesEnrollTooShort).foregroundStyle(Color.toneWarn) }
                     if enrollment.print != nil { Text(Wave6Copy.voicesEnrollReady) }
                     Button(Wave6Copy.voicesEnrollSave) {

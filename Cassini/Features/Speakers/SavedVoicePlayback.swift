@@ -5,8 +5,16 @@ import CassiniNotebook
 /// Built off the UI thread once per saved-voice snapshot, using each referenced meeting's stats once.
 struct SavedVoicePlayback: Sendable {
     let source: PlaybackSource
+    let savedPosition: Double
     let start: Double
     let end: Double
+
+    /// Include the library snapshot: loading, trashing or replacing meeting audio changes sample resolution.
+    struct Snapshot: Hashable {
+        let voices: [SavedVoice]
+        let notes: [Note]
+        let root: URL?
+    }
 
     static func samples(voices: [SavedVoice], notes: [Note], root: URL?) -> [UUID: Self] {
         guard let root else { return [:] }
@@ -20,7 +28,7 @@ struct SavedVoicePlayback: Sendable {
                 if sample.guidedEnrollment == true {
                     let url = root.appendingPathComponent("PrivateVoices/Enrollment/\(voice.id.uuidString).caf")
                     if FileManager.default.fileExists(atPath: url.path) {
-                        result[voice.id] = Self(source: PlaybackSource(noteID: voice.id, url: url, title: voice.name), start: 0,
+                        result[voice.id] = Self(source: PlaybackSource(noteID: voice.id, url: url, title: voice.name), savedPosition: 0, start: 0,
                                                end: min(10, sample.print.speechSeconds))
                         break
                     }
@@ -28,7 +36,7 @@ struct SavedVoicePlayback: Sendable {
                           let window = stats[note.id]?.first(where: { $0.speakerID == sample.print.speakerID })?.sample {
                     let url = root.appendingPathComponent(note.id.uuidString).appendingPathComponent(note.audioFilename)
                     result[voice.id] = Self(source: PlaybackSource(noteID: note.id, url: url, title: voice.name),
-                                           start: window.start, end: window.end)
+                                           savedPosition: note.playbackPosition, start: window.start, end: window.end)
                     break
                 }
             }

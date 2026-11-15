@@ -55,7 +55,7 @@ import CassiniNotebook
         recording = RecordingStore(.init(environment: environment, library: library, processing: processing,
                                          playback: playback, settings: settings, notices: noticeCenter, router: router,
                                          ready: { [startup] in _ = await startup.ready() }))
-        voiceEnrollment = VoiceEnrollmentAdapter(capture: AVCaptureAdapter(), analyzer: environment.analyzer,
+        voiceEnrollment = VoiceEnrollmentAdapter(makeCapture: { AVCaptureAdapter() }, analyzer: environment.analyzer,
             settings: settings, playback: playback, recording: recording,
             root: environment.exports.appendingPathComponent("VoiceEnrollment"))
         let importFiles = CoordinatedFileImporter(storage: environment.storage)
