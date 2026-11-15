@@ -4,6 +4,33 @@ import Vision
 /// The Library end to end (Android `LibraryBehaviourTest` and the Library rows of `TextLimitBehaviourTest`): its
 /// controls, the row statuses and inline actions, the search, the empty states and Rename.
 final class LibraryUITests: XCTestCase {
+    @MainActor func testImportedProvenanceInLibrarySearchAndHeader() {
+        let app = launch(["--seed", "importedProvenance"])
+        let imported = row(app, "Imported audio planning")
+        XCTAssertTrue(imported.waitForExistence(within: uiWaitFloor))
+        XCTAssertTrue(imported.label.contains("imported"))
+        XCTAssertTrue(imported.label.contains("transcribed"))
+        let search = app.textFields["librarySearch"]
+        search.tap()
+        search.typeText("Imported audio planning\n")
+        XCTAssertTrue(waitFor(imported, label: "imported"))
+        imported.tap()
+        let subtitle = app.staticTexts["noteSubtitle"]
+        XCTAssertTrue(subtitle.waitForExistence(within: uiWaitFloor))
+        XCTAssertTrue(subtitle.label.contains("Imported"))
+        XCTAssertFalse(subtitle.label.contains("Transcribed on another device"))
+    }
+
+    @MainActor func testImportedDocumentHeaderNamesOtherDevice() {
+        let app = launch(["--seed", "importedProvenance"])
+        let imported = scrolledRow(app, "Imported document planning")
+        XCTAssertTrue(imported.label.contains("imported"))
+        imported.tap()
+        let subtitle = app.staticTexts["noteSubtitle"]
+        XCTAssertTrue(subtitle.waitForExistence(within: uiWaitFloor))
+        XCTAssertTrue(subtitle.label.contains("Imported · Transcribed on another device"))
+    }
+
     @MainActor private func launch(_ arguments: [String] = ["--seed-test-data"]) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing", "--reset-test-data"] + arguments

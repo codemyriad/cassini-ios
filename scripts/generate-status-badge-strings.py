@@ -13,7 +13,7 @@ LOOKUP = Path('Cassini/Strings/StatusBadgeStrings.swift')
 STRINGS_PIN = Path('contracts/shared-strings/UPSTREAM.json')
 LANGUAGES = ('en', 'it', 'fr', 'es', 'pt-BR', 'pt-PT')
 IDS = ({'states.badge.' + key for key in ('recording', 'importing', 'saving', 'transcribing', 'needsAttention',
-        'interrupted', 'received', 'transcribing.noEta', 'transcribing.underMinute')} | {'meeting.interruptedAt'} |
+        'interrupted', 'received', 'transcribing.noEta', 'transcribing.underMinute')} | {'meeting.interruptedAt', 'format.previewSubtitle.received', 'format.previewSubtitle.importedOtherDevice'} |
        {'states.phone.' + key for key in ('audioOnly', 'cantPlay', 'cantReadTranscript', 'couldntTranscribe',
         'newerFormat', 'pausedAt', 'queued')})
 
@@ -34,7 +34,7 @@ def render(root=ROOT):
         raise ValueError('Global shared-string pin differs from the vendored catalog pin')
     catalog = json.loads((folder / 'strings/strings.json').read_text())
     selected = [entry for entry in catalog['entries'] if entry['id'].startswith(('states.badge.', 'states.phone.'))
-                or entry['id'] == 'meeting.interruptedAt']
+                or entry['id'] in {'meeting.interruptedAt', 'format.previewSubtitle.received', 'format.previewSubtitle.importedOtherDevice'}]
     if {entry['id'] for entry in selected} != IDS or len(selected) != len(IDS):
         raise ValueError('Unexpected W0.4 catalog IDs')
     strings = {}

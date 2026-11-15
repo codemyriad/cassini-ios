@@ -1,4 +1,4 @@
-// Generated from cassini-ux 5e0c34e0f1bb390298dabdf4eedc494e933fd329; do not edit.
+// Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3; do not edit.
 import Foundation
 
 /// Shared Phase 1 meeting and speaker copy, resolved using the current app language.

@@ -542,3 +542,5 @@ assigned speaker colours as transcript labels; unnamed speakers remain stone in 
 Library Search and Find match spoken words rather than labels inserted by the viewer. Search previews
 join paragraphs with spaces so blank lines cannot hide the matching word. Both search surfaces preserve
 the viewer’s spacing around standalone punctuation, including punctuation inside inline replies.
+
+Imported provenance (L-10): Library and Search show the shared outline Imported badge before speaker counts on finished imported meetings; progress and problem states take its place. Headers identify imported meetings and files that arrived with a transcript from another device. This matches the Phase 2 phone contract; recovered local captures remain own recordings. Existing stored import records are read without migration, and import-flow copy is unchanged.

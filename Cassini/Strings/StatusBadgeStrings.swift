@@ -1,10 +1,14 @@
-// Generated from cassini-ux 5e0c34e0f1bb390298dabdf4eedc494e933fd329; do not edit.
+// Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3; do not edit.
 import Foundation
 
 /// Literal call sites keep Xcode extraction and the compiled catalog in agreement.
 enum StatusBadgeStrings {
     static func template(_ id: String, bundle: Bundle, locale: Locale) -> String {
         switch id {
+        case "format.previewSubtitle.importedOtherDevice":
+            return String(localized: "format.previewSubtitle.importedOtherDevice", table: "StatusBadge", bundle: bundle, locale: locale)
+        case "format.previewSubtitle.received":
+            return String(localized: "format.previewSubtitle.received", table: "StatusBadge", bundle: bundle, locale: locale)
         case "meeting.interruptedAt":
             return String(localized: "meeting.interruptedAt", table: "StatusBadge", bundle: bundle, locale: locale)
         case "states.badge.importing":

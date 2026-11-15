@@ -25,6 +25,7 @@ final class StatusBadgeLayoutTests: XCTestCase {
                 guard badge.exists, !badge.frame.isEmpty else { return false }
                 return badge.frame.minY >= viewport.minY && badge.frame.maxY <= viewport.maxY
             }, "the complete badge \(index) is visible")
+            if index == 5 { XCTAssertEqual(badge.label, "Importée", "Imported uses the shared provenance translation") }
             if index == 0 { XCTAssertTrue(badge.label.hasPrefix("Enregistrement"), "the real French catalog is active") }
             XCTAssertGreaterThan(badge.frame.width, 0)
             XCTAssertGreaterThanOrEqual(badge.frame.minX, content.minX - 1, "badge \(index) stays inside the left edge")
