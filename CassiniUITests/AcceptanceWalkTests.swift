@@ -62,8 +62,8 @@ final class AcceptanceWalkTests: XCTestCase {
 
         // Export the transcript as subtitles.
         app.buttons["Share and more"].tap()
-        app.collectionViews.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Export transcript'")).firstMatch.tapWhenSettled()
-        app.collectionViews.buttons["Subtitles · .srt"].tapWhenSettled()
+        app.buttons["Export"].tapWhenSettled()
+        confirmExport(app, choice: "srt")
         closeShareSheet(app)
 
         // Move to Recently Deleted: the Library says so; Restore brings the note back with its names.

@@ -167,7 +167,7 @@ private actor Gate {
         #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path).sorted() == ["audio.m4a", "encoded.opus"])
     }
 
-    @Test func anImportedOpusIsUsedAsItIsAndAFailureLeavesNothing() async throws {
+    @Test func anImportedOpusAndEmptyTranscriptKeepSourceAudio() async throws {
         let folder = try folder()
         defer { try? FileManager.default.removeItem(at: folder) }
         let original = folder.appendingPathComponent("source.opus")
@@ -179,11 +179,12 @@ private actor Gate {
         #expect(try OggOpus.scan(output).digest() == OggOpus.scan(original).digest())
         #expect(try Data(contentsOf: original) == Data(opus))
 
-        await #expect(throws: PortableExportError.noTranscript) {
-            try await PortableExportService(audio: FakeAudioProcessing(), provenance: FakeProvenance(), unassignedLabel: "Unknown speaker")
-                .export(Note(title: "Empty"), original: original, playable: original, into: folder, filename: "Empty")
-        }
-        #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path).sorted() == ["Talk.opus", "source.opus"])
+        let empty = try await PortableExportService(audio: FakeAudioProcessing(), provenance: FakeProvenance(), unassignedLabel: "Unknown speaker")
+            .export(Note(title: "Empty"), original: original, playable: original, into: folder, filename: "Empty")
+        #expect(CassiniDocument.read(empty).selected()?.transcript?.words.isEmpty == true)
+        #expect(try OggOpus.scan(empty).digest() == OggOpus.scan(original).digest())
+        #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path).sorted() == ["Empty.opus", "Talk.opus", "source.opus"])
+
     }
 
     /// The record an export wrote for `variant`: `provenance.speechToText.<variant>`.

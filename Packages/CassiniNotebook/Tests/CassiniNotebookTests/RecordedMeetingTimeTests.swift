@@ -24,7 +24,7 @@ struct RecordedMeetingTimeTests {
         #expect(imported.meetingTime == .instant(start))
         #expect(imported.sortDate == start)
         let texts = ExportTexts(subtitle: { date, _, _ in date.ISO8601Format() }, emptyText: "No words", unassignedLabel: "Unknown speaker")
-        let text = String(decoding: try TranscriptExports.data(imported, format: .text, texts: texts), as: UTF8.self)
+        let text = String(decoding: try TranscriptExports.data(imported, format: .json, texts: texts), as: UTF8.self)
         #expect(text.contains(start.ISO8601Format()))
         let encoded = try JSONEncoder().encode(imported)
         #expect(try JSONDecoder().decode(Note.self, from: encoded).meetingTime == .instant(start))

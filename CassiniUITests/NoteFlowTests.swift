@@ -63,26 +63,33 @@ final class NoteFlowTests: XCTestCase {
         app.buttons["Done"].tap()
         XCTAssertTrue(app.navigationBars["Versions"].waitForNonExistence(within: 5))
 
-        // The exports reach the share sheet.
-        app.buttons["Share and more"].tap()
-        app.collectionViews.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Export transcript'")).firstMatch.tapWhenSettled()
-        app.collectionViews.buttons["Transcript as text"].tapWhenSettled()
-        closeShareSheet(app)
-        for format in ["Markdown", "Subtitles · .srt", "Subtitles · .vtt"] {
+        // Every format reaches the share sheet through the shared selector.
+        for format in ["plainText", "markdown", "srt", "vtt", "cassiniFile"] {
             app.buttons["Share and more"].tap()
-            app.collectionViews.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Export transcript'")).firstMatch.tapWhenSettled()
-            app.collectionViews.buttons[format].tapWhenSettled()
+            app.buttons["Export"].tapWhenSettled()
+            confirmExport(app, choice: format)
             closeShareSheet(app)
         }
-        app.buttons["Share and more"].tap()
-        app.collectionViews.buttons["Export Cassini document"].tapWhenSettled()
-        closeShareSheet(app)
         XCTAssertTrue(app.staticTexts["noteTitle"].exists, "the exports leave the note open")
     }
 
 }
 
 extension XCTestCase {
+    /// Identifiers avoid combined title/description labels, which differ between iOS 18 and newer Forms.
+    @MainActor func confirmExport(_ app: XCUIApplication, choice: String, file: StaticString = #filePath, line: UInt = #line) {
+        let primary = app.buttons["exportChoice-cassiniFile"]
+        XCTAssertTrue(primary.waitForExistence(within: 15), file: file, line: line)
+        XCTAssertTrue(primary.isSelected, "Cassini file is the default", file: file, line: line)
+        XCTAssertTrue(app.buttons["exportChoice-markdown"].exists, file: file, line: line)
+        XCTAssertFalse(app.buttons["exportChoice-json"].exists, file: file, line: line)
+        if ["plainText", "srt", "vtt"].contains(choice) {
+            app.buttons["exportMoreFormats"].tapWhenSettled(file: file, line: line)
+        }
+        app.buttons["exportChoice-\(choice)"].tapWhenSettled(file: file, line: line)
+        app.buttons["exportConfirm"].tapWhenSettled(file: file, line: line)
+    }
+
     /// Waits for the share sheet and closes it. iOS 27 sometimes draws the sheet's Close in a floating bar outside the
     /// activity list, and the sheet's contents come from another process a moment after the sheet itself: on a clone
     /// just booted, many seconds.

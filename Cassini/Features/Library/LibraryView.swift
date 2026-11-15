@@ -27,6 +27,8 @@ struct LibraryView: View {
     @State private var editMode: EditMode = .inactive
     @State private var selectedNotes: Set<UUID> = []
     @State private var archiveExport = ArchiveExportModel()
+    @State private var exportTarget: ExportTarget?
+    @State private var confirmedExport: (UUID, ExportSheetState.Choice)?
 
     var body: some View {
         @Bindable var model = model
@@ -110,6 +112,13 @@ struct LibraryView: View {
             case .success(let urls): imports.start(urls)
             case .failure(let error):
                 if (error as? CocoaError)?.code != .userCancelled { errors.present(error.localizedDescription) }
+            }
+        }
+        .sheet(item: $exportTarget, onDismiss: shareConfirmedExport) { target in
+            if let note = model.note(target.id), let menu = model.menu(target.id) {
+                ExportFormatSheet(note: note, jobPending: menu.transcribe == .stop || menu.transcribe == .removeFromQueue) {
+                    confirmedExport = (target.id, $0)
+                }
             }
         }
         .sheet(item: renaming) { RenameNoteDialog(noteID: $0.id, draft: renameDraft) { renameDraft = $0 } }
@@ -282,7 +291,7 @@ struct LibraryView: View {
             case .trash: Task { await model.perform(.moveToTrash, on: row.id) }
             }
             }
-            .contextMenu { NoteActionsMenu(noteID: row.id) }
+            .contextMenu { NoteActionsMenu(noteID: row.id) { exportTarget = ExportTarget(id: row.id) } }
         }
     }
 
@@ -315,6 +324,19 @@ struct LibraryView: View {
         guard restoresSceneState, dialogRestored else { return }
         savedDialog = model.dialog.flatMap { SavedLibraryDialog($0, draft: renameDraft).encoded }
     }
+
+    // Present on the persistent Library, since the context menu disappears before the selector opens.
+    private func shareConfirmedExport() {
+        guard let (id, choice) = confirmedExport else { return }
+        confirmedExport = nil
+        let action: NoteAction
+        if let format = choice.transcriptFormat { action = .export(format) }
+        else if choice == .originalAudio { action = .shareAudio }
+        else { action = .exportDocument }
+        Task { await model.perform(action, on: id) }
+    }
+
+    private struct ExportTarget: Identifiable { let id: UUID }
 
     private struct RenameTarget: Identifiable { let id: UUID }
 

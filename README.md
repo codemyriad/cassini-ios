@@ -549,4 +549,16 @@ Library Search and Find match spoken words rather than labels inserted by the vi
 join paragraphs with spaces so blank lines cannot hide the matching word. Both search surfaces preserve
 the viewer’s spacing around standalone punctuation, including punctuation inside inline replies.
 
+Single-meeting export follows D99 / PARITY §2: Cassini file and Markdown are primary choices, with Plain text,
+SRT and WebVTT under More formats. Meetings without a finished transcript hide text choices; raw imports then
+share the original audio. Finished transcripts, edits and saved versions remain exportable during a queued,
+running or failed re-transcription. A completed no-speech result also offers text formats. Job checkpoints never
+enter the stored transcript or its exports.
+Confirming opens the iOS share sheet. Multi-meeting export remains ZIP. JSON is retained as an internal writer,
+but is absent from the sheet. The Phase 2 TXT/SRT/VTT derivatives use speaker-turn blocks, seven-second subtitle
+segments and monotonic non-overlapping cues; the older Android writer fixtures remain as historical coverage.
+The shared Markdown golden matches byte for byte. At cassini-ux `b26190b`, `vectors/export/` has no TXT/SRT/VTT
+vectors, so those formats have local regression coverage pending shared goldens. This is the current difference
+from Android's older subtitle rules (six-second cues and cross-speaker overlap).
+
 Imported provenance (L-10): Library and Search show the shared outline Imported badge before speaker counts on finished imported meetings; progress and problem states take its place. Headers identify imported meetings and files that arrived with a transcript from another device. This matches the Phase 2 phone contract; recovered local captures remain own recordings. Existing stored import records are read without migration, and import-flow copy is unchanged.

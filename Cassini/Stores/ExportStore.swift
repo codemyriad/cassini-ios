@@ -55,7 +55,7 @@ import CassiniNotebook
         }
         let folder = try service.newFolder()
         do {
-            return try await portable.export(note, original: original, playable: audio, into: folder,
+            return try await portable.export(ExportSheetState.portableSnapshot(note), original: original, playable: audio, into: folder,
                                              filename: ExportNames.stem(note.title))
         } catch {
             await service.discardFolder(folder).value

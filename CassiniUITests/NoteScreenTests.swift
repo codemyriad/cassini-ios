@@ -507,17 +507,17 @@ final class NoteScreenTests: XCTestCase {
         app.launchAndWait()
         XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 15))
         app.buttons["Share and more"].tap()
-        let share = app.collectionViews.buttons["Share original audio"]
-        XCTAssertTrue(app.collectionViews.buttons["Transcribe"].waitForExistence(within: 3))
-        XCTAssertFalse(app.collectionViews.buttons["Document info"].exists)
-        let export = app.collectionViews.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Export transcript")).firstMatch
-        XCTAssertEqual(export.label, "Export transcript, Available after transcription")
-        XCTAssertTrue(share.exists && share.isEnabled, "the audio can be shared")
-        // iOS can open a disabled submenu. Gate on its rendered rows before inspecting their enabled state.
-        export.tapWhenSettled()
-        let text = app.collectionViews.buttons["Transcript as text"]
-        XCTAssertTrue(text.waitForExistence(within: 15), "the export submenu finished opening")
-        XCTAssertFalse(text.isEnabled, "no transcript to export")
+        XCTAssertTrue(app.buttons["Transcribe"].waitForExistence(within: 3))
+        XCTAssertFalse(app.buttons["Document info"].exists)
+        app.buttons["Export"].tapWhenSettled()
+        let audio = app.buttons["exportChoice-cassiniFile"]
+        XCTAssertTrue(audio.waitForExistence(within: 15), "an own recording exports a Cassini file")
+        XCTAssertTrue(audio.isSelected)
+        XCTAssertFalse(app.buttons["exportChoice-markdown"].exists)
+        XCTAssertFalse(app.buttons["exportMoreFormats"].exists)
+        XCTAssertFalse(app.buttons["exportChoice-json"].exists)
+        app.buttons["exportConfirm"].tapWhenSettled()
+        closeShareSheet(app)
     }
 
     @MainActor func testDocumentInfoShowsTheNotesFacts() {

@@ -861,11 +861,11 @@ final class LibraryUITests: XCTestCase {
     /// Export in the long-press menu opens the note, which runs the export: the share sheet offers the subtitles.
     // ports: LibraryBehaviourTest#theSubtitleChooserExportsTheNote
     @MainActor func testTheActionsMenuExportOpensTheNoteWhichSharesTheSubtitles() {
-        assertActionsMenuShares("Subtitles · .vtt")
+        assertActionsMenuShares("vtt")
     }
 
     @MainActor func testTheActionsMenuMarkdownOpensTheNoteAndShares() {
-        assertActionsMenuShares("Markdown")
+        assertActionsMenuShares("markdown")
     }
 
     @MainActor private func assertActionsMenuShares(_ format: String) {
@@ -873,8 +873,15 @@ final class LibraryUITests: XCTestCase {
         let note = scrolledRow(app, "A quieter kind of productivity")
         XCTAssertTrue(note.waitForExistence(within: 5))
         note.press(forDuration: 1)
+        app.buttons["Remove star"].tapWhenSettled()
+        XCTAssertTrue(poll(within: uiWaitFloor) { note.exists && !note.label.contains("starred") })
+        note.press(forDuration: 1)
+        app.buttons["Star"].tapWhenSettled()
+        XCTAssertTrue(waitFor(note, label: "starred"))
+        note.press(forDuration: 1)
+        XCTAssertTrue(app.buttons["Remove star"].waitForExistence(within: uiWaitFloor))
         app.buttons["Export"].tapWhenSettled()
-        app.buttons[format].tapWhenSettled()
+        confirmExport(app, choice: format)
         XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 5))
         XCTAssertEqual(app.staticTexts["noteTitle"].label, "A quieter kind of productivity")
         let shareSheet = app.otherElements["ActivityListView"]
