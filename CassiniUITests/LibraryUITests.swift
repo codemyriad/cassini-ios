@@ -183,7 +183,7 @@ final class LibraryUITests: XCTestCase {
         app.buttons["recordButton"].tap()
         XCTAssertTrue(app.buttons["pauseResumeRecording"].waitForEnabled(within: uiWaitFloor))
         app.buttons["recordingAllMeetings"].tap()
-        let meeting = row(app, "Voice note 8 Oct, 09:41")
+        let meeting = scrolledRow(app, "Voice note 8 Oct, 09:41")
         XCTAssertTrue(waitFor(meeting, label: ", recording"))
         meeting.tap()
         XCTAssertTrue(app.buttons["stopRecording"].waitForExistence(within: uiWaitFloor))
@@ -319,48 +319,8 @@ final class LibraryUITests: XCTestCase {
         app.scrollViews["libraryScroll"]
     }
 
-    /// The row titled `title`, fully between the navigation and capture bars before a tap or long-press.
     @MainActor private func scrolledRow(_ app: XCUIApplication, _ title: String) -> XCUIElement {
-        let element = row(app, title), bar = app.buttons["recordButton"]
-        let viewport = list(app), navigation = app.navigationBars.firstMatch
-        guard viewport.waitForExistence(within: uiWaitFloor), bar.waitForExistence(within: uiWaitFloor) else {
-            XCTFail("The library's scroll region or capture bar is missing")
-            return element
-        }
-        func clearFrame() -> CGRect {
-            let frame = viewport.frame
-            let search = app.textFields["librarySearch"]
-            let top = max(frame.minY, navigation.exists ? navigation.frame.maxY : frame.minY,
-                          search.exists ? search.frame.maxY : frame.minY) + 8
-            let bottom = min(frame.maxY, bar.frame.minY) - 8
-            return CGRect(x: frame.minX, y: top, width: frame.width, height: max(0, bottom - top))
-        }
-        for _ in 0..<12 {
-            if element.exists, let frame = (try? element.snapshot())?.frame, !frame.isEmpty {
-                let clear = clearFrame()
-                guard let movement = RowScrollGeometry.correction(for: frame, within: clear) else {
-                    XCTFail("The row \(title) cannot fit between the navigation and capture bars")
-                    return element
-                }
-                if movement == 0 {
-                    let ready = poll(within: uiWaitFloor) {
-                        guard element.exists, let now = (try? element.snapshot())?.frame else { return false }
-                        return RowScrollGeometry.correction(for: now, within: clearFrame()) == 0 && element.isHittable
-                    }
-                    if ready { return element }
-                    XCTFail("The fully visible row \(title) did not become hittable")
-                    return element
-                }
-                let start = viewport.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0))
-                    .withOffset(CGVector(dx: 0, dy: clear.midY - viewport.frame.minY))
-                start.press(forDuration: 0, thenDragTo: start.withOffset(CGVector(dx: 0, dy: movement)),
-                            withVelocity: .slow, thenHoldForDuration: 0)
-                continue
-            }
-            viewport.swipeUp(velocity: .slow)
-        }
-        XCTFail("The row \(title) did not become clear of the navigation and capture bars")
-        return element
+        app.scrolledLibraryRow(title)
     }
 
     @MainActor private func waitFor(_ element: XCUIElement, label: String, timeout: TimeInterval = 10) -> Bool {

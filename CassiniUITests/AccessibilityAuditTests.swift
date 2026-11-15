@@ -39,7 +39,10 @@ final class AccessibilityAuditTests: XCTestCase {
 
     @MainActor private func emptyLibrary(_ extra: [String] = []) -> XCUIApplication {
         let app = launch(extra)
-        XCTAssertTrue(app.staticTexts["heroTitle"].waitForExistence(within: 15))
+        let hero = app.staticTexts["heroTitle"]
+        // The Wave 6 backup notice precedes the hero and can fill the viewport at AX5.
+        XCTAssertTrue(app.scrollViews["libraryScroll"].scroll(attempts: 12) { hero.exists && hero.isHittable },
+                      "The first-run hero is not on the screen")
         return app
     }
 
@@ -87,7 +90,11 @@ final class AccessibilityAuditTests: XCTestCase {
         // six once stopped a row short of it.
         XCTAssertTrue(app.scroll(attempts: 12) { row.exists && row.isHittable }, "Saved voices is not on the screen")
         row.tap()
-        XCTAssertTrue(app.staticTexts["Alex Moreau"].waitForExistence(within: 20))
+        // Audit the new setup question before scrolling to the existing saved-voice rows at AX5.
+        if extra.contains(Self.largestText[1]) { audit(app, screen: "largest-voiceSetup", .textClipped) }
+        let person = app.staticTexts["Alex Moreau"]
+        XCTAssertTrue(app.scroll(attempts: 12) { person.exists && person.isHittable },
+                      "The saved voice is not on the screen below setup")
         return app
     }
 

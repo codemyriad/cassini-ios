@@ -79,9 +79,7 @@ final class WideScreenTests: XCTestCase {
     /// part carries its size.
     @MainActor func testIPadModelDownloadIsCappedAndCentred() throws {
         let app = try launch(["--seed", "library", "--models-missing"] + DeviceUnderTest.downloadedSpeech)
-        let row = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Thoughts from the morning walk")).firstMatch
-        XCTAssertTrue(row.waitForExistence(within: 5))
-        for _ in 0..<3 where !row.isHittable { app.swipeUp() }
+        let row = app.scrolledLibraryRow("Thoughts from the morning walk")
         row.tap()
         XCTAssertTrue(app.buttons["Transcribe"].waitForExistence(within: 5))
         app.buttons["Transcribe"].tap()
