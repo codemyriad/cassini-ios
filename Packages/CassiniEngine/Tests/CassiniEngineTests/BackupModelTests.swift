@@ -26,6 +26,20 @@ import CassiniNotebook
         try URL(fileURLWithPath: url.path).resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup == true
     }
 
+    // macOS can briefly report the preceding backup flag after setResourceValues returns, even on a
+    // newly constructed URL with its resource cache cleared. Wait for the filesystem observation,
+    // rather than assuming an actor hop also synchronises the OS backup metadata. Never retry writes.
+    func expectFilesystem(_ condition: () throws -> Bool,
+                          sourceLocation: SourceLocation = #_sourceLocation) async throws {
+        let deadline = ContinuousClock.now.advanced(by: .seconds(5))
+        var satisfied = try condition()
+        while !satisfied, ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(10))
+            satisfied = try condition()
+        }
+        #expect(satisfied, "Filesystem did not reach the expected backup flags", sourceLocation: sourceLocation)
+    }
+
     @Test func defaultsIncludeMeetingsAndVoicesAndMigrateLegacyVoicesFlag() async throws {
         defer { cleanup() }
         let settings = settings()
@@ -37,9 +51,9 @@ import CassiniNotebook
         let model = BackupModel(settings: settings, root: root)
         try await model.start()
         try voices.save([])
-        #expect(try !flag(root))
-        #expect(try !flag(voices.folder))
-        #expect(try !excluded(voices.folder.appendingPathComponent("voices.json")))
+        try await expectFilesystem { try !flag(root) }
+        try await expectFilesystem { try !flag(voices.folder) }
+        try await expectFilesystem { try !excluded(voices.folder.appendingPathComponent("voices.json")) }
     }
 
     @Test func cardSurvivesRelaunchAtomicReplacementNewHierarchyAndBothDirections() async throws {
@@ -54,24 +68,24 @@ import CassiniNotebook
         try Data("first".utf8).write(to: noteFile, options: .atomic)
         try await model.update(cloud: false, voices: true, dismissNotice: true)
         #expect(settings.backupNoticeDismissed)
-        #expect(try flag(root) && flag(voiceLibrary.folder))
+        try await expectFilesystem { try flag(root) && flag(voiceLibrary.folder) }
         try Data("replacement".utf8).write(to: noteFile, options: .atomic)
         try voiceLibrary.save([]) // DurableFile's temp + rename path.
-        #expect(try excluded(noteFile))
-        #expect(try excluded(voiceLibrary.folder.appendingPathComponent("voices.json")))
+        try await expectFilesystem { try excluded(noteFile) }
+        try await expectFilesystem { try excluded(voiceLibrary.folder.appendingPathComponent("voices.json")) }
         let fresh = root.appendingPathComponent("new/hierarchy/audio.caf")
         try FileManager.default.createDirectory(at: fresh.deletingLastPathComponent(), withIntermediateDirectories: true)
         try Data([1]).write(to: fresh, options: .atomic)
-        #expect(try excluded(fresh))
+        try await expectFilesystem { try excluded(fresh) }
         let reopened = self.settings()
         #expect(!reopened.cloudBackup && reopened.includeSavedVoicesInBackups && reopened.backupNoticeDismissed)
         try await BackupModel(settings: reopened, root: root).start()
-        #expect(try excluded(noteFile))
+        try await expectFilesystem { try excluded(noteFile) }
         try await model.update(cloud: true, voices: true)
-        #expect(try !flag(root) && !flag(voiceLibrary.folder))
-        #expect(try !excluded(noteFile) && !excluded(fresh))
+        try await expectFilesystem { try !flag(root) && !flag(voiceLibrary.folder) }
+        try await expectFilesystem { try !excluded(noteFile) && !excluded(fresh) }
         try await model.update(cloud: false, voices: true)
-        #expect(try excluded(noteFile))
+        try await expectFilesystem { try excluded(noteFile) }
     }
 
     @Test func voicesSwitchIsIndependentAndPersistsWhileGlobalBackupIsOff() async throws {
@@ -83,15 +97,29 @@ import CassiniNotebook
         try voices.save([])
         let file = voices.folder.appendingPathComponent("voices.json")
         try await model.update(cloud: true, voices: false)
-        #expect(try !flag(root) && flag(voices.folder) && excluded(file))
+        try await expectFilesystem { try !flag(root) && flag(voices.folder) && excluded(file) }
         try voices.save([])
-        #expect(try excluded(file))
+        try await expectFilesystem { try excluded(file) }
         try await model.update(cloud: false, voices: false)
         try await model.update(cloud: true, voices: false)
-        #expect(try excluded(file))
+        try await expectFilesystem { try excluded(file) }
         #expect(self.settings().cloudBackup && !self.settings().includeSavedVoicesInBackups)
         try await model.update(cloud: true, voices: true)
-        #expect(try !excluded(file))
+        try await expectFilesystem { try !excluded(file) }
+    }
+
+    @Test func repeatedBackupChangesReachBothDirectoryFlags() async throws {
+        defer { cleanup() }
+        let model = BackupModel(settings: settings(), root: root)
+        try await model.start()
+        let voices = root.appendingPathComponent("PrivateVoices", isDirectory: true)
+        for step in 0..<40 {
+            let cloud = step % 2 == 0, includeVoices = step % 4 < 2
+            try await model.update(cloud: cloud, voices: includeVoices)
+            try await expectFilesystem {
+                try flag(root) == !cloud && flag(voices) == (!cloud || !includeVoices)
+            }
+        }
     }
 
     @Test func noticeDismissalAndOneQuestionSetupPersistWithoutChangingBackup() {
