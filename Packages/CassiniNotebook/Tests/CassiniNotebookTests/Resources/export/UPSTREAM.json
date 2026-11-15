@@ -1,0 +1,11 @@
+{
+  "repository": "https://github.com/codemyriad/cassini-ux",
+  "commit": "b26190b57d8e35391ba9b4bafd177d66b10f0ec3",
+  "sha256": {
+    "vectors/export/MARKDOWN.md": "15d0ab1b00a94ecb4b81eccec48a370fe9cdb3e2a332d98a35770817092545c7",
+    "vectors/export/README.md": "004005cdd2b5fb5f5b8e39a1627a232f154c6f6d35c6dc24c2725c67252de13c",
+    "vectors/export/budget-review.md": "a25e0ee9bd9f49d2184b8a6705aaa80aa9550a79e5f5d80099d5dcfcab289f67",
+    "vectors/export/export-vectors.json": "698e445c11c1c81c333f54074efd6770a06bbb353559db6527d5c115b8cc30ba",
+    "vectors/export/markdown-cases.json": "f9ce458f68f1a33421ecdd53b4df086a10b215896a158794d2077cca3356c089"
+  }
+}

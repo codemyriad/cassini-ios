@@ -137,7 +137,11 @@ import CassiniWhistle
         graph.graph.settings.queueHold = .user // Admission persists jobs but never runs fake/native inference.
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         let audio = root.appendingPathComponent("Synthetic English cold admission.wav")
-        try Data("English audio stand-in, decoded only by FakeAudioProcessing".utf8).write(to: audio)
+        // Minimal valid mono PCM WAV; FakeAudioProcessing supplies the admission test's duration.
+        let header: [UInt8] = Array("RIFF".utf8) + [38, 0, 0, 0] + Array("WAVEfmt ".utf8)
+            + [16, 0, 0, 0, 1, 0, 1, 0, 0x80, 0x3e, 0, 0, 0, 0x7d, 0, 0, 2, 0, 16, 0]
+            + Array("data".utf8) + [2, 0, 0, 0, 0, 0]
+        try Data(header).write(to: audio)
         let start = Task { await graph.graph.start() }
         let imported = graph.graph.imports.importFile(audio, opensNote: true)
         await fulfillment(of: [started], timeout: 30)

@@ -188,13 +188,14 @@ import CassiniNotebook
             stop: { processing.stop($0) }, dequeue: { processing.dequeue($0) },
             update: { _ = library.update($0, $1) }, trash: { _ = await trash.requestTrash($0) },
             speakerModelsReady: { await processing.speakerModelsReady() },
+            setRecordingTitle: { recording.controller.setTitle($0) },
             cloudBackup: {
                 #if DEBUG
                 if environment.launch.backupExcluded { return library.isLoaded ? false : nil }
                 #endif
                 return library.cloudBackup
             },
-            clock: environment.clock, calendar: environment.calendar))
+            clock: environment.clock, calendar: environment.calendar), defaults: environment.defaults)
     }
 
     /// Runs the launch steps once; the app is ready when it returns.
@@ -213,6 +214,13 @@ import CassiniNotebook
         // The models' status is read once the library is ready, without holding the launch for it.
         Task { [models = processing.models] in await models.refresh() }
         #if DEBUG
+        if environment.launch.importingFixture { imports.prepareImportingFixture() }
+        if environment.launch.failedImportFixture, imports.tracker.cards.isEmpty {
+            let source = environment.root.appendingPathComponent("Damaged audio.ogg")
+            if (try? Data("OggS damaged".utf8).write(to: source)) != nil {
+                _ = await imports.importFile(source, opensNote: false).value
+            }
+        }
         if let seed = environment.launch.seed {
             TestFixtures.prepare(seed, settings: settings, processing: processing, voices: voices,
                                  draftSpeakerSuggestion: environment.launch.draftSpeakerSuggestion)

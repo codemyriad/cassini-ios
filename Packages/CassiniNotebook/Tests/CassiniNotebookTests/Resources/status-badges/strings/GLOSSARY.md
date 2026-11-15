@@ -32,6 +32,9 @@ How to use it:
 | transcript | trascrizione (f) | transcription (f) | transcripción (f) | transcrição (f) | transcrição (f) | The text of a meeting. fr uses the same word for the text and the process. |
 | Transcription (settings tab, process) | Trascrizione | Transcription | Transcripción | Transcrição | Transcrição | |
 | write down / transcribe | trascrivere | transcrire | transcribir | transcrever | transcrever | English says "write down" to avoid jargon. In these four languages the transcribe verb is everyday language: always use it. Never "sbobinare", "mettre par écrit", "poner por escrito", "anotar". |
+| Every word written down. (first-run hero, L-27) | Ogni parola trascritta. | Chaque mot transcrit. | Cada palabra transcrita. | Cada palavra transcrita. | Cada palavra transcrita. | `firstRun.hero.title` (W0.5 / D-956 / D-937; all four apps). Uses the transcribe participle per "write down / transcribe" above. |
+| None of it uploaded. (first-run hero, L-27) | Nulla viene caricato. | Rien n’est mis en ligne. | No se sube nada. | Nada é enviado. | Nada é enviado. | `firstRun.hero.subtitle` (W0.5 / D-956 / D-937; dimmed second line under `firstRun.hero.title`; unqualified on desktop, paired with `firstRun.hero.phoneBackupQualifier` on phones while encrypted cloud backup is enabled). Matches the `uploaded` verbs in `companion.privacy` and `savedVoices.privacy`. |
+| (except for encrypted cloud backup) (phone hero qualifier, D-937) | (tranne per il backup crittografato nel cloud) | (sauf pour la sauvegarde cloud chiffrée) | (salvo para la copia de seguridad cifrada en la nube) | (exceto para o backup criptografado na nuvem) | (exceto para a cópia de segurança encriptada na nuvem) | `firstRun.hero.phoneBackupQualifier` (W6.0 / D-937; shown on iOS/Android while encrypted cloud backup is enabled; `firstRun.hero.subtitlePhoneNote` combines `firstRun.hero.subtitle` + this qualifier). |
 | Write it down (button) | Trascrivi | Transcrire | Transcribir | Transcrever | Transcrever | Matches mobile "Trascrivi". |
 | Write it down again (button) | Trascrivi di nuovo | Transcrire à nouveau | Volver a transcribir | Transcrever de novo | Transcrever novamente | Matches mobile. |
 | Importing… (badge) | Importazione… | Importation… | Importando… | Importando… | A importar… | L-25/L-26: active transient import entry, neutral spinner. |
@@ -47,8 +50,12 @@ How to use it:
 | Your microphone | Il tuo microfono | Votre microphone | Tu micrófono | Seu microfone | O seu microfone | Never "ingresso microfono". |
 | microphone | microfono | microphone | micrófono | microfone | microfone | fr: "microphone", not "micro", for consistency. |
 | this computer’s sound | l’audio di questo computer | le son de cet ordinateur | el sonido de este equipo | o som deste computador | o som deste computador | What the computer plays. es: "equipo" is neutral across Spain and Latin America (avoid "ordenador"/"computadora"). |
-| on this computer | su questo computer | sur cet ordinateur | en este equipo | neste computador | neste computador | Privacy lines. |
+| on this computer | su questo computer | sur cet ordinateur | en este equipo | neste computador | neste computador | `privacy.onDevice.computer` and desktop privacy lines (`L-09` / `D-938`, async copy review in `D-1019`). |
+| on this Mac / iPhone / iPad / phone (privacy line, L-09) | su questo Mac / iPhone / iPad / telefono | sur ce Mac / cet iPhone / cet iPad / ce téléphone | en este Mac / iPhone / iPad / teléfono | neste Mac / iPhone / iPad / celular | neste Mac / iPhone / iPad / telemóvel | `privacy.onDevice.{mac,iphone,ipad,phone}` (W6.0 / `D-938`, provisional wording logged in `D-1019`): "Written down on this {device}. The audio never leaves it." → it "Trascritto su questo … L’audio non lo lascia mai.", fr "Transcrit sur ce/cet … L’audio n’en sort jamais.", es "Transcrito en este … El audio nunca sale de él.", pt "Transcrito neste … O áudio nunca sai dele." |
 | saved voices | voci salvate | voix mémorisées | voces guardadas | vozes salvas | vozes guardadas | fr: **never "enregistrées"**, it collides with "enregistrement" (recording). |
+| backup (cloud / encrypted) | backup (nel cloud / crittografato) | sauvegarde (cloud / chiffrée) | copia de seguridad (en la nube / cifrada) | backup (na nuvem / criptografado) | cópia de segurança (na nuvem / encriptada) | Wave 6 (`D-957` / `D-1012`). fr: "sauvegarde", never "enregistrement". |
+| Include saved voices in backups | Includi le voci salvate nei backup | Inclure les voix mémorisées dans les sauvegardes | Incluir las voces guardadas en las copias de seguridad | Incluir as vozes salvas nos backups | Incluir as vozes guardadas nas cópias de segurança | `backup.includeSavedVoices.title` (W6.0 / `D-957` / `D-1012`; default ON on iOS and Android). |
+| Moving and backup | Trasferimento e backup | Transfert et sauvegarde | Traslado y copia de seguridad | Transferência e backup | Mudança e cópia de segurança | `backup.settings.heading` (W6.0; phone Settings section). pt-PT avoids "Transferência" here because "transferir" is its word for download. |
 | Remember this voice | Ricorda questa voce | Mémoriser cette voix | Recordar esta voz | Lembrar esta voz | Memorizar esta voz | fr "mémoriser" pairs with "voix mémorisées". |
 | voiceprint | impronta vocale | empreinte vocale | huella de voz | impressão de voz | impressão vocal | The private biometric data. Never "biometria", "modèle vocal" (that is a speech model). |
 | voice profile | profilo vocale | profil vocal | perfil de voz | perfil de voz | perfil de voz | "Delete {name}’s voice profile?" → "Eliminare il profilo vocale di {name}?" / "Supprimer le profil vocal de {name} ?" / "¿Eliminar el perfil de voz de {name}?" / "Excluir o perfil de voz de {name}?" |
@@ -71,6 +78,8 @@ How to use it:
 | drive (Library offline) | unità | disque | unidad | unidade | unidade | |
 | space (disk) | spazio | espace | espacio | espaço | espaço | "Only {n} minutes of space left" talks about recording time left. |
 | Trash | Cestino | Corbeille | Papelera | Lixeira | Lixo | Capitalised, as GNOME and macOS do. iOS uses Apple’s "Eliminati di recente": that is iOS-only. |
+| Recently Deleted (macOS, Phase 2 `D100`) | Eliminati di recente | Supprimés récemment | Eliminados | Apagados | Apagados recentemente | The Mac name of the in-app Trash (`menu.trash` / `trash.*` `mac` text), matching `meeting.moveToRecentlyDeleted`. Never on GNOME. |
+| Help (menu) / Cassini talk Help | Aiuto / Aiuto di Cassini talk | Aide / Aide de Cassini talk | Ayuda / Ayuda de Cassini talk | Ajuda / Ajuda do Cassini talk | Ajuda / Ajuda do Cassini talk | `menu.help`, `help.title` (`D100`). |
 | model (speech model) | modello (vocale) | modèle (vocal) | modelo (de voz) | modelo (de voz) | modelo (de voz) | |
 | Tell speakers apart (model name) | Distingui le voci | Distinguer les intervenants | Distinguir hablantes | Distinguir locutores | Distinguir oradores | Quoted inside two status strings: the quoted text must match the name exactly. |
 | speaker separation (details label) | Distinzione delle voci | Distinction des intervenants | Separación de hablantes | Separação de locutores | Separação de oradores | Noun form of the model name (it matches iOS "Distinzione delle voci"). |
@@ -96,6 +105,7 @@ How to use it:
 | address bar | barra degli indirizzi | barre d’adresse | barra de direcciones | barra de endereço | barra de endereço | |
 | step (setup) | passo | étape | paso | etapa | passo | "Step {n}, done": "Passo {n}, completato" / "Étape {n}, terminée" / "Paso {n}, completado" / "Etapa {n}, concluída". |
 | Today / Yesterday | Oggi / Ieri | Aujourd’hui / Hier | Hoy / Ayer | Hoje / Ontem | Hoje / Ontem | |
+| Date filter options: Any date / Today / Past 7 days / Past 30 days / This year | Qualsiasi data / Oggi / Ultimi 7 giorni / Ultimi 30 giorni / Quest’anno | Toutes les dates / Aujourd’hui / 7 derniers jours / 30 derniers jours / Cette année | Cualquier fecha / Hoy / Últimos 7 días / Últimos 30 días / Este año | Qualquer data / Hoje / Últimos 7 dias / Últimos 30 dias / Este ano | Qualquer data / Hoje / Últimos 7 dias / Últimos 30 dias / Este ano | L-35 (D-999, D99): one wording on all four apps (`search.filter.anyDate`, `search.filter.date.*`). Never "Past week" / "Past month" / "Last 7 days". |
 | Search | Cerca | Rechercher | Buscar | Buscar | Pesquisar | "Search every meeting": "Cerca in tutte le riunioni" / "Rechercher dans toutes les réunions" / "Buscar en todas las reuniones" / "Buscar em todas as reuniões". |
 | Title / Name (field labels) | Titolo / Nome | Titre / Nom | Título / Nombre | Título / Nome | Título / Nome | |
 
@@ -138,7 +148,9 @@ Button forms: it imperative (tu); fr, es, pt-BR infinitive. See section 4.
 | Rename / Rename… | Rinomina / Rinomina… | Renommer / Renommer… | Renombrar / Renombrar… | Renomear / Renomear… | Mudar o nome / Mudar o nome… | Dialog title "Rename Meeting": "Rinomina riunione" / "Renommer la réunion" / "Renombrar reunión" / "Renomear reunião". |
 | Move / Move… / Move Library | Sposta / Sposta… / Sposta la Libreria | Déplacer / Déplacer… / Déplacer la bibliothèque | Mover / Mover… / Mover la biblioteca | Mover / Mover… / Mover a biblioteca | Mover / Mover… / Mover a Biblioteca | |
 | Move to Trash | Sposta nel Cestino | Mettre à la corbeille | Mover a la papelera | Mover para a Lixeira | Mover para o Lixo | Toast "“{title}” moved to Trash": it "“{title}” spostata nel Cestino", fr "« {title} » mise à la corbeille", es "“{title}” movida a la papelera", pt "“{title}” movida para a Lixeira" (agree with meeting, f). |
+| Restore / Delete permanently… / Empty Trash… / Delete All… | Ripristina / Elimina definitivamente… / Svuota il Cestino… / Elimina tutto… | Restaurer / Supprimer définitivement… / Vider la corbeille… / Tout supprimer… | Restaurar / Eliminar definitivamente… / Vaciar la papelera… / Eliminar todo… | Restaurar / Excluir permanentemente… / Esvaziar a Lixeira… / Excluir tudo… | Restaurar / Eliminar definitivamente… / Esvaziar o Lixo… / Eliminar tudo… | Deleted-meetings view (`D100`, `trash.*`). Delete All… is the Mac form of Empty Trash…. |
 | Export / Export… | Esporta / Esporta… | Exporter / Exporter… | Exportar / Exportar… | Exportar / Exportar… | Exportar / Exportar… | |
+| Export formats: Plain text / Subtitles (SRT) / Subtitles (WebVTT) / Original audio / More formats | Testo semplice / Sottotitoli (SRT) / Sottotitoli (WebVTT) / Audio originale / Altri formati | Texte brut / Sous-titres (SRT) / Sous-titres (WebVTT) / Audio d’origine / Autres formats | Texto sin formato / Subtítulos (SRT) / Subtítulos (WebVTT) / Audio original / Más formatos | Texto simples / Legendas (SRT) / Legendas (WebVTT) / Áudio original / Mais formatos | Texto simples / Legendas (SRT) / Legendas (WebVTT) / Áudio original / Mais formatos | L-11 (D-998, D99): `export.plainText.*`, `export.srt.*`, `export.vtt.*`, `export.originalAudio.*`, `export.moreFormats`. File-type names (SRT, WebVTT, ZIP) are never translated. |
 | Share | Condividi | Partager | Compartir | Compartilhar | Partilhar | |
 | Details / Recording details… | Dettagli / Dettagli della registrazione… | Détails / Détails de l’enregistrement… | Detalles / Detalles de la grabación… | Detalhes / Detalhes da gravação… | Detalhes / Detalhes da gravação… | |
 | Copy details | Copia i dettagli | Copier les détails | Copiar detalles | Copiar detalhes | Copiar detalhes | |
@@ -150,6 +162,8 @@ Button forms: it imperative (tu); fr, es, pt-BR infinitive. See section 4.
 | Set up | Configura | Configurer | Configurar | Configurar | Configurar | |
 | Connect | Connetti | Connecter | Conectar | Conectar | Ligar | |
 | Add / Add to {browser} | Aggiungi / Aggiungi a {browser} | Ajouter / Ajouter à {browser} | Añadir / Añadir a {browser} | Adicionar / Adicionar ao {browser} | Adicionar / Adicionar ao {browser} | pt-BR: browser names take "o" ("ao Chrome"). |
+| Add a voice… | Aggiungi una voce… | Ajouter une voix… | Añadir una voz… | Adicionar uma voz… | Adicionar uma voz… | `voices.enroll.addAction` (W6.0; opens guided test-phrase voice enrollment). |
+| Keep them on this phone only / Keep on this phone only | Mantieni solo su questo telefono | Garder uniquement sur ce téléphone | Mantener solo en este teléfono | Manter apenas neste celular | Manter apenas neste telemóvel | `backup.phoneOnlyCard.title` & `backup.phoneOnlyCard.action` (W6.0 / `D-957`; dismissible phone cloud-backup opt-out card). |
 | Allow | Consenti | Autoriser | Permitir | Permitir | Permitir | Status "Allowed": "Consentito" / "Autorisé" / "Permitido" / "Permitido". |
 | Copy | Copia | Copier | Copiar | Copiar | Copiar | "Copy folder location": "Copia il percorso della cartella" / "Copier l’emplacement du dossier" / "Copiar la ubicación de la carpeta" / "Copiar o local da pasta". |
 | Update (verb) | Aggiorna | Mettre à jour | Actualizar | Atualizar | Atualizar | |
@@ -165,7 +179,9 @@ Button forms: it imperative (tu); fr, es, pt-BR infinitive. See section 4.
 | English | it | fr | es | pt-BR | pt-PT | Note |
 |---|---|---|---|---|---|---|
 | Saving… | Salvataggio… | Sauvegarde… | Guardando… | Salvando… | A guardar… | fr: never "Enregistrement…" (reads as "Recording…"). |
-| Received | Ricevuta | Reçue | Recibida | Recebida | Recebida | Retained through WP6; renamed to `Imported` (`Importata` / `Importée` / `Importada` / `Importada` / `Importada`) in WP7 (`L-57`). |
+| Imported (was Received, L-57) | Importata | Importée | Importada | Importada | Importada | `states.badge.received` and `format.previewSubtitle.received` (model `origin`/`kind` stays `received`). All four apps since L-10 (D-997, D99). |
+| Starred (filter, row state) | Con stella | Avec étoile | Destacadas | Com estrela | Com estrela | L-34/L-35 (D-999, D99): `library.filter.starred`, `search.filter.starred`, `library.row.starred.a11y` (es singular "Destacada"). Actions: Star / Unstar = "Aggiungi stella" / "Rimuovi stella", "Ajouter une étoile" / "Retirer l’étoile", "Destacar" / "Quitar destacado", "Adicionar estrela" / "Remover estrela" (pt-BR and pt-PT). es follows the "destacar" convention, not a literal star. |
+| All (Library filter) | Tutte | Toutes | Todas | Todas | Todas | `library.filter.all`; feminine plural agrees with meeting (and the Android legacy "note"). |
 | Queued (phone badge, L-52) | In coda | En attente | En cola | Na fila | Em fila | Neutral clock badge on phones (`states.phone.queued`). |
 | Paused at {position} (phone badge, L-52) | In pausa a {position} | En pause à {position} | En pausa en {position} | Em pausa em {position} | Em pausa aos {position} | Amber pause badge on phones (`states.phone.pausedAt`). |
 | Couldn’t transcribe (phone badge, L-52) | Trascrizione non riuscita | Échec de la transcription | No se pudo transcribir | Falha na transcrição | Falha na transcrição | Error alert badge on phones (`states.phone.couldntTranscribe`). |
@@ -307,7 +323,7 @@ Shared rules for all four:
 - Product names: **Cassini talk**, **Cassini** (also as the menu/a11y label `hidden.menu.a11y`).
 - Model names: **Whistle**, **Parakeet Ultra**, **Nemotron** (translate only their descriptions).
 - Brands and platforms: Chrome, Chromium, Edge, Brave, Firefox, Safari, GNOME, macOS, Mac, iOS,
-  Android, Finder, Zoom, Google Meet, Microsoft Teams, GitHub.
+  iPhone, iPad, iCloud, Android, Seedvault, Finder, Zoom, Google Meet, Microsoft Teams, GitHub.
 - Format and file names: Markdown, Opus, M4A, WAV, MP3, JSON, and every file extension (.md, .opus, …),
   `{filename}` values, `meeting.json`, `people.json`, `models.json`.
 - The literal path **Music/Cassini**.

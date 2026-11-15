@@ -223,7 +223,7 @@ final class CassiniUITests: XCTestCase {
         app.buttons["Share and more"].tap(); app.buttons["Move to Recently Deleted"].tap()
         XCTAssertTrue(app.buttons["Recently Deleted"].waitForExistence(within: 5)); app.buttons["Recently Deleted"].tap()
         XCTAssertTrue(app.buttons["Empty"].waitForExistence(within: 5)); app.buttons["Empty"].tap()
-        let alert = app.alerts["Delete 1 note for good?"]
+        let alert = app.alerts["Delete 1 meeting for good?"]
         XCTAssertTrue(alert.waitForExistence(within: 5))
         alert.buttons["Cancel"].tap()
         XCTAssertTrue(app.buttons["Restore"].exists)

@@ -232,7 +232,7 @@ private struct PrivacySection: View {
                 SettingsRowLabel(title: String(localized: "Recently Deleted", table: "Settings"),
                                  subtitle: model.trash == 0
                                     ? String(localized: "Empty", table: "Settings")
-                                    : String(localized: "\(model.trash) notes", table: "Settings"))
+                                    : String(localized: "\(model.trash) meetings", table: "Settings"))
             }
             .accessibilityIdentifier("recentlyDeletedRow")
         } header: {
@@ -264,7 +264,7 @@ private struct LibrarySection: View {
         } header: {
             Text("Your library", tableName: "Settings").foregroundStyle(Color.muted)
         } footer: {
-            Text("Notes in Recently Deleted are not counted. They are deleted for good after 30 days.", tableName: "Settings").foregroundStyle(Color.muted)
+            Text("Meetings in Recently Deleted are not counted. They are deleted for good after 30 days.", tableName: "Settings").foregroundStyle(Color.muted)
         }
     }
 }

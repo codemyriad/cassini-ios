@@ -27,5 +27,14 @@ import CassiniNotebook
             #expect(StatusBadges.entry(importing: true, text: text)?.text == importing)
         }
         #expect(StatusBadgeCopy.template("states.badge.importing", language: "fr_CA") == "Importation…")
+        for (language, imported) in [("en", "Imported"), ("it", "Importata"), ("fr", "Importée"),
+                                     ("es", "Importada"), ("pt-BR", "Importada"), ("pt-PT", "Importada")] {
+            #expect(StatusBadgeCopy.template("states.badge.received", language: language) == imported)
+            for key in ["format.previewSubtitle.received", "format.previewSubtitle.importedOtherDevice"] {
+                let template = StatusBadgeCopy.template(key, language: language)
+                #expect(template.contains(imported))
+                #expect(template.contains("{day}") && template.contains("{time}") && template.contains("{duration}"))
+            }
+        }
     }
 }

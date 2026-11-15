@@ -23,6 +23,54 @@ private actor Gate {
 @MainActor @Suite struct ImportTrackerTests {
     let clock = FakeClock()
 
+    @Test func failedCardsPersistIndependentlyAndDuplicatesAndCancellationLeaveNoCard() async throws {
+        let tracker = ImportTracker(clock: clock)
+        let gate = Gate()
+        let running = tracker.start(displayName: "same.ogg") { await gate.wait(); return .created(UUID()) }
+        #expect(tracker.cards.count == 1)
+        #expect(tracker.cards.first?.failure == nil)
+        _ = await tracker.start(displayName: "same.ogg") { .rejected(.cannotOpen) }.value
+        let failedID = try #require(tracker.cards.last?.id)
+        _ = await tracker.start(displayName: "duplicate.ogg") { .existing(UUID()) }.value
+        _ = await tracker.start(displayName: "cancelled.ogg") { throw CancellationError() }.value
+        #expect(tracker.cards.count == 2)
+        #expect(tracker.cards.last?.failure == .cannotOpen)
+        tracker.dismissCard(tracker.cards[0].id) // A running import cannot be dismissed underneath its task.
+        #expect(tracker.cards.count == 2)
+        await gate.release()
+        _ = await running.value
+        #expect(tracker.cards.map(\.id) == [failedID])
+        tracker.dismissCard(failedID)
+        #expect(tracker.cards.isEmpty)
+    }
+
+    @Test(arguments: [true, false])
+    func cancellationWinsOverAConcurrentFailure(rejected: Bool) async {
+        let tracker = ImportTracker(clock: clock)
+        let gate = Gate()
+        let task = tracker.start(displayName: "cancelled.wav") {
+            await gate.wait()
+            if rejected { return .rejected(.cannotOpen) }
+            throw CocoaError(.fileReadUnknown)
+        }
+        task.cancel()
+        await gate.release()
+        #expect(await task.value == nil)
+        #expect(tracker.cards.isEmpty)
+        #expect(tracker.failure == nil)
+    }
+
+    @Test func cancellationAfterCommitPreservesTheSuccessfulOutcome() async {
+        let tracker = ImportTracker(clock: clock)
+        let gate = Gate(), id = UUID()
+        let task = tracker.start(displayName: "committed.wav") { await gate.wait(); return .created(id) }
+        task.cancel()
+        await gate.release()
+        #expect(await task.value == .created(id))
+        #expect(tracker.cards.isEmpty)
+        #expect(tracker.failure == nil)
+    }
+
     @Test func importsRunSideBySideAndEachIsShownWhileItRuns() async {
         let tracker = ImportTracker(clock: clock)
         let gate = Gate()
@@ -119,7 +167,7 @@ private actor Gate {
         #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path).sorted() == ["audio.m4a", "encoded.opus"])
     }
 
-    @Test func anImportedOpusIsUsedAsItIsAndAFailureLeavesNothing() async throws {
+    @Test func anImportedOpusAndEmptyTranscriptKeepSourceAudio() async throws {
         let folder = try folder()
         defer { try? FileManager.default.removeItem(at: folder) }
         let original = folder.appendingPathComponent("source.opus")
@@ -131,11 +179,12 @@ private actor Gate {
         #expect(try OggOpus.scan(output).digest() == OggOpus.scan(original).digest())
         #expect(try Data(contentsOf: original) == Data(opus))
 
-        await #expect(throws: PortableExportError.noTranscript) {
-            try await PortableExportService(audio: FakeAudioProcessing(), provenance: FakeProvenance(), unassignedLabel: "Unknown speaker")
-                .export(Note(title: "Empty"), original: original, playable: original, into: folder, filename: "Empty")
-        }
-        #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path).sorted() == ["Talk.opus", "source.opus"])
+        let empty = try await PortableExportService(audio: FakeAudioProcessing(), provenance: FakeProvenance(), unassignedLabel: "Unknown speaker")
+            .export(Note(title: "Empty"), original: original, playable: original, into: folder, filename: "Empty")
+        #expect(CassiniDocument.read(empty).selected()?.transcript?.words.isEmpty == true)
+        #expect(try OggOpus.scan(empty).digest() == OggOpus.scan(original).digest())
+        #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path).sorted() == ["Empty.opus", "Talk.opus", "source.opus"])
+
     }
 
     /// The record an export wrote for `variant`: `provenance.speechToText.<variant>`.

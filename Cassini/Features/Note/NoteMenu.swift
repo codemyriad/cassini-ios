@@ -16,6 +16,9 @@ struct NoteMenu: View {
     @Environment(ProcessingStore.self) private var processing
     private var speechUnavailable: Bool { processing.models.speechUnavailability == .model }
 
+    @State private var exportOpen = false
+    @State private var confirmedExport: ExportSheetState.Choice?
+
     var body: some View {
         let finishing = recording.finishingNoteID == note.id
         Menu {
@@ -34,23 +37,9 @@ struct NoteMenu: View {
             Button(NoteCopy.rename, systemImage: "pencil") { perform(.rename) }
             if note.hasDocument { Button(NoteCopy.documentInfo, systemImage: "info.circle") { perform(.documentInfo) } }
             Divider()
-            let unavailable = ExportCopy.reason(TranscriptExports.availability(of: note))
-            Menu {
-                // A disabled submenu still opens on iOS, so its rows are disabled as well.
-                ForEach(TranscriptFormat.allCases) { format in
-                    Button(ExportCopy.title(format)) { perform(.exportTranscript(format)) }.disabled(unavailable != nil)
-                }
-            } label: {
-                Text(NoteCopy.exportTranscript)
-                if let unavailable { Text(unavailable) }
-                Image(systemName: "square.and.arrow.up")
-            }
-            .disabled(unavailable != nil)
-            Button(exportingDocument ? NoteCopy.preparingDocument : NoteCopy.exportDocument, systemImage: "doc.badge.arrow.up") {
-                perform(.exportDocument)
-            }
-            .disabled(exportingDocument || note.transcript.isEmpty || transcribeRow == .stop || finishing)
-            Button(NoteCopy.shareAudio, systemImage: "waveform") { perform(.shareAudio) }.disabled(finishing)
+            Button(LibraryCopy.export, systemImage: "square.and.arrow.up") { exportOpen = true }
+                .accessibilityIdentifier("exportOpen")
+                .disabled(exportingDocument || finishing || note.isRecording)
             if let transcribeRow {
                 Divider()
                 transcription(transcribeRow, disabled: finishing)
@@ -62,8 +51,21 @@ struct NoteMenu: View {
         } label: {
             Image(systemName: "ellipsis").frame(minWidth: HitTarget.minimum, minHeight: HitTarget.minimum)
         }
+        .sheet(isPresented: $exportOpen, onDismiss: shareConfirmed) {
+            ExportFormatSheet(note: note, jobPending: transcribeRow == .stop || transcribeRow == .removeFromQueue) {
+                confirmedExport = $0
+            }
+        }
         .accessibilityLabel(NoteCopy.shareAndMore)
         .accessibilityIdentifier("noteActions")
+    }
+
+    private func shareConfirmed() {
+        guard let choice = confirmedExport else { return }
+        confirmedExport = nil
+        if let format = choice.transcriptFormat { perform(.exportTranscript(format)) }
+        else if choice == .originalAudio { perform(.shareAudio) }
+        else { perform(.exportDocument) }
     }
 
     @ViewBuilder private func transcription(_ row: TranscribeRow, disabled: Bool) -> some View {

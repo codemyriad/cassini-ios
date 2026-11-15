@@ -13,6 +13,22 @@ struct TranscriptExportsTests {
         return note
     }
 
+    @Test func starringDoesNotChangeTranscriptExports() throws {
+        var value = note([TranscriptSegment(text: "Hello", start: 0, end: 1)])
+        let markdown = MarkdownOptions(copy: try MarkdownExportTests.copy("en"), dateLine: { _, _ in "Today" },
+                                       untitled: "Untitled", unnamedSpeaker: { "Speaker \($0)" })
+        var exportTexts = texts
+        exportTexts.markdown = markdown
+        for format in TranscriptFormat.allCases {
+            value.isFavorite = false
+            let before = try TranscriptExports.data(value, format: format, texts: exportTexts)
+            value.isFavorite = true
+            #expect(try TranscriptExports.data(value, format: format, texts: exportTexts) == before)
+        }
+        let json = try JSONSerialization.jsonObject(with: JSONExport.data(value)) as? [String: Any]
+        #expect(json?["isFavorite"] == nil)
+    }
+
     @Test func timedWordsKeepTheirSpeakersAndTimesInCanonicalOrder() {
         let segments = [
             TranscriptSegment(text: "Yes, sure.", start: 0, end: 0.9, speakerID: "S1",
@@ -68,7 +84,7 @@ struct TranscriptExportsTests {
         ]
         let text = String(decoding: try TranscriptExports.data(note(segments, speakers: [.init(id: "S1", name: "Giulia")]),
                                                                 format: .text, texts: texts), as: UTF8.self)
-        #expect(text == "Delivery: Thursday?\nsub 12500 2\n\n[00:00] Giulia\nHello\n\n[00:03] Unknown speaker\nWho speaks?\n")
+        #expect(text == "Giulia · 00:00:00\nHello\n\nUnknown speaker · 00:00:03\nWho speaks?\n")
     }
 
     @Test func aListedSpeakerWithoutWordsIsNotCounted() throws {
@@ -76,7 +92,7 @@ struct TranscriptExportsTests {
         let speakers: [NoteSpeaker] = [.init(id: "S1", name: "Giulia"), .init(id: "S2", name: "Marco")]
         let text = String(decoding: try TranscriptExports.data(note(segments, speakers: speakers), format: .text, texts: texts),
                           as: UTF8.self)
-        #expect(text == "Delivery: Thursday?\nsub 12500 1\n\n[00:00]\nHello\n")
+        #expect(text == "Giulia · 00:00:00\nHello\n")
     }
 
     @Test func aVersionExportsItsOwnWordsAndNames() throws {
@@ -85,7 +101,7 @@ struct TranscriptExportsTests {
                                         speakers: [.init(id: "S1", name: "Bruno")])
         source.versions = [version]
         let vtt = String(decoding: try TranscriptExports.data(source, format: .webVTT, version: version, texts: texts), as: UTF8.self)
-        #expect(vtt == "WEBVTT\n\n00:00:01.000 --> 00:00:02.000\nVecchio\n")
+        #expect(vtt == "WEBVTT\n\n00:00:01.000 --> 00:00:02.000\n<v Bruno>Vecchio</v>\n")
         let json = try JSONSerialization.jsonObject(with: TranscriptExports.data(source, format: .json, version: version, texts: texts)) as? [String: Any]
         #expect((json?["transcript"] as? [[String: Any]])?.first?["text"] as? String == "Vecchio")
     }
@@ -105,7 +121,7 @@ struct TranscriptExportsTests {
 
     @Test func aFinishedTranscriptWithoutWordsWritesTheEmptyText() throws {
         let text = String(decoding: try TranscriptExports.data(note([]), format: .text, texts: texts), as: UTF8.self)
-        #expect(text == "Delivery: Thursday?\nsub 12500 0\n\nNo words were found in this recording.\n")
+        #expect(text == "\n")
         #expect(TranscriptExports.availability(of: note([])) == .available)
     }
 

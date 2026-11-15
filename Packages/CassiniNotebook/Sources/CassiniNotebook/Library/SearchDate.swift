@@ -2,7 +2,7 @@ import Foundation
 
 /// D14: local calendar days, including today; never a rolling count of 24-hour periods.
 public enum SearchDate: CaseIterable, Hashable, Sendable {
-    case any, today, week, month
+    case any, today, week, month, year
 
     public func interval(now: Date, calendar: Calendar) -> DateInterval? {
         let days: Int
@@ -11,6 +11,10 @@ public enum SearchDate: CaseIterable, Hashable, Sendable {
         case .today: days = 1
         case .week: days = 7
         case .month: days = 30
+        case .year:
+            guard let start = calendar.dateInterval(of: .year, for: now)?.start,
+                  let tomorrow = calendar.date(byAdding: .day, value: 1, to: now) else { return nil }
+            return DateInterval(start: calendar.startOfDay(for: start), end: calendar.startOfDay(for: tomorrow))
         }
         let today = calendar.startOfDay(for: now)
         guard let start = calendar.date(byAdding: .day, value: 1 - days, to: today),

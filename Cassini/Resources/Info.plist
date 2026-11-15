@@ -76,8 +76,12 @@
 			<string>Audio</string>
 			<key>LSItemContentTypes</key>
 			<array>
-				<string>public.audio</string>
 				<string>org.xiph.opus</string>
+				<string>org.xiph.ogg-audio</string>
+				<string>public.mp3</string>
+				<string>com.apple.m4a-audio</string>
+				<string>public.mpeg-4-audio</string>
+				<string>com.microsoft.waveform-audio</string>
 			</array>
 			<key>LSHandlerRank</key>
 			<string>Alternate</string>
@@ -89,7 +93,7 @@
 			<key>UTTypeIdentifier</key>
 			<string>org.xiph.opus</string>
 			<key>UTTypeDescription</key>
-			<string>Ogg Opus audio and Cassini document</string>
+			<string>Opus/Ogg</string>
 			<key>UTTypeConformsTo</key>
 			<array>
 				<string>public.audio</string>
@@ -99,12 +103,33 @@
 				<key>public.filename-extension</key>
 				<array>
 					<string>opus</string>
+				</array>
+				<key>public.mime-type</key>
+				<array>
+					<string>audio/opus</string>
+					<string>audio/x-opus+ogg</string>
+				</array>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>org.xiph.ogg-audio</string>
+			<key>UTTypeDescription</key>
+			<string>Opus/Ogg</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.audio</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
 					<string>ogg</string>
 				</array>
 				<key>public.mime-type</key>
 				<array>
 					<string>audio/opus</string>
-					<string>audio/ogg</string>
+					<string>audio/x-opus+ogg</string>
 				</array>
 			</dict>
 		</dict>

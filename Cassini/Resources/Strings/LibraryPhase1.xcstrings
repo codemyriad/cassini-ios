@@ -2,7 +2,7 @@
   "sourceLanguage": "en",
   "strings": {
     "common.close": {
-      "comment": "Generated from cassini-ux 5e0c34e0f1bb390298dabdf4eedc494e933fd329, common.close.",
+      "comment": "Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3, common.close.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -44,7 +44,7 @@
       }
     },
     "common.record": {
-      "comment": "Generated from cassini-ux 5e0c34e0f1bb390298dabdf4eedc494e933fd329, common.record.",
+      "comment": "Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3, common.record.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -85,8 +85,50 @@
         }
       }
     },
+    "common.tryAgain": {
+      "comment": "Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3, common.tryAgain.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try again"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riprova"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réessayer"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reintentar"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tentar novamente"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tentar novamente"
+          }
+        }
+      }
+    },
     "format.searchCount.join": {
-      "comment": "Generated from cassini-ux 5e0c34e0f1bb390298dabdf4eedc494e933fd329, format.searchCount.join.",
+      "comment": "Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3, format.searchCount.join.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -128,7 +170,7 @@
       }
     },
     "format.searchCount.meetings": {
-      "comment": "Generated from cassini-ux 5e0c34e0f1bb390298dabdf4eedc494e933fd329, format.searchCount.meetings.",
+      "comment": "Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3, format.searchCount.meetings.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -272,7 +314,7 @@
       }
     },
     "format.searchCount.places": {
-      "comment": "Generated from cassini-ux 5e0c34e0f1bb390298dabdf4eedc494e933fd329, format.searchCount.places.",
+      "comment": "Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3, format.searchCount.places.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -416,7 +458,7 @@
       }
     },
     "import.button.mobile": {
-      "comment": "Generated from cassini-ux 5e0c34e0f1bb390298dabdf4eedc494e933fd329, import.button.mobile.",
+      "comment": "Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3, import.button.mobile.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -457,8 +499,176 @@
         }
       }
     },
+    "library.filter.all": {
+      "comment": "Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3, library.filter.all.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tutte"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toutes"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Todas"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Todas"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Todas"
+          }
+        }
+      }
+    },
+    "library.filter.starred": {
+      "comment": "Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3, library.filter.starred.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Starred"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Con stella"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avec étoile"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Destacadas"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Com estrela"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Com estrela"
+          }
+        }
+      }
+    },
+    "library.filters.a11y": {
+      "comment": "Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3, library.filters.a11y.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filters"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filtri"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filtres"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filtros"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filtros"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filtros"
+          }
+        }
+      }
+    },
+    "library.starred.empty": {
+      "comment": "Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3, library.starred.empty.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No stars yet."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ancora nessuna stella."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucune étoile pour l’instant."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aún no hay nada destacado."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nenhuma estrela ainda."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ainda sem estrelas."
+          }
+        }
+      }
+    },
     "phone.row.noSpeech": {
-      "comment": "Generated from cassini-ux 5e0c34e0f1bb390298dabdf4eedc494e933fd329, phone.row.noSpeech.",
+      "comment": "Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3, phone.row.noSpeech.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -500,7 +710,7 @@
       }
     },
     "phone.row.speakerCount": {
-      "comment": "Generated from cassini-ux 5e0c34e0f1bb390298dabdf4eedc494e933fd329, phone.row.speakerCount.",
+      "comment": "Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3, phone.row.speakerCount.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -644,7 +854,7 @@
       }
     },
     "phone.row.transcribed.a11y": {
-      "comment": "Generated from cassini-ux 5e0c34e0f1bb390298dabdf4eedc494e933fd329, phone.row.transcribed.a11y.",
+      "comment": "Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3, phone.row.transcribed.a11y.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -686,7 +896,7 @@
       }
     },
     "search.field.a11y": {
-      "comment": "Generated from cassini-ux 5e0c34e0f1bb390298dabdf4eedc494e933fd329, search.field.a11y.",
+      "comment": "Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3, search.field.a11y.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -728,7 +938,7 @@
       }
     },
     "search.field.placeholder": {
-      "comment": "Generated from cassini-ux 5e0c34e0f1bb390298dabdf4eedc494e933fd329, search.field.placeholder.",
+      "comment": "Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3, search.field.placeholder.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -769,8 +979,428 @@
         }
       }
     },
+    "search.filter.anyDate": {
+      "comment": "Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3, search.filter.anyDate.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Any date"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Qualsiasi data"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toutes les dates"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cualquier fecha"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Qualquer data"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Qualquer data"
+          }
+        }
+      }
+    },
+    "search.filter.anySpeaker": {
+      "comment": "Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3, search.filter.anySpeaker.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Any speaker"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Qualsiasi voce"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tous les intervenants"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cualquier hablante"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Qualquer locutor"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Qualquer orador"
+          }
+        }
+      }
+    },
+    "search.filter.date.month": {
+      "comment": "Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3, search.filter.date.month.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Past 30 days"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ultimi 30 giorni"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "30 derniers jours"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Últimos 30 días"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Últimos 30 dias"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Últimos 30 dias"
+          }
+        }
+      }
+    },
+    "search.filter.date.today": {
+      "comment": "Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3, search.filter.date.today.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Today"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oggi"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aujourd’hui"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hoy"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hoje"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hoje"
+          }
+        }
+      }
+    },
+    "search.filter.date.week": {
+      "comment": "Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3, search.filter.date.week.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Past 7 days"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ultimi 7 giorni"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "7 derniers jours"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Últimos 7 días"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Últimos 7 dias"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Últimos 7 dias"
+          }
+        }
+      }
+    },
+    "search.filter.date.year": {
+      "comment": "Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3, search.filter.date.year.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This year"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quest’anno"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cette année"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este año"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este ano"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este ano"
+          }
+        }
+      }
+    },
+    "search.filter.recordedByMe": {
+      "comment": "Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3, search.filter.recordedByMe.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recorded by me"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registrate da me"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enregistrées par moi"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Grabadas por mí"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gravadas por mim"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gravadas por mim"
+          }
+        }
+      }
+    },
+    "search.filter.speaker": {
+      "comment": "Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3, search.filter.speaker.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Speaker: {name}"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voce: {name}"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Intervenant : {name}"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hablante: {name}"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Locutor: {name}"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Orador: {name}"
+          }
+        }
+      }
+    },
+    "search.filter.speakerNone": {
+      "comment": "Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3, search.filter.speakerNone.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Speaker"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voce"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Intervenant"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hablante"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Locutor"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Orador"
+          }
+        }
+      }
+    },
+    "search.filter.starred": {
+      "comment": "Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3, search.filter.starred.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Starred"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Con stella"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avec étoile"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Destacadas"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Com estrela"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Com estrela"
+          }
+        }
+      }
+    },
     "search.results.a11y": {
-      "comment": "Generated from cassini-ux 5e0c34e0f1bb390298dabdf4eedc494e933fd329, search.results.a11y.",
+      "comment": "Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3, search.results.a11y.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -812,7 +1442,7 @@
       }
     },
     "search.title": {
-      "comment": "Generated from cassini-ux 5e0c34e0f1bb390298dabdf4eedc494e933fd329, search.title.",
+      "comment": "Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3, search.title.",
       "extractionState": "manual",
       "localizations": {
         "en": {

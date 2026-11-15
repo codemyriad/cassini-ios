@@ -36,7 +36,7 @@ class BadgeStringGenerationTests(unittest.TestCase):
         self.assertIn('{n}', output['strings']['states.badge.transcribing']['localizations']['fr']['stringUnit']['value'])
         self.assertIn('{position}', output['strings']['meeting.interruptedAt']['localizations']['it']['stringUnit']['value'])
         self.assertIn('{position}', output['strings']['states.phone.pausedAt']['localizations']['fr']['stringUnit']['value'])
-        self.assertEqual(len(output['strings']), 17)
+        self.assertEqual(len(output['strings']), 19)
 
     def test_global_and_bundle_pins_cannot_diverge(self):
         path = self.root / generator.STRINGS_PIN

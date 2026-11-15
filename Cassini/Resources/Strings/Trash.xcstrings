@@ -144,8 +144,9 @@
         }
       }
     },
-    "%lld notes could not be deleted. They stay in Recently Deleted.": {
-      "comment": "Empty failed for several notes; the others were deleted",
+    "%lld meetings could not be deleted. They stay in Recently Deleted.": {
+      "comment": "Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3, ios.trash.deleteManyFailed.",
+      "extractionState": "manual",
       "localizations": {
         "en": {
           "variations": {
@@ -153,61 +154,13 @@
               "one": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "%lld note could not be deleted. It stays in Recently Deleted."
+                  "value": "%lld meeting could not be deleted. It stays in Recently Deleted."
                 }
               },
               "other": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "%lld notes could not be deleted. They stay in Recently Deleted."
-                }
-              }
-            }
-          }
-        },
-        "es": {
-          "variations": {
-            "plural": {
-              "many": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "No se pudieron eliminar %lld notas. Siguen en Eliminado recientemente."
-                }
-              },
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "No se pudo eliminar %lld nota. Sigue en Eliminado recientemente."
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "No se pudieron eliminar %lld notas. Siguen en Eliminado recientemente."
-                }
-              }
-            }
-          }
-        },
-        "fr": {
-          "variations": {
-            "plural": {
-              "many": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Impossible de supprimer %lld notes. Elles restent dans Suppressions récentes."
-                }
-              },
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Impossible de supprimer %lld note. Elle reste dans Suppressions récentes."
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Impossible de supprimer %lld notes. Elles restent dans Suppressions récentes."
+                  "value": "%lld meetings could not be deleted. They stay in Recently Deleted."
                 }
               }
             }
@@ -219,19 +172,67 @@
               "many": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "Non è stato possibile eliminare %lld note. Restano in Eliminati di recente."
+                  "value": "Non è stato possibile eliminare %lld riunioni. Restano in Eliminati di recente."
                 }
               },
               "one": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "Non è stato possibile eliminare %lld nota. Resta in Eliminati di recente."
+                  "value": "Non è stato possibile eliminare %lld riunione. Resta in Eliminati di recente."
                 }
               },
               "other": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "Non è stato possibile eliminare %lld note. Restano in Eliminati di recente."
+                  "value": "Non è stato possibile eliminare %lld riunioni. Restano in Eliminati di recente."
+                }
+              }
+            }
+          }
+        },
+        "fr": {
+          "variations": {
+            "plural": {
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Impossible de supprimer %lld réunions. Elles restent dans Suppressions récentes."
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Impossible de supprimer %lld réunion. Elle reste dans Suppressions récentes."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Impossible de supprimer %lld réunions. Elles restent dans Suppressions récentes."
+                }
+              }
+            }
+          }
+        },
+        "es": {
+          "variations": {
+            "plural": {
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "No se pudieron eliminar %lld reuniones. Siguen en Eliminado recientemente."
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "No se pudo eliminar %lld reunión. Sigue en Eliminado recientemente."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "No se pudieron eliminar %lld reuniones. Siguen en Eliminado recientemente."
                 }
               }
             }
@@ -243,19 +244,19 @@
               "many": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "Não foi possível excluir %lld notas. Elas continuam em Apagados."
+                  "value": "Não foi possível excluir %lld reuniões. Elas continuam em Apagados."
                 }
               },
               "one": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "Não foi possível excluir %lld nota. Ela continua em Apagados."
+                  "value": "Não foi possível excluir %lld reunião. Ela continua em Apagados."
                 }
               },
               "other": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "Não foi possível excluir %lld notas. Elas continuam em Apagados."
+                  "value": "Não foi possível excluir %lld reuniões. Elas continuam em Apagados."
                 }
               }
             }
@@ -267,19 +268,19 @@
               "many": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "Não foi possível eliminar %lld notas. Ficam em Apagados."
+                  "value": "Não foi possível eliminar %lld reuniões. Ficam em Apagados."
                 }
               },
               "one": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "Não foi possível eliminar %lld nota. Fica em Apagados."
+                  "value": "Não foi possível eliminar %lld reunião. Fica em Apagados."
                 }
               },
               "other": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "Não foi possível eliminar %lld notas. Ficam em Apagados."
+                  "value": "Não foi possível eliminar %lld reuniões. Ficam em Apagados."
                 }
               }
             }
@@ -369,8 +370,9 @@
         }
       }
     },
-    "Delete %lld notes for good?": {
-      "comment": "Empty confirmation title",
+    "Delete %lld meetings for good?": {
+      "comment": "Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3, android.trash.deleteAll.title.",
+      "extractionState": "manual",
       "localizations": {
         "en": {
           "variations": {
@@ -378,61 +380,13 @@
               "one": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "Delete %lld note for good?"
+                  "value": "Delete %lld meeting for good?"
                 }
               },
               "other": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "Delete %lld notes for good?"
-                }
-              }
-            }
-          }
-        },
-        "es": {
-          "variations": {
-            "plural": {
-              "many": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "¿Eliminar %lld notas para siempre?"
-                }
-              },
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "¿Eliminar %lld nota para siempre?"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "¿Eliminar %lld notas para siempre?"
-                }
-              }
-            }
-          }
-        },
-        "fr": {
-          "variations": {
-            "plural": {
-              "many": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Supprimer définitivement %lld notes ?"
-                }
-              },
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Supprimer définitivement %lld note ?"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Supprimer définitivement %lld notes ?"
+                  "value": "Delete %lld meetings for good?"
                 }
               }
             }
@@ -444,19 +398,67 @@
               "many": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "Eliminare %lld note per sempre?"
+                  "value": "Eliminare %lld riunioni per sempre?"
                 }
               },
               "one": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "Eliminare %lld nota per sempre?"
+                  "value": "Eliminare %lld riunione per sempre?"
                 }
               },
               "other": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "Eliminare %lld note per sempre?"
+                  "value": "Eliminare %lld riunioni per sempre?"
+                }
+              }
+            }
+          }
+        },
+        "fr": {
+          "variations": {
+            "plural": {
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Supprimer définitivement %lld réunions ?"
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Supprimer définitivement %lld réunion ?"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Supprimer définitivement %lld réunions ?"
+                }
+              }
+            }
+          }
+        },
+        "es": {
+          "variations": {
+            "plural": {
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "¿Eliminar %lld reuniones definitivamente?"
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "¿Eliminar %lld reunión definitivamente?"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "¿Eliminar %lld reuniones definitivamente?"
                 }
               }
             }
@@ -468,19 +470,19 @@
               "many": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "Excluir %lld notas para sempre?"
+                  "value": "Excluir %lld reuniões para sempre?"
                 }
               },
               "one": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "Excluir %lld nota para sempre?"
+                  "value": "Excluir %lld reunião para sempre?"
                 }
               },
               "other": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "Excluir %lld notas para sempre?"
+                  "value": "Excluir %lld reuniões para sempre?"
                 }
               }
             }
@@ -492,19 +494,19 @@
               "many": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "Eliminar %lld notas definitivamente?"
+                  "value": "Eliminar %lld reuniões definitivamente?"
                 }
               },
               "one": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "Eliminar %lld nota definitivamente?"
+                  "value": "Eliminar %lld reunião definitivamente?"
                 }
               },
               "other": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "Eliminar %lld notas definitivamente?"
+                  "value": "Eliminar %lld reuniões definitivamente?"
                 }
               }
             }
@@ -758,43 +760,44 @@
         }
       }
     },
-    "Its audio, transcripts and voiceprints from this note are deleted. This can’t be undone.": {
-      "comment": "Delete now confirmation body",
+    "Its audio, transcripts and voiceprints from this meeting are deleted. This can’t be undone.": {
+      "comment": "Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3, android.trash.delete.body.",
+      "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Its audio, transcripts and voiceprints from this note are deleted. This can’t be undone."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Se eliminarán su audio, sus transcripciones y las huellas de voz de esta nota. No se puede deshacer."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Son audio, ses transcriptions et les empreintes vocales de cette note sont supprimés. Cette action est irréversible."
+            "value": "Its audio, transcripts and voiceprints from this meeting are deleted. This can’t be undone."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "L’audio, le trascrizioni e le impronte vocali di questa nota vengono eliminati. Non si può annullare."
+            "value": "L’audio, le trascrizioni e le impronte vocali di questa riunione vengono eliminati. Non si può annullare."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Son audio, ses transcriptions et les empreintes vocales de cette réunion sont supprimés. Cette action est irréversible."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se eliminan su audio, sus transcripciones y las huellas de voz de esta reunión. No se puede deshacer."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "O áudio, as transcrições e as impressões de voz desta nota serão excluídos. Não é possível desfazer."
+            "value": "O áudio, as transcrições e as impressões de voz desta reunião são excluídos. Isso não pode ser desfeito."
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "O áudio, as transcrições e as impressões vocais desta nota são eliminados. Não é possível desfazer."
+            "value": "O áudio, as transcrições e as impressões vocais desta reunião são eliminados. Esta ação não pode ser anulada."
           }
         }
       }
@@ -840,6 +843,90 @@
         }
       }
     },
+    "Meetings here are deleted for good after 30 days, with their audio, transcripts and voiceprints from those meetings.": {
+      "comment": "Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3, android.trash.retentionNote.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Meetings here are deleted for good after 30 days, with their audio, transcripts and voiceprints from those meetings."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le riunioni qui vengono eliminate per sempre dopo 30 giorni, con il loro audio, le trascrizioni e le impronte vocali di quelle riunioni."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les réunions placées ici sont supprimées définitivement après 30 jours, avec leur audio, leurs transcriptions et les empreintes vocales issues de ces réunions."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Las reuniones de aquí se eliminan definitivamente tras 30 días, con su audio, sus transcripciones y las huellas de voz de esas reuniones."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "As reuniões aqui são excluídas para sempre após 30 dias, com o áudio, as transcrições e as impressões de voz dessas reuniões."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "As reuniões aqui são eliminadas definitivamente após 30 dias, com o áudio, as transcrições e as impressões vocais dessas reuniões."
+          }
+        }
+      }
+    },
+    "Meetings you delete stay here for 30 days.": {
+      "comment": "Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3, android.trash.empty.body.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Meetings you delete stay here for 30 days."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le riunioni che elimini restano qui per 30 giorni."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les réunions que vous supprimez restent ici 30 jours."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Las reuniones que eliminas se quedan aquí 30 días."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "As reuniões que você excluir ficam aqui por 30 dias."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "As reuniões que eliminar ficam aqui durante 30 dias."
+          }
+        }
+      }
+    },
     "Move to Recently Deleted": {
       "comment": "Note action and confirmation button",
       "localizations": {
@@ -877,88 +964,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mover para Apagados"
-          }
-        }
-      }
-    },
-    "Notes here are deleted for good after 30 days, with their audio, transcripts and voiceprints from those notes.": {
-      "comment": "Recently Deleted intro",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Notes here are deleted for good after 30 days, with their audio, transcripts and voiceprints from those notes."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Las notas de aquí se eliminan para siempre tras 30 días, junto con su audio, sus transcripciones y las huellas de voz de esas notas."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Les notes présentes ici sont supprimées définitivement après 30 jours, avec leur audio, leurs transcriptions et leurs empreintes vocales."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Le note qui vengono eliminate per sempre dopo 30 giorni, con il loro audio, le trascrizioni e le impronte vocali di quelle note."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "As notas aqui são excluídas para sempre após 30 dias, com o áudio, as transcrições e as impressões de voz delas."
-          }
-        },
-        "pt-PT": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "As notas aqui são eliminadas definitivamente após 30 dias, com o respetivo áudio, transcrições e impressões vocais."
-          }
-        }
-      }
-    },
-    "Notes you delete stay here for 30 days.": {
-      "comment": "Recently Deleted with no notes, body",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Notes you delete stay here for 30 days."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Las notas que eliminas se quedan aquí durante 30 días."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Les notes que vous supprimez restent ici 30 jours."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Le note che elimini restano qui per 30 giorni."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "As notas que você exclui ficam aqui por 30 dias."
-          }
-        },
-        "pt-PT": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "As notas que eliminar ficam aqui durante 30 dias."
           }
         }
       }
@@ -1251,7 +1256,8 @@
       }
     },
     "“%@” could not be deleted. It stays in Recently Deleted.": {
-      "comment": "Delete now or Empty failed for one note",
+      "comment": "Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3, ios.trash.deleteFailed.",
+      "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -1259,22 +1265,22 @@
             "value": "“%@” could not be deleted. It stays in Recently Deleted."
           }
         },
-        "es": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "No se pudo eliminar “%@”. Sigue en Eliminado recientemente."
+            "value": "Non è stato possibile eliminare “%@”. Resta in Eliminati di recente."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Impossible de supprimer « %@ ». La note reste dans Suppressions récentes."
+            "value": "Impossible de supprimer « %@ ». La réunion reste dans Suppressions récentes."
           }
         },
-        "it": {
+        "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Non è stato possibile eliminare “%@”. Resta in Eliminati di recente."
+            "value": "No se pudo eliminar “%@”. Sigue en Eliminado recientemente."
           }
         },
         "pt-BR": {

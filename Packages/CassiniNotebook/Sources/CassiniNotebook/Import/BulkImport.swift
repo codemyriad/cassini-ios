@@ -31,7 +31,8 @@ public struct BulkImportReport: Sendable {
 }
 
 public enum ArchiveAudio {
-    /// Containers offered by iOS's audio picker; AVFoundation/the existing importer still verifies their bytes.
+    /// Legacy archive audio containers; these are not offered by the external audio picker.
+    /// AVFoundation/the existing importer still verifies their bytes.
     public static let extensions: Set<String> = ["opus", "ogg", "oga", "wav", "mp3", "m4a", "m4b", "aac", "flac",
                                                   "aif", "aiff", "caf", "mp4", "3gp", "3gpp", "3g2", "amr", "ac3", "au", "sd2"]
     public static func supports(_ name: String) -> Bool { extensions.contains((name as NSString).pathExtension.lowercased()) }
@@ -76,7 +77,9 @@ public enum ArchiveContents {
 
     public static func preservesOriginal(_ note: Note) -> Bool {
         let hasLocalWords = note.versions?.contains { $0.portableID == nil && !$0.segments.isEmpty } ?? false
-        if note.transcript.isEmpty && !hasLocalWords { return true }
+        if !note.hasFinishedTranscript { return true }
+        // An imported document already carries its empty default and any earlier variants.
+        if note.document != nil && note.transcript.isEmpty && !hasLocalWords { return true }
         if note.document?.state == .unknownFormat { return true }
         if case .unplayable = note.audio, note.holdsOnlyImportedVersions { return true }
         return false

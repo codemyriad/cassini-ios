@@ -18,7 +18,11 @@ public enum JSONExport {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         encoder.dateEncodingStrategy = .iso8601
-        return try encoder.encode(copy)
+        // D53.1: stars belong to this device's Library, including for the legacy JSON export.
+        let data = try encoder.encode(copy)
+        var object = try JSONSerialization.jsonObject(with: data) as! [String: Any]
+        object.removeValue(forKey: "isFavorite")
+        return try JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys])
     }
 
     private static func publicSpeakers(_ speakers: [NoteSpeaker]) -> [NoteSpeaker] {

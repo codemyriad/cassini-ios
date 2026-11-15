@@ -4,12 +4,310 @@ import Vision
 /// The Library end to end (Android `LibraryBehaviourTest` and the Library rows of `TextLimitBehaviourTest`): its
 /// controls, the row statuses and inline actions, the search, the empty states and Rename.
 final class LibraryUITests: XCTestCase {
+    @MainActor func testIPadRecordingTicksPreserveContextMenu() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad)
+        try testRecordingTicksPreserveContextMenu()
+    }
+
+    /// A live tick must update the label and pixels without dismissing the row's context menu.
+    @MainActor func testRecordingTicksPreserveContextMenu() throws {
+        let app = launch(["--seed", "recording"] + DeviceUnderTest.workingSpeech)
+        app.buttons["recordButton"].tap()
+        XCTAssertTrue(app.buttons["pauseResumeRecording"].waitForEnabled(within: uiWaitFloor))
+        app.buttons["recordingAllMeetings"].tap()
+        let meeting = row(app, "Voice note 8 Oct, 09:41")
+        XCTAssertTrue(waitFor(meeting, label: ", recording"))
+        let initial = meeting.label, frame = meeting.frame
+        XCTAssertTrue(poll(within: uiWaitFloor) { meeting.label != initial }, "Live row duration advances")
+        XCTAssertEqual(meeting.frame, frame, "Duration updates preserve the row's scroll position")
+        try assertRowPixels(meeting, contain: "Recording")
+        meeting.press(forDuration: 1)
+        let rename = app.buttons["Rename"]
+        XCTAssertTrue(rename.waitForExistence(within: uiWaitFloor))
+        let card = app.buttons["activeRecordingCard"]
+        assertLiveTicksPreserveMenu(rename, card: card)
+        captureEvidence("Live recording context menu after duration tick", app)
+        XCTAssertTrue(rename.exists, "A duration tick must preserve the open context menu")
+        rename.tapWhenSettled()
+        let field = app.textFields["renameField"]
+        XCTAssertTrue(field.waitForExistence(within: uiWaitFloor))
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(within: uiWaitFloor))
+        field.replaceText(with: "Live capture renamed")
+        app.buttons["Save"].tap()
+        let renamed = row(app, "Live capture renamed")
+        XCTAssertTrue(renamed.waitForExistence(within: uiWaitFloor))
+        renamed.press(forDuration: 1)
+        assertLiveTicksPreserveMenu(app.buttons["Star"], card: card)
+        app.buttons["Star"].tapWhenSettled()
+        // Star changes the render key: require its result before starting another gesture.
+        XCTAssertTrue(poll(within: uiWaitFloor) {
+            renamed.label.contains(", starred") && !app.buttons["Star"].exists && renamed.isHittable
+        }, "Star updates the row and closes its menu")
+        renamed.press(forDuration: 1)
+        assertLiveTicksPreserveMenu(app.buttons["Remove star"], card: card)
+        app.buttons["Remove star"].tapWhenSettled()
+        XCTAssertTrue(poll(within: uiWaitFloor) {
+            !renamed.label.contains(", starred") && !app.buttons["Remove star"].exists && renamed.isHittable
+        }, "Removing the star completes before returning to recording")
+        app.buttons["activeRecordingCard"].tap()
+        XCTAssertTrue(app.buttons["stopRecording"].waitForExistence(within: uiWaitFloor))
+        app.buttons["stopRecording"].tap()
+        XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: uiWaitFloor))
+        if UIDevice.current.userInterfaceIdiom != .pad { app.navigationBars.buttons["Back to all meetings"].tap() }
+        XCTAssertTrue(waitFor(renamed, label: ", transcribed"))
+        assertIPadSplitView(app)
+        try assertRowPixels(renamed, contain: "2 speakers", excluding: "Recording")
+    }
+
+    @MainActor private func assertLiveTicksPreserveMenu(_ item: XCUIElement, card: XCUIElement,
+                                                       file: StaticString = #filePath, line: UInt = #line) {
+        XCTAssertTrue(item.waitForExistence(within: uiWaitFloor), file: file, line: line)
+        // Exercise every menu across multiple ticks, including after a rename/star replaces the row.
+        // Native menus can expose their final AX frame before their entrance animation accepts a tap.
+        for _ in 0..<2 {
+            let elapsed = card.label
+            XCTAssertTrue(poll(within: uiWaitFloor) { card.label != elapsed }, "Capture advances with menu open", file: file, line: line)
+            XCTAssertTrue(item.exists, "A live tick preserves the menu action", file: file, line: line)
+        }
+    }
+
+    @MainActor func testPostRecordingFirstNoteAndActions() throws {
+        let app = launch(["--seed", "recording"] + DeviceUnderTest.workingSpeech)
+        // Keep the fixture's fake microphone, but empty its library through real actions.
+        while app.buttons.matching(identifier: "noteRow").count > 0 {
+            let count = app.buttons.matching(identifier: "noteRow").count
+            let note = app.buttons.matching(identifier: "noteRow").firstMatch
+            note.press(forDuration: 1)
+            app.buttons["Move to Recently Deleted"].tapWhenSettled()
+            XCTAssertTrue(app.buttons["Undo"].waitForExistence(within: uiWaitFloor))
+            XCTAssertTrue(poll(within: uiWaitFloor) { app.buttons.matching(identifier: "noteRow").count < count })
+        }
+        XCTAssertTrue(app.staticTexts["heroTitle"].waitForExistence(within: uiWaitFloor))
+        captureEvidence("06-empty-library-before-first-recording", app)
+        app.buttons["recordButton"].tap()
+        XCTAssertTrue(app.buttons["pauseResumeRecording"].waitForEnabled(within: uiWaitFloor))
+        app.buttons["recordingAllMeetings"].tap()
+        let meeting = row(app, "Voice note 8 Oct, 09:41")
+        XCTAssertTrue(waitFor(meeting, label: ", recording"))
+        XCTAssertFalse(app.staticTexts["heroTitle"].exists)
+        XCTAssertTrue(app.staticTexts["TODAY"].exists)
+        try assertRowPixels(meeting, contain: "Recording")
+        captureEvidence("07-first-recording-minimised", app)
+        meeting.tap()
+        XCTAssertTrue(app.buttons["pauseResumeRecording"].waitForEnabled(within: uiWaitFloor))
+        app.buttons["pauseResumeRecording"].tap()
+        XCTAssertTrue(app.buttons["Resume recording"].waitForExistence(within: uiWaitFloor))
+        app.buttons["recordingAllMeetings"].tap()
+        XCTAssertTrue(app.buttons["activeRecordingCard"].waitForExistence(within: uiWaitFloor))
+        XCTAssertTrue(app.buttons["activeRecordingCard"].label.contains("Recording paused"))
+        try assertRowPixels(meeting, contain: "Recording")
+        captureEvidence("First recording paused in Library", app)
+        app.buttons["activeRecordingCard"].tap()
+        XCTAssertTrue(app.buttons["Resume recording"].waitForExistence(within: uiWaitFloor))
+        app.buttons["pauseResumeRecording"].tap()
+        XCTAssertTrue(app.buttons["Pause recording"].waitForExistence(within: uiWaitFloor))
+        app.buttons["stopRecording"].tap()
+        XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: uiWaitFloor))
+        captureEvidence("First recording detail", app)
+        app.navigationBars.buttons["Back to all meetings"].tap()
+        XCTAssertTrue(waitFor(meeting, label: ", transcribed"))
+        try assertRowPixels(meeting, contain: "2 speakers", excluding: "Recording")
+        XCTAssertFalse(app.buttons["activeRecordingCard"].exists)
+        XCTAssertFalse(app.staticTexts["heroTitle"].exists)
+        XCTAssertTrue(app.staticTexts["TODAY"].exists)
+        XCTAssertEqual(app.buttons["recordButton"].label, "Record a new note")
+        app.buttons["recordButton"].tap()
+        XCTAssertTrue(app.buttons["pauseResumeRecording"].waitForEnabled(within: uiWaitFloor))
+        app.buttons["stopRecording"].tap()
+        XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: uiWaitFloor))
+        app.navigationBars.buttons["Back to all meetings"].tap()
+        XCTAssertTrue(waitFor(meeting, label: ", transcribed"))
+        let duplicates = app.buttons.matching(NSPredicate(format: "identifier == 'noteRow' AND label BEGINSWITH %@", "Voice note 8 Oct, 09:41"))
+        XCTAssertTrue(poll(within: uiWaitFloor) { duplicates.count == 2 })
+        for note in duplicates.allElementsBoundByIndex {
+            XCTAssertTrue(waitFor(note, label: ", transcribed"))
+            try assertRowPixels(note, contain: "2 speakers", excluding: "Recording")
+        }
+        captureEvidence("Two consecutive recordings with identical generated titles", app)
+        let field = openRename(app, "Voice note 8 Oct, 09:41")
+        field.replaceText(with: "First capture")
+        app.buttons["Save"].tap()
+        let first = row(app, "First capture")
+        XCTAssertTrue(first.waitForExistence(within: uiWaitFloor))
+        XCTAssertEqual(app.buttons.matching(identifier: "noteRow").count, 2)
+        try assertRowPixels(first, contain: "2 speakers", excluding: "Recording")
+        try assertRowPixels(meeting, contain: "2 speakers", excluding: "Recording")
+        meeting.press(forDuration: 1)
+        app.buttons["Star"].tapWhenSettled()
+        app.buttons["Starred"].tapWhenSettled()
+        XCTAssertTrue(poll(within: uiWaitFloor) { meeting.exists && !first.exists })
+        app.buttons["All"].tapWhenSettled()
+        XCTAssertTrue(first.waitForExistence(within: uiWaitFloor))
+        let search = app.textFields["librarySearch"]
+        search.tap(); search.typeText("Voice note\n")
+        XCTAssertTrue(app.staticTexts["librarySearchCount"].waitForExistence(within: uiWaitFloor))
+        try assertRowPixels(meeting, contain: "2 speakers", excluding: "Recording")
+        app.buttons["closeLibrarySearch"].tapWhenSettled()
+        let rename = openRename(app, "Voice note 8 Oct, 09:41")
+        rename.replaceText(with: "Second capture")
+        app.buttons["Save"].tap()
+        let second = row(app, "Second capture")
+        XCTAssertTrue(second.waitForExistence(within: uiWaitFloor))
+        second.press(forDuration: 1)
+        app.buttons["Move to Recently Deleted"].tapWhenSettled()
+        XCTAssertTrue(app.buttons["Undo"].waitForExistence(within: uiWaitFloor))
+        app.buttons["Undo"].tap()
+        XCTAssertTrue(second.waitForExistence(within: uiWaitFloor))
+        second.press(forDuration: 1)
+        app.buttons["Move to Recently Deleted"].tapWhenSettled()
+        XCTAssertTrue(app.buttons["Undo"].waitForExistence(within: uiWaitFloor))
+        app.buttons["Recently Deleted"].tap()
+        XCTAssertTrue(app.buttons["Restore"].firstMatch.waitForExistence(within: uiWaitFloor))
+        // The fixed test clock gives all trash entries the same deletion date; locate this card by title.
+        let deletedTitle = app.staticTexts["Second capture"]
+        XCTAssertTrue(app.scrollViews.firstMatch.scroll { deletedTitle.exists && deletedTitle.isHittable })
+        let belowTitle = app.buttons.matching(identifier: "Restore").allElementsBoundByIndex
+            .filter { $0.frame.minY >= deletedTitle.frame.maxY }
+        guard let restore = belowTitle.min(by: { $0.frame.minY < $1.frame.minY }) else {
+            XCTFail("The recorded note's Restore button is missing"); return
+        }
+        restore.tapWhenSettled()
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(second.waitForExistence(within: uiWaitFloor))
+        try assertRowPixels(second, contain: "2 speakers", excluding: "Recording")
+        captureEvidence("Post-recording renamed and restored", app)
+    }
+
+    @MainActor func testFinishedRecordingDeclinedModelsIsAudioOnly() throws {
+        let app = launch(["--seed", "recording", "--models-missing"] + DeviceUnderTest.downloadedSpeech)
+        app.buttons["recordButton"].tap()
+        XCTAssertTrue(app.buttons["pauseResumeRecording"].waitForEnabled(within: uiWaitFloor))
+        app.buttons["recordingAllMeetings"].tap()
+        let meeting = row(app, "Voice note 8 Oct, 09:41")
+        XCTAssertTrue(waitFor(meeting, label: ", recording"))
+        meeting.tap()
+        XCTAssertTrue(app.buttons["stopRecording"].waitForExistence(within: uiWaitFloor))
+        app.buttons["stopRecording"].tap()
+        let notNow = app.buttons["Not now — keep the audio"]
+        XCTAssertTrue(notNow.waitForExistence(within: uiWaitFloor))
+        captureEvidence("Post-recording missing model consent", app)
+        notNow.tap()
+        XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: uiWaitFloor))
+        XCTAssertTrue(app.buttons["Transcribe"].waitForExistence(within: uiWaitFloor))
+        app.navigationBars.buttons["Back to all meetings"].tap()
+        XCTAssertTrue(waitFor(meeting, label: ", audio only"))
+        try assertRowPixels(meeting, contain: "Audio only", excluding: "Recording")
+        captureEvidence("Post-recording declined consent audio only", app)
+    }
+
+    @MainActor func testSpeakerAndRecordedByMeChipsAndRememberedLibraryChoice() {
+        let app = launch(["--seed", "libraryFilters"])
+        let recovered = row(app, "Recovered budget")
+        let imported = row(app, "Imported budget")
+        XCTAssertTrue(imported.waitForExistence(within: uiWaitFloor))
+        app.buttons["Starred"].tapWhenSettled()
+        XCTAssertTrue(poll(within: uiWaitFloor) { recovered.exists && !imported.exists })
+        app.launchArguments = ["--ui-testing", "--seed", "libraryFilters"]
+        app.launchAndWait(fresh: true)
+        XCTAssertTrue(recovered.waitForExistence(within: uiWaitFloor))
+        XCTAssertFalse(imported.exists, "Starred survives a new process")
+        app.buttons["All"].tapWhenSettled()
+        XCTAssertTrue(imported.waitForExistence(within: uiWaitFloor))
+        app.launchAndWait(fresh: true)
+        XCTAssertTrue(imported.waitForExistence(within: uiWaitFloor), "All survives a new process")
+
+        let search = app.textFields["librarySearch"]
+        search.tap()
+        search.typeText("budget\n")
+        let speaker = app.buttons["librarySearchSpeaker"]
+        XCTAssertTrue(speaker.waitForExistence(within: uiWaitFloor))
+        speaker.tapWhenSettled()
+        app.buttons["Alice"].tapWhenSettled()
+        XCTAssertTrue(poll(within: uiWaitFloor) {
+            app.staticTexts["librarySearchCount"].label == "0 meetings"
+        })
+        XCTAssertFalse(recovered.exists, "A title or Bob's words cannot match Alice")
+        speaker.tapWhenSettled()
+        app.buttons["Bob"].tapWhenSettled()
+        XCTAssertTrue(waitFor(recovered, label: "belongs to Bob"))
+        app.buttons["Clear search"].tapWhenSettled()
+        speaker.tapWhenSettled()
+        app.buttons["Alice"].tapWhenSettled()
+        XCTAssertTrue(imported.waitForExistence(within: uiWaitFloor), "Filter-only search finds Alice")
+        let own = app.buttons["libraryRecordedByMe"]
+        // iOS 18 can report a clipped chip as hittable even when its centre is outside the scroll view.
+        let filters = app.scrollViews["librarySearchFilters"]
+        for _ in 0..<5 {
+            if own.exists && filters.frame.contains(own.frame) { break }
+            filters.swipeLeft()
+        }
+        XCTAssertTrue(filters.frame.contains(own.frame))
+        own.tapWhenSettled()
+        XCTAssertTrue(poll(within: uiWaitFloor) { own.isSelected })
+        XCTAssertTrue(poll(within: uiWaitFloor) { recovered.exists && !imported.exists })
+        app.buttons["closeLibrarySearch"].tapWhenSettled()
+        XCTAssertTrue(imported.waitForExistence(within: uiWaitFloor), "Closing Search restores All")
+    }
+
+    @MainActor func testImportedProvenanceInLibrarySearchAndHeader() {
+        let app = launch(["--seed", "importedProvenance"])
+        let imported = row(app, "Imported audio planning")
+        XCTAssertTrue(imported.waitForExistence(within: uiWaitFloor))
+        XCTAssertTrue(imported.label.contains("imported"))
+        XCTAssertTrue(imported.label.contains("transcribed"))
+        let search = app.textFields["librarySearch"]
+        search.tap()
+        search.typeText("Imported audio planning\n")
+        XCTAssertTrue(waitFor(imported, label: "imported"))
+        imported.tap()
+        let subtitle = app.staticTexts["noteSubtitle"]
+        XCTAssertTrue(subtitle.waitForExistence(within: uiWaitFloor))
+        XCTAssertTrue(subtitle.label.contains("Imported"))
+        XCTAssertFalse(subtitle.label.contains("Transcribed on another device"))
+    }
+
+    @MainActor func testImportedDocumentHeaderNamesOtherDevice() {
+        let app = launch(["--seed", "importedProvenance"])
+        let imported = scrolledRow(app, "Imported document planning")
+        XCTAssertTrue(imported.label.contains("imported"))
+        imported.tap()
+        let subtitle = app.staticTexts["noteSubtitle"]
+        XCTAssertTrue(subtitle.waitForExistence(within: uiWaitFloor))
+        XCTAssertTrue(subtitle.label.contains("Imported · Transcribed on another device"))
+    }
+
     @MainActor private func launch(_ arguments: [String] = ["--seed-test-data"]) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing", "--reset-test-data"] + arguments
         app.launchAndWait()
         XCTAssertTrue(app.textFields["librarySearch"].waitForExistence(within: 15))
         return app
+    }
+
+    @MainActor func testImportingCardShowsSharedSpinnerBadge() {
+        let app = launch(["--importing-fixture"])
+        let card = app.descendants(matching: .any)["importingCard"].firstMatch
+        XCTAssertTrue(card.waitForExistence(within: 15))
+        XCTAssertTrue(card.staticTexts["Audio.ogg"].exists)
+        XCTAssertTrue(card.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "Importing…")).firstMatch.exists)
+        XCTAssertFalse(app.buttons["retryImport"].exists)
+        XCTAssertFalse(app.buttons["dismissImport"].exists)
+        capture("Importing audio")
+    }
+
+    @MainActor func testFailedImportKeepsNeedsAttentionCardAndCanRetryAndDismiss() {
+        let app = launch(["--failed-import-fixture"])
+        let card = app.descendants(matching: .any)["failedImportCard"].firstMatch
+        XCTAssertTrue(card.waitForExistence(within: 15))
+        XCTAssertTrue(card.staticTexts["Damaged audio.ogg"].exists)
+        XCTAssertTrue(card.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "Needs attention")).firstMatch.exists)
+        XCTAssertTrue(app.buttons["retryImport"].exists)
+        capture("Failed import - Needs attention")
+        app.buttons["retryImport"].tapWhenSettled()
+        XCTAssertTrue(app.buttons["dismissImport"].waitForExistence(within: 15))
+        app.buttons["dismissImport"].tapWhenSettled()
+        XCTAssertTrue(app.textFields["librarySearch"].exists)
+        XCTAssertFalse(card.exists)
     }
 
     @MainActor private func row(_ app: XCUIApplication, _ title: String) -> XCUIElement {
@@ -73,6 +371,12 @@ final class LibraryUITests: XCTestCase {
     @MainActor private func capture(_ name: String) {
         let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         attachment.name = name; attachment.lifetime = .keepAlways; add(attachment)
+    }
+
+    @MainActor private func captureEvidence(_ name: String, _ app: XCUIApplication) {
+        capture(name)
+        let hierarchy = XCTAttachment(string: app.debugDescription)
+        hierarchy.name = name + " hierarchy"; hierarchy.lifetime = .keepAlways; add(hierarchy)
     }
 
     /// Measure the resting capsule after its native morph, without turning animation duration into a test wait.
@@ -202,6 +506,167 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 10), "Stop saves and opens the note")
     }
 
+    @MainActor func testFinishedRecordingRefreshesMaterializedRow() throws {
+        try assertFinishedRecordingRow(minimised: true)
+    }
+
+    @MainActor func testFinishedRecordingRefreshesCoveredLibrary() throws {
+        try assertFinishedRecordingRow(minimised: false)
+    }
+
+    @MainActor func testIPadFinishedRecordingRefreshesMaterializedRow() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad)
+        try assertFinishedRecordingRow(minimised: true)
+    }
+
+    @MainActor func testIPadFinishedRecordingRefreshesCoveredLibrary() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad)
+        try assertFinishedRecordingRow(minimised: false)
+    }
+
+    @MainActor func testFinishedAudioOnlyRecordingRefreshesMaterializedRow() throws {
+        try assertFinishedRecordingRow(minimised: true, automatic: false)
+    }
+
+    @MainActor func testFinishedAudioOnlyRecordingRefreshesCoveredLibrary() throws {
+        try assertFinishedRecordingRow(minimised: false, automatic: false)
+    }
+
+    @MainActor func testIPadFinishedAudioOnlyRecordingRefreshesMaterializedRow() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad)
+        try assertFinishedRecordingRow(minimised: true, automatic: false)
+    }
+
+    @MainActor func testIPadFinishedAudioOnlyRecordingRefreshesCoveredLibrary() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad)
+        try assertFinishedRecordingRow(minimised: false, automatic: false)
+    }
+
+    @MainActor func testFinishedRecordingRefreshesMaterializedSearchRow() throws {
+        try assertFinishedRecordingRow(minimised: true, automatic: true, search: true)
+    }
+
+    @MainActor func testFinishedRecordingRefreshesCoveredSearchRow() throws {
+        try assertFinishedRecordingRow(minimised: false, automatic: true, search: true)
+    }
+
+    @MainActor func testFinishedAudioOnlyRecordingRefreshesMaterializedSearchRow() throws {
+        try assertFinishedRecordingRow(minimised: true, automatic: false, search: true)
+    }
+
+    @MainActor func testFinishedAudioOnlyRecordingRefreshesCoveredSearchRow() throws {
+        try assertFinishedRecordingRow(minimised: false, automatic: false, search: true)
+    }
+
+    @MainActor func testIPadFinishedRecordingRefreshesMaterializedSearchRow() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad)
+        try assertFinishedRecordingRow(minimised: true, automatic: true, search: true)
+    }
+
+    @MainActor func testIPadFinishedRecordingRefreshesCoveredSearchRow() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad)
+        try assertFinishedRecordingRow(minimised: false, automatic: true, search: true)
+    }
+
+    @MainActor func testIPadFinishedAudioOnlyRecordingRefreshesMaterializedSearchRow() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad)
+        try assertFinishedRecordingRow(minimised: true, automatic: false, search: true)
+    }
+
+    @MainActor func testIPadFinishedAudioOnlyRecordingRefreshesCoveredSearchRow() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad)
+        try assertFinishedRecordingRow(minimised: false, automatic: false, search: true)
+    }
+
+    @MainActor private func assertFinishedRecordingRow(minimised: Bool, automatic: Bool = true, search: Bool = false) throws {
+        // The 13-inch iPad destination has regular width in portrait too. Use the normal in-app
+        // relaunch: terminating and rotating SpringBoard can wedge its idle wait on iOS 27.
+        let app = launch(["--seed", "recording"] + DeviceUnderTest.workingSpeech)
+        if !automatic {
+            app.buttons["settingsButton"].tap()
+            let toggle = app.switches["Transcribe after recording or import"]
+            XCTAssertTrue(toggle.waitForExistence(within: uiWaitFloor))
+            // SwiftUI exposes the form row as a switch too; activate the nested UISwitch.
+            if toggle.value as? String != "0" {
+                toggle.switches.firstMatch.tap()
+            }
+            XCTAssertTrue(toggle.waitForValue("0"), "Automatic transcription is off before starting")
+            if UIDevice.current.userInterfaceIdiom != .pad {
+                app.navigationBars.buttons["All meetings"].tap()
+            }
+        }
+        if UIDevice.current.userInterfaceIdiom == .pad && automatic {
+            // Finishing a recording must replace an existing detail, not push above the old selection.
+            row(app, "A quieter kind of productivity").tap()
+            XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: uiWaitFloor))
+        }
+        if search {
+            app.textFields["librarySearch"].tap()
+            app.textFields["librarySearch"].typeText("Voice note\n")
+            XCTAssertTrue(app.staticTexts["librarySearchCount"].waitForExistence(within: uiWaitFloor))
+        }
+        app.buttons["recordButton"].tap()
+        XCTAssertTrue(app.buttons["pauseResumeRecording"].waitForEnabled(within: uiWaitFloor))
+        let meeting = row(app, "Voice note 8 Oct, 09:41")
+        if minimised {
+            app.buttons["recordingAllMeetings"].tap()
+            XCTAssertTrue(waitFor(meeting, label: ", recording"), meeting.label)
+            try assertRowPixels(meeting, contain: "Recording")
+            meeting.tap()
+            XCTAssertTrue(app.buttons["stopRecording"].waitForExistence(within: uiWaitFloor))
+        }
+        app.buttons["stopRecording"].tap()
+        XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: uiWaitFloor))
+        // The regular-width Library stays alongside the detail; compact width returns via Back.
+        if UIDevice.current.userInterfaceIdiom != .pad {
+            app.navigationBars.buttons["Back to all meetings"].tap()
+        }
+        XCTAssertTrue(waitFor(meeting, label: automatic ? ", transcribed" : ", audio only"), meeting.label)
+        XCTAssertFalse(meeting.label.localizedCaseInsensitiveContains("recording"), meeting.label)
+        assertIPadSplitView(app)
+        if UIDevice.current.userInterfaceIdiom == .pad { XCTAssertTrue(meeting.isSelected, "Finished note is selected beside its detail") }
+        try assertRowPixels(meeting, contain: automatic ? "2 speakers" : "Audio only", excluding: "Recording")
+        XCTAssertTrue(app.buttons["recordButton"].waitForEnabled(within: uiWaitFloor))
+        XCTAssertEqual(app.buttons["recordButton"].label, "Record a new note")
+        XCTAssertFalse(app.buttons["activeRecordingCard"].exists)
+        try assertRowPixels(app.buttons["recordButton"], contain: "Record", excluding: "Recording")
+        captureEvidence(UIDevice.current.userInterfaceIdiom == .pad ? "05-after-fix-ipad-split-view"
+            : automatic ? "03-after-fix-after-stop-transcribed" : "04-after-fix-after-stop-audio-only", app)
+        if UIDevice.current.userInterfaceIdiom == .pad && !automatic {
+            app.buttons["Transcribe"].tap()
+            XCTAssertTrue(waitFor(meeting, label: ", transcribed"), meeting.label)
+            try assertRowPixels(meeting, contain: "2 speakers", excluding: "Recording")
+            app.buttons["Share and more"].tap()
+            app.buttons["Star"].tapWhenSettled()
+            XCTAssertTrue(waitFor(meeting, label: ", starred"), meeting.label)
+            XCTAssertTrue(meeting.isSelected)
+            captureEvidence("iPad sidebar after detail Transcribe and Star", app)
+        }
+    }
+
+    @MainActor private func assertIPadSplitView(_ app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        guard UIDevice.current.userInterfaceIdiom == .pad else { return }
+        let search = app.textFields["librarySearch"], title = app.staticTexts["noteTitle"]
+        XCTAssertTrue(search.isHittable, "Library sidebar remains visible", file: file, line: line)
+        XCTAssertTrue(title.isHittable, "Note detail remains visible", file: file, line: line)
+        XCTAssertLessThanOrEqual(search.frame.maxX, title.frame.minX, "Library sits beside the detail", file: file, line: line)
+    }
+
+    @MainActor private func assertRowPixels(_ row: XCUIElement, contain expected: String, excluding forbidden: String? = nil) throws {
+        var visible = ""
+        XCTAssertTrue(poll(within: uiWaitFloor) {
+            guard row.exists, row.isHittable, let image = row.screenshot().image.cgImage else { return false }
+            let request = VNRecognizeTextRequest()
+            request.recognitionLevel = .accurate
+            request.recognitionLanguages = ["en-US"]
+            do { try VNImageRequestHandler(cgImage: image).perform([request]) }
+            catch { visible = String(describing: error); return false }
+            visible = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ")
+            return visible.localizedCaseInsensitiveContains(expected)
+                && !(forbidden.map { visible.localizedCaseInsensitiveContains($0) } ?? false)
+        }, "Expected rendered \(expected), excluding \(forbidden ?? "nothing"): \(visible)")
+    }
+
     // ports: LibraryBehaviourTest#duringARecordingTheCardAndTheButtonReturnToIt
     @MainActor func testDuringARecordingTheCardTheButtonAndTheRowReturnToIt() {
         let app = launch(["--seed", "recording"])
@@ -287,7 +752,7 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(garden.waitForExistence(within: 15))
         app.buttons["Clear search"].tap()
         XCTAssertTrue(app.staticTexts["TODAY"].waitForExistence(within: 15))
-        XCTAssertFalse(date.exists, "Clear removes the typed-search date filter while Search stays open")
+        XCTAssertTrue(date.exists, "Search keeps its unified filter row after clearing the text")
         XCTAssertTrue(app.buttons["closeLibrarySearch"].exists, "Clear keeps Search open")
         search.tap()
         search.typeText("thurs\n")
@@ -381,7 +846,7 @@ final class LibraryUITests: XCTestCase {
             XCTAssertTrue(close.isHittable, "empty Submit keeps Search open", file: file, line: line)
         }
         let date = app.buttons["librarySearchDate"]
-        XCTAssertFalse(date.exists, "Date filtering requires a typed query", file: file, line: line)
+        XCTAssertTrue(date.exists, "Open Search offers its filter row before typing", file: file, line: line)
         search.tap()
         search.typeText("Thursday\n")
         XCTAssertTrue(app.staticTexts["librarySearchCount"].waitForExistence(within: 5), file: file, line: line)
@@ -391,14 +856,14 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(date.wait(until: NSPredicate(format: "label CONTAINS 'Today'"), within: 5), file: file, line: line)
         app.buttons["Clear search"].tapWhenSettled()
         XCTAssertTrue(app.staticTexts["TODAY"].waitForExistence(within: 5), file: file, line: line)
-        XCTAssertFalse(date.exists, "Clearing Search removes its date filter", file: file, line: line)
+        XCTAssertTrue(date.exists, "Clearing Search keeps its filter row", file: file, line: line)
         close.tap()
         XCTAssertTrue(app.buttons["settingsButton"].waitForExistence(within: 5), file: file, line: line)
         XCTAssertFalse(close.exists, file: file, line: line)
         XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(within: 5), file: file, line: line)
         search.tap()
         XCTAssertTrue(close.waitForExistence(within: 5), file: file, line: line)
-        XCTAssertFalse(date.exists, "Reopening empty Search offers no date filter", file: file, line: line)
+        XCTAssertTrue(date.exists, "Reopening Search offers the unified filter row", file: file, line: line)
         XCTAssertTrue(search.wait(until: NSPredicate(format: "hasKeyboardFocus == true"), within: 5), file: file, line: line)
         if submitEmptyBeforeDate {
             // A simulator with a hardware keyboard connected shows iPadOS 18's shortcut bar instead of a software
@@ -451,7 +916,7 @@ final class LibraryUITests: XCTestCase {
         let date = app.buttons["librarySearchDate"]
         let close = app.buttons["closeLibrarySearch"]
         XCTAssertTrue(close.waitForExistence(within: 5))
-        XCTAssertFalse(date.exists, "Empty Search has no date filter")
+        XCTAssertTrue(date.exists, "Open Search offers its filter row before typing")
         search.typeText("planning\n")
         XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(within: 5))
         XCTAssertTrue(date.waitForExistence(within: 5))
@@ -503,7 +968,7 @@ final class LibraryUITests: XCTestCase {
         focusSearchWithPointer(app)
         capture("Empty Search focused after scrolling the Library")
         let date = app.buttons["librarySearchDate"]
-        XCTAssertFalse(date.exists, "Empty Search has no date filter")
+        XCTAssertTrue(date.exists, "Open Search offers its filter row before typing")
         let close = app.buttons["closeLibrarySearch"]
         XCTAssertTrue(close.waitForExistence(within: 5))
         XCTAssertFalse(app.buttons["settingsButton"].exists)
@@ -759,11 +1224,11 @@ final class LibraryUITests: XCTestCase {
     /// Export in the long-press menu opens the note, which runs the export: the share sheet offers the subtitles.
     // ports: LibraryBehaviourTest#theSubtitleChooserExportsTheNote
     @MainActor func testTheActionsMenuExportOpensTheNoteWhichSharesTheSubtitles() {
-        assertActionsMenuShares("Subtitles · .vtt")
+        assertActionsMenuShares("vtt")
     }
 
     @MainActor func testTheActionsMenuMarkdownOpensTheNoteAndShares() {
-        assertActionsMenuShares("Markdown")
+        assertActionsMenuShares("markdown")
     }
 
     @MainActor private func assertActionsMenuShares(_ format: String) {
@@ -771,8 +1236,15 @@ final class LibraryUITests: XCTestCase {
         let note = scrolledRow(app, "A quieter kind of productivity")
         XCTAssertTrue(note.waitForExistence(within: 5))
         note.press(forDuration: 1)
+        app.buttons["Remove star"].tapWhenSettled()
+        XCTAssertTrue(poll(within: uiWaitFloor) { note.exists && !note.label.contains("starred") })
+        note.press(forDuration: 1)
+        app.buttons["Star"].tapWhenSettled()
+        XCTAssertTrue(waitFor(note, label: "starred"))
+        note.press(forDuration: 1)
+        XCTAssertTrue(app.buttons["Remove star"].waitForExistence(within: uiWaitFloor))
         app.buttons["Export"].tapWhenSettled()
-        app.buttons[format].tapWhenSettled()
+        confirmExport(app, choice: format)
         XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 5))
         XCTAssertEqual(app.staticTexts["noteTitle"].label, "A quieter kind of productivity")
         let shareSheet = app.otherElements["ActivityListView"]

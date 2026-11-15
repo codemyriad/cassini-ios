@@ -95,6 +95,13 @@ enum TestFixtures {
         var main = fixture(now: now)
         var notes: [Note] = []
         switch seed {
+        case .importedProvenance:
+            main.title = "Imported document planning"
+            main.origin = .importedDocument
+            main.versions = [TranscriptVersion(kind: .imported, segments: main.transcript, speakers: main.speakers ?? [])]
+            var audio = transcribed("Imported audio planning", at: now.addingTimeInterval(-3600), "Planning locally transcribed audio")
+            audio.origin = .imported
+            notes.append(audio)
         case .oneSpeaker:
             main.title = "Solo planning"
             main.speakers = [NoteSpeaker(id: "alex", name: "Alex", colourIndex: 0, provenance: .user)]
@@ -134,12 +141,27 @@ enum TestFixtures {
         }
         notes = [main, walk(now: now)] + notes
         switch seed {
+        case .libraryFilters:
+            var recovered = transcribed("Recovered budget", at: now, "")
+            recovered.id = fixtureID
+            recovered.origin = .recovered
+            recovered.isFavorite = true
+            recovered.speakers = [NoteSpeaker(id: "a", name: "Alice"), NoteSpeaker(id: "b", name: "Bob")]
+            recovered.transcript = [
+                .init(text: "Hello from Alice", start: 0, end: 6, speakerID: "a"),
+                .init(text: "The budget belongs to Bob", start: 6, end: 14, speakerID: "b")]
+            var imported = recovered
+            imported.id = UUID()
+            imported.title = "Imported budget"
+            imported.origin = .imported
+            imported.isFavorite = false
+            notes = [recovered, imported]
         case .brandSpeakers:
             var failed = Note(id: failedID, title: "Garden audio check", createdAt: now.addingTimeInterval(-3 * 3600), audioFilename: "audio.wav")
             failed.duration = fixtureDuration; failed.language = "en-US"; failed.waveform = waveform
             failed.status = .failed; failed.failure = .audio
             notes.append(failed)
-        case .library, .recording, .voices, .speakers, .oneSpeaker:
+        case .importedProvenance, .library, .recording, .voices, .speakers, .oneSpeaker:
             break
         case .search, .reading:
             // Whistle transcribed the review after Parakeet Ultra could not get its memory: its note says so.

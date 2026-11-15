@@ -40,6 +40,7 @@ import CassiniNotebook
         var finishing: UUID?
         var speakerModelsReady = false
         var cloudBackup: Bool? = true
+        var defaults: UserDefaults?
         @ObservationIgnored let clock = GatedClock()
         @ObservationIgnored lazy var model: LibraryScreenModel = {
             var calendar = Calendar(identifier: .gregorian)
@@ -66,8 +67,9 @@ import CassiniNotebook
                 },
                 trash: { [unowned self] in actions.append("trash \(title($0))") },
                 speakerModelsReady: { [unowned self] in speakerModelsReady },
+                setRecordingTitle: { [unowned self] in actions.append("recordingTitle \($0)") },
                 cloudBackup: { [unowned self] in cloudBackup },
-                clock: clock, calendar: calendar))
+                clock: clock, calendar: calendar), defaults: defaults)
             model.onEffect = { [unowned self] in effects.append($0) }
             return model
         }()
@@ -82,6 +84,290 @@ import CassiniNotebook
         }
 
         func title(_ id: UUID) -> String { notes.first { $0.id == id }?.title ?? "?" }
+    }
+
+    @Test func renameUpdatesOnlyTheMatchingActiveRecorderWithTheCleanTitle() async {
+        let library = Library()
+        let live = library.add("Live"), other = library.add("Other")
+        library.recording = .active(ActiveRecording(noteID: live, title: "Live", defaultTitle: "Live", format: .pcm48kMono))
+        let model = library.model
+        #expect(model.rename(other, to: "Other renamed"))
+        #expect(!library.actions.contains(where: { $0.hasPrefix("recordingTitle") }))
+        #expect(!model.rename(live, to: "   "))
+        #expect(model.rename(live, to: "  Live renamed  "))
+        #expect(library.actions.suffix(2) == ["recordingTitle Live renamed", "update Live renamed"])
+        await model.settle()
+        library.actions = []
+        #expect(model.rename(live, to: "Live renamed"))
+        #expect(library.actions.isEmpty)
+        library.recording = .idle
+        #expect(model.rename(live, to: "Saved renamed"))
+        #expect(library.actions == ["update Saved renamed"])
+    }
+
+    @Test func rememberedStarredAppliesToTheVeryFirstProjection() throws {
+        let suite = "D1042-\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let first = Library()
+        first.defaults = defaults
+        #expect(!first.model.favoritesOnly)
+        first.model.favoritesOnly = true
+        let next = Library()
+        next.defaults = defaults
+        let unstarred = next.add("Unstarred")
+        let starred = next.add("Starred")
+        next.notes[next.notes.firstIndex { $0.id == starred }!].isFavorite = true
+        let initial = next.model.content
+        #expect(initial.sections.flatMap(\.rows).map(\.id) == [starred])
+        #expect(!initial.sections.flatMap(\.rows).contains { $0.id == unstarred })
+        next.notes = []
+        // A fresh model with no meetings still shows the shared starred empty state.
+        let empty = Library()
+        empty.defaults = defaults
+        #expect(empty.model.content.emptyState == .noStarred)
+        empty.model.favoritesOnly = false
+        let all = Library()
+        all.defaults = defaults
+        #expect(!all.model.favoritesOnly)
+    }
+
+    @Test func unifiedFiltersCombineAndCloseRestoresTheLibraryChoice() async throws {
+        let library = Library()
+        let own = library.add("Planning own", "Planning")
+        let imported = library.add("Planning imported", "Planning")
+        let document = library.add("Planning document", "Planning")
+        let recovered = library.add("Planning recovered", "Planning")
+        let otherSpeaker = library.add("Planning Bob", "Planning")
+        let old = library.add("Planning last year", "Planning", minutesAgo: 400 * 24 * 60)
+        let unstarred = library.add("Planning unstarred", "Planning")
+        let unrelated = library.add("Unrelated")
+        for i in library.notes.indices {
+            library.notes[i].isFavorite = library.notes[i].id != unstarred
+            library.notes[i].transcript = library.notes[i].transcript.map { segment in
+                var segment = segment; segment.speakerID = "s1"; return segment
+            }
+            library.notes[i].speakers = [NoteSpeaker(id: "s1", name: library.notes[i].id == otherSpeaker ? "Bob" : "Alice")]
+        }
+        library.notes[library.notes.firstIndex { $0.id == imported }!].origin = .imported
+        library.notes[library.notes.firstIndex { $0.id == document }!].origin = .importedDocument
+        library.notes[library.notes.firstIndex { $0.id == recovered }!].origin = .recovered
+        let model = library.model
+        model.favoritesOnly = true
+        model.query = "Planning"
+        await waitUntilSleeping(library.clock)
+        library.clock.release()
+        await model.settle()
+        #expect(model.searchStarred)
+        #expect(model.searchSpeakers == ["Alice", "Bob"])
+        model.searchSpeaker = "Alice"
+        await model.settle()
+        #expect(Set(model.content.results!.map(\.id)) == Set([own, imported, document, recovered, old]))
+        model.recordedByMe = true
+        #expect(Set(model.content.results!.map(\.id)) == Set([own, recovered, old]))
+        model.searchDate = .year
+        #expect(Set(model.content.results!.map(\.id)) == Set([own, recovered]))
+        model.searchStarred = false
+        #expect(Set(model.content.results!.map(\.id)) == Set([own, recovered, unstarred]))
+        #expect(!model.content.results!.contains { $0.id == unrelated })
+        model.closeSearch()
+        #expect(model.searchSpeaker == nil && model.searchDate == .any && !model.recordedByMe)
+        #expect(model.searchStarred && model.favoritesOnly)
+        #expect(model.content.results == nil)
+        #expect(!model.content.sections.flatMap(\.rows).contains { $0.id == unstarred })
+        model.beginSearch()
+        #expect(model.searchStarred && model.searchSpeaker == nil)
+        model.searchStarred = false
+        model.closeSearch()
+        #expect(model.favoritesOnly && model.searchStarred)
+    }
+
+    @Test func speakerSearchMatchesOnlyThatSpeakersRunsAndDeduplicatesNames() async {
+        let library = Library()
+        let meeting = library.add("Budget title")
+        library.notes[0].speakers = [NoteSpeaker(id: "a", name: "Alice"), NoteSpeaker(id: "b", name: "Bob"),
+                                     NoteSpeaker(id: "c", name: "alice"), NoteSpeaker(id: "p", name: "Speaker 4"),
+                                     NoteSpeaker(id: "blank", name: "  ")]
+        library.notes[0].transcript = [
+            .init(text: "Hello everyone", start: 0, end: 1, speakerID: "a"),
+            .init(text: "The budget belongs to Bob", start: 1, end: 2, speakerID: "b"),
+            .init(text: "Hello again", start: 2, end: 3, speakerID: "c")]
+        let model = library.model
+        #expect(model.searchSpeakers == ["Alice", "Bob"])
+        model.query = "budget"
+        await waitUntilSleeping(library.clock)
+        library.clock.release()
+        await model.settle()
+        model.searchSpeaker = "ALICE"
+        await model.settle()
+        #expect(model.content.results?.isEmpty == true)
+        model.searchSpeaker = "bob"
+        await model.settle()
+        #expect(model.content.results?.map(\.id) == [meeting])
+        var index = LibraryIndex(library.notes)
+        let hits = index.search(SearchQuery("budget"), speaker: "BOB")
+        #expect(hits.first?.snippet.contains("belongs to Bob") == true)
+        #expect(hits.first?.snippet.contains("Hello") == false)
+        #expect(index.search(SearchQuery("hello again"), speaker: "Alice").count == 1)
+        #expect(index.search(SearchQuery("hello everyone"), speaker: "alice").count == 1)
+        #expect(index.search(SearchQuery("title"), speaker: "Alice").isEmpty)
+        model.query = ""
+        model.beginSearch()
+        model.searchSpeaker = "alice"
+        await model.settle()
+        #expect(model.content.results?.map(\.id) == [meeting])
+        model.searchSpeaker = "Speaker 4"
+        await model.settle()
+        #expect(model.content.results?.isEmpty == true)
+    }
+
+    @Test(arguments: ["?", "...", "---"])
+    func punctuationOnlyQueriesApplyDateAndOriginButNeverInventSpeakerMatches(raw: String) async {
+        let library = Library()
+        let own = library.add("Own", "Hello")
+        library.notes[0].speakers = [NoteSpeaker(id: "a", name: "Alice")]
+        library.notes[0].transcript[0].speakerID = "a"
+        _ = library.add("Imported", minutesAgo: 1)
+        library.notes[1].origin = .imported
+        _ = library.add("Yesterday", minutesAgo: 24 * 60)
+        let model = library.model
+        model.query = raw
+        await waitUntilSleeping(library.clock)
+        library.clock.release()
+        await model.settle()
+        model.recordedByMe = true
+        model.searchDate = .today
+        #expect(model.content.results?.map(\.id) == [own])
+        model.searchSpeaker = "Alice"
+        await model.settle()
+        #expect(model.content.results?.isEmpty == true)
+        #expect(model.content.facts.results == 0)
+        #expect(model.content.emptyState == .noMatch(raw))
+    }
+
+    @Test func filterOnlySearchNeverShowsRestingLibraryEmptyStates() async {
+        let library = Library()
+        library.add("Starred yesterday", minutesAgo: 24 * 60)
+        library.notes[0].isFavorite = true
+        library.notes[0].origin = .imported
+        let model = library.model
+        model.favoritesOnly = true
+        model.beginSearch()
+        model.searchDate = .today
+        await model.settle()
+        #expect(model.content.facts.results == 0)
+        #expect(model.content.emptyState == nil)
+        model.searchStarred = false
+        #expect(model.content.emptyState == nil)
+        model.searchDate = .any
+        model.recordedByMe = true
+        #expect(model.content.facts.results == 0)
+        #expect(model.content.emptyState == nil)
+        model.recordedByMe = false
+        model.searchSpeaker = "Bob"
+        await model.settle()
+        #expect(model.content.facts.results == 0)
+        #expect(model.content.emptyState == nil)
+    }
+
+    @Test func firstTypedQueryHidesFilterOnlyPreloadDuringDebounce() async {
+        let library = Library()
+        let meeting = library.add("Budget")
+        library.notes[0].isFavorite = true
+        _ = library.add("Other")
+        let model = library.model
+        model.beginSearch()
+        await model.settle()
+
+        model.query = "zzz"
+        #expect(model.content.results?.isEmpty == true)
+        #expect(model.content.facts.results == nil)
+        await waitUntilSleeping(library.clock)
+        #expect(model.content.results?.isEmpty == true)
+        #expect(model.content.facts.results == nil)
+        library.clock.release()
+        await model.settle()
+        #expect(model.content.facts.results == 0)
+
+        model.searchStarred = true
+        model.query = ""
+        // Clearing resets transient filters; a chip can immediately start another filter-only search.
+        model.searchStarred = true
+        #expect(model.content.results?.isEmpty == true)
+        #expect(model.content.facts.results == nil)
+        await model.settle()
+        #expect(model.content.results?.map(\.id) == [meeting])
+        #expect(model.content.facts.results == 1)
+    }
+
+    @Test func changingQueryKeepsPreviousHitsBeforeTheSearchAnswers() async {
+        let library = Library()
+        let meeting = library.add("Budget")
+        let model = library.model
+        model.query = "bud"
+        await waitUntilSleeping(library.clock)
+        library.clock.release()
+        await model.settle()
+        #expect(model.content.results?.map(\.id) == [meeting])
+        #expect(model.content.facts.results == 1)
+
+        model.query = "budget"
+        await waitUntilSleeping(library.clock)
+        // Observe the old projection just before the new answer is published.
+        // At that point the debounce has applied the new query, but found still holds the old hits.
+        let checked = Mutex(false)
+        withObservationTracking { _ = model.searched } onChange: {
+            MainActor.assumeIsolated {
+                withObservationTracking { _ = model.content } onChange: {
+                    MainActor.assumeIsolated {
+                        #expect(model.searched == "budget")
+                        #expect(model.content.results?.map(\.id) == [meeting])
+                        #expect(model.content.facts.query.isEmpty)
+                        #expect(model.content.facts.results == nil)
+                        #expect(model.content.emptyState == nil)
+                        checked.withLock { $0 = true }
+                    }
+                }
+            }
+        }
+        library.clock.release()
+        await model.settle()
+        #expect(checked.withLock { $0 })
+        #expect(model.content.results?.map(\.id) == [meeting])
+        #expect(model.content.facts.results == 1)
+    }
+
+    @Test func changingSpeakerHidesPreviousHitsBeforeTheSearchAnswers() async {
+        let library = Library()
+        let meeting = library.add("Alice meeting", "hello")
+        library.notes[0].speakers = [NoteSpeaker(id: "a", name: "Alice")]
+        library.notes[0].transcript[0].speakerID = "a"
+        let model = library.model
+        model.beginSearch()
+        model.searchSpeaker = "Alice"
+        await model.settle()
+        #expect(model.content.results?.map(\.id) == [meeting])
+        model.searchSpeaker = "Bob"
+        // No actor suspension: the new task cannot have published yet.
+        #expect(model.content.results?.isEmpty == true)
+        #expect(model.content.facts.results == nil)
+        #expect(model.content.emptyState == nil)
+        await model.settle()
+        #expect(model.content.results?.isEmpty == true)
+    }
+
+    @Test func recordedByMeIncludesRecoveredInFilterOnlySearch() async {
+        let library = Library()
+        let own = library.add("Own")
+        let recovered = library.add("Recovered")
+        library.notes[1].origin = .recovered
+        _ = library.add("Imported")
+        library.notes[2].origin = .imported
+        let model = library.model
+        model.beginSearch()
+        model.recordedByMe = true
+        await model.settle()
+        #expect(Set(model.content.results!.map(\.id)) == Set([own, recovered]))
     }
 
     /// The view must observe these projections, rather than retain a pre-active row captured by a lazy builder.
