@@ -5,16 +5,16 @@ import CassiniNotebook
 enum TrashCopy {
     static let title = String(localized: "Recently Deleted", table: "Trash", comment: "The Recently Deleted screen's title")
     static let empty = String(localized: "Empty", table: "Trash", comment: "Recently Deleted toolbar: delete every note there")
-    static let intro = String(localized: "Notes here are deleted for good after 30 days, with their audio, transcripts and voiceprints from those notes.",
+    static let intro = String(localized: "Meetings here are deleted for good after 30 days, with their audio, transcripts and voiceprints from those meetings.",
                               table: "Trash", comment: "Recently Deleted intro")
     static let restore = String(localized: "Restore", table: "Trash", comment: "Recently Deleted card: put the note back in the library")
     static let deleteNow = String(localized: "Delete now", table: "Trash", comment: "Recently Deleted card: delete the note for good")
     static let delete = String(localized: "Delete", table: "Trash", comment: "Confirmation button: delete for good")
     static let cancel = String(localized: "Cancel", table: "Trash", comment: "Confirmation button: keep everything")
     static let isEmpty = String(localized: "Recently Deleted is empty", table: "Trash", comment: "Recently Deleted with no notes")
-    static let isEmptyBody = String(localized: "Notes you delete stay here for 30 days.", table: "Trash",
+    static let isEmptyBody = String(localized: "Meetings you delete stay here for 30 days.", table: "Trash",
                                     comment: "Recently Deleted with no notes, body")
-    static let deleteBody = String(localized: "Its audio, transcripts and voiceprints from this note are deleted. This can’t be undone.",
+    static let deleteBody = String(localized: "Its audio, transcripts and voiceprints from this meeting are deleted. This can’t be undone.",
                                    table: "Trash", comment: "Delete now confirmation body")
     static let deleteAllBody = String(localized: "Their audio, transcripts and voiceprints are deleted. This can’t be undone.",
                                       table: "Trash", comment: "Empty confirmation body")
@@ -32,7 +32,7 @@ enum TrashCopy {
     }
 
     static func deleteAllTitle(_ count: Int) -> String {
-        String(localized: "Delete \(count) notes for good?", table: "Trash", comment: "Empty confirmation title")
+        String(localized: "Delete \(count) meetings for good?", table: "Trash", comment: "Empty confirmation title")
     }
 
     static func moved(_ title: String) -> String {
@@ -40,13 +40,13 @@ enum TrashCopy {
                comment: "Library snackbar after a note was moved to Recently Deleted")
     }
 
-    /// Delete now or Empty left `ids`: the note by its title when one stayed, else how many.
+    /// Delete now or Empty left `ids`: the meeting by its title when one stayed, else how many.
     static func notDeleted(_ ids: [UUID], in items: [TrashItem]) -> String {
         if ids.count == 1, let title = items.first(where: { $0.id == ids[0] })?.title {
             return String(localized: "“\(title)” could not be deleted. It stays in Recently Deleted.", table: "Trash",
                           comment: "Delete now or Empty failed for one note")
         }
-        return String(localized: "\(ids.count) notes could not be deleted. They stay in Recently Deleted.", table: "Trash",
+        return String(localized: "\(ids.count) meetings could not be deleted. They stay in Recently Deleted.", table: "Trash",
                       comment: "Empty failed for several notes; the others were deleted")
     }
 

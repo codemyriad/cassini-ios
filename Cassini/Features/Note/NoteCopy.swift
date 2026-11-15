@@ -32,6 +32,11 @@ enum NoteCopy {
     /// "Today, 10:02 · 48:13", "Monday 5 Oct, 10:02 · 48:13": the day as the Library heads it (`DateLabels.day`).
     static func subtitle(_ subtitle: NoteSubtitle, calendar: Calendar) -> String {
         let dates = DateLabels(calendar: calendar)
+        if let key = subtitle.provenance.subtitleKey {
+            return subtitle.importedText(template: StatusBadgeCopy.template(key),
+                day: dates.day(subtitle.day), time: subtitle.meetingTime.instant.map { dates.time($0) } ?? "",
+                duration: TimeText.clock(subtitle.duration))
+        }
         switch subtitle.meetingTime {
         case .instant(let instant):
             let day = dates.day(subtitle.day), time = dates.time(instant)

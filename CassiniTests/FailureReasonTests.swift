@@ -7,9 +7,9 @@ import CassiniNotebook
 @Suite struct FailureReasonTests {
     @Test func aDamagedNoteIsWordedFromTheFailuresTable() throws {
         #expect(FailureReason.of(RepositoryError.invalidDocument)
-                == String(localized: "This note’s details are not supported or are damaged. Its files have been kept.", table: "Failures"))
+                == String(localized: "This meeting’s details are not supported or are damaged. Its files have been kept.", table: "Failures"))
         let italian = try #require(Bundle.main.path(forResource: "it", ofType: "lproj").flatMap(Bundle.init(path:)))
-        #expect(italian.localizedString(forKey: "This note’s details are not supported or are damaged. Its files have been kept.",
+        #expect(italian.localizedString(forKey: "This meeting’s details are not supported or are damaged. Its files have been kept.",
                                         value: nil, table: "Failures").hasPrefix("I dettagli"))
     }
 

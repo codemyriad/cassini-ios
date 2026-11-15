@@ -4,12 +4,65 @@ import Vision
 /// The Library end to end (Android `LibraryBehaviourTest` and the Library rows of `TextLimitBehaviourTest`): its
 /// controls, the row statuses and inline actions, the search, the empty states and Rename.
 final class LibraryUITests: XCTestCase {
+    @MainActor func testImportedProvenanceInLibrarySearchAndHeader() {
+        let app = launch(["--seed", "importedProvenance"])
+        let imported = row(app, "Imported audio planning")
+        XCTAssertTrue(imported.waitForExistence(within: uiWaitFloor))
+        XCTAssertTrue(imported.label.contains("imported"))
+        XCTAssertTrue(imported.label.contains("transcribed"))
+        let search = app.textFields["librarySearch"]
+        search.tap()
+        search.typeText("Imported audio planning\n")
+        XCTAssertTrue(waitFor(imported, label: "imported"))
+        imported.tap()
+        let subtitle = app.staticTexts["noteSubtitle"]
+        XCTAssertTrue(subtitle.waitForExistence(within: uiWaitFloor))
+        XCTAssertTrue(subtitle.label.contains("Imported"))
+        XCTAssertFalse(subtitle.label.contains("Transcribed on another device"))
+    }
+
+    @MainActor func testImportedDocumentHeaderNamesOtherDevice() {
+        let app = launch(["--seed", "importedProvenance"])
+        let imported = scrolledRow(app, "Imported document planning")
+        XCTAssertTrue(imported.label.contains("imported"))
+        imported.tap()
+        let subtitle = app.staticTexts["noteSubtitle"]
+        XCTAssertTrue(subtitle.waitForExistence(within: uiWaitFloor))
+        XCTAssertTrue(subtitle.label.contains("Imported · Transcribed on another device"))
+    }
+
     @MainActor private func launch(_ arguments: [String] = ["--seed-test-data"]) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing", "--reset-test-data"] + arguments
         app.launchAndWait()
         XCTAssertTrue(app.textFields["librarySearch"].waitForExistence(within: 15))
         return app
+    }
+
+    @MainActor func testImportingCardShowsSharedSpinnerBadge() {
+        let app = launch(["--importing-fixture"])
+        let card = app.descendants(matching: .any)["importingCard"].firstMatch
+        XCTAssertTrue(card.waitForExistence(within: 15))
+        XCTAssertTrue(card.staticTexts["Audio.ogg"].exists)
+        XCTAssertTrue(card.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "Importing…")).firstMatch.exists)
+        XCTAssertFalse(app.buttons["retryImport"].exists)
+        XCTAssertFalse(app.buttons["dismissImport"].exists)
+        capture("Importing audio")
+    }
+
+    @MainActor func testFailedImportKeepsNeedsAttentionCardAndCanRetryAndDismiss() {
+        let app = launch(["--failed-import-fixture"])
+        let card = app.descendants(matching: .any)["failedImportCard"].firstMatch
+        XCTAssertTrue(card.waitForExistence(within: 15))
+        XCTAssertTrue(card.staticTexts["Damaged audio.ogg"].exists)
+        XCTAssertTrue(card.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "Needs attention")).firstMatch.exists)
+        XCTAssertTrue(app.buttons["retryImport"].exists)
+        capture("Failed import - Needs attention")
+        app.buttons["retryImport"].tapWhenSettled()
+        XCTAssertTrue(app.buttons["dismissImport"].waitForExistence(within: 15))
+        app.buttons["dismissImport"].tapWhenSettled()
+        XCTAssertTrue(app.textFields["librarySearch"].exists)
+        XCTAssertFalse(card.exists)
     }
 
     @MainActor private func row(_ app: XCUIApplication, _ title: String) -> XCUIElement {

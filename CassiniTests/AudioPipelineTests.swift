@@ -39,6 +39,25 @@ final class AudioPipelineTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: source.path))
     }
 
+    /// A generated 440 Hz tone, 24 kHz mono / 24 kbps Layer III; no external encoder is needed at test time.
+    @MainActor func testNativeMP3ImportDecodesAndNeverChangesCallerBytes() async throws {
+        let sources = try makeRoot(); defer { try? FileManager.default.removeItem(at: sources) }
+        let test = TestGraph(); defer { test.tearDown() }
+        let source = sources.appendingPathComponent("Tone.mp3")
+        let bytes = try XCTUnwrap(Data(base64Encoded: "SUQzBAAAAAAAIlRTU0UAAAAOAAADTGF2ZjYzLjEuMTAyAAAAAAAAAAAAAAD/8zTEAAzoRpxfTBgCBuWyQABevXnZmZvwCQBMAMCYHxHJ5/cHAQBAMYnPh/EAIZcH34IHC4Y1Amfwfd0+7p93Skbiz26n3TD/8zTEBw3wtoQBm1AAtSO2KhgtPDBgaVHfFZkoYW2e3r58AlAZAo/isIoRRD/j0enEw++VBURHvrBURHv4lnCfqHwIAOWtAQD/8zTECg9AWiwB3gAAaYHoWRhUD5GCcGiYSoiR5OvcGe8IeYUoVRgqgnGC2BMYAAB5ZEvStJxpFj/////////pDccbGBukht3/8zTECA6wUix057JAhTMEAQwyQTi+5CEiYIIjZ1SbamL6EifkBlil4FTs4cuNyw/jatdGmz+++706dFn/6uiivRdxFNy4hgn/8zTECA6IWhwA7/RAgSYlCYcqOAZmiYQhNxliLdMYMECkGz0mCVBciKAk01yO5A853X/9Fnu9VWj2f39dVPXVnpM87NEgxYL/8zTECA44WhwA7/RAQHE+c9hoZ3D6YEIFRmBvujJgGALGY/sYBqFSwoFT+aXA8HUfP///dr+nRZt93XdX0qWekMDMlDAEYkD/8zTECgyYWigA5/RA6eMqJpsvGBIg2Bj7yUYYJKBuG4imPMAAOgmZTHp2es9////////9XRUSSByR0AeylApSONzoMUBMFBD/8zTEEgygSlR+RroiTuPlzFgFQgAmIu9LbXEXrV6Pb/ufctdWvTY1v2ddf16FFottleAGOVWtHWZCgqaJ7mMiRgfgqGwggAb/8zTEGgygSkR+37BAGqA8B8l+lqutIbYmv3f7ez77v+n2f/r+ha1DBjY07CEESAajCOvDDARTAvgE80FUH9MJgAFwHyDKosf/8zTEIgxgUigA7/RAkSVxupEKE9///7v////+heABb+5Dk2juYKg+YIj+YgjiZgFAerO+Z9lOYlgas8twryxT5iD//UpMkDj/8zTEKwnYTlgZXQAAF03G4vG4GEpYeCAqGGvCgc57IEiAIN1o0gYs2GCYM/ydFzlcATEIAuqSeJ3MicMA5INuEtFbeXGJxZv/8zTEPhhRVqJZmoAAj5HCOSOEfX006amLpSKxNE8Uf0Gst00jE8Ympk7+WB4ClQRqTEFNRTQuMKqqqqqqqqqqqqqqqqqqqqr/8zTEFwAAA0gBwAAAqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqo="))
+        try bytes.write(to: source)
+        await test.graph.start()
+        test.graph.settings.autoTranscribe = false
+        let outcome = await test.graph.imports.importFile(source, opensNote: false).value
+        let note = try XCTUnwrap(test.graph.library.notes.first)
+        XCTAssertEqual(outcome, .created(note.id))
+        XCTAssertEqual(note.audioFilename, "source.mp3")
+        XCTAssertGreaterThan(note.duration, 0.1)
+        XCTAssertEqual(note.waveform.count, 96)
+        XCTAssertEqual(try Data(contentsOf: source), bytes)
+        XCTAssertTrue(test.graph.imports.tracker.cards.isEmpty)
+    }
+
     func testInvalidAudioIsRejected() async throws {
         let root = try makeRoot(); defer { try? FileManager.default.removeItem(at: root) }
         let url = root.appendingPathComponent("invalid.wav")
@@ -99,7 +118,7 @@ final class AudioPipelineTests: XCTestCase {
     @MainActor func testPortableExportReimportPlaysAndPreservesSource() async throws {
         let sources = try makeRoot(); defer { try? FileManager.default.removeItem(at: sources) }
         let test = TestGraph(); defer { test.tearDown() }
-        let source = sources.appendingPathComponent("capture.caf")
+        let source = sources.appendingPathComponent("capture.wav")
         try writeSignal(to: source)
         await test.graph.start()
         test.graph.settings.autoTranscribe = false
@@ -142,7 +161,7 @@ final class AudioPipelineTests: XCTestCase {
     @MainActor func testTheSealedDocumentLabelsPassagesWithoutASpeakerWithTheExportTexts() async throws {
         let sources = try makeRoot(); defer { try? FileManager.default.removeItem(at: sources) }
         let test = TestGraph(); defer { test.tearDown() }
-        let source = sources.appendingPathComponent("capture.caf")
+        let source = sources.appendingPathComponent("capture.wav")
         try writeSignal(to: source)
         await test.graph.start()
         test.graph.settings.autoTranscribe = false
@@ -170,7 +189,7 @@ final class AudioPipelineTests: XCTestCase {
         let sources = try makeRoot(); defer { try? FileManager.default.removeItem(at: sources) }
         let test = TestGraph(); defer { test.tearDown() }
         var files: [URL] = []
-        for (index, name) in ["One.caf", "Two.caf", "Three.caf"].enumerated() {
+        for (index, name) in ["One.wav", "Two.wav", "Three.wav"].enumerated() {
             let url = sources.appendingPathComponent(name)
             try writeSignal(to: url, frequency: 220 * Double(index + 1))
             files.append(url)
@@ -179,7 +198,7 @@ final class AudioPipelineTests: XCTestCase {
         test.graph.settings.autoTranscribe = false
         // As the picker does: every import starts before any ends.
         let imports = files.map { test.graph.imports.importFile($0, opensNote: false) }
-        XCTAssertEqual(test.graph.imports.tracker.running, ["One.caf", "Two.caf", "Three.caf"])
+        XCTAssertEqual(test.graph.imports.tracker.running, ["One.wav", "Two.wav", "Three.wav"])
         var outcomes: [ImportOutcome?] = []
         for running in imports { outcomes.append(await running.value) }
         XCTAssertEqual(outcomes.compactMap { $0?.noteID }.count, 3)
@@ -211,7 +230,7 @@ final class AudioPipelineTests: XCTestCase {
     @MainActor func testAFileOpenedDuringLaunchWaitsForTheLibraryAndOpensTheNoteItAlreadyHas() async throws {
         let sources = try makeRoot(); defer { try? FileManager.default.removeItem(at: sources) }
         let first = TestGraph(); defer { first.tearDown() }
-        let url = sources.appendingPathComponent("Meeting.caf")
+        let url = sources.appendingPathComponent("Meeting.wav")
         try writeSignal(to: url)
         await first.graph.start()
         first.graph.settings.autoTranscribe = false
@@ -222,7 +241,7 @@ final class AudioPipelineTests: XCTestCase {
         // A cold launch from Files: the open arrives before the launch work has read the notes.
         let relaunch = first.reopened()
         let opening = relaunch.graph.imports.importFile(url, opensNote: true)
-        XCTAssertEqual(relaunch.graph.imports.tracker.running, ["Meeting.caf"])
+        XCTAssertEqual(relaunch.graph.imports.tracker.running, ["Meeting.wav"])
         await relaunch.graph.start()
         let outcome = await opening.value
 

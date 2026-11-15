@@ -31,7 +31,8 @@ public struct BulkImportReport: Sendable {
 }
 
 public enum ArchiveAudio {
-    /// Containers offered by iOS's audio picker; AVFoundation/the existing importer still verifies their bytes.
+    /// Legacy archive audio containers; these are not offered by the external audio picker.
+    /// AVFoundation/the existing importer still verifies their bytes.
     public static let extensions: Set<String> = ["opus", "ogg", "oga", "wav", "mp3", "m4a", "m4b", "aac", "flac",
                                                   "aif", "aiff", "caf", "mp4", "3gp", "3gpp", "3g2", "amr", "ac3", "au", "sd2"]
     public static func supports(_ name: String) -> Bool { extensions.contains((name as NSString).pathExtension.lowercased()) }

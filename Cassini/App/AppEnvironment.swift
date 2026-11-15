@@ -63,6 +63,8 @@ import CassiniEngineTesting
         var token = ""
         #if DEBUG
         var badgeGallery = false
+        var failedImportFixture = false
+        var importingFixture = false
         var draftSpeakerSuggestion = false
         var backupExcluded = false
         #endif
@@ -77,7 +79,7 @@ import CassiniEngineTesting
     /// Recording (the recording seed shows that one); `reading` is `search` with word times in the fixture's
     /// passages, so playback highlights one word.
     enum Seed: String, CaseIterable {
-        case library, search, speakers, trash, voices, processing, recording, statuses, long, reading, brandSpeakers, oneSpeaker
+        case importedProvenance, library, search, speakers, trash, voices, processing, recording, statuses, long, reading, brandSpeakers, oneSpeaker
     }
 
     var calendar: Calendar {
@@ -217,6 +219,8 @@ extension AppEnvironment {
                   platform: arguments.contains("--ios18-platform") ? .iOS18 : LivePlatform.facts,
                   inProcess: inProcess, token: token)
         environment.launch.badgeGallery = arguments.contains("--badge-gallery")
+        environment.launch.failedImportFixture = arguments.contains("--failed-import-fixture")
+        environment.launch.importingFixture = arguments.contains("--importing-fixture")
         environment.launch.draftSpeakerSuggestion = draftSpeakerSuggestion
         environment.launch.backupExcluded = arguments.contains("--backup-excluded")
         return environment

@@ -1121,37 +1121,44 @@
         }
       }
     },
-    "This note’s details are not supported or are damaged. Its files have been kept.": {
+    "This meeting’s details are not supported or are damaged. Its files have been kept.": {
+      "comment": "Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3, ios.failure.meetingDetails.",
       "extractionState": "manual",
       "localizations": {
-        "es": {
+        "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Los detalles de esta nota no son compatibles o están dañados. Se conservaron sus archivos."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Les détails de cette note ne sont pas pris en charge ou sont endommagés. Ses fichiers ont été conservés."
+            "value": "This meeting’s details are not supported or are damaged. Its files have been kept."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "I dettagli di questa nota non sono supportati o sono danneggiati. I suoi file sono stati conservati."
+            "value": "I dettagli di questa riunione non sono supportati o sono danneggiati. I suoi file sono stati conservati."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les détails de cette réunion ne sont pas pris en charge ou sont endommagés. Ses fichiers ont été conservés."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Los detalles de esta reunión no son compatibles o están dañados. Se conservaron sus archivos."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Os detalhes desta nota não são compatíveis ou estão danificados. Os arquivos dela foram mantidos."
+            "value": "Os detalhes desta reunião não são compatíveis ou estão danificados. Os arquivos dela foram mantidos."
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "Os detalhes desta nota não são suportados ou estão danificados. Os ficheiros foram mantidos."
+            "value": "Os detalhes desta reunião não são suportados ou estão danificados. Os ficheiros foram mantidos."
           }
         }
       }

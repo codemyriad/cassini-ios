@@ -139,22 +139,22 @@ import Testing
 
     @Test func rememberBodyFollowsAutomaticNamingSettingAndDeviceIdiomInEveryLocale() {
         #expect(SpeakersCopy.rememberBody("Luca", automatic: false, pad: false, language: "en")
-                == "Future notes will suggest Luca. The voiceprint never leaves this device.")
+                == "Future meetings will suggest Luca. The voiceprint never leaves this device.")
         #expect(SpeakersCopy.rememberBody("", automatic: false, pad: false, language: "en")
-                == "Future notes will suggest this person. The voiceprint never leaves this device.")
+                == "Future meetings will suggest this person. The voiceprint never leaves this device.")
         #expect(SpeakersCopy.rememberBody("Luca", automatic: false, pad: true, language: "en")
-                == "Future notes will suggest Luca. The voiceprint never leaves this device.")
+                == "Future meetings will suggest Luca. The voiceprint never leaves this device.")
         #expect(SpeakersCopy.rememberBody("", automatic: false, pad: true, language: "en")
-                == "Future notes will suggest this person. The voiceprint never leaves this device.")
+                == "Future meetings will suggest this person. The voiceprint never leaves this device.")
 
         #expect(SpeakersCopy.rememberBody("Luca", automatic: true, pad: false, language: "en")
                 == "Luca is named automatically next time.\nThe voiceprint stays on this iPhone.")
         #expect(SpeakersCopy.rememberBody("", automatic: true, pad: false, language: "en")
                 == "This person is named automatically next time.\nThe voiceprint stays on this iPhone.")
         #expect(SpeakersCopy.rememberBody("Luca", automatic: true, pad: true, language: "en")
-                == "Future notes will name Luca automatically. The voiceprint never leaves this device.")
+                == "Future meetings will name Luca automatically. The voiceprint never leaves this device.")
         #expect(SpeakersCopy.rememberBody("", automatic: true, pad: true, language: "en")
-                == "Future notes will name this person automatically. The voiceprint never leaves this device.")
+                == "Future meetings will name this person automatically. The voiceprint never leaves this device.")
 
         for locale in Self.locales {
             for pad in [false, true] {

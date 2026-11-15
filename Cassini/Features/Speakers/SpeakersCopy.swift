@@ -100,16 +100,16 @@ enum SpeakersCopy {
                                            locale: Locale = .current) -> String {
         switch (name.isEmpty, automatic) {
         case (false, true):
-            String(localized: "Future notes will name \(name) automatically. The voiceprint never leaves this device.",
+            String(localized: "Future meetings will name \(name) automatically. The voiceprint never leaves this device.",
                    table: "Speakers", bundle: bundle, locale: locale)
         case (true, true):
-            String(localized: "Future notes will name this person automatically. The voiceprint never leaves this device.",
+            String(localized: "Future meetings will name this person automatically. The voiceprint never leaves this device.",
                    table: "Speakers", bundle: bundle, locale: locale)
         case (false, false):
-            String(localized: "Future notes will suggest \(name). The voiceprint never leaves this device.",
+            String(localized: "Future meetings will suggest \(name). The voiceprint never leaves this device.",
                    table: "Speakers", bundle: bundle, locale: locale)
         case (true, false):
-            String(localized: "Future notes will suggest this person. The voiceprint never leaves this device.",
+            String(localized: "Future meetings will suggest this person. The voiceprint never leaves this device.",
                    table: "Speakers", bundle: bundle, locale: locale)
         }
     }
@@ -161,34 +161,34 @@ enum SpeakersCopy {
     static func meta(notes: Int, seconds: Double) -> String {
         let speech = SavedVoiceList.roughMinutes(seconds).map(RecordingCopy.hoursMinutes)
             ?? String(localized: "under 1 min", table: "Speakers")
-        return String(localized: "\(notes) notes", table: "Speakers") + " · "
-            + String(localized: "\(speech) confirmed speech", table: "Speakers")
+        let confirmedSpeech = String(localized: "\(speech) confirmed speech", table: "Speakers")
+        return SavedVoicesPhase2Copy.meta(meetings: notes, confirmedSpeech: confirmedSpeech)
     }
     static func options(_ name: String) -> String { String(localized: "Options for \(name)", table: "Speakers") }
     static let renameMore = String(localized: "Rename…", table: "Speakers")
     static let forgetMore = String(localized: "Forget…", table: "Speakers")
     static func forgetTitle(_ name: String) -> String { String(localized: "Forget \(name)?", table: "Speakers") }
-    static let forgetBody = String(localized: "Cassini stops recognising this voice. Names already in your notes stay.", table: "Speakers")
+    static let forgetBody = String(localized: "Cassini stops recognising this voice. Names already in your meetings stay.", table: "Speakers")
     static let forget = String(localized: "Forget", table: "Speakers")
-    static let stale = String(localized: "Name them again in a note to keep recognising them", table: "Speakers")
-    static let footnote = String(localized: "To add someone, name a speaker in any note and keep “Remember this voice” on.", table: "Speakers")
+    static var stale: String { SavedVoicesPhase2Copy.stale }
+    static var footnote: String { SavedVoicesPhase2Copy.howToAdd }
     static let forgetEveryoneMore = String(localized: "Forget everyone…", table: "Speakers")
     static let forgetEveryoneTitle = String(localized: "Forget everyone?", table: "Speakers")
     static func forgetEveryoneBody(_ count: Int) -> String {
-        String(localized: "Cassini stops recognising all \(count) saved voices and deletes the voiceprints from every note. Names already in your notes stay.", table: "Speakers")
+        String(localized: "Cassini stops recognising all \(count) saved voices and deletes the voiceprints from every meeting. Names already in your meetings stay.", table: "Speakers")
     }
     static let forgetEveryone = String(localized: "Forget everyone", table: "Speakers")
     static let empty = String(localized: "No saved voices yet", table: "Speakers")
     static let unreadableTitle = String(localized: "Saved voices can’t be read", table: "Speakers")
     static let unreadableBody = String(localized: "They were made by a newer Cassini or are damaged. Nothing was changed.", table: "Speakers")
-    /// iOS: voiceprints of notes remain although nobody is saved.
+    /// iOS: voiceprints of meetings remain although nobody is saved.
     static let forgetAllData = String(localized: "Forget all voice data", table: "Speakers")
-    static let forgetAllDataBody = String(localized: "Deletes the voiceprints of every note. Names already in your notes stay.", table: "Speakers")
+    static let forgetAllDataBody = String(localized: "Deletes the voiceprints of every meeting. Names already in your meetings stay.", table: "Speakers")
 
-    // MARK: Speakers of a note (iOS)
+    // MARK: Speakers of a meeting (iOS)
 
     static let speakersTitle = String(localized: "Speakers", table: "Speakers")
-    static let peopleInRecording = String(localized: "People in this note", table: "Speakers")
+    static let peopleInRecording = String(localized: "People in this meeting", table: "Speakers")
     static let speakersFooter = String(localized: "A name applies to every passage of that speaker. Check suggested and automatic names before relying on them.", table: "Speakers")
     static let addSpeaker = String(localized: "Add a speaker", table: "Speakers")
     static let add = String(localized: "Add", table: "Speakers")
@@ -260,7 +260,7 @@ enum SpeakersCopy {
     // MARK: Errors
 
     static let voicesReadOnly = String(localized: "Saved voices can’t be changed now. Nothing was changed.", table: "Speakers")
-    static let noteNotSaved = String(localized: "The note could not be saved. Nothing was changed.", table: "Speakers")
+    static let noteNotSaved = String(localized: "The meeting could not be saved. Nothing was changed.", table: "Speakers")
     static func voiceNotSaved(_ reason: String) -> String {
         String(localized: "The saved voice could not be written: \(reason). Try again.", table: "Speakers")
     }

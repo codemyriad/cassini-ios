@@ -125,10 +125,10 @@ struct RowChip: View {
     private var status: LibraryRow.Status { row.status }
 
     @ViewBuilder var body: some View {
-        if case .transcribed = status {
-            EmptyView()
-        } else if let badge = RowBadge.presentation(row, text: { StatusBadgeCopy.template($0) }) {
+        if let badge = RowBadge.presentation(row, text: { StatusBadgeCopy.template($0) }) {
             StatusBadgeView(badge: badge)
+        } else if case .transcribed = status {
+            EmptyView()
         } else {
             PhoneStatusBadgeView(status: status)
         }

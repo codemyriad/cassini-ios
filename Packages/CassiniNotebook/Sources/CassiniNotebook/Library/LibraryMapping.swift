@@ -88,6 +88,7 @@ public struct LibraryRow: Identifiable, Hashable, Sendable {
     public var isFavorite: Bool
     public var bookmarkCount: Int
     public var isSavingCapture = false
+    public var provenance: MeetingProvenance = .own
 }
 
 /// One day of the Library.
@@ -264,7 +265,7 @@ public enum LibraryMapping {
             preview: hit.map(\.snippet) ?? entry.preview,
             highlighted: context.jobState(note.id) == .running,
             isRecording: recording, isFavorite: note.isFavorite, bookmarkCount: note.bookmarks.count,
-            isSavingCapture: recording && context.isSavingCapture)
+            isSavingCapture: recording && context.isSavingCapture, provenance: MeetingProvenance.of(note))
     }
 
     /// Meeting-day sections and rows, ordered by the viewer's calendar and each meeting's own clock (D95).

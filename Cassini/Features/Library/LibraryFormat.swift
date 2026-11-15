@@ -57,7 +57,9 @@ struct LibraryFormat {
         let language = locale.identifier
         let status: String
         if case .transcribed = row.status {
-            status = LibraryPhase1Copy.template("phone.row.transcribed.a11y", language: language)
+            let transcribed = LibraryPhase1Copy.template("phone.row.transcribed.a11y", language: language)
+            let provenance = RowBadge.presentation(row, text: { StatusBadgeCopy.template($0, language: language) })?.text
+            status = [transcribed, provenance].compactMap { $0 }.joined(separator: ", ")
         } else {
             status = RowBadge.presentation(row, text: { StatusBadgeCopy.template($0, language: language) })?.text
                 ?? PhoneStatusBadgeView(status: row.status).text(language: language)

@@ -4,7 +4,7 @@ import Testing
 import CassiniNotebook
 @testable import Cassini
 
-/// Wave 5 first-run hero and backup-gated privacy copy from pinned cassini-ux `31973ff9784fcc66c1c7993b903a336e8f2c1432`,
+/// Wave 5 first-run hero and backup-gated privacy copy from pinned cassini-ux `b26190b57d8e35391ba9b4bafd177d66b10f0ec3`,
 /// plus decorative wave geometry (`W5.2`, `W5.3`, `D-974`, `D98`).
 @MainActor struct LibraryWave5CopyTests {
     @Test func nativeCompiledWave5CopyResolvesEverySharedKeyInAllSixLanguages() {

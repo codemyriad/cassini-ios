@@ -70,9 +70,9 @@ let package = Package(
         .target(name: "CassiniNotebook", dependencies: ["CassiniCore"], path: "Packages/CassiniNotebook/Sources/CassiniNotebook"),
         .testTarget(name: "CassiniNotebookTests", dependencies: ["CassiniNotebook", "CassiniCore"], path: "Packages/CassiniNotebook/Tests/CassiniNotebookTests",
                     resources: [.copy("Resources/export"), .copy("Resources/interjections"), .copy("Resources/markdown"), .copy("Resources/status-badges")]),
-        .target(name: "CassiniEngine", dependencies: ["CassiniCore", "CassiniNotebook"], path: "Packages/CassiniEngine/Sources/CassiniEngine"),
+        .target(name: "CassiniEngine", dependencies: ["CassiniCore", "CassiniNotebook"], path: "Packages/CassiniEngine/Sources/CassiniEngine", resources: [.copy("Resources/import-types.json")]),
         .target(name: "CassiniEngineTesting", dependencies: ["CassiniCore", "CassiniEngine", "CassiniNotebook"], path: "Packages/CassiniEngine/Sources/CassiniEngineTesting"),
-        .testTarget(name: "CassiniEngineTests", dependencies: ["CassiniCore", "CassiniEngine", "CassiniEngineTesting", "CassiniNotebook"], path: "Packages/CassiniEngine/Tests/CassiniEngineTests",
+        .testTarget(name: "CassiniEngineTests", dependencies: ["CassiniAudio", "CassiniCore", "CassiniEngine", "CassiniEngineTesting", "CassiniNotebook"], path: "Packages/CassiniEngine/Tests/CassiniEngineTests",
                     resources: [.copy("Resources/cross-app-vectors"), .copy("Resources/language-tag"), .copy("Resources/model-host")]),
         sherpaTarget,
         .testTarget(name: "CassiniSherpaTests", dependencies: ["CassiniSherpa", "CassiniEngine", "CassiniNotebook"], path: "Packages/CassiniSherpa/Tests/CassiniSherpaTests")
