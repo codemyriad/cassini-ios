@@ -240,6 +240,11 @@ extension XCUIApplication {
     /// The row titled `title`, fully between the navigation and capture bars before a tap or long-press.
     @MainActor func scrolledLibraryRow(_ title: String) -> XCUIElement {
         let element = buttons.matching(NSPredicate(format: "identifier == 'noteRow' AND label BEGINSWITH %@", title)).firstMatch
+        return scrolledLibraryElement(element, description: "row \(title)")
+    }
+
+    /// A Library control or row, fully clear of both bars before interacting with it.
+    @MainActor func scrolledLibraryElement(_ element: XCUIElement, description: String) -> XCUIElement {
         let bar = buttons["recordButton"]
         let viewport = scrollViews["libraryScroll"], navigation = navigationBars.firstMatch
         guard viewport.waitForExistence(within: uiWaitFloor), bar.waitForExistence(within: uiWaitFloor) else {
@@ -258,7 +263,7 @@ extension XCUIApplication {
             if element.exists, let frame = (try? element.snapshot())?.frame, !frame.isEmpty {
                 let clear = clearFrame()
                 guard let movement = RowScrollGeometry.correction(for: frame, within: clear) else {
-                    XCTFail("The row \(title) cannot fit between the navigation and capture bars")
+                    XCTFail("The \(description) cannot fit between the navigation and capture bars")
                     return element
                 }
                 if movement == 0 {
@@ -267,7 +272,7 @@ extension XCUIApplication {
                         return RowScrollGeometry.correction(for: now, within: clearFrame()) == 0 && element.isHittable
                     }
                     if ready { return element }
-                    XCTFail("The fully visible row \(title) did not become hittable")
+                    XCTFail("The fully visible \(description) did not become hittable")
                     return element
                 }
                 let start = viewport.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0))
@@ -278,7 +283,7 @@ extension XCUIApplication {
             }
             viewport.swipeUp(velocity: .slow)
         }
-        XCTFail("The row \(title) did not become clear of the navigation and capture bars")
+        XCTFail("The \(description) did not become clear of the navigation and capture bars")
         return element
     }
 }

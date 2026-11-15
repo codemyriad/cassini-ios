@@ -82,6 +82,7 @@ struct SavedVoicesView: View {
                 } footer: { Text(SpeakersCopy.forgetAllDataBody).foregroundStyle(Color.muted) }
             }
         }
+        .accessibilityIdentifier("savedVoicesList")
         .paperListBackground()
         .readableListWidth()
         .navigationTitle(SpeakersCopy.voices)
@@ -173,6 +174,7 @@ private struct PersonRow: View {
     let sample: SavedVoicePlayback?
     let owner: PlaybackOwner
     @Environment(PlaybackStore.self) private var playback
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let send: (SavedVoicesEvent) -> Void
 
     private var sampleCount: String {
@@ -184,18 +186,38 @@ private struct PersonRow: View {
     }
 
     var body: some View {
-        HStack(spacing: 12) {
+        // At accessibility sizes the name, counts and status need the row's full width;
+        // keeping the avatar and both controls beside them squeezes words into fragments.
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12))
+            : AnyLayout(HStackLayout(spacing: 12))
+        layout {
             SpeakerAvatar(name: person.name, tint: SpeakerTint.named(person.colourIndex), showsPlaceholderNumber: false)
             VStack(alignment: .leading, spacing: 2) {
                 Text(person.name).font(.body.weight(.medium)).foregroundStyle(Color.ink)
+                    .fixedSize(horizontal: false, vertical: true)
                 Text(SpeakersCopy.meta(notes: person.notes, seconds: person.confirmedSeconds))
                     .font(.caption).foregroundStyle(Color.muted)
+                    .fixedSize(horizontal: false, vertical: true)
                 Text(sampleCount).font(.caption).foregroundStyle(Color.muted)
-                if person.stale { Text(Wave6Copy.savedVoicesRowStale).font(.caption).foregroundStyle(Color.toneWarn) }
-                else { Text(Wave6Copy.savedVoicesRowStatusReady).font(.caption).foregroundStyle(Color.muted) }
+                    .fixedSize(horizontal: false, vertical: true)
+                if person.stale {
+                    Text(Wave6Copy.savedVoicesRowStale).font(.caption).foregroundStyle(Color.toneWarn)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    Text(Wave6Copy.savedVoicesRowStatusReady).font(.caption).foregroundStyle(Color.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityElement(children: .combine)
-            Spacer()
+            controls
+        }
+        .padding(.vertical, 2)
+    }
+
+    private var controls: some View {
+        HStack(spacing: 12) {
             if let sample {
                 let playing = playback.owns(sample.source.noteID) && playback.state.sample != nil
                 Button {
@@ -218,6 +240,6 @@ private struct PersonRow: View {
             .disabled(!editable)
             .accessibilityLabel(SpeakersCopy.options(person.name))
         }
-        .padding(.vertical, 2)
+        .fixedSize()
     }
 }

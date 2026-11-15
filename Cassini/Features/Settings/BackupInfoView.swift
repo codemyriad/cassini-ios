@@ -69,9 +69,12 @@ struct BackupNoticeCard: View {
                 }
                 Button(Wave6Copy.backupPhoneOnlyCardDismiss) { settings.dismissBackupNotice() }
                     .accessibilityLabel(Wave6Copy.backupPhoneOnlyCardCloseA11y)
+                    .accessibilityIdentifier("backupNoticeDismiss")
             }
             .padding().background(Color.paper, in: RoundedRectangle(cornerRadius: 16))
-            .disabled(backup.updating).accessibilityIdentifier("backupNotice")
+            .disabled(backup.updating)
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("backupNotice")
         }
     }
 }
