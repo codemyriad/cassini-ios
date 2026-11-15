@@ -10,7 +10,11 @@ public struct AudioInspection: Sendable {
             try NativeFLAC.validateIfPresent(url)
             let file = try AVAudioFile(forReading: url)
             guard file.length > 0, file.processingFormat.sampleRate > 0 else { throw AudioError.empty }
-            let duration = Double(file.length) / file.processingFormat.sampleRate
+            // Match AVPlaybackAdapter's endpoint, including AAC priming/edit lists. Decoded frame counts and
+            // asset metadata can straddle a whole second differently from the player. Opening the player stays
+            // on this file-work executor; it never prepares/plays audio or activates a session.
+            let duration = try AVAudioPlayer(contentsOf: url).duration
+            guard duration.isFinite, duration > 0 else { throw AudioError.empty }
             // Sample 96 short windows; memory and work stay bounded for long recordings.
             let count = 96
             let capacity: AVAudioFrameCount = 2048

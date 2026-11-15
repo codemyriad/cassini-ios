@@ -103,7 +103,13 @@ extension RecordingController {
         let compressed = capture.deletingLastPathComponent().appendingPathComponent(Self.compressedFilename)
         do {
             try await parts.audio.compress(capture, to: compressed)
-            if try await notes.update(id, { $0.audioFilename = Self.compressedFilename }) != nil {
+            // AAC export can move the endpoint across a whole second. Publish the replacement and its
+            // playback duration together, only once it is readable; any failure keeps the original CAF.
+            let stored = try await parts.audio.inspect(compressed)
+            if try await notes.update(id, {
+                $0.audioFilename = Self.compressedFilename
+                $0.duration = stored.duration
+            }) != nil {
                 try? FileManager.default.removeItem(at: capture)
             } else {
                 try? FileManager.default.removeItem(at: compressed)

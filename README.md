@@ -249,7 +249,10 @@ TestFlight still need.
   the older per-app paragraph rules, including iOS's former 200/120-word paragraph limits. SRT/VTT retain their
   subtitle cue rules; portable `.opus`/JSON exports retain canonical word order.
 - **Recording.** iOS captures PCM CAF and compresses it to M4A, so there is no 1 GiB AAC limit, and the storage floor
-  includes the room for that compression. The audio session does not mix with other apps, so a call pauses the
+  includes the room for that compression. After compression, the stored duration comes from the same AVAudioPlayer
+  endpoint as playback (read off the UI thread), so AAC sample-rate conversion cannot leave the Library and player
+  a second apart. The filename and duration are saved together; failed inspection or saving keeps the CAF.
+  The audio session does not mix with other apps, so a call pauses the
   recording. Losing the input pauses it too. A Live Activity replaces Android's ongoing notification, and recovery
   repairs CAF files. The Recording screen has Android's controls (All meetings, Stop in the centre, Pause or Resume)
   on the always-dark night ground; iOS adds "Mark a moment" above them.
