@@ -4,6 +4,52 @@ import Vision
 /// The Library end to end (Android `LibraryBehaviourTest` and the Library rows of `TextLimitBehaviourTest`): its
 /// controls, the row statuses and inline actions, the search, the empty states and Rename.
 final class LibraryUITests: XCTestCase {
+    @MainActor func testSpeakerAndRecordedByMeChipsAndRememberedLibraryChoice() {
+        let app = launch(["--seed", "libraryFilters"])
+        let recovered = row(app, "Recovered budget")
+        let imported = row(app, "Imported budget")
+        XCTAssertTrue(imported.waitForExistence(within: uiWaitFloor))
+        app.buttons["Starred"].tapWhenSettled()
+        XCTAssertTrue(poll(within: uiWaitFloor) { recovered.exists && !imported.exists })
+        app.launchArguments = ["--ui-testing", "--seed", "libraryFilters"]
+        app.launchAndWait(fresh: true)
+        XCTAssertTrue(recovered.waitForExistence(within: uiWaitFloor))
+        XCTAssertFalse(imported.exists, "Starred survives a new process")
+        app.buttons["All"].tapWhenSettled()
+        XCTAssertTrue(imported.waitForExistence(within: uiWaitFloor))
+        app.launchAndWait(fresh: true)
+        XCTAssertTrue(imported.waitForExistence(within: uiWaitFloor), "All survives a new process")
+
+        let search = app.textFields["librarySearch"]
+        search.tap()
+        search.typeText("budget\n")
+        let speaker = app.buttons["librarySearchSpeaker"]
+        XCTAssertTrue(speaker.waitForExistence(within: uiWaitFloor))
+        speaker.tapWhenSettled()
+        app.buttons["Alice"].tapWhenSettled()
+        XCTAssertTrue(poll(within: uiWaitFloor) {
+            app.staticTexts["librarySearchCount"].label == "0 meetings"
+        })
+        XCTAssertFalse(recovered.exists, "A title or Bob's words cannot match Alice")
+        speaker.tapWhenSettled()
+        app.buttons["Bob"].tapWhenSettled()
+        XCTAssertTrue(waitFor(recovered, label: "belongs to Bob"))
+        app.buttons["Clear search"].tapWhenSettled()
+        speaker.tapWhenSettled()
+        app.buttons["Alice"].tapWhenSettled()
+        XCTAssertTrue(imported.waitForExistence(within: uiWaitFloor), "Filter-only search finds Alice")
+        let own = app.buttons["libraryRecordedByMe"]
+        // The chip row scrolls horizontally on narrow phones.
+        for _ in 0..<5 {
+            if own.isHittable { break }
+            speaker.swipeLeft()
+        }
+        own.tapWhenSettled()
+        XCTAssertTrue(poll(within: uiWaitFloor) { recovered.exists && !imported.exists })
+        app.buttons["closeLibrarySearch"].tapWhenSettled()
+        XCTAssertTrue(imported.waitForExistence(within: uiWaitFloor), "Closing Search restores All")
+    }
+
     @MainActor func testImportedProvenanceInLibrarySearchAndHeader() {
         let app = launch(["--seed", "importedProvenance"])
         let imported = row(app, "Imported audio planning")

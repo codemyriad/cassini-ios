@@ -221,6 +221,7 @@ struct LibraryView: View {
                             chipLabel(dateTitle(model.searchDate), selected: model.searchDate != .any)
                         }.accessibilityIdentifier("librarySearchDate")
                         filterButton(LibraryPhase1Copy.recordedByMe, selected: model.recordedByMe) { model.recordedByMe.toggle() }
+                            .accessibilityIdentifier("libraryRecordedByMe")
                     }
                 }
             } else {

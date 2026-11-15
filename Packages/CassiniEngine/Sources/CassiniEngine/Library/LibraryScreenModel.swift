@@ -79,7 +79,9 @@ public final class LibraryScreenModel {
         }
     }
     public var searchStarred = false
-    public var searchSpeaker: String?
+    public var searchSpeaker: String? {
+        didSet { if searchSpeaker != oldValue { search() } }
+    }
     public var recordedByMe = false
     private var searchOpen = false
     @ObservationIgnored private let defaults: UserDefaults?
@@ -106,10 +108,11 @@ public final class LibraryScreenModel {
     /// The last search's results: for `query` over the notes at `revision` of the index.
     private var found: Found?
     /// The search running off the main actor.
-    @ObservationIgnored private var running: (query: String, task: Task<Void, Never>)?
+    @ObservationIgnored private var running: (query: String, speaker: String?, task: Task<Void, Never>)?
 
     private struct Found {
         let query: String
+        let speaker: String?
         let revision: Int
         let hits: [LibraryIndex.Hit]
     }
@@ -124,7 +127,10 @@ public final class LibraryScreenModel {
     }
 
     /// Whether a query is open: the rows are the flat results.
-    public var isSearching: Bool { !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    public var isSearching: Bool {
+        !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+            (searchOpen && (searchStarred != favoritesOnly || searchSpeaker != nil || recordedByMe || searchDate != .any))
+    }
 
     public var content: LibraryContent {
         _ = presentationRevision
@@ -146,13 +152,12 @@ public final class LibraryScreenModel {
         // Until the first search answers, the results are empty and say nothing. Afterwards a new query or a changed
         // note shows the last results, over the notes as they are now, until the search over them answers.
         guard let found else { return LibraryContent(loading: loading, results: [], facts: facts) }
-        let current = found.revision == index.revision ? found.hits : index.current(found.hits, query: SearchQuery(found.query))
+        let current = found.revision == index.revision ? found.hits : index.current(found.hits, query: SearchQuery(found.query), speaker: found.speaker)
         let interval = searchDate.interval(now: now, calendar: calendar)
         let hits = current.filter {
             let note = $0.entry.note
             return (!searchStarred || note.isFavorite) &&
-                (!recordedByMe || note.origin == .recorded) &&
-                (searchSpeaker.map { name in Self.namedSpeakers(note).contains(name) } ?? true) &&
+                (!recordedByMe || MeetingProvenance.of(note) == .own) &&
                 (interval.map { range in
                     note.meetingTime.isWithin(range, calendar: calendar)
                 } ?? true)
@@ -168,21 +173,17 @@ public final class LibraryScreenModel {
     /// Every named speaker in the Library, independent of the current query and filters.
     public var searchSpeakers: [String] {
         _ = presentationRevision
-        return Set(index.entries.flatMap { Self.namedSpeakers($0.note) }).sorted {
-            $0.localizedStandardCompare($1) == .orderedAscending
-        }
-    }
-
-    private static func namedSpeakers(_ note: Note) -> [String] {
-        (note.speakers ?? []).filter {
-            $0.provenance != .unnamed && !$0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        }.map(\.name)
+        var seen = Set<String>()
+        return index.entries.flatMap { LibraryIndex.namedSpeakers($0.note).map(\.name) }
+            .filter { seen.insert($0.folding(options: .caseInsensitive, locale: nil)).inserted }
+            .sorted { $0.caseInsensitiveCompare($1) == .orderedAscending }
     }
 
     public func beginSearch() {
         guard !searchOpen else { return }
         searchOpen = true
         searchStarred = favoritesOnly
+        search()
     }
 
     public func closeSearch() {
@@ -359,7 +360,7 @@ private extension LibraryScreenModel {
         guard index.revision != indexedRevision else { return }
         indexedRevision = index.revision
         presentationRevision &+= 1
-        if !searched.isEmpty, found?.revision != indexedRevision { search() }
+        if searchOpen, found?.revision != indexedRevision { search() }
     }
 
     func notesChanged() {
@@ -394,32 +395,32 @@ private extension LibraryScreenModel {
     /// tokens it works out are kept for the next search. A search over notes that changed meanwhile still publishes
     /// its results, then runs again over the new notes; a new query cancels it.
     func search() {
-        let query = searched
+        let query = searched, speaker = searchSpeaker
         if let running {
-            if running.query == query { return } // it searches again over the new notes when it answers
+            if running.query == query && running.speaker == speaker { return } // it searches again over the new notes when it answers
             running.task.cancel()
         }
         let snapshot = index, revision = index.revision
         let task = Task { [weak self] in
             let work = Task.detached(priority: .userInitiated) {
                 var copy = snapshot
-                return (copy.search(SearchQuery(query)), copy)
+                return (copy.search(SearchQuery(query), speaker: speaker), copy)
             }
             let (hits, searched) = await withTaskCancellationHandler { await work.value } onCancel: { work.cancel() }
             guard let self, !Task.isCancelled else { return }
             index.adoptTokens(from: searched)
-            found = Found(query: query, revision: revision, hits: hits)
+            found = Found(query: query, speaker: speaker, revision: revision, hits: hits)
             running = nil
             if self.searched == query, revision != index.revision { search() }
         }
-        running = (query, task)
+        running = (query, speaker, task)
     }
 
     func scheduleSearch() {
         pendingSearch?.cancel()
         let text = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        // Clearing the text restores the Library and drops the transient Search choices.
-        if text.isEmpty { resetSearchFilters() } else { beginSearch() }
+        // Clearing the text drops transient choices while leaving the chip row ready for filter-only search.
+        if text.isEmpty { resetSearchFilters(); beginSearch() } else { beginSearch() }
         guard text != searched else { pendingSearch = nil; return }
         guard !text.isEmpty else {
             searched = ""
@@ -427,6 +428,7 @@ private extension LibraryScreenModel {
             running?.task.cancel()
             running = nil
             pendingSearch = nil
+            search()
             return
         }
         pendingSearch = Task { [weak self, clock = ports.clock] in

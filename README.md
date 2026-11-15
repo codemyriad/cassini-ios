@@ -166,8 +166,9 @@ TestFlight still need.
 [docs/differences.md](docs/differences.md) describes each difference in detail. In summary:
 
 - **Library and Search (D99).** iOS uses a native All / Starred segmented control and a scrolling Search chip row.
-  The filter contract matches Android: AND, local calendar dates, recorded meetings only for Recorded by me, and
-  transient Search choices seeded from the remembered Library choice. Stars stay in local Library metadata.
+  The filter contract matches Android: AND, local calendar dates, own recordings (including recovered captures) for Recorded by me, case-insensitive speaker names, and
+  transient Search choices seeded from the remembered Library choice. Speaker searches match that speaker’s words
+  and show their excerpt; with no text, they match meetings with that named speaker. Stars stay in local Library metadata.
 
 - **Phase 2 meeting wording.** Settings, Saved voices, Speakers and Recently Deleted use the shared meeting
   catalog in all six UI languages. iOS retains its existing Recently Deleted labels and device-specific

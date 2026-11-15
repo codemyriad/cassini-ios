@@ -114,16 +114,19 @@ import CassiniNotebook
 
     @Test func unifiedFiltersCombineAndCloseRestoresTheLibraryChoice() async throws {
         let library = Library()
-        let own = library.add("Planning own")
-        let imported = library.add("Planning imported")
-        let document = library.add("Planning document")
-        let recovered = library.add("Planning recovered")
-        let otherSpeaker = library.add("Planning Bob")
-        let old = library.add("Planning last year", minutesAgo: 400 * 24 * 60)
-        let unstarred = library.add("Planning unstarred")
+        let own = library.add("Planning own", "Planning")
+        let imported = library.add("Planning imported", "Planning")
+        let document = library.add("Planning document", "Planning")
+        let recovered = library.add("Planning recovered", "Planning")
+        let otherSpeaker = library.add("Planning Bob", "Planning")
+        let old = library.add("Planning last year", "Planning", minutesAgo: 400 * 24 * 60)
+        let unstarred = library.add("Planning unstarred", "Planning")
         let unrelated = library.add("Unrelated")
         for i in library.notes.indices {
             library.notes[i].isFavorite = library.notes[i].id != unstarred
+            library.notes[i].transcript = library.notes[i].transcript.map { segment in
+                var segment = segment; segment.speakerID = "s1"; return segment
+            }
             library.notes[i].speakers = [NoteSpeaker(id: "s1", name: library.notes[i].id == otherSpeaker ? "Bob" : "Alice")]
         }
         library.notes[library.notes.firstIndex { $0.id == imported }!].origin = .imported
@@ -138,13 +141,14 @@ import CassiniNotebook
         #expect(model.searchStarred)
         #expect(model.searchSpeakers == ["Alice", "Bob"])
         model.searchSpeaker = "Alice"
+        await model.settle()
         #expect(Set(model.content.results!.map(\.id)) == Set([own, imported, document, recovered, old]))
         model.recordedByMe = true
-        #expect(Set(model.content.results!.map(\.id)) == Set([own, old]))
+        #expect(Set(model.content.results!.map(\.id)) == Set([own, recovered, old]))
         model.searchDate = .year
-        #expect(model.content.results?.map(\.id) == [own])
+        #expect(Set(model.content.results!.map(\.id)) == Set([own, recovered]))
         model.searchStarred = false
-        #expect(Set(model.content.results!.map(\.id)) == Set([own, unstarred]))
+        #expect(Set(model.content.results!.map(\.id)) == Set([own, recovered, unstarred]))
         #expect(!model.content.results!.contains { $0.id == unrelated })
         model.closeSearch()
         #expect(model.searchSpeaker == nil && model.searchDate == .any && !model.recordedByMe)
@@ -156,6 +160,59 @@ import CassiniNotebook
         model.searchStarred = false
         model.closeSearch()
         #expect(model.favoritesOnly && model.searchStarred)
+    }
+
+    @Test func speakerSearchMatchesOnlyThatSpeakersRunsAndDeduplicatesNames() async {
+        let library = Library()
+        let meeting = library.add("Budget title")
+        library.notes[0].speakers = [NoteSpeaker(id: "a", name: "Alice"), NoteSpeaker(id: "b", name: "Bob"),
+                                     NoteSpeaker(id: "c", name: "alice"), NoteSpeaker(id: "p", name: "Speaker 4"),
+                                     NoteSpeaker(id: "blank", name: "  ")]
+        library.notes[0].transcript = [
+            .init(text: "Hello everyone", start: 0, end: 1, speakerID: "a"),
+            .init(text: "The budget belongs to Bob", start: 1, end: 2, speakerID: "b"),
+            .init(text: "Hello again", start: 2, end: 3, speakerID: "c")]
+        let model = library.model
+        #expect(model.searchSpeakers == ["Alice", "Bob"])
+        model.query = "budget"
+        await waitUntilSleeping(library.clock)
+        library.clock.release()
+        await model.settle()
+        model.searchSpeaker = "ALICE"
+        await model.settle()
+        #expect(model.content.results?.isEmpty == true)
+        model.searchSpeaker = "bob"
+        await model.settle()
+        #expect(model.content.results?.map(\.id) == [meeting])
+        var index = LibraryIndex(library.notes)
+        let hits = index.search(SearchQuery("budget"), speaker: "BOB")
+        #expect(hits.first?.snippet.contains("belongs to Bob") == true)
+        #expect(hits.first?.snippet.contains("Hello") == false)
+        #expect(index.search(SearchQuery("hello again"), speaker: "Alice").count == 1)
+        #expect(index.search(SearchQuery("hello everyone"), speaker: "alice").count == 1)
+        #expect(index.search(SearchQuery("title"), speaker: "Alice").isEmpty)
+        model.query = ""
+        model.beginSearch()
+        model.searchSpeaker = "alice"
+        await model.settle()
+        #expect(model.content.results?.map(\.id) == [meeting])
+        model.searchSpeaker = "Speaker 4"
+        await model.settle()
+        #expect(model.content.results?.isEmpty == true)
+    }
+
+    @Test func recordedByMeIncludesRecoveredInFilterOnlySearch() async {
+        let library = Library()
+        let own = library.add("Own")
+        let recovered = library.add("Recovered")
+        library.notes[1].origin = .recovered
+        _ = library.add("Imported")
+        library.notes[2].origin = .imported
+        let model = library.model
+        model.beginSearch()
+        model.recordedByMe = true
+        await model.settle()
+        #expect(Set(model.content.results!.map(\.id)) == Set([own, recovered]))
     }
 
     /// The view must observe these projections, rather than retain a pre-active row captured by a lazy builder.
