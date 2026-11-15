@@ -250,6 +250,43 @@ import CassiniNotebook
         #expect(model.content.emptyState == nil)
     }
 
+    @Test func changingQueryKeepsPreviousHitsBeforeTheSearchAnswers() async {
+        let library = Library()
+        let meeting = library.add("Budget")
+        let model = library.model
+        model.query = "bud"
+        await waitUntilSleeping(library.clock)
+        library.clock.release()
+        await model.settle()
+        #expect(model.content.results?.map(\.id) == [meeting])
+        #expect(model.content.facts.results == 1)
+
+        model.query = "budget"
+        await waitUntilSleeping(library.clock)
+        // Observe the old projection just before the new answer is published.
+        // At that point the debounce has applied the new query, but found still holds the old hits.
+        let checked = Mutex(false)
+        withObservationTracking { _ = model.searched } onChange: {
+            MainActor.assumeIsolated {
+                withObservationTracking { _ = model.content } onChange: {
+                    MainActor.assumeIsolated {
+                        #expect(model.searched == "budget")
+                        #expect(model.content.results?.map(\.id) == [meeting])
+                        #expect(model.content.facts.query.isEmpty)
+                        #expect(model.content.facts.results == nil)
+                        #expect(model.content.emptyState == nil)
+                        checked.withLock { $0 = true }
+                    }
+                }
+            }
+        }
+        library.clock.release()
+        await model.settle()
+        #expect(checked.withLock { $0 })
+        #expect(model.content.results?.map(\.id) == [meeting])
+        #expect(model.content.facts.results == 1)
+    }
+
     @Test func changingSpeakerHidesPreviousHitsBeforeTheSearchAnswers() async {
         let library = Library()
         let meeting = library.add("Alice meeting", "hello")

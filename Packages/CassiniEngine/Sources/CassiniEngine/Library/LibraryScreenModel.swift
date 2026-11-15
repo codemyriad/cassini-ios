@@ -150,7 +150,7 @@ public final class LibraryScreenModel {
                                   emptyState: emptyState, hero: hero, facts: facts)
         }
         // Query and speaker identify the asynchronous work. Other chips filter these hits synchronously.
-        guard let found, found.query == searched, found.speaker == searchSpeaker else {
+        guard let found, found.speaker == searchSpeaker else {
             return LibraryContent(loading: loading, results: [],
                                   emptyState: unavailable ? .unavailable : nil, facts: facts)
         }
@@ -164,8 +164,11 @@ public final class LibraryScreenModel {
                     note.meetingTime.isWithin(range, calendar: calendar)
                 } ?? true)
         }
-        facts.query = searched
-        facts.results = hits.count
+        // A new query shows the last results until the search over them answers.
+        if found.query == searched {
+            facts.query = searched
+            facts.results = hits.count
+        }
         let emptyState: LibraryEmptyState? = unavailable ? .unavailable
             : (!loading && !facts.query.isEmpty && hits.isEmpty ? .noMatch(facts.query) : nil)
         return LibraryContent(loading: loading, results: LibraryMapping.results(hits, context: context, now: now, calendar: calendar),
