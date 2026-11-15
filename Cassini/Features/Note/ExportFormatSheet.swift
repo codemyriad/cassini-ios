@@ -17,10 +17,16 @@ struct ExportFormatSheet: View {
                 Section {
                     ForEach(state.primary) { row($0) }
                     if !state.moreFormats.isEmpty {
-                        DisclosureGroup(ExportPhase2Copy.moreFormats, isExpanded: $expanded) {
-                            ForEach(state.moreFormats) { row($0) }
+                        Button { expanded.toggle() } label: {
+                            HStack {
+                                Text(ExportPhase2Copy.moreFormats)
+                                Spacer()
+                                Image(systemName: expanded ? "chevron.down" : "chevron.right")
+                                    .accessibilityHidden(true)
+                            }
                         }
                         .accessibilityIdentifier("exportMoreFormats")
+                        if expanded { ForEach(state.moreFormats) { row($0) } }
                     }
                 }
                 .accessibilityLabel(ExportPhase2Copy.formatGroup)
