@@ -19,7 +19,7 @@ import CassiniEngine
 
         XCTAssertEqual(url.lastPathComponent, "Meeting_ Monday.txt")
         XCTAssertEqual(plainSpaces(try String(contentsOf: url, encoding: .utf8)),
-                       "Meeting: Monday\nOct 8, 2026, 3:10 PM · 01:05 · 2 speakers\n\n[00:01] Giulia\nHello\n\n[00:03] Speaker 2\nGood evening\n")
+                       "Giulia · 00:00:01\nHello\n\nSpeaker 2 · 00:00:03\nGood evening\n")
         test.graph.exports.discard(url)
         await test.graph.exports.waitForDiscards()
         XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
