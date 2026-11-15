@@ -25,8 +25,7 @@ final class LibraryUITests: XCTestCase {
         let rename = app.buttons["Rename"]
         XCTAssertTrue(rename.waitForExistence(within: uiWaitFloor))
         let card = app.buttons["activeRecordingCard"]
-        let atMenu = card.label
-        XCTAssertTrue(poll(within: uiWaitFloor) { card.label != atMenu }, "Capture advances with menu open")
+        assertLiveTicksPreserveMenu(rename, card: card)
         captureEvidence("Live recording context menu after duration tick", app)
         XCTAssertTrue(rename.exists, "A duration tick must preserve the open context menu")
         rename.tapWhenSettled()
@@ -38,13 +37,14 @@ final class LibraryUITests: XCTestCase {
         let renamed = row(app, "Live capture renamed")
         XCTAssertTrue(renamed.waitForExistence(within: uiWaitFloor))
         renamed.press(forDuration: 1)
+        assertLiveTicksPreserveMenu(app.buttons["Star"], card: card)
         app.buttons["Star"].tapWhenSettled()
-        // Star changes the render key. Wait for the replacement row and the dismissing menu before
-        // starting another gesture; XCTest can otherwise long-press the retiring row at {-1, -1}.
+        // Star changes the render key: require its result before starting another gesture.
         XCTAssertTrue(poll(within: uiWaitFloor) {
             renamed.label.contains(", starred") && !app.buttons["Star"].exists && renamed.isHittable
-        }, "The starred replacement row is interactive before reopening its menu")
+        }, "Star updates the row and closes its menu")
         renamed.press(forDuration: 1)
+        assertLiveTicksPreserveMenu(app.buttons["Remove star"], card: card)
         app.buttons["Remove star"].tapWhenSettled()
         XCTAssertTrue(poll(within: uiWaitFloor) {
             !renamed.label.contains(", starred") && !app.buttons["Remove star"].exists && renamed.isHittable
@@ -57,6 +57,18 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(waitFor(renamed, label: ", transcribed"))
         assertIPadSplitView(app)
         try assertRowPixels(renamed, contain: "2 speakers", excluding: "Recording")
+    }
+
+    @MainActor private func assertLiveTicksPreserveMenu(_ item: XCUIElement, card: XCUIElement,
+                                                       file: StaticString = #filePath, line: UInt = #line) {
+        XCTAssertTrue(item.waitForExistence(within: uiWaitFloor), file: file, line: line)
+        // Exercise every menu across multiple ticks, including after a rename/star replaces the row.
+        // Native menus can expose their final AX frame before their entrance animation accepts a tap.
+        for _ in 0..<2 {
+            let elapsed = card.label
+            XCTAssertTrue(poll(within: uiWaitFloor) { card.label != elapsed }, "Capture advances with menu open", file: file, line: line)
+            XCTAssertTrue(item.exists, "A live tick preserves the menu action", file: file, line: line)
+        }
     }
 
     @MainActor func testPostRecordingFirstNoteAndActions() throws {
