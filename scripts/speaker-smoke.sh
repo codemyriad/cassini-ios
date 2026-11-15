@@ -22,9 +22,10 @@
 set -euo pipefail
 # One heavy run at a time per host (scripts/test.sh, "the host"): this script runs under the host lock, which the
 # scripts/test.sh it calls then knows it holds.
-if [ "${CASSINI_HEAVY_LOCK_HELD:-}" != 1 ]; then
+if [ "${CASSINI_IOS_LOCK_HELD:-}" != 1 ]; then
     echo "taking the host lock ${CASSINI_HEAVY_LOCK:-$HOME/.cassini-heavy.lock} (waits while another run holds it)"
-    exec env CASSINI_HEAVY_LOCK_HELD=1 /usr/bin/lockf -k -t $(( ${CASSINI_LOCK_MINUTES:-60} * 60 )) \
+    # Only this acquisition sets the legacy marker too, for callers from older checkouts.
+    exec env CASSINI_IOS_LOCK_HELD=1 CASSINI_HEAVY_LOCK_HELD=1 /usr/bin/lockf -k -t $(( ${CASSINI_LOCK_MINUTES:-60} * 60 )) \
         "${CASSINI_HEAVY_LOCK:-$HOME/.cassini-heavy.lock}" "$0" "$@"
 fi
 cd "$(dirname "$0")/.."

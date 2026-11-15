@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import re
 import shlex
+import shutil
 import signal
 import subprocess
 import sys
@@ -90,6 +91,110 @@ class LifecycleTests(unittest.TestCase):
     def test_immediate_exit_preserves_status_without_one_second_poll(self):
         process = self.shell(f'run_limited {str(self.log)!r} {HANG_GUARD} /bin/sh -c "exit 23"')
         self.assertEqual(finish(process), 23)
+
+    def test_fleet_slot_marker_does_not_bypass_shared_mac_flock_and_nested_ios_reuses_it(self):
+        lock = self.root / ".cassini-heavy.lock"
+        code = f'''set -euo pipefail
+root={str(ROOT)!r}
+heavy_lock={str(lock)!r}
+lock_minutes=1; lock_pid=""; lock_held_file=""; tier=simulator
+die() {{ echo "$*" >&2; exit 1; }}
+{function("take_heavy_lock")}
+{function("release_heavy_lock")}
+trap release_heavy_lock EXIT
+take_heavy_lock
+# A nested iOS leg must reuse the parent lock, even with its own empty lock_pid.
+( export CASSINI_IOS_LOCK_HELD=1; lock_pid=""; take_heavy_lock; test -z "$lock_pid" )
+echo READY
+read -r finish
+'''
+        env = dict(os.environ, CASSINI_HEAVY_LOCK_HELD="1", TMPDIR=str(self.root))
+        env.pop("CASSINI_IOS_LOCK_HELD", None)
+        process = subprocess.Popen(["/bin/bash", "-c", code], env=env, text=True,
+                                   stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        try:
+            self.assertEqual(process.stdout.readline().strip(), "READY")
+            # cassini-mac's ci-heavy.py uses this same flock; the slot marker must not let it overlap.
+            with lock.open("r+") as held:
+                with self.assertRaises(BlockingIOError):
+                    fcntl.flock(held, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                process.stdin.write("done\n"); process.stdin.flush()
+                self.assertEqual(finish(process), 0)
+                fcntl.flock(held, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                self.assertEqual(lock.read_text(), "")
+        finally:
+            if process.poll() is None:
+                process.terminate(); finish(process)
+            for stream in (process.stdin, process.stdout, process.stderr):
+                stream.close()
+
+    def test_ios_lockf_callers_use_the_same_reentrancy_marker(self):
+        for name in ("screenshots.sh", "sherpa-bench.sh", "speaker-smoke.sh"):
+            text = (ROOT / "scripts" / name).read_text()
+            self.assertIn('${CASSINI_IOS_LOCK_HELD:-}', text)
+            self.assertIn('exec env CASSINI_IOS_LOCK_HELD=1 CASSINI_HEAVY_LOCK_HELD=1 /usr/bin/lockf -k', text)
+            self.assertNotIn('${CASSINI_HEAVY_LOCK_HELD:-}', text)
+
+    def test_simulator_cleanup_waits_for_owner_for_both_tier_names(self):
+        scripts = self.root / "scripts"
+        scripts.mkdir()
+        shutil.copy2(HELPER, scripts / HELPER.name)
+        fake = scripts / "test.sh"
+        fake.write_text('''#!/usr/bin/python3 -I
+import os, pathlib, signal, sys
+root = pathlib.Path(__file__).resolve().parent.parent
+if sys.argv[1] == 'clean':
+    assert (root / 'exited').exists()
+    (root / 'cleaned').touch()
+else:
+    def stop(*_):
+        (root / 'exited').touch()
+        sys.exit(143)
+    signal.signal(signal.SIGTERM, stop)
+    (root / 'ready').touch()
+    signal.pause()
+''')
+        fake.chmod(0o755)
+        gate = scripts / "simulator-gate.sh"
+        source = (ROOT / "scripts/simulator-gate.sh").read_text()
+        for tier in ("simulator", "all"):
+            with self.subTest(tier=tier):
+                for name in ("ready", "exited", "cleaned"):
+                    (self.root / name).unlink(missing_ok=True)
+                gate.write_text(source.replace('test.sh" simulator >', f'test.sh" {tier} >'))
+                marker = self.root / "owner.pid"
+                env = dict(os.environ, CASSINI_GATE_OWNER_FILE=str(marker))
+                with events.Events() as queue:
+                    queue.file(self.root)
+                    owner = subprocess.Popen(["/bin/bash", str(gate), "owner"], env=env)
+                    try:
+                        while not (self.root / "ready").exists():
+                            self.assertTrue(queue.until(time.monotonic() + HANG_GUARD))
+                        cleaned = subprocess.run(["/bin/bash", str(gate), "clean"], env=env,
+                                                 capture_output=True, text=True, timeout=HANG_GUARD)
+                        self.assertEqual(cleaned.returncode, 0, cleaned.stdout + cleaned.stderr)
+                        self.assertEqual(finish(owner), 143)
+                        self.assertTrue((self.root / "cleaned").exists())
+                        self.assertFalse(marker.exists())
+                    finally:
+                        if owner.poll() is None:
+                            owner.terminate(); finish(owner)
+        # A stale marker must not signal a PID that now belongs to another command.
+        (self.root / "cleaned").unlink()
+        unrelated = subprocess.Popen([sys.executable, "-c", "import sys; print('ready',flush=True); sys.stdin.read()"],
+                                     stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+        try:
+            self.assertEqual(unrelated.stdout.readline(), b"ready\n")
+            marker.write_text(str(unrelated.pid))
+            result = subprocess.run(["/bin/bash", str(gate), "clean"], env=env,
+                                    capture_output=True, text=True, timeout=HANG_GUARD)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("no longer identifies this run", result.stderr)
+            self.assertIsNone(unrelated.poll())
+            self.assertFalse((self.root / "cleaned").exists())
+            self.assertTrue(marker.exists())
+        finally:
+            unrelated.stdin.close(); finish(unrelated); unrelated.stdout.close()
 
     def test_end_tree_ends_entire_command_tree(self):
         child = self.root / "child"

@@ -98,6 +98,34 @@ def select_runner(
 
 
 class CiRunnerSelectionTests(unittest.TestCase):
+    def test_simulator_cadence_and_ios18_modes(self):
+        text = (WORKFLOWS / "simulator-gate.yml").read_text()
+        triggers = text.split("\non:\n", 1)[1].split("\npermissions:", 1)[0]
+        self.assertNotIn("\n  push:", triggers)
+        self.assertIn("types: [opened, synchronize, reopened, labeled]", triggers)
+        self.assertIn("schedule:\n    - cron:", triggers)
+        self.assertIn("workflow_dispatch:", triggers)
+        # Main CI remains exact-head evidence for release; simulator cadence does not change it.
+        self.assertIn("\n  push:\n    branches: [main]\n", (WORKFLOWS / "ci.yml").read_text())
+        mode = re.search(r"CASSINI_IOS18: \$\{\{ (.+) \}\}", text).group(1)
+        mode = mode.replace("github.event.pull_request.labels.*.name", "labels")
+        mode = mode.replace("&&", " and ").replace("||", " or ")
+        guard = re.search(r"(?m)^    if: (.+)$", text).group(1).replace("&&", " and ").replace("||", " or ")
+        for event in ["pull_request", "schedule", "workflow_dispatch"]:
+            for action, added in [("opened", ""), ("synchronize", ""), ("reopened", ""),
+                                  ("labeled", "full-ci"), ("labeled", "unrelated")]:
+                for labels in [[], ["full-ci"]]:
+                    github = SimpleNamespace(event_name=event, repository="codemyriad/cassini-ios",
+                        ref="refs/heads/main", event=SimpleNamespace(action=action,
+                        label=SimpleNamespace(name=added), pull_request=SimpleNamespace(
+                        head=SimpleNamespace(repo=SimpleNamespace(full_name="codemyriad/cassini-ios")))))
+                    with self.subTest(event=event, action=action, added=added, labels=labels):
+                        self.assertEqual(eval(mode, {"__builtins__": {}}, dict(github=github, labels=labels,
+                            contains=lambda values, value: value in values)),
+                            "full" if event != "pull_request" or "full-ci" in labels else "smoke")
+                        self.assertEqual(bool(eval(guard, {"__builtins__": {}}, dict(github=github))),
+                                         event != "pull_request" or action != "labeled" or added == "full-ci")
+
     def test_observational_gate_adds_no_automatic_cancellation(self):
         text = (WORKFLOWS / "simulator-gate.yml").read_text()
         self.assertNotIn("\nconcurrency:", text, "D20: no new pending-run eviction or automatic cancellation")
@@ -133,12 +161,13 @@ class CiRunnerSelectionTests(unittest.TestCase):
                 for head in ["codemyriad/cassini-ios", "fork/cassini-ios", "", None]:
                     for ref in ["refs/heads/main", "refs/heads/feature", "refs/pull/123/merge"]:
                         metadata = _NULL if head is None else SimpleNamespace(full_name=head)
-                        payload = SimpleNamespace(pull_request=SimpleNamespace(head=SimpleNamespace(repo=metadata)))
+                        payload = SimpleNamespace(pull_request=SimpleNamespace(head=SimpleNamespace(repo=metadata)),
+                                                  action="synchronize", label=_NULL)
                         github = SimpleNamespace(event_name=event, repository=repo, ref=ref,
                                                  event=payload if event in ("pull_request", "pull_request_target") else _NULL)
                         expected = repo == "codemyriad/cassini-ios" and (
                             (event == "pull_request" and head == repo) or
-                            (event in ("push", "workflow_dispatch") and ref == "refs/heads/main"))
+                            (event in ("schedule", "workflow_dispatch") and ref == "refs/heads/main"))
                         with self.subTest(event=event, repo=repo, head=head, ref=ref):
                             self.assertEqual(bool(eval(guard, {"__builtins__": {}}, {"github": github})), expected)
 
@@ -148,7 +177,7 @@ class CiRunnerSelectionTests(unittest.TestCase):
         for prohibited in ["secrets.", "GH_TOKEN:", "GITHUB_TOKEN:", "statuses: write", "id-token:",
                            "altool", "testflight.py", "archive.py", "-allowProvisioningUpdates", "security ", "sudo "]:
             self.assertNotIn(prohibited, text)
-        for line in ["CASSINI_POST_STATUS: '0'", "CASSINI_CONFORMANCE_REQUIRED: '1'", "CASSINI_IOS18: full",
+        for line in ["CASSINI_POST_STATUS: '0'", "CASSINI_CONFORMANCE_REQUIRED: '1'",
                      "CASSINI_UI_IPAD: '1'", "CASSINI_KEEP_SIMS: '0'", "fetch-depth: 0"]:
             self.assertIn(line, text)
         self.assertEqual(text.count("persist-credentials: false"), 2)

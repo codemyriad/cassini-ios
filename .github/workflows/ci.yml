@@ -182,7 +182,7 @@ jobs:
             export CASSINI_SIM_PREFIX="$prefix"
             scripts/test.sh clean
             # scripts/test.sh app acquires ~/.cassini-heavy.lock itself via start_heavy/take_heavy_lock;
-            # wrapping in heavy-run without CASSINI_HEAVY_LOCK_HELD=1 would self-deadlock on the lock.
+            # no fleet-slot wrapper is needed (its .big-heavy.slot.* locks are separate).
             scripts/test.sh app
             grep -E "^Test Case '-\[CassiniTests\.LibraryScreenTests testAThousandNotesFilterWithoutDroppingFrames\]' passed \(" DerivedData.noindex/test-logs/hosted.log
             grep -F "(CASSINI_PERF_GATE=1)" DerivedData.noindex/test-logs/hosted.log

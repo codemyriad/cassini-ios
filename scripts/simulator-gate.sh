@@ -16,7 +16,7 @@ case "${1:-}" in
         printf '%s\n' "$$" > "$owner_file"
         # The runner closes a cancelled step's pipe before always-run cleanup starts. Keep the owner's
         # output independent of that pipe so its EXIT trap cannot lose its summary or receive SIGPIPE.
-        exec "$root/scripts/test.sh" all > "$owner_file.log" 2>&1
+        exec "$root/scripts/test.sh" simulator > "$owner_file.log" 2>&1
         ;;
     clean)
         if [ -s "$owner_file" ]; then
@@ -26,7 +26,7 @@ case "${1:-}" in
                 # A completed run can leave a stale file. Fail closed on PID reuse, rather than signal another job.
                 command_line=$(ps -p "$owner" -o command= || true)
                 case "$command_line" in
-                    *"$root/scripts/test.sh all"*) ;;
+                    *"$root/scripts/test.sh all"*|*"$root/scripts/test.sh simulator"*) ;;
                     '') ;; # It may have exited naturally between kill -0 and ps.
                     *) echo "simulator test owner PID no longer identifies this run: $owner" >&2; exit 1 ;;
                 esac

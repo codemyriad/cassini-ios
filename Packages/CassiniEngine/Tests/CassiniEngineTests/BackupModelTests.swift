@@ -4,7 +4,7 @@ import CassiniEngine
 import CassiniEngineTesting
 import CassiniNotebook
 
-@MainActor @Suite struct BackupModelTests {
+@MainActor @Suite(.serialized) struct BackupModelTests {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     let suite = "backup.tests.\(UUID().uuidString)"
     var defaults: UserDefaults { UserDefaults(suiteName: suite)! }
@@ -17,13 +17,16 @@ import CassiniNotebook
     func excluded(_ url: URL) throws -> Bool {
         var value = URL(fileURLWithPath: url.path)
         while value.path != "/" {
+            value.removeAllCachedResourceValues()
             if try value.resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup == true { return true }
             value.deleteLastPathComponent()
         }
         return false
     }
     func flag(_ url: URL) throws -> Bool {
-        try URL(fileURLWithPath: url.path).resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup == true
+        var value = URL(fileURLWithPath: url.path)
+        value.removeAllCachedResourceValues()
+        return try value.resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup == true
     }
 
     // macOS can briefly report the preceding backup flag after setResourceValues returns, even on a
@@ -115,7 +118,8 @@ import CassiniNotebook
         let model = BackupModel(settings: settings(), root: root)
         try await model.start()
         let voices = root.appendingPathComponent("PrivateVoices", isDirectory: true)
-        for step in 0..<40 {
+        // Three complete cycles of all four (cloud, voices) states, without flooding coreservicesd.
+        for step in 0..<12 {
             let cloud = step % 2 == 0, includeVoices = step % 4 < 2
             try await model.update(cloud: cloud, voices: includeVoices)
             try await expectFilesystem {
