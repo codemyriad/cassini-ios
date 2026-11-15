@@ -31,7 +31,9 @@ import CassiniNotebook
     // rather than assuming an actor hop also synchronises the OS backup metadata. Never retry writes.
     func expectFilesystem(_ condition: () throws -> Bool,
                           sourceLocation: SourceLocation = #_sourceLocation) async throws {
-        let deadline = ContinuousClock.now.advanced(by: .seconds(5))
+        // The full gate runs package tests beside Xcode compilation; allow the same 30-second
+        // observation window as the other package polling helpers, without retrying any writes.
+        let deadline = ContinuousClock.now.advanced(by: .seconds(30))
         var satisfied = try condition()
         while !satisfied, ContinuousClock.now < deadline {
             try await Task.sleep(for: .milliseconds(10))

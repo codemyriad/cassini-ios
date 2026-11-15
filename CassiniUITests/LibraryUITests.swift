@@ -1193,6 +1193,8 @@ final class LibraryUITests: XCTestCase {
 
     @MainActor private func assertActionsMenuShares(_ format: String) {
         let app = launch(["--seed", "statuses"])
+        XCTAssertTrue(app.buttons["backupNoticeDismiss"].waitForExistence(within: uiWaitFloor),
+                      "Keep the multiline backup notice present for the scroll-and-export regression")
         let note = scrolledRow(app, "A quieter kind of productivity")
         XCTAssertTrue(note.waitForExistence(within: 5))
         note.press(forDuration: 1)
