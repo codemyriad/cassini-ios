@@ -87,16 +87,21 @@ import CassiniNotebook
         #expect(try row().status == .recording)
         #expect(library.note(id)?.meetingTime != .unknown)
         let activeRevision = model.presentationRevision
+        let activeKey = try row().renderKey
         h.capture.elapsed = 12
         _ = h.controller.tick()
         await model.settle()
         #expect(try row().duration == 12)
+        #expect(try row().renderKey == activeKey)
         #expect(model.presentationRevision > activeRevision)
         screen.minimise()
         #expect(effects.last == .close)
         #expect(try row().isRecording)
         #expect(model.rename(id, to: "  Renamed while recording  "))
         #expect(h.controller.state.activeRecording?.title == "Renamed while recording")
+        await model.settle()
+        let renamedKey = try row().renderKey
+        #expect(renamedKey != activeKey)
         await screen.enter()
         screen.finish()
         #expect(h.controller.state == .finishing(noteID: id))
@@ -110,6 +115,7 @@ import CassiniNotebook
         #expect(library.note(id)?.audio == .plain)
         #expect(await h.store.note(id)?.audio == .plain)
         #expect(try !row().isRecording)
+        #expect(try row().renderKey != renamedKey)
         #expect(try row().status == .audioOnly)
         if finish == .missingModels {
             try await h.waitFor("consent navigation", advancingClock: false) { effects.last == .openNote(id, modelDownload: true) }

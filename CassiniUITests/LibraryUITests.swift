@@ -6,9 +6,6 @@ import Vision
 final class LibraryUITests: XCTestCase {
     @MainActor func testIPadRecordingTicksPreserveContextMenu() throws {
         try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad)
-        XCUIApplication().terminate()
-        XCUIDevice.shared.orientation = .landscapeLeft
-        defer { XCUIDevice.shared.orientation = .portrait }
         try testRecordingTicksPreserveContextMenu()
     }
 
@@ -50,6 +47,7 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: uiWaitFloor))
         if UIDevice.current.userInterfaceIdiom != .pad { app.navigationBars.buttons["Back to all meetings"].tap() }
         XCTAssertTrue(waitFor(renamed, label: ", transcribed"))
+        assertIPadSplitView(app)
         try assertRowPixels(renamed, contain: "2 speakers", excluding: "Recording")
     }
 
@@ -561,11 +559,8 @@ final class LibraryUITests: XCTestCase {
     }
 
     @MainActor private func assertFinishedRecordingRow(minimised: Bool, automatic: Bool = true, search: Bool = false) throws {
-        if UIDevice.current.userInterfaceIdiom == .pad {
-            XCUIApplication().terminate()
-            XCUIDevice.shared.orientation = .landscapeLeft
-            addTeardownBlock { @MainActor in XCUIDevice.shared.orientation = .portrait }
-        }
+        // The 13-inch iPad destination has regular width in portrait too. Use the normal in-app
+        // relaunch: terminating and rotating SpringBoard can wedge its idle wait on iOS 27.
         let app = launch(["--seed", "recording"] + DeviceUnderTest.workingSpeech)
         if !automatic {
             app.buttons["settingsButton"].tap()
@@ -608,6 +603,7 @@ final class LibraryUITests: XCTestCase {
         }
         XCTAssertTrue(waitFor(meeting, label: automatic ? ", transcribed" : ", audio only"), meeting.label)
         XCTAssertFalse(meeting.label.localizedCaseInsensitiveContains("recording"), meeting.label)
+        assertIPadSplitView(app)
         if UIDevice.current.userInterfaceIdiom == .pad { XCTAssertTrue(meeting.isSelected, "Finished note is selected beside its detail") }
         try assertRowPixels(meeting, contain: automatic ? "2 speakers" : "Audio only", excluding: "Recording")
         XCTAssertTrue(app.buttons["recordButton"].waitForEnabled(within: uiWaitFloor))
@@ -626,6 +622,14 @@ final class LibraryUITests: XCTestCase {
             XCTAssertTrue(meeting.isSelected)
             captureEvidence("iPad sidebar after detail Transcribe and Star", app)
         }
+    }
+
+    @MainActor private func assertIPadSplitView(_ app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        guard UIDevice.current.userInterfaceIdiom == .pad else { return }
+        let search = app.textFields["librarySearch"], title = app.staticTexts["noteTitle"]
+        XCTAssertTrue(search.isHittable, "Library sidebar remains visible", file: file, line: line)
+        XCTAssertTrue(title.isHittable, "Note detail remains visible", file: file, line: line)
+        XCTAssertLessThanOrEqual(search.frame.maxX, title.frame.minX, "Library sits beside the detail", file: file, line: line)
     }
 
     @MainActor private func assertRowPixels(_ row: XCUIElement, contain expected: String, excluding forbidden: String? = nil) throws {

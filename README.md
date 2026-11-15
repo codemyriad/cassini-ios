@@ -222,8 +222,9 @@ TestFlight still need.
   sealed document and a Room catalogue. The queue is `jobs.json`, and checkpoints use iOS's own format. Search
   uses an in-memory index instead of FTS4. As on Android, search joins spoken turns with spaces; row excerpts flatten
   embedded line breaks while preserving highlights. The lazy list separates grouped and flat projections so iOS 18
-  does not retain ordinary row bodies in search results. Rows also key their stateless SwiftUI drawing by the full
-  row presentation, so returning from recording or a note replaces a retained Recording badge after Stop; note
+  does not retain ordinary row bodies in search results. Rows key their stateless SwiftUI drawing by `renderKey`,
+  which includes the full row presentation except live recording duration ticks. Ticks update text in place without
+  interrupting taps or context menus; Stop and other presentation changes replace retained Recording badges. Note
   UUIDs still identify navigation and actions. Android does not need this SwiftUI identity workaround. Library renames
   of a live note also update the iOS recorder’s title before it seals the note, keeping the mirror and capture in sync.
   On iPad, a newly recorded or imported note replaces the detail column so its Library selection follows the note.

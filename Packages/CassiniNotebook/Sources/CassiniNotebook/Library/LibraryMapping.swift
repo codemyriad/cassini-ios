@@ -89,6 +89,18 @@ public struct LibraryRow: Identifiable, Hashable, Sendable {
     public var bookmarkCount: Int
     public var isSavingCapture = false
     public var provenance: MeetingProvenance = .own
+
+    /// SwiftUI must replace retained rows when their presentation changes, but keep the live button
+    /// and its context menu mounted across elapsed-time ticks. Navigation still uses the note's `id`.
+    public struct RenderKey: Hashable, Sendable {
+        fileprivate let presentation: LibraryRow
+    }
+
+    public var renderKey: RenderKey {
+        var presentation = self
+        if isRecording { presentation.duration = 0 }
+        return RenderKey(presentation: presentation)
+    }
 }
 
 /// One day of the Library.
