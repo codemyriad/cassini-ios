@@ -67,6 +67,7 @@ import CassiniNotebook
                 },
                 trash: { [unowned self] in actions.append("trash \(title($0))") },
                 speakerModelsReady: { [unowned self] in speakerModelsReady },
+                setRecordingTitle: { [unowned self] in actions.append("recordingTitle \($0)") },
                 cloudBackup: { [unowned self] in cloudBackup },
                 clock: clock, calendar: calendar), defaults: defaults)
             model.onEffect = { [unowned self] in effects.append($0) }
@@ -83,6 +84,25 @@ import CassiniNotebook
         }
 
         func title(_ id: UUID) -> String { notes.first { $0.id == id }?.title ?? "?" }
+    }
+
+    @Test func renameUpdatesOnlyTheMatchingActiveRecorderWithTheCleanTitle() async {
+        let library = Library()
+        let live = library.add("Live"), other = library.add("Other")
+        library.recording = .active(ActiveRecording(noteID: live, title: "Live", defaultTitle: "Live", format: .pcm48kMono))
+        let model = library.model
+        #expect(model.rename(other, to: "Other renamed"))
+        #expect(!library.actions.contains(where: { $0.hasPrefix("recordingTitle") }))
+        #expect(!model.rename(live, to: "   "))
+        #expect(model.rename(live, to: "  Live renamed  "))
+        #expect(library.actions.suffix(2) == ["recordingTitle Live renamed", "update Live renamed"])
+        await model.settle()
+        library.actions = []
+        #expect(model.rename(live, to: "Live renamed"))
+        #expect(library.actions.isEmpty)
+        library.recording = .idle
+        #expect(model.rename(live, to: "Saved renamed"))
+        #expect(library.actions == ["update Saved renamed"])
     }
 
     @Test func rememberedStarredAppliesToTheVeryFirstProjection() throws {

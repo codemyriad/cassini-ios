@@ -75,8 +75,12 @@ public struct ScreenStack: Hashable, Sendable {
         sessions[noteID, default: NoteSession()].search = query ?? ""
     }
 
-    /// Shows the note, popping to it when it is already open.
-    public mutating func openNote(_ id: UUID) { set(BackStack.popOrPush(stack, .note(id))) }
+    /// Shows the note, popping to it when it is already open. A new note replaces the detail column in split
+    /// view, including after a recording or import; leaving another screen below it would select the wrong row.
+    public mutating func openNote(_ id: UUID) {
+        if isSplit && !isOpen(id) { show(.note(id)) }
+        else { set(BackStack.popOrPush(stack, .note(id))) }
+    }
 
     public mutating func popToLibrary() { path.removeAll() }
 

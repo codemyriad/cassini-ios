@@ -59,7 +59,8 @@ import CassiniNotebook
             recording: { h.controller.state }, finishing: { h.controller.finalizing.first },
             transcribe: { _, _ in .queued(changed: false) }, startOver: { _ in .queued(changed: false) },
             stop: { _ in }, dequeue: { _ in }, update: { id, change in library.update(id, change) },
-            trash: { _ in }, speakerModelsReady: { true }, clock: h.clock, calendar: Calendar(identifier: .gregorian)))
+            trash: { _ in }, speakerModelsReady: { true },
+            setRecordingTitle: { h.controller.setTitle($0) }, clock: h.clock, calendar: Calendar(identifier: .gregorian)))
         #expect(model.content.sections.isEmpty)
         var effects: [RecordingEffect] = []
         screen.onEffect = { effects.append($0) }
@@ -94,6 +95,8 @@ import CassiniNotebook
         screen.minimise()
         #expect(effects.last == .close)
         #expect(try row().isRecording)
+        #expect(model.rename(id, to: "  Renamed while recording  "))
+        #expect(h.controller.state.activeRecording?.title == "Renamed while recording")
         await screen.enter()
         screen.finish()
         #expect(h.controller.state == .finishing(noteID: id))
@@ -102,6 +105,8 @@ import CassiniNotebook
         await library.settle()
         await model.settle()
         #expect(h.controller.state == .idle)
+        #expect(library.note(id)?.title == "Renamed while recording")
+        #expect(await h.store.note(id)?.title == "Renamed while recording")
         #expect(library.note(id)?.audio == .plain)
         #expect(await h.store.note(id)?.audio == .plain)
         #expect(try !row().isRecording)

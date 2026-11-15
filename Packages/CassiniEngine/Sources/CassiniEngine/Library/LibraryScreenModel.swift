@@ -32,6 +32,8 @@ public final class LibraryScreenModel {
         public var dequeue: @MainActor (UUID) -> Void
         /// Saves a note's change.
         public var update: @MainActor (UUID, @escaping @Sendable (inout Note) -> Void) -> Void
+        /// Keeps the active recorder’s title in sync with a Library rename before it seals the note.
+        public var setRecordingTitle: @MainActor (String) -> Void
         /// Move to Recently Deleted (it asks first while the note is transcribing).
         public var trash: @MainActor (UUID) async -> Void
         /// Whether the speaker models are installed, so names carry over to a new version.
@@ -51,12 +53,14 @@ public final class LibraryScreenModel {
                     update: @escaping @MainActor (UUID, @escaping @Sendable (inout Note) -> Void) -> Void,
                     trash: @escaping @MainActor (UUID) async -> Void,
                     speakerModelsReady: @escaping @MainActor () async -> Bool,
+                    setRecordingTitle: @escaping @MainActor (String) -> Void = { _ in },
                     cloudBackup: @escaping @MainActor () -> Bool? = { true },
                     clock: any AppClock, calendar: Calendar) {
             self.notes = notes; self.loading = loading; self.unavailable = unavailable; self.processing = processing
             self.phase = phase; self.install = install; self.recording = recording; self.finishing = finishing
             self.transcribe = transcribe; self.startOver = startOver; self.stop = stop; self.dequeue = dequeue
             self.update = update; self.trash = trash; self.speakerModelsReady = speakerModelsReady
+            self.setRecordingTitle = setRecordingTitle
             self.cloudBackup = cloudBackup
             self.clock = clock; self.calendar = calendar
         }
@@ -315,7 +319,10 @@ public final class LibraryScreenModel {
     public func rename(_ id: UUID, to title: String) -> Bool {
         guard let cleaned = NoteTitles.clean(title) else { return false }
         if dialog == .rename(id) { dialog = nil }
-        if note(id)?.title != cleaned { ports.update(id) { $0.title = cleaned } }
+        if note(id)?.title != cleaned {
+            if ports.recording().activeRecording?.noteID == id { ports.setRecordingTitle(cleaned) }
+            ports.update(id) { $0.title = cleaned }
+        }
         return true
     }
 
