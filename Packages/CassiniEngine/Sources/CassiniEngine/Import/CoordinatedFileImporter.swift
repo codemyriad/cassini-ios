@@ -1,3 +1,6 @@
+import AVFoundation
+import CassiniCore
+import CassiniNotebook
 import CryptoKit
 import Foundation
 import Synchronization
@@ -28,12 +31,42 @@ public struct CoordinatedFileImporter: FileImporting {
     }
 
     public func copy(from source: URL, to destination: URL, maxBytes: Int64, reserveBytes: Int64) async throws -> ImportedFile {
+        try await copy(from: source, to: destination, maxBytes: maxBytes, reserveBytes: reserveBytes, archiveMember: false)
+    }
+
+    public func copyArchiveMember(from source: URL, to destination: URL, maxBytes: Int64, reserveBytes: Int64) async throws -> ImportedFile {
+        let copied = try await copy(from: source, to: destination, maxBytes: maxBytes, reserveBytes: reserveBytes, archiveMember: true)
+        do {
+            // Legacy MP4/3GP containers must hold audio only, never restore a movie as a note.
+            let content = try await CancellableFileWork.run { try ImportClassifier.sniff(fileAt: destination) }
+            if content == .other(fileExtension: "m4a") || content == .other(fileExtension: "3gp") {
+                // AVFoundation cannot reliably open source.tmp. Use a content-derived extension,
+                // independent of both the staging name and a disguised archive member's name.
+                let ext = content == .other(fileExtension: "3gp") ? "3gp" : "mp4"
+                let probe = destination.deletingLastPathComponent().appendingPathComponent(UUID().uuidString + "." + ext)
+                try FileManager.default.linkItem(at: destination, to: probe)
+                defer { try? FileManager.default.removeItem(at: probe) }
+                let asset = AVURLAsset(url: probe)
+                guard try await asset.loadTracks(withMediaType: .video).isEmpty,
+                      try await !asset.loadTracks(withMediaType: .audio).isEmpty else { throw FileImportError.cannotOpen }
+            }
+            try Task.checkCancellation()
+            return copied
+        } catch {
+            try? FileManager.default.removeItem(at: destination)
+            if error is CancellationError || Task.isCancelled { throw CancellationError() }
+            throw FileImportError.cannotOpen
+        }
+    }
+
+    private func copy(from source: URL, to destination: URL, maxBytes: Int64, reserveBytes: Int64,
+                      archiveMember: Bool) async throws -> ImportedFile {
         let cancel = Cancellation()
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
                 DispatchQueue.global(qos: .userInitiated).async {
                     continuation.resume(with: Result {
-                        try coordinatedCopy(from: source, to: destination, maxBytes: maxBytes, reserveBytes: reserveBytes, cancel: cancel)
+                        try coordinatedCopy(from: source, to: destination, maxBytes: maxBytes, reserveBytes: reserveBytes, archiveMember: archiveMember, cancel: cancel)
                     })
                 }
             }
@@ -43,11 +76,11 @@ public struct CoordinatedFileImporter: FileImporting {
     }
 
     private func coordinatedCopy(from source: URL, to destination: URL, maxBytes: Int64, reserveBytes: Int64,
-                                 cancel: Cancellation) throws -> ImportedFile {
+                                 archiveMember: Bool, cancel: Cancellation) throws -> ImportedFile {
         let scoped = source.startAccessingSecurityScopedResource()
         defer { if scoped { source.stopAccessingSecurityScopedResource() } }
         let copy = Copy(storage: storage, folder: destination.deletingLastPathComponent(), maxBytes: maxBytes,
-                        reserveBytes: reserveBytes, cancel: cancel)
+                        reserveBytes: reserveBytes, archiveMember: archiveMember, cancel: cancel)
         // Before any download: the cap and the space for the whole file. Once a placeholder has been downloaded, its
         // bytes already take space on this volume, so the check in the accessor covers only a size not reported here.
         let reported = sizeOf(source)
@@ -74,6 +107,7 @@ private struct Copy {
     let folder: URL
     let maxBytes: Int64
     let reserveBytes: Int64
+    let archiveMember: Bool
     let cancel: Cancellation
 
     /// Rejects a known `size` over the cap and, with `space`, one the free space cannot hold with the reserve.
@@ -88,7 +122,7 @@ private struct Copy {
     /// Streams `source` to `destination`; the limits are enforced as it goes.
     func run(from source: URL, size: Int64?, to destination: URL, name: String) throws -> ImportedFile {
         do {
-            let (sha256, bytes) = try stream(from: source, size: size, to: destination)
+            let (sha256, bytes) = try stream(from: source, size: size, to: destination, name: name)
             return ImportedFile(displayName: name, byteCount: bytes, sha256: sha256)
         } catch {
             try? FileManager.default.removeItem(at: destination)
@@ -96,12 +130,28 @@ private struct Copy {
         }
     }
 
-    private func stream(from source: URL, size: Int64?, to destination: URL) throws -> (String, Int64) {
+    private func stream(from source: URL, size: Int64?, to destination: URL, name: String) throws -> (String, Int64) {
         let input: FileHandle
         do { input = try FileHandle(forReadingFrom: source) } catch { throw FileImportError.cannotOpen }
         defer { try? input.close() }
+        // Provider metadata can be cached across a replacement at the same URL. The coordinated descriptor is
+        // authoritative; retain this length to detect truncation or growth during the read.
+        let expectedSize = Int64(clamping: try input.seekToEnd())
+        try input.seek(toOffset: 0)
+        try check(expectedSize, space: true)
+        // Admission uses the caller's name, even if a file provider coordinates a different temporary URL.
+        // ZIP restoration additionally admits legacy audio containers, still inspected before publication.
+        if ImportPolicy.accepts(filename: name) {
+            let header = try input.read(upToCount: ImportPolicy.probeBytes) ?? Data()
+            try ImportPolicy.validate(header: header, filename: name, fileBytes: expectedSize)
+            try input.seek(toOffset: 0)
+        } else if archiveMember {
+            guard ArchiveAudio.supports(name) else { throw FileImportError.cannotOpen }
+        } else if (name as NSString).pathExtension.lowercased() != "zip" {
+            throw FileImportError.cannotOpen
+        }
         guard FileManager.default.createFile(atPath: destination.path, contents: nil),
-              let output = try? FileHandle(forWritingTo: destination) else { throw lowSpace(size, 0) ?? FileImportError.cannotOpen }
+              let output = try? FileHandle(forWritingTo: destination) else { throw lowSpace(expectedSize, 0) ?? FileImportError.cannotOpen }
         defer { try? output.close() }
         var hasher = SHA256()
         var total: Int64 = 0
@@ -110,19 +160,21 @@ private struct Copy {
             if cancel.isCancelled { throw CancellationError() }
             let chunk: Data
             do { chunk = try input.read(upToCount: CoordinatedFileImporter.bufferBytes) ?? Data() } catch {
-                throw lowSpace(size, total) ?? FileImportError.cannotOpen
+                throw lowSpace(expectedSize, total) ?? FileImportError.cannotOpen
             }
             guard !chunk.isEmpty else { break }
             total += Int64(chunk.count)
             if total > maxBytes { throw FileImportError.tooLarge }
             if total >= nextSpaceCheck {
                 nextSpaceCheck += CoordinatedFileImporter.spaceCheckBytes
-                if let low = lowSpace(size, total) { throw low }
+                if let low = lowSpace(expectedSize, total) { throw low }
             }
             hasher.update(data: chunk)
-            do { try output.write(contentsOf: chunk) } catch { throw lowSpace(size, total) ?? FileImportError.cannotOpen }
+            do { try output.write(contentsOf: chunk) } catch { throw lowSpace(expectedSize, total) ?? FileImportError.cannotOpen }
         }
-        do { try output.synchronize() } catch { throw lowSpace(size, total) ?? FileImportError.cannotOpen }
+        if total != expectedSize { throw FileImportError.cannotOpen }
+        if cancel.isCancelled { throw CancellationError() }
+        do { try output.synchronize() } catch { throw lowSpace(expectedSize, total) ?? FileImportError.cannotOpen }
         return (hasher.finalize().map { String(format: "%02x", $0) }.joined(), total)
     }
 

@@ -82,9 +82,10 @@ records their exact revisions.
 - **Safe capture.** Audio is captured as 48 kHz PCM (CAF), which survives a crash, and compressed to M4A at Stop. If
   compression fails, the original stays playable. The recording stops and saves before storage runs out, with a
   warning about 15 minutes before. At launch, recordings that were interrupted are repaired and listed as recovered.
-- **Import** any audio format that iOS reads, plus Ogg Opus and Cassini `.opus` documents, from Files (several files
-  at once) or with "Open in Cassini" from another app. A file that is already in the library is not added twice. A
-  Cassini document's verified transcripts are imported with it.
+- **Import** Opus/Ogg (`.opus`, `.ogg`), MP3, M4A and WAV from Files (several files at once) or with "Open in Cassini"
+  from another app, using the pinned shared decided-format contract. Ogg inputs require Opus headers; FLAC remains
+  excluded. A file already in the Library is not added twice. A Cassini document's verified transcripts are imported
+  with it. Imports show an `Importing…` card; failures keep a `Needs attention` card with retry/dismiss controls.
 - **Transcribe on the device** with the bundled Whistle model at once, or with Parakeet Ultra after a one-time download
   of about 531 MB (Ultra, its speech detector and the speaker models, from Cassini's model host) on devices with
   4 GB of memory or more (those that report at least 3.25 GiB). A Parakeet run that cannot get the memory it needs or
@@ -163,6 +164,12 @@ TestFlight still need.
 
 [docs/differences.md](docs/differences.md) describes each difference in detail. In summary:
 
+- **Audio import (L-25 / D-1029).** Picker/Open-with types and accepted extensions come from the shared decided-format
+  contract. iOS uses AVFoundation for MP3/M4A/WAV, including 24-bit and float WAV beyond Android's 16-bit PCM path.
+  `.opus` and `.ogg` require actual Ogg Opus headers; the former Android-compatible MP3-under-`.opus` fallback is
+  excluded by this shared contract. ZIP restoration also accepts legacy audio containers (including CAF and AAC)
+  so audio-only notes exported unchanged can return to the Library; this iOS compatibility path does not expand
+  Picker/Open-with admission. See [the import differences](docs/differences.md#import).
 - **Unknown meeting dates (D95).** The Library names the group with the shared “Date unknown” heading in all six
   languages, including for VoiceOver. iOS omits the repeated unknown-date label from individual row metadata,
   the Note subtitle and the Document info Recorded row; the Note subtitle keeps the duration. Android repeats
