@@ -152,20 +152,21 @@ public struct LibraryIndex: Sendable {
         }.map { Data($0.id.utf8) })
         guard !ids.isEmpty else { return nil }
         guard let query else { return Hit(entry: entry, snippet: "", titleSnippet: entry.note.title) }
-        // Match each uninterrupted speaker run independently, as Android's SpeakerSearch does. Inline
-        // interjections belong to their actual speaker, never to the surrounding paragraph's header.
-        let words = NoteTranscripts.sealed(entry.note).turns.flatMap(\.words).sorted { $0.sourceIndex < $1.sourceIndex }
-        var runs: [(id: Data?, text: String)] = []
-        for word in words {
-            let id = word.speakerID.map { Data($0.utf8) }
-            if runs.last?.id == id, !runs.isEmpty {
-                runs[runs.count - 1].text += " " + word.text
-            } else {
-                runs.append((id, word.text))
-            }
+        let words = entry.note.transcriptWords
+        let modelWords = words.map {
+            TurnModel.Word(speaker: $0.speaker, startMs: ($0.start * 1000).rounded(),
+                           endMs: ($0.end * 1000).rounded(), text: $0.text,
+                           lowConfidenceSpeaker: $0.lowConfidenceSpeaker)
         }
-        for run in runs where run.id.map(ids.contains) == true {
-            let fields = SearchFields(title: "", body: run.text)
+        let runs = TurnModel.wholeRuns(of: modelWords, endsBoundedByAudio:
+            !entry.note.transcript.isEmpty && entry.note.transcript.allSatisfy { $0.wordEndsBoundedByAudio == true })
+            .filter { $0.speaker.map { ids.contains(Data($0.utf8)) } == true }
+            .sorted {
+                $0.startMs == $1.startMs
+                    ? ($0.wordIndices.first ?? 0) < ($1.wordIndices.first ?? 0) : $0.startMs < $1.startMs
+            }
+        for run in runs {
+            let fields = SearchFields(title: "", body: TurnModel.joinedText(run.wordIndices.map { words[$0].text }))
             if fields.matches(query) {
                 return Hit(entry: entry, snippet: fields.snippet(query), titleSnippet: entry.note.title)
             }

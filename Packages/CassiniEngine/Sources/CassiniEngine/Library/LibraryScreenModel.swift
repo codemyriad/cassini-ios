@@ -149,9 +149,11 @@ public final class LibraryScreenModel {
             return LibraryContent(loading: loading, sections: LibraryMapping.sections(live, context: context, now: now, calendar: calendar),
                                   emptyState: emptyState, hero: hero, facts: facts)
         }
-        // Until the first search answers, the results are empty and say nothing. Afterwards a new query or a changed
-        // note shows the last results, over the notes as they are now, until the search over them answers.
-        guard let found else { return LibraryContent(loading: loading, results: [], facts: facts) }
+        // Query and speaker identify the asynchronous work. Other chips filter these hits synchronously.
+        guard let found, found.query == searched, found.speaker == searchSpeaker else {
+            return LibraryContent(loading: loading, results: [],
+                                  emptyState: unavailable ? .unavailable : nil, facts: facts)
+        }
         let current = found.revision == index.revision ? found.hits : index.current(found.hits, query: SearchQuery(found.query), speaker: found.speaker)
         let interval = searchDate.interval(now: now, calendar: calendar)
         let hits = current.filter {
@@ -162,12 +164,12 @@ public final class LibraryScreenModel {
                     note.meetingTime.isWithin(range, calendar: calendar)
                 } ?? true)
         }
-        if found.query == searched {
-            facts.query = searched
-            facts.results = hits.count
-        }
+        facts.query = searched
+        facts.results = hits.count
+        let emptyState: LibraryEmptyState? = unavailable ? .unavailable
+            : (!loading && !facts.query.isEmpty && hits.isEmpty ? .noMatch(facts.query) : nil)
         return LibraryContent(loading: loading, results: LibraryMapping.results(hits, context: context, now: now, calendar: calendar),
-                              emptyState: LibraryMapping.emptyState(facts, favoritesOnly: favoritesOnly), facts: facts)
+                              emptyState: emptyState, facts: facts)
     }
 
     /// Every named speaker in the Library, independent of the current query and filters.
@@ -404,7 +406,9 @@ private extension LibraryScreenModel {
         let task = Task { [weak self] in
             let work = Task.detached(priority: .userInitiated) {
                 var copy = snapshot
-                return (copy.search(SearchQuery(query), speaker: speaker), copy)
+                let parsed = SearchQuery(query)
+                let unsearchableSpeakerQuery = speaker != nil && !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && parsed == nil
+                return (unsearchableSpeakerQuery ? [] : copy.search(parsed, speaker: speaker), copy)
             }
             let (hits, searched) = await withTaskCancellationHandler { await work.value } onCancel: { work.cancel() }
             guard let self, !Task.isCancelled else { return }

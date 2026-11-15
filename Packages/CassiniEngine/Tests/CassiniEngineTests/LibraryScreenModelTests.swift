@@ -201,6 +201,74 @@ import CassiniNotebook
         #expect(model.content.results?.isEmpty == true)
     }
 
+    @Test(arguments: ["?", "...", "---"])
+    func punctuationOnlyQueriesApplyDateAndOriginButNeverInventSpeakerMatches(raw: String) async {
+        let library = Library()
+        let own = library.add("Own", "Hello")
+        library.notes[0].speakers = [NoteSpeaker(id: "a", name: "Alice")]
+        library.notes[0].transcript[0].speakerID = "a"
+        _ = library.add("Imported", minutesAgo: 1)
+        library.notes[1].origin = .imported
+        _ = library.add("Yesterday", minutesAgo: 24 * 60)
+        let model = library.model
+        model.query = raw
+        await waitUntilSleeping(library.clock)
+        library.clock.release()
+        await model.settle()
+        model.recordedByMe = true
+        model.searchDate = .today
+        #expect(model.content.results?.map(\.id) == [own])
+        model.searchSpeaker = "Alice"
+        await model.settle()
+        #expect(model.content.results?.isEmpty == true)
+        #expect(model.content.facts.results == 0)
+        #expect(model.content.emptyState == .noMatch(raw))
+    }
+
+    @Test func filterOnlySearchNeverShowsRestingLibraryEmptyStates() async {
+        let library = Library()
+        library.add("Starred yesterday", minutesAgo: 24 * 60)
+        library.notes[0].isFavorite = true
+        library.notes[0].origin = .imported
+        let model = library.model
+        model.favoritesOnly = true
+        model.beginSearch()
+        model.searchDate = .today
+        await model.settle()
+        #expect(model.content.facts.results == 0)
+        #expect(model.content.emptyState == nil)
+        model.searchStarred = false
+        #expect(model.content.emptyState == nil)
+        model.searchDate = .any
+        model.recordedByMe = true
+        #expect(model.content.facts.results == 0)
+        #expect(model.content.emptyState == nil)
+        model.recordedByMe = false
+        model.searchSpeaker = "Bob"
+        await model.settle()
+        #expect(model.content.facts.results == 0)
+        #expect(model.content.emptyState == nil)
+    }
+
+    @Test func changingSpeakerHidesPreviousHitsBeforeTheSearchAnswers() async {
+        let library = Library()
+        let meeting = library.add("Alice meeting", "hello")
+        library.notes[0].speakers = [NoteSpeaker(id: "a", name: "Alice")]
+        library.notes[0].transcript[0].speakerID = "a"
+        let model = library.model
+        model.beginSearch()
+        model.searchSpeaker = "Alice"
+        await model.settle()
+        #expect(model.content.results?.map(\.id) == [meeting])
+        model.searchSpeaker = "Bob"
+        // No actor suspension: the new task cannot have published yet.
+        #expect(model.content.results?.isEmpty == true)
+        #expect(model.content.facts.results == nil)
+        #expect(model.content.emptyState == nil)
+        await model.settle()
+        #expect(model.content.results?.isEmpty == true)
+    }
+
     @Test func recordedByMeIncludesRecoveredInFilterOnlySearch() async {
         let library = Library()
         let own = library.add("Own")

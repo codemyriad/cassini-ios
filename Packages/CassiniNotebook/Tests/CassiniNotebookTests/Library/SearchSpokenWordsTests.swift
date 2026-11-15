@@ -21,6 +21,51 @@ import Testing
         return note
     }
 
+    @Test func speakerSearchKeepsTheHostRunAcrossAnOverlappingBackchannel() throws {
+        var index = LibraryIndex([try inlineReply()])
+        let hit = try #require(index.search(SearchQuery("release download"), speaker: "Ada").first)
+        #expect(hit.snippet.contains("release"))
+        #expect(hit.snippet.contains("download"))
+        #expect(!hit.snippet.contains("Sounds"))
+        #expect(index.search(SearchQuery("Sounds good"), speaker: "Ben").count == 1)
+        #expect(index.search(SearchQuery("Sounds good"), speaker: "Ada").isEmpty)
+    }
+
+    @Test func allTermsMustMatchTheSameAttributedRun() throws {
+        var note = try inlineReply()
+        note.transcript = [
+            .init(text: "release", start: 0, end: 1, speakerID: "ada"),
+            .init(text: "download", start: 6, end: 7, speakerID: "ada")]
+        var index = LibraryIndex([note])
+        #expect(index.search(SearchQuery("release download"), speaker: "Ada").isEmpty)
+        #expect(index.search(SearchQuery("download"), speaker: "Ada").count == 1)
+    }
+
+    @Test func speakerRunsPreserveByteExactSpeakerIDs() {
+        let composed = "caf\u{e9}", decomposed = "cafe\u{301}"
+        var note = Note(title: "Exact IDs", createdAt: Date(timeIntervalSince1970: 1))
+        note.speakers = [NoteSpeaker(id: composed, name: "Ada"), NoteSpeaker(id: decomposed, name: "Ben")]
+        note.transcript = [
+            .init(text: "release", start: 0, end: 1, speakerID: composed),
+            .init(text: "download", start: 1, end: 2, speakerID: decomposed)]
+        var index = LibraryIndex([note])
+        #expect(index.search(SearchQuery("release download"), speaker: "Ada").isEmpty)
+        #expect(index.search(SearchQuery("download"), speaker: "Ada").isEmpty)
+        #expect(index.search(SearchQuery("download"), speaker: "Ben").count == 1)
+    }
+
+    @Test func earliestMatchingRunWinsEvenWhenCanonicalRunsAreNotStartSorted() throws {
+        var note = try inlineReply()
+        note.transcript = [
+            .init(text: "release later", start: 100, end: 101, speakerID: "ada"),
+            .init(text: "separator", start: 110, end: 111, speakerID: "ben"),
+            .init(text: "release earlier", start: 0, end: 1, speakerID: "ada")]
+        var index = LibraryIndex([note])
+        let hit = try #require(index.search(SearchQuery("release"), speaker: "Ada").first)
+        #expect(hit.snippet.contains("earlier"))
+        #expect(!hit.snippet.contains("later"))
+    }
+
     @Test func searchIndexesSpeechAndFindMapsAnInlineReplyBackToItsWord() throws {
         let note = try inlineReply()
         let transcript = NoteTranscripts.sealed(note)
