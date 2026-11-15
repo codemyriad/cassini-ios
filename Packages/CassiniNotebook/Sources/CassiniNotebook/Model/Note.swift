@@ -47,6 +47,12 @@ public struct Note: Identifiable, Hashable, Sendable {
         self.meetingTime = .instant(createdAt)
     }
 
+    /// Stored words and versions come from completed runs; in-progress checkpoints belong to the job.
+    /// Ready also records a completed run that found no speech.
+    public var hasFinishedTranscript: Bool {
+        status == .ready || !transcript.isEmpty || versions?.isEmpty == false
+    }
+
     public var text: String { transcript.map(\.text).joined(separator: " ") }
     public var wordCount: Int { text.split(whereSeparator: \.isWhitespace).count }
     public var isRecording: Bool { audio == .live }

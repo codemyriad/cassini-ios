@@ -550,7 +550,10 @@ join paragraphs with spaces so blank lines cannot hide the matching word. Both s
 the viewer’s spacing around standalone punctuation, including punctuation inside inline replies.
 
 Single-meeting export follows D99 / PARITY §2: Cassini file and Markdown are primary choices, with Plain text,
-SRT and WebVTT under More formats. Audio-only meetings hide text choices; raw imports share the original audio.
+SRT and WebVTT under More formats. Meetings without a finished transcript hide text choices; raw imports then
+share the original audio. Finished transcripts, edits and saved versions remain exportable during a queued,
+running or failed re-transcription. A completed no-speech result also offers text formats. Job checkpoints never
+enter the stored transcript or its exports.
 Confirming opens the iOS share sheet. Multi-meeting export remains ZIP. JSON is retained as an internal writer,
 but is absent from the sheet. The Phase 2 TXT/SRT/VTT derivatives use speaker-turn blocks, seven-second subtitle
 segments and monotonic non-overlapping cues; the older Android writer fixtures remain as historical coverage.

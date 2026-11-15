@@ -20,17 +20,18 @@ public struct ExportSheetState: Equatable, Sendable {
     public var audioOnly: Bool { moreFormats.isEmpty }
     public var selection: Choice
 
-    public init(note: Note, jobPending: Bool = false) {
-        let completed = note.status == .ready && !jobPending && TranscriptExports.availability(of: note) == .available
+    // Pending jobs contain their own drafts and do not change availability of stored transcripts.
+    public init(note: Note, jobPending _: Bool = false) {
+        let completed = TranscriptExports.availability(of: note) == .available
         let original = !completed && note.origin == .imported && note.document == nil
         let audio: Choice = original ? .originalAudio : .cassiniFile
         primary = completed ? [audio, .markdown] : [audio]
         moreFormats = completed ? [.plainText, .srt, .vtt] : []
         selection = audio
     }
-    /// D12: draft words and local draft versions never travel in an audio-only Cassini file.
+    /// D12: first-run jobs have no stored transcript; re-transcription keeps the completed one.
     public static func portableSnapshot(_ note: Note) -> Note {
-        guard note.status != .ready else { return note }
+        guard !note.hasFinishedTranscript else { return note }
         var snapshot = note
         snapshot.transcript = []
         snapshot.versions = []

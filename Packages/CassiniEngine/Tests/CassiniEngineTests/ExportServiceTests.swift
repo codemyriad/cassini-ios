@@ -35,7 +35,7 @@ struct ExportServiceTests {
     func singleAudioOnlyCassiniFileHasAnEmptyTimedTranscript(status: NoteStatus) async throws {
         defer { try? FileManager.default.removeItem(at: base) }
         try FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
-        var note = transcribedNote(); note.status = status
+        var note = Note(title: "First run"); note.status = status
         let source = base.appendingPathComponent("source.m4a")
         try Data(ImportFixtures.m4a).write(to: source)
         let output = try await PortableExportService(audio: FakeAudioProcessing(), provenance: FakeProvenance(), unassignedLabel: "Unknown speaker")
@@ -46,7 +46,7 @@ struct ExportServiceTests {
         #expect(transcript.words.isEmpty)
     }
 
-    @Test(arguments: [NoteStatus.queued, .failed])
+    @Test(arguments: [NoteStatus.queued, .transcribing, .failed])
     func archiveKeepsStoredTranscriptWhileAnotherTranscriptionIsQueuedOrFailed(status: NoteStatus) async throws {
         defer { try? FileManager.default.removeItem(at: base) }
         try FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
@@ -66,6 +66,60 @@ struct ExportServiceTests {
         #expect(document.state == .ok)
         #expect(document.selected()?.transcript?.words == PortableTranscript.words(of: note))
         #expect(try Data(contentsOf: source) == original)
+    }
+
+    @Test(arguments: [NoteStatus.queued, .transcribing, .failed], [false, true])
+    func singleCassiniKeepsFinishedEditsAndVersions(status: NoteStatus, imported: Bool) async throws {
+        defer { try? FileManager.default.removeItem(at: base) }
+        try FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
+        let source = base.appendingPathComponent(imported ? "source.opus" : "source.m4a")
+        var note = transcribedNote()
+        if imported {
+            try Data(ImportFixtures.document("Imported finished words", title: note.title)).write(to: source)
+            let document = try #require(PortableTranscript(CassiniDocument.read(source)))
+            note.document = document.info; note.origin = .importedDocument
+            note.transcript = document.segments; note.versions = document.versions
+            note.selectedVersionID = document.selectedVersionID; note.speakers = document.speakers
+        } else {
+            try Data(ImportFixtures.m4a).write(to: source)
+            note.saveCurrentVersion(.transcription)
+        }
+        let originalWords = imported ? "Imported finished words" : PortableTranscript.words(of: note).map(\.text).joined(separator: " ")
+        note.transcript = [.init(text: "Hand edited finished words", start: 0, end: 2, speakerID: "S1")]
+        note.saveCurrentVersion(.editedTranscript)
+        note.status = status
+        #expect(!ExportSheetState(note: note, jobPending: true).audioOnly)
+        #expect(ExportSheetState.portableSnapshot(note) == note)
+        let output = try await PortableExportService(audio: FakeAudioProcessing(), provenance: FakeProvenance(), unassignedLabel: "Unknown speaker")
+            .export(ExportSheetState.portableSnapshot(note), original: source, playable: source, into: base, filename: "finished")
+        let document = CassiniDocument.read(output)
+        #expect(document.state == .ok)
+        #expect(document.selected()?.transcript?.words == PortableTranscript.words(of: note))
+        #expect(Set(document.variants.compactMap { $0.transcript?.words.map(\.text).joined(separator: " ") }) == [originalWords, "Hand edited finished words"])
+        try await notes.save(note)
+        let text = try await service.exportTranscript(note.id, format: .text, texts: texts)
+        #expect(try String(contentsOf: text, encoding: .utf8).contains("Hand edited finished words"))
+    }
+
+    @Test(arguments: [NoteStatus.ready, .queued, .transcribing, .failed])
+    func noSpeechCompletionStillExportsAnEmptyTranscript(status: NoteStatus) async throws {
+        defer { try? FileManager.default.removeItem(at: base) }
+        var note = Note(title: "No speech")
+        note.status = status
+        if status != .ready { note.versions = [.init(kind: .transcription, segments: [], speakers: [])] }
+        try await notes.save(note)
+        let source = notes.originalAudioURL(for: note)
+        try Data(ImportFixtures.m4a).write(to: source)
+        #expect(!ExportSheetState(note: note, jobPending: true).audioOnly)
+        _ = try await service.exportTranscript(note.id, format: .text, texts: texts)
+        let portable = PortableExportService(audio: FakeAudioProcessing(), provenance: FakeProvenance(), unassignedLabel: "Unknown speaker")
+        let single = try await portable.export(note, original: source, playable: source, into: base, filename: "single")
+        let archive = try await portable.archiveSnapshot(note, original: source, playable: source, into: base)
+        for output in [single, archive] {
+            let document = CassiniDocument.read(output)
+            #expect(document.state == .ok)
+            #expect(document.selected()?.transcript?.words.isEmpty == true)
+        }
     }
 
     @Test(arguments: [DocumentState.invalidMetadata, .unreadable])

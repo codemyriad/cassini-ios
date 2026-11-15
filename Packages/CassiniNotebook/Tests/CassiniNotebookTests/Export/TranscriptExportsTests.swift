@@ -135,7 +135,7 @@ struct TranscriptExportsTests {
         #expect(TranscriptExports.availability(of: recording) == .afterTranscription)
         var kept = note([TranscriptSegment(text: "x", start: 0, end: 1)])
         kept.status = .transcribing
-        #expect(TranscriptExports.availability(of: kept) == .afterTranscription)
+        #expect(TranscriptExports.availability(of: kept) == .available)
         for state in [DocumentState.unreadable, .invalidMetadata, .unknownFormat] {
             var document = note([TranscriptSegment(text: "x", start: 0, end: 1)])
             document.document = DocumentInfo(state: state)

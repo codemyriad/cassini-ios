@@ -1,4 +1,6 @@
 import XCTest
+import CassiniCore
+import CassiniEngineTesting
 import CassiniNotebook
 import CassiniEngine
 @testable import Cassini
@@ -37,6 +39,52 @@ import CassiniEngine
         } catch {
             XCTAssertEqual(error, .notAvailable(.afterTranscription))
             XCTAssertEqual(ExportCopy.message(error), "Available after transcription")
+        }
+    }
+
+    func testSingleCassiniKeepsCompletedEditsAndVersionsDuringRetranscription() async throws {
+        for status in [NoteStatus.queued, .transcribing, .failed] {
+            let test = TestGraph(audio: FakeAudioProcessing()); defer { test.tearDown() }
+            var note = transcribedNote()
+            note.saveCurrentVersion(.transcription)
+            let repository = try NoteRepository(root: test.root)
+            try repository.save(note)
+            try Data("caff".utf8).write(to: repository.directory(for: note.id).appendingPathComponent(note.audioFilename))
+            await test.graph.start()
+            // Persisted edits on screen are committed by exportPortable before the snapshot is made.
+            test.graph.library.update(note.id) {
+                $0.transcript = [.init(text: "Hand edited words", start: 0, end: 1, speakerID: "S1")]
+                $0.status = status
+            }
+            let url = try await test.graph.exports.exportPortable(note.id)
+            let stored = try XCTUnwrap(test.graph.library.note(note.id))
+            XCTAssertFalse(ExportSheetState(note: stored, jobPending: true).audioOnly)
+            XCTAssertEqual(ExportSheetState.portableSnapshot(stored), stored)
+            let document = CassiniDocument.read(url)
+            XCTAssertEqual(document.state, .ok)
+            XCTAssertEqual(document.selected()?.transcript?.words.map(\.text), ["Hand", "edited", "words"])
+            XCTAssertEqual(Set(document.variants.compactMap { $0.transcript?.words.map(\.text).joined(separator: " ") }),
+                           ["Hello everyone", "Hand edited words"])
+            let text = try await test.graph.exports.exportTranscript(note.id, format: .text)
+            XCTAssertTrue(try String(contentsOf: text, encoding: .utf8).contains("Hand edited words"))
+        }
+    }
+
+    func testFirstRunCassiniHasNoWordsOrTextChoices() async throws {
+        for status in [NoteStatus.audioOnly, .queued, .transcribing, .failed] {
+            let test = TestGraph(audio: FakeAudioProcessing()); defer { test.tearDown() }
+            var note = Note(title: "First run", audioFilename: "audio.caf")
+            note.status = status
+            try NoteRepository(root: test.root).save(note)
+            try Data("caff".utf8).write(to: test.root.appendingPathComponent(note.id.uuidString).appendingPathComponent(note.audioFilename))
+            await test.graph.start()
+            await test.graph.library.commit(note.id) { $0.status = status }
+            let stored = try XCTUnwrap(test.graph.library.note(note.id))
+            XCTAssertTrue(ExportSheetState(note: stored, jobPending: true).audioOnly)
+            let url = try await test.graph.exports.exportPortable(note.id)
+            let document = CassiniDocument.read(url)
+            XCTAssertEqual(document.state, .ok)
+            XCTAssertEqual(document.selected()?.transcript?.words, [])
         }
     }
 

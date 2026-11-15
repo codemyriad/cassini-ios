@@ -44,11 +44,11 @@ public enum TranscriptExports {
     public static let notExportable: Set<DocumentState> = [.unreadable, .invalidMetadata, .unknownFormat]
 
     /// A note exports its transcript once it has one: a finished transcription (even one without words) or a
-    /// transcript kept from before, with no queued, running or failed job. Live capture and unreadable documents
+    /// transcript kept from before, including during re-transcription. Live capture and unreadable documents
     /// (`notExportable`) cannot export text.
     public static func availability(of note: Note) -> TranscriptExportAvailability {
         if let state = note.document?.state, notExportable.contains(state) { return .notReadable }
-        if note.isRecording || note.status != .ready { return .afterTranscription }
+        if note.isRecording || !note.hasFinishedTranscript { return .afterTranscription }
         return .available
     }
 
