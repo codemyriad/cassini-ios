@@ -20,4 +20,14 @@ public protocol FileImporting: Sendable {
     /// Copies `source` to `destination`, hashing as it goes. Stops with `tooLarge` past `maxBytes`, and with `noSpace`
     /// when less than `reserveBytes` would stay free. Nothing is left at `destination` after an error.
     func copy(from source: URL, to destination: URL, maxBytes: Int64, reserveBytes: Int64) async throws -> ImportedFile
+
+    /// The same bounded copy for a staged ZIP member, admitting legacy archive audio containers.
+    /// External copies continue to use the shared import policy.
+    func copyArchiveMember(from source: URL, to destination: URL, maxBytes: Int64, reserveBytes: Int64) async throws -> ImportedFile
+}
+
+public extension FileImporting {
+    func copyArchiveMember(from source: URL, to destination: URL, maxBytes: Int64, reserveBytes: Int64) async throws -> ImportedFile {
+        try await copy(from: source, to: destination, maxBytes: maxBytes, reserveBytes: reserveBytes)
+    }
 }

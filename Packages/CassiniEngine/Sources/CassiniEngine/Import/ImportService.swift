@@ -35,6 +35,18 @@ public struct ImportService: Sendable {
     /// `fallbackTitle` names a file without a usable name. Throws only `CancellationError`, and then leaves nothing
     /// behind.
     public func importFile(_ url: URL, fallbackTitle: String, displayName: String? = nil) async throws -> ImportOutcome {
+        try await importFile(url, fallbackTitle: fallbackTitle, displayName: displayName, archiveMember: false)
+    }
+
+    /// Restores a staged ZIP member, including legacy audio formats that the app exports unchanged.
+    /// A display name alone never grants archive admission to an external single-file import.
+    public func importArchiveMember(_ url: URL, fallbackTitle: String, displayName: String) async throws -> ImportOutcome {
+        try await importFile(url, fallbackTitle: fallbackTitle, displayName: displayName, archiveMember: true)
+    }
+
+    private func importFile(_ url: URL, fallbackTitle: String, displayName: String?, archiveMember: Bool) async throws -> ImportOutcome {
+        let name = displayName ?? url.lastPathComponent
+        guard archiveMember ? ArchiveAudio.supports(name) : ImportPolicy.accepts(filename: name) else { return .rejected(.cannotOpen) }
         let id = UUID()
         let folder = notes.directory(for: id)
         do {
@@ -44,7 +56,7 @@ public struct ImportService: Sendable {
         }
         let outcome: ImportOutcome
         do {
-            outcome = try await stage(url, as: id, in: folder, fallbackTitle: fallbackTitle, displayName: displayName)
+            outcome = try await stage(url, as: id, in: folder, fallbackTitle: fallbackTitle, displayName: displayName, archiveMember: archiveMember)
         } catch {
             await discard(id, folder)
             throw error
@@ -53,12 +65,17 @@ public struct ImportService: Sendable {
         return outcome
     }
 
-    private func stage(_ url: URL, as id: UUID, in folder: URL, fallbackTitle: String, displayName: String?) async throws -> ImportOutcome {
+    private func stage(_ url: URL, as id: UUID, in folder: URL, fallbackTitle: String, displayName: String?, archiveMember: Bool) async throws -> ImportOutcome {
         let staging = folder.appendingPathComponent(Self.stagingFilename)
         var copied: ImportedFile
         do {
-            copied = try await files.copy(from: url, to: staging, maxBytes: Limits.maxImportBytes,
-                                          reserveBytes: Limits.minFreeImportBytes)
+            if archiveMember {
+                copied = try await files.copyArchiveMember(from: url, to: staging, maxBytes: Limits.maxImportBytes,
+                                                          reserveBytes: Limits.minFreeImportBytes)
+            } else {
+                copied = try await files.copy(from: url, to: staging, maxBytes: Limits.maxImportBytes,
+                                             reserveBytes: Limits.minFreeImportBytes)
+            }
         } catch let error as FileImportError {
             return .rejected(error.failure)
         } catch is CancellationError {
