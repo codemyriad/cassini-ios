@@ -598,8 +598,14 @@ stricter or looser than the spec.
 
 ### Import
 
-- **WAV.** iOS hands every container except Ogg Opus to AVFoundation, which also decodes 24-bit and float WAV. There
-  is therefore no "Unsupported WAV" failure and no IMPORT_WAV banner.
+- **Admission (L-25 / D-1029).** The pinned shared `import-types.json` decides picker/Open-with UTIs and accepted
+  extensions: `.opus`, `.ogg`, `.mp3`, `.m4a`, `.wav`. FLAC and non-contract extensions stay excluded. Bounded probes
+  inside the coordinated security-scoped read reject non-Opus Ogg, multiplexed video, FLAC, recognized non-contract
+  containers and truncated WAV before a destination file is created. `.opus` no longer accepts MP3 bytes as a fallback.
+  ZIP restoration separately admits legacy `ArchiveAudio` containers, including CAF and AAC, after audio validation,
+  so the app can restore audio-only exports without widening Picker/Open-with admission.
+- **WAV.** iOS hands the admitted MP3/M4A/WAV containers to AVFoundation, which also decodes 24-bit and float WAV.
+  There is therefore no separate "Unsupported WAV" failure and no IMPORT_WAV banner.
 - **Sniffing.** AVFoundation reports no MIME type, so the stored name comes from the container signature in the first
   64 bytes (`ImportClassifier`). A display name's extension still wins, as on Android.
 - **Opus playback.** iOS cannot play Ogg Opus directly. An imported plain Opus file or Cassini document is decoded once
@@ -612,9 +618,14 @@ stricter or looser than the spec.
   another app opens its note, or the note that already has those bytes. The picker takes several files at once.
 - **Size and placeholders.** The size the provider reports (an iCloud placeholder reports its logical size) is
   checked against the 4 GiB cap and the free space before the coordinated read that downloads it.
-- **Imports during launch** are held, with "Importing <name>…" showing, until the launch work has read the notes.
-- **Concurrency.** Imports run side by side. The duplicate check and the note write are one step on the `NoteStore`
-  actor, so four imports of one file at once add one note.
+  The coordinated descriptor supplies the authoritative byte count when provider metadata is cached or absent;
+  streaming length checks reject partial reads and retain atomic staging cleanup.
+- **Import cards.** Imports show a session-only `Importing…` card naming the file, including while waiting for launch
+  readiness. A failure keeps its `Needs attention` card until dismissed; original source URLs can be retried. Duplicate,
+  successful and cancelled imports remove their own card. ZIP-member scratch files are removed with the batch, so
+  their failure cards offer dismissal. All labels use the pinned shared catalog.
+- **Concurrency.** Direct opens can run side by side; picker/ZIP batches retain their ordered summaries. The duplicate
+  check and note write are one step on the `NoteStore` actor, so concurrent imports of the same bytes add one note.
 
 ### Export
 

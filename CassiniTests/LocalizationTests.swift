@@ -50,8 +50,9 @@ import Testing
     }
 
     /// A count reads in its language's CLDR category: 0 is `one` in French and Brazilian Portuguese but `other` in
-    /// European Portuguese, Spanish and Italian ("0 note" against "0 notas"). A million is `many` in every language but
-    /// English; `many` has the `other` text, so those cases check that the form is there rather than which one is read.
+    /// European Portuguese, Spanish and Italian ("0 réunions" vs "0 réunion", "0 reuniões" vs "0 reunião"). A million
+    /// is `many` in every language but English; `many` has the `other` text, so those cases check that the form is
+    /// there rather than which one is read.
     @Test(arguments: [
         ("en", 0, "other"), ("en", 1, "one"), ("en", 1_000_000, "other"),
         ("it", 0, "other"), ("it", 1, "one"), ("it", 2, "other"), ("it", 1_000_000, "many"),
@@ -64,11 +65,11 @@ import Testing
         let bundle = try Self.bundle(language)
         let url = try #require(bundle.url(forResource: "Settings", withExtension: "stringsdict"))
         let table = try #require(NSDictionary(contentsOf: url) as? [String: Any])
-        let entry = try #require(table["%lld notes"] as? [String: Any])
+        let entry = try #require(table["%lld meetings"] as? [String: Any])
         let variable = try #require(entry.values.compactMap { $0 as? [String: Any] }.first)
         let form = try #require(variable[category] as? String, "\(language) has no \(category)")
         let locale = Locale(identifier: language)
-        let format = bundle.localizedString(forKey: "%lld notes", value: nil, table: "Settings")
+        let format = bundle.localizedString(forKey: "%lld meetings", value: nil, table: "Settings")
         #expect(String(format: format, locale: locale, count) == String(format: form, locale: locale, count))
     }
 
@@ -76,5 +77,92 @@ import Testing
     @Test func theAppLanguageRowNamesTheLanguageInItsOwnWords() {
         #expect(Self.languages.map(AppLanguageSection.name(of:))
                 == ["English", "Español", "Français", "Italiano", "Português (Brasil)", "Português (Portugal)"])
+    }
+
+    /// L-67 (`D-1047`): Phase 2 screens and shared tables never call a meeting a "note" in any of the six languages.
+    /// `Export`'s `"Notes"` key is `export.markdown.notesHeading` (bookmarks/annotations), not a meeting.
+    @Test(arguments: languages)
+    func phase2TablesNeverCallAMeetingANoteInAnyLanguage(language: String) throws {
+        let bundle = try Self.bundle(language)
+        let forbidden = try NSRegularExpression(pattern: #"\b(note|notes|nota|notas)\b"#, options: [.caseInsensitive])
+        let tables = ["Settings", "Transcription", "Speakers", "SavedVoicesPhase2", "Trash", "BulkTransfer", "Failures", "Export"]
+        for table in tables {
+            var checked = 0
+            if let url = bundle.url(forResource: table, withExtension: "strings"),
+               let entries = NSDictionary(contentsOf: url) as? [String: String] {
+                for (key, value) in entries {
+                    if table == "Export" && key == "Notes" { continue }
+                    checked += 1
+                    let range = NSRange(value.startIndex..<value.endIndex, in: value)
+                    #expect(forbidden.firstMatch(in: value, range: range) == nil,
+                            "\(language) \(table) [\(key)]: \(value)")
+                }
+            }
+            if let url = bundle.url(forResource: table, withExtension: "stringsdict"),
+               let entries = NSDictionary(contentsOf: url) as? [String: Any] {
+                for (key, rawEntry) in entries {
+                    guard let dict = rawEntry as? [String: Any] else { continue }
+                    for rawVar in dict.values {
+                        guard let variable = rawVar as? [String: Any] else { continue }
+                        for category in ["zero", "one", "two", "few", "many", "other"] {
+                            guard let value = variable[category] as? String else { continue }
+                            checked += 1
+                            let range = NSRange(value.startIndex..<value.endIndex, in: value)
+                            #expect(forbidden.firstMatch(in: value, range: range) == nil,
+                                    "\(language) \(table) [\(key) \(category)]: \(value)")
+                        }
+                    }
+                }
+            }
+            #expect(checked > 0, "\(language) \(table) had no localized entries")
+        }
+    }
+
+    @Test func savedVoicesPhase2CopyResolvesCatalogEntriesAndFeminineMeetingCountsInAllSixLanguages() {
+        let staleExpected: [(String, String)] = [
+            ("en", "Name them again in a meeting to keep recognising them."),
+            ("it", "Dai di nuovo il nome in una riunione per continuare a riconoscerla."),
+            ("fr", "Nommez à nouveau cette personne dans une réunion pour que Cassini continue à la reconnaître."),
+            ("es", "Vuelve a poner nombre a esta persona en una reunión para que Cassini la siga reconociendo."),
+            ("pt-BR", "Nomeie essa pessoa de novo em uma reunião para que ela continue sendo reconhecida."),
+            ("pt-PT", "Dê novamente nome a esta pessoa numa reunião para que continue a ser reconhecida."),
+        ]
+        for (language, expected) in staleExpected {
+            #expect(SavedVoicesPhase2Copy.template("savedVoices.row.stale", language: language) == expected)
+            let howToAdd = SavedVoicesPhase2Copy.template("savedVoices.howToAdd", language: language)
+            #expect(!howToAdd.isEmpty)
+        }
+        #expect(SavedVoicesPhase2Copy.template("savedVoices.row.stale", language: "fr_CA")
+                == "Nommez à nouveau cette personne dans une réunion pour que Cassini continue à la reconnaître.")
+
+        let countCases: [(String, Int, String)] = [
+            ("en", 0, "0 meetings · 22 min"),
+            ("en", 1, "1 meeting · 22 min"),
+            ("en", 14, "14 meetings · 22 min"),
+            ("en", 1_000_000, "1,000,000 meetings · 22 min"),
+            ("it", 0, "0 riunioni · 22 min"),
+            ("it", 1, "1 riunione · 22 min"),
+            ("it", 14, "14 riunioni · 22 min"),
+            ("it", 1_000_000, "1.000.000 riunioni · 22 min"),
+            ("fr", 0, "0 réunion · 22 min"),
+            ("fr", 1, "1 réunion · 22 min"),
+            ("fr", 14, "14 réunions · 22 min"),
+            ("fr", 1_000_000, "1\u{202F}000\u{202F}000 réunions · 22 min"),
+            ("es", 0, "0 reuniones · 22 min"),
+            ("es", 1, "1 reunión · 22 min"),
+            ("es", 14, "14 reuniones · 22 min"),
+            ("es", 1_000_000, "1.000.000 reuniones · 22 min"),
+            ("pt-BR", 0, "0 reunião · 22 min"),
+            ("pt-BR", 1, "1 reunião · 22 min"),
+            ("pt-BR", 14, "14 reuniões · 22 min"),
+            ("pt-BR", 1_000_000, "1.000.000 reuniões · 22 min"),
+            ("pt-PT", 0, "0 reuniões · 22 min"),
+            ("pt-PT", 1, "1 reunião · 22 min"),
+            ("pt-PT", 14, "14 reuniões · 22 min"),
+            ("pt-PT", 1_000_000, "1\u{00A0}000\u{00A0}000 reuniões · 22 min"),
+        ]
+        for (language, count, expected) in countCases {
+            #expect(SavedVoicesPhase2Copy.meta(meetings: count, confirmedSpeech: "22 min", language: language) == expected)
+        }
     }
 }

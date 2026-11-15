@@ -10,6 +10,9 @@ enum LibraryPhase1Copy {
     static var record: String {
         String(localized: "common.record", table: "LibraryPhase1")
     }
+    static var tryAgain: String {
+        String(localized: "common.tryAgain", table: "LibraryPhase1")
+    }
     static var importAudio: String {
         String(localized: "import.button.mobile", table: "LibraryPhase1")
     }
@@ -52,6 +55,8 @@ enum LibraryPhase1Copy {
             return String(localized: "common.close", table: "LibraryPhase1", bundle: localized, locale: locale)
         case "common.record":
             return String(localized: "common.record", table: "LibraryPhase1", bundle: localized, locale: locale)
+        case "common.tryAgain":
+            return String(localized: "common.tryAgain", table: "LibraryPhase1", bundle: localized, locale: locale)
         case "format.searchCount.join":
             return String(localized: "format.searchCount.join", table: "LibraryPhase1", bundle: localized, locale: locale)
         case "format.searchCount.meetings":

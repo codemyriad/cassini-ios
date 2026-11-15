@@ -206,8 +206,8 @@ private func sha256(_ url: URL) throws -> String {
     @Test func aMislabelledFileGetsTheExtensionOfWhatItIs() async throws {
         // An MP3 named .opus must never become source.opus, which the pipeline reads as Ogg Opus.
         let h = try ImportHarness()
-        let id = try h.created(try await h.run(try h.input(ImportFixtures.mp3, "song.opus")))
-        try await h.assertPlain(id, file: "source.mp3", duration: ImportFixtures.duration, title: "song")
+        let outcome = try await h.run(try h.input(ImportFixtures.mp3, "song.opus"))
+        #expect(outcome == .rejected(.cannotOpen)) // Shared Opus contract requires OpusHead before copying.
     }
 
     @Test func aWavIsReadByAVFoundationWhateverItsSampleFormat() async throws {
