@@ -18,15 +18,15 @@ import CassiniNotebook
     }
 
     @Test func onlyDecidedExtensionsAndNarrowUTIsAreOffered() {
-        #expect(ImportPolicy.entries.map(\.id) == ["opus-ogg", "mp3", "m4a", "wav"])
-        for name in ["one.opus", "ONE.OGG", "one.mp3", "one.m4a", "one.wav"] {
+        #expect(ImportPolicy.entries.map(\.id) == ["opus-ogg", "mp3", "m4a", "wav", "flac"])
+        for name in ["one.opus", "ONE.OGG", "one.mp3", "one.m4a", "one.wav", "one.flac"] {
             #expect(ImportPolicy.accepts(filename: name))
         }
-        for ext in ["flac", "oga", "ogv", "ogx", "spx", "aac", "aiff", "caf", "mp4"] {
+        for ext in ["oga", "ogv", "ogx", "spx", "aac", "aiff", "caf", "mp4"] {
             #expect(!ImportPolicy.accepts(filename: "one." + ext))
         }
         #expect(!ImportPolicy.utis.contains("public.audio"))
-        #expect(!ImportPolicy.utis.contains("org.xiph.flac"))
+        #expect(ImportPolicy.utis.contains("org.xiph.flac"))
     }
 
     private func page(_ payload: [UInt8], bos: Bool = true, serial: UInt8 = 1) -> [UInt8] {

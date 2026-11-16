@@ -74,7 +74,7 @@ required.
 
 Platform differences: iOS uses its existing native document picker and system share/save sheet. The picker has
 no custom filter-title API; shared `import.filter.cassiniAndZip` is the import button's accessibility hint.
-Individual imports follow the pinned shared decided-format contract (Opus/Ogg, MP3, M4A and WAV). ZIP members
+Individual imports follow the pinned shared decided-format contract (Opus/Ogg, MP3, M4A, WAV and native FLAC). ZIP members
 also admit legacy `ArchiveAudio` containers so exports can be restored unchanged, with audio inspection and
 MPEG-4/3GP video-track rejection. ZIP extraction retains a member's extension on its private UUID scratch file. D96
 copy, including all six translations/plurals, is pinned in [shared-strings-pin.md](shared-strings-pin.md). The

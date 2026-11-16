@@ -8,6 +8,96 @@ import CassiniEngineTesting
 @testable import Cassini
 
 final class AudioPipelineTests: XCTestCase {
+    @MainActor func testNativeFLACImportPlaybackAndPortableDecodeAtBothRates() async throws {
+        let sources = try makeRoot(); defer { try? FileManager.default.removeItem(at: sources) }
+        for rate in [48_000, 44_100] {
+            let test = TestGraph(); defer { test.tearDown() }
+            let source = sources.appendingPathComponent("Signal.flac")
+            try FLACFixtures.native(rate: rate).write(to: source)
+            await test.graph.start()
+            test.graph.settings.autoTranscribe = false
+            let outcome = await test.graph.imports.importFile(source, opensNote: false).value
+            let note = try XCTUnwrap(test.graph.library.notes.first)
+            XCTAssertEqual(outcome, .created(note.id))
+            XCTAssertEqual(note.audioFilename, "source.flac")
+            XCTAssertEqual(note.duration, Double(FLACFixtures.samples) / Double(rate), accuracy: 0.0001)
+            test.graph.playback.show(note, owner: PlaybackOwner())
+            XCTAssertEqual(test.playback.loadedURL, test.graph.library.audioURL(note))
+            let player = try AVAudioPlayer(contentsOf: source)
+            XCTAssertTrue(player.prepareToPlay())
+            XCTAssertEqual(player.duration, note.duration, accuracy: 0.001)
+            await test.graph.library.commit(note.id) { note in
+                note.transcript = [.init(text: "Generated signal", start: 0, end: note.duration)]
+                note.status = .ready
+            }
+            let encoded = try await test.graph.exports.exportPortable(note.id)
+            defer { try? FileManager.default.removeItem(at: encoded.deletingLastPathComponent()) }
+            XCTAssertEqual(CassiniDocument.read(encoded).state, .ok)
+            let decoded = sources.appendingPathComponent("decoded.caf")
+            try OpusAudio.decode(encoded, to: decoded)
+            let decodedSummary = try await AudioInspection.inspect(decoded)
+            XCTAssertEqual(decodedSummary.duration, note.duration, accuracy: 0.001)
+            XCTAssertTrue(test.graph.imports.tracker.cards.isEmpty)
+        }
+    }
+
+    @MainActor func testDamagedFLACShowsNeedsAttentionAndCleansNoteDirectory() async throws {
+        let sources = try makeRoot(); defer { try? FileManager.default.removeItem(at: sources) }
+        let test = TestGraph(); defer { test.tearDown() }
+        await test.graph.start()
+        for bytes in FLACFixtures.invalid {
+            let source = sources.appendingPathComponent("Broken.flac")
+            try bytes.write(to: source)
+            let outcome = await test.graph.imports.importFile(source, opensNote: false).value
+            XCTAssertEqual(outcome, .rejected(.cannotOpen))
+            XCTAssertEqual(test.graph.imports.tracker.cards.last?.failure, .cannotOpen)
+            XCTAssertEqual(StatusBadgeCopy.template("states.badge.needsAttention", language: "en"), "Needs attention")
+            XCTAssertTrue(test.graph.library.notes.isEmpty)
+            XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: test.root.path).filter { UUID(uuidString: $0) != nil }, [])
+            let encoded = sources.appendingPathComponent("must-not-seal.opus")
+            XCTAssertThrowsError(try OpusAudio.encode(source, to: encoded))
+            XCTAssertFalse(FileManager.default.fileExists(atPath: encoded.path))
+        }
+    }
+
+    @MainActor func testExtensionlessNativeFLACImportsWithPlayableDuration() async throws {
+        let sources = try makeRoot(); defer { try? FileManager.default.removeItem(at: sources) }
+        let test = TestGraph(); defer { test.tearDown() }
+        let source = sources.appendingPathComponent("Shared recording")
+        try FLACFixtures.native().write(to: source)
+        await test.graph.start()
+        test.graph.settings.autoTranscribe = false
+        let outcome = await test.graph.imports.importFile(source, opensNote: false).value
+        let note = try XCTUnwrap(test.graph.library.notes.first)
+        XCTAssertEqual(outcome, .created(note.id))
+        XCTAssertEqual(note.audioFilename, "source.flac")
+        XCTAssertEqual(note.duration, Double(FLACFixtures.samples) / 48_000, accuracy: 0.0001)
+        let audio = try XCTUnwrap(test.graph.library.audioURL(note))
+        let player = try AVAudioPlayer(contentsOf: audio)
+        XCTAssertTrue(player.prepareToPlay())
+        XCTAssertEqual(player.duration, note.duration, accuracy: 0.001)
+        XCTAssertTrue(test.graph.imports.tracker.cards.isEmpty)
+    }
+
+    @MainActor func testDamagedExtensionlessFLACFailsWithoutNoteOrStaging() async throws {
+        let sources = try makeRoot(); defer { try? FileManager.default.removeItem(at: sources) }
+        let test = TestGraph(); defer { test.tearDown() }
+        let source = sources.appendingPathComponent("Broken recording")
+        let bytes = FLACFixtures.native().dropLast()
+        try bytes.write(to: source)
+        await test.graph.start()
+        let outcome = await test.graph.imports.importFile(source, opensNote: false).value
+        XCTAssertEqual(outcome, .rejected(.cannotOpen))
+        XCTAssertEqual(test.graph.imports.tracker.cards.last?.failure, .cannotOpen)
+        XCTAssertEqual(StatusBadgeCopy.template("states.badge.needsAttention", language: "en"), "Needs attention")
+        XCTAssertTrue(test.graph.library.notes.isEmpty)
+        let files = try XCTUnwrap(FileManager.default.enumerator(at: test.root, includingPropertiesForKeys: nil))
+            .allObjects.compactMap { $0 as? URL }
+        XCTAssertFalse(files.contains { $0.lastPathComponent == ImportService.stagingFilename || $0.lastPathComponent == "source.flac" })
+        XCTAssertFalse(files.contains { UUID(uuidString: $0.lastPathComponent) != nil })
+        XCTAssertEqual(try Data(contentsOf: source), bytes)
+    }
+
     private func makeRoot() throws -> URL {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)

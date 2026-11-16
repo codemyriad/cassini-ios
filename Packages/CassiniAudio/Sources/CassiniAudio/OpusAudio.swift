@@ -65,6 +65,7 @@ public enum OpusAudio {
     }
 
     private static func encode(_ source: URL, into sink: FileSink, onChunk: (@Sendable () throws -> Void)?) throws {
+        try NativeFLAC.validateIfPresent(source)
         let input = try AVAudioFile(forReading: source)
         guard let format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 48_000, channels: 1, interleaved: false),
               let converter = AVAudioConverter(from: input.processingFormat, to: format),

@@ -1,5 +1,10 @@
 import AVFoundation
 import Foundation
+import CassiniEngineTesting
+import CassiniEngine
+import CassiniAudio
+import CassiniCore
+import Synchronization
 import Speech
 import Testing
 @testable import CassiniInference
@@ -7,6 +12,119 @@ import Testing
 /// `FileReader` over generated WAV and CAF files: the resume offset, the recording-clock time of the first block, block reading,
 /// conversion, the end of the file and a file cut short.
 @Suite struct FileReaderTests {
+    @Test(arguments: [48_000, 44_100]) func nativeFLACReachesTheEndForAppleAndParakeet(rate: Int) throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".flac")
+        defer { try? FileManager.default.removeItem(at: url) }
+        try FLACFixtures.native(rate: rate).write(to: url)
+        let output = try #require(AVAudioFormat(standardFormatWithSampleRate: 16_000, channels: 1))
+        let reader = try FileReader(url: url, from: 0, to: output, downmix: true)
+        var count = 0
+        while let block = reader.nextBuffer() { count += Int(block.0.frameLength) }
+        #expect(abs(count - FLACFixtures.samples * 16_000 / rate) <= 1)
+        #expect(reader.reachedEnd)
+        #expect(reader.failure == nil)
+        for bytes in FLACFixtures.invalid {
+            try bytes.write(to: url)
+            #expect(throws: (any Error).self) { try FileReader(url: url, from: 0, to: output) }
+        }
+    }
+
+    @Test func cancellationDuringValidationOnInferenceThread() async throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".flac")
+        defer { try? FileManager.default.removeItem(at: url) }
+        try FLACFixtures.native(frames: 8192).write(to: url)
+        let cancel = CancelFlag()
+        let decoding = Mutex(false)
+        NativeFLAC.observeValidation(at: url) { event in
+            // This callback is the event: cancellation happens only after frame validation starts,
+            // on the actual dedicated thread, before any full decode can finish.
+            if event == .checkingFrames { cancel.set() }
+            if event == .decoding { decoding.withLock { $0 = true } }
+        }
+        defer { NativeFLAC.observeValidation(at: url, nil) }
+        await #expect(throws: CancellationError.self) {
+            try await InferenceThread.speech.run {
+                withUnsafeCurrentTask { task in #expect(task == nil) }
+                let format = try #require(AVAudioFormat(standardFormatWithSampleRate: 16_000, channels: 1))
+                _ = try FileReader(url: url, from: 0, to: format, checkCancellation: cancel.check)
+            }
+        }
+        #expect(!decoding.withLock { $0 })
+        // A cancelled validation must not populate the cache.
+        NativeFLAC.observeValidation(at: url) { event in
+            if event == .decoding { decoding.withLock { $0 = true } }
+        }
+        try NativeFLAC.validateIfPresent(url)
+        #expect(decoding.withLock { $0 })
+    }
+
+    @Test func importedFLACValidationIsReusedByEveryReaderAndInvalidatedByChanges() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = root.appendingPathComponent("extensionless")
+        let staged = root.appendingPathComponent("source.tmp")
+        let final = root.appendingPathComponent("source.flac")
+        let passes = Mutex(0)
+        for url in [staged, final] {
+            NativeFLAC.observeValidation(at: url) { event in
+                if event == .decoding { passes.withLock { $0 += 1 } }
+            }
+        }
+        defer {
+            NativeFLAC.observeValidation(at: staged, nil)
+            NativeFLAC.observeValidation(at: final, nil)
+        }
+        let bytes = FLACFixtures.native()
+        try bytes.write(to: source)
+        _ = try await CoordinatedFileImporter(storage: FakeStorage()).copy(
+            from: source, to: staged, maxBytes: 1 << 20, reserveBytes: 0)
+        #expect(passes.withLock { $0 } == 1)
+        try NativeFLAC.moveValidatedFile(from: staged, to: final)
+        _ = try await AudioInspection.inspect(final)
+        let format = try #require(AVAudioFormat(standardFormatWithSampleRate: 16_000, channels: 1))
+        _ = try FileReader(url: final, from: 0, to: format)
+        _ = try WhistleAudioReader(url: final, position: 0)
+        try OpusAudio.encode(final, to: root.appendingPathComponent("export.opus"))
+        #expect(passes.withLock { $0 } == 1)
+        // Cache hits still honor cancellation, including readers on a non-Task inference thread.
+        let cancel = CancelFlag(); cancel.set()
+        #expect(throws: CancellationError.self) {
+            try FileReader(url: final, from: 0, to: format, checkCancellation: cancel.check)
+        }
+        #expect(throws: CancellationError.self) {
+            try WhistleAudioReader(url: final, position: 0, checkCancellation: cancel.check)
+        }
+        // Same size/inode, changed mtime: revalidate once, then reuse.
+        try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSince1970: 100)], ofItemAtPath: final.path)
+        try NativeFLAC.validateIfPresent(final)
+        #expect(passes.withLock { $0 } == 2)
+        // Replacing an inode with the same size and mtime must also force a pass.
+        let replacement = root.appendingPathComponent("replacement")
+        try bytes.write(to: replacement)
+        try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSince1970: 100)], ofItemAtPath: replacement.path)
+        try FileManager.default.removeItem(at: final)
+        try FileManager.default.moveItem(at: replacement, to: final)
+        try NativeFLAC.validateIfPresent(final)
+        #expect(passes.withLock { $0 } == 3)
+        // Even an identical cache key never bypasses the cheap magic/header check.
+        let header = try FileHandle(forWritingTo: final)
+        try header.write(contentsOf: Data([0]))
+        try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSince1970: 100)], ofItemAtPath: final.path)
+        #expect(throws: (any Error).self) { try NativeFLAC.validateIfPresent(final) }
+        try header.seek(toOffset: 0)
+        try header.write(contentsOf: Data([bytes[0]]))
+        try header.close()
+        let handle = try FileHandle(forWritingTo: final)
+        try handle.truncate(atOffset: UInt64(bytes.count - 1))
+        try handle.close()
+        #expect(throws: (any Error).self) { try NativeFLAC.validateIfPresent(final) }
+        await #expect(throws: (any Error).self) { try await AudioInspection.inspect(final) }
+        #expect(throws: (any Error).self) { try FileReader(url: final, from: 0, to: format) }
+        #expect(throws: (any Error).self) { try WhistleAudioReader(url: final, position: 0) }
+        #expect(throws: (any Error).self) { try OpusAudio.encode(final, to: root.appendingPathComponent("bad.opus")) }
+    }
+
     private let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     private let rate = 16_000.0
 

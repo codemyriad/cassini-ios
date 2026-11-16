@@ -5,7 +5,9 @@
       "en": "The transcript as a text file, with speakers and times.",
       "platforms": [
         "gnome",
-        "mac"
+        "mac",
+        "ios",
+        "android"
       ],
       "role": "caption",
       "boards": [
@@ -30,14 +32,17 @@
         "pt-PT": {
           "text": "A transcrição como ficheiro de texto, com oradores e tempos."
         }
-      }
+      },
+      "note": "L-11 (D-998, D99): one export format set on all four apps (PARITY export contract)."
     },
     {
       "id": "export.markdown.label",
       "en": "Markdown",
       "platforms": [
         "gnome",
-        "mac"
+        "mac",
+        "ios",
+        "android"
       ],
       "role": "label",
       "boards": [
@@ -45,7 +50,7 @@
         "Export-mac"
       ],
       "milestone": "UX7a",
-      "note": "Radio option 2, semibold. No size is shown.",
+      "note": "Radio option 2, semibold. No size is shown. L-11 (D-998, D99): one export format set on all four apps (PARITY export contract).",
       "status": "drawn",
       "l10n": {
         "it": {

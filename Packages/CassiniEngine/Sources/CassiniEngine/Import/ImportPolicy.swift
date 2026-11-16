@@ -1,5 +1,6 @@
 import Foundation
 import CassiniNotebook
+import CassiniCore
 
 /// The pinned shared policy is the sole source of offered audio types. Header reads are bounded and happen inside
 /// the coordinated/security-scoped accessor, before a destination file is created.
@@ -10,6 +11,14 @@ public enum ImportPolicy {
         public let extensions: [String]
         public let utis: [String]
         let contentValidation: Validation?
+        let headerValidation: HeaderValidation?
+        let mimeTypes: [String]
+    }
+    struct HeaderValidation: Decodable, Sendable {
+        let minProbeBytes: Int
+        let magicHex: String
+        let firstMetadataBlockType: Int
+        let streamInfoLength: Int
     }
     struct Validation: Decodable, Sendable {
         let minProbeBytes: Int
@@ -29,10 +38,29 @@ public enum ImportPolicy {
         let ext = "." + (filename as NSString).pathExtension.lowercased()
         return entries.contains { $0.extensions.contains(ext) }
     }
-    public static let probeBytes = entries.compactMap(\.contentValidation?.minProbeBytes).max()!
+    public static func accepts(filename: String, typeIdentifier: String?, mimeType: String?) -> Bool {
+        let mime = mimeType?.split(separator: ";", maxSplits: 1).first.map(String.init)?.trimmingCharacters(in: .whitespaces).lowercased()
+        let flac = entries.first { $0.id == "flac" }!
+        let declaresFLAC = flac.utis.contains(typeIdentifier ?? "") || flac.mimeTypes.contains(mime ?? "")
+        let ext = (filename as NSString).pathExtension.lowercased()
+        let isFLAC = flac.extensions.contains("." + ext) || (ext.isEmpty && declaresFLAC)
+        if isFLAC { return mime == nil || flac.mimeTypes.contains(mime!) }
+        if declaresFLAC { return false }
+        return accepts(filename: filename)
+    }
+    public static let probeBytes = entries.flatMap { [$0.contentValidation?.minProbeBytes, $0.headerValidation?.minProbeBytes].compactMap { $0 } }.max()!
 
-    public static func validate(header: Data, filename: String, fileBytes: Int64?) throws {
-        guard accepts(filename: filename), !header.starts(with: Data("fLaC".utf8)) else { throw FileImportError.cannotOpen }
+    public static func validate(header: Data, filename: String, fileBytes: Int64?,
+                                typeIdentifier: String? = nil, mimeType: String? = nil) throws {
+        // Providers sometimes omit both an extension and a concrete type. Only native FLAC bytes can
+        // fill that gap; every named extension still has to agree with the container.
+        let filename = (filename as NSString).pathExtension.isEmpty ? filename + ".flac" : filename
+        guard accepts(filename: filename, typeIdentifier: typeIdentifier, mimeType: mimeType) else { throw FileImportError.cannotOpen }
+        if (filename as NSString).pathExtension.lowercased() == "flac" {
+            do { _ = try NativeFLAC.header(header) } catch { throw FileImportError.cannotOpen }
+            return
+        }
+        guard !header.starts(with: Data("fLaC".utf8)) else { throw FileImportError.cannotOpen }
         let bytes = [UInt8](header)
         // A decided filename must not admit a recognized non-contract container such as raw ADTS, CAF or AIFF.
         if case .other(let container?) = ImportClassifier.sniff(bytes), !accepts(filename: "source." + container) {

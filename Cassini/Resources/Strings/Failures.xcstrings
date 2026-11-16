@@ -875,43 +875,43 @@
         }
       }
     },
-    "This audio could not be opened. Try M4A, WAV, MP3, AIFF, or CAF.": {
+    "This audio could not be opened. Try Opus/Ogg, M4A, WAV, MP3, or FLAC.": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "This audio could not be opened. Try M4A, WAV, MP3, AIFF, or CAF."
+            "value": "This audio could not be opened. Try Opus/Ogg, M4A, WAV, MP3, or FLAC."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "No se pudo abrir este audio. Prueba con M4A, WAV, MP3, AIFF o CAF."
+            "value": "No se pudo abrir este audio. Prueba con Opus/Ogg, M4A, WAV, MP3 o FLAC."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Impossible d’ouvrir cet audio. Essayez M4A, WAV, MP3, AIFF ou CAF."
+            "value": "Impossible d’ouvrir cet audio. Essayez Opus/Ogg, M4A, WAV, MP3 ou FLAC."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Impossibile aprire l’audio. Prova M4A, WAV, MP3, AIFF o CAF."
+            "value": "Impossibile aprire l’audio. Prova Opus/Ogg, M4A, WAV, MP3 o FLAC."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Não foi possível abrir este áudio. Tente M4A, WAV, MP3, AIFF ou CAF."
+            "value": "Não foi possível abrir este áudio. Tente Opus/Ogg, M4A, WAV, MP3 ou FLAC."
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "Não foi possível abrir este áudio. Experimente M4A, WAV, MP3, AIFF ou CAF."
+            "value": "Não foi possível abrir este áudio. Experimente Opus/Ogg, M4A, WAV, MP3 ou FLAC."
           }
         }
       }
@@ -1315,43 +1315,43 @@
         }
       }
     },
-    "Use a 16-bit PCM WAV, or try M4A, MP3, AIFF, or CAF.": {
+    "Use a 16-bit PCM WAV, or try Opus/Ogg, M4A, MP3, or FLAC.": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Use a 16-bit PCM WAV, or try M4A, MP3, AIFF, or CAF."
+            "value": "Use a 16-bit PCM WAV, or try Opus/Ogg, M4A, MP3, or FLAC."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Usa un WAV PCM de 16 bits, o prueba con M4A, MP3, AIFF o CAF."
+            "value": "Usa un WAV PCM de 16 bits, o prueba con Opus/Ogg, M4A, MP3 o FLAC."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Utilisez un WAV PCM 16 bits, ou essayez M4A, MP3, AIFF ou CAF."
+            "value": "Utilisez un WAV PCM 16 bits, ou essayez Opus/Ogg, M4A, MP3 ou FLAC."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Usa un WAV PCM a 16 bit, oppure M4A, MP3, AIFF o CAF."
+            "value": "Usa un WAV PCM a 16 bit, oppure Opus/Ogg, M4A, MP3 o FLAC."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Use um WAV PCM de 16 bits ou tente M4A, MP3, AIFF ou CAF."
+            "value": "Use um WAV PCM de 16 bits ou tente Opus/Ogg, M4A, MP3 ou FLAC."
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "Use um WAV PCM de 16 bits ou experimente M4A, MP3, AIFF ou CAF."
+            "value": "Use um WAV PCM de 16 bits ou experimente Opus/Ogg, M4A, MP3 ou FLAC."
           }
         }
       }

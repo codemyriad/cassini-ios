@@ -82,6 +82,7 @@
 				<string>com.apple.m4a-audio</string>
 				<string>public.mpeg-4-audio</string>
 				<string>com.microsoft.waveform-audio</string>
+				<string>org.xiph.flac</string>
 			</array>
 			<key>LSHandlerRank</key>
 			<string>Alternate</string>
@@ -130,6 +131,28 @@
 				<array>
 					<string>audio/opus</string>
 					<string>audio/x-opus+ogg</string>
+				</array>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>org.xiph.flac</string>
+			<key>UTTypeDescription</key>
+			<string>FLAC</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.audio</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>flac</string>
+				</array>
+				<key>public.mime-type</key>
+				<array>
+					<string>audio/flac</string>
+					<string>audio/x-flac</string>
 				</array>
 			</dict>
 		</dict>
