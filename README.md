@@ -165,6 +165,12 @@ TestFlight still need.
 
 [docs/differences.md](docs/differences.md) describes each difference in detail. In summary:
 
+- **Live recording motion (iOS presentation extra).** The microphone meter samples at 40 Hz; the same 56 peak
+  buckets still cover seven seconds. A display-scheduled Canvas interpolates their heights and horizontal position
+  at the available refresh rate (including ProMotion). Pause, Reduce Motion and inactive scenes remove the
+  animation timeline. Capture duration, policy, stored audio and enrollment limits remain based on captured time.
+  See [the UI observation audit](docs/ui-observation.md) for observation boundaries and verification.
+
 - **Library export on iOS 18.** The format selector opens full-screen below iOS 26. A sheet can hang SwiftUI’s lazy
   Library layout after Star changes on iOS 18.2; full-screen presentation avoids resizing the Library behind it.
   The formats and share-after-confirmation flow are unchanged. iOS 26 and later keep the sheet.

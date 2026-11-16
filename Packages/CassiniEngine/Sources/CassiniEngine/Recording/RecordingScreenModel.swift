@@ -62,7 +62,9 @@ public final class RecordingScreenModel {
     public private(set) var pendingStart = false
     public private(set) var ended: Ended?
     /// The capture as last shown, for the title and time while it is being saved.
-    private var shown: ActiveRecording?
+    @ObservationIgnored private var shown: ActiveRecording?
+    /// Layout observes lifecycle facts independently of the once-per-second duration.
+    private var layoutState: RecordingState = .idle
 
     @ObservationIgnored public var onEffect: (@MainActor (RecordingEffect) -> Void)?
     @ObservationIgnored private let ports: Ports
@@ -83,7 +85,7 @@ public final class RecordingScreenModel {
     // MARK: What the screen shows
 
     public var phase: RecordingPhase {
-        let recorder = controller.state
+        let recorder = layoutState
         let idle = !recorder.inProgress
         if idle, microphoneDenied || pendingStart { return .needsPermission }
         switch idle ? endedOutcome : nil {
@@ -99,7 +101,7 @@ public final class RecordingScreenModel {
     }
 
     public var title: String {
-        switch controller.state {
+        switch layoutState {
         case .active(let active): active.title
         case .starting: controller.startingTitle ?? ""
         case .finishing: shown?.title ?? ""
@@ -112,7 +114,7 @@ public final class RecordingScreenModel {
         return controller.state.inProgress || ended != nil ? shown?.elapsed ?? 0 : 0
     }
 
-    public var format: CaptureFormat { controller.state.activeRecording?.format ?? shown?.format ?? .pcm48kMono }
+    public var format: CaptureFormat { layoutState.activeRecording?.format ?? shown?.format ?? .pcm48kMono }
 
     /// The free space as recording time, for the hint; nil before the capture runs.
     public var space: RecordingSpace? { controller.state.activeRecording?.space }
@@ -121,14 +123,14 @@ public final class RecordingScreenModel {
 
     /// The banner the screen shows: the first of `Notices.recording`, from the catalogue.
     public var banner: BannerSpec? {
-        Notices.recording(controller.state, microphoneOff: microphoneDenied && !controller.state.inProgress,
+        Notices.recording(layoutState, microphoneOff: microphoneDenied && !layoutState.inProgress,
                           ended: endedOutcome).first
     }
 
     /// The outcome the screen shows: the one it kept, or the recorder's before the screen has taken it.
     private var endedOutcome: RecordingOutcome? {
         if let ended { return ended.outcome }
-        if case .ended(_, let outcome) = controller.state { return outcome }
+        if case .ended(_, let outcome) = layoutState { return outcome }
         return nil
     }
 
@@ -206,6 +208,13 @@ public final class RecordingScreenModel {
     // MARK: The recorder
 
     private func follow(_ state: RecordingState) {
+        var layout = state
+        if case .active(var active) = layout {
+            active.elapsed = 0
+            active.space = nil
+            layout = .active(active)
+        }
+        if layoutState != layout { layoutState = layout }
         switch state {
         case .starting, .finishing:
             sawCapture = true

@@ -74,7 +74,7 @@ struct NameSpeakerSheet: View {
     }
 
     /// A sample of this note is playing; it ends by itself at its end, on a pause, an interruption or a lost output.
-    private var sampling: Bool { playback.owns(noteID) && playback.state.sample != nil }
+    private var sampling: Bool { playback.owns(noteID) && playback.controls.sample != nil }
 
     private var mergeShown: Binding<Bool> {
         Binding(get: { state?.merge != nil }, set: { if !$0, state?.merge != nil { send(.closeMerge) } })

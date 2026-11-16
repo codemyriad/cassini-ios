@@ -14,6 +14,7 @@ import CassiniNotebook
 /// chip do, so a tick redraws only them.
 struct NoteDetailView: View {
     let noteID: UUID
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(ProcessingStore.self) private var processing
     @Environment(Router.self) private var router
     @Environment(VoicesStore.self) private var voices
@@ -99,10 +100,11 @@ struct NoteDetailView: View {
     }
 
     private func content(_ note: Note, mode: NoteMode) -> some View {
-        let transcript = mode.showsReading
-            ? cache.sealed(note, voices: voices.savedVoices, suggestions: readOnly == nil ? voices.suggestions(for: note) : [])
-            : .empty
-        let matches = model.screen.search.map { cache.matches(transcript, query: $0.query) } ?? []
+        let sealedKey = TranscriptCache.SealedKey(note, voices: voices.savedVoices,
+                                                 suggestions: readOnly == nil ? voices.suggestions(for: note) : [])
+        let transcript = mode.showsReading ? cache.sealed(sealedKey) : .empty
+        let searchKey = TranscriptCache.SearchKey(transcript, query: model.screen.search?.query ?? "")
+        let matches = model.screen.search == nil ? [] : cache.matches(searchKey)
         let current = model.screen.search?.current(of: matches.count) ?? 0
         let subtitle = NoteSubtitle.of(note, mode: mode, now: clock.now, calendar: calendar)
         let openDetails = {
@@ -129,6 +131,10 @@ struct NoteDetailView: View {
                                   headerTitleVisible: headerTitleVisible, titleVisibilityChanged: { headerTitleVisible = $0 })
             }
         }
+        .task(id: mode.showsReading ? sealedKey : nil) {
+            if mode.showsReading { await cache.prepareSealed(sealedKey) }
+        }
+        .task(id: searchKey) { await cache.prepareMatches(searchKey) }
         .overlay(alignment: .topLeading) {
             if let speechModels = processing.speechModels {
                 // The diagnostics callback precedes .ended. Its flag alone does not mean the reading banners exist.
@@ -159,7 +165,7 @@ struct NoteDetailView: View {
                     NotePlayerBar(note: note, markMoment: { model.markMoment(at: $0) })
                 }
             }
-            .animation(.default, value: model.screen.follow)
+            .animation(reduceMotion ? nil : .default, value: model.screen.follow)
         }
         .toolbar {
             ToolbarItem(placement: .principal) {

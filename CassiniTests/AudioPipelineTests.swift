@@ -21,7 +21,7 @@ final class AudioPipelineTests: XCTestCase {
             XCTAssertEqual(outcome, .created(note.id))
             XCTAssertEqual(note.audioFilename, "source.flac")
             XCTAssertEqual(note.duration, Double(FLACFixtures.samples) / Double(rate), accuracy: 0.0001)
-            test.graph.playback.show(note, owner: PlaybackOwner())
+            await test.graph.playback.show(note, owner: PlaybackOwner())
             XCTAssertEqual(test.playback.loadedURL, test.graph.library.audioURL(note))
             let player = try AVAudioPlayer(contentsOf: source)
             XCTAssertTrue(player.prepareToPlay())
@@ -240,7 +240,7 @@ final class AudioPipelineTests: XCTestCase {
         XCTAssertEqual(imported.duration, 2, accuracy: 0.01)
         XCTAssertEqual(try Data(contentsOf: XCTUnwrap(store.originalAudioURL(imported))), original)
         XCTAssertEqual(try Data(contentsOf: portable), original)
-        test.graph.playback.show(imported, owner: PlaybackOwner())
+        await test.graph.playback.show(imported, owner: PlaybackOwner())
         XCTAssertEqual(test.graph.playback.state.noteID, imported.id)
         XCTAssertEqual(test.playback.loadedURL, store.audioURL(imported))
     }

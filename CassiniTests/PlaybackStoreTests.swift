@@ -7,12 +7,36 @@ import CassiniEngineTesting
 /// The app's player over a real library: positions saved to the note, the reload when the audio changes, and the
 /// failure state.
 @MainActor final class PlaybackStoreTests: XCTestCase {
+    func testLeavingBeforeFilePreparationCompletesDoesNotReopenThePlayer() async throws {
+        let test = TestGraph(); defer { test.tearDown() }
+        let note = try await seedNote(in: test)
+        let playback = test.graph.playback, owner = PlaybackOwner()
+        playback.requestShow(note, owner: owner)
+        playback.leave(owner)
+        await playback.settle()
+        XCTAssertNil(playback.state.noteID)
+        XCTAssertNil(test.playback.loadedURL)
+    }
+
+    func testANewerRequestWinsBeforeFilePreparationBegins() async throws {
+        let test = TestGraph(); defer { test.tearDown() }
+        let note = try await seedNote(in: test)
+        let playback = test.graph.playback, oldOwner = PlaybackOwner(), owner = PlaybackOwner()
+        playback.requestShow(note, owner: oldOwner)
+        playback.requestShow(note, owner: owner)
+        playback.leave(oldOwner)
+        await playback.settle()
+        XCTAssertTrue(playback.owns(note.id))
+        playback.leave(owner)
+        XCTAssertNil(playback.state.noteID)
+    }
+
     func testAFinalSaveStoresThePositionAndTheLibraryPreview() async throws {
         let test = TestGraph(); defer { test.tearDown() }
         let note = try await seedNote(in: test)
         let playback = PlaybackStore(playback: test.playback, library: test.graph.library,
                                      preview: { note, position in "\(note.title) at \(Int(position))" })
-        playback.show(try XCTUnwrap(test.graph.library.note(note.id)), owner: PlaybackOwner())
+        await playback.show(try XCTUnwrap(test.graph.library.note(note.id)), owner: PlaybackOwner())
         playback.seek(1)
         playback.play()
         playback.pause()
@@ -31,11 +55,11 @@ import CassiniEngineTesting
         let saved = await test.graph.library.commit(note.id) { $0.playbackPosition = 1.5 }
         note = try XCTUnwrap(saved)
         let playback = test.graph.playback, owner = PlaybackOwner()
-        playback.show(note, owner: owner)
+        await playback.show(note, owner: owner)
         XCTAssertTrue(playback.owns(note.id))
         XCTAssertEqual(playback.state.position, 1.5)
         playback.seek(1.75)
-        playback.show(note, owner: owner)
+        await playback.show(note, owner: owner)
         XCTAssertEqual(playback.state.position, 1.75, "the same file is not opened again")
 
         playback.leave(PlaybackOwner())
@@ -48,14 +72,14 @@ import CassiniEngineTesting
         let test = TestGraph(); defer { test.tearDown() }
         let note = try await seedNote(in: test)
         let library = test.graph.library, playback = test.graph.playback, owner = PlaybackOwner()
-        playback.show(try XCTUnwrap(library.note(note.id)), owner: owner)
+        await playback.show(try XCTUnwrap(library.note(note.id)), owner: owner)
         playback.seek(1.25)
         playback.play()
 
         let compressed = test.root.appendingPathComponent(note.id.uuidString).appendingPathComponent("audio.m4a")
         try Data([1]).write(to: compressed)
         let moved = await library.commit(note.id) { $0.audioFilename = "audio.m4a" }
-        playback.show(try XCTUnwrap(moved), owner: owner)
+        await playback.show(try XCTUnwrap(moved), owner: owner)
 
         XCTAssertEqual(test.playback.loadedURL, compressed)
         XCTAssertEqual(test.playback.position, 1.25)
@@ -67,14 +91,14 @@ import CassiniEngineTesting
         let note = try await seedNote(in: test)
         let library = test.graph.library, playback = test.graph.playback, owner = PlaybackOwner()
         let shown = try XCTUnwrap(library.note(note.id))
-        playback.show(shown, owner: owner)
+        await playback.show(shown, owner: owner)
         playback.seek(1.25)
         let url = try XCTUnwrap(library.audioURL(shown))
         try Data([1, 2, 3]).write(to: url)
 
         // The screen shows the note again with the same name and duration: the file's new size tells it apart.
         test.playback.loadError = CocoaError(.fileReadCorruptFile)
-        playback.show(shown, owner: owner)
+        await playback.show(shown, owner: owner)
         XCTAssertTrue(playback.failed(note.id), "the rewritten file was opened again")
     }
 
@@ -85,13 +109,13 @@ import CassiniEngineTesting
         let shown = try XCTUnwrap(test.graph.library.note(note.id))
         playback.setBlocked(true)
         XCTAssertNil(NotePlayer.key(for: shown, blocked: playback.isBlocked), "the screen asks for no player")
-        playback.show(shown, owner: owner)
+        await playback.show(shown, owner: owner)
         XCTAssertFalse(playback.owns(note.id), "nothing opens while a recording runs")
 
         playback.setBlocked(false)
         let key = try XCTUnwrap(NotePlayer.key(for: shown, blocked: playback.isBlocked), "the key changes, so the screen shows it again")
         XCTAssertEqual(key.noteID, note.id)
-        playback.show(shown, owner: owner)
+        await playback.show(shown, owner: owner)
         XCTAssertTrue(playback.owns(note.id))
     }
 
@@ -99,7 +123,7 @@ import CassiniEngineTesting
         let test = TestGraph(); defer { test.tearDown() }
         let note = try await seedNote(in: test)
         let playback = test.graph.playback
-        playback.show(try XCTUnwrap(test.graph.library.note(note.id)), owner: PlaybackOwner())
+        await playback.show(try XCTUnwrap(test.graph.library.note(note.id)), owner: PlaybackOwner())
         // The note's directory cannot be written, so its writes fail.
         let directory = test.root.appendingPathComponent(note.id.uuidString)
         try FileManager.default.setAttributes([.posixPermissions: 0o500], ofItemAtPath: directory.path)
@@ -127,7 +151,7 @@ import CassiniEngineTesting
         try Data().write(to: test.root.appendingPathComponent(note.id.uuidString).appendingPathComponent("audio.caf"))
         await test.graph.start()
         let playback = test.graph.playback
-        playback.show(try XCTUnwrap(test.graph.library.note(note.id)), owner: PlaybackOwner())
+        await playback.show(try XCTUnwrap(test.graph.library.note(note.id)), owner: PlaybackOwner())
         playback.seek(1.5)
         playback.play()
         playback.pause()
@@ -141,7 +165,7 @@ import CassiniEngineTesting
         let note = try await seedNote(in: test)
         test.playback.loadError = CocoaError(.fileReadCorruptFile)
         let playback = test.graph.playback
-        playback.show(try XCTUnwrap(test.graph.library.note(note.id)), owner: PlaybackOwner())
+        await playback.show(try XCTUnwrap(test.graph.library.note(note.id)), owner: PlaybackOwner())
         XCTAssertTrue(playback.failed(note.id))
         XCTAssertFalse(playback.owns(note.id))
         XCTAssertNil(test.graph.errors.current, "no global alert")
@@ -151,7 +175,7 @@ import CassiniEngineTesting
         let test = TestGraph(); defer { test.tearDown() }
         let note = try await seedNote(in: test)
         let playback = test.graph.playback
-        playback.show(try XCTUnwrap(test.graph.library.note(note.id)), owner: PlaybackOwner())
+        await playback.show(try XCTUnwrap(test.graph.library.note(note.id)), owner: PlaybackOwner())
         playback.seek(0.5)
         XCTAssertTrue(playback.playSample(note, from: 1, to: 1.8))
         XCTAssertNotNil(playback.state.sample)

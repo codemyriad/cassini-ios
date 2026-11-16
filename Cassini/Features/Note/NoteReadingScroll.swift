@@ -53,6 +53,7 @@ struct NoteReadingScroll: View {
                     }
                     if mode.showsDraft, let draft = model.shownDraft, !draft.words.isEmpty {
                         DraftSection(draft: draft, transcript: cache.draft(draft), model: model)
+                            .task(id: draft) { await cache.prepareDraft(draft) }
                     }
                     if note.saysNoSpeech(in: mode) {
                         NoSpeechState()
@@ -77,7 +78,7 @@ struct NoteReadingScroll: View {
                 }
             }
             .onScrollPhaseChange { _, phase in
-                model.scrolled(PlaybackFollow.Scrolling(phase), playing: playback.owns(note.id) && playback.state.isPlaying)
+                model.scrolled(PlaybackFollow.Scrolling(phase), playing: playback.owns(note.id) && playback.controls.isPlaying)
                 if uiTesting {
                     // A gesture that reaches a boundary can track without entering .interacting.
                     if phase == .tracking || phase == .interacting { userScrollInFlight = true }

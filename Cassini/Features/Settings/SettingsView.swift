@@ -78,7 +78,6 @@ struct SettingsView: View {
 private struct SettingsForm: View {
     let model: SettingsModel
     @Environment(SettingsStore.self) private var settings
-    @Environment(NoticesStore.self) private var notices
     @Environment(SettingsAdapter.self) private var ports
 
     var body: some View {
@@ -86,33 +85,13 @@ private struct SettingsForm: View {
         Form {
             AppLanguageSection(open: model.openAppLanguage, speechLanguageApart: model.showsSpeechLanguage)
             TranscriptionSection(model: model, language: $settings.speechLanguage, autoTranscribe: $settings.autoTranscribe)
-            let banners = notices.settingsBanners
-            if !banners.isEmpty {
-                Section {
-                    BannerList(specs: banners, onAction: { spec, action in notices.perform(action, on: spec) },
-                               onDismiss: notices.dismiss)
-                }
-                .listRowInsets(EdgeInsets()).listRowBackground(Color.canvasClear)
-            }
+            SettingsNoticesSection()
             if let speechModels = ports.speechModels {
                 if speechModels.shows(.settings) || speechModels.promotionVisible {
                     Section { ParakeetSuggestionView(store: speechModels, placement: .settings) }
                 }
             }
-            Section {
-                if let speechModels = ports.speechModels { SpeechModelChoiceRow(store: speechModels) }
-                ForEach(model.models) { row in
-                    ModelRowView(row: row, modelName: row.part == .speech && ports.speechModels != nil
-                        ? (ports.speechModels?.parakeetCapable == true ? "Parakeet Ultra" : (ports.speechModels?.policy.whistleAvailable == true ? "Whistle" : nil)) : nil) {
-                        if row.part == .speech, ports.speechModels?.installation == .unavailable { ports.speechModels?.refresh() }
-                        else { model.openModel(row.part) }
-                    }
-                }
-            } header: {
-                Text("On-device models", tableName: "Settings").foregroundStyle(Color.muted)
-            } footer: {
-                Text("Transcription runs on this device.", tableName: "Settings").foregroundStyle(Color.muted)
-            }
+            OnDeviceModelsSection(model: model)
             VoiceSetupSection()
             Section {
                 Toggle(isOn: $settings.identifySpeakers) { Text("Identify speakers after transcription", tableName: "Settings") }
@@ -327,5 +306,41 @@ private struct AboutCard: View {
             .font(.subheadline)
         }
         .padding(.vertical, 6)
+    }
+}
+
+/// Download progress belongs to these sections, not the preferences form or its toggles.
+private struct SettingsNoticesSection: View {
+    @Environment(NoticesStore.self) private var notices
+    var body: some View {
+        let banners = notices.settingsBanners
+        if !banners.isEmpty {
+            Section {
+                BannerList(specs: banners, onAction: { spec, action in notices.perform(action, on: spec) },
+                           onDismiss: notices.dismiss)
+            }
+            .listRowInsets(EdgeInsets()).listRowBackground(Color.canvasClear)
+        }
+    }
+}
+
+private struct OnDeviceModelsSection: View {
+    let model: SettingsModel
+    @Environment(SettingsAdapter.self) private var ports
+    var body: some View {
+        Section {
+            if let speechModels = ports.speechModels { SpeechModelChoiceRow(store: speechModels) }
+            ForEach(model.models) { row in
+                ModelRowView(row: row, modelName: row.part == .speech && ports.speechModels != nil
+                    ? (ports.speechModels?.parakeetCapable == true ? "Parakeet Ultra" : (ports.speechModels?.policy.whistleAvailable == true ? "Whistle" : nil)) : nil) {
+                    if row.part == .speech, ports.speechModels?.installation == .unavailable { ports.speechModels?.refresh() }
+                    else { model.openModel(row.part) }
+                }
+            }
+        } header: {
+            Text("On-device models", tableName: "Settings").foregroundStyle(Color.muted)
+        } footer: {
+            Text("Transcription runs on this device.", tableName: "Settings").foregroundStyle(Color.muted)
+        }
     }
 }

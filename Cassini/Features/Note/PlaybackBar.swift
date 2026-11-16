@@ -13,22 +13,14 @@ struct PlaybackBar: View {
     /// Mark this moment at a position: the bookmark, and the section that lists it open.
     let markMoment: (TimeInterval) -> Void
     @Environment(PlaybackStore.self) private var playback
-    /// Where the slider is while it is dragged.
-    @State private var dragging: TimeInterval?
 
     private var ours: Bool { playback.owns(note.id) }
-    private var duration: TimeInterval { ours && playback.state.duration > 0 ? playback.state.duration : note.duration }
-    private var position: TimeInterval { dragging ?? (ours ? playback.state.position : note.playbackPosition) }
-    private var isPlaying: Bool { ours && playback.state.isPlaying }
+    private var position: TimeInterval { ours ? playback.state.position : note.playbackPosition }
+    private var isPlaying: Bool { ours && playback.controls.isPlaying }
 
     var body: some View {
         VStack(spacing: 8) {
-            HStack(spacing: 10) {
-                Text(TimeText.clock(position)).fixedSize().accessibilityHidden(true)
-                slider
-                Text(TimeText.clock(duration)).fixedSize().accessibilityHidden(true)
-            }
-            .font(.caption.monospacedDigit()).foregroundStyle(Color.muted)
+            PlaybackScrubber(note: note)
             controls
         }
         // Keep the established large-content viewer policy for the five controls.
@@ -49,28 +41,6 @@ struct PlaybackBar: View {
             }
         }
         #endif
-    }
-
-    private var slider: some View {
-        let range = 0...max(0.1, duration)
-        return Slider(value: Binding(get: { min(position, range.upperBound) }, set: { dragging = $0 }), in: range) { editing in
-            guard !editing, let target = dragging else { return }
-            playback.seek(target)
-            dragging = nil
-        }
-        .tint(.accent)
-        .frame(height: 44)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("Position", tableName: "Playback"))
-        .accessibilityValue(Text(Self.spokenPosition(position, of: duration)))
-        .accessibilityAdjustableAction { direction in
-            switch direction {
-            case .increment: playback.seek(PlaybackSkip.step(from: position, forward: true, duration: duration))
-            case .decrement: playback.seek(PlaybackSkip.step(from: position, forward: false, duration: duration))
-            @unknown default: break
-            }
-        }
-        .accessibilityIdentifier("playbackPosition")
     }
 
     private var controls: some View {
@@ -146,4 +116,46 @@ struct PlaybackBar: View {
         return String(localized: "\(position) of \(total)", table: "Playback",
                       comment: "Accessibility value of the position slider: position of total duration, e.g. 11:44 of 23:50")
     }
+}
+
+/// Only the scrubber observes the playback clock. Transport controls and open speed menus retain their views.
+private struct PlaybackScrubber: View {
+    let note: Note
+    @Environment(PlaybackStore.self) private var playback
+    @State private var dragging: TimeInterval?
+    private var ours: Bool { playback.owns(note.id) }
+    private var duration: TimeInterval { ours && playback.controls.duration > 0 ? playback.controls.duration : note.duration }
+    private var position: TimeInterval { dragging ?? (ours ? playback.state.position : note.playbackPosition) }
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Text(TimeText.clock(position)).fixedSize().accessibilityHidden(true)
+            slider
+            Text(TimeText.clock(duration)).fixedSize().accessibilityHidden(true)
+        }
+        .font(.caption.monospacedDigit()).foregroundStyle(Color.muted)
+    }
+
+    private var slider: some View {
+        let range = 0...max(0.1, duration)
+        return Slider(value: Binding(get: { min(position, range.upperBound) }, set: { dragging = $0 }), in: range) { editing in
+            guard !editing, let target = dragging else { return }
+            playback.seek(target)
+            dragging = nil
+        }
+        .tint(.accent)
+        .frame(height: 44)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("Position", tableName: "Playback"))
+        .accessibilityValue(Text(PlaybackBar.spokenPosition(position, of: duration)))
+        .accessibilityAdjustableAction { direction in
+            switch direction {
+            case .increment: playback.seek(PlaybackSkip.step(from: position, forward: true, duration: duration))
+            case .decrement: playback.seek(PlaybackSkip.step(from: position, forward: false, duration: duration))
+            @unknown default: break
+            }
+        }
+        .accessibilityIdentifier("playbackPosition")
+    }
+
 }

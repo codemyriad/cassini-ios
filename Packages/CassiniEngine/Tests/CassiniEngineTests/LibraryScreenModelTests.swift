@@ -370,6 +370,33 @@ import CassiniNotebook
         #expect(Set(model.content.results!.map(\.id)) == Set([own, recovered]))
     }
 
+    @Test func recordingTicksUpdateTheCardWithoutInvalidatingTheList() async throws {
+        let library = Library()
+        var note = Note(title: "Live", createdAt: library.clock.now)
+        note.audio = .live; note.status = .recording
+        library.notes = [note]
+        var active = ActiveRecording(noteID: note.id, title: note.title, defaultTitle: note.title, format: .pcm48kMono)
+        library.recording = .active(active)
+        let model = library.model
+        await model.settle()
+        let initial = model.listContent
+        let revision = model.presentationRevision
+        let listChanged = Mutex(false), cardChanged = Mutex(false)
+        withObservationTracking { _ = model.listContent } onChange: { listChanged.withLock { $0 = true } }
+        withObservationTracking { _ = model.recordingCard } onChange: { cardChanged.withLock { $0 = true } }
+        active.elapsed = 15
+        library.recording = .active(active)
+        await model.settle()
+        #expect(!listChanged.withLock { $0 })
+        #expect(cardChanged.withLock { $0 })
+        #expect(model.presentationRevision == revision)
+        #expect(model.recordingCard?.elapsed == 15)
+        #expect(model.listContent == initial)
+        library.recording = .finishing(noteID: note.id)
+        await model.settle()
+        #expect(listChanged.withLock { $0 }, "Lifecycle changes still refresh retained rows")
+    }
+
     /// The view must observe these projections, rather than retain a pre-active row captured by a lazy builder.
     @Test func liveRecordingAndTimestampChangesInvalidateTheObservedRowProjection() async throws {
         let library = Library()

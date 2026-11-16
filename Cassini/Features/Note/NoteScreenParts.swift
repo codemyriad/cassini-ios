@@ -87,7 +87,7 @@ struct FollowChipHost: View {
     @Environment(PlaybackStore.self) private var playback
 
     var body: some View {
-        if follow.showsChip(playing: playback.owns(noteID) && playback.state.isPlaying) {
+        if follow.showsChip(playing: playback.owns(noteID) && playback.controls.isPlaying) {
             FollowChip(action: resume).transition(.opacity.combined(with: .move(edge: .bottom)))
         }
     }
@@ -102,6 +102,7 @@ struct RunningDraft: View {
     var body: some View {
         if let draft = model.shownDraft, !draft.words.isEmpty {
             DraftSection(draft: draft, transcript: cache.draft(draft), model: model)
+                .task(id: draft) { await cache.prepareDraft(draft) }
         }
     }
 }
@@ -127,55 +128,5 @@ struct DraftSection: View {
                                }))
         }
         .accessibilityIdentifier("draftTranscript")
-    }
-}
-
-/// The transcripts and search hits the screen shows, made again only when what they come from changed. Comparing
-/// a note's passages with the last ones is cheap while they are the same array.
-@MainActor final class TranscriptCache {
-    private struct SealedKey: Equatable {
-        var transcript: [TranscriptSegment]
-        var speakers: [NoteSpeaker]?
-        var voices: [SavedVoice]
-        var suggestions: [SpeakerSuggestion]
-    }
-
-    private var sealedKey: SealedKey?
-    private var sealedValue = NoteTranscript.empty
-
-    /// The reading transcript last made.
-    var shownSealed: NoteTranscript { sealedValue }
-    private var draftKey: DraftState?
-    private var draftValue = NoteTranscript.empty
-    private var hitsKey: (NoteTranscript, String)?
-    private var hitsValue: [TranscriptMatch] = []
-
-    func sealed(_ note: Note, voices: [SavedVoice], suggestions: [SpeakerSuggestion]) -> NoteTranscript {
-        let key = SealedKey(transcript: note.transcript, speakers: note.speakers, voices: voices, suggestions: suggestions)
-        if key != sealedKey {
-            sealedKey = key
-            sealedValue = NoteTranscripts.sealed(note, voices: voices, suggestions: suggestions)
-        }
-        return sealedValue
-    }
-
-    /// The draft with its names; a stopped job's (`tentativeFromMs` at its end) is all settled.
-    func draft(_ draft: DraftState) -> NoteTranscript {
-        if draft != draftKey {
-            draftKey = draft
-            draftValue = NoteTranscripts.draft(draft.words, tentativeFromMs: draft.tentativeFromMs == .max ? nil : draft.tentativeFromMs,
-                                               labels: draft.labels, automatic: draft.automatic,
-                                               suggestions: draft.suggestions, colourIndices: draft.colourIndices,
-                                               provenance: draft.provenance)
-        }
-        return draftValue
-    }
-
-    func matches(_ transcript: NoteTranscript, query: String) -> [TranscriptMatch] {
-        if hitsKey?.0 != transcript || hitsKey?.1 != query {
-            hitsKey = (transcript, query)
-            hitsValue = TranscriptSearch.matches(transcript.turns, query: query)
-        }
-        return hitsValue
     }
 }

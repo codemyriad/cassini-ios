@@ -9,6 +9,9 @@ import CassiniNotebook
     @ObservationIgnored let controller: PlaybackController
     @ObservationIgnored private let library: LibraryStore
     @ObservationIgnored let seekProbe: PlaybackSeekProbe?
+    @ObservationIgnored private var preparation = 0
+    @ObservationIgnored private var preparing: Task<Void, Never>?
+    @ObservationIgnored private var preparingOwner: PlaybackOwner?
 
     init(controller: PlaybackController, library: LibraryStore, seekProbe: PlaybackSeekProbe? = nil) {
         self.controller = controller; self.library = library; self.seekProbe = seekProbe
@@ -21,6 +24,7 @@ import CassiniNotebook
     }
 
     var state: PlaybackState { controller.state }
+    var controls: PlaybackControls { controller.controls }
 
     var rate: Float {
         get { controller.rate }
@@ -28,26 +32,49 @@ import CassiniNotebook
     }
 
     /// Whether `noteID` holds the player and it can play.
-    func owns(_ noteID: UUID) -> Bool { state.noteID == noteID && state.status != .failed }
+    func owns(_ noteID: UUID) -> Bool { controls.noteID == noteID && controls.status != .failed }
 
     /// Whether the player of `noteID` could not open its file.
-    func failed(_ noteID: UUID) -> Bool { state.noteID == noteID && state.status == .failed }
+    func failed(_ noteID: UUID) -> Bool { controls.noteID == noteID && controls.status == .failed }
 
     /// While a recording runs the player is closed and nothing opens.
     var isBlocked: Bool { controller.isBlocked }
 
     /// The Note screen `owner` shows `note`'s player: `PlaybackController.show` with the note's file, which opens it at
     /// the saved position or reloads it when the audio changed (the compressed copy replaced the capture).
-    func show(_ note: Note, owner: PlaybackOwner) {
-        guard note.audio.isPlayable, let source = source(for: note) else {
+    func requestShow(_ note: Note, owner: PlaybackOwner) {
+        let request = beginPreparation(owner)
+        preparing = Task { await prepare(note, owner: owner, request: request) }
+    }
+
+    func show(_ note: Note, owner: PlaybackOwner) async {
+        await prepare(note, owner: owner, request: beginPreparation(owner))
+    }
+
+    private func beginPreparation(_ owner: PlaybackOwner) -> Int {
+        preparation &+= 1
+        preparingOwner = owner
+        return preparation
+    }
+
+    private func prepare(_ note: Note, owner: PlaybackOwner, request: Int) async {
+        guard preparation == request else { return }
+        guard note.audio.isPlayable, let url = library.audioURL(note) else {
             controller.leave(owner)
             return
         }
+        let signature = await Self.signature(of: url)
+        guard !Task.isCancelled, preparation == request else { return }
+        preparingOwner = nil
+        let source = PlaybackSource(noteID: note.id, url: url, title: note.title, signature: signature)
         controller.show(source, at: note.playbackPosition, owner: owner)
     }
 
     /// The screen `owner` is gone, or its note lost its player (a transcription started).
-    func leave(_ owner: PlaybackOwner) { controller.leave(owner) }
+    func leave(_ owner: PlaybackOwner) {
+        if preparingOwner == owner { preparation &+= 1; preparingOwner = nil }
+        controller.leave(owner)
+    }
 
     func togglePlayback() { controller.toggle() }
     func play() { controller.play() }
@@ -74,24 +101,25 @@ import CassiniNotebook
     }
 
     /// Closes the player (its note is moving to Recently Deleted), saving the position first.
-    func stop() { controller.leave() }
+    func stop() { preparation &+= 1; preparingOwner = nil; controller.leave() }
 
     /// Closes the player while a recording runs, and keeps it closed until it ends.
-    func setBlocked(_ blocked: Bool) { controller.setBlocked(blocked) }
+    func setBlocked(_ blocked: Bool) {
+        if blocked { preparation &+= 1; preparingOwner = nil }
+        controller.setBlocked(blocked)
+    }
 
     /// Saves the position (final) without pausing: the app goes to the background.
     func savePosition() { controller.savePosition() }
 
     /// Waits until every position save asked for so far has been handed to the Library.
-    func settle() async { await controller.settle() }
-
-    private func source(for note: Note) -> PlaybackSource? {
-        guard let url = library.audioURL(note) else { return nil }
-        return PlaybackSource(noteID: note.id, url: url, title: note.title, signature: Self.signature(of: url))
+    func settle() async {
+        await preparing?.value
+        await controller.settle()
     }
 
     /// The size and modification date of the file: a file written again under the same name gets a new one.
-    private static func signature(of url: URL) -> String? {
+    @concurrent private static func signature(of url: URL) async -> String? {
         guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path) else { return nil }
         let size = (attributes[.size] as? NSNumber)?.int64Value ?? 0
         let modified = (attributes[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0

@@ -454,7 +454,7 @@ import CassiniEngineTesting
         let test = TestGraph(); defer { test.tearDown() }
         let note = try await seedPlainNote(in: test)
         let graph = test.graph
-        graph.playback.show(try XCTUnwrap(graph.library.note(note.id)), owner: PlaybackOwner())
+        await graph.playback.show(try XCTUnwrap(graph.library.note(note.id)), owner: PlaybackOwner())
         graph.playback.seek(1.5)
 
         graph.enterBackground()

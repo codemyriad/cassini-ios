@@ -93,7 +93,7 @@ import CassiniNotebook
         await model.settle()
         #expect(try row().duration == 12)
         #expect(try row().renderKey == activeKey)
-        #expect(model.presentationRevision > activeRevision)
+        #expect(model.presentationRevision == activeRevision, "Elapsed ticks belong to the live row, not the list projection")
         screen.minimise()
         #expect(effects.last == .close)
         #expect(try row().isRecording)

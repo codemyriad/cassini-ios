@@ -114,11 +114,7 @@ extension AVAudioRecorder: CaptureRecorder {}
             // record() can spend time preparing hardware; anchor to the actual audio position after it succeeds.
             recordedAt = Date().addingTimeInterval(-max(0, capture.currentTime))
             recorder = capture; isPaused = false
-            let meterTimer = Timer(timeInterval: 0.1, repeats: true) { [weak self] _ in
-                MainActor.assumeIsolated { self?.tick() }
-            }
-            timer = meterTimer
-            RunLoop.main.add(meterTimer, forMode: .common)
+            startMetering()
             return .pcm48kMono
         } catch {
             session.deactivate()
@@ -135,6 +131,7 @@ extension AVAudioRecorder: CaptureRecorder {}
     func pause() {
         guard let recorder, !isPaused else { return }
         recorder.pause(); isPaused = true
+        timer?.invalidate(); timer = nil
     }
 
     /// Resumes once the session is active again, off the main thread (`AudioSession`); when another app still holds
@@ -147,6 +144,7 @@ extension AVAudioRecorder: CaptureRecorder {}
             do { try await self?.session.activate(); error = nil } catch let failure { error = failure }
             guard let self, let recorder = self.recorder, !self.isPaused else { return }
             if error != nil || !recorder.record() { self.pauseAndReport(.interrupted) }
+            else { self.startMetering() }
         }
     }
 
@@ -163,6 +161,17 @@ extension AVAudioRecorder: CaptureRecorder {}
         recorder = nil
         timer?.invalidate(); timer = nil
         capture.stop()
+    }
+
+    private func startMetering() {
+        timer?.invalidate()
+        // Forty samples/sec preserve short peaks; only the visible Canvas runs at display cadence.
+        let meterTimer = Timer(timeInterval: 0.025, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.tick() }
+        }
+        meterTimer.tolerance = 0.005
+        timer = meterTimer
+        RunLoop.main.add(meterTimer, forMode: .common)
     }
 
     private func tick() {

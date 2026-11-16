@@ -30,10 +30,9 @@ struct RecordingView: View {
                         }
                         Spacer(minLength: 16)
                         VStack(spacing: 24) {
-                            RecordingTimer(elapsed: screen.elapsed)
-                            RecordingWaveform(levels: screen.levels, isPaused: screen.phase != .recording)
-                            Text(caption).font(.subheadline).foregroundStyle(Color.recordingSecondary)
-                                .multilineTextAlignment(.center).frame(maxWidth: 280)
+                            RecordingTimer(screen: screen)
+                            LiveRecordingWaveform(screen: screen)
+                            RecordingCaption(screen: screen)
                         }
                         Spacer(minLength: 16)
                         Button {
@@ -66,6 +65,15 @@ struct RecordingView: View {
             guard old != new, new == .recording || new == .paused else { return }
             AccessibilityNotification.Announcement(new == .paused ? RecordingCopy.status(paused: true) : RecordingCopy.status(paused: false)).post()
         }
+    }
+
+}
+
+private struct RecordingCaption: View {
+    let screen: RecordingScreenModel
+    var body: some View {
+        Text(caption).font(.subheadline).foregroundStyle(Color.recordingSecondary)
+            .multilineTextAlignment(.center).frame(maxWidth: 280)
     }
 
     private var caption: String {
@@ -162,10 +170,11 @@ private struct RecordingTitleField: View {
 }
 
 private struct RecordingTimer: View {
-    let elapsed: TimeInterval
+    let screen: RecordingScreenModel
     @ScaledMetric(relativeTo: .largeTitle) private var size: CGFloat = 56
 
     var body: some View {
+        let elapsed = screen.elapsed
         // System sans with tabular figures, as Android's 56 sp timer (WP4).
         Text(TimeText.clock(elapsed))
             .font(.system(size: size, weight: .medium)).monospacedDigit().tracking(-0.02 * size)

@@ -35,3 +35,18 @@ public struct PlaybackState: Hashable, Sendable {
 
     public var isPlaying: Bool { status == .playing }
 }
+
+/// The controls, menus and sample selection observe these facts without subscribing to position ticks.
+public struct PlaybackControls: Hashable, Sendable {
+    public let noteID: UUID?
+    public let status: PlaybackStatus
+    public let duration: TimeInterval
+    public let rate: Float
+    public let sample: PlaybackSample?
+    public var isPlaying: Bool { status == .playing }
+
+    public init(_ state: PlaybackState = PlaybackState()) {
+        noteID = state.noteID; status = state.status; duration = state.duration
+        rate = state.rate; sample = state.sample
+    }
+}
