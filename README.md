@@ -185,7 +185,10 @@ TestFlight still need.
   excluded by this shared contract. ZIP restoration also accepts legacy audio containers (including CAF and AAC)
   so audio-only notes exported unchanged can return to the Library; this iOS compatibility path does not expand
   Picker/Open-with admission. Native FLAC is checked with bounded metadata/CRC reads and a full decoded frame count
-  before import, conversion and transcription, because Apple’s reported duration alone does not detect truncation. See [the import differences](docs/differences.md#import).
+  because Apple’s reported duration alone does not detect truncation. A bounded process-local cache reuses successful
+  validation only while the path, inode, size and modification time match; the import staging rename carries that
+  validation to the final file. Header checks and cancellation still run on every open. Streams with an unknown
+  sample count are decoded through EOF and must contain complete, nonempty frames. See [the import differences](docs/differences.md#import).
 - **Unknown meeting dates (D95).** The Library names the group with the shared “Date unknown” heading in all six
   languages, including for VoiceOver. iOS omits the repeated unknown-date label from individual row metadata,
   the Note subtitle and the Document info Recorded row; the Note subtitle keeps the duration. Android repeats

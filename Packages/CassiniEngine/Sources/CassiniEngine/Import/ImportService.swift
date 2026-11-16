@@ -219,7 +219,7 @@ public struct ImportService: Sendable {
 
     private func move(_ staging: URL, to name: String, in folder: URL) throws -> URL {
         let target = folder.appendingPathComponent(name)
-        try FileManager.default.moveItem(at: staging, to: target)
+        try NativeFLAC.moveValidatedFile(from: staging, to: target)
         return target
     }
 

@@ -32,8 +32,9 @@ final class FileReader: @unchecked Sendable {
 
     /// `downmix` averages the channels of a file with more channels than `format` (Parakeet hears one); otherwise
     /// the converter's own channel map applies.
-    init(url: URL, from offset: TimeInterval, to format: AVAudioFormat, downmix: Bool = false) throws {
-        try NativeFLAC.validateIfPresent(url)
+    init(url: URL, from offset: TimeInterval, to format: AVAudioFormat, downmix: Bool = false,
+         checkCancellation: () throws -> Void = { try Task.checkCancellation() }) throws {
+        try NativeFLAC.validateIfPresent(url, checkCancellation: checkCancellation)
         file = try AVAudioFile(forReading: url)
         let rate = file.processingFormat.sampleRate
         duration = Double(file.length) / rate

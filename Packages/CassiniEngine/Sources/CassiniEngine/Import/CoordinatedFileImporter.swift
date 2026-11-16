@@ -181,13 +181,14 @@ private struct Copy {
         }
         if total != expectedSize { throw FileImportError.cannotOpen }
         if cancel.isCancelled { throw CancellationError() }
+        do { try output.synchronize() } catch { throw lowSpace(expectedSize, total) ?? FileImportError.cannotOpen }
+        // Validation records the fully written destination identity for subsequent readers and the final rename.
         do {
             try NativeFLAC.validateIfPresent(destination) {
                 if cancel.isCancelled { throw CancellationError() }
             }
         } catch is CancellationError { throw CancellationError() }
         catch { throw FileImportError.cannotOpen }
-        do { try output.synchronize() } catch { throw lowSpace(expectedSize, total) ?? FileImportError.cannotOpen }
         return (hasher.finalize().map { String(format: "%02x", $0) }.joined(), total)
     }
 

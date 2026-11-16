@@ -211,7 +211,8 @@ extension ParakeetTranscriber {
         func transcribe(_ request: TranscriptionRequest, cancel: CancelFlag,
                         events: @Sendable (TranscriptionEvent) -> Void) throws -> TranscriptionResult {
             let reader: FileReader
-            do { reader = try FileReader(url: request.url, from: 0, to: Self.format, downmix: true) } catch {
+            do { reader = try FileReader(url: request.url, from: 0, to: Self.format, downmix: true, checkCancellation: cancel.check) }
+            catch is CancellationError { throw CancellationError() } catch {
                 throw TranscriptionError.failed(.open)
             }
             let total = reader.duration

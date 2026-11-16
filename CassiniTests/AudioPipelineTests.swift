@@ -60,6 +60,44 @@ final class AudioPipelineTests: XCTestCase {
         }
     }
 
+    @MainActor func testExtensionlessNativeFLACImportsWithPlayableDuration() async throws {
+        let sources = try makeRoot(); defer { try? FileManager.default.removeItem(at: sources) }
+        let test = TestGraph(); defer { test.tearDown() }
+        let source = sources.appendingPathComponent("Shared recording")
+        try FLACFixtures.native().write(to: source)
+        await test.graph.start()
+        test.graph.settings.autoTranscribe = false
+        let outcome = await test.graph.imports.importFile(source, opensNote: false).value
+        let note = try XCTUnwrap(test.graph.library.notes.first)
+        XCTAssertEqual(outcome, .created(note.id))
+        XCTAssertEqual(note.audioFilename, "source.flac")
+        XCTAssertEqual(note.duration, Double(FLACFixtures.samples) / 48_000, accuracy: 0.0001)
+        let audio = try XCTUnwrap(test.graph.library.audioURL(note))
+        let player = try AVAudioPlayer(contentsOf: audio)
+        XCTAssertTrue(player.prepareToPlay())
+        XCTAssertEqual(player.duration, note.duration, accuracy: 0.001)
+        XCTAssertTrue(test.graph.imports.tracker.cards.isEmpty)
+    }
+
+    @MainActor func testDamagedExtensionlessFLACFailsWithoutNoteOrStaging() async throws {
+        let sources = try makeRoot(); defer { try? FileManager.default.removeItem(at: sources) }
+        let test = TestGraph(); defer { test.tearDown() }
+        let source = sources.appendingPathComponent("Broken recording")
+        let bytes = FLACFixtures.native().dropLast()
+        try bytes.write(to: source)
+        await test.graph.start()
+        let outcome = await test.graph.imports.importFile(source, opensNote: false).value
+        XCTAssertEqual(outcome, .rejected(.cannotOpen))
+        XCTAssertEqual(test.graph.imports.tracker.cards.last?.failure, .cannotOpen)
+        XCTAssertEqual(StatusBadgeCopy.template("states.badge.needsAttention", language: "en"), "Needs attention")
+        XCTAssertTrue(test.graph.library.notes.isEmpty)
+        let files = try XCTUnwrap(FileManager.default.enumerator(at: test.root, includingPropertiesForKeys: nil))
+            .allObjects.compactMap { $0 as? URL }
+        XCTAssertFalse(files.contains { $0.lastPathComponent == ImportService.stagingFilename || $0.lastPathComponent == "source.flac" })
+        XCTAssertFalse(files.contains { UUID(uuidString: $0.lastPathComponent) != nil })
+        XCTAssertEqual(try Data(contentsOf: source), bytes)
+    }
+
     private func makeRoot() throws -> URL {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)

@@ -160,7 +160,8 @@ public struct SpeakerAnalyzer: SpeakerAnalyzing {
                           memory: @escaping @Sendable () -> Int64?, cancel: CancelFlag,
                           progress: (SpeakerAnalysisEvent) -> Void) throws -> SpeakerAnalysis {
         let reader: FileReader
-        do { reader = try FileReader(url: url, from: 0, to: format, downmix: true) } catch { throw JobFailure.open }
+        do { reader = try FileReader(url: url, from: 0, to: format, downmix: true, checkCancellation: cancel.check) }
+        catch is CancellationError { throw CancellationError() } catch { throw JobFailure.open }
         let totalSamples = max(1, Int64((reader.duration * Double(format.sampleRate)).rounded()))
         let clips: MemoryClips? = printsReady ? MemoryClips() : nil
         let speakers = try WindowSpeakers(engines: engines, clips: clips, prefix: prefix, availableMemory: memory)
