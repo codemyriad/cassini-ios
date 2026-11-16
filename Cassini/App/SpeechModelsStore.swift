@@ -72,12 +72,14 @@ import CassiniWhistle
     }
 
     /// Rendering reads published installation facts, never file existence or free space.
-    var displayRecognizer: SpeechRecognizer {
+    private var displayPolicy: SpeechModelPolicy {
         SpeechModelPolicy(whistleAvailable: whistleCapability.available, parakeetLinked: parakeetCapable,
             physicalMemory: physicalMemory, availableMemory: availableMemory(), parakeetInstallation: installation,
             availableDiskBytes: 0, downloadPlan: ModelPlan([]))
-            .recognizer(preference: preference, platform: platform) ?? .appleSpeech
     }
+
+    var displayRecognizer: SpeechRecognizer { displayPolicy.recognizer(preference: preference, platform: platform) ?? .appleSpeech }
+    var canChooseParakeet: Bool { installation == .verified && displayPolicy.parakeetRunnable }
 
     var policy: SpeechModelPolicy {
         SpeechModelPolicy(whistleAvailable: whistle.withLock { $0.available }, parakeetLinked: parakeetCapable,
@@ -102,7 +104,7 @@ import CassiniWhistle
     }
 
     func choose(_ recognizer: SpeechRecognizer) {
-        guard recognizer == .whistle && whistle.withLock({ $0.available }) || recognizer == .parakeet && policy.parakeetInstallation == .verified && policy.parakeetRunnable else { return }
+        guard recognizer == .whistle && whistle.withLock({ $0.available }) || recognizer == .parakeet && canChooseParakeet else { return }
         preference = recognizer == .whistle ? .whistle : .parakeet
         defaults.set(preference.rawValue, forKey: Key.preference)
         let value = preference

@@ -154,7 +154,10 @@ private struct SettingsForm: View {
     private var audioDuration: String {
         model.library.duration >= 3600
             ? SettingsPhase2Copy.audioHours(Int(model.library.duration / 3600))
-            : TimeText.clock(model.library.duration)
+            : MarkdownDate.duration(Int64(max(0, model.library.duration) * 1000), locale: locale,
+                underMinute: String(localized: "under 1 min", table: "Export"),
+                minutes: String(localized: "{m} min", table: "Export"),
+                hours: String(localized: "{h} h {mm} min", table: "Export")) ?? ""
     }
 
     private var speechAnswer: String {
@@ -331,7 +334,7 @@ private struct SpeechChoicesView: View {
                         if recognizer == .whistle { Text(SettingsPhase2Copy.builtIn).font(.caption).foregroundStyle(Color.muted) }
                     }
                 }.frame(maxWidth: .infinity, alignment: .leading)
-            }.buttonStyle(.plain).disabled(!installed)
+            }.buttonStyle(.plain).disabled(recognizer == .parakeet && !store.canChooseParakeet)
                 .accessibilityIdentifier(recognizer == .whistle ? "chooseWhistle" : "chooseParakeet")
                 .accessibilityAddTraits(store.displayRecognizer == recognizer ? [.isSelected] : [])
             if recognizer == .parakeet, !installed {

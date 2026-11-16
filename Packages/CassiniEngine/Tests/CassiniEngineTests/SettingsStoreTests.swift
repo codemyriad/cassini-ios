@@ -12,15 +12,17 @@ import CassiniNotebook
     private func store() -> SettingsStore { SettingsStore(defaults: defaults(), clock: clock, defaultLanguage: "en-US") }
     private func cleanUp() { defaults().removePersistentDomain(forName: suite) }
 
-    @Test func recognitionDefaultsOnAndPersistsIndependentlyFromAutoNaming() {
+    @Test func recognitionDefaultsOnAndPersistsIndependentlyFromAutoNaming() async {
         defer { cleanUp() }
         let settings = store()
         #expect(settings.recogniseSavedVoices)
+        #expect(await Task.detached { settings.allowsSavedVoiceRecognition }.value)
         #expect(!settings.automaticallyNameVoices)
         settings.recogniseSavedVoices = false
         settings.automaticallyNameVoices = true
         let reloaded = store()
         #expect(!reloaded.recogniseSavedVoices)
+        #expect(await Task.detached { !settings.allowsSavedVoiceRecognition && !reloaded.allowsSavedVoiceRecognition }.value)
         #expect(reloaded.automaticallyNameVoices)
         #expect(reloaded.identifySpeakers)
     }

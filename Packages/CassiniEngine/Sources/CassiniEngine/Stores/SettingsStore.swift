@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import Synchronization
 import CassiniNotebook
 
 /// The app's preferences, read once from `UserDefaults` and written back on every change. Keys are `SettingsKeys`;
@@ -8,6 +9,10 @@ import CassiniNotebook
 public final class SettingsStore {
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let clock: any AppClock
+    @ObservationIgnored nonisolated private let recognition = Mutex(true)
+
+    /// Inference callbacks see the current switch without hopping to or blocking the main actor.
+    public nonisolated var allowsSavedVoiceRecognition: Bool { recognition.withLock { $0 } }
 
     public private(set) var cloudBackup: Bool
     public private(set) var includeSavedVoicesInBackups: Bool
@@ -36,7 +41,12 @@ public final class SettingsStore {
     public var speechLanguage: String { didSet { defaults.set(speechLanguage, forKey: SettingsKeys.speechLanguage) } }
     public var autoTranscribe: Bool { didSet { defaults.set(autoTranscribe, forKey: SettingsKeys.autoTranscribe) } }
     public var identifySpeakers: Bool { didSet { defaults.set(identifySpeakers, forKey: SettingsKeys.identifySpeakers) } }
-    public var recogniseSavedVoices: Bool { didSet { defaults.set(recogniseSavedVoices, forKey: SettingsKeys.recogniseSavedVoices) } }
+    public var recogniseSavedVoices: Bool {
+        didSet {
+            recognition.withLock { $0 = recogniseSavedVoices }
+            defaults.set(recogniseSavedVoices, forKey: SettingsKeys.recogniseSavedVoices)
+        }
+    }
     public var automaticallyNameVoices: Bool {
         didSet { defaults.set(automaticallyNameVoices, forKey: SettingsKeys.automaticallyNameVoices) }
     }
@@ -75,6 +85,7 @@ public final class SettingsStore {
         finalizationMs = (defaults.object(forKey: SettingsKeys.finalizationMs) as? NSNumber)?.int64Value
         trashLastPurgeAt = Self.date(defaults, SettingsKeys.trashLastPurgeAt)
         voicesGeneration = defaults.integer(forKey: SettingsKeys.voicesGeneration)
+        recognition.withLock { $0 = recogniseSavedVoices }
     }
 
     /// Whether the speech model may be downloaded.

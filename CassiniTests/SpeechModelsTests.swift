@@ -12,6 +12,30 @@ import CassiniWhistle
     private let accepted = WhistleCapability(arm64: true, operatingSystemSupported: true, bundleVerified: true,
                                             pipelineAccepted: true, deviceAccepted: true)
 
+    func testSettingsSelectionReadsPublishedFactsWithoutProbingFiles() throws {
+        let suite = "cassini.settings-models.\(UUID())"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let probes = Mutex(0)
+        let store = SpeechModelsStore(root: FileManager.default.temporaryDirectory, defaults: defaults,
+            storage: FakeStorage(), whistle: accepted, parakeetLinked: true, platform: .iOS26,
+            physicalMemory: 6 << 30, availableMemory: { ParakeetMemory.beforeLoadBytes },
+            installed: { probes.withLock { $0 += 1 }; return true },
+            verified: { probes.withLock { $0 += 1 }; return true }, verify: { true })
+        XCTAssertEqual(store.displayRecognizer, .whistle)
+        XCTAssertFalse(store.canChooseParakeet)
+        XCTAssertEqual(probes.withLock { $0 }, 0)
+        store.refresh()
+        let reads = probes.withLock { $0 }
+        XCTAssertEqual(store.displayRecognizer, .parakeet)
+        XCTAssertTrue(store.canChooseParakeet)
+        store.choose(.whistle)
+        XCTAssertEqual(store.displayRecognizer, .whistle)
+        store.choose(.parakeet)
+        XCTAssertEqual(store.displayRecognizer, .parakeet)
+        XCTAssertEqual(probes.withLock { $0 }, reads, "Rendering and choosing use published facts")
+    }
+
     func testVerificationPromotesOnlyNewDefaultsAndAnnouncesOnce() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let suite = "cassini.d78.\(UUID())", defaults: UserDefaults
