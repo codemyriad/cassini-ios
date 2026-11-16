@@ -47,6 +47,9 @@ for older checkout compatibility, but never trust that marker to skip acquisitio
 events and releases only after
 owned children stop; the lock inode is retained. The local PR screenshot driver rejects either enclosing lock marker.
 Without heavy-run, the test script takes the same flock directly.
+The package/build CI job allows 90 minutes to acquire this lock, matching the simulator job timeout,
+and 120 minutes overall to retain its existing 30-minute work budget after queuing. Its previous
+15-minute lock wait could fail before compilation while a healthy simulator run held the lock.
 The existing resource-admission rules remain active. Runner slots share physical CPU/RAM; an idle runner service
 does not imply an idle machine.
 

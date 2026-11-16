@@ -298,7 +298,15 @@ class CiRunnerSelectionTests(unittest.TestCase):
         self.assertFalse((ROOT / "scripts/ci-label-gate.py").exists())
         self.assertIn("scripts/test.sh app", ci_text)
         self.assertNotIn('"$HOME/bin/heavy-run"', ci_text)
-        self.assertIn("CASSINI_LOCK_MINUTES: '15'", ci_text)
+        build_job = ci_text.split("\n  fast-and-build:\n", 1)[1]
+        lock_minutes = int(re.search(r"CASSINI_LOCK_MINUTES: '([0-9]+)'", build_job).group(1))
+        job_minutes = int(re.search(r"timeout-minutes: ([0-9]+)", build_job).group(1))
+        gate_text = (WORKFLOWS / "simulator-gate.yml").read_text()
+        gate_minutes = int(re.search(r"timeout-minutes: ([0-9]+)", gate_text).group(1))
+        self.assertGreaterEqual(lock_minutes, gate_minutes,
+                                "CI must tolerate a simulator gate holding the shared host lock")
+        self.assertGreaterEqual(job_minutes - lock_minutes, 30,
+                                "lock queuing must leave the existing build/performance work budget")
         self.assertIn('(CASSINI_PERF_GATE=1)" DerivedData.noindex/test-logs/hosted.log', ci_text)
         self.assertLess(
             ci_text.index("uses: actions/upload-artifact@v5"),
