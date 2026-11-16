@@ -284,6 +284,7 @@ scripts/test.sh ui       # build for testing, then the UI tests, sharded across 
 scripts/test.sh all      # all of the above (the package tests run beside the build); prints the time of each step
 scripts/test.sh changed  # only what the changes since origin/main touch (or since a base: changed <ref>)
 scripts/test.sh build    # only build for testing
+scripts/test.sh simulator # simulator tiers only (CI runs fast separately); never posts drmeyers/test-all
 scripts/test.sh ios18    # build for testing, then only the iOS 18 leg (below)
 scripts/test.sh clean    # delete this worktree's simulator clones
 ```
@@ -370,8 +371,11 @@ turns it on.
 
 On GitHub, `.github/workflows/ci.yml` runs harness regressions, `scripts/test.sh fast` and `scripts/test.sh build`
 with Xcode 27.0 on the configured trusted runner pool (hosted fallback for forks/unset configuration).
-The [observational simulator workflow](docs/simulator-gate.md) also runs the full gate on rented self-hosted iOS
-runners for main and same-repository PRs, including the full iOS 18 leg. Its job guard skips fork PRs; a server-side
+The [observational simulator workflow](docs/simulator-gate.md) runs `scripts/test.sh simulator` on rented self-hosted
+iOS runners for same-repository PRs, nightly schedules and manual main dispatches. Every run keeps the full default
+runtime coverage. Ordinary PRs run the iOS 18 smoke list plus all `AccessibilityAuditTests` and `WideScreenTests`,
+including their iPad tests, serially. Nightly, manual and `full-ci` PR runs retain the full iOS 18 leg. CI still runs on
+every main push; the simulator workflow does not repeat after each merge. Its job guard skips fork PRs; a server-side
 runner policy must also exclude PR-edited workflows, as described in that design. During the comparison period, the `drmeyers/test-all` status from
 `CASSINI_POST_STATUS=1 scripts/test.sh all` remains the coordinator's merge gate.
 

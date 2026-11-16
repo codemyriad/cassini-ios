@@ -142,14 +142,14 @@ jobs:
     # GA macos-26 image's Xcode 26.6 (Swift 6.2) does not compile the package tests. Trusted runs with
     # CM_MAC_RUNNER=cm-mac-m4 use the self-hosted Apple Silicon runners; fork PRs and unset values keep xcode-27.
     runs-on: ${{ (github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)) && vars.CM_MAC_RUNNER == 'cm-mac-m4' && fromJSON('["self-hosted","macOS","ARM64","cm-mac-m4"]') || 'xcode-27' }}
-    # About 3x the measured run (6.3 min from a cold runner: package tests 3.9, build 2.0; plus ~1.5 min hosted tests
-    # on nightly/full-ci), so a hang frees the org's shared macOS slot.
-    timeout-minutes: 30
+    # Shared hosts serialize this build with simulator gates. Allow 120 minutes for two queued gates
+    # plus the existing 30-minute work budget; compilation and simulator work still share one host lock.
+    timeout-minutes: 150
     env:
       CASSINI_CONFORMANCE_REQUIRED: '1'
       CASSINI_KEEP_SIMS: '0'
       CASSINI_UI_WORKERS: '0'
-      CASSINI_LOCK_MINUTES: '15'
+      CASSINI_LOCK_MINUTES: '120'
     steps:
       - uses: actions/checkout@v5
         with:
@@ -182,7 +182,7 @@ jobs:
             export CASSINI_SIM_PREFIX="$prefix"
             scripts/test.sh clean
             # scripts/test.sh app acquires ~/.cassini-heavy.lock itself via start_heavy/take_heavy_lock;
-            # wrapping in heavy-run without CASSINI_HEAVY_LOCK_HELD=1 would self-deadlock on the lock.
+            # no fleet-slot wrapper is needed (its .big-heavy.slot.* locks are separate).
             scripts/test.sh app
             grep -E "^Test Case '-\[CassiniTests\.LibraryScreenTests testAThousandNotesFilterWithoutDroppingFrames\]' passed \(" DerivedData.noindex/test-logs/hosted.log
             grep -F "(CASSINI_PERF_GATE=1)" DerivedData.noindex/test-logs/hosted.log

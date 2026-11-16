@@ -84,6 +84,7 @@ class RenderTests(unittest.TestCase):
         self.git("commit", "-qam", "head")
         self.env = dict(os.environ, CLEAN_LOG=str(self.root / "clean"), READY=str(self.root / "ready"), CLEAN_READY=str(self.root/'clean-ready'))
         self.env.pop("CASSINI_HEAVY_LOCK_HELD", None)
+        self.env.pop("CASSINI_IOS_LOCK_HELD", None)
         self.env.pop('CASSINI_HEAVY_LOCK', None)
         self.command = [sys.executable, str(ROOT / "scripts/pr-shots-local.py"), "--head", str(self.repo),
                         "--base", "HEAD~1", "--out", str(self.root / "output")]
@@ -107,6 +108,16 @@ class RenderTests(unittest.TestCase):
 
     def run_tool(self):
         return subprocess.run(self.command, env=self.env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=60)
+
+    def test_rejects_enclosing_ios_lock_and_legacy_fleet_marker(self):
+        for marker in ("CASSINI_IOS_LOCK_HELD", "CASSINI_HEAVY_LOCK_HELD"):
+            with self.subTest(marker=marker):
+                self.env[marker] = "1"
+                result = self.run_tool()
+                self.env.pop(marker)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(b"run outside the heavy lock", result.stdout)
+                self.assertFalse((self.root / "output").exists())
 
     def test_pair_preserves_each_sources_capture_and_renderer_with_same_devices(self):
         result = self.run_tool(); self.assertEqual(result.returncode, 0, result.stdout)

@@ -16,7 +16,7 @@ case "${1:-}" in
         printf '%s\n' "$$" > "$owner_file"
         # The runner closes a cancelled step's pipe before always-run cleanup starts. Keep the owner's
         # output independent of that pipe so its EXIT trap cannot lose its summary or receive SIGPIPE.
-        exec "$root/scripts/test.sh" all > "$owner_file.log" 2>&1
+        exec "$root/scripts/test.sh" simulator > "$owner_file.log" 2>&1
         ;;
     clean)
         if [ -s "$owner_file" ]; then
@@ -26,16 +26,17 @@ case "${1:-}" in
                 # A completed run can leave a stale file. Fail closed on PID reuse, rather than signal another job.
                 command_line=$(ps -p "$owner" -o command= || true)
                 case "$command_line" in
-                    *"$root/scripts/test.sh all"*) ;;
+                    *"$root/scripts/test.sh all"*|*"$root/scripts/test.sh simulator"*) ;;
                     '') ;; # It may have exited naturally between kill -0 and ps.
                     *) echo "simulator test owner PID no longer identifies this run: $owner" >&2; exit 1 ;;
                 esac
                 if [ -n "$command_line" ]; then
                     echo "Stopping simulator test owner $owner before clone cleanup"
-                    kill -TERM "$owner" 2>/dev/null || true
-                    # kqueue exit event, not a fixed delay. On timeout, leave clones in place and fail cleanup.
-                    /usr/bin/python3 -I "$root/scripts/test-events.py" watch "$owner" /dev/null 60 60
-                    echo "Simulator test owner $owner exited before clone cleanup"
+                    # Bash defers TERM traps while waiting on foreground children. Stop the whole
+                    # PPID tree, across sessions, and await every exit before touching clones.
+                    # Bounded TERM/KILL waits fail closed if any captured process survives.
+                    /usr/bin/python3 -I "$root/scripts/test-events.py" stop-tree "$owner"
+                    echo "Simulator test owner $owner and descendants exited before clone cleanup"
                 fi
             fi
             # Replay after the owner exits, including its cancellation summary, into this live step's log.

@@ -98,6 +98,39 @@ def select_runner(
 
 
 class CiRunnerSelectionTests(unittest.TestCase):
+    def test_simulator_cadence_and_ios18_modes(self):
+        text = (WORKFLOWS / "simulator-gate.yml").read_text()
+        triggers = text.split("\non:\n", 1)[1].split("\npermissions:", 1)[0]
+        self.assertNotIn("\n  push:", triggers)
+        self.assertIn("types: [opened, synchronize, reopened, labeled]", triggers)
+        self.assertIn("schedule:\n    - cron:", triggers)
+        self.assertIn("workflow_dispatch:", triggers)
+        # Main CI remains exact-head evidence for release; simulator cadence does not change it.
+        self.assertIn("\n  push:\n    branches: [main]\n", (WORKFLOWS / "ci.yml").read_text())
+        mode = re.search(r"CASSINI_IOS18: \$\{\{ (.+) \}\}", text).group(1)
+        mode = mode.replace("github.event.pull_request.labels.*.name", "labels")
+        mode = mode.replace("&&", " and ").replace("||", " or ")
+        guard = re.search(r"(?m)^    if: (.+)$", text).group(1).replace("&&", " and ").replace("||", " or ")
+        guard = re.sub(r"!(?!=)", "not ", guard)
+        guard = guard.replace("github.event.pull_request.labels.*.name", "labels")
+        for event in ["pull_request", "schedule", "workflow_dispatch"]:
+            for action, added in [("opened", ""), ("synchronize", ""), ("reopened", ""),
+                                  ("labeled", "full-ci"), ("labeled", "unrelated")]:
+                for labels in [[], ["full-ci"]]:
+                    github = SimpleNamespace(event_name=event, repository="codemyriad/cassini-ios",
+                        ref="refs/heads/main", event=SimpleNamespace(action=action,
+                        label=SimpleNamespace(name=added), pull_request=SimpleNamespace(
+                        head=SimpleNamespace(repo=SimpleNamespace(full_name="codemyriad/cassini-ios")))))
+                    with self.subTest(event=event, action=action, added=added, labels=labels):
+                        self.assertEqual(eval(mode, {"__builtins__": {}}, dict(github=github, labels=labels,
+                            contains=lambda values, value: value in values)),
+                            "full" if event != "pull_request" or "full-ci" in labels else "smoke")
+                        self.assertEqual(bool(eval(guard, {"__builtins__": {}}, dict(
+                            github=github, labels=labels, contains=lambda values, value: value in values))),
+                            event != "pull_request" or (
+                                (action != "labeled" or added == "full-ci") and
+                                (action != "opened" or "full-ci" not in labels)))
+
     def test_observational_gate_adds_no_automatic_cancellation(self):
         text = (WORKFLOWS / "simulator-gate.yml").read_text()
         self.assertNotIn("\nconcurrency:", text, "D20: no new pending-run eviction or automatic cancellation")
@@ -127,18 +160,21 @@ class CiRunnerSelectionTests(unittest.TestCase):
     def test_simulator_job_rejects_forks_and_untrusted_events_before_checkout(self):
         text = (WORKFLOWS / "simulator-gate.yml").read_text()
         guard = re.search(r"(?m)^    if: (.+)$", text).group(1).replace("&&", " and ").replace("||", " or ")
+        guard = re.sub(r"!(?!=)", "not ", guard)
+        guard = guard.replace("github.event.pull_request.labels.*.name", "labels")
         self.assertNotIn("pull_request_target:", text)
         for event in ["push", "workflow_dispatch", "pull_request", "schedule", "pull_request_target", "workflow_run", "issue_comment"]:
             for repo in ["codemyriad/cassini-ios", "fork/cassini-ios"]:
                 for head in ["codemyriad/cassini-ios", "fork/cassini-ios", "", None]:
                     for ref in ["refs/heads/main", "refs/heads/feature", "refs/pull/123/merge"]:
                         metadata = _NULL if head is None else SimpleNamespace(full_name=head)
-                        payload = SimpleNamespace(pull_request=SimpleNamespace(head=SimpleNamespace(repo=metadata)))
+                        payload = SimpleNamespace(pull_request=SimpleNamespace(head=SimpleNamespace(repo=metadata)),
+                                                  action="synchronize", label=_NULL)
                         github = SimpleNamespace(event_name=event, repository=repo, ref=ref,
                                                  event=payload if event in ("pull_request", "pull_request_target") else _NULL)
                         expected = repo == "codemyriad/cassini-ios" and (
                             (event == "pull_request" and head == repo) or
-                            (event in ("push", "workflow_dispatch") and ref == "refs/heads/main"))
+                            (event in ("schedule", "workflow_dispatch") and ref == "refs/heads/main"))
                         with self.subTest(event=event, repo=repo, head=head, ref=ref):
                             self.assertEqual(bool(eval(guard, {"__builtins__": {}}, {"github": github})), expected)
 
@@ -148,7 +184,7 @@ class CiRunnerSelectionTests(unittest.TestCase):
         for prohibited in ["secrets.", "GH_TOKEN:", "GITHUB_TOKEN:", "statuses: write", "id-token:",
                            "altool", "testflight.py", "archive.py", "-allowProvisioningUpdates", "security ", "sudo "]:
             self.assertNotIn(prohibited, text)
-        for line in ["CASSINI_POST_STATUS: '0'", "CASSINI_CONFORMANCE_REQUIRED: '1'", "CASSINI_IOS18: full",
+        for line in ["CASSINI_POST_STATUS: '0'", "CASSINI_CONFORMANCE_REQUIRED: '1'",
                      "CASSINI_UI_IPAD: '1'", "CASSINI_KEEP_SIMS: '0'", "fetch-depth: 0"]:
             self.assertIn(line, text)
         self.assertEqual(text.count("persist-credentials: false"), 2)
@@ -269,7 +305,18 @@ class CiRunnerSelectionTests(unittest.TestCase):
         self.assertFalse((ROOT / "scripts/ci-label-gate.py").exists())
         self.assertIn("scripts/test.sh app", ci_text)
         self.assertNotIn('"$HOME/bin/heavy-run"', ci_text)
-        self.assertIn("CASSINI_LOCK_MINUTES: '15'", ci_text)
+        build_job = ci_text.split("\n  fast-and-build:\n", 1)[1]
+        lock_minutes = int(re.search(r"CASSINI_LOCK_MINUTES: '([0-9]+)'", build_job).group(1))
+        job_minutes = int(re.search(r"timeout-minutes: ([0-9]+)", build_job).group(1))
+        gate_text = (WORKFLOWS / "simulator-gate.yml").read_text()
+        gate_minutes = int(re.search(r"timeout-minutes: ([0-9]+)", gate_text).group(1))
+        gate_lock_minutes = int(re.search(r"CASSINI_LOCK_MINUTES: '([0-9]+)'", gate_text).group(1))
+        self.assertGreaterEqual(gate_minutes, gate_lock_minutes + 60,
+                                "a queued gate needs its full run and cleanup after the lock wait")
+        self.assertEqual(lock_minutes, 120, "CI must tolerate two queued simulator gates")
+        self.assertEqual(job_minutes, 150)
+        self.assertGreaterEqual(job_minutes - lock_minutes, 30,
+                                "lock queuing must leave the existing build/performance work budget")
         self.assertIn('(CASSINI_PERF_GATE=1)" DerivedData.noindex/test-logs/hosted.log', ci_text)
         self.assertLess(
             ci_text.index("uses: actions/upload-artifact@v5"),
@@ -403,6 +450,14 @@ class CiRunnerSelectionTests(unittest.TestCase):
             eval_gha(perf_expr, event_name="pull_request", action="labeled", added_label="full-ci", labels=("full-ci",)),
             "1",
         )
+
+        # Opened-with-label also runs CI; its existing distinct group avoids cancellation.
+        self.assertEqual(simulate_dag(ci_jobs, event_name="pull_request", action="opened",
+                                     labels=("full-ci",)), {"harness", "fast-and-build"})
+        self.assertEqual("ci-" + eval_gha(group_expr, event_name="pull_request", action="opened",
+                                        labels=("full-ci",)), "ci-pr-123")
+        self.assertEqual(eval_gha(perf_expr, event_name="pull_request", action="opened",
+                                 labels=("full-ci",)), "1")
 
         # 3. Labeled PR with unrelated label: isolated non-cancelling group, zero jobs run
         self.assertEqual(

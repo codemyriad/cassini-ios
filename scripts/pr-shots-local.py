@@ -65,7 +65,7 @@ def run_render(command, **kwargs):
 
 
 def render(head, base_ref, out, diff_tool=None, pr=None, repo="codemyriad/cassini-ios", render_only=False):
-    if os.environ.get("CASSINI_HEAVY_LOCK_HELD") == "1":
+    if any(os.environ.get(key) == "1" for key in ("CASSINI_IOS_LOCK_HELD", "CASSINI_HEAVY_LOCK_HELD")):
         raise ValueError("run outside the heavy lock; each screenshots.sh acquires it")
     head = head.resolve()
     sha = git(head, "rev-parse", "HEAD")
@@ -87,6 +87,7 @@ def render(head, base_ref, out, diff_tool=None, pr=None, repo="codemyriad/cassin
                CASSINI_SHOTS_RUN_ID=session)
     # Each screenshots.sh owns the host lock itself; never acquire a second non-reentrant lock here.
     env.pop("CASSINI_HEAVY_LOCK_HELD", None)
+    env.pop("CASSINI_IOS_LOCK_HELD", None)
     started = time.monotonic()
     with tempfile.TemporaryDirectory(prefix="cassini-prshots-") as temporary:
         base = Path(temporary) / "base"

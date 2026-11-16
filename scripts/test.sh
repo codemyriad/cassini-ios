@@ -6,6 +6,7 @@
 #   scripts/test.sh ui       build for testing, then the UI tests, sharded across simulator clones
 #   scripts/test.sh all      fast, app and ui (the package tests run beside the build), then the iOS 18 leg when it is on
 #                            (CASSINI_IOS18)
+#   scripts/test.sh simulator build, hosted and UI tests, then the iOS 18 leg; CI runs fast separately
 #   scripts/test.sh ios18    build for testing, then only the iOS 18 leg (default smoke; CASSINI_IOS18=full for the full
 #                            leg). For iterating on it; an -only-testing:CassiniUITests/... selection replaces the smoke list
 #   scripts/test.sh prebuilt the hosted and UI tests of the last build, without building (what the iOS 18 leg runs on its
@@ -43,7 +44,7 @@
 #                        (DerivedData/test-logs-ios18) and timing table (ui-test-durations-ios18.tsv in the cache) are
 #                        its own. It shuts down this worktree's other booted clones before it boots, and all of them
 #                        afterwards (CASSINI_KEEP_SIMS default 0), and it posts no commit status.
-#   CASSINI_IOS18        the iOS 18 leg of all: after the default runtime's tiers pass, this worktree's clones are shut
+#   CASSINI_IOS18        the iOS 18 leg of all/simulator: after the default runtime's tiers pass, this worktree's clones are shut
 #                        down and the products of the same build run on the iOS 18 runtime, through `prebuilt` with
 #                        CASSINI_RUNTIME=18 (its clones, logs and timing table, above). smoke: the hosted tests, then the
 #                        UI tests listed in scripts/ios18-smoke-tests.txt on one iPhone; full: the hosted tests, every
@@ -52,6 +53,8 @@
 #                        (Cassini/Features, Cassini/Design since it left origin/main); with ios18_default=off there
 #                        is no leg and the status says nothing of iOS 18. With the leg on, a Mac
 #                        without the runtime fails the run, and its status, before anything is built; it never skips it.
+#                        simulator smoke additionally runs all AccessibilityAuditTests and WideScreenTests,
+#                        including their iPad cases, serially. `all` smoke remains phone-only.
 #   CASSINI_IOS18_RUNTIME  the runtime of that leg, as CASSINI_RUNTIME takes it (default 18; 26 runs the whole leg on an
 #                        installed iOS 26 runtime, with the iOS 18 facts given to every UI test's launch). Set, the run
 #                        posts no commit status
@@ -100,7 +103,7 @@ runtime_tag_of() {
     esac
 }
 runtime_tag=""
-case "$tier" in app|ui|all|changed|prebuilt)
+case "$tier" in app|ui|all|simulator|changed|prebuilt)
     if [ -n "${CASSINI_RUNTIME:-}" ]; then
         runtime_tag=$(runtime_tag_of "$CASSINI_RUNTIME")
         # Checked on the value, not on the tag: an identifier without a version (…SimRuntime.iOS-) strips to an empty
@@ -126,7 +129,7 @@ esac
 ios18_mode=off ios18_by_default=0
 case "$tier" in
     # A whole `all` on another runtime (CASSINI_RUNTIME) has no second leg.
-    all) [ -n "$runtime_tag" ] || ios18_mode="${CASSINI_IOS18:-$ios18_default}"
+    all|simulator) [ -n "$runtime_tag" ] || ios18_mode="${CASSINI_IOS18:-$ios18_default}"
         [ -n "${CASSINI_IOS18:-}" ] || ios18_by_default=1 ;;
     ios18) ios18_mode="${CASSINI_IOS18:-smoke}"
         [ "$ios18_mode" != 0 ] || { echo "error: CASSINI_IOS18=0 leaves the ios18 tier nothing to run" >&2; exit 2; } ;;
@@ -143,7 +146,7 @@ ipad_type="${CASSINI_IPAD:-iPad Pro 13-inch (M5)}"
 # After the whole gate the clones go (Mac and Android work on this host never reclaims their memory); after the
 # iterating tiers the iPhones stay booted for the next run, unless they are another runtime's, which the next run
 # would not use.
-keep_sims="${CASSINI_KEEP_SIMS:-$( { [ "$tier" = all ] || [ "$tier" = ios18 ] || [ -n "$runtime_tag" ]; } && echo 0 || echo 1 )}"
+keep_sims="${CASSINI_KEEP_SIMS:-$( { [ "$tier" = all ] || [ "$tier" = simulator ] || [ "$tier" = ios18 ] || [ -n "$runtime_tag" ]; } && echo 0 || echo 1 )}"
 # The whole gate fails, rather than skips, the format's conformance vectors when it cannot find them.
 [ "$tier" != all ] || export CASSINI_CONFORMANCE_REQUIRED="${CASSINI_CONFORMANCE_REQUIRED:-1}"
 # Forward nightly/full-ci performance gate into simulator test hosts as well as swift test.
@@ -360,14 +363,15 @@ run_logged() {
 # by a small helper process rather than by this shell, so no daemon that xcodebuild or swift leaves running inherits
 # it; the helper lets go once this script has ended its own processes (summary), or at once if the script is killed
 # outright. The other heavy scripts (screenshots.sh, sherpa-bench.sh, speaker-smoke.sh) hold it through
-# `/usr/bin/lockf -k`, which another tool can use too, and set CASSINI_HEAVY_LOCK_HELD=1 so that the test.sh they call
-# does not wait for their own lock.
+# `/usr/bin/lockf -k`, which another tool can use too, and set CASSINI_IOS_LOCK_HELD=1 so that the test.sh they call
+# does not wait for their own lock. The fleet heavy-run marker CASSINI_HEAVY_LOCK_HELD only
+# promises a .big-heavy.slot.* lock, not this inode; never use it to bypass this lock.
 heavy_lock="${CASSINI_HEAVY_LOCK:-$HOME/.cassini-heavy.lock}"
 lock_minutes="${CASSINI_LOCK_MINUTES:-60}"
 lock_pid="" lock_held_file="" heavy_started=0
 take_heavy_lock() {
     [ -z "$lock_pid" ] || return 0
-    [ "${CASSINI_HEAVY_LOCK_HELD:-}" != 1 ] || return 0
+    [ "${CASSINI_IOS_LOCK_HELD:-}" != 1 ] || return 0
     local note rc
     # Named for this run: two runs of one worktree must not take each other's lock for their own.
     lock_held_file="${TMPDIR:-/tmp}/cassini-heavy-lock-held.$$"
@@ -696,7 +700,7 @@ for devices in json.load(sys.stdin)["devices"].values():
 }
 
 # The start of every run that builds or boots: the host lock, then the disk. From here on the run may boot clones,
-# so summary shuts them down unless they are kept (also under CASSINI_HEAVY_LOCK_HELD=1, where the caller holds the
+# so summary shuts them down unless they are kept (also under CASSINI_IOS_LOCK_HELD=1, where the caller holds the
 # lock); take_heavy_lock exits the run when it does not get the lock, before heavy_started is set.
 start_heavy() {
     take_heavy_lock
@@ -1309,17 +1313,27 @@ run_ios18_leg() {
         case "$a" in -only-testing:CassiniUITests/*) selected=1 ;; esac
         args+=("$a")
     done
-    envs=(CASSINI_RUNTIME="$ios18_runtime" CASSINI_HEAVY_LOCK_HELD=1 CASSINI_KEEP_SIMS=0)
+    envs=(CASSINI_RUNTIME="$ios18_runtime" CASSINI_IOS_LOCK_HELD=1 CASSINI_KEEP_SIMS=0)
     # On a runtime with Apple speech (the leg run on iOS 26 today), every launch gets the iOS 18 facts and the UI
     # tests expect what iOS 18 shows (CassiniUITests/DeviceUnderTest.swift), so the iOS 18 side of each test runs.
     [ "${ios18_tag%%.*}" -lt 26 ] || envs+=(TEST_RUNNER_CASSINI_IOS18_FACTS=1)
     if [ "$ios18_mode" = smoke ]; then
-        envs+=(CASSINI_UI_IPAD=0 CASSINI_UI_WORKERS=1)
+        if [ "$tier" = simulator ]; then
+            # CI smoke retains every audit and wide-screen/iPad rotation assertion. Serial mode
+            # keeps only one clone booted; legacy `all` smoke retains its existing phone-only list.
+            envs+=(CASSINI_UI_IPAD=1 CASSINI_UI_WORKERS=0)
+        else
+            envs+=(CASSINI_UI_IPAD=0 CASSINI_UI_WORKERS=1)
+        fi
         if [ $selected = 0 ]; then
             while IFS= read -r line || [ -n "$line" ]; do
                 line="${line%%#*}"; line="${line//[[:space:]]/}"
                 [ -z "$line" ] || args+=("-only-testing:CassiniUITests/$line")
             done < "$ios18_smoke_list"
+            if [ "$tier" = simulator ]; then
+                args+=("-only-testing:CassiniUITests/AccessibilityAuditTests"
+                       "-only-testing:CassiniUITests/WideScreenTests")
+            fi
         fi
     fi
     shutdown_clones
@@ -1441,7 +1455,7 @@ extra_xcodebuild_from_extra() {
 
 case "$tier" in
     clean) delete_clones; echo "deleted the $prefix-* clones"; exit 0 ;;
-    fast|app|ui|all|changed|build|ios18|prebuilt) ;;
+    fast|app|ui|all|simulator|changed|build|ios18|prebuilt) ;;
     *) awk 'NR > 1 { if (!/^#/) exit; sub(/^# ?/, ""); print }' "$0"; exit 2 ;;
 esac
 
@@ -1461,6 +1475,7 @@ case "$tier" in
     ui)   start_heavy; start_first_boot; build_for_testing; tier_ui ;;
     all)  start_heavy; start_first_boot; check_strings; start_fast_beside; build_for_testing; tier_app; tier_ui
           wait_fast_beside; run_ios18_leg ;;
+    simulator) start_heavy; start_first_boot; build_for_testing; tier_app; tier_ui; run_ios18_leg ;;
     ios18) start_heavy; build_for_testing; run_ios18_leg ;;
     prebuilt) start_heavy; start_first_boot; use_built_products; tier_app; tier_ui ;;
     changed) tier_changed ;;

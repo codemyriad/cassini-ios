@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import re
 import shlex
+import shutil
 import signal
 import subprocess
 import sys
@@ -90,6 +91,252 @@ class LifecycleTests(unittest.TestCase):
     def test_immediate_exit_preserves_status_without_one_second_poll(self):
         process = self.shell(f'run_limited {str(self.log)!r} {HANG_GUARD} /bin/sh -c "exit 23"')
         self.assertEqual(finish(process), 23)
+
+    def test_fleet_slot_marker_does_not_bypass_shared_mac_flock_and_nested_ios_reuses_it(self):
+        lock = self.root / ".cassini-heavy.lock"
+        code = f'''set -euo pipefail
+root={str(ROOT)!r}
+heavy_lock={str(lock)!r}
+lock_minutes=1; lock_pid=""; lock_held_file=""; tier=simulator
+die() {{ echo "$*" >&2; exit 1; }}
+{function("take_heavy_lock")}
+{function("release_heavy_lock")}
+trap release_heavy_lock EXIT
+take_heavy_lock
+# A nested iOS leg must reuse the parent lock, even with its own empty lock_pid.
+( export CASSINI_IOS_LOCK_HELD=1; lock_pid=""; take_heavy_lock; test -z "$lock_pid" )
+echo READY
+read -r finish
+'''
+        env = dict(os.environ, CASSINI_HEAVY_LOCK_HELD="1", TMPDIR=str(self.root))
+        env.pop("CASSINI_IOS_LOCK_HELD", None)
+        process = subprocess.Popen(["/bin/bash", "-c", code], env=env, text=True,
+                                   stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        try:
+            self.assertEqual(process.stdout.readline().strip(), "READY")
+            # cassini-mac's ci-heavy.py uses this same flock; the slot marker must not let it overlap.
+            with lock.open("r+") as held:
+                with self.assertRaises(BlockingIOError):
+                    fcntl.flock(held, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                process.stdin.write("done\n"); process.stdin.flush()
+                self.assertEqual(finish(process), 0)
+                fcntl.flock(held, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                self.assertEqual(lock.read_text(), "")
+        finally:
+            if process.poll() is None:
+                process.terminate(); finish(process)
+            for stream in (process.stdin, process.stdout, process.stderr):
+                stream.close()
+
+    def test_ios_lockf_callers_use_the_same_reentrancy_marker(self):
+        for name in ("screenshots.sh", "sherpa-bench.sh", "speaker-smoke.sh"):
+            text = (ROOT / "scripts" / name).read_text()
+            self.assertIn('${CASSINI_IOS_LOCK_HELD:-}', text)
+            self.assertIn('exec env CASSINI_IOS_LOCK_HELD=1 CASSINI_HEAVY_LOCK_HELD=1 /usr/bin/lockf -k', text)
+            self.assertNotIn('${CASSINI_HEAVY_LOCK_HELD:-}', text)
+
+    def test_simulator_cleanup_waits_for_owner_for_both_tier_names(self):
+        scripts = self.root / "scripts"
+        scripts.mkdir()
+        shutil.copy2(HELPER, scripts / HELPER.name)
+        fake = scripts / "test.sh"
+        fake.write_text('''#!/usr/bin/python3 -I
+import os, pathlib, signal, sys
+root = pathlib.Path(__file__).resolve().parent.parent
+if sys.argv[1] == 'clean':
+    assert (root / 'exited').exists()
+    (root / 'cleaned').touch()
+else:
+    def stop(*_):
+        (root / 'exited').touch()
+        sys.exit(143)
+    signal.signal(signal.SIGTERM, stop)
+    (root / 'ready').touch()
+    signal.pause()
+''')
+        fake.chmod(0o755)
+        gate = scripts / "simulator-gate.sh"
+        source = (ROOT / "scripts/simulator-gate.sh").read_text()
+        for tier in ("simulator", "all"):
+            with self.subTest(tier=tier):
+                for name in ("ready", "exited", "cleaned"):
+                    (self.root / name).unlink(missing_ok=True)
+                gate.write_text(source.replace('test.sh" simulator >', f'test.sh" {tier} >'))
+                marker = self.root / "owner.pid"
+                env = dict(os.environ, CASSINI_GATE_OWNER_FILE=str(marker))
+                with events.Events() as queue:
+                    queue.file(self.root)
+                    owner = subprocess.Popen(["/bin/bash", str(gate), "owner"], env=env)
+                    try:
+                        while not (self.root / "ready").exists():
+                            self.assertTrue(queue.until(time.monotonic() + HANG_GUARD))
+                        cleaned = subprocess.run(["/bin/bash", str(gate), "clean"], env=env,
+                                                 capture_output=True, text=True, timeout=HANG_GUARD)
+                        self.assertEqual(cleaned.returncode, 0, cleaned.stdout + cleaned.stderr)
+                        self.assertEqual(finish(owner), 143)
+                        self.assertTrue((self.root / "cleaned").exists())
+                        self.assertFalse(marker.exists())
+                    finally:
+                        if owner.poll() is None:
+                            owner.terminate(); finish(owner)
+        # A stale marker must not signal a PID that now belongs to another command.
+        (self.root / "cleaned").unlink()
+        unrelated = subprocess.Popen([sys.executable, "-c", "import sys; print('ready',flush=True); sys.stdin.read()"],
+                                     stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+        try:
+            self.assertEqual(unrelated.stdout.readline(), b"ready\n")
+            marker.write_text(str(unrelated.pid))
+            result = subprocess.run(["/bin/bash", str(gate), "clean"], env=env,
+                                    capture_output=True, text=True, timeout=HANG_GUARD)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("no longer identifies this run", result.stderr)
+            self.assertIsNone(unrelated.poll())
+            self.assertFalse((self.root / "cleaned").exists())
+            self.assertTrue(marker.exists())
+        finally:
+            unrelated.stdin.close(); finish(unrelated); unrelated.stdout.close()
+
+    def test_simulator_cleanup_stops_foreground_tree_across_sessions(self):
+        scripts = self.root / "scripts"
+        scripts.mkdir()
+        shutil.copy2(HELPER, scripts / HELPER.name)
+        gate = scripts / "simulator-gate.sh"
+        shutil.copy2(ROOT / "scripts/simulator-gate.sh", gate)
+        marker = self.root / "owner.pid"
+        env = dict(os.environ, CASSINI_GATE_OWNER_FILE=str(marker))
+        # Real macOS Bash defers its TERM trap while this foreground child runs.
+        fake = scripts / "test.sh"
+        fake.write_text('''#!/bin/bash
+set -eu
+cd "$(dirname "$0")/.."
+if [ "$1" = clean ]; then
+    exec /usr/bin/python3 -I check.py
+fi
+trap 'touch exited; exit 143' TERM
+echo "$$" > fixture-owner.pid
+/usr/bin/python3 -I child.py
+''')
+        fake.chmod(0o755)
+        (self.root / "check.py").write_text('''import pathlib, subprocess
+root = pathlib.Path('.')
+assert (root / 'exited').exists(), 'owner trap did not run'
+for name in ('fixture-owner.pid', 'child.pid', 'grandchild.pid'):
+    pid = (root / name).read_text().strip()
+    result = subprocess.run(['/bin/ps', '-p', pid, '-o', 'stat='], capture_output=True, text=True)
+    assert not result.stdout.strip() or result.stdout.strip().startswith('Z'), (name, result.stdout)
+(root / 'cleaned').touch()
+''')
+        for ignore_term in (False, True):
+            with self.subTest(ignore_term=ignore_term):
+                for name in ('exited', 'cleaned', 'ready', 'child.pid', 'grandchild.pid'):
+                    (self.root / name).unlink(missing_ok=True)
+                (self.root / "grandchild.py").write_text(
+                    "import os, pathlib, signal\n"
+                    + ("signal.signal(signal.SIGTERM, signal.SIG_IGN)\n" if ignore_term else "")
+                    + "pathlib.Path('grandchild.pid').write_text(str(os.getpid()))\n"
+                    "pathlib.Path('ready').touch()\n"
+                    "signal.pause()\n")
+                (self.root / "child.py").write_text(
+                    "import os, pathlib, subprocess, sys\n"
+                    "pathlib.Path('child.pid').write_text(str(os.getpid()))\n"
+                    "p = subprocess.Popen([sys.executable, '-I', 'grandchild.py'], start_new_session=True)\n"
+                    "p.wait()\n")
+                with events.Events() as queue:
+                    queue.file(self.root)
+                    owner = subprocess.Popen(["/bin/bash", str(gate), "owner"], env=env)
+                    try:
+                        deadline = time.monotonic() + HANG_GUARD
+                        while not (self.root / "ready").exists():
+                            self.assertTrue(queue.until(deadline), "grandchild did not become ready")
+                        result = subprocess.run(["/bin/bash", str(gate), "clean"], env=env,
+                                                capture_output=True, text=True, timeout=HANG_GUARD)
+                        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                        self.assertEqual(finish(owner), 143)
+                        self.assertTrue((self.root / "cleaned").exists())
+                        self.assertFalse(marker.exists())
+                    finally:
+                        for name in ('child.pid', 'grandchild.pid'):
+                            path = self.root / name
+                            if path.exists():
+                                kill_quietly(int(path.read_text()))
+                        if owner.poll() is None:
+                            owner.kill()
+                        owner.wait()
+
+    def test_stop_tree_retains_real_hold_lock_until_separate_session_grandchild_exits(self):
+        # Include a space in the helper's path, as ps prints argv without quoting it.
+        helper = self.root / "test-events.py"
+        shutil.copy2(HELPER, helper)
+        lock = self.root / ".cassini-heavy.lock"
+        (self.root / "grandchild.py").write_text(
+            "import os, pathlib, signal\n"
+            "signal.signal(signal.SIGTERM, signal.SIG_IGN)\n"
+            "pathlib.Path('grandchild.pid').write_text(str(os.getpid()))\n"
+            "while True: signal.pause()\n")
+        (self.root / "child.py").write_text(
+            "import os, pathlib, subprocess, sys\n"
+            "pathlib.Path('child.pid').write_text(str(os.getpid()))\n"
+            "subprocess.Popen([sys.executable, '-I', 'grandchild.py'], start_new_session=True).wait()\n")
+        (self.root / "owner.py").write_text(
+            "import os, pathlib, signal, subprocess, sys\n"
+            f"p = subprocess.Popen([sys.executable, '-I', {str(helper)!r}, 'hold',\n"
+            "    '.cassini-heavy.lock', str(os.getpid()), 'held', 'regression'])\n"
+            "pathlib.Path('holder.pid').write_text(str(p.pid))\n"
+            "subprocess.run([sys.executable, '-I', 'test-events.py', 'lock-ready',\n"
+            "    str(p.pid), '.cassini-heavy.lock', 'held', '30'], check=True)\n"
+            "subprocess.Popen([sys.executable, '-I', 'child.py'])\n"
+            "signal.pause()\n")
+        stopper = None
+        owner = subprocess.Popen([sys.executable, '-I', 'owner.py'], cwd=self.root)
+        try:
+            with events.Events() as queue:
+                queue.file(self.root)
+                deadline = time.monotonic() + HANG_GUARD
+                while not (self.root / 'grandchild.pid').exists():
+                    self.assertTrue(queue.until(deadline), 'grandchild never became ready')
+            grandchild = int((self.root / 'grandchild.pid').read_text())
+            holder = int((self.root / 'holder.pid').read_text())
+            with lock.open('r+') as contender, events.Events() as queue:
+                self.assertTrue(queue.process(grandchild))
+                self.assertTrue(queue.process(holder))
+                self.assertTrue(queue.process(owner.pid))
+                with self.assertRaises(BlockingIOError):
+                    fcntl.flock(contender, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                stopper = subprocess.Popen([sys.executable, '-I', str(HELPER), 'stop-tree', str(owner.pid)])
+                self.assertTrue(queue.process(stopper.pid))
+                exited = set()
+                while stopper.pid not in exited:
+                    batch = queue.until(deadline)
+                    self.assertTrue(batch, 'stop-tree never finished')
+                    exited.update(event.ident for event in batch if event.filter == events.select.KQ_FILTER_PROC)
+                    try:
+                        fcntl.flock(contender, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    except BlockingIOError:
+                        continue
+                    try:
+                        # The lock can be acquired only after the worker actually exits.
+                        # Check kernel state too: its exit may precede delivery of NOTE_EXIT.
+                        state = subprocess.run(['/bin/ps', '-p', str(grandchild), '-o', 'stat='],
+                                               capture_output=True, text=True, check=False).stdout.strip()
+                        self.assertTrue(not state or state.startswith('Z'),
+                                        f'host lock released while grandchild {grandchild} was {state}')
+                    finally:
+                        fcntl.flock(contender, fcntl.LOCK_UN)
+                self.assertEqual(finish(stopper), 0)
+                self.assertIn(grandchild, exited)
+                self.assertIn(holder, exited)
+                # No timeout or retry: returning from stop-tree guarantees release.
+                fcntl.flock(contender, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        finally:
+            for process in (stopper, owner):
+                if process is not None:
+                    if process.poll() is None:
+                        process.kill()
+                    process.wait()
+            for name in ('holder.pid', 'child.pid', 'grandchild.pid'):
+                path = self.root / name
+                if path.exists():
+                    kill_quietly(int(path.read_text()))
 
     def test_end_tree_ends_entire_command_tree(self):
         child = self.root / "child"

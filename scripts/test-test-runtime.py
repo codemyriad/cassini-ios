@@ -236,7 +236,7 @@ class Harness:
     def env(self, **extra):
         env = {k: v for k, v in os.environ.items() if not k.startswith("CASSINI_")}
         env.update(PATH=f"{self.stub / 'bin'}:/usr/bin:/bin:/usr/sbin:/sbin", HOME=str(self.home),
-                   STUB=str(self.stub), CASSINI_TEST_CACHE=str(self.cache), CASSINI_HEAVY_LOCK_HELD="1",
+                   STUB=str(self.stub), CASSINI_TEST_CACHE=str(self.cache), CASSINI_IOS_LOCK_HELD="1",
                    CASSINI_ADMIT_MINUTES="0", CASSINI_UI_WORKERS="2", TMPDIR=str(self.home))
         env.update(extra)
         return env
@@ -729,7 +729,7 @@ sys.exit("the lock was free: this test must hold it")
         lock = h.home / "heavy.lock"
         with open(lock, "w") as held:
             fcntl.flock(held, fcntl.LOCK_EX)
-            result = h.run("app", CASSINI_RUNTIME="26", CASSINI_HEAVY_LOCK_HELD="", CASSINI_HEAVY_LOCK=str(lock),
+            result = h.run("app", CASSINI_RUNTIME="26", CASSINI_IOS_LOCK_HELD="", CASSINI_HEAVY_LOCK_HELD="1", CASSINI_HEAVY_LOCK=str(lock),
                            CASSINI_LOCK_MINUTES="2")
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn(f"host busy: could not take {lock} within 2 min", result.stderr)
@@ -1030,6 +1030,41 @@ class OwnershipTests(unittest.TestCase):
 class Ios18LegTests(unittest.TestCase):
     DEFAULT_CLONES = ("ts-wt-iphone-1", "ts-wt-iphone-2", "ts-wt-ipad-1")
 
+    def test_simulator_skips_fast_but_reuses_one_build_and_keeps_all_layout_audits(self):
+        for mode in ("smoke", "full"):
+            with self.subTest(mode=mode):
+                h = Harness(self, WITH_18)
+                # Copy real declarations so coverage includes newly added tests in either class.
+                for name in ("AccessibilityAuditTests", "WideScreenTests"):
+                    shutil.copy2(ROOT / f"CassiniUITests/{name}.swift", h.root / f"CassiniUITests/{name}.swift")
+                (h.root / "scripts/check-strings.sh").write_text("#!/bin/sh\nexit 91\n")
+                result = h.run("simulator", CASSINI_IOS18=mode, CASSINI_UI_WORKERS="0",
+                               CASSINI_KEEP_SIMS="0", STUB_SIM_SNAPSHOTS="1", CASSINI_IOS_LOCK_HELD="",
+                               CASSINI_HEAVY_LOCK_HELD="1", CASSINI_HEAVY_LOCK=str(h.home / "heavy.lock"))
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertFalse([c for c in h.calls() if c.startswith("swift")])
+                self.assertEqual(sum("build-for-testing" in c for c in h.calls()), 1)
+                calls = self.by_name(h)
+                leg = [c for c in calls if "test-without-building" in c and "ts-wt-" in c and "18-" in c]
+                self.assertEqual(sum("-only-testing:CassiniTests" in c for c in leg), 1)
+                phone = "\n".join(c for c in leg if "iphone18-" in c)
+                ipad = "\n".join(c for c in leg if "ipad18-" in c)
+                known = h.shell(["ui_tests"], f'ui_tests {str(h.root)!r}/CassiniUITests/*.swift').stdout.split()
+                expected = set(known) if mode == "full" else {"AlphaTests/testOne"} | {
+                    t for t in known if t.startswith(("AccessibilityAuditTests/", "WideScreenTests/"))}
+                self.assertEqual(set(re.findall(r"-only-testing:CassiniUITests/(\S+)", phone)), expected)
+                self.assertEqual(set(re.findall(r"-only-testing:CassiniUITests/(\S+)", ipad)),
+                                 {t for t in expected if "/testIPad" in t})
+                snapshots = [json.loads(line) for line in (h.stub / "simulator-snapshots").read_text().splitlines()]
+                self.assertTrue(all(len(s["booted"]) <= 1 for s in snapshots))
+                self.assertTrue(all(d["state"] == "Shutdown" for ds in h.state()["devices"].values() for d in ds))
+                self.assertEqual(h.statuses(), [])
+
+    def test_simulator_cannot_post_the_legacy_status(self):
+        h = Harness(self)
+        result = h.shell(["status_skip_reason"], 'tier=simulator; status_skip_reason')
+        self.assertEqual(result.stdout.strip(), "the tier is simulator, not all")
+
     def variant(self, h, old, new):
         """The worktree's test.sh with `old` replaced by `new`."""
         path = h.root / "scripts/test.sh"
@@ -1229,7 +1264,7 @@ class Ios18LegTests(unittest.TestCase):
         self.assertEqual([re.findall(r"CassiniUITests/(\S+)", c) for c in ui], [["BetaTests/testThree"]])
 
     def test_the_legs_own_run_shuts_its_clones_down_under_the_callers_lock(self):
-        # The leg's run gets CASSINI_HEAVY_LOCK_HELD=1 and never takes the lock itself; it still counts as a run that
+        # The leg's run gets CASSINI_IOS_LOCK_HELD=1 and never takes the lock itself; it still counts as a run that
         # got the lock, so it shuts its clones down, even when the calling run keeps its own booted.
         h = Harness(self, WITH_18)
         result = h.run("ios18", CASSINI_KEEP_SIMS="1")
