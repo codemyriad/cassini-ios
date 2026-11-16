@@ -149,16 +149,24 @@ private struct RecordingStatus: View {
 
 private struct RecordingTitleField: View {
     @Binding var title: String
+    // Keep the native edit even when the model's clamped title is unchanged, so the cut reaches the field.
+    @State private var text = ""
     @FocusState private var focused: Bool
 
     var body: some View {
         // L-48: no visible "Title" caption; the field keeps it as its spoken label.
         HStack(spacing: 8) {
                 // Wraps rather than cutting a long title at large text sizes.
-            TextField(String(localized: "Title", table: "Recording"), text: $title,
+            TextField(String(localized: "Title", table: "Recording"), text: $text.handingEdits(to: edited),
                       prompt: Text("Title", tableName: "Recording").foregroundStyle(Color.ink3), axis: .vertical)
                 .lineLimit(1...3).font(.title3).focused($focused).submitLabel(.done)
                 .textInputAutocapitalization(.sentences).onSubmit { focused = false }
+                .onAppear { text = title }
+                .onChange(of: text) { _, typed in edited(typed) }
+                .onChange(of: title) { _, updated in
+                    // Follow the default title when capture starts, without interrupting an edit's deferred cut.
+                    if updated != String(text.prefix(Limits.titleMaxLength)) { text = updated }
+                }
                 .accessibilityLabel(Text("Title", tableName: "Recording"))
                 .accessibilityIdentifier("recordingTitle")
             Image(systemName: "pencil").foregroundStyle(Color.recordingSecondary).accessibilityHidden(true)
@@ -166,6 +174,18 @@ private struct RecordingTitleField: View {
         .frame(minHeight: HitTarget.minimum)
         .padding(.horizontal, 4).padding(.bottom, 6)
         .overlay(alignment: .bottom) { Rectangle().fill(Color.recordingLine).frame(height: 1) }
+    }
+
+    private func edited(_ typed: String) {
+        let shortened = String(typed.prefix(Limits.titleMaxLength))
+        title = shortened
+        if typed != shortened {
+            // As in RenameSheet, finish the native edit before putting the shortened text back.
+            DispatchQueue.main.async {
+                guard text == typed else { return }
+                text = shortened
+            }
+        }
     }
 }
 

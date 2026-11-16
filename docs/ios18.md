@@ -121,9 +121,12 @@ late one, and not a lost binding write.
 Below iOS 26, a text field whose edits change something else therefore also takes each edit from its binding's
 setter (`Binding.handingEdits(to:)`, Cassini/Design/TextEdits.swift), which runs on every keystroke, and keeps its
 `onChange(of:)` for changes made in code: Name a speaker (the name, the draft kept for a relaunch and the cut to 80
-characters) and the Rename sheet (the draft and the cut to its limit; Save already read the text itself). Running an
+characters), the Rename sheet (the draft and the cut to its limit; Save already read the text itself), and the
+recording title (the model and the cut to 200 characters). The recording title keeps field-owned text and puts an
+over-limit edit back on the next main-queue turn, as Rename does, even when the model's clamped title is unchanged.
+It therefore needs no elapsed-time or meter tick to refresh the displayed text. Running an
 action twice for one edit changes nothing (`NameSpeakerModelTests.aNameReportedTwiceIsTheSameAsOnce`). The other text
-inputs read their binding directly when they act (the passage editor, the recording title, the in-note search, Add a
+inputs read their binding directly when they act (the passage editor, the in-note search, Add a
 speaker), so a skipped action cannot reach them. The scene-restoration copies of the Library and in-note search
 queries still follow `onChange(of:)`: after a skipped last keystroke, a relaunch restores the query without it.
 

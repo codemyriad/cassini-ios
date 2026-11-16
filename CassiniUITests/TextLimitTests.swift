@@ -76,6 +76,9 @@ final class TextLimitTests: XCTestCase {
         XCTAssertTrue(app.buttons["recordButton"].waitForExistence(within: 15))
         app.buttons["recordButton"].tap()
         XCTAssertTrue(app.buttons["Pause recording"].waitForEnabled(within: 8))
+        // The field must put the shortened edit back without a recording timer or meter tick refreshing it.
+        app.buttons["Pause recording"].tap()
+        XCTAssertTrue(app.buttons["Resume recording"].waitForEnabled(within: 8))
         let field = app.textFields["recordingTitle"]
         field.tap()
         // The multiline SwiftUI field exposes its empty prompt as value without placeholderValue.
