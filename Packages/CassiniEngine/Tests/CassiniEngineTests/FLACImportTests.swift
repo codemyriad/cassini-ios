@@ -1,6 +1,7 @@
 import Foundation
 import AVFoundation
 import Testing
+import CassiniAudio
 import CassiniCore
 import CassiniEngine
 import CassiniEngineTesting
@@ -16,6 +17,13 @@ import CassiniEngineTesting
             try bytes.write(to: source)
             let info = try #require(try NativeFLAC.validateIfPresent(source))
             #expect(info.totalSamples == FLACFixtures.samples)
+            // Inspect both names directly as well as copying them: adding playback duration must not narrow
+            // the valid FLAC inputs accepted by the decoder, including extensionless Open-with inputs.
+            let player = try AVAudioPlayer(contentsOf: source)
+            let inspection = try await AudioInspection.inspect(source)
+            #expect(inspection.duration == player.duration)
+            #expect(inspection.duration == Double(FLACFixtures.samples) / Double(rate))
+            #expect(inspection.waveform.count == 96)
             let importer = CoordinatedFileImporter(storage: FakeStorage())
             _ = try await importer.copy(from: source, to: destination, maxBytes: 1 << 20, reserveBytes: 0)
             #expect(try Data(contentsOf: destination) == bytes)
@@ -110,6 +118,9 @@ import CassiniEngineTesting
             for name in ["broken.flac", "shared-audio"] {
                 let source = folder.appendingPathComponent(name), destination = folder.appendingPathComponent("stage.tmp")
                 try bytes.write(to: source)
+                await #expect(throws: (any Error).self) {
+                    try await AudioInspection.inspect(source)
+                }
                 await #expect(throws: FileImportError.cannotOpen) {
                     try await CoordinatedFileImporter(storage: FakeStorage()).copy(from: source, to: destination, maxBytes: 1 << 20, reserveBytes: 0)
                 }

@@ -4,7 +4,7 @@ import Testing
 import CassiniCore
 import CassiniAudio
 
-@Test func opusRoundTripPreservesDurationAndSignal() throws {
+@Test func opusRoundTripPreservesDurationAndSignal() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: root) }
@@ -22,6 +22,10 @@ import CassiniAudio
     #expect(info.validFraming)
     #expect(abs(Double(info.sampleCount) / 48_000 - Double(count) / 44_100) < 0.002)
     try OpusAudio.decode(opus, to: decoded)
+    // ImportService inspects the decoded CAF, not the Ogg container.
+    let inspection = try await AudioInspection.inspect(decoded)
+    #expect(inspection.duration == (try AVAudioPlayer(contentsOf: decoded)).duration)
+    #expect(inspection.waveform.count == 96)
     let file = try AVAudioFile(forReading: decoded)
     #expect(file.length == info.sampleCount)
     let buffer = try #require(AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: AVAudioFrameCount(file.length)))

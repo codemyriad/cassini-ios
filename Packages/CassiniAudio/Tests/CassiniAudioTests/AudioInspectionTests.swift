@@ -20,16 +20,19 @@ import Testing
         #expect(abs(level(tone.map { $0 - 2060.0 / 32768 }) - clean) < 0.0005)
     }
 
-    @Test func theWaveformOfAnOffsetRecordingIsFlat() async throws {
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".caf")
+    @Test(arguments: ["caf", "wav"]) func theWaveformOfAnOffsetRecordingIsFlat(extensionName: String) async throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + "." + extensionName)
         defer { try? FileManager.default.removeItem(at: url) }
         let format = try #require(AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 16_000, channels: 1, interleaved: false))
-        let file = try AVAudioFile(forWriting: url, settings: format.settings, commonFormat: .pcmFormatFloat32, interleaved: false)
-        let buffer = try #require(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 32_000))
-        buffer.frameLength = 32_000
-        for i in 0..<32_000 { buffer.floatChannelData![0][i] = -2060.0 / 32768 }
-        try file.write(from: buffer)
+        do {
+            let file = try AVAudioFile(forWriting: url, settings: format.settings, commonFormat: .pcmFormatFloat32, interleaved: false)
+            let buffer = try #require(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 32_000))
+            buffer.frameLength = 32_000
+            for i in 0..<32_000 { buffer.floatChannelData![0][i] = -2060.0 / 32768 }
+            try file.write(from: buffer)
+        } // Close the writer so the WAV header contains the final frame count before inspection.
         let inspection = try await AudioInspection.inspect(url)
+        #expect(inspection.duration == (try AVAudioPlayer(contentsOf: url)).duration)
         #expect(inspection.waveform.count == 96)
         #expect(inspection.waveform.allSatisfy { $0 == 0.04 }, "the floor, not a bar of sound")
     }
