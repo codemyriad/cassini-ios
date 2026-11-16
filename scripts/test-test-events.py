@@ -263,6 +263,81 @@ for name in ('fixture-owner.pid', 'child.pid', 'grandchild.pid'):
                             owner.kill()
                         owner.wait()
 
+    def test_stop_tree_retains_real_hold_lock_until_separate_session_grandchild_exits(self):
+        # Include a space in the helper's path, as ps prints argv without quoting it.
+        helper = self.root / "test-events.py"
+        shutil.copy2(HELPER, helper)
+        lock = self.root / ".cassini-heavy.lock"
+        (self.root / "grandchild.py").write_text(
+            "import os, pathlib, signal\n"
+            "signal.signal(signal.SIGTERM, signal.SIG_IGN)\n"
+            "pathlib.Path('grandchild.pid').write_text(str(os.getpid()))\n"
+            "while True: signal.pause()\n")
+        (self.root / "child.py").write_text(
+            "import os, pathlib, subprocess, sys\n"
+            "pathlib.Path('child.pid').write_text(str(os.getpid()))\n"
+            "subprocess.Popen([sys.executable, '-I', 'grandchild.py'], start_new_session=True).wait()\n")
+        (self.root / "owner.py").write_text(
+            "import os, pathlib, signal, subprocess, sys\n"
+            f"p = subprocess.Popen([sys.executable, '-I', {str(helper)!r}, 'hold',\n"
+            "    '.cassini-heavy.lock', str(os.getpid()), 'held', 'regression'])\n"
+            "pathlib.Path('holder.pid').write_text(str(p.pid))\n"
+            "subprocess.run([sys.executable, '-I', 'test-events.py', 'lock-ready',\n"
+            "    str(p.pid), '.cassini-heavy.lock', 'held', '30'], check=True)\n"
+            "subprocess.Popen([sys.executable, '-I', 'child.py'])\n"
+            "signal.pause()\n")
+        stopper = None
+        owner = subprocess.Popen([sys.executable, '-I', 'owner.py'], cwd=self.root)
+        try:
+            with events.Events() as queue:
+                queue.file(self.root)
+                deadline = time.monotonic() + HANG_GUARD
+                while not (self.root / 'grandchild.pid').exists():
+                    self.assertTrue(queue.until(deadline), 'grandchild never became ready')
+            grandchild = int((self.root / 'grandchild.pid').read_text())
+            holder = int((self.root / 'holder.pid').read_text())
+            with lock.open('r+') as contender, events.Events() as queue:
+                self.assertTrue(queue.process(grandchild))
+                self.assertTrue(queue.process(holder))
+                self.assertTrue(queue.process(owner.pid))
+                with self.assertRaises(BlockingIOError):
+                    fcntl.flock(contender, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                stopper = subprocess.Popen([sys.executable, '-I', str(HELPER), 'stop-tree', str(owner.pid)])
+                self.assertTrue(queue.process(stopper.pid))
+                exited = set()
+                while stopper.pid not in exited:
+                    batch = queue.until(deadline)
+                    self.assertTrue(batch, 'stop-tree never finished')
+                    exited.update(event.ident for event in batch if event.filter == events.select.KQ_FILTER_PROC)
+                    try:
+                        fcntl.flock(contender, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    except BlockingIOError:
+                        continue
+                    try:
+                        # The lock can be acquired only after the worker actually exits.
+                        # Check kernel state too: its exit may precede delivery of NOTE_EXIT.
+                        state = subprocess.run(['/bin/ps', '-p', str(grandchild), '-o', 'stat='],
+                                               capture_output=True, text=True, check=False).stdout.strip()
+                        self.assertTrue(not state or state.startswith('Z'),
+                                        f'host lock released while grandchild {grandchild} was {state}')
+                    finally:
+                        fcntl.flock(contender, fcntl.LOCK_UN)
+                self.assertEqual(finish(stopper), 0)
+                self.assertIn(grandchild, exited)
+                self.assertIn(holder, exited)
+                # No timeout or retry: returning from stop-tree guarantees release.
+                fcntl.flock(contender, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        finally:
+            for process in (stopper, owner):
+                if process is not None:
+                    if process.poll() is None:
+                        process.kill()
+                    process.wait()
+            for name in ('holder.pid', 'child.pid', 'grandchild.pid'):
+                path = self.root / name
+                if path.exists():
+                    kill_quietly(int(path.read_text()))
+
     def test_end_tree_ends_entire_command_tree(self):
         child = self.root / "child"
         script = self.root / "tree.py"

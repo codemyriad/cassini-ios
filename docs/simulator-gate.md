@@ -12,7 +12,9 @@ There are no signing, keychain, archive, TestFlight or App Store steps.
 ## Trust and source
 
 The job is eligible only in `codemyriad/cassini-ios`, for nightly main schedules, manual main dispatches and same-repository
-pull requests (opened, synchronized, reopened, or labeled `full-ci`). Unrelated label events do not allocate a runner.
+pull requests (opened, synchronized, reopened, or labeled `full-ci`). An opened PR already labeled `full-ci`
+skips the opened gate: its labeled event starts the full gate. Reopening still starts a full gate because it emits
+no labeled event. Unrelated label events do not allocate a runner.
 CI still verifies every main push for TestFlight exact-head evidence; the simulator workflow no longer repeats after
 each merge. This is a cadence decision, not reuse of PR success as proof of a merged tree. The job-level condition
 rejects forks, missing head metadata and other events before allocating a
@@ -47,9 +49,12 @@ for older checkout compatibility, but never trust that marker to skip acquisitio
 events and releases only after
 owned children stop; the lock inode is retained. The local PR screenshot driver rejects either enclosing lock marker.
 Without heavy-run, the test script takes the same flock directly.
-The package/build CI job allows 90 minutes to acquire this lock, matching the simulator job timeout,
-and 120 minutes overall to retain its existing 30-minute work budget after queuing. Its previous
-15-minute lock wait could fail before compilation while a healthy simulator run held the lock.
+The simulator gate explicitly allows 90 minutes to acquire this lock and 155 minutes overall, leaving
+65 minutes for the roughly 50-minute full run and cleanup. The package/build CI job allows 120 minutes
+to acquire the lock and 150 minutes overall, retaining its 30-minute work budget after two queued gates.
+These budgets let the lock deadline report "host busy" before the runner cancels a waiting job, including
+main-push CI used by unattended TestFlight. Existing CI concurrency groups remain unchanged: opened and
+full-ci labeled events can both run CI, with labeled runs isolated to avoid cancelling code-push runs.
 The existing resource-admission rules remain active. Runner slots share physical CPU/RAM; an idle runner service
 does not imply an idle machine.
 
@@ -58,8 +63,12 @@ Each service executes one job at a time. Initial and always-run cleanup remove o
 a host crash, its next job cleans the same owned prefix rather than abandoning a new generation of clones.
 The gate step uses exec through its workflow wrapper and records the actual test owner's PID in a run/attempt-specific
 file under RUNNER_TEMP. Always-run cleanup sends TERM to that owner if needed and waits for its process-exit event
-before deleting clones. A timeout or PID identity mismatch fails cleanup without deleting clones. Cancellation ends
-this run's build/shard descendants even when a host slot was acquired outside the test script.
+before deleting clones. Cleanup first suspends any `test-events.py hold` helpers so their parent-exit
+watchers cannot release the lock early, then sends TERM (and KILL if needed) to the owner and other descendants.
+Only after all those processes exit does it terminate, resume and await the lock helpers. If workers fail to
+exit, the helpers stay suspended with the lock held. A timeout or PID identity mismatch fails cleanup without
+deleting clones. Cancellation ends this run's build/shard descendants even when a host slot was acquired outside
+the test script.
 Logs and result bundles from both runtime legs
 are uploaded on success or failure and retained for seven days, identified by run and attempt. Native step failure
 fails the job; no upload retry or test retry is added. No automatic cancellation is configured.

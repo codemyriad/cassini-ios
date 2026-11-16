@@ -111,6 +111,8 @@ class CiRunnerSelectionTests(unittest.TestCase):
         mode = mode.replace("github.event.pull_request.labels.*.name", "labels")
         mode = mode.replace("&&", " and ").replace("||", " or ")
         guard = re.search(r"(?m)^    if: (.+)$", text).group(1).replace("&&", " and ").replace("||", " or ")
+        guard = re.sub(r"!(?!=)", "not ", guard)
+        guard = guard.replace("github.event.pull_request.labels.*.name", "labels")
         for event in ["pull_request", "schedule", "workflow_dispatch"]:
             for action, added in [("opened", ""), ("synchronize", ""), ("reopened", ""),
                                   ("labeled", "full-ci"), ("labeled", "unrelated")]:
@@ -123,8 +125,11 @@ class CiRunnerSelectionTests(unittest.TestCase):
                         self.assertEqual(eval(mode, {"__builtins__": {}}, dict(github=github, labels=labels,
                             contains=lambda values, value: value in values)),
                             "full" if event != "pull_request" or "full-ci" in labels else "smoke")
-                        self.assertEqual(bool(eval(guard, {"__builtins__": {}}, dict(github=github))),
-                                         event != "pull_request" or action != "labeled" or added == "full-ci")
+                        self.assertEqual(bool(eval(guard, {"__builtins__": {}}, dict(
+                            github=github, labels=labels, contains=lambda values, value: value in values))),
+                            event != "pull_request" or (
+                                (action != "labeled" or added == "full-ci") and
+                                (action != "opened" or "full-ci" not in labels)))
 
     def test_observational_gate_adds_no_automatic_cancellation(self):
         text = (WORKFLOWS / "simulator-gate.yml").read_text()
@@ -155,6 +160,8 @@ class CiRunnerSelectionTests(unittest.TestCase):
     def test_simulator_job_rejects_forks_and_untrusted_events_before_checkout(self):
         text = (WORKFLOWS / "simulator-gate.yml").read_text()
         guard = re.search(r"(?m)^    if: (.+)$", text).group(1).replace("&&", " and ").replace("||", " or ")
+        guard = re.sub(r"!(?!=)", "not ", guard)
+        guard = guard.replace("github.event.pull_request.labels.*.name", "labels")
         self.assertNotIn("pull_request_target:", text)
         for event in ["push", "workflow_dispatch", "pull_request", "schedule", "pull_request_target", "workflow_run", "issue_comment"]:
             for repo in ["codemyriad/cassini-ios", "fork/cassini-ios"]:
@@ -303,8 +310,11 @@ class CiRunnerSelectionTests(unittest.TestCase):
         job_minutes = int(re.search(r"timeout-minutes: ([0-9]+)", build_job).group(1))
         gate_text = (WORKFLOWS / "simulator-gate.yml").read_text()
         gate_minutes = int(re.search(r"timeout-minutes: ([0-9]+)", gate_text).group(1))
-        self.assertGreaterEqual(lock_minutes, gate_minutes,
-                                "CI must tolerate a simulator gate holding the shared host lock")
+        gate_lock_minutes = int(re.search(r"CASSINI_LOCK_MINUTES: '([0-9]+)'", gate_text).group(1))
+        self.assertGreaterEqual(gate_minutes, gate_lock_minutes + 60,
+                                "a queued gate needs its full run and cleanup after the lock wait")
+        self.assertEqual(lock_minutes, 120, "CI must tolerate two queued simulator gates")
+        self.assertEqual(job_minutes, 150)
         self.assertGreaterEqual(job_minutes - lock_minutes, 30,
                                 "lock queuing must leave the existing build/performance work budget")
         self.assertIn('(CASSINI_PERF_GATE=1)" DerivedData.noindex/test-logs/hosted.log', ci_text)
@@ -440,6 +450,14 @@ class CiRunnerSelectionTests(unittest.TestCase):
             eval_gha(perf_expr, event_name="pull_request", action="labeled", added_label="full-ci", labels=("full-ci",)),
             "1",
         )
+
+        # Opened-with-label also runs CI; its existing distinct group avoids cancellation.
+        self.assertEqual(simulate_dag(ci_jobs, event_name="pull_request", action="opened",
+                                     labels=("full-ci",)), {"harness", "fast-and-build"})
+        self.assertEqual("ci-" + eval_gha(group_expr, event_name="pull_request", action="opened",
+                                        labels=("full-ci",)), "ci-pr-123")
+        self.assertEqual(eval_gha(perf_expr, event_name="pull_request", action="opened",
+                                 labels=("full-ci",)), "1")
 
         # 3. Labeled PR with unrelated label: isolated non-cancelling group, zero jobs run
         self.assertEqual(

@@ -17,12 +17,14 @@ jobs:
     name: Full simulator gate (observational)
     # Evaluate before runner allocation/checkout. Server-side fork exclusion is also
     # required: a PR-editable condition cannot enforce policy for the runner pool.
-    if: github.repository == 'codemyriad/cassini-ios' && ((github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && (github.event.action != 'labeled' || github.event.label.name == 'full-ci')) || ((github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'))
+    if: github.repository == 'codemyriad/cassini-ios' && ((github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && (github.event.action != 'labeled' || github.event.label.name == 'full-ci') && (github.event.action != 'opened' || !contains(github.event.pull_request.labels.*.name, 'full-ci'))) || ((github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'))
     runs-on: [self-hosted, macOS, ARM64, cm-mac-m4]
-    timeout-minutes: 90
+    # Leave the lock deadline plus a full run and cleanup within the runner deadline.
+    timeout-minutes: 155
     env:
       DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
       CASSINI_POST_STATUS: '0'
+      CASSINI_LOCK_MINUTES: '90'
       CASSINI_CONFORMANCE_REQUIRED: '1'
       CASSINI_IOS18: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'full-ci')) && 'full' || 'smoke' }}
       CASSINI_UI_WORKERS: '0'

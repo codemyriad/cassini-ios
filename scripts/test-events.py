@@ -5,6 +5,7 @@ import contextlib
 import fcntl
 import os
 from pathlib import Path
+import re
 import select
 import signal
 import subprocess
@@ -91,37 +92,55 @@ def stop_tree(args):
     Register every exit before signaling: descendants can be orphaned when the
     owner exits, and kill(pid, 0) cannot distinguish exited zombies from workers.
     """
-    table = subprocess.check_output(["/bin/ps", "-ax", "-o", "pid=,ppid="], text=True)
+    table = subprocess.check_output(["/bin/ps", "-wwax", "-o", "pid=,ppid=,args="], text=True)
     children = {}
+    holders = set()
     for row in table.splitlines():
-        pid, parent = map(int, row.split())
+        pid_text, parent_text, command = row.split(None, 2)
+        pid, parent = int(pid_text), int(parent_text)
         children.setdefault(parent, []).append(pid)
+        # Match the Python script invocation, not a shell/-c command mentioning it.
+        # ps does not quote paths, so allow spaces in the script's directory.
+        if re.match(r"^\S*[Pp]ython(?:\d+(?:\.\d+)*)?\s+(?:-I\s+)?(?:.+/)?test-events\.py\s+hold(?:\s|$)", command):
+            holders.add(pid)
     tree = [args.pid]
     for parent in tree:
         tree.extend(children.get(parent, []))
     with Events() as events:
         pending = {pid for pid in tree if events.process(pid)}
+        holders &= pending - {args.pid}
+        # hold also releases on parent exit. Freeze it BEFORE terminating the owner,
+        # retaining the flock even if the owner's exit trap sends it TERM.
+        for pid in holders:
+            with contextlib.suppress(ProcessLookupError):
+                os.kill(pid, signal.SIGSTOP)
 
-        def drain(deadline):
-            while pending:
+        def drain(targets, deadline):
+            while pending & targets:
                 for event in events.until(deadline):
                     if event.filter == select.KQ_FILTER_PROC:
                         pending.discard(event.ident)
                 if time.monotonic() >= deadline:
                     break
 
-        for sig, seconds in ((signal.SIGTERM, 10), (signal.SIGKILL, 5)):
-            # Consume already delivered exits before signaling (especially at escalation).
-            drain(time.monotonic())
-            for pid in tree:
-                if pid in pending:
-                    with contextlib.suppress(ProcessLookupError):
-                        os.kill(pid, sig)
-            drain(time.monotonic() + seconds)
-            if not pending:
-                return 0
-        print(f"processes still alive; refusing clone cleanup: {sorted(pending)}", file=sys.stderr)
-        return 124
+        for targets in (pending - holders, holders):
+            for sig, seconds in ((signal.SIGTERM, 10), (signal.SIGKILL, 5)):
+                # Consume already delivered exits before signaling (especially at escalation).
+                drain(targets, time.monotonic())
+                for pid in tree:
+                    if pid in pending & targets:
+                        with contextlib.suppress(ProcessLookupError):
+                            os.kill(pid, sig)
+                            if pid in holders and sig == signal.SIGTERM:
+                                os.kill(pid, signal.SIGCONT)
+                drain(targets, time.monotonic() + seconds)
+                if not pending & targets:
+                    break
+            if pending & targets:
+                # Fail closed: never resume/release holders while a worker remains.
+                print(f"processes still alive; refusing clone cleanup: {sorted(pending)}", file=sys.stderr)
+                return 124
+        return 0
 
 
 def hold(args):
