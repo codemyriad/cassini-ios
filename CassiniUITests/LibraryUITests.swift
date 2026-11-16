@@ -1191,6 +1191,24 @@ final class LibraryUITests: XCTestCase {
         assertActionsMenuShares("markdown")
     }
 
+    @MainActor func testTheActionsMenuExportCanBeCancelledAndReopened() {
+        let app = launch(["--seed", "statuses"])
+        let formats = app.buttons["exportChoice-cassiniFile"]
+        for _ in 0..<2 {
+            let note = scrolledRow(app, "A quieter kind of productivity")
+            note.press(forDuration: 1)
+            app.buttons["Export"].tapWhenSettled()
+            XCTAssertTrue(formats.waitForExistence(within: uiWaitFloor))
+            XCTAssertTrue(formats.isSelected, "A reopened selector starts with the default format")
+            app.buttons["exportChoice-markdown"].tapWhenSettled()
+            app.buttons["Cancel"].tapWhenSettled()
+            XCTAssertTrue(formats.waitForNonExistence(within: uiWaitFloor))
+            XCTAssertTrue(app.staticTexts["uiTestState-libraryInteractive"].waitForExistence(within: uiWaitFloor))
+            XCTAssertFalse(app.staticTexts["noteTitle"].exists, "Cancel stays in the Library")
+            XCTAssertFalse(app.otherElements["ActivityListView"].exists, "Selecting a format alone does not share it")
+        }
+    }
+
     @MainActor private func assertActionsMenuShares(_ format: String) {
         let app = launch(["--seed", "statuses"])
         XCTAssertTrue(app.buttons["backupNoticeDismiss"].waitForExistence(within: uiWaitFloor),

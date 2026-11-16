@@ -165,6 +165,10 @@ TestFlight still need.
 
 [docs/differences.md](docs/differences.md) describes each difference in detail. In summary:
 
+- **Library export on iOS 18.** The format selector opens full-screen below iOS 26. A sheet can hang SwiftUI’s lazy
+  Library layout after Star changes on iOS 18.2; full-screen presentation avoids resizing the Library behind it.
+  The formats and share-after-confirmation flow are unchanged. iOS 26 and later keep the sheet.
+
 - **Library and Search (D99).** iOS uses a native All / Starred segmented control and a scrolling Search chip row.
   The filter contract matches Android: AND, local calendar dates, own recordings (including recovered captures) for Recorded by me, case-insensitive speaker names, and
   transient Search choices seeded from the remembered Library choice. Speaker searches match that speaker’s words

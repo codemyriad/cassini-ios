@@ -24,6 +24,15 @@ The app reads the system once (`Cassini/App/LivePlatform.swift`) and passes the 
 Whistle's other conditions are the same on both: an arm64 device, a verified bundle and at least 2 GiB of physical
 memory.
 
+## Library presentation
+
+The Library uses one `LazyVStack` for its header and rows on every supported OS. On iOS 18, placing that lazy stack
+inside an eager scrolling stack caused the Dynamic Type clipping audit to hang. Export leaves the context-menu
+callback through a main-actor task, like Rename. Below iOS 26 its format selector uses `fullScreenCover`: the iOS 18.2
+simulator still intermittently loops in lazy-stack layout when a regular sheet resizes the Library after Star
+changes, even with an asynchronous handoff or a wait for `presentedViewController` to clear. Full-screen presentation
+avoids that resize. Cancel and confirmed sharing retain their existing dismissal flow; iOS 26 keeps its sheet.
+
 ## Which engine a device gets
 
 New jobs use Whistle until Parakeet is installed and verified, then Parakeet (D78). Where Whistle cannot run, iOS 26

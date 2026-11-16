@@ -87,7 +87,7 @@ struct LibraryView: View {
                 if (error as? CocoaError)?.code != .userCancelled { errors.present(error.localizedDescription) }
             }
         }
-        .sheet(item: $exportTarget, onDismiss: shareConfirmedExport) { target in
+        .libraryExportPresentation(item: $exportTarget, onDismiss: shareConfirmedExport) { target in
             if let note = model.note(target.id), let menu = model.menu(target.id) {
                 ExportFormatSheet(note: note, jobPending: menu.transcribe == .stop || menu.transcribe == .removeFromQueue) {
                     confirmedExport = (target.id, $0)
@@ -105,21 +105,10 @@ struct LibraryView: View {
         } message: { _ in Text(LibraryCopy.freshBody) }
     }
 
-    @ViewBuilder private func libraryStack(_ content: LibraryContent, exportable: Set<UUID>) -> some View {
-        if #available(iOS 26.0, *) {
-            LazyVStack(alignment: .leading, spacing: Spacing.row) {
-                libraryHeader(content)
-                libraryRows(content, exportable: exportable)
-            }
-        } else {
-            // iOS 18 can loop in lazy-stack layout while presenting Export after scrolling past the
-            // multiline backup notice. Measure the small header eagerly; meeting rows remain lazy.
-            VStack(alignment: .leading, spacing: Spacing.row) {
-                libraryHeader(content)
-                LazyVStack(alignment: .leading, spacing: Spacing.row) {
-                    libraryRows(content, exportable: exportable)
-                }
-            }
+    private func libraryStack(_ content: LibraryContent, exportable: Set<UUID>) -> some View {
+        LazyVStack(alignment: .leading, spacing: Spacing.row) {
+            libraryHeader(content)
+            libraryRows(content, exportable: exportable)
         }
     }
 
@@ -318,7 +307,16 @@ struct LibraryView: View {
             case .trash: Task { await model.perform(.moveToTrash, on: row.id) }
             }
             }
-            .contextMenu { NoteActionsMenu(noteID: row.id) { exportTarget = ExportTarget(id: row.id) } }
+            .contextMenu {
+                NoteActionsMenu(noteID: row.id) {
+                    if #available(iOS 26.0, *) {
+                        exportTarget = ExportTarget(id: row.id)
+                    } else {
+                        // Like Rename, return from the context-menu action before presenting Export.
+                        Task { @MainActor in exportTarget = ExportTarget(id: row.id) }
+                    }
+                }
+            }
         }
     }
 
@@ -378,6 +376,18 @@ struct LibraryView: View {
 }
 
 private extension View {
+    /// iOS 18 can loop in lazy-stack layout when a sheet resizes the Library after Star changes.
+    /// A full-screen selector avoids that resize; confirmation still shares only after dismissal.
+    @ViewBuilder func libraryExportPresentation<Item: Identifiable, Content: View>(
+        item: Binding<Item?>, onDismiss: @escaping () -> Void, @ViewBuilder content: @escaping (Item) -> Content
+    ) -> some View {
+        if #available(iOS 26.0, *) {
+            sheet(item: item, onDismiss: onDismiss, content: content)
+        } else {
+            fullScreenCover(item: item, onDismiss: onDismiss, content: content)
+        }
+    }
+
     /// Native bars let content fade beneath the glass; older systems keep their material inset.
     @ViewBuilder func librarySearchBar<Header: View>(@ViewBuilder content: () -> Header) -> some View {
         if #available(iOS 26.0, *) {
