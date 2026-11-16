@@ -2,6 +2,7 @@
 public enum SettingsKeys {
     public static let speechLanguage = "speechLanguage"
     public static let autoTranscribe = "autoTranscribe"
+    public static let recogniseSavedVoices = "recogniseSavedVoices"
     public static let identifySpeakers = "identifySpeakers"
     /// Off unless the user turns it on.
     public static let automaticallyNameVoices = "automaticallyNameVoices"
@@ -23,7 +24,7 @@ public enum SettingsKeys {
     public static let voicesGeneration = "voices.generation"
 
     public static let all: [String] = [
-        speechLanguage, autoTranscribe, identifySpeakers, automaticallyNameVoices,
+        speechLanguage, autoTranscribe, identifySpeakers, recogniseSavedVoices, automaticallyNameVoices,
         modelsConsentAt, modelsDeclinedAt, speakerModelsConsentAt, queueHold, recoveredAck,
         notificationsAsked, finalizationMs, trashLastPurgeAt, voicesGeneration,
     ]

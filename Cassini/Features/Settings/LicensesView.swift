@@ -42,7 +42,7 @@ struct LicensesView: View {
     }
 
     /// The bundled files and the model host's notices of an installed model, read off the main actor.
-    @Sendable private static func text(_ entry: LicenseEntry, models: URL) async throws -> String {
+    @Sendable static func text(_ entry: LicenseEntry, models: URL) async throws -> String {
         let notice: @Sendable () -> String? = {
             ModelCatalog.installedNotice(in: models).flatMap { try? String(contentsOf: $0, encoding: .utf8) }
         }
@@ -100,6 +100,26 @@ extension LicenseEntry {
         case .modelSources: String(localized: "The servers Cassini downloads models from", table: "Settings")
         case .privacy: String(localized: "What Cassini keeps on this device and what it sends", table: "Settings")
         case .sourceCode: sourceCodeURL.absoluteString.replacingOccurrences(of: "https://", with: "")
+        }
+    }
+}
+
+/// Direct third-layer links share the asynchronous license reader.
+struct LicenseDetailView: View {
+    let entry: LicenseEntry
+    let models: URL
+    @State private var text: LicenseText?
+    @Environment(ErrorPresenter.self) private var errors
+
+    var body: some View {
+        Group {
+            if let text { LicenseTextPane(text: text) }
+            else { ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity) }
+        }
+        .navigationTitle(entry.title).navigationBarTitleDisplayMode(.inline)
+        .task {
+            do { text = LicenseText(entry: entry, text: try await LicensesView.text(entry, models: models)) }
+            catch { errors.present(error.localizedDescription) }
         }
     }
 }

@@ -16,6 +16,7 @@ import CassiniNotebook
     }
 
     func liveVoices(generation: Int) async -> @Sendable () -> [SavedVoice] {
+        guard settings.recogniseSavedVoices else { return { [] } }
         let live = voices.liveVoices
         return { live.voices(generation: generation) }
     }

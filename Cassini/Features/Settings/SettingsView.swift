@@ -2,9 +2,9 @@ import SwiftUI
 import CassiniEngine
 import CassiniNotebook
 
-/// Settings: App language, Transcription, the banners (notifications off, saved voices unreadable), On-device models, Speakers, Privacy, Your
-/// library and About, in that order.
+/// The shared phone Settings map, with choices and model details one layer below it.
 struct SettingsView: View {
+    var page: SettingsPage? = nil
     @Environment(ProcessingStore.self) private var processing
     @Environment(SettingsStore.self) private var settings
     #if DEBUG
@@ -17,9 +17,19 @@ struct SettingsView: View {
     @State private var loaded = false
     @State private var pendingLoads = 0
 
+    private var pageTitle: String {
+        switch page {
+        case .transcription: SettingsPhase2Copy.transcription
+        case .speakers: SettingsPhase2Copy.speakers
+        case .about: SettingsPhase2Copy.about
+        case .backup: SettingsPhase2Copy.backup
+        case nil: String(localized: "Settings", table: "Settings")
+        }
+    }
+
     var body: some View {
         Group {
-            if let model { SettingsForm(model: model) } else { Color.paper }
+            if let model { SettingsForm(model: model, page: page) } else { Color.paper }
         }
         .paperListBackground()
         .overlay(alignment: .topLeading) {
@@ -44,7 +54,7 @@ struct SettingsView: View {
             }
             #endif
         }
-        .navigationTitle(Text("Settings", tableName: "Settings")).navigationBarTitleDisplayMode(.inline)
+        .navigationTitle(pageTitle).navigationBarTitleDisplayMode(.inline)
         .task {
             loaded = false
             pendingLoads += 1
@@ -77,174 +87,266 @@ struct SettingsView: View {
 
 private struct SettingsForm: View {
     let model: SettingsModel
+    let page: SettingsPage?
     @Environment(SettingsStore.self) private var settings
     @Environment(SettingsAdapter.self) private var ports
+    @Environment(Router.self) private var router
+    @Environment(\.locale) private var locale
+
+    private var pad: Bool { UIDevice.current.userInterfaceIdiom == .pad }
+    private var privacy: String {
+        LibraryWave5Copy.privacyLine(settings.cloudBackup ? .withBackup : .backupExcluded, device: pad ? .pad : .phone)
+    }
 
     var body: some View {
-        @Bindable var settings = settings
         Form {
-            AppLanguageSection(open: model.openAppLanguage, speechLanguageApart: model.showsSpeechLanguage)
-            TranscriptionSection(model: model, language: $settings.speechLanguage, autoTranscribe: $settings.autoTranscribe)
-            SettingsNoticesSection()
-            if let speechModels = ports.speechModels {
-                if speechModels.shows(.settings) || speechModels.promotionVisible {
-                    Section { ParakeetSuggestionView(store: speechModels, placement: .settings) }
-                }
-            }
-            OnDeviceModelsSection(model: model)
-            VoiceSetupSection()
-            Section {
-                Toggle(isOn: $settings.identifySpeakers) { Text("Identify speakers after transcription", tableName: "Settings") }
-                Toggle(isOn: $settings.automaticallyNameVoices) { Text("Name strong voice matches automatically", tableName: "Settings") }
-            } header: {
-                Text("Speakers", tableName: "Settings").foregroundStyle(Color.muted)
-            } footer: {
-                Text("Matches can be wrong; check the names. Only voices you save are used to recognise people.", tableName: "Settings").foregroundStyle(Color.muted)
-            }
-            PrivacySection(model: model)
-            LibrarySection(totals: model.library)
-            BackupSection()
-            Section {
-                AboutCard(version: model.version, openNotices: model.openLicenses)
-            } header: {
-                Text("About", tableName: "Settings").foregroundStyle(Color.muted)
+            switch page {
+            case nil: map
+            case .transcription: transcription
+            case .speakers: speakers
+            case .about: about
+            case .backup: BackupSection()
             }
         }
         .readableListWidth()
     }
-}
 
-/// iOS sets the app's language in the Settings app; the row shows it and opens Cassini's page there.
-struct AppLanguageSection: View {
-    let open: () -> Void
-    /// Transcription has a Speech language picker (Apple Speech devices): the footer points to it.
-    let speechLanguageApart: Bool
-
-    private var current: String { Self.name(of: Bundle.main.preferredLocalizations.first ?? "en") }
-
-    /// A language in its own words, with the region where the app has two variants: "Français", "Português (Brasil)",
-    /// "Português (Portugal)".
-    nonisolated static func name(of code: String) -> String {
-        Locale(identifier: code).localizedString(forIdentifier: code)?.localizedCapitalized ?? code
-    }
-
-    var body: some View {
-        Section {
-            Button(action: open) {
-                LabeledContent {
-                    HStack(spacing: 6) {
-                        Text(current)
-                        Image(systemName: "arrow.up.forward.app").imageScale(.small)
-                    }
-                } label: {
-                    Text("App language", tableName: "Settings").foregroundStyle(Color.ink)
+    private var map: some View {
+        Group {
+            Section {
+                topic(SettingsPhase2Copy.transcription, answer: speechAnswer, icon: "text.bubble", page: .transcription, id: "transcriptionRow")
+                topic(SettingsPhase2Copy.speakers, answer: settings.identifySpeakers ? SettingsPhase2Copy.on : SettingsPhase2Copy.off,
+                      icon: "person.2", page: .speakers, id: "speakersRow")
+                voicesRow
+            } header: { Text(SettingsPhase2Copy.transcripts) } footer: { Text(privacy) }
+            Section {
+                topic(SettingsPhase2Copy.backup, answer: settings.cloudBackup ? SettingsPhase2Copy.icloud : SettingsPhase2Copy.off,
+                      icon: "icloud", page: .backup, id: "backupRow")
+                Button(action: model.openTrash) {
+                    SettingsAnswerRow(title: SettingsPhase2Copy.trash, answer: SettingsPhase2Copy.meetingCount(model.trash), icon: "trash")
+                }.accessibilityIdentifier("recentlyDeletedRow")
+            } header: { Text(SettingsPhase2Copy.meetings) } footer: {
+                Text(SettingsPhase2Copy.libraryStats
+                    .replacingOccurrences(of: "{meetings}", with: SettingsPhase2Copy.meetingCount(model.library.notes))
+                    .replacingOccurrences(of: "{hours}", with: audioDuration))
+            }
+            Section {
+                Button(action: model.openAppLanguage) {
+                    SettingsAnswerRow(title: SettingsPhase2Copy.language,
+                                      answer: AppLanguageSection.name(of: Bundle.main.preferredLocalizations.first ?? "en"), icon: "globe")
                 }
+                .accessibilityHint(Text("Opens Cassini in the Settings app", tableName: "Settings"))
+                .accessibilityIdentifier("appLanguageRow")
+            } header: { Text(SettingsPhase2Copy.app) }
+            Section {
+                Button { router.push(.settingsPage(.about)) } label: {
+                    HStack(spacing: 12) {
+                        OrbitMark(size: 36)
+                        SettingsRowLabel(title: SettingsPhase2Copy.nameVersion.replacingOccurrences(of: "{version}", with: model.version),
+                                         subtitle: SettingsPhase2Copy.aboutSubtitle)
+                    }.padding(.vertical, 6)
+                }.accessibilityIdentifier("aboutRow")
             }
-            .accessibilityHint(Text("Opens Cassini in the Settings app", tableName: "Settings"))
-            .accessibilityIdentifier("appLanguageRow")
-        } header: {
-            Text("App language", tableName: "Settings").foregroundStyle(Color.muted)
-        } footer: {
-            if speechLanguageApart {
-                Text("The language of speech is chosen separately, under Transcription.", tableName: "Settings").foregroundStyle(Color.muted)
-            }
-        }
-    }
-}
-
-private struct TranscriptionSection: View {
-    let model: SettingsModel
-    @Binding var language: String
-    @Binding var autoTranscribe: Bool
-    @Environment(\.locale) private var locale
-
-    var body: some View {
-        Section {
-            // Only Apple Speech takes a language; Parakeet hears it, so its devices have no picker.
-            if model.showsSpeechLanguage { picker }
-            Toggle(isOn: $autoTranscribe) { Text("Transcribe after recording or import", tableName: "Settings") }
-        } header: {
-            Text("Transcription", tableName: "Settings").foregroundStyle(Color.muted)
-        } footer: {
-            if model.showsSpeechLanguage {
-                Text("A new language applies to the next transcription.", tableName: "Settings").foregroundStyle(Color.muted)
-            }
+            SettingsNoticesSection()
         }
     }
 
-    private var picker: some View {
-        Picker(selection: $language) {
-            ForEach(model.languageOptions(chosen: language, name: name(of:)), id: \.id) { option in
-                Group {
-                    if option.installed {
-                        Text("\(name(of: option.id)) · Installed", tableName: "Settings")
-                    } else {
-                        Text(name(of: option.id))
-                    }
-                }.tag(option.id)
-            }
-        } label: {
-            Text("Speech language", tableName: "Settings")
-        }
-        // A list of its own rather than a menu: a long language name wraps instead of being cut at large text sizes.
-        .pickerStyle(.navigationLink)
-        .accessibilityIdentifier("speechLanguagePicker")
+    private var audioDuration: String {
+        model.library.duration >= 3600
+            ? SettingsPhase2Copy.audioHours(Int(model.library.duration / 3600))
+            : TimeText.clock(model.library.duration)
     }
 
-    private func name(of identifier: String) -> String { locale.localizedString(forIdentifier: identifier) ?? identifier }
-}
-
-/// "Saved voices" and "Recently Deleted", with their counts.
-private struct PrivacySection: View {
-    let model: SettingsModel
-
-    var body: some View {
-        Section {
-            Button(action: model.openVoices) {
-                SettingsRowLabel(title: String(localized: "Saved voices", table: "Settings"),
-                                 subtitle: model.voices == 0
-                                    ? String(localized: "None yet", table: "Settings")
-                                    : String(localized: "\(model.voices) people", table: "Settings"))
+    private var speechAnswer: String {
+        if let store = ports.speechModels {
+            switch store.displayRecognizer {
+            case .whistle: return SettingsPhase2Copy.whistle
+            case .parakeet: return SettingsPhase2Copy.parakeet
+            case .appleSpeech: break
             }
-            .accessibilityIdentifier("savedVoicesRow")
-            Button(action: model.openTrash) {
-                SettingsRowLabel(title: String(localized: "Recently Deleted", table: "Settings"),
-                                 subtitle: model.trash == 0
-                                    ? String(localized: "Empty", table: "Settings")
-                                    : String(localized: "\(model.trash) meetings", table: "Settings"))
-            }
-            .accessibilityIdentifier("recentlyDeletedRow")
-        } header: {
-            Text("Privacy", tableName: "Settings").foregroundStyle(Color.muted)
         }
+        if ports.recognizer == .parakeet { return SettingsPhase2Copy.parakeet }
+        if ports.recognizer == .whistle { return SettingsPhase2Copy.whistle }
+        return ModelPart.speech.settingsLabel
     }
-}
 
-/// The notes outside Recently Deleted and their audio.
-private struct LibrarySection: View {
-    let totals: SettingsModel.LibraryTotals
-
-    var body: some View {
-        Section {
-            LabeledContent {
-                Text(verbatim: "\(totals.notes)")
-            } label: {
-                Text("Recordings", tableName: "Settings")
-            }
-            LabeledContent {
-                if #available(iOS 26.0, *) {
-                    Text(verbatim: TimeText.clock(totals.duration)).monospacedDigit()
+    private var transcription: some View {
+        @Bindable var settings = settings
+        return Group {
+            Section {
+                if let store = ports.speechModels, store.whistleCapability.available {
+                    SpeechChoicesView(store: store, rows: model.models)
                 } else {
-                    Text(verbatim: TimeText.clock(totals.duration))
+                    ForEach(model.models.filter { $0.part == .speech }) { row in
+                        ModelRowView(row: row) { model.openModel(.speech) }
+                    }
                 }
-            } label: {
-                Text("Audio duration", tableName: "Settings")
+                if model.showsSpeechLanguage { SpeechLanguagePicker(model: model, language: $settings.speechLanguage) }
+            } header: { Text(SettingsPhase2Copy.forNew) } footer: { Text(SettingsPhase2Copy.keepTranscript) }
+            Section {
+                Toggle(SettingsPhase2Copy.rightAway, isOn: $settings.autoTranscribe).accessibilityIdentifier("autoTranscribeToggle")
+            } header: { Text(SettingsPhase2Copy.afterRecording) } footer: { Text(SettingsPhase2Copy.rightAwaySubtitle) }
+            Section {
+                Button { router.push(.licenseText(.modelSources)) } label: {
+                    SettingsAnswerRow(title: SettingsPhase2Copy.whereFrom, answer: "")
+                }
+            } header: { Text(SettingsPhase2Copy.goingOnline) } footer: { Text(SettingsPhase2Copy.online) }
+            if let store = ports.speechModels, store.promotionVisible {
+                Section { ParakeetSuggestionView(store: store, placement: .settings) }
             }
-        } header: {
-            Text("Your library", tableName: "Settings").foregroundStyle(Color.muted)
-        } footer: {
-            Text("Meetings in Recently Deleted are not counted. They are deleted for good after 30 days.", tableName: "Settings").foregroundStyle(Color.muted)
         }
+    }
+
+    private var speakers: some View {
+        @Bindable var settings = settings
+        return Group {
+            Section {
+                Toggle(isOn: Binding(get: { settings.identifySpeakers }, set: { value in
+                    settings.identifySpeakers = value
+                    if value { model.openModel(.speakers) }
+                })) { description(SettingsPhase2Copy.tellApart, SettingsPhase2Copy.tellApartDescription) }
+                    .accessibilityIdentifier("identifySpeakersToggle")
+                Toggle(isOn: Binding(get: { settings.recogniseSavedVoices }, set: { value in
+                    settings.recogniseSavedVoices = value
+                    if value { model.openModel(.voices) }
+                })) { description(SettingsPhase2Copy.recognise, SettingsPhase2Copy.recogniseDescription) }
+                    .accessibilityIdentifier("recogniseSavedVoicesToggle")
+            } header: { Text(SettingsPhase2Copy.whoIsSpeaking) } footer: {
+                Text(pad ? SettingsPhase2Copy.runsOnIpad : SettingsPhase2Copy.runsOnIphone)
+            }
+            Section {
+                Toggle(isOn: $settings.automaticallyNameVoices) {
+                    description(SettingsPhase2Copy.autoName, SettingsPhase2Copy.autoNameSubtitle)
+                }.accessibilityIdentifier("autoNameVoicesToggle")
+                voicesRow
+            } header: { Text(SettingsPhase2Copy.savedVoices) } footer: { Text(Wave6Copy.savedVoicesPrivacyPhone) }
+            // Preserve installation status and size in the second layer, including retries and pending consent.
+            Section {
+                ForEach(model.models.filter { $0.part != .speech }) { row in
+                    ModelRowView(row: row) { model.openModel(row.part) }
+                }
+            }
+            VoiceSetupSection()
+        }
+    }
+
+    private var about: some View {
+        Group {
+            Section {
+                VStack(spacing: 8) {
+                    OrbitMark(size: 64)
+                    Text(verbatim: ProductName.full).font(.title2.weight(.semibold))
+                    Text(SettingsPhase2Copy.version.replacingOccurrences(of: "{version}", with: model.version)).foregroundStyle(Color.muted)
+                    Text(pad ? SettingsPhase2Copy.taglineIpad : SettingsPhase2Copy.taglineIphone)
+                        .multilineTextAlignment(.center).padding(.top, 8)
+                }.frame(maxWidth: .infinity).padding(.vertical, 20)
+            }.listRowBackground(Color.clear)
+            Section {
+                Link(destination: URL(string: "https://cassini.talk/help")!) {
+                    SettingsRowLabel(title: SettingsPhase2Copy.help, subtitle: SettingsPhase2Copy.helpSubtitle)
+                }.accessibilityIdentifier("aboutHelp")
+                Button { router.push(.licenseText(.privacy)) } label: {
+                    SettingsRowLabel(title: SettingsPhase2Copy.privacy, subtitle: pad ? SettingsPhase2Copy.privacyIpad : SettingsPhase2Copy.privacyIphone)
+                }.accessibilityIdentifier("aboutPrivacy")
+                Button(action: model.openLicenses) {
+                    SettingsRowLabel(title: SettingsPhase2Copy.licences, subtitle: SettingsPhase2Copy.licencesSubtitle)
+                }.accessibilityIdentifier("aboutLicences")
+                Link(destination: sourceCodeURL) {
+                    SettingsRowLabel(title: SettingsPhase2Copy.sourceCode, subtitle: sourceCodeURL.absoluteString.replacingOccurrences(of: "https://", with: ""))
+                }.accessibilityIdentifier("aboutSourceCode")
+            } footer: { Text(SettingsPhase2Copy.licenceLine) }
+        }
+    }
+
+    private var voicesRow: some View {
+        Button(action: model.openVoices) {
+            SettingsAnswerRow(title: SettingsPhase2Copy.savedVoices, answer: SettingsPhase2Copy.peopleCount(model.voices), icon: "person.crop.circle")
+        }.accessibilityIdentifier("savedVoicesRow")
+    }
+
+    private func topic(_ title: String, answer: String, icon: String, page: SettingsPage, id: String) -> some View {
+        Button { router.push(.settingsPage(page)) } label: {
+            SettingsAnswerRow(title: title, answer: answer, icon: icon)
+        }.accessibilityIdentifier(id)
+    }
+
+    private func description(_ title: String, _ subtitle: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title)
+            Text(subtitle).font(.subheadline).foregroundStyle(Color.muted)
+        }
+    }
+}
+
+struct SettingsAnswerRow: View {
+    let title: String
+    let answer: String
+    var icon: String? = nil
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    var body: some View {
+        HStack(spacing: 12) {
+            if let icon {
+                Image(systemName: icon).font(.body).foregroundStyle(Color.accent)
+                    .frame(width: 30, height: 30).background(Color.accent.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
+                    .accessibilityHidden(true)
+            }
+            if typeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 3) { Text(title).foregroundStyle(Color.ink); Text(answer).foregroundStyle(Color.muted) }
+                Spacer(minLength: 0)
+            } else {
+                Text(title).foregroundStyle(Color.ink)
+                Spacer(minLength: 8)
+                Text(answer).foregroundStyle(Color.muted).multilineTextAlignment(.trailing)
+            }
+            Image(systemName: "chevron.forward").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
+        }
+        .frame(minHeight: 40).contentShape(Rectangle()).accessibilityElement(children: .combine)
+    }
+}
+
+private struct SpeechChoicesView: View {
+    let store: SpeechModelsStore
+    let rows: [ModelRow]
+    @Environment(\.locale) private var locale
+    @Environment(Router.self) private var router
+
+    var body: some View {
+        choice(.whistle, title: SettingsPhase2Copy.whistle, subtitle: SettingsPhase2Copy.whistleDescription)
+        if store.parakeetCapable {
+            choice(.parakeet, title: SettingsPhase2Copy.parakeet, subtitle: SettingsPhase2Copy.parakeetDescription)
+        }
+    }
+
+    private func choice(_ recognizer: SpeechRecognizer, title: String, subtitle: String) -> some View {
+        let installed = recognizer == .whistle || store.installation == .verified
+        return HStack(alignment: .top, spacing: 12) {
+            Button { store.choose(recognizer) } label: {
+                HStack(alignment: .top, spacing: 12) {
+                    Image(systemName: store.displayRecognizer == recognizer ? "checkmark.circle.fill" : "circle")
+                        .foregroundStyle(store.displayRecognizer == recognizer ? Color.accent : Color.muted)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(title).foregroundStyle(Color.ink)
+                        Text(subtitle).font(.subheadline).foregroundStyle(Color.muted)
+                        if recognizer == .whistle { Text(SettingsPhase2Copy.builtIn).font(.caption).foregroundStyle(Color.muted) }
+                    }
+                }.frame(maxWidth: .infinity, alignment: .leading)
+            }.buttonStyle(.plain).disabled(!installed)
+                .accessibilityIdentifier(recognizer == .whistle ? "chooseWhistle" : "chooseParakeet")
+                .accessibilityAddTraits(store.displayRecognizer == recognizer ? [.isSelected] : [])
+            if recognizer == .parakeet, !installed {
+                VStack(spacing: 4) {
+                    Button(SettingsPhase2Copy.download) { router.push(.parakeetDownload) }
+                        .buttonStyle(.bordered).buttonBorderShape(.capsule)
+                        .accessibilityIdentifier("downloadParakeet")
+                        .disabled(store.installation == .checking)
+                    Text(SizeCopy.text(ModelDownloadPlan.fullDownloadBytes(.speech), locale: locale)).font(.caption).foregroundStyle(Color.muted)
+                    if let row = rows.first(where: { $0.part == .speech }), row.status != .notDownloaded {
+                        Text(row.status.label).font(.caption).foregroundStyle(row.status.tone.color)
+                    }
+                }
+            }
+        }.padding(.vertical, 6)
     }
 }
 
@@ -267,49 +369,6 @@ struct SettingsRowLabel: View {
     }
 }
 
-/// "Cassini talk 0.1.0 — turns speech into searchable, timed text on your device." and the notices link.
-private struct AboutCard: View {
-    let version: String
-    let openNotices: () -> Void
-
-    /// The name and version in bold ink, then the tagline.
-    private var tagline: AttributedString {
-        var name = AttributedString("\(ProductName.full) \(version)")
-        name.inlinePresentationIntent = .stronglyEmphasized
-        name.foregroundColor = Color.ink
-        return name + AttributedString(" ")
-            + AttributedString(String(localized: "— turns speech into searchable, timed text on your device.", table: "Settings"))
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .top, spacing: 12) {
-                OrbitMark(size: 36)
-                Text(tagline).font(.subheadline).foregroundStyle(Color.muted)
-            }
-            if let copyright = Bundle.main.object(forInfoDictionaryKey: "NSHumanReadableCopyright") as? String {
-                Text(verbatim: copyright).font(.footnote).foregroundStyle(Color.muted)
-            }
-            HStack(spacing: 4) {
-                Text("Free software under GPLv3.", tableName: "Settings").foregroundStyle(Color.muted)
-                Button(action: openNotices) {
-                    if #available(iOS 26.0, *) {
-                        Text("Source code and notices", tableName: "Settings").underline()
-                    } else {
-                        // Older borderless buttons expose only the text's height as their touch target.
-                        Text("Source code and notices", tableName: "Settings").underline()
-                            .frame(minHeight: HitTarget.minimum).contentShape(Rectangle())
-                    }
-                }
-                    .tint(.accent).buttonStyle(.borderless)
-            }
-            .font(.subheadline)
-        }
-        .padding(.vertical, 6)
-    }
-}
-
-/// Download progress belongs to these sections, not the preferences form or its toggles.
 private struct SettingsNoticesSection: View {
     @Environment(NoticesStore.self) private var notices
     var body: some View {
@@ -324,23 +383,34 @@ private struct SettingsNoticesSection: View {
     }
 }
 
-private struct OnDeviceModelsSection: View {
+private struct SpeechLanguagePicker: View {
     let model: SettingsModel
-    @Environment(SettingsAdapter.self) private var ports
+    @Binding var language: String
+    @Environment(\.locale) private var locale
     var body: some View {
-        Section {
-            if let speechModels = ports.speechModels { SpeechModelChoiceRow(store: speechModels) }
-            ForEach(model.models) { row in
-                ModelRowView(row: row, modelName: row.part == .speech && ports.speechModels != nil
-                    ? (ports.speechModels?.parakeetCapable == true ? "Parakeet Ultra" : (ports.speechModels?.policy.whistleAvailable == true ? "Whistle" : nil)) : nil) {
-                    if row.part == .speech, ports.speechModels?.installation == .unavailable { ports.speechModels?.refresh() }
-                    else { model.openModel(row.part) }
-                }
+        Picker(selection: $language) {
+            ForEach(model.languageOptions(chosen: language, name: name(of:)), id: \.id) { option in
+                Group {
+                    if option.installed {
+                        Text("\(name(of: option.id)) · Installed", tableName: "Settings")
+                    } else {
+                        Text(name(of: option.id))
+                    }
+                }.tag(option.id)
             }
-        } header: {
-            Text("On-device models", tableName: "Settings").foregroundStyle(Color.muted)
-        } footer: {
-            Text("Transcription runs on this device.", tableName: "Settings").foregroundStyle(Color.muted)
+        } label: {
+            Text("Speech language", tableName: "Settings")
         }
+        // A list of its own rather than a menu: a long language name wraps instead of being cut at large text sizes.
+        .pickerStyle(.navigationLink)
+        .accessibilityIdentifier("speechLanguagePicker")
+    }
+
+    private func name(of identifier: String) -> String { locale.localizedString(forIdentifier: identifier) ?? identifier }
+}
+
+enum AppLanguageSection {
+    nonisolated static func name(of code: String) -> String {
+        Locale(identifier: code).localizedString(forIdentifier: code)?.localizedCapitalized ?? code
     }
 }

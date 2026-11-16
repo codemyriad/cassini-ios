@@ -544,13 +544,16 @@ final class LibraryUITests: XCTestCase {
         let app = launch(["--seed", "recording"] + DeviceUnderTest.workingSpeech)
         if !automatic {
             app.buttons["settingsButton"].tap()
-            let toggle = app.switches["Transcribe after recording or import"]
+            XCTAssertTrue(app.buttons["transcriptionRow"].waitForExistence(within: 15))
+            app.buttons["transcriptionRow"].tap()
+            let toggle = app.switches["autoTranscribeToggle"]
             XCTAssertTrue(toggle.waitForExistence(within: uiWaitFloor))
             // SwiftUI exposes the form row as a switch too; activate the nested UISwitch.
             if toggle.value as? String != "0" {
                 toggle.switches.firstMatch.tap()
             }
             XCTAssertTrue(toggle.waitForValue("0"), "Automatic transcription is off before starting")
+            app.navigationBars.buttons.firstMatch.tap()
             if UIDevice.current.userInterfaceIdiom != .pad {
                 app.navigationBars.buttons["All meetings"].tap()
             }

@@ -128,6 +128,14 @@ import CassiniNotebook
         let voiceID = try #require(voices.savedVoices.first?.id)
         let analysis = SpeakerAnalysis(turns: [.init(speakerID: "a", start: 0, end: 10)], prints: [print])
         let generation = settings.voicesGeneration
+        settings.automaticallyNameVoices = true
+        settings.recogniseSavedVoices = false
+        try await voices.applySpeakerAnalysis(analysis, to: target.id, generation: generation)
+        #expect(library.note(target.id)?.speakers?.first?.suggestedVoiceID == nil)
+        #expect(library.note(target.id)?.speakers?.first?.linkedVoiceID == nil)
+        #expect(library.note(target.id)?.transcript.first?.speaker != "Alex")
+        #expect(voices.savedVoices.count == 1, "Recognition off keeps saved voices")
+        settings.recogniseSavedVoices = true
         settings.automaticallyNameVoices = false
         try await voices.applySpeakerAnalysis(analysis, to: target.id, generation: generation)
         #expect(library.note(target.id)?.speakers?.first?.suggestedVoiceID == voiceID)

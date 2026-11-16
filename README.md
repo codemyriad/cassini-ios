@@ -601,3 +601,5 @@ vectors, so those formats have local regression coverage pending shared goldens.
 from Android's older subtitle rules (six-second cues and cross-speaker overlap).
 
 Imported provenance (L-10): Library and Search show the shared outline Imported badge before speaker counts on finished imported meetings; progress and problem states take its place. Headers identify imported meetings and files that arrived with a transcript from another device. This matches the Phase 2 phone contract; recovered local captures remain own recordings. Existing stored import records are read without migration, and import-flow copy is unchanged.
+
+D103 phone Settings uses the shared topic map. iOS keeps its speech-language picker on Apple Speech devices, its “Transcribe right away” and “Name strong matches automatically” switches, and opens app language in iOS Settings. The Backup page retains iOS backup guidance; it cannot report whether iCloud Backup has run.

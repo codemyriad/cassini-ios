@@ -26,6 +26,7 @@ python3 "$root/scripts/generate-wave5-strings.py" --check
 python3 "$root/scripts/generate-wave6-strings.py" --check
 python3 "$root/scripts/test-wave6-strings.py"
 python3 "$root/scripts/generate-export-strings.py" --check
+python3 "$root/scripts/generate-settings-strings.py" --check
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 

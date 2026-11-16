@@ -61,7 +61,7 @@ final class WideScreenTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Old interview draft"].waitForExistence(within: 5))
         assertCentred([app.staticTexts["Old interview draft"], app.buttons["Restore"].firstMatch], in: detailColumn(app))
         app.buttons["Settings"].tap()
-        let language = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "App language")).firstMatch
+        let language = app.buttons["appLanguageRow"]
         assertCentred([language], in: detailColumn(app))
     }
 

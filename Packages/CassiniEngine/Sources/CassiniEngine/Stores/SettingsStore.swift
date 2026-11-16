@@ -36,6 +36,7 @@ public final class SettingsStore {
     public var speechLanguage: String { didSet { defaults.set(speechLanguage, forKey: SettingsKeys.speechLanguage) } }
     public var autoTranscribe: Bool { didSet { defaults.set(autoTranscribe, forKey: SettingsKeys.autoTranscribe) } }
     public var identifySpeakers: Bool { didSet { defaults.set(identifySpeakers, forKey: SettingsKeys.identifySpeakers) } }
+    public var recogniseSavedVoices: Bool { didSet { defaults.set(recogniseSavedVoices, forKey: SettingsKeys.recogniseSavedVoices) } }
     public var automaticallyNameVoices: Bool {
         didSet { defaults.set(automaticallyNameVoices, forKey: SettingsKeys.automaticallyNameVoices) }
     }
@@ -63,6 +64,7 @@ public final class SettingsStore {
         speechLanguage = storedLanguage.map { Locale(identifier: $0).identifier(.bcp47) } ?? defaultLanguage
         autoTranscribe = defaults.object(forKey: SettingsKeys.autoTranscribe) as? Bool ?? true
         identifySpeakers = defaults.object(forKey: SettingsKeys.identifySpeakers) as? Bool ?? true
+        recogniseSavedVoices = defaults.object(forKey: SettingsKeys.recogniseSavedVoices) as? Bool ?? true
         automaticallyNameVoices = defaults.bool(forKey: SettingsKeys.automaticallyNameVoices)
         modelsConsentAt = Self.date(defaults, SettingsKeys.modelsConsentAt)
         modelsDeclinedAt = Self.date(defaults, SettingsKeys.modelsDeclinedAt)

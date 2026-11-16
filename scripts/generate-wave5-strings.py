@@ -36,10 +36,6 @@ SAVED_VOICES_IDS = set(SAVED_VOICES_PROPERTIES) | SAVED_VOICES_PLURALS | {SAVED_
 
 # Keep existing native lookup keys stable while deriving all Phase 2 values from the shared catalog.
 PHASE2_TABLES = {
-    'Settings': {
-        '%lld meetings': 'format.searchCount.meetings',
-        'Meetings in Recently Deleted are not counted. They are deleted for good after 30 days.': 'ios.settings.library.trashFooter',
-    },
     'Speakers': {
         'Cassini stops recognising this voice. Names already in your meetings stay.': 'android.savedVoices.forget.body',
         'Cassini stops recognising all %lld saved voices and deletes the voiceprints from every meeting. Names already in your meetings stay.': 'android.savedVoices.forgetEveryone.body',

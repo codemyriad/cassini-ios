@@ -71,6 +71,14 @@ import CassiniWhistle
         onChange()
     }
 
+    /// Rendering reads published installation facts, never file existence or free space.
+    var displayRecognizer: SpeechRecognizer {
+        SpeechModelPolicy(whistleAvailable: whistleCapability.available, parakeetLinked: parakeetCapable,
+            physicalMemory: physicalMemory, availableMemory: availableMemory(), parakeetInstallation: installation,
+            availableDiskBytes: 0, downloadPlan: ModelPlan([]))
+            .recognizer(preference: preference, platform: platform) ?? .appleSpeech
+    }
+
     var policy: SpeechModelPolicy {
         SpeechModelPolicy(whistleAvailable: whistle.withLock { $0.available }, parakeetLinked: parakeetCapable,
             physicalMemory: physicalMemory, availableMemory: availableMemory(), parakeetInstallation: effectiveInstallation(installation),

@@ -697,7 +697,7 @@
       }
     },
     "Cassini stops recognising all %lld saved voices and deletes the voiceprints from every meeting. Names already in your meetings stay.": {
-      "comment": "Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3, android.savedVoices.forgetEveryone.body.",
+      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, android.savedVoices.forgetEveryone.body.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -841,7 +841,7 @@
       }
     },
     "Cassini stops recognising this voice. Names already in your meetings stay.": {
-      "comment": "Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3, android.savedVoices.forget.body.",
+      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, android.savedVoices.forget.body.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -924,7 +924,7 @@
       }
     },
     "Deletes the voiceprints of every meeting. Names already in your meetings stay.": {
-      "comment": "Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3, ios.savedVoices.forgetAllData.body.",
+      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, ios.savedVoices.forgetAllData.body.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1477,7 +1477,7 @@
       }
     },
     "Future meetings will name %@ automatically. The voiceprint never leaves this device.": {
-      "comment": "Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3, ios.speakers.rememberVoice.description.",
+      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, ios.speakers.rememberVoice.description.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1519,7 +1519,7 @@
       }
     },
     "Future meetings will name this person automatically. The voiceprint never leaves this device.": {
-      "comment": "Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3, ios.speakers.rememberVoice.description.unnamed.",
+      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, ios.speakers.rememberVoice.description.unnamed.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1561,7 +1561,7 @@
       }
     },
     "Future meetings will suggest %@. The voiceprint never leaves this device.": {
-      "comment": "Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3, ios.speakers.suggestVoice.description.",
+      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, ios.speakers.suggestVoice.description.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1603,7 +1603,7 @@
       }
     },
     "Future meetings will suggest this person. The voiceprint never leaves this device.": {
-      "comment": "Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3, ios.speakers.suggestVoice.description.unnamed.",
+      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, ios.speakers.suggestVoice.description.unnamed.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -2243,7 +2243,7 @@
       }
     },
     "People in this meeting": {
-      "comment": "Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3, ios.speakers.peopleInMeeting.",
+      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, ios.speakers.peopleInMeeting.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -2831,7 +2831,7 @@
       }
     },
     "The meeting could not be saved. Nothing was changed.": {
-      "comment": "Generated from cassini-ux b26190b57d8e35391ba9b4bafd177d66b10f0ec3, ios.speakers.meetingSaveFailed.",
+      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, ios.speakers.meetingSaveFailed.",
       "extractionState": "manual",
       "localizations": {
         "en": {

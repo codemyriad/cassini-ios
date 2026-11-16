@@ -86,6 +86,8 @@ private struct RouteDestination: View {
             // Split-view selection replaces a destination at the same stack depth. Its state belongs to this note.
             NoteDetailView(model: notes.model(id, query: query)).id(id)
         case .settings: SettingsView()
+        case .settingsPage(let page): SettingsView(page: page)
+        case .licenseText(let entry): LicenseDetailView(entry: entry, models: modelRoot)
         case .savedVoices: SavedVoicesView()
         case .trash: TrashView()
         case .licenses: LicensesView(models: modelRoot)
