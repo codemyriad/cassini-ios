@@ -128,6 +128,11 @@ final class ScreenshotTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 10))
         app.buttons["Share and more"].tap()
         app.buttons["exportOpen"].tapWhenSettled()
+        XCTAssertTrue(app.buttons["exportConfirm"].waitForExistence(within: 15))
+        if app.buttons["exportMoreFormats"].exists {
+            app.buttons["exportMoreFormats"].tapWhenSettled()
+            XCTAssertTrue(app.buttons["exportChoice-vtt"].waitForExistence(within: 15))
+        }
         captureExportMenu("10-note-export", app)
     }
 

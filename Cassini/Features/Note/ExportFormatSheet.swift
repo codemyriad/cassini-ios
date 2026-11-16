@@ -24,13 +24,16 @@ struct ExportFormatSheet: View {
                                 Image(systemName: expanded ? "chevron.down" : "chevron.right")
                                     .accessibilityHidden(true)
                             }
+                            .foregroundStyle(Color.accentInk)
                         }
                         .accessibilityIdentifier("exportMoreFormats")
                         if expanded { ForEach(state.moreFormats) { row($0) } }
                     }
                 }
                 .accessibilityLabel(ExportPhase2Copy.formatGroup)
-                if state.audioOnly { Text(ExportPhase2Copy.audioOnlyNote) }
+                if state.audioOnly {
+                    Text(ExportPhase2Copy.audioOnlyNote).foregroundStyle(Color.muted)
+                }
             }
             .accessibilityIdentifier("exportFormats")
             .navigationTitle(ExportPhase2Copy.title.replacingOccurrences(of: "{title}", with: note.title))
@@ -56,13 +59,15 @@ struct ExportFormatSheet: View {
         Button { selection = choice } label: {
             HStack {
                 VStack(alignment: .leading) {
-                    Text(title(choice))
-                    Text(description(choice)).font(.caption).foregroundStyle(.secondary)
+                    // Explicit ink keeps Form buttons from resolving text as levels of the accent tint.
+                    Text(title(choice)).foregroundStyle(Color.ink)
+                    Text(description(choice)).font(.caption).foregroundStyle(Color.muted)
                 }
                 Spacer()
-                if (selection ?? state.selection) == choice { Image(systemName: "checkmark") }
+                if (selection ?? state.selection) == choice {
+                    Image(systemName: "checkmark").foregroundStyle(Color.accentInk)
+                }
             }
-            .foregroundStyle(.primary)
         }
         .accessibilityIdentifier("exportChoice-\(choice.rawValue)")
         .accessibilityAddTraits((selection ?? state.selection) == choice ? .isSelected : [])
