@@ -291,8 +291,8 @@ struct SettingsAnswerRow: View {
     var body: some View {
         HStack(spacing: 12) {
             if let icon {
-                Image(systemName: icon).font(.body).foregroundStyle(Color.accent)
-                    .frame(width: 30, height: 30).background(Color.accent.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
+                Image(systemName: icon).font(.body).foregroundStyle(Color.accentInk)
+                    .frame(width: 30, height: 30).background(Color.accentTint, in: RoundedRectangle(cornerRadius: 8))
                     .accessibilityHidden(true)
             }
             if typeSize.isAccessibilitySize {
