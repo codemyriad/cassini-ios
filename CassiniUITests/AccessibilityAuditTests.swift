@@ -96,6 +96,12 @@ final class AccessibilityAuditTests: XCTestCase {
         // six once stopped a row short of it.
         XCTAssertTrue(app.scroll(attempts: 12) { row.exists && row.isHittable }, "Saved voices is not on the screen")
         row.tapWhenSettled()
+        // At AX5 on iOS 18, tapping a row at the List's bottom edge can only scroll it into place.
+        // Retry once after waiting for navigation, with the row visible and settled again.
+        if !app.collectionViews["savedVoicesList"].waitForExistence(within: 5) {
+            XCTAssertTrue(app.scroll(attempts: 12) { row.exists && row.isHittable }, "Saved voices is not on the screen")
+            row.tapWhenSettled()
+        }
         XCTAssertTrue(app.collectionViews["savedVoicesList"].waitForExistence(within: 15), "Saved voices did not open")
         // Audit the new setup question before scrolling to the existing saved-voice rows at AX5.
         if extra.contains(Self.largestText[1]) { audit(app, screen: "largest-voiceSetup", .textClipped) }
