@@ -63,14 +63,16 @@ import Testing
     ])
     func aCountReadsInItsLanguagesPluralForm(language: String, count: Int, category: String) throws {
         let bundle = try Self.bundle(language)
-        let url = try #require(bundle.url(forResource: "Settings", withExtension: "stringsdict"))
+        let url = try #require(bundle.url(forResource: "SettingsPhase2", withExtension: "stringsdict"))
         let table = try #require(NSDictionary(contentsOf: url) as? [String: Any])
-        let entry = try #require(table["%lld meetings"] as? [String: Any])
-        let variable = try #require(entry.values.compactMap { $0 as? [String: Any] }.first)
-        let form = try #require(variable[category] as? String, "\(language) has no \(category)")
-        let locale = Locale(identifier: language)
-        let format = bundle.localizedString(forKey: "%lld meetings", value: nil, table: "Settings")
-        #expect(String(format: format, locale: locale, count) == String(format: form, locale: locale, count))
+        for key in ["library.meetingCount", "savedVoices.peopleCount", "settings.phone.audioHours"] {
+            let entry = try #require(table[key] as? [String: Any])
+            let variable = try #require(entry.values.compactMap { $0 as? [String: Any] }.first)
+            let form = try #require(variable[category] as? String, "\(language) \(key) has no \(category)")
+            let locale = Locale(identifier: language)
+            let format = bundle.localizedString(forKey: key, value: nil, table: "SettingsPhase2")
+            #expect(String(format: format, locale: locale, count) == String(format: form, locale: locale, count))
+        }
     }
 
     /// Settings › App language names the language in its own words, with the region where there are two Portugueses.
@@ -85,7 +87,7 @@ import Testing
     func phase2TablesNeverCallAMeetingANoteInAnyLanguage(language: String) throws {
         let bundle = try Self.bundle(language)
         let forbidden = try NSRegularExpression(pattern: #"\b(note|notes|nota|notas)\b"#, options: [.caseInsensitive])
-        let tables = ["Settings", "Transcription", "Speakers", "SavedVoicesPhase2", "Trash", "BulkTransfer", "Failures", "Export"]
+        let tables = ["Settings", "SettingsPhase2", "Transcription", "Speakers", "SavedVoicesPhase2", "Trash", "BulkTransfer", "Failures", "Export"]
         for table in tables {
             var checked = 0
             if let url = bundle.url(forResource: table, withExtension: "strings"),

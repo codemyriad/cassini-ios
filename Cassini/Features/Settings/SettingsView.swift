@@ -243,7 +243,7 @@ private struct SettingsForm: View {
                     Text(pad ? SettingsPhase2Copy.taglineIpad : SettingsPhase2Copy.taglineIphone)
                         .multilineTextAlignment(.center).padding(.top, 8)
                 }.frame(maxWidth: .infinity).padding(.vertical, 20)
-            }.listRowBackground(Color.clear)
+            }.listRowBackground(Color.canvasClear)
             Section {
                 Link(destination: URL(string: "https://cassini.talk/help")!) {
                     SettingsRowLabel(title: SettingsPhase2Copy.help, subtitle: SettingsPhase2Copy.helpSubtitle)
@@ -257,7 +257,8 @@ private struct SettingsForm: View {
                 Link(destination: sourceCodeURL) {
                     SettingsRowLabel(title: SettingsPhase2Copy.sourceCode, subtitle: sourceCodeURL.absoluteString.replacingOccurrences(of: "https://", with: ""))
                 }.accessibilityIdentifier("aboutSourceCode")
-            } footer: { Text(SettingsPhase2Copy.licenceLine) }
+            } footer: { Text(SettingsPhase2Copy.licenceLine.replacingOccurrences(of: "{year}",
+                with: String(Calendar(identifier: .gregorian).component(.year, from: Date())))) }
         }
     }
 
@@ -324,7 +325,10 @@ private struct SpeechChoicesView: View {
     private func choice(_ recognizer: SpeechRecognizer, title: String, subtitle: String) -> some View {
         let installed = recognizer == .whistle || store.installation == .verified
         return HStack(alignment: .top, spacing: 12) {
-            Button { store.choose(recognizer) } label: {
+            Button {
+                if installed { store.choose(recognizer) }
+                else { router.push(.parakeetDownload) }
+            } label: {
                 HStack(alignment: .top, spacing: 12) {
                     Image(systemName: store.displayRecognizer == recognizer ? "checkmark.circle.fill" : "circle")
                         .foregroundStyle(store.displayRecognizer == recognizer ? Color.accent : Color.muted)
@@ -334,7 +338,7 @@ private struct SpeechChoicesView: View {
                         if recognizer == .whistle { Text(SettingsPhase2Copy.builtIn).font(.caption).foregroundStyle(Color.muted) }
                     }
                 }.frame(maxWidth: .infinity, alignment: .leading)
-            }.buttonStyle(.plain).disabled(recognizer == .parakeet && !store.canChooseParakeet)
+            }.buttonStyle(.plain).disabled(installed && recognizer == .parakeet && !store.canChooseParakeet)
                 .accessibilityIdentifier(recognizer == .whistle ? "chooseWhistle" : "chooseParakeet")
                 .accessibilityAddTraits(store.displayRecognizer == recognizer ? [.isSelected] : [])
             if recognizer == .parakeet, !installed {
