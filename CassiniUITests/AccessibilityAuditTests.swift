@@ -39,7 +39,16 @@ final class AccessibilityAuditTests: XCTestCase {
 
     @MainActor private func emptyLibrary(_ extra: [String] = []) -> XCUIApplication {
         let app = launch(extra)
-        XCTAssertTrue(app.staticTexts["heroTitle"].waitForExistence(within: 15))
+        let hero = app.staticTexts["heroTitle"]
+        // The Library audit covers the backup notice at the top. Dismiss it here to audit the hero:
+        // iOS 18's clipping audit resets the scroll offset when it changes text sizes, bringing an
+        // offscreen notice back into this audit and reporting its heading instead of the hero.
+        let dismissNotice = app.scrolledLibraryElement(app.buttons["backupNoticeDismiss"], description: "backup notice dismiss button")
+        let scroll = app.scrollViews["libraryScroll"]
+        dismissNotice.tapWhenSettled()
+        XCTAssertTrue(dismissNotice.waitForNonExistence(within: 15))
+        XCTAssertTrue(scroll.scroll(up: false, attempts: 12) { hero.exists && hero.isHittable },
+                      "The first-run hero is not on the screen")
         return app
     }
 
@@ -86,8 +95,13 @@ final class AccessibilityAuditTests: XCTestCase {
         // At the largest text size the row is about six swipes down, more when a loaded host makes each fling shorter:
         // six once stopped a row short of it.
         XCTAssertTrue(app.scroll(attempts: 12) { row.exists && row.isHittable }, "Saved voices is not on the screen")
-        row.tap()
-        XCTAssertTrue(app.staticTexts["Alex Moreau"].waitForExistence(within: 20))
+        row.tapWhenSettled()
+        XCTAssertTrue(app.collectionViews["savedVoicesList"].waitForExistence(within: 15), "Saved voices did not open")
+        // Audit the new setup question before scrolling to the existing saved-voice rows at AX5.
+        if extra.contains(Self.largestText[1]) { audit(app, screen: "largest-voiceSetup", .textClipped) }
+        let person = app.staticTexts["Alex Moreau"]
+        XCTAssertTrue(app.scroll(attempts: 12) { person.exists && person.isHittable },
+                      "The saved voice is not on the screen below setup")
         return app
     }
 

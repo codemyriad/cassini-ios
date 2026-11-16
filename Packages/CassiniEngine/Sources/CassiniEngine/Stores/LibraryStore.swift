@@ -78,6 +78,8 @@ import CassiniNotebook
     public func audioURL(_ note: Note) -> URL? { noteStore?.audioURL(for: note) }
     public func originalAudioURL(_ note: Note) -> URL? { noteStore?.originalAudioURL(for: note) }
     public func directory(for id: UUID) -> URL? { noteStore?.directory(for: id) }
+    public func setCloudBackup(_ enabled: Bool) { cloudBackup = enabled }
+
     public var root: URL? { noteStore?.root }
 
     /// Changes the note now and writes the change in the background. False when there is no such note.

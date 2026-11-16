@@ -9,6 +9,8 @@ import CassiniNotebook
     let router = Router()
     let errors = ErrorPresenter()
     let settings: SettingsStore
+    let backup: BackupModel
+    let voiceEnrollment: VoiceEnrollmentAdapter
     let noticeCenter: NoticeCenter
     let notices: NoticesStore
     let library: LibraryStore
@@ -40,6 +42,7 @@ import CassiniNotebook
             return status == .ready || status == .unsupported
         }
         library = LibraryStore(root: environment.root, errors: errors)
+        backup = BackupModel(settings: settings, root: environment.root, library: library)
         voices = VoicesStore(library: library, settings: settings, clock: environment.clock)
         voices.printsReady = { [analyzer = environment.analyzer] in await analyzer.printsReady() }
         playback = PlaybackStore(playback: environment.playback, library: library, preview: { note, position in
@@ -52,6 +55,9 @@ import CassiniNotebook
         recording = RecordingStore(.init(environment: environment, library: library, processing: processing,
                                          playback: playback, settings: settings, notices: noticeCenter, router: router,
                                          ready: { [startup] in _ = await startup.ready() }))
+        voiceEnrollment = VoiceEnrollmentAdapter(makeCapture: { AVCaptureAdapter() }, analyzer: environment.analyzer,
+            settings: settings, playback: playback, recording: recording,
+            root: environment.exports.appendingPathComponent("VoiceEnrollment"))
         let importFiles = CoordinatedFileImporter(storage: environment.storage)
         let importService = library.noteStore.map {
             ImportService(notes: $0, files: importFiles, audio: environment.audio,
@@ -275,6 +281,7 @@ import CassiniNotebook
             }
         }
         #endif
+        startup.register(.load) { [backup] in try await backup.start() }
         startup.register(.load) { [recording] in await recording.rebuildBareDirectories() }
         startup.register(.load) { [library, voices, noticeCenter] in
             await library.load()
@@ -310,7 +317,7 @@ extension View {
     func environment(_ graph: AppGraph) -> some View {
         self
             .environment(graph.router).environment(graph.errors).environment(graph.notices)
-            .environment(graph.settings).environment(graph.library).environment(graph.voices)
+            .environment(graph.voiceEnrollment).environment(graph.backup).environment(graph.settings).environment(graph.library).environment(graph.voices)
             .environment(graph.playback).environment(graph.processing).environment(graph.processing.progress)
             .environment(graph.recording)
             .environment(graph.imports).environment(graph.trash).environment(graph.trash.undo).environment(graph.exports)

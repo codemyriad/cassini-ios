@@ -165,6 +165,10 @@ TestFlight still need.
 
 [docs/differences.md](docs/differences.md) describes each difference in detail. In summary:
 
+- **Library export on iOS 18.** The format selector opens full-screen below iOS 26. A sheet can hang SwiftUI’s lazy
+  Library layout after Star changes on iOS 18.2; full-screen presentation avoids resizing the Library behind it.
+  The formats and share-after-confirmation flow are unchanged. iOS 26 and later keep the sheet.
+
 - **Library and Search (D99).** iOS uses a native All / Starred segmented control and a scrolling Search chip row.
   The filter contract matches Android: AND, local calendar dates, own recordings (including recovered captures) for Recorded by me, case-insensitive speaker names, and
   transient Search choices seeded from the remembered Library choice. Speaker searches match that speaker’s words
@@ -554,6 +558,18 @@ assigned speaker colours as transcript labels; unnamed speakers remain stone in 
 Library Search and Find match spoken words rather than labels inserted by the viewer. Search previews
 join paragraphs with spaces so blank lines cannot hide the matching word. Both search surfaces preserve
 the viewer’s spacing around standalone punctuation, including punctuation inside inline replies.
+
+Wave 6 voices and phone backups (`D-979`, `D98`): iOS includes meetings and saved voices in OS backups by default.
+Settings → Moving and backup controls Library directory exclusion and the independent PrivateVoices exclusion;
+Saved voices includes a one-question opt-in for automatic naming, transcript enrollment (unchanged), guided
+four-second test-phrase enrollment, sample playback, rename and forget. Guided audio stays under
+`PrivateVoices/Enrollment`, never in the Library or ZIP export, and is removed when its voice is forgotten.
+Unlike Android's “phone only” mode, iOS only marks directories to be left out of iCloud Backup: Quick Start may still
+copy them. The once-only Library card and layered explainer say so. Turning exclusion on does not delete existing
+cloud backups. Directory resource flags cover all descendants, including new directories, atomic replacements,
+recordings and imports; startup reapplies both committed preferences, including the old always-excluded voice store.
+Manual ZIP export contains portable meetings (or their original audio) and never private voiceprints or guided samples,
+regardless of the saved-voice backup switch. Speech model folders retain their separate backup exclusions.
 
 Single-meeting export follows D99 / PARITY §2: Cassini file and Markdown are primary choices, with Plain text,
 SRT and WebVTT under More formats. Meetings without a finished transcript hide text choices; raw imports then

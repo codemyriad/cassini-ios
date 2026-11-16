@@ -97,3 +97,10 @@ Existing generated subsets are regenerated from the new global pin. The export r
 file present in upstream `vectors/export/`, byte-identical with SHA-256 receipts in its `UPSTREAM.json`.
 That commit contains Markdown vectors and audio-size vectors, but no plain-text/SRT/WebVTT goldens;
 local regression tests cover those PARITY §2 rules without claiming shared-vector conformance.
+
+Wave 6 (`D-979`, supersedes #120) shares the Wave 5 source pin
+`b26190b57d8e35391ba9b4bafd177d66b10f0ec3` (SHA-256
+`10d65abc7b10f81422377632aa899506b33e02cc9269afc96e11ec89cee69367`). The full byte-identical catalog is in
+`contracts/wave5-strings/strings.json`. `generate-wave6-strings.py` selects iOS backup and voice wording,
+with all six translations verbatim in `Wave6.xcstrings`; Android-only exclusion claims are deliberately omitted.
+The global catalog and generated Phase 2 subsets retain the current main-branch pins described above.

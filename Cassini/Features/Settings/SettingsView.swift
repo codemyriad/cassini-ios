@@ -113,6 +113,7 @@ private struct SettingsForm: View {
             } footer: {
                 Text("Transcription runs on this device.", tableName: "Settings").foregroundStyle(Color.muted)
             }
+            VoiceSetupSection()
             Section {
                 Toggle(isOn: $settings.identifySpeakers) { Text("Identify speakers after transcription", tableName: "Settings") }
                 Toggle(isOn: $settings.automaticallyNameVoices) { Text("Name strong voice matches automatically", tableName: "Settings") }
@@ -123,6 +124,7 @@ private struct SettingsForm: View {
             }
             PrivacySection(model: model)
             LibrarySection(totals: model.library)
+            BackupSection()
             Section {
                 AboutCard(version: model.version, openNotices: model.openLicenses)
             } header: {

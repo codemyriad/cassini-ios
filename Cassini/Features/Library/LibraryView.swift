@@ -35,37 +35,7 @@ struct LibraryView: View {
         let content = model.content
         let exportable = Set(ArchiveSelection.ids(library.notes))
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: Spacing.row) {
-                if content.facts.liveNotes > 0 || model.favoritesOnly || searchPresented || model.isSearching {
-                    filters.padding(.top, 6)
-                }
-                if model.isSearching, let count = content.facts.results {
-                    Text(LibraryPhase1Copy.template("format.searchCount.meetings", count: count))
-                        .font(.subheadline.weight(.semibold)).foregroundStyle(Color.ink)
-                        .accessibilityAddTraits(.isHeader).accessibilityIdentifier("librarySearchCount")
-                }
-                activity.padding(.top, 6)
-                ImportCardsView()
-                if !content.loading || content.emptyState == .unavailable {
-                    if let hero = content.hero, !model.favoritesOnly { FirstRunHeroView(hero: hero) }
-                    // Banners cover no-match and unavailable states; the empty Library uses the Wave 5 hero and Starred has its own.
-                    if content.emptyState == .noStarred { NoStarredState().padding(.top, 8) }
-                    // LazyVStack can retain a covered row body for an unchanged UUID even after the
-                    // model publishes new capture/job facts. The render key excludes live duration ticks
-                    // so they preserve taps and context menus; navigation and selection use the note UUID.
-                    if let results = content.results {
-                        ForEach(results, id: \.renderKey) { row($0, day: $0.day ?? .today, exportable: exportable.contains($0.id)) }
-                    } else {
-                        ForEach(content.sections) { section in
-                            Text(LibraryFormat(calendar: calendar).day(section.key).uppercased())
-                                .font(.caption.weight(.semibold)).tracking(1.6).foregroundStyle(Color.muted)
-                                .accessibilityAddTraits(.isHeader)
-                                .padding(.top, 14)
-                            ForEach(section.rows, id: \.renderKey) { row($0, day: section.key, exportable: exportable.contains($0.id)) }
-                        }
-                    }
-                }
-            }
+            libraryStack(content, exportable: exportable)
             // iOS 18 otherwise retains ordinary row bodies when the same notes become flat search results.
             .id(content.results != nil)
             .padding(.horizontal, Spacing.gutter).padding(.top, 12).padding(.bottom, 28)
@@ -117,7 +87,7 @@ struct LibraryView: View {
                 if (error as? CocoaError)?.code != .userCancelled { errors.present(error.localizedDescription) }
             }
         }
-        .sheet(item: $exportTarget, onDismiss: shareConfirmedExport) { target in
+        .libraryExportPresentation(item: $exportTarget, onDismiss: shareConfirmedExport) { target in
             if let note = model.note(target.id), let menu = model.menu(target.id) {
                 ExportFormatSheet(note: note, jobPending: menu.transcribe == .stop || menu.transcribe == .removeFromQueue) {
                     confirmedExport = (target.id, $0)
@@ -133,6 +103,49 @@ struct LibraryView: View {
             Button(LibraryCopy.transcribeAgain) { confirm(dialog) }
             Button(LibraryCopy.cancel, role: .cancel) {}
         } message: { _ in Text(LibraryCopy.freshBody) }
+    }
+
+    private func libraryStack(_ content: LibraryContent, exportable: Set<UUID>) -> some View {
+        LazyVStack(alignment: .leading, spacing: Spacing.row) {
+            libraryHeader(content)
+            libraryRows(content, exportable: exportable)
+        }
+    }
+
+    @ViewBuilder private func libraryHeader(_ content: LibraryContent) -> some View {
+        if content.facts.liveNotes > 0 || model.favoritesOnly || searchPresented || model.isSearching {
+            filters.padding(.top, 6)
+        }
+        if model.isSearching, let count = content.facts.results {
+            Text(LibraryPhase1Copy.template("format.searchCount.meetings", count: count))
+                .font(.subheadline.weight(.semibold)).foregroundStyle(Color.ink)
+                .accessibilityAddTraits(.isHeader).accessibilityIdentifier("librarySearchCount")
+        }
+        activity.padding(.top, 6)
+        if library.isLoaded, !model.isSearching { BackupNoticeCard() }
+        ImportCardsView()
+    }
+
+    @ViewBuilder private func libraryRows(_ content: LibraryContent, exportable: Set<UUID>) -> some View {
+        if !content.loading || content.emptyState == .unavailable {
+            if let hero = content.hero, !model.favoritesOnly { FirstRunHeroView(hero: hero) }
+            // Banners cover no-match and unavailable states; the empty Library uses the Wave 5 hero and Starred has its own.
+            if content.emptyState == .noStarred { NoStarredState().padding(.top, 8) }
+            // LazyVStack can retain a covered row body for an unchanged UUID even after the
+            // model publishes new capture/job facts. The render key excludes live duration ticks
+            // so they preserve taps and context menus; navigation and selection use the note UUID.
+            if let results = content.results {
+                ForEach(results, id: \.renderKey) { row($0, day: $0.day ?? .today, exportable: exportable.contains($0.id)) }
+            } else {
+                ForEach(content.sections) { section in
+                    Text(LibraryFormat(calendar: calendar).day(section.key).uppercased())
+                        .font(.caption.weight(.semibold)).tracking(1.6).foregroundStyle(Color.muted)
+                        .accessibilityAddTraits(.isHeader)
+                        .padding(.top, 14)
+                    ForEach(section.rows, id: \.renderKey) { row($0, day: section.key, exportable: exportable.contains($0.id)) }
+                }
+            }
+        }
     }
 
     @ViewBuilder private var searchHeader: some View {
@@ -294,7 +307,16 @@ struct LibraryView: View {
             case .trash: Task { await model.perform(.moveToTrash, on: row.id) }
             }
             }
-            .contextMenu { NoteActionsMenu(noteID: row.id) { exportTarget = ExportTarget(id: row.id) } }
+            .contextMenu {
+                NoteActionsMenu(noteID: row.id) {
+                    if #available(iOS 26.0, *) {
+                        exportTarget = ExportTarget(id: row.id)
+                    } else {
+                        // Like Rename, return from the context-menu action before presenting Export.
+                        Task { @MainActor in exportTarget = ExportTarget(id: row.id) }
+                    }
+                }
+            }
         }
     }
 
@@ -354,6 +376,18 @@ struct LibraryView: View {
 }
 
 private extension View {
+    /// iOS 18 can loop in lazy-stack layout when a sheet resizes the Library after Star changes.
+    /// A full-screen selector avoids that resize; confirmation still shares only after dismissal.
+    @ViewBuilder func libraryExportPresentation<Item: Identifiable, Content: View>(
+        item: Binding<Item?>, onDismiss: @escaping () -> Void, @ViewBuilder content: @escaping (Item) -> Content
+    ) -> some View {
+        if #available(iOS 26.0, *) {
+            sheet(item: item, onDismiss: onDismiss, content: content)
+        } else {
+            fullScreenCover(item: item, onDismiss: onDismiss, content: content)
+        }
+    }
+
     /// Native bars let content fade beneath the glass; older systems keep their material inset.
     @ViewBuilder func librarySearchBar<Header: View>(@ViewBuilder content: () -> Header) -> some View {
         if #available(iOS 26.0, *) {
