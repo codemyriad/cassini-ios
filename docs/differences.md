@@ -677,6 +677,12 @@ stricter or looser than the spec.
   `audio.m4a` at Finish. Android captures Opus or AAC. The format chip reads "PCM 48 kHz". If compression fails, the
   CAF stays the recording, the notice REC_COMPRESSION_FAILED ("Saved in its original quality") shows, and the CAF is
   transcribed.
+- **Live waveform motion (iOS presentation extra).** `AVAudioRecorder` is metered every 25 ms (40 Hz), independent
+  of the one-second recording policy. `WaveformBars` still takes each 125 ms bucket's peak over seven seconds;
+  `WaveformAnimation` interpolates presentation with a monotonic clock. The visible, active Recording screen
+  draws on SwiftUI's display animation schedule without rounding bar heights. Paused, Reduce Motion and inactive
+  scenes have no animation timeline; pausing also invalidates the meter timer. ProMotion is enabled in the app's
+  Info.plist, with actual cadence controlled by iOS. No audio, bookmark, storage policy or enrollment timing changes.
 - **Levels (D26.1).** The note's stored waveform measures AC level (`AudioInspection.acLevel`, the mean taken off each
   sampled window), so a microphone's DC offset draws silence as silence. **The live meter does not yet:** it is
   `AVAudioRecorder`'s `averagePower`, which measures the raw level and does not expose the samples, so an offset raises

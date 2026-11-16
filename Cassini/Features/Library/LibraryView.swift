@@ -6,7 +6,6 @@ import CassiniNotebook
 /// Import audio and Record stay at the bottom; no decorative privacy or meeting-progress card.
 struct LibraryView: View {
     @Environment(LibraryScreenModel.self) private var model
-    @Environment(NoticesStore.self) private var notices
     @Environment(ImportStore.self) private var imports
     @Environment(LibraryStore.self) private var library
     @Environment(Router.self) private var router
@@ -32,7 +31,7 @@ struct LibraryView: View {
 
     var body: some View {
         @Bindable var model = model
-        let content = model.content
+        let content = model.listContent
         let exportable = Set(ArchiveSelection.ids(library.notes))
         ScrollView {
             libraryStack(content, exportable: exportable)
@@ -200,7 +199,7 @@ struct LibraryView: View {
                 .transition(.opacity)
             }
         }
-        .animation(.easeInOut(duration: 0.15), value: searchPresented)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.15), value: searchPresented)
         .labelStyle(.iconOnly).font(.system(size: 20)).foregroundStyle(Color.ink)
         .buttonStyle(LibraryHeaderButtonStyle())
         .padding(2).frame(width: searchPresented ? 48 : 92, height: 48)
@@ -209,9 +208,7 @@ struct LibraryView: View {
     /// All real notices, the recording card, standalone downloads and import/export progress stay available.
     /// The Wave 5 first-run hero replaces the `LIB_EMPTY` banner (`L-27`).
     @ViewBuilder private var activity: some View {
-        BannerList(specs: notices.library(model.content.facts).filter { $0.kind != .libEmpty },
-                   onAction: { spec, action in notices.perform(action, on: spec) { importing = true } },
-                   onDismiss: notices.dismiss)
+        LibraryNotices(facts: model.listContent.facts) { importing = true }
         LibraryActivity()
         ImportBatchesView()
         ArchiveExportProgressView(model: archiveExport)
@@ -299,7 +296,7 @@ struct LibraryView: View {
                 .accessibilityIdentifier("selectArchiveNote-\(row.id)")
                 .accessibilityAddTraits(selectedNotes.contains(row.id) ? [.isSelected] : [])
             }
-            NoteRow(row: row, day: day, selected: router.selectedNoteID == row.id) { action in
+            LibraryNoteRow(row: row, day: day, selected: router.selectedNoteID == row.id) { action in
             switch action {
             case .open: model.open(row.id)
             case .resume: Task { await model.resume(row.id) }

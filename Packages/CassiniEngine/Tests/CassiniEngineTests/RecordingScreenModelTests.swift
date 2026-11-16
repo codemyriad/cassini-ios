@@ -1,5 +1,7 @@
 import Foundation
 import Testing
+import Observation
+import Synchronization
 import CassiniEngine
 import CassiniEngineTesting
 import CassiniNotebook
@@ -34,6 +36,28 @@ import CassiniNotebook
             screen = self
             model.onEffect = { [weak self] in self?.effects.append($0) }
         }
+    }
+
+    @Test func meterAndElapsedTicksDoNotInvalidateRecordingLayout() async throws {
+        let s = try Screen(); defer { s.h.tearDown() }
+        await s.model.enter()
+        try await s.h.waitFor("the capture") { s.model.phase == .recording }
+        let layoutChanged = Mutex(false), levelsChanged = Mutex(false), elapsedChanged = Mutex(false)
+        withObservationTracking {
+            _ = s.model.phase; _ = s.model.title; _ = s.model.format; _ = s.model.banner
+        } onChange: { layoutChanged.withLock { $0 = true } }
+        withObservationTracking { _ = s.model.levels } onChange: { levelsChanged.withLock { $0 = true } }
+        withObservationTracking { _ = s.model.elapsed } onChange: { elapsedChanged.withLock { $0 = true } }
+        s.h.capture.elapsed = 1
+        s.h.capture.send(.level(0.5))
+        try await s.h.eventsHandled()
+        try await s.h.waitFor("the policy duration") { s.model.elapsed == 1 }
+        #expect(levelsChanged.withLock { $0 })
+        #expect(elapsedChanged.withLock { $0 })
+        #expect(!layoutChanged.withLock { $0 })
+        s.model.pauseOrResume()
+        #expect(layoutChanged.withLock { $0 })
+        #expect(s.model.phase == .paused)
     }
 
     // ports: RecordingViewModelTest#startsOnEntryWithThePermissionAndShowsTheCapture

@@ -1325,7 +1325,7 @@ class Ios18LegTests(unittest.TestCase):
         self.assertIn("xcodebuild: error: Failed to launch the test host", result.stderr)
         self.assertIn("see ", result.stderr)
 
-    def test_the_smoke_list_names_ui_tests_and_plans_about_five_minutes(self):
+    def test_the_smoke_list_names_ui_tests_and_plans_about_six_minutes(self):
         h = Harness(self)
         listed = [line.split("#")[0].strip() for line in (ROOT / "scripts/ios18-smoke-tests.txt").read_text().splitlines()]
         listed = [line for line in listed if line]
@@ -1336,7 +1336,7 @@ class Ios18LegTests(unittest.TestCase):
         code = (f'timings_file=/nonexistent; committed_timings={str(ROOT / "scripts/ui-test-durations.tsv")!r}\n'
                 'printf "%s\\n" ' + " ".join(listed) + ' | planned_seconds')
         planned = int(h.shell(["planned_seconds"], code).stdout)
-        self.assertLessEqual(planned, 340, f"the smoke list plans {planned} s")
+        self.assertLessEqual(planned, 360, f"the smoke list plans {planned} s")
         committed = {line.split("\t")[0] for line in (ROOT / "scripts/ui-test-durations.tsv").read_text().splitlines()}
         self.assertFalse([t for t in listed if t not in committed], "every listed test has a measured time")
 

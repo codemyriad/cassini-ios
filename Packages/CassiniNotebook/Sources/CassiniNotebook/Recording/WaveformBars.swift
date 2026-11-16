@@ -10,13 +10,16 @@ public struct WaveformBars: Hashable, Sendable {
 
     /// 0...1, oldest first.
     public private(set) var levels = Array(repeating: Float(0), count: count)
+    /// Captured time of the latest sample; presentation never changes domain bucket semantics.
+    public private(set) var elapsedMs: Int64 = 0
     private var lastBar: Int64?
 
     public init() {}
 
     /// Puts one level sample (0...1), taken at `elapsedMs` of captured time, into its bar.
     public mutating func add(_ level: Float, atMs elapsedMs: Int64) {
-        let bar = max(0, elapsedMs) / Self.barMs
+        self.elapsedMs = max(self.elapsedMs, max(0, elapsedMs))
+        let bar = self.elapsedMs / Self.barMs
         if let lastBar {
             let shift = Int(min(max(bar - lastBar, 0), Int64(Self.count)))
             if shift > 0 {

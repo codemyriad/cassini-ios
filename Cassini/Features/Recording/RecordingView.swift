@@ -30,10 +30,9 @@ struct RecordingView: View {
                         }
                         Spacer(minLength: 16)
                         VStack(spacing: 24) {
-                            RecordingTimer(elapsed: screen.elapsed)
-                            RecordingWaveform(levels: screen.levels, isPaused: screen.phase != .recording)
-                            Text(caption).font(.subheadline).foregroundStyle(Color.recordingSecondary)
-                                .multilineTextAlignment(.center).frame(maxWidth: 280)
+                            RecordingTimer(screen: screen)
+                            LiveRecordingWaveform(screen: screen)
+                            RecordingCaption(screen: screen)
                         }
                         Spacer(minLength: 16)
                         Button {
@@ -66,6 +65,15 @@ struct RecordingView: View {
             guard old != new, new == .recording || new == .paused else { return }
             AccessibilityNotification.Announcement(new == .paused ? RecordingCopy.status(paused: true) : RecordingCopy.status(paused: false)).post()
         }
+    }
+
+}
+
+private struct RecordingCaption: View {
+    let screen: RecordingScreenModel
+    var body: some View {
+        Text(caption).font(.subheadline).foregroundStyle(Color.recordingSecondary)
+            .multilineTextAlignment(.center).frame(maxWidth: 280)
     }
 
     private var caption: String {
@@ -141,16 +149,24 @@ private struct RecordingStatus: View {
 
 private struct RecordingTitleField: View {
     @Binding var title: String
+    // Keep the native edit even when the model's clamped title is unchanged, so the cut reaches the field.
+    @State private var text = ""
     @FocusState private var focused: Bool
 
     var body: some View {
         // L-48: no visible "Title" caption; the field keeps it as its spoken label.
         HStack(spacing: 8) {
                 // Wraps rather than cutting a long title at large text sizes.
-            TextField(String(localized: "Title", table: "Recording"), text: $title,
+            TextField(String(localized: "Title", table: "Recording"), text: $text.handingEdits(to: edited),
                       prompt: Text("Title", tableName: "Recording").foregroundStyle(Color.ink3), axis: .vertical)
                 .lineLimit(1...3).font(.title3).focused($focused).submitLabel(.done)
                 .textInputAutocapitalization(.sentences).onSubmit { focused = false }
+                .onAppear { text = title }
+                .onChange(of: text) { _, typed in edited(typed) }
+                .onChange(of: title) { _, updated in
+                    // Follow the default title when capture starts, without interrupting an edit's deferred cut.
+                    if updated != String(text.prefix(Limits.titleMaxLength)) { text = updated }
+                }
                 .accessibilityLabel(Text("Title", tableName: "Recording"))
                 .accessibilityIdentifier("recordingTitle")
             Image(systemName: "pencil").foregroundStyle(Color.recordingSecondary).accessibilityHidden(true)
@@ -159,13 +175,26 @@ private struct RecordingTitleField: View {
         .padding(.horizontal, 4).padding(.bottom, 6)
         .overlay(alignment: .bottom) { Rectangle().fill(Color.recordingLine).frame(height: 1) }
     }
+
+    private func edited(_ typed: String) {
+        let shortened = String(typed.prefix(Limits.titleMaxLength))
+        title = shortened
+        if typed != shortened {
+            // As in RenameSheet, finish the native edit before putting the shortened text back.
+            DispatchQueue.main.async {
+                guard text == typed else { return }
+                text = shortened
+            }
+        }
+    }
 }
 
 private struct RecordingTimer: View {
-    let elapsed: TimeInterval
+    let screen: RecordingScreenModel
     @ScaledMetric(relativeTo: .largeTitle) private var size: CGFloat = 56
 
     var body: some View {
+        let elapsed = screen.elapsed
         // System sans with tabular figures, as Android's 56 sp timer (WP4).
         Text(TimeText.clock(elapsed))
             .font(.system(size: size, weight: .medium)).monospacedDigit().tracking(-0.02 * size)

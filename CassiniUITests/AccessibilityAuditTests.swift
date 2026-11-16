@@ -96,7 +96,24 @@ final class AccessibilityAuditTests: XCTestCase {
         // six once stopped a row short of it.
         XCTAssertTrue(app.scroll(attempts: 12) { row.exists && row.isHittable }, "Saved voices is not on the screen")
         row.tapWhenSettled()
-        XCTAssertTrue(app.collectionViews["savedVoicesList"].waitForExistence(within: 15), "Saved voices did not open")
+        // At AX5 on iOS 18, tapping a row at the List's bottom edge can only scroll it into place.
+        // A positive destination or a settled, hittable source row decides whether to retry.
+        let list = app.collectionViews["savedVoicesList"]
+        var previousRowFrame: CGRect?
+        let decided = poll(within: uiWaitFloor) {
+            if list.exists { return true }
+            guard row.exists, row.isHittable, let frame = (try? row.snapshot())?.frame else {
+                previousRowFrame = nil
+                return false
+            }
+            defer { previousRowFrame = frame }
+            return previousRowFrame == frame
+        }
+        XCTAssertTrue(decided, "Neither Saved voices nor its Settings row became ready")
+        if decided && !list.exists {
+            row.tapWhenSettled()
+        }
+        XCTAssertTrue(list.waitForExistence(within: 15), "Saved voices did not open")
         // Audit the new setup question before scrolling to the existing saved-voice rows at AX5.
         if extra.contains(Self.largestText[1]) { audit(app, screen: "largest-voiceSetup", .textClipped) }
         let person = app.staticTexts["Alex Moreau"]

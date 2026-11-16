@@ -26,6 +26,8 @@
 	<true/>
 	<key>UIPrefersShowingLanguageSettings</key>
 	<true/>
+	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>NSMicrophoneUsageDescription</key>

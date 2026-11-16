@@ -1,5 +1,6 @@
 import SwiftUI
 import CassiniNotebook
+import CassiniEngine
 
 /// What a row asks the Library to do.
 enum NoteRowAction {
@@ -284,5 +285,35 @@ struct FlowLayout: Layout {
             rows[rows.count - 1] = row
         }
         return rows.filter { !$0.items.isEmpty }
+    }
+}
+
+/// Keep the context menu attached outside the ticking leaf. Finished rows never observe the recorder.
+struct LibraryNoteRow: View {
+    let row: LibraryRow
+    let day: DayKey
+    let selected: Bool
+    let perform: (NoteRowAction) -> Void
+
+    var body: some View {
+        if row.isRecording {
+            LiveRecordingRow(row: row, day: day, selected: selected, perform: perform)
+        } else {
+            NoteRow(row: row, day: day, selected: selected, perform: perform)
+        }
+    }
+}
+
+private struct LiveRecordingRow: View {
+    let row: LibraryRow
+    let day: DayKey
+    let selected: Bool
+    let perform: (NoteRowAction) -> Void
+    @Environment(LibraryScreenModel.self) private var model
+
+    var body: some View {
+        var current = row
+        if let card = model.recordingCard, card.noteID == row.id { current.duration = card.elapsed }
+        return NoteRow(row: current, day: day, selected: selected, perform: perform)
     }
 }

@@ -96,7 +96,7 @@ struct SavedVoicesView: View {
             guard !Task.isCancelled else { return }
             samples = prepared
         }
-        .onChange(of: playback.state.sample) { _, sample in
+        .onChange(of: playback.controls.sample) { _, sample in
             if sample == nil { playingVoiceID = nil }
         }
         .onDisappear { playback.leave(sampleOwner); playingVoiceID = nil }
@@ -224,11 +224,11 @@ private struct PersonRow: View {
     private var controls: some View {
         HStack(spacing: 12) {
             if let sample {
-                let playing = playingVoiceID == person.id && playback.owns(sample.source.noteID) && playback.state.sample != nil
+                let playing = playingVoiceID == person.id && playback.owns(sample.source.noteID) && playback.controls.sample != nil
                 Button {
                     if playing { playback.stopSample(); playingVoiceID = nil }
                     else {
-                        playback.controller.show(sample.source, at: sample.savedPosition, owner: owner)
+                        playback.showImmediately(sample.source, at: sample.savedPosition, owner: owner)
                         let started = playback.controller.playRange(sample.source.noteID, from: sample.start, to: sample.end)
                         playingVoiceID = started ? person.id : nil
                     }

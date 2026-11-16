@@ -2,6 +2,19 @@ import SwiftUI
 import CassiniEngine
 import CassiniNotebook
 
+/// Download bytes in a banner never invalidate the Library's list or its context menus.
+struct LibraryNotices: View {
+    let facts: LibraryFacts
+    let importAudio: () -> Void
+    @Environment(NoticesStore.self) private var notices
+
+    var body: some View {
+        BannerList(specs: notices.library(facts).filter { $0.kind != .libEmpty },
+                   onAction: { spec, action in notices.perform(action, on: spec, chooseFile: importAudio) },
+                   onDismiss: notices.dismiss)
+    }
+}
+
 /// The Library retains its recording card and standalone model download banner. Meeting jobs stay in their rows.
 struct LibraryActivity: View {
     @Environment(LibraryScreenModel.self) private var model

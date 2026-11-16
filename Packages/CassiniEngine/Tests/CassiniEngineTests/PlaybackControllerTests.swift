@@ -1,5 +1,7 @@
 import Foundation
 import Testing
+import Observation
+import Synchronization
 import CassiniEngine
 import CassiniEngineTesting
 import CassiniNotebook
@@ -42,6 +44,21 @@ import CassiniNotebook
 
     private func waitFor(_ what: String, _ condition: @escaping @MainActor @Sendable () -> Bool) async throws {
         try await waitForObserved(what, condition)
+    }
+
+    @Test func positionTicksDoNotInvalidateTransportControls() {
+        controller.open(source(note), at: 0)
+        controller.play()
+        let controlsChanged = Mutex(false), positionChanged = Mutex(false)
+        withObservationTracking { _ = controller.controls } onChange: { controlsChanged.withLock { $0 = true } }
+        withObservationTracking { _ = controller.state.position } onChange: { positionChanged.withLock { $0 = true } }
+        advance(1_000)
+        #expect(positionChanged.withLock { $0 })
+        #expect(!controlsChanged.withLock { $0 })
+        controller.pause()
+        #expect(controlsChanged.withLock { $0 })
+        #expect(!controller.controls.isPlaying)
+        #expect(controller.controls.noteID == note)
     }
 
     // ports: PlaybackControllerTest#thePositionIsSavedEveryFiveSecondsAndFinallyOnPauseAndLeave

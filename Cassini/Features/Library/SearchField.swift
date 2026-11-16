@@ -8,6 +8,7 @@ struct SearchField: View {
     @Binding var query: String
     @Binding var isPresented: Bool
     @FocusState private var focused: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicType
     /// The width the field's text has, for the placeholder that fits it on one line.
     @State private var textWidth: CGFloat = 0
@@ -24,7 +25,7 @@ struct SearchField: View {
             .accessibilityLabel(isPresented ? LibraryPhase1Copy.searchResultsAccessibilityLabel : MeetingPhase1Copy.allMeetings)
             .accessibilityAddTraits(.isHeader)
             .accessibilityIdentifier("libraryHeading")
-            .animation(.easeInOut(duration: 0.15), value: query.isEmpty)
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.15), value: query.isEmpty)
             TextField(LibraryPhase1Copy.searchAccessibilityLabel, text: $query,
                       prompt: Text(placeholder).foregroundStyle(Color.ink3), axis: .vertical)
                 .lineLimit(1...3)

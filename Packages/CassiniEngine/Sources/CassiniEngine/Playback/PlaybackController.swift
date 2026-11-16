@@ -49,7 +49,13 @@ public final class PlaybackController {
         }
     }
 
-    public private(set) var state = PlaybackState()
+    public private(set) var state = PlaybackState() {
+        didSet {
+            let next = PlaybackControls(state)
+            if controls != next { controls = next }
+        }
+    }
+    public private(set) var controls = PlaybackControls()
     /// While a recording runs nothing opens.
     public private(set) var isBlocked = false
 
@@ -89,7 +95,7 @@ public final class PlaybackController {
 
     /// The speed (an iOS extra); it stays for the next file.
     public var rate: Float {
-        get { state.rate }
+        get { controls.rate }
         set { player.rate = newValue; state.rate = newValue }
     }
 

@@ -79,7 +79,7 @@ struct ReadingTranscript: View {
         TranscriptList(transcript: transcript, activeWord: active, hits: hits, renamable: renamable, actions: actions,
                        geometry: geometry, suggestion: suggestion)
             .onChange(of: active) { _, word in
-                guard following, playback.state.isPlaying, let word else { return }
+                guard following, playback.controls.isPlaying, let word else { return }
                 follow(word)
             }
     }

@@ -41,7 +41,7 @@ extension AppGraph {
             savedDraft: { await processing.savedDraft($0) },
             speakerModelsReady: { await processing.speakerModelsReady() },
             ownsPlayer: { playback.owns($0) }, play: { playback.play() }, playFrom: { playback.play($0, from: $1) },
-            showPlayer: { playback.show($0, owner: $1) }, leavePlayer: { playback.leave($0) },
+            showPlayer: { playback.requestShow($0, owner: $1) }, leavePlayer: { playback.leave($0) },
             playerBlocked: { playback.isBlocked }, recording: { recording.state.isActive },
             exportTranscript: { id, format throws(ExportError) in try await exports.exportTranscript(id, format: format) },
             copyAudio: { id throws(ExportError) in try await exports.copyAudio(id) },

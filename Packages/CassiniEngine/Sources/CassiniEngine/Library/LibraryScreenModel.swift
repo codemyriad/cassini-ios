@@ -106,6 +106,9 @@ public final class LibraryScreenModel {
     /// A local observable dependency for every row input, including capture/job changes behind ports.
     /// Views must not rely on transitive observation through those closures to refresh a retained row.
     private(set) var presentationRevision = 0
+    /// List structure excludes the recording clock. Only the live row/card reads that clock.
+    private var listContext = RowContext()
+    @ObservationIgnored private var contextBackup: Bool?
     @ObservationIgnored private var pendingSearch: Task<Void, Never>?
     @ObservationIgnored private var pendingNotes: Task<Void, Never>?
     @ObservationIgnored private var pendingContext: Task<Void, Never>?
@@ -137,9 +140,15 @@ public final class LibraryScreenModel {
     }
 
     public var content: LibraryContent {
+        makeContent(context: RowContext(processing: ports.processing(), recording: ports.recording()))
+    }
+
+    /// Stable projection for a lazy list. Its active recording row supplies its duration in a leaf view.
+    public var listContent: LibraryContent { makeContent(context: listContext) }
+
+    private func makeContent(context: RowContext) -> LibraryContent {
         _ = presentationRevision
-        let processing = ports.processing(), now = ports.clock.now, calendar = ports.calendar
-        let context = RowContext(processing: processing, recording: ports.recording())
+        let now = ports.clock.now, calendar = ports.calendar
         let loading = ports.loading(), unavailable = ports.unavailable()
         let live = favoritesOnly ? index.entries.filter(\.note.isFavorite) : index.entries
         _ = day // a new local day rebuilds the sections, the relative dates and the date filter
@@ -386,10 +395,10 @@ private extension LibraryScreenModel {
     /// model's own observable revision, so lazy rows also refresh while another screen covers them.
     func observeContext() {
         pendingContext = nil
-        withObservationTracking {
-            _ = ports.processing()
-            _ = ports.recording()
-            _ = ports.cloudBackup()
+        let (context, backup) = withObservationTracking {
+            var context = RowContext(processing: ports.processing(), recording: ports.recording())
+            context.recordingElapsed = 0
+            return (context, ports.cloudBackup())
         } onChange: { [weak self] in
             if Thread.isMainThread {
                 MainActor.assumeIsolated { self?.contextChanged() }
@@ -397,7 +406,11 @@ private extension LibraryScreenModel {
                 Task { @MainActor [weak self] in self?.contextChanged() }
             }
         }
-        presentationRevision &+= 1
+        if listContext != context || contextBackup != backup {
+            listContext = context
+            contextBackup = backup
+            presentationRevision &+= 1
+        }
     }
 
     func contextChanged() {
