@@ -23,7 +23,9 @@ public enum SpeakerNaming {
             if case .confirmed = input.match { return voice.id }
             return NameMatch.same(voice.name, name) ? voice.id : nil
         }
-        let remember = rememberReason(input) == nil
+        // Eligibility is not consent. Keep an existing confirmed enrollment, but require an explicit
+        // opt-in for every new voice, independently of the automatic naming preference.
+        let remember = confirmedVoice(input) != nil && rememberReason(input) == nil
         return NamingState(input: input, name: name, boundVoiceID: bound, remember: remember, initialName: name,
                            initialBound: bound, initialRemember: remember)
     }

@@ -57,7 +57,7 @@ import CassiniNotebook
         #expect(sheet.draft)
         #expect(sheet.quote == "Lunga")
         #expect(!sheet.canSample, "a running job holds the audio: no sample plays")
-        send(model, .nameChanged("Luca"), .save)
+        send(model, .rememberToggled(true), .nameChanged("Luca"), .save)
         await model.settle()
         #expect(fake.draftWrites == [[.draftName(speakerID: "s1", name: "Luca", voice: .new, confirm: false, score: 1)]])
         #expect(fake.namingWrites.isEmpty, "a draft never rewrites the note")
@@ -75,9 +75,9 @@ import CassiniNotebook
     @Test func theNameSheetAsksAboutTheSamePersonThenEnrolsANewVoice() async throws {
         let model = await open()
         let opened = SpeakerNaming.ui(try #require(model.state))
-        #expect(opened.name == "" && opened.remember)
+        #expect(opened.name == "" && !opened.remember)
 
-        send(model, .nameChanged("Anna"))
+        send(model, .rememberToggled(true), .nameChanged("Anna"))
         let asking = SpeakerNaming.ui(try #require(model.state))
         #expect(asking.samePerson == "Anna Ricci")
         #expect(asking.save == .blockedByQuestion)
@@ -92,11 +92,20 @@ import CassiniNotebook
         #expect(actions.all.last == .close)
     }
 
+    @Test func savingANameWithoutOptingInWritesNoVoice() async throws {
+        let model = await open()
+        #expect(!SpeakerNaming.ui(try #require(model.state)).remember)
+        send(model, .nameChanged("John"), .save)
+        await model.settle()
+        #expect(fake.namingWrites == [[.relabel(speakerID: "b", name: "John")]])
+        #expect(actions.all == [.close])
+    }
+
     /// Below iOS 26 the sheet reports each keystroke from the field's binding and again from its `onChange`: the second
     /// report of the same name keeps the answered question and the picked voice.
     @Test func aNameReportedTwiceIsTheSameAsOnce() async throws {
         let model = await open()
-        send(model, .nameChanged("Anna Ricci"), .samePerson)
+        send(model, .rememberToggled(true), .nameChanged("Anna Ricci"), .samePerson)
         let answered = try #require(model.state)
         #expect(answered.boundVoiceID == anna.id)
         send(model, .nameChanged("Anna Ricci"))

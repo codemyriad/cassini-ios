@@ -71,13 +71,17 @@ final class SpeakerNamingFlowTests: XCTestCase {
         let field = app.textFields["speakerNameField"]
         XCTAssertTrue(field.waitForExistence(within: 5))
         field.tap()
+        let remember = app.switches["rememberVoice"]
+        XCTAssertTrue(remember.waitForExistence(within: 5))
+        XCTAssertEqual(remember.value as? String, "0")
+        remember.tap()
+        field.tap()
         field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 10) + "Sam")
         let samePerson = app.buttons["questionYes"]
         XCTAssertTrue(samePerson.waitForExistence(within: 20), "the field holds \(String(describing: field.value))")
         XCTAssertTrue(element(app, containing: "Sam Rivera is already a saved voice.").waitForExistence(within: 20))
         XCTAssertFalse(element(app, containing: "Is this the same person?").exists)
         XCTAssertTrue(app.staticTexts["speakerQuote"].exists)
-        let remember = app.switches["rememberVoice"]
         XCTAssertTrue(remember.exists)
         XCTAssertTrue(remember.label.contains("Future meetings will suggest Sam. The voiceprint never leaves this device."),
                       "automatic naming is off by default: \(remember.label)")
@@ -92,6 +96,44 @@ final class SpeakerNamingFlowTests: XCTestCase {
 
         XCTAssertTrue(app.textFields["speakerNameField"].waitForNonExistence(within: 20), "Save closes the sheet")
         XCTAssertTrue(element(app, containing: "Sam Rivera").waitForExistence(within: 20))
+    }
+
+    /// Declining automatic recognition does not consent to remembering a new voice.
+    @MainActor func testDecliningVoiceSetupLeavesRememberOffWhenNamingAnUnnamedSpeaker() {
+        let app = launchSpeakersSeed()
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        let settings = app.buttons["Settings"]
+        XCTAssertTrue(settings.waitForExistence(within: 5))
+        settings.tap()
+        let notNow = app.buttons["Not now"]
+        app.scroll(attempts: 8) { notNow.exists && notNow.isHittable }
+        XCTAssertTrue(notNow.isHittable)
+        notNow.tap()
+        let automatic = app.switches["Name strong voice matches automatically"]
+        app.scroll(attempts: 6) { automatic.exists && automatic.isHittable }
+        XCTAssertEqual(automatic.value as? String, "0")
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        let note = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "A quieter kind of productivity")).firstMatch
+        XCTAssertTrue(note.waitForExistence(within: 5))
+        note.tap()
+        let header = app.buttons["speakerHeader-w1"]
+        XCTAssertTrue(header.waitForExistence(within: 10))
+        header.tap()
+        let field = app.textFields["speakerNameField"]
+        XCTAssertTrue(field.waitForExistence(within: 5))
+        let remember = app.switches["rememberVoice"]
+        XCTAssertTrue(remember.exists && remember.isEnabled)
+        XCTAssertEqual(remember.value as? String, "0")
+        field.tap()
+        field.typeText("John")
+        XCTAssertEqual(remember.value as? String, "0")
+        app.buttons["saveSpeakerName"].tap()
+        XCTAssertTrue(field.waitForNonExistence(within: 10))
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "John, at")).firstMatch
+            .waitForExistence(within: 10))
+        header.tap()
+        XCTAssertTrue(field.waitForExistence(within: 5))
+        XCTAssertEqual(remember.value as? String, "0", "saving a name must not enroll the voice")
     }
 
     /// Without consent for the speaker models, Identify speakers opens the model download screen, which asks for those

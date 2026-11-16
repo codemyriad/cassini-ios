@@ -104,7 +104,9 @@ records their exact revisions.
   can name a speaker across all their passages, play a sample of their voice, merge two speakers, or reassign a
   passage.
 - **Saved voices.** Cassini can remember a named voice, suggest it in later notes ("Is this Sam Rivera?"), and keep
-  names over a Transcribe again. Automatic naming is optional and off by default. You can rename or forget a saved
+  names over a Transcribe again. On iOS, Remember this voice starts off for an unconfirmed speaker and requires
+  explicit opt-in (unlike Android’s eligibility default); existing confirmed voices stay remembered. This is separate
+  from the voice setup question. Automatic naming is optional and off by default. You can rename or forget a saved
   voice, forget everyone, or erase all voice data.
 - **Read and listen.** The playing word is highlighted, and tapping a word plays from there. You can skip 10 seconds
   back or forward, change the speed, and use the lock-screen and headphone controls. The playback position is kept

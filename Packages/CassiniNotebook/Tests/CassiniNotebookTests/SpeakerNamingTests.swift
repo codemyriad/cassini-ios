@@ -27,11 +27,11 @@ import Testing
 
     func effects(_ state: NamingState, _ event: NamingEvent) -> [NamingEffect] { SpeakerNaming.reduce(state, event).effects }
 
-    // ports: SpeakerNamingTest#aPlaceholderOpensEmptyWithRememberOnAndNothingToSave
-    @Test func aPlaceholderOpensEmptyWithRememberOnAndNothingToSave() {
+    // D-1071: iOS requires explicit remembering rather than Android’s eligibility default.
+    @Test func aPlaceholderOpensEmptyWithRememberOffAndNothingToSave() {
         let ui = SpeakerNaming.ui(SpeakerNaming.open(input()))
         #expect(ui.name == "")
-        #expect(ui.remember)
+        #expect(!ui.remember)
         #expect(ui.rememberEnabled)
         #expect(ui.save == .disabled)
         #expect(ui.ranked)
@@ -41,9 +41,28 @@ import Testing
         #expect(ui.placeholderNumber == 3)
     }
 
+    @Test(arguments: [false, true])
+    func savingANewNameRequiresExplicitRemembering(draft: Bool) throws {
+        let opened = SpeakerNaming.open(input(voices: [], draft: draft))
+        #expect(!opened.remember && !opened.initialRemember)
+        #expect(SpeakerNaming.ui(opened).rememberEnabled)
+        let named = try on(opened, .nameChanged("John"))
+        let labelOnly: NamingEffect = draft
+            ? .draftName(speakerID: "s3", name: "John", voice: nil, confirm: false, score: 1)
+            : .relabel(speakerID: "s3", name: "John")
+        #expect(effects(named, .save) == [labelOnly, .close])
+        let optedIn = try on(named, .rememberToggled(true))
+        let remembered: [NamingEffect] = draft
+            ? [.draftName(speakerID: "s3", name: "John", voice: .new, confirm: false, score: 1), .close]
+            : [labelOnly, .rememberVoice(speakerID: "s3", voiceID: nil, name: "John"), .close]
+        #expect(effects(optedIn, .save) == remembered)
+        #expect(effects(try on(optedIn, .rememberToggled(false)), .save) == [labelOnly, .close])
+        #expect(!SpeakerNaming.open(input(voices: [], draft: draft)).remember, "reopening needs a new opt-in")
+    }
+
     // ports: SpeakerNamingTest#aTypedFirstNameAsksAboutTheSamePersonAndBlocksSave
     @Test func aTypedFirstNameAsksAboutTheSamePersonAndBlocksSave() throws {
-        let state = try on(SpeakerNaming.open(input()), .nameChanged("anna"))
+        let state = try on(SpeakerNaming.open(input()), .rememberToggled(true), .nameChanged("anna"))
         let ui = SpeakerNaming.ui(state)
         #expect(ui.samePerson == "Anna Ricci")
         #expect(ui.save == .blockedByQuestion)
@@ -54,13 +73,13 @@ import Testing
 
     // ports: SpeakerNamingTest#accentsAndCaseDoNotMatterForTheSamePersonQuestion
     @Test func accentsAndCaseDoNotMatterForTheSamePersonQuestion() throws {
-        let state = try on(SpeakerNaming.open(input()), .nameChanged("  ELODIE "))
+        let state = try on(SpeakerNaming.open(input()), .rememberToggled(true), .nameChanged("  ELODIE "))
         #expect(SpeakerNaming.ui(state).samePerson == "Élodie Martin")
     }
 
     // ports: SpeakerNamingTest#samePersonBindsTheVoiceAndSaveEnrolsIntoIt
     @Test func samePersonBindsTheVoiceAndSaveEnrolsIntoIt() throws {
-        let state = try on(SpeakerNaming.open(input()), .nameChanged("Anna"), .samePerson)
+        let state = try on(SpeakerNaming.open(input()), .rememberToggled(true), .nameChanged("Anna"), .samePerson)
         let ui = SpeakerNaming.ui(state)
         #expect(ui.name == "Anna Ricci")
         #expect(ui.samePerson == nil)
@@ -71,7 +90,7 @@ import Testing
 
     // ports: SpeakerNamingTest#someoneElseKeepsTheTypedNameAndMakesANewVoice
     @Test func someoneElseKeepsTheTypedNameAndMakesANewVoice() throws {
-        let state = try on(SpeakerNaming.open(input()), .nameChanged("Anna"), .someoneElse)
+        let state = try on(SpeakerNaming.open(input()), .rememberToggled(true), .nameChanged("Anna"), .someoneElse)
         #expect(SpeakerNaming.ui(state).samePerson == nil)
         #expect(SpeakerNaming.ui(state).save == .enabled)
         #expect(effects(state, .save) == [.relabel(speakerID: "s3", name: "Anna"),
@@ -129,6 +148,7 @@ import Testing
     @Test func aConfirmedVoiceIsBoundAtOpenAndUnchangedMeansNothingToSave() {
         let state = SpeakerNaming.open(input(label: "Anna Ricci", match: .confirmed(voice: anna.id, score: 0.8)))
         #expect(state.boundVoiceID == anna.id)
+        #expect(state.remember)
         #expect(SpeakerNaming.ui(state).save == .disabled)
         #expect(SpeakerNaming.ui(state).notName == "Anna Ricci")
     }
@@ -151,7 +171,10 @@ import Testing
 
     // ports: SpeakerNamingTest#anAutoMatchIsConfirmedBySaveAndClearedWhenTheNameChangesWithoutRemember
     @Test func anAutoMatchIsConfirmedBySaveAndClearedWhenTheNameChangesWithoutRemember() throws {
-        let state = SpeakerNaming.open(input(label: "Luca Bianchi", match: .auto(voice: luca.id, score: 0.86)))
+        let opened = SpeakerNaming.open(input(label: "Luca Bianchi", match: .auto(voice: luca.id, score: 0.86)))
+        #expect(!opened.remember)
+        #expect(effects(opened, .save) == [.close])
+        let state = try on(opened, .rememberToggled(true))
         #expect(SpeakerNaming.ui(state).save == .enabled, "Save is enabled: the match is only automatic")
         #expect(effects(state, .save) == [.rememberVoice(speakerID: "s3", voiceID: luca.id, name: "Luca Bianchi"), .close])
         let renamed = try on(state, .rememberToggled(false), .nameChanged("Marco"))
@@ -209,9 +232,9 @@ import Testing
     @Test func aDraftSaveRenamesAndRemembersANewOrBoundVoice() throws {
         let draft = SpeakerNaming.open(input(draft: true))
         #expect(SpeakerNaming.ui(draft).draft)
-        let typed = try on(draft, .nameChanged("Giorgio"))
+        let typed = try on(draft, .rememberToggled(true), .nameChanged("Giorgio"))
         #expect(effects(typed, .save) == [.draftName(speakerID: "s3", name: "Giorgio", voice: .new, confirm: false, score: 1), .close])
-        let bound = try on(draft, .pickVoice(luca.id))
+        let bound = try on(draft, .rememberToggled(true), .pickVoice(luca.id))
         guard case .draftName(_, _, let voice, let confirm, _) = try #require(effects(bound, .save).first) else {
             Issue.record("not a draft name"); return
         }
@@ -262,7 +285,7 @@ import Testing
 
     /// The acceptance case of the plan: "Anna" typed against a saved "Anna Ricci" asks the same-person question.
     @Test func annaAgainstASavedAnnaRicciAsksTheSamePersonQuestion() throws {
-        let state = try on(SpeakerNaming.open(input(voices: [anna])), .nameChanged("Anna"))
+        let state = try on(SpeakerNaming.open(input(voices: [anna])), .rememberToggled(true), .nameChanged("Anna"))
         #expect(SpeakerNaming.samePerson(state)?.id == anna.id)
     }
 
@@ -282,7 +305,7 @@ import Testing
     @Test func aChangedQuoteIsPublishedWithoutChangingNamingRules() throws {
         var initial = input(voices: [anna])
         initial.quote = "Initial quote."
-        let opened = try on(SpeakerNaming.open(initial), .nameChanged("Anna"))
+        let opened = try on(SpeakerNaming.open(initial), .rememberToggled(true), .nameChanged("Anna"))
         #expect(SpeakerNaming.ui(opened).quote == "Initial quote.")
         #expect(SpeakerNaming.ui(opened).save == .blockedByQuestion)
 
