@@ -19,6 +19,66 @@ import CassiniNotebook
         }
     }
 
+    @MainActor @Observable final class ReadingModel {
+        var note: Note
+        let cache = TranscriptCache()
+        init(note: Note) { self.note = note }
+        var key: TranscriptCache.SealedKey { .init(note, voices: [], suggestions: []) }
+    }
+
+    /// Drive preparation explicitly so the pending rename spans real display frames, regardless of CPU speed.
+    private struct ReadingHost: View {
+        let reading: ReadingModel
+        let model: NoteScreenModel
+        var body: some View {
+            NoteReadingScroll(note: reading.note, mode: .reading, transcript: reading.cache.sealed(reading.key),
+                              subtitle: nil, matches: [], current: 0, model: model, cache: reading.cache,
+                              actions: TranscriptActions(), suggestion: { _ in nil })
+        }
+    }
+
+    private func readingScroll(in view: UIView) -> UIScrollView? {
+        if let scroll = view as? UIScrollView { return scroll }
+        return view.subviews.lazy.compactMap { self.readingScroll(in: $0) }.first
+    }
+
+    func testSpeakerRenameKeepsTheReadingTranscriptVisibleAndItsScrollOffset() async throws {
+        RenderProbe.reset()
+        let test = TestGraph(); defer { test.tearDown() }
+        let note = longNote(passages: 30)
+        try NoteRepository(root: test.root).save(note)
+        await test.graph.start()
+        let reading = ReadingModel(note: note)
+        await reading.cache.prepareSealed(reading.key)
+        let model = test.graph.noteScreens.model(note.id, query: nil)
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        window.rootViewController = UIHostingController(
+            rootView: ReadingHost(reading: reading, model: model).environment(test.graph))
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true }
+        await settle(window)
+        let scroll = try XCTUnwrap(readingScroll(in: window))
+        XCTAssertGreaterThan(scroll.contentSize.height, scroll.bounds.height * 3)
+        scroll.setContentOffset(CGPoint(x: 0, y: 1_200), animated: false)
+        await settle(window)
+        let offset = scroll.contentOffset.y
+        XCTAssertGreaterThan(offset, 1_000, "The rename happens well below the header")
+        let previous = reading.cache.sealed(reading.key)
+
+        reading.note.speakers?[0].name = "Grace"
+        await settle(window)
+        XCTAssertEqual(reading.cache.sealed(reading.key), previous, "The pending build still presents the transcript")
+        XCTAssertTrue(readingScroll(in: window) === scroll, "Keep the same scroll view")
+        XCTAssertGreaterThan(scroll.contentSize.height, offset + scroll.bounds.height, "Content never collapses to the header")
+        XCTAssertEqual(scroll.contentOffset.y, offset, accuracy: 1, "No clamping while the new names prepare")
+
+        await reading.cache.prepareSealed(reading.key)
+        await settle(window)
+        XCTAssertEqual(reading.cache.sealed(reading.key), NoteTranscripts.sealed(reading.note))
+        XCTAssertGreaterThan(scroll.contentSize.height, offset + scroll.bounds.height)
+        XCTAssertEqual(scroll.contentOffset.y, offset, accuracy: 1, "Publishing the rename preserves the reading position")
+    }
+
     /// Three hours of two speakers, a minute each, with word times: 120-word sentences make paragraphs of 120 words.
     private func longNote(passages: Int = 180) -> Note {
         var note = Note(title: "Long", audioFilename: "audio.caf")

@@ -7,6 +7,35 @@ import CassiniEngineTesting
 /// The app's player over a real library: positions saved to the note, the reload when the audio changes, and the
 /// failure state.
 @MainActor final class PlaybackStoreTests: XCTestCase {
+    func testAPendingNoteFileStatCannotTakeThePlayerBackFromASavedVoiceSample() async throws {
+        let test = TestGraph(); defer { test.tearDown() }
+        let note = try await seedNote(in: test)
+        let started = expectation(description: "Note file stat started")
+        var finishStat: CheckedContinuation<String?, Never>?
+        let playback = PlaybackStore(controller: test.graph.playback.controller, library: test.graph.library,
+                                     fileSignature: { _ in
+            await withCheckedContinuation { continuation in
+                finishStat = continuation
+                started.fulfill()
+            }
+        })
+        playback.requestShow(note, owner: PlaybackOwner())
+        await fulfillment(of: [started], timeout: 15)
+        let stat = try XCTUnwrap(finishStat)
+        let sampleID = UUID()
+        let sample = PlaybackSource(noteID: sampleID, url: test.root.appendingPathComponent("sample.caf"), title: "Voice")
+        playback.showImmediately(sample, at: 0, owner: PlaybackOwner())
+        XCTAssertTrue(playback.controller.playRange(sampleID, from: 0.2, to: 1))
+        XCTAssertTrue(playback.owns(sampleID))
+        let playingSample = playback.state.sample
+
+        stat.resume(returning: "note-file-signature")
+        await playback.settle()
+        XCTAssertTrue(playback.owns(sampleID), "Finishing the older Note request must not replace the sample")
+        XCTAssertEqual(playback.state.sample, playingSample)
+        XCTAssertTrue(playback.state.isPlaying)
+    }
+
     func testLeavingBeforeFilePreparationCompletesDoesNotReopenThePlayer() async throws {
         let test = TestGraph(); defer { test.tearDown() }
         let note = try await seedNote(in: test)

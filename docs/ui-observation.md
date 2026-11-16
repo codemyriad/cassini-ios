@@ -47,12 +47,15 @@ The UI remains native SwiftUI on iOS 18+, with existing iOS 26 glass and platfor
   concurrent executor, never in a view's body. View-owned tasks publish only uncancelled current
   results. Keys retain transcript timing provenance, speaker names/provenance/colors, saved voice
   names, suggestions, full draft state and search query. Theme is resolved by views from semantic
-  tokens, not cached colors. The cache is per Note screen. A growing draft keeps its last prepared
-  content while the next snapshot is built, avoiding temporary scroll-height collapse.
+  tokens, not cached colors. The cache is per Note screen. Sealed transcripts and growing drafts keep
+  their last prepared content while the next snapshot is built, avoiding temporary scroll-height
+  collapse during speaker edits or sealing. Nonblank searches retain their prepared hits until the
+  next result arrives; clearing search or removing the transcript hides those hits immediately.
 - Playback file size/modification-date reads now run off the main actor. The app's synchronous
   show command starts a preparation request; owner/generation checks prevent a departed or
   superseded screen from reopening its player. The metadata signature still detects rewritten
-  files at the same path. AVFoundation session/player operations retain their platform isolation.
+  files at the same path. Saved voice samples claim the player through the same store, invalidating
+  pending Note requests. AVFoundation session/player operations retain their platform isolation.
 
 ## Structure, accessibility and availability
 

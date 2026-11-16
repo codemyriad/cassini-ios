@@ -228,7 +228,7 @@ private struct PersonRow: View {
                 Button {
                     if playing { playback.stopSample(); playingVoiceID = nil }
                     else {
-                        playback.controller.show(sample.source, at: sample.savedPosition, owner: owner)
+                        playback.showImmediately(sample.source, at: sample.savedPosition, owner: owner)
                         let started = playback.controller.playRange(sample.source.noteID, from: sample.start, to: sample.end)
                         playingVoiceID = started ? person.id : nil
                     }

@@ -37,8 +37,10 @@ import CassiniNotebook
 
     public var shownSealed: NoteTranscript { sealedValue }
 
+    /// This cache belongs to one note screen. Keep its content (and scroll extent) while names, voices,
+    /// suggestions or newly sealed words prepare. Removing the transcript still takes effect immediately.
     public func sealed(_ key: SealedKey) -> NoteTranscript {
-        key == sealedKey ? sealedValue : .empty
+        key.transcript.isEmpty ? .empty : sealedValue
     }
 
     /// Keep the last completed draft while its next snapshot prepares, so the scroll content never collapses
@@ -46,13 +48,22 @@ import CassiniNotebook
     public func draft(_ key: DraftState) -> NoteTranscript { draftValue }
 
     public func matches(_ key: SearchKey) -> [TranscriptMatch] {
-        key == searchKey ? searchValue : []
+        canSearch(key) ? searchValue : []
+    }
+
+    private func canSearch(_ key: SearchKey) -> Bool {
+        !key.transcript.isEmpty && !key.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     public func prepareSealed(_ key: SealedKey) async {
         guard !Task.isCancelled else { return }
         sealedRequest = key
         guard key != sealedKey else { return }
+        if key.transcript.isEmpty {
+            sealedValue = .empty
+            sealedKey = key
+            return
+        }
         let value = await Self.buildSealed(key)
         guard !Task.isCancelled, sealedRequest == key else { return }
         sealedValue = value
@@ -73,6 +84,12 @@ import CassiniNotebook
         guard !Task.isCancelled else { return }
         searchRequest = key
         guard key != searchKey else { return }
+        // Clearing search must also invalidate any pending result before yielding to another task.
+        guard canSearch(key) else {
+            searchValue = []
+            searchKey = key
+            return
+        }
         let value = await Self.buildMatches(key)
         guard !Task.isCancelled, searchRequest == key else { return }
         searchValue = value

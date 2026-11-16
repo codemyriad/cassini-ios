@@ -12,9 +12,12 @@ import CassiniNotebook
     @ObservationIgnored private var preparation = 0
     @ObservationIgnored private var preparing: Task<Void, Never>?
     @ObservationIgnored private var preparingOwner: PlaybackOwner?
+    @ObservationIgnored private let fileSignature: @MainActor (URL) async -> String?
 
-    init(controller: PlaybackController, library: LibraryStore, seekProbe: PlaybackSeekProbe? = nil) {
+    init(controller: PlaybackController, library: LibraryStore, seekProbe: PlaybackSeekProbe? = nil,
+         fileSignature: @escaping @MainActor (URL) async -> String? = { await PlaybackStore.signature(of: $0) }) {
         self.controller = controller; self.library = library; self.seekProbe = seekProbe
+        self.fileSignature = fileSignature
     }
 
     convenience init(playback: any AudioPlayback, library: LibraryStore, preview: NotePreview? = nil) {
@@ -51,6 +54,13 @@ import CassiniNotebook
         await prepare(note, owner: owner, request: beginPreparation(owner))
     }
 
+    /// Saved voices already has a source. Claim the player before a pending Note file stat can finish.
+    func showImmediately(_ source: PlaybackSource, at position: TimeInterval, owner: PlaybackOwner) {
+        preparation &+= 1
+        preparingOwner = nil
+        controller.show(source, at: position, owner: owner)
+    }
+
     private func beginPreparation(_ owner: PlaybackOwner) -> Int {
         preparation &+= 1
         preparingOwner = owner
@@ -63,7 +73,7 @@ import CassiniNotebook
             controller.leave(owner)
             return
         }
-        let signature = await Self.signature(of: url)
+        let signature = await fileSignature(url)
         guard !Task.isCancelled, preparation == request else { return }
         preparingOwner = nil
         let source = PlaybackSource(noteID: note.id, url: url, title: note.title, signature: signature)
