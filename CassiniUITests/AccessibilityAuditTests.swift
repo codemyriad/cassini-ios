@@ -232,6 +232,42 @@ final class AccessibilityAuditTests: XCTestCase {
     @MainActor func testNoTextIsClippedInFrench() { auditClipping(language: "fr", region: "fr_FR") }
     @MainActor func testNoTextIsClippedInBrazilianPortuguese() { auditClipping(language: "pt-BR", region: "pt_BR") }
 
+    @MainActor func testSettingsAboutCardWrapsAtLargestTextSizeInAuditLanguages() {
+        auditSettingsAboutAtLargestTextSize()
+    }
+
+    @MainActor func testIPadSettingsAboutCardWrapsAtLargestTextSizeInAuditLanguages() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad, "a wide window")
+        auditSettingsAboutAtLargestTextSize()
+    }
+
+    @MainActor private func auditSettingsAboutAtLargestTextSize() {
+        defer { XCUIApplication().terminate() }
+        for (language, region) in [("en", "en_US"), ("fr", "fr_FR"), ("pt-BR", "pt_BR")] {
+            let app = settings(Self.largestText + ["-AppleLanguages", "(\(language))", "-AppleLocale", region])
+            let about = app.buttons["aboutRow"]
+            XCTAssertTrue(app.scroll(attempts: 12) {
+                about.exists && about.isHittable && app.frame.contains(about.frame)
+                    && about.frame.minY >= app.navigationBars.firstMatch.frame.maxY
+            }, "The About card is not visible at the largest text size in \(language)")
+            var previousFrame: CGRect?
+            XCTAssertTrue(poll(within: uiWaitFloor) {
+                guard about.exists, about.isHittable else { previousFrame = nil; return false }
+                let frame = about.frame
+                defer { previousFrame = frame }
+                return previousFrame == frame
+            }, "The About card did not settle after scrolling")
+            let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+            screenshot.name = "largest-about-before-audit-\(language)"
+            screenshot.lifetime = .keepAlways
+            add(screenshot)
+            // Exercise the card below the fold at the actual largest size. Do not apply the
+            // iOS 18 List prediction allowance used by the default-size audits.
+            audit(app, screen: "largest-about-\(language)", .textClipped)
+            app.terminate()
+        }
+    }
+
     @MainActor private func auditClipping(language: String, region: String) {
         defer { XCUIApplication().terminate() }
         let screens: [(String, @MainActor ([String]) -> XCUIApplication)] = [
@@ -300,7 +336,7 @@ enum AuditFilter {
     /// removing the privacy line, the footer or the Forget section leaves both; hiding the navigation bar or the back
     /// button leaves them. Settings was attributed by analogy (same List rows, same two issues, unchanged by the
     /// navigation-bar experiments); its parts were not removed one by one. With the app's own bar each screen reports at
-    /// most two on Saved voices and three on Settings (`listRowLimit`); the next issue fails.
+    /// most two on Saved voices and four on the Settings map (`listRowLimit`); the next issue fails.
     /// The largest-size test (`testNoTextIsClippedAtTheLargestTextSize`)
     /// does not use this pass, but it is no full backstop: at AX5 Saved voices still reports one unattributed issue,
     /// unexplained, which `isNavigationTitle` lets through though the title is not cut (125 pt in a 393 pt bar). iOS 26
@@ -311,7 +347,13 @@ enum AuditFilter {
     /// On iOS 18.2, fresh-process Settings audits also report a third identical prediction: reproduced in the
     /// full PR #150 gate and in an isolated audit. Its attached screenshot shows wrapping labels, and the full
     /// largest-text audit passes without this allowance. Keep the extra prediction limited to Settings.
-    static func listRowLimit(settings: Bool) -> Int { settings ? 3 : 2 }
+    /// The D103 map's About card adds a fourth prediction at the default size on iOS 18.2
+    /// (PR #166 run 43986086225). Removing only that card removes the fourth issue; explicit vertical
+    /// sizing does not. Its adaptive layout gives long labels more width at accessibility sizes.
+    /// `testSettingsAboutCardWrapsAtLargestTextSizeInAuditLanguages` and its iPad counterpart bring the
+    /// whole card into view at AX5 in English, French and Brazilian Portuguese, retain screenshots,
+    /// and audit it without this allowance. Any attributed issue still fails.
+    static func listRowLimit(settings: Bool) -> Int { settings ? 4 : 2 }
 
     @MainActor static func isListRowPrediction(_ issue: XCUIAccessibilityAuditIssue) -> Bool {
         ProcessInfo.processInfo.operatingSystemVersion.majorVersion < 26

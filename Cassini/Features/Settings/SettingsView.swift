@@ -92,6 +92,7 @@ private struct SettingsForm: View {
     @Environment(SettingsAdapter.self) private var ports
     @Environment(Router.self) private var router
     @Environment(\.locale) private var locale
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     private var pad: Bool { UIDevice.current.userInterfaceIdiom == .pad }
     private var privacy: String {
@@ -140,7 +141,9 @@ private struct SettingsForm: View {
             } header: { Text(SettingsPhase2Copy.app) }
             Section {
                 Button { router.push(.settingsPage(.about)) } label: {
-                    HStack(spacing: 12) {
+                    (typeSize.isAccessibilitySize
+                     ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12))
+                     : AnyLayout(HStackLayout(spacing: 12))) {
                         OrbitMark(size: 36)
                         SettingsRowLabel(title: SettingsPhase2Copy.nameVersion.replacingOccurrences(of: "{version}", with: model.version),
                                          subtitle: SettingsPhase2Copy.aboutSubtitle)
