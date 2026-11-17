@@ -28,6 +28,8 @@ public enum Route: Codable, Hashable, Sendable {
     case library
     case note(UUID, query: String? = nil, start: NoteStartAction? = nil)
     case settings
+    case settingsPage(SettingsPage)
+    case licenseText(LicenseEntry)
     case savedVoices
     case trash
     case licenses
@@ -76,4 +78,9 @@ extension Array where Element == Route {
         removeLast(count - shared)
         append(contentsOf: target.dropFirst(shared))
     }
+}
+
+/// The second layer of the phone Settings map.
+public enum SettingsPage: String, Codable, Hashable, Sendable {
+    case transcription, speakers, backup, about
 }

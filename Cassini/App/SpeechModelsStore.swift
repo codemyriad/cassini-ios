@@ -31,8 +31,11 @@ import CassiniWhistle
     @ObservationIgnored private let verify: @Sendable () throws -> Bool
     @ObservationIgnored private let verifyBundle: @Sendable () async -> Bool
     @ObservationIgnored private var verificationTask: Task<Void, Never>?
+    @ObservationIgnored private var speechInstalling = false
+    @ObservationIgnored private var installationRevision = 0
     @ObservationIgnored var onChange: @MainActor () -> Void = {}
     @ObservationIgnored var onDownload: @MainActor () -> Void = {}
+    private(set) var whistleAvailable: Bool
     private(set) var installation: ParakeetInstallation = .missing
     private(set) var suggestion: ParakeetSuggestionState
     private(set) var promotionVisible = false
@@ -46,6 +49,7 @@ import CassiniWhistle
          verify: (@Sendable () throws -> Bool)? = nil,
          verifyBundle: @escaping @Sendable () async -> Bool = { await WhistleRuntime.verifyBundle() }) {
         self.verifyBundle = verifyBundle
+        whistleAvailable = whistle.available
         self.root = root; self.defaults = defaults; self.storage = storage; self.whistle = Mutex(whistle)
         self.physicalMemory = physicalMemory; self.availableMemory = availableMemory; self.platform = platform
         parakeetCapable = parakeetLinked && SpeechCapability.parakeetCapable(physicalMemory: physicalMemory)
@@ -65,11 +69,22 @@ import CassiniWhistle
     func verifyBundledSpeech() async {
         let verified = await verifyBundle()
         whistle.withLock { $0.bundleVerified = verified }
-        let recognizer = selectedRecognizer().rawValue
+        whistleAvailable = whistleCapability.available
+        let recognizer = displayRecognizer.rawValue
         Logger(subsystem: "io.codemyriad.cassini", category: "WhistleBundle")
             .notice("Speech selection after bundle verification; verified=\(verified, privacy: .public) physicalMemory=\(self.physicalMemory, privacy: .public) recognizer=\(recognizer, privacy: .public)")
         onChange()
     }
+
+    /// Rendering reads published installation facts, never file existence or free space.
+    private var displayPolicy: SpeechModelPolicy {
+        SpeechModelPolicy(whistleAvailable: whistleAvailable, parakeetLinked: parakeetCapable,
+            physicalMemory: physicalMemory, availableMemory: availableMemory(), parakeetInstallation: installation,
+            availableDiskBytes: 0, downloadPlan: ModelPlan([]))
+    }
+
+    var displayRecognizer: SpeechRecognizer { displayPolicy.recognizer(preference: preference, platform: platform) ?? .appleSpeech }
+    var canChooseParakeet: Bool { installation == .verified && displayPolicy.parakeetRunnable }
 
     var policy: SpeechModelPolicy {
         SpeechModelPolicy(whistleAvailable: whistle.withLock { $0.available }, parakeetLinked: parakeetCapable,
@@ -94,7 +109,7 @@ import CassiniWhistle
     }
 
     func choose(_ recognizer: SpeechRecognizer) {
-        guard recognizer == .whistle && whistle.withLock({ $0.available }) || recognizer == .parakeet && policy.parakeetInstallation == .verified && policy.parakeetRunnable else { return }
+        guard recognizer == .whistle && whistle.withLock({ $0.available }) || recognizer == .parakeet && canChooseParakeet else { return }
         preference = recognizer == .whistle ? .whistle : .parakeet
         defaults.set(preference.rawValue, forKey: Key.preference)
         let value = preference
@@ -138,12 +153,14 @@ import CassiniWhistle
     }
 
     func installerChanged(_ status: PinnedModelInstaller.Status) {
-        switch status {
-        case .installing(let parts, _, _) where parts.contains(.speech):
+        let wasInstalling = speechInstalling
+        if case .installing(let parts, _, _) = status { speechInstalling = parts.contains(.speech) }
+        else { speechInstalling = false }
+        if wasInstalling != speechInstalling { installationRevision += 1 }
+        if speechInstalling {
             if installation != .verified { publish(.installing) }
-        case .idle: refresh()
-        default: break
-        }
+        } else if case .idle = status { refresh() }
+        else if wasInstalling { refresh() }
     }
 
     /// Resolve installed-model verification before releasing cold-start queue/recording/import admission.
@@ -151,31 +168,52 @@ import CassiniWhistle
     func verifyInstalledSpeech() async {
         refresh()
         if preference == .whistle && whistleCapability.available { return }
-        await verificationTask?.value
+        await settleVerification()
     }
 
-    /// A size-matching directory is only a candidate. An explicit Whistle choice remains usable while this check
-    /// runs; automatic/Parakeet cold-start admission awaits it through verifyInstalledSpeech().
+    /// Read file facts off-main before changing the displayed state. Only unchecked files need a checking state;
+    /// routine refreshes preserve the installed choice, its one-time promotion and an active download's progress.
     func refresh() {
-        guard verificationTask == nil else { return }
-        guard parakeetCapable, installed() else { publish(.missing); return }
-        if verified() { publish(.verified); return }
-        publish(.checking)
-        let verify = verify
+        guard verificationTask == nil, !speechInstalling else { return }
+        guard parakeetCapable else { publish(.missing); return }
+        let verify = verify, installed = installed, verified = verified
+        let revision = installationRevision
         verificationTask = Task { [weak self] in
-            let result = await withCheckedContinuation { continuation in
-                DispatchQueue.global(qos: .utility).async {
-                    do { continuation.resume(returning: Result<Bool, any Error>.success(try verify())) }
-                    catch { continuation.resume(returning: .failure(error)) }
-                }
+            let precheck = await Self.fileWork {
+                guard installed() else { return .missing }
+                return verified() ? .verified : .checking
             }
             guard let self else { return }
-            self.verificationTask = nil
-            switch result {
-            case .success: self.publish(self.installed() && self.verified() ? .verified : .missing)
-            case .failure: self.publish(self.installed() && self.verified() ? .verified : .unavailable)
+            defer {
+                self.verificationTask = nil
+                // An install that began/ended during this read supersedes it. Once idle, read the new files.
+                if revision != self.installationRevision { self.refresh() }
             }
+            guard revision == self.installationRevision, !self.speechInstalling else { return }
+            guard precheck == .checking else { self.publish(precheck); return }
+            self.publish(.checking)
+            let result = await Self.fileWork {
+                do {
+                    _ = try verify()
+                    return installed() && verified() ? .verified : .missing
+                } catch {
+                    return installed() && verified() ? .verified : .unavailable
+                }
+            }
+            guard revision == self.installationRevision, !self.speechInstalling else { return }
+            self.publish(result)
         }
+    }
+
+    nonisolated private static func fileWork(_ work: @escaping @Sendable () -> ParakeetInstallation) async -> ParakeetInstallation {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .utility).async { continuation.resume(returning: work()) }
+        }
+    }
+
+    /// Includes a replacement verification when an install superseded an earlier precheck.
+    func settleVerification() async {
+        while let verificationTask { await verificationTask.value }
     }
 
     private func publish(_ value: ParakeetInstallation) {

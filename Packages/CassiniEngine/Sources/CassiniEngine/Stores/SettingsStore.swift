@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import Synchronization
 import CassiniNotebook
 
 /// The app's preferences, read once from `UserDefaults` and written back on every change. Keys are `SettingsKeys`;
@@ -8,6 +9,32 @@ import CassiniNotebook
 public final class SettingsStore {
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let clock: any AppClock
+    @ObservationIgnored nonisolated private let recognition = Mutex(true)
+
+    @ObservationIgnored private weak var draftNames: DraftNamesStore?
+    @ObservationIgnored private var recognitionCleanup: Task<Void, Never>?
+
+    /// Bind before restoring jobs. The flag changes immediately; paused drafts are scrubbed on a worker.
+    public func bindDraftNames(_ drafts: DraftNamesStore?) {
+        draftNames = drafts
+        updateDraftRecognition()
+    }
+
+    public func settleDraftRecognition() async { await recognitionCleanup?.value }
+
+    private func updateDraftRecognition() {
+        guard let drafts = draftNames else { return }
+        drafts.setRecognitionAllowed(recogniseSavedVoices)
+        guard !recogniseSavedVoices else { return }
+        let previous = recognitionCleanup
+        recognitionCleanup = Task.detached(priority: .utility) {
+            await previous?.value
+            drafts.mutateAll { $0.withoutUnconfirmedMatches() }
+        }
+    }
+
+    /// Inference callbacks see the current switch without hopping to or blocking the main actor.
+    public nonisolated var allowsSavedVoiceRecognition: Bool { recognition.withLock { $0 } }
 
     public private(set) var cloudBackup: Bool
     public private(set) var includeSavedVoicesInBackups: Bool
@@ -36,6 +63,13 @@ public final class SettingsStore {
     public var speechLanguage: String { didSet { defaults.set(speechLanguage, forKey: SettingsKeys.speechLanguage) } }
     public var autoTranscribe: Bool { didSet { defaults.set(autoTranscribe, forKey: SettingsKeys.autoTranscribe) } }
     public var identifySpeakers: Bool { didSet { defaults.set(identifySpeakers, forKey: SettingsKeys.identifySpeakers) } }
+    public var recogniseSavedVoices: Bool {
+        didSet {
+            recognition.withLock { $0 = recogniseSavedVoices }
+            defaults.set(recogniseSavedVoices, forKey: SettingsKeys.recogniseSavedVoices)
+            updateDraftRecognition()
+        }
+    }
     public var automaticallyNameVoices: Bool {
         didSet { defaults.set(automaticallyNameVoices, forKey: SettingsKeys.automaticallyNameVoices) }
     }
@@ -63,6 +97,7 @@ public final class SettingsStore {
         speechLanguage = storedLanguage.map { Locale(identifier: $0).identifier(.bcp47) } ?? defaultLanguage
         autoTranscribe = defaults.object(forKey: SettingsKeys.autoTranscribe) as? Bool ?? true
         identifySpeakers = defaults.object(forKey: SettingsKeys.identifySpeakers) as? Bool ?? true
+        recogniseSavedVoices = defaults.object(forKey: SettingsKeys.recogniseSavedVoices) as? Bool ?? true
         automaticallyNameVoices = defaults.bool(forKey: SettingsKeys.automaticallyNameVoices)
         modelsConsentAt = Self.date(defaults, SettingsKeys.modelsConsentAt)
         modelsDeclinedAt = Self.date(defaults, SettingsKeys.modelsDeclinedAt)
@@ -73,6 +108,7 @@ public final class SettingsStore {
         finalizationMs = (defaults.object(forKey: SettingsKeys.finalizationMs) as? NSNumber)?.int64Value
         trashLastPurgeAt = Self.date(defaults, SettingsKeys.trashLastPurgeAt)
         voicesGeneration = defaults.integer(forKey: SettingsKeys.voicesGeneration)
+        recognition.withLock { $0 = recogniseSavedVoices }
     }
 
     /// Whether the speech model may be downloaded.

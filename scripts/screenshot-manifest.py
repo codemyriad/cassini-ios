@@ -32,6 +32,10 @@ SHOTS = {
     "20-library-scrolled": ("Scrolled Library", "Library-iOSScrolled", "test20LibraryScrolled", "statuses"),
     "21-one-speaker-row": ("One-speaker row", "Row-iOS", "test21OneSpeakerRow", "oneSpeaker"),
 
+    "22-transcription-settings": ("Transcription settings", "P2Transcription-Phones", "test22TranscriptionSettings", "voices"),
+    "23-speaker-settings": ("Speaker settings", "P2Speakers-Phones", "test23SpeakerSettings", "voices"),
+    "24-about-settings": ("About", "P2About-Phones", "test24AboutSettings", "voices"),
+
     "01-split-landscape": ("Split view landscape", "Meeting", "testSplitViewLandscape", "reading"),
     "02-split-portrait": ("Split view portrait", "Meeting", "testSplitViewPortrait", "reading"),
 }

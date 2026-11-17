@@ -126,7 +126,7 @@ import CassiniNotebook
             // A note's prints are kept even if the saved voices can't be changed now; the note keeps working without.
             let kept = (try? await store.appendPrints(prints, noteID: id, ifForgottenCount: count)) ?? true
             if kept, generation == settings.voicesGeneration {
-                matching = AnalysisMatches.of(note, turns: turns, prints: prints, savedVoices: savedVoices,
+                matching = AnalysisMatches.of(note, turns: turns, prints: prints, savedVoices: settings.recogniseSavedVoices ? savedVoices : [],
                                               earlierPrints: earlier,
                                               trashed: Set(library.notes.filter { $0.trashedAt != nil }.map(\.id)),
                                               excluded: excluded)

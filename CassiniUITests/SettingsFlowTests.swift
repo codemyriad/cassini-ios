@@ -51,56 +51,105 @@ final class SettingsFlowTests: XCTestCase {
     /// `testOnAParakeetDeviceTheSpeechRowShowsItsDownload`.
     @MainActor func testSettingsShowsTheModelRowsTheBannerTheCountsAndTheBundleVersion() {
         let app = openSettings()
-        // In the iPad split view the list fills in after the navigation bar.
-        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "App language")).firstMatch
-            .waitForExistence(within: 5))
-        XCTAssertTrue(app.staticTexts["Notifications are off"].waitForExistence(within: 5))
-        XCTAssertTrue(app.buttons["Turn on"].exists)
-        XCTAssertEqual(app.descendants(matching: .any)["speechLanguagePicker"].exists, DeviceUnderTest.appleSpeech,
-                       "Apple Speech takes a language: Transcription offers the picker, and only then")
-        let speech = element(app, startingWith: "Speech recognition")
-        reveal(speech, in: app)
-        if DeviceUnderTest.appleSpeech {
-            XCTAssertTrue(speech.label.contains("Ready"), speech.label)
-            XCTAssertTrue(speech.label.contains("Managed by iOS"), speech.label)
-        } else {
-            XCTAssertEqual(speech.label, "Speech recognition, Not available")
-        }
-        XCTAssertFalse(row(app, startingWith: "Speech recognition").exists, "a Ready or Not available row is not a button")
-        XCTAssertTrue(row(app, startingWith: "Telling speakers apart").label.contains("Not downloaded"))
-        XCTAssertTrue(row(app, startingWith: "Telling speakers apart").label.contains("88 MB"))
-        let modelsFooter = app.staticTexts["Transcription runs on this device."]
-        reveal(modelsFooter, in: app)
-        XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", "never leaves")).firstMatch.exists)
-        let voices = row(app, startingWith: "Saved voices")
-        reveal(voices, in: app)
-        XCTAssertTrue(voices.label.contains("None yet"), voices.label)
-        // With its value: on iPad the library's toolbar beside Settings has a Recently Deleted button too.
-        XCTAssertTrue(row(app, startingWith: "Recently Deleted,").label.contains("Empty"))
+        XCTAssertTrue(app.waitForSettingsPage("map"))
+        XCTAssertTrue(app.buttons["transcriptionRow"].exists)
+        XCTAssertTrue(app.buttons["speakersRow"].label.contains("On"))
+        XCTAssertTrue(app.buttons["savedVoicesRow"].label.contains("0 people"))
+        XCTAssertTrue(app.buttons["recentlyDeletedRow"].label.contains("0 meetings"))
+        XCTAssertFalse(app.switches.firstMatch.exists, "Choices live one level below the map")
+        XCTAssertFalse(app.staticTexts["On-device models"].exists)
         let version = element(app, startingWith: "Cassini talk 0.1.0")
         reveal(version, in: app)
+        let language = app.buttons["appLanguageRow"]
+        reveal(language, in: app)
+        XCTAssertTrue(language.label.contains("English"))
+        let notifications = element(app, startingWith: "Notifications are off")
+        reveal(notifications, in: app)
+        XCTAssertTrue(notifications.exists)
+        XCTAssertTrue(app.buttons["Turn on"].exists)
+        app.scroll(up: false) { app.buttons["transcriptionRow"].isHittable }
+        openPage(app, "transcriptionRow", title: "Transcription")
+        XCTAssertEqual(app.descendants(matching: .any)["speechLanguagePicker"].exists, DeviceUnderTest.appleSpeech)
+        let speech = element(app, startingWith: "Speech recognition")
+        XCTAssertTrue(speech.waitForExistence(within: 15))
+        if DeviceUnderTest.appleSpeech {
+            XCTAssertTrue(speech.label.contains("Ready"))
+            XCTAssertTrue(speech.label.contains("Managed by iOS"))
+        } else { XCTAssertEqual(speech.label, "Speech recognition, Not available") }
+    }
+
+    @MainActor private func openPage(_ app: XCUIApplication, _ id: String, title: String) {
+        let button = app.buttons[id]
+        reveal(button, in: app)
+        button.tap()
+        XCTAssertTrue(app.navigationBars[title].waitForExistence(within: 15))
+        XCTAssertTrue(app.waitForSettingsPage(String(id.dropLast(3))))
+    }
+
+    @MainActor func testTranscriptionDownloadShowsProgressAndCancelWithoutReopeningConsent() {
+        let app = openSettings(["--d78", "--d78-capable", "--hold-model-download"])
+        openPage(app, "transcriptionRow", title: "Transcription")
+        let download = app.buttons["downloadParakeet"]
+        XCTAssertTrue(download.waitForEnabled(within: 15))
+        download.tap()
+        XCTAssertTrue(app.buttons["Download"].waitForExistence(within: 15))
+        app.buttons["Download"].tap()
+        assertProgressAndCancel(app, page: "transcription", title: "Transcription", checkChoice: true)
+    }
+
+    @MainActor func testSpeakersDownloadShowsProgressAndCancelOnItsPage() {
+        let app = openSettings(["--parakeet", "--models-missing", "--hold-model-download"])
+        openPage(app, "speakersRow", title: "Speakers")
+        let selected = row(app, startingWith: "Telling speakers apart")
+        reveal(selected, in: app)
+        selected.tap()
+        XCTAssertTrue(app.buttons["Download"].waitForExistence(within: 15))
+        app.buttons["Download"].tap()
+        assertProgressAndCancel(app, page: "speakers", title: "Speakers", checkChoice: false)
+    }
+
+    @MainActor private func assertProgressAndCancel(_ app: XCUIApplication, page: String, title: String, checkChoice: Bool) {
+        XCTAssertTrue(app.navigationBars[title].waitForExistence(within: 15))
+        XCTAssertTrue(app.waitForSettingsPage(page))
+        let banner = app.descendants(matching: .any)["banner.DL_DOWNLOADING"]
+        reveal(banner, in: app)
+        XCTAssertTrue(banner.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "46%"))
+            .firstMatch.waitForExistence(within: 15))
+        if checkChoice {
+            app.scroll(up: false) { app.buttons["chooseParakeet"].isHittable }
+            XCTAssertFalse(app.buttons["chooseParakeet"].isEnabled)
+            XCTAssertFalse(app.buttons["downloadParakeet"].exists)
+            reveal(banner, in: app)
+        }
+        let cancel = app.buttons["Cancel"]
+        reveal(cancel, in: app)
+        cancel.tap()
+        // Cancellation publishes a positive journal event; absence is checked only after it.
+        XCTAssertTrue(app.staticTexts["uiTestState-modelInstallCancelled"].waitForValue("cancelled"))
+        XCTAssertFalse(banner.exists)
     }
 
     /// On a Parakeet device the speech row shows the model's precision and its download by the shared size rule, and
     /// Transcription has no Speech language picker: Parakeet hears the language.
     @MainActor func testOnAParakeetDeviceTheSpeechRowShowsItsDownload() {
         let app = openSettings(["--parakeet"])
+        openPage(app, "transcriptionRow", title: "Transcription")
         // The picker would sit above this toggle, in the same section: once the toggle is there, so would it be.
-        XCTAssertTrue(app.switches.matching(NSPredicate(format: "label BEGINSWITH %@", "Transcribe after recording"))
+        XCTAssertTrue(app.switches.matching(NSPredicate(format: "label BEGINSWITH %@", "Transcribe right away"))
             .firstMatch.waitForExistence(within: 5))
         XCTAssertFalse(app.descendants(matching: .any)["speechLanguagePicker"].exists)
         XCTAssertFalse(element(app, startingWith: "Speech language").exists)
         let speech = element(app, startingWith: "Speech recognition")
         reveal(speech, in: app)
         XCTAssertEqual(speech.label, "Speech recognition, INT8 · 444 MB, Ready")
-        XCTAssertTrue(row(app, startingWith: "Telling speakers apart").label.contains("88 MB"))
     }
 
     /// The iOS 18 facts on a device with no recognizer that can run: no Speech language picker and no "Managed by iOS";
     /// the speech row only says it is not available.
     @MainActor func testWithoutAppleSpeechOrAnotherRecognizerTheSpeechRowIsNotAvailable() {
         let app = openSettings(["--ios18-platform"])
-        XCTAssertTrue(app.switches.matching(NSPredicate(format: "label BEGINSWITH %@", "Transcribe after recording"))
+        openPage(app, "transcriptionRow", title: "Transcription")
+        XCTAssertTrue(app.switches.matching(NSPredicate(format: "label BEGINSWITH %@", "Transcribe right away"))
             .firstMatch.waitForExistence(within: 5))
         XCTAssertFalse(app.descendants(matching: .any)["speechLanguagePicker"].exists)
         XCTAssertFalse(element(app, startingWith: "Speech language").exists)
@@ -109,6 +158,8 @@ final class SettingsFlowTests: XCTestCase {
         reveal(speech, in: app)
         XCTAssertEqual(speech.label, "Speech recognition, Not available")
         XCTAssertFalse(row(app, startingWith: "Speech recognition").exists, "a Not available row is not a button")
+        app.navigationBars.buttons.firstMatch.tap()
+        openPage(app, "speakersRow", title: "Speakers")
         let speakers = row(app, startingWith: "Telling speakers apart")
         XCTAssertTrue(speakers.label.contains("88 MB"))
         // D59: the download screen does not point at the Speech language picker Settings hides.
@@ -124,6 +175,7 @@ final class SettingsFlowTests: XCTestCase {
     /// A Parakeet device without Ultra: its row is a button that opens the download screen with the sizes.
     @MainActor func testOnAParakeetDeviceAMissingSpeechModelOpensTheDownloadWithItsSize() {
         let app = openSettings(["--parakeet", "--models-missing"])
+        openPage(app, "transcriptionRow", title: "Transcription")
         let speech = row(app, startingWith: "Speech recognition")
         reveal(speech, in: app)
         XCTAssertEqual(speech.label, "Speech recognition, INT8 · 444 MB, Not downloaded")
@@ -140,6 +192,7 @@ final class SettingsFlowTests: XCTestCase {
     @MainActor func testEachSpeakerRowDownloadsOnlyTheSpeakerBundleWhileSpeechIsMissing() {
         for label in ["Telling speakers apart", "Recognising saved voices"] {
             let app = openSettings(["--parakeet", "--models-missing"])
+            openPage(app, "speakersRow", title: "Speakers")
             let selected = row(app, startingWith: label)
             reveal(selected, in: app)
             selected.tap()
@@ -150,10 +203,12 @@ final class SettingsFlowTests: XCTestCase {
                 .firstMatch.exists, "A speaker row must not add the missing speech model")
             XCTAssertFalse(app.staticTexts["speechLanguageLine"].exists)
             downloadAndAssertRequests(app, group: "speakers")
-            XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(within: 5))
+            XCTAssertTrue(app.navigationBars["Speakers"].waitForExistence(within: 5))
             let pending = element(app, startingWith: "Telling speakers apart")
             reveal(pending, in: app)
             XCTAssertTrue(pending.label.contains("Downloads with next transcription"), pending.label)
+            app.navigationBars.buttons.firstMatch.tap()
+            openPage(app, "transcriptionRow", title: "Transcription")
             XCTAssertTrue(row(app, startingWith: "Speech recognition").label.contains("Not downloaded"))
             app.terminate()
         }
@@ -162,23 +217,71 @@ final class SettingsFlowTests: XCTestCase {
     // ports: SettingsViewModelTest#onlyANotDownloadedOrAFailedRowOpensModelDownload (on the screen)
     @MainActor func testANotDownloadedRowOpensTheStandaloneDownload() {
         let app = openSettings()
+        openPage(app, "speakersRow", title: "Speakers")
         let speakers = row(app, startingWith: "Telling speakers apart")
         reveal(speakers, in: app)
         speakers.tap()
         XCTAssertTrue(app.staticTexts["Transcribe on this device"].waitForExistence(within: 5))
         XCTAssertTrue(app.buttons["Download"].exists, "with no note the screen offers a standalone Download")
         app.buttons["Download"].tap()
-        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(within: 5))
+        XCTAssertTrue(app.navigationBars["Speakers"].waitForExistence(within: 5))
         // The fake models install nothing: agreed to and still missing, the row waits for the next transcription.
         let pending = element(app, startingWith: "Telling speakers apart")
         reveal(pending, in: app)
         XCTAssertTrue(pending.label.contains("Downloads with next transcription"), pending.label)
     }
 
+    @MainActor func testInstalledModelChoiceKeepsItsSizeAndSurvivesRelaunch() {
+        let app = openSettings(["--d78", "--d78-capable", "--d78-verified"])
+        openPage(app, "transcriptionRow", title: "Transcription")
+        let whistle = app.buttons["chooseWhistle"], parakeet = app.buttons["chooseParakeet"]
+        XCTAssertTrue(parakeet.wait(until: NSPredicate(format: "selected == true"), within: 15))
+        XCTAssertTrue(app.staticTexts["installedParakeetSize"].label.contains("444 MB"))
+        XCTAssertFalse(app.buttons["downloadParakeet"].exists)
+        let promotion = app.staticTexts["New meetings now use Parakeet Ultra."]
+        XCTAssertTrue(app.scroll { promotion.exists && app.frame.contains(promotion.frame) },
+                      "The one-time announcement remains readable after loading: \(app.debugDescription)")
+        app.scroll(up: false) { whistle.isHittable }
+        whistle.tap()
+        XCTAssertTrue(whistle.wait(until: NSPredicate(format: "selected == true"), within: 15))
+        app.launchArguments.removeAll { $0 == "--reset-test-data" }
+        app.launchAndWait(fresh: true)
+        app.buttons["settingsButton"].tap()
+        openPage(app, "transcriptionRow", title: "Transcription")
+        XCTAssertTrue(whistle.wait(until: NSPredicate(format: "selected == true"), within: 15))
+        parakeet.tap()
+        XCTAssertTrue(parakeet.wait(until: NSPredicate(format: "selected == true"), within: 15))
+    }
+
+    @MainActor func testSpeakerChoicesPersistAndAboutOpensPrivacyDirectly() {
+        let app = openSettings()
+        openPage(app, "speakersRow", title: "Speakers")
+        let recognition = app.switches["recogniseSavedVoicesToggle"]
+        XCTAssertTrue(recognition.waitForValue("1"))
+        recognition.switches.firstMatch.tap()
+        XCTAssertTrue(recognition.waitForValue("0"))
+        XCTAssertEqual(app.switches["autoNameVoicesToggle"].value as? String, "0")
+        app.launchArguments = ["--ui-testing", "--seed", "library"]
+        app.launchAndWait(fresh: true)
+        app.buttons["settingsButton"].tap()
+        openPage(app, "speakersRow", title: "Speakers")
+        XCTAssertTrue(app.switches["recogniseSavedVoicesToggle"].waitForValue("0"))
+        app.navigationBars.buttons.firstMatch.tap()
+        openPage(app, "aboutRow", title: "About")
+        XCTAssertTrue(app.descendants(matching: .any)["aboutHelp"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["aboutSourceCode"].exists)
+        XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "{year}")).firstMatch.exists)
+        app.buttons["aboutPrivacy"].tap()
+        XCTAssertTrue(app.navigationBars["Privacy"].waitForExistence(within: 15))
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Cassini for iOS keeps"))
+            .firstMatch.waitForExistence(within: 15))
+    }
+
     // ports: SettingsBehaviourTest#licenceRowsOpenAndBackClosesTheText
     @MainActor func testLicenceRowsOpenTheirTextAndBackClosesIt() {
         let app = openSettings()
-        let notices = app.buttons["Source code and notices"]
+        openPage(app, "aboutRow", title: "About")
+        let notices = app.buttons["aboutLicences"]
         reveal(notices, in: app)
         notices.tap()
         XCTAssertTrue(app.navigationBars["Source code and notices"].waitForExistence(within: 5))
@@ -199,6 +302,6 @@ final class SettingsFlowTests: XCTestCase {
         app.navigationBars["Cassini talk"].buttons.element(boundBy: 0).tap()
         XCTAssertTrue(app.navigationBars["Source code and notices"].waitForExistence(within: 5))
         app.navigationBars["Source code and notices"].buttons.element(boundBy: 0).tap()
-        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(within: 5))
+        XCTAssertTrue(app.navigationBars["About"].waitForExistence(within: 5))
     }
 }

@@ -208,6 +208,7 @@ extension AppEnvironment {
         var environment = uiTesting(reset: arguments.contains("--reset-test-data"), seed: seed(in: arguments),
                   openFixture: fixture(in: arguments), modelsMissing: arguments.contains("--models-missing"),
                   modelDownloading: arguments.contains("--model-downloading"),
+                  holdModelDownload: arguments.contains("--hold-model-download"),
                   draftGrowing: arguments.contains("--draft-growing"),
                   draftSpeakerSuggestion: draftSpeakerSuggestion,
                   speakersReady: arguments.contains("--speakers-ready"),
@@ -241,7 +242,7 @@ extension AppEnvironment {
     /// without Apple speech the default device has no recognizer that can run, so its transcriber refuses every job,
     /// and the background runner never asks for continued processing.
     static func uiTesting(reset: Bool, seed: Seed?, openFixture: OpenFixture? = nil,
-                          modelsMissing: Bool = false, modelDownloading: Bool = false, draftGrowing: Bool = false,
+                          modelsMissing: Bool = false, modelDownloading: Bool = false, holdModelDownload: Bool = false, draftGrowing: Bool = false,
                           draftSpeakerSuggestion: Bool = false,
                           speakersReady: Bool = false, parakeet: Bool = false,
                           notificationsDenied: Bool = false, heldCapture: Bool = false, region: String? = nil,
@@ -266,7 +267,7 @@ extension AppEnvironment {
         default:
             .returns(TestFixtures.transcribedSegments, total: TestFixtures.fixtureDuration)
         }
-        let installRecorder = FakeModelInstallRecorder()
+        let installRecorder = FakeModelInstallRecorder(holdDownload: holdModelDownload)
         let draftClock = draftGrowing ? PermitClock(now: uiTestingNow) : nil
         let pacingClock: any AppClock = if let draftClock { draftClock } else { FakeClock(now: uiTestingNow) }
         let transcriber = FakeTranscriber(script, status: status, recognizer: recognizer, clock: pacingClock, installRecorder: installRecorder)

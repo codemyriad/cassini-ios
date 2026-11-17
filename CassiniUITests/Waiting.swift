@@ -287,3 +287,11 @@ extension XCUIApplication {
         return element
     }
 }
+
+// A pushed Settings page can coexist with the outgoing map during navigation.
+extension XCUIApplication {
+    @MainActor func waitForSettingsPage(_ page: String) -> Bool {
+        staticTexts.matching(NSPredicate(format: "identifier == %@ AND value == %@",
+            "uiTestState-settingsLoaded", page)).firstMatch.waitForValue(page, within: 15)
+    }
+}

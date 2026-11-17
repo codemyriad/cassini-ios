@@ -38,7 +38,12 @@ import CassiniNotebook
 
     func size(of part: ModelPart) -> ModelSize { ModelRows.size(of: part, recognizer: recognizer, platform: platform) }
 
-    func refreshModels() async { speechModels?.refresh(); await processing.models.refresh() }
+    func refreshModels() async {
+        speechModels?.refresh()
+        await speechModels?.settleVerification()
+        // Model rows must read the newly verified files before Settings publishes its loaded marker.
+        await processing.models.refresh()
+    }
 
     func speechLanguages() async -> [SpeechLanguage] { await transcriber.speechLanguages() }
 

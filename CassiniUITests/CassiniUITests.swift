@@ -28,7 +28,11 @@ final class CassiniUITests: XCTestCase {
         capture("Empty library")
         app.buttons["Settings"].tap()
         XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(within: 5))
-        XCTAssertTrue(app.switches["Transcribe after recording or import"].exists)
+        XCTAssertTrue(app.buttons["transcriptionRow"].exists)
+        XCTAssertTrue(app.waitForSettingsPage("map"))
+        let stats = app.staticTexts["libraryStats"]
+        app.scroll { stats.exists && stats.isHittable }
+        XCTAssertEqual(stats.label, "0 meetings, 0 hours of audio.")
         capture("Settings")
         goBack(app)
         XCTAssertTrue(app.buttons["recordButton"].waitForExistence(within: 5))

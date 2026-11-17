@@ -9,8 +9,9 @@ final class ParakeetSuggestionTests: XCTestCase {
         app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed-test-data", "--d78", "--d78-capable"]
         app.launchAndWait()
         app.buttons["settingsButton"].tap()
-        XCTAssertTrue(app.staticTexts[title].waitForExistence(within: 15))
-        let download = app.buttons["downloadParakeetSuggestion"]
+        app.buttons["transcriptionRow"].tap()
+        XCTAssertTrue(app.buttons["downloadParakeet"].waitForExistence(within: 15))
+        let download = app.buttons["downloadParakeet"]
         app.scroll { download.exists && download.isHittable }
         download.tap()
         XCTAssertTrue(app.staticTexts["Transcribe on this device"].waitForExistence(within: 15))
@@ -41,16 +42,10 @@ final class ParakeetSuggestionTests: XCTestCase {
         app.navigationBars.buttons.firstMatch.tap()
         XCTAssertTrue(app.buttons["settingsButton"].waitForExistence(within: 15))
         app.buttons["settingsButton"].tap()
-        XCTAssertTrue(app.staticTexts[title].waitForExistence(within: 15), "Settings still offers the upgrade")
-        let dismiss = app.buttons["dismissParakeetSuggestion"]
-        app.scroll { dismiss.exists && dismiss.isHittable }
-        dismiss.tap()
-        XCTAssertTrue(app.staticTexts[title].waitForNonExistence(within: 15))
-        app.launchArguments = ["--ui-testing", "--seed-test-data", "--d78", "--d78-capable"]
-        app.launchAndWait(fresh: true)
-        app.buttons["settingsButton"].tap()
-        XCTAssertTrue(app.staticTexts["uiTestState-settingsLoaded"].waitForExistence(within: 15))
-        XCTAssertFalse(app.staticTexts[title].exists)
+        app.buttons["transcriptionRow"].tap()
+        XCTAssertTrue(app.buttons["downloadParakeet"].waitForExistence(within: 15), "Transcription always offers the upgrade")
+        XCTAssertFalse(app.staticTexts[title].exists, "The Settings map uses the permanent model choice")
+
     }
 
     @MainActor func testThreeGigabyteDeviceUsesWhistleWithoutAnUpgradeSuggestion() {
@@ -79,7 +74,7 @@ final class ParakeetSuggestionTests: XCTestCase {
         XCTAssertTrue(app.buttons["settingsButton"].waitForExistence(within: 15))
         app.buttons["settingsButton"].tap()
         XCTAssertTrue(app.staticTexts["Whistle"].firstMatch.waitForExistence(within: 15))
-        XCTAssertTrue(app.staticTexts["uiTestState-settingsLoaded"].waitForExistence(within: 15))
+        XCTAssertTrue(app.waitForSettingsPage("map"))
         XCTAssertFalse(app.staticTexts[title].exists)
         XCTAssertFalse(app.staticTexts["Parakeet Ultra"].exists)
     }

@@ -28,6 +28,16 @@ public final class DraftNamesStore: Sendable {
     private let root: URL
     private let directory: @Sendable (UUID) -> URL
     private let state = Mutex(State())
+    // Separate from the file lock: changing Settings never waits for filesystem I/O.
+    private let recognitionAllowed = Mutex(true)
+
+    public func setRecognitionAllowed(_ allowed: Bool) {
+        recognitionAllowed.withLock { $0 = allowed }
+    }
+
+    private func permitted(_ names: DraftNames) -> DraftNames {
+        recognitionAllowed.withLock { $0 } ? names : names.withoutUnconfirmedMatches()
+    }
 
     /// `root` holds the note folders; `directory` gives a note's `work/` folder.
     public init(root: URL, directory: @escaping @Sendable (UUID) -> URL) {
@@ -43,7 +53,7 @@ public final class DraftNamesStore: Sendable {
 
     /// The current draft names of `noteID`.
     public func current(_ noteID: UUID) -> DraftNames {
-        state.withLock { load(noteID, &$0) }
+        state.withLock { permitted(load(noteID, &$0)) }
     }
 
     /// Reserve raw speaker IDs before publishing words or applying a live merge; names.json survives checkpoint reload.
@@ -63,7 +73,7 @@ public final class DraftNamesStore: Sendable {
     public func mutate(_ noteID: UUID, _ reducer: (DraftNames) throws -> DraftNames) rethrows -> DraftNames {
         let (result, observers) = try state.withLock { state -> (DraftNames, [AsyncStream<DraftNames>.Continuation]) in
             let before = load(noteID, &state)
-            let after = try reducer(before)
+            let after = permitted(try reducer(permitted(before)))
             state.open[noteID] = after
             if after != before { write(after, noteID) }
             return (after, Array((state.observers[noteID] ?? [:]).values))
@@ -104,7 +114,7 @@ public final class DraftNamesStore: Sendable {
     public func close(_ noteID: UUID) -> DraftNames {
         state.withLock { state in
             state.closed.insert(noteID)
-            return load(noteID, &state)
+            return permitted(load(noteID, &state))
         }
     }
 
@@ -124,7 +134,7 @@ public final class DraftNamesStore: Sendable {
         let token = UUID()
         let first = state.withLock { state in
             state.observers[noteID, default: [:]][token] = continuation
-            return load(noteID, &state)
+            return permitted(load(noteID, &state))
         }
         continuation.yield(first)
         continuation.onTermination = { [weak self] _ in

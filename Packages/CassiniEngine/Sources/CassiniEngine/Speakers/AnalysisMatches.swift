@@ -27,7 +27,7 @@ public struct AnalysisMatches: Hashable, Sendable {
     public static func of(_ note: Note, turns: [SpeakerTurn], prints: [SpeakerPrint], savedVoices: [SavedVoice],
                           earlierPrints: [SpeakerPrint], trashed: Set<UUID>,
                           excluded: [String: Set<UUID>] = [:]) -> AnalysisMatches {
-        let links = note.carriedVoiceLinks
+        let links = savedVoices.isEmpty ? [:] : note.carriedVoiceLinks
         let saved = savedVoices.map { voice in
             var copy = voice
             let ownKept = links[voice.id] != nil

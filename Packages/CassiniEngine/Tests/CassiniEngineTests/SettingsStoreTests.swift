@@ -12,6 +12,50 @@ import CassiniNotebook
     private func store() -> SettingsStore { SettingsStore(defaults: defaults(), clock: clock, defaultLanguage: "en-US") }
     private func cleanUp() { defaults().removePersistentDomain(forName: suite) }
 
+    @Test func recognitionDefaultsOnAndPersistsIndependentlyFromAutoNaming() async {
+        defer { cleanUp() }
+        let settings = store()
+        #expect(settings.recogniseSavedVoices)
+        #expect(await Task.detached { settings.allowsSavedVoiceRecognition }.value)
+        #expect(!settings.automaticallyNameVoices)
+        settings.recogniseSavedVoices = false
+        settings.automaticallyNameVoices = true
+        let reloaded = store()
+        #expect(!reloaded.recogniseSavedVoices)
+        #expect(await Task.detached { !settings.allowsSavedVoiceRecognition && !reloaded.allowsSavedVoiceRecognition }.value)
+        #expect(reloaded.automaticallyNameVoices)
+        #expect(reloaded.identifySpeakers)
+    }
+
+    @Test func disablingRecognitionScrubsPausedDraftsAndColdStartBeforeJobsResume() async throws {
+        defer { cleanUp() }
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let note = UUID(), confirmed = UUID(), suggested = UUID(), automatic = UUID()
+        try FileManager.default.createDirectory(at: root.appendingPathComponent(note.uuidString), withIntermediateDirectories: true)
+        let names = DraftNames.empty.confirm("a", voice: confirmed, name: "Alex", generation: 1, score: 1)
+            .rename("b", "Manual").reject("c", voice: suggested)
+            .applyLive(["d": LiveMatch(suggested, 0.6, .suggested), "e": LiveMatch(automatic, 1, .auto)],
+                       names: [automatic: "Auto"])
+        let drafts = DraftNamesStore(notes: try NoteStore(root: root))
+        drafts.mutate(note) { _ in names }
+        drafts.release(note) // A paused draft not loaded into memory.
+        let settings = store()
+        settings.bindDraftNames(drafts)
+        settings.recogniseSavedVoices = false
+        await settings.settleDraftRecognition()
+        let expected = names.withoutUnconfirmedMatches()
+        #expect(DraftNamesStore(notes: try NoteStore(root: root)).current(note) == expected)
+        // Simulate an older process leaving stale suggestions behind before this cold start.
+        let old = DraftNamesStore(notes: try NoteStore(root: root))
+        old.mutate(note) { _ in names }
+        let reopened = store(), fresh = DraftNamesStore(notes: try NoteStore(root: root))
+        reopened.bindDraftNames(fresh)
+        #expect(fresh.current(note) == expected)
+        await reopened.settleDraftRecognition()
+        #expect(DraftNamesStore(notes: try NoteStore(root: root)).current(note) == expected)
+    }
+
     // ports: SettingsRepositoryTest#defaultsBeforeAnyWrite
     @Test func defaultsBeforeAnyWrite() {
         defer { cleanUp() }

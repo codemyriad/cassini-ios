@@ -74,10 +74,38 @@ final class ScreenshotTests: XCTestCase {
     @MainActor func test05Settings() throws {
         let app = try launchPhone(["--seed", "library"])
         app.buttons["settingsButton"].tap()
-        XCTAssertTrue(app.switches.firstMatch.waitForExistence(within: 5), "Settings shows")
-        XCTAssertTrue(app.staticTexts["uiTestState-settingsLoaded"].waitForExistence(within: 15),
+        XCTAssertTrue(app.buttons["transcriptionRow"].waitForExistence(within: 5), "Settings shows")
+        XCTAssertTrue(app.waitForSettingsPage("map"),
                       "Settings finishes loading model and language availability before capture")
         capture("05-settings")
+    }
+
+    @MainActor func test22TranscriptionSettings() throws {
+        try captureSettingsPage("transcriptionRow", name: "22-transcription-settings", arguments: ["--d78", "--d78-capable"])
+    }
+
+    @MainActor func test23SpeakerSettings() throws {
+        try captureSettingsPage("speakersRow", name: "23-speaker-settings")
+    }
+
+    @MainActor func test24AboutSettings() throws {
+        try captureSettingsPage("aboutRow", name: "24-about-settings")
+    }
+
+    @MainActor private func captureSettingsPage(_ id: String, name: String, arguments: [String] = []) throws {
+        let app = try launchPhone(["--seed", "voices"] + arguments)
+        app.buttons["settingsButton"].tap()
+        let button = app.buttons[id]
+        app.scroll { button.exists && button.isHittable && app.frame.contains(button.frame) }
+        XCTAssertTrue(button.waitForExistence(within: 15))
+        let mapTitle = app.navigationBars.firstMatch.identifier
+        button.tap()
+        let page = String(id.dropLast(3))
+        // The localized destination title must replace Settings before capture.
+        XCTAssertTrue(app.navigationBars.matching(NSPredicate(format: "identifier != %@", mapTitle))
+            .firstMatch.waitForExistence(within: 15))
+        XCTAssertTrue(app.waitForSettingsPage(page))
+        capture(name)
     }
 
     // MARK: - iPhone, iOS screens
@@ -115,7 +143,7 @@ final class ScreenshotTests: XCTestCase {
     @MainActor func test09SavedVoices() throws {
         let app = try launchPhone(["--seed", "voices"])
         app.buttons["settingsButton"].tap()
-        XCTAssertTrue(app.switches.firstMatch.waitForExistence(within: 5), "Settings shows")
+        XCTAssertTrue(app.buttons["transcriptionRow"].waitForExistence(within: 5), "Settings shows")
         let savedVoices = app.buttons["savedVoicesRow"]
         app.scroll(attempts: 6) { savedVoices.exists && savedVoices.isHittable }
         savedVoices.tap()

@@ -102,7 +102,8 @@ public struct FakeTranscriber: Transcribing {
     /// Reports the download as done at once; nothing is installed, so `assetStatus` stays as it was.
     public func installAssets(locale: Locale, progress: @escaping @Sendable (InstallProgress) -> Void) async throws {
         installRecorder?.request(.speech)
-        progress(.downloading(1))
+        progress(.downloading(installRecorder?.holdDownload == true ? 0.46 : 1))
+        try await installRecorder?.waitIfHeld()
         installRecorder?.complete(.speech)
     }
 }
