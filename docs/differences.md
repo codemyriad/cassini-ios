@@ -824,10 +824,15 @@ These features exist only on iOS. They were kept by decision.
   with the new ones, so the earlier attribution stays available. While a job is pending for the note, the list's
   speakers and Add a speaker are disabled, as the transcript's read-only rule asks.
 - **"Recently Deleted"** instead of "Trash", as in Photos and Notes. The rest of the copy is Android's.
-  - Each language names the place the way Apple does: "Eliminati di recente", "Suppressions récentes" and "Eliminado
-    recientemente".
-  - Both Portugueses use the short "Apagados". "Apagados recentemente" did not fit beside the screen's Empty button at
-    larger text sizes (`testNoTextIsClippedInBrazilianPortuguese`).
+  - The iOS catalog names the place "Eliminati di recente", "Supprimés récemment" and "Eliminado recientemente".
+    Spanish keeps that iOS name in its actions and notices; "Eliminados" is the shared catalog’s Mac name.
+  - Both Portuguese variants keep the short app-local label "Apagados". European Portuguese uses the full
+    "Apagados recentemente" in explanatory copy and the pinned Settings row, but it clips beside Empty in the
+    navigation bar at the largest text size. Both variants have default-size clipping audits; European Portuguese
+    also audits Recently Deleted at the largest text size to retain this platform constraint.
+  - The approved `dd06a62` catalog still uses the older French "Suppressions récentes" in the generated deletion
+    failure messages and Settings footer, while its iOS title is "Supprimés récemment". Those generated values stay
+    pinned; correcting the upstream catalog and adopting its next approved pin is a remaining D-1075 shared-copy task.
 - **Forget all voice data** in Saved voices. It is offered when nobody is saved but notes still hold voiceprints, and
   also for a damaged list, so there is always a way back.
 - **Settings sections** for Transcription (the speech language on Apple Speech devices, and "Transcribe after

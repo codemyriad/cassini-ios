@@ -189,7 +189,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Download non riuscito — riprova la prossima volta"
+            "value": "Download non riuscito — nuovo tentativo la prossima volta"
           }
         },
         "pt-BR": {

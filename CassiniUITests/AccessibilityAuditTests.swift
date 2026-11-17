@@ -316,11 +316,19 @@ final class AccessibilityAuditTests: XCTestCase {
 
     // MARK: Long languages
 
-    /// French and Brazilian Portuguese, the longest of the app's languages (D50), at the default text size: no text is
-    /// cut on any of the six screens. The screens are found by identifier and by the fixtures' names, which no language
-    /// changes.
+    /// French and both Portuguese variants at the default text size: no text is cut on any of the seven screens.
+    /// The screens are found by identifier and by the fixtures' names, which no language changes.
     @MainActor func testNoTextIsClippedInFrench() { auditClipping(language: "fr", region: "fr_FR") }
     @MainActor func testNoTextIsClippedInBrazilianPortuguese() { auditClipping(language: "pt-BR", region: "pt_BR") }
+    @MainActor func testNoTextIsClippedInEuropeanPortuguese() { auditClipping(language: "pt-PT", region: "pt_PT") }
+
+    // The full pt-PT title clips beside Empty at AX5; keep the app-local navigation label short.
+    @MainActor func testRecentlyDeletedWrapsInEuropeanPortugueseAtLargestTextSize() {
+        defer { XCUIApplication().terminate() }
+        let app = trash(Self.largestText + ["-AppleLanguages", "(pt-PT)", "-AppleLocale", "pt_PT"])
+        XCTAssertTrue(app.navigationBars["Apagados"].waitForExistence(within: 15))
+        audit(app, screen: "largest-pt-PT-trash", .textClipped)
+    }
 
     @MainActor func testSettingsAboutCardWrapsAtLargestTextSizeInAuditLanguages() {
         auditSettingsAboutAtLargestTextSize()

@@ -291,7 +291,7 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld %% → unos %lld %%"
+            "value": "%lld %% → aprox. %lld %%"
           }
         },
         "fr": {
@@ -752,13 +752,13 @@
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "En charge"
+            "value": "Branché"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "In carica"
+            "value": "Collegato alla corrente"
           }
         },
         "pt-BR": {
@@ -840,7 +840,7 @@
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "Na fila"
+            "value": "Em fila"
           }
         }
       }
@@ -1226,7 +1226,7 @@
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "A transcrição acontece neste dispositivo. Se o iOS interrompê-la em segundo plano, seu progresso é mantido."
+            "value": "A transcrição acontece neste dispositivo. Se o iOS a interromper em segundo plano, seu progresso é mantido."
           }
         },
         "pt-PT": {

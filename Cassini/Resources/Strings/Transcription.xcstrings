@@ -189,7 +189,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Scarica e riconosci le voci"
+            "value": "Scarica e distingui le voci"
           }
         },
         "pt-BR": {
@@ -224,7 +224,7 @@
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Restaurez cet enregistrement depuis Suppressions récentes pour le transcrire."
+            "value": "Restaurez cet enregistrement depuis Supprimés récemment pour le transcrire."
           }
         },
         "it": {
@@ -242,7 +242,7 @@
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "Recupere esta gravação de Apagados para a transcrever."
+            "value": "Restaure esta gravação de Apagados recentemente para a transcrever."
           }
         }
       }

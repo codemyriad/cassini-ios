@@ -14,7 +14,7 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@, %@"
+            "value": "%@ %@"
           }
         },
         "fr": {
@@ -427,13 +427,13 @@
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Só áudio"
+            "value": "Somente áudio"
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "Só áudio"
+            "value": "Apenas áudio"
           }
         }
       }
@@ -493,7 +493,7 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "No reproducible"
+            "value": "No se puede reproducir"
           }
         },
         "fr": {
@@ -505,19 +505,19 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Non riproducibile"
+            "value": "Impossibile riprodurre"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Não reproduzível"
+            "value": "Não é possível reproduzir"
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "Não reproduzível"
+            "value": "Não é possível reproduzir"
           }
         }
       }
@@ -1457,7 +1457,7 @@
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ouvre la note"
+            "value": "Ouvrir la note"
           }
         },
         "it": {
@@ -1469,7 +1469,7 @@
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Abre a nota"
+            "value": "Abrir nota"
           }
         },
         "pt-PT": {
@@ -1499,7 +1499,7 @@
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ouvre les réglages"
+            "value": "Ouvrir les réglages"
           }
         },
         "it": {
@@ -1511,13 +1511,13 @@
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Abre os Ajustes"
+            "value": "Abrir Ajustes"
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "Abrir Definições"
+            "value": "Abrir definições"
           }
         }
       }
@@ -1617,7 +1617,7 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pausada en %@"
+            "value": "En pausa en %@"
           }
         },
         "fr": {
@@ -1635,13 +1635,13 @@
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pausada em %@"
+            "value": "Em pausa em %@"
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pausada aos %@"
+            "value": "Em pausa aos %@"
           }
         }
       }
@@ -1664,7 +1664,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Scegli una registrazione nella libreria per leggerla e ascoltarla."
+            "value": "Scegli una registrazione nella Libreria per leggerla e ascoltarla."
           }
         },
         "pt-BR": {
@@ -1676,7 +1676,7 @@
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "Escolha uma gravação na biblioteca para a ler e ouvir."
+            "value": "Escolha uma gravação na Biblioteca para a ler e ouvir."
           }
         }
       }
@@ -1718,7 +1718,7 @@
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "Na fila"
+            "value": "Em fila"
           }
         }
       }
@@ -1988,19 +1988,19 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Quitar de favoritas"
+            "value": "Quitar destacado"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Retirer des favoris"
+            "value": "Retirer l’étoile"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Togli dai preferiti"
+            "value": "Rimuovi stella"
           }
         },
         "pt-BR": {
@@ -2318,7 +2318,7 @@
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Rechercher titres et paroles"
+            "value": "Rechercher dans les titres et les paroles"
           }
         },
         "it": {
@@ -2438,19 +2438,19 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Añadir a favoritas"
+            "value": "Destacar"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ajouter aux favoris"
+            "value": "Ajouter une étoile"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Aggiungi ai preferiti"
+            "value": "Aggiungi stella"
           }
         },
         "pt-BR": {
@@ -2480,19 +2480,19 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Añade una nota a favoritas para encontrarla aquí."
+            "value": "Destaca una nota para encontrarla aquí."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ajoutez une note aux favoris pour la retrouver ici."
+            "value": "Ajoutez une étoile à une note pour la retrouver ici."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Aggiungi una nota ai preferiti per trovarla qui."
+            "value": "Aggiungi una stella a una nota per trovarla qui."
           }
         },
         "pt-BR": {
@@ -2522,19 +2522,19 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Favoritas"
+            "value": "Destacadas"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Favorites"
+            "value": "Avec étoile"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Preferite"
+            "value": "Con stella"
           }
         },
         "pt-BR": {
@@ -2756,7 +2756,7 @@
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "O rascunho até agora é descartado. A gravação é mantida."
+            "value": "O rascunho criado até agora é descartado. A gravação é mantida."
           }
         }
       }

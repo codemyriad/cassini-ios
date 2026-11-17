@@ -142,7 +142,7 @@
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld ko"
+            "value": "%lld Ko"
           }
         },
         "it": {
@@ -811,7 +811,7 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Todas las palabras como una sola voz"
+            "value": "Todas las palabras se muestran como una sola voz"
           }
         },
         "fr": {
@@ -823,7 +823,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Tutte le parole come una sola voce"
+            "value": "Tutte le parole attribuite a una sola voce"
           }
         },
         "pt-BR": {
@@ -1509,13 +1509,13 @@
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "La compression n’a pas pu aboutir. Votre enregistrement est en sécurité."
+            "value": "Impossible de terminer la compression. Votre enregistrement est en sécurité."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Non è stato possibile completare la compressione. La registrazione è al sicuro."
+            "value": "Impossibile completare la compressione. La registrazione è al sicuro."
           }
         },
         "pt-BR": {
@@ -3290,7 +3290,7 @@
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "Abrir Definições"
+            "value": "Abrir definições"
           }
         }
       }
@@ -3313,19 +3313,19 @@
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Parakeet Ultra n’a pas pu fonctionner sur cet appareil pour cet enregistrement : Whistle l’a donc transcrit."
+            "value": "Impossible d’utiliser Parakeet Ultra sur cet appareil pour cet enregistrement : Whistle l’a donc transcrit."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Non è stato possibile usare Parakeet Ultra su questo dispositivo per questa registrazione, quindi l’ha trascritta Whistle."
+            "value": "Impossibile usare Parakeet Ultra su questo dispositivo per questa registrazione, quindi l’ha trascritta Whistle."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "O Parakeet Ultra não pôde ser executado neste dispositivo para esta gravação, então o Whistle a transcreveu."
+            "value": "Não foi possível executar o Parakeet Ultra neste dispositivo para esta gravação, então o Whistle a transcreveu."
           }
         },
         "pt-PT": {
@@ -3348,7 +3348,7 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pausada en %@ de %@"
+            "value": "En pausa en %@ de %@"
           }
         },
         "fr": {
@@ -3366,13 +3366,13 @@
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pausada em %@ de %@"
+            "value": "Em pausa em %@ de %@"
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pausada aos %@ de %@"
+            "value": "Em pausa aos %@ de %@"
           }
         }
       }
@@ -3413,7 +3413,7 @@
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pausada antes de se encontrarem palavras"
+            "value": "Em pausa antes de se encontrarem palavras"
           }
         }
       }
@@ -3641,13 +3641,13 @@
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "En charge — pas besoin d’estimer la batterie."
+            "value": "Branché — pas besoin d’estimer la consommation de batterie."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "In carica — non serve una stima della batteria."
+            "value": "Collegato alla corrente — non serve una stima della batteria."
           }
         },
         "pt-BR": {
@@ -3852,7 +3852,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "La registrazione è terminata. L’audio fin qui è nella libreria."
+            "value": "La registrazione è terminata. L’audio fin qui è nella Libreria."
           }
         },
         "pt-BR": {
@@ -3864,7 +3864,7 @@
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "A gravação terminou. O áudio até agora está na biblioteca."
+            "value": "A gravação terminou. O áudio gravado até agora está na Biblioteca."
           }
         }
       }
@@ -4262,7 +4262,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Non è stato possibile distinguere le voci in questa registrazione."
+            "value": "Impossibile distinguere le voci in questa registrazione."
           }
         },
         "pt-BR": {
@@ -4420,13 +4420,13 @@
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "L’audio n’a pas pu être vérifié, donc le minutage des mots peut être décalé."
+            "value": "Impossible de vérifier l’audio, le minutage des mots peut donc être décalé."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Non è stato possibile controllare l’audio, quindi i tempi delle parole potrebbero non corrispondere."
+            "value": "Impossibile controllare l’audio, quindi i tempi delle parole potrebbero non corrispondere."
           }
         },
         "pt-BR": {
@@ -4561,7 +4561,7 @@
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "Os dados Cassini do ficheiro estão danificados. O áudio continua a ser reproduzido."
+            "value": "Os dados Cassini do ficheiro estão danificados. O áudio pode ser reproduzido na mesma."
           }
         }
       }
@@ -4889,7 +4889,7 @@
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "Esta versão ainda não pode ser lida aqui. O áudio continua a ser reproduzido."
+            "value": "Esta versão ainda não pode ser lida aqui. O áudio pode ser reproduzido na mesma."
           }
         }
       }
@@ -5424,7 +5424,7 @@
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Essayez un autre mot ou un titre."
+            "value": "Essayez un autre mot ou un autre titre."
           }
         },
         "it": {
@@ -5746,7 +5746,7 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "iOS terminó el tiempo que Cassini tenía en segundo plano. Reanuda para continuar donde se detuvo."
+            "value": "iOS dio por terminado el tiempo que Cassini tenía en segundo plano. Reanuda para continuar donde se detuvo."
           }
         },
         "fr": {
@@ -5758,7 +5758,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "iOS ha terminato il tempo che Cassini aveva in background. Riprendi per continuare da dove si è fermata."
+            "value": "Il tempo concesso da iOS a Cassini in background è terminato. Riprendi per continuare dal punto di interruzione."
           }
         },
         "pt-BR": {
@@ -5770,7 +5770,7 @@
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "O iOS terminou o tempo que o Cassini tinha em segundo plano. Retome para continuar onde parou."
+            "value": "O iOS terminou o período concedido ao Cassini para funcionar em segundo plano. Retome para continuar onde parou."
           }
         }
       }
@@ -5787,7 +5787,7 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "iOS necesitaba recuperar el tiempo. Abre Cassini para reanudar."
+            "value": "iOS necesitaba recuperar el tiempo asignado a Cassini. Abre Cassini para reanudar."
           }
         },
         "fr": {
@@ -5799,19 +5799,19 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "iOS ha avuto bisogno del tempo. Apri Cassini per riprendere."
+            "value": "iOS ha dovuto interrompere l’attività in background. Apri Cassini per riprendere."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "O iOS precisou do tempo de volta. Abra o Cassini para retomar."
+            "value": "O iOS precisou encerrar a execução em segundo plano. Abra o Cassini para retomar."
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "O iOS precisou do tempo de volta. Abra o Cassini para retomar."
+            "value": "O iOS precisou de recuperar o tempo atribuído ao Cassini. Abra o Cassini para retomar."
           }
         }
       }

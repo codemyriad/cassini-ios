@@ -22,7 +22,7 @@ import CassiniNotebook
         let cases: [(String, String, String, String, String, String, String)] = [
             ("en", "Speakers: {names}", "Transcript", "Notes", "(over {names})", "Untitled meeting", "under 1 min"),
             ("it", "Voci: {names}", "Trascrizione", "Note", "(in sovrapposizione con {names})", "Riunione senza titolo", "meno di 1 min"),
-            ("fr", "Intervenants\u{00A0}: {names}", "Transcription", "Notes", "(en même temps que {names})", "Réunion sans titre", "moins d’1 min"),
+            ("fr", "Intervenants\u{00A0}: {names}", "Transcription", "Notes", "(en même temps que {names})", "Réunion sans titre", "moins de 1 min"),
             ("es", "Hablantes: {names}", "Transcripción", "Notas", "(a la vez que {names})", "Reunión sin título", "menos de 1 min"),
             ("pt-BR", "Locutores: {names}", "Transcrição", "Notas", "(ao mesmo tempo que {names})", "Reunião sem título", "menos de 1 min"),
             ("pt-PT", "Oradores: {names}", "Transcrição", "Notas", "(ao mesmo tempo que {names})", "Reunião sem título", "menos de 1 min")]
@@ -51,7 +51,7 @@ import CassiniNotebook
             XCTAssertEqual(options.dateLine(.local(label), 0), label)
             XCTAssertEqual(options.dateLine(.unknown, 3_120_000), "52 min")
             XCTAssertEqual(options.dateLine(.unknown, 0), "")
-            XCTAssertEqual(options.dateLine(.unknown, 1), "moins d’1 min")
+            XCTAssertEqual(options.dateLine(.unknown, 1), "moins de 1 min")
         }
     }
 
